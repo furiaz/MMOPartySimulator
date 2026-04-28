@@ -1,4 +1,5 @@
 import type {
+  AutonomousEntity,
   Companion,
   Enemy,
   EntityState,
@@ -15,6 +16,7 @@ export function createPlayer(id: string, position: Position): Player {
     kind: "player",
     position,
     state: "idle",
+    currentTargetId: null,
   };
 }
 
@@ -62,6 +64,13 @@ export function moveEntityTo<T extends GameEntity>(
   };
 }
 
+export function moveEntityToward<T extends GameEntity>(
+  entity: T,
+  target: GameEntity,
+): T {
+  return moveEntityTo(entity, stepToward(entity.position, target.position));
+}
+
 export function updateCompanionFollow(
   companion: Companion,
   target: GameEntity,
@@ -70,12 +79,24 @@ export function updateCompanionFollow(
     return companion;
   }
 
-  const nextPosition = stepToward(companion.position, target.position);
+  return moveEntityToward(companion, target);
+}
 
-  return {
-    ...companion,
-    position: nextPosition,
-  };
+export function updateAutonomousEntityFollow<T extends AutonomousEntity>(
+  entity: T,
+  target: GameEntity,
+): T {
+  if (entity.state !== "follow") {
+    return entity;
+  }
+
+  return moveEntityToward(entity, target);
+}
+
+export function isAutonomousEntity(
+  entity: GameEntity | undefined,
+): entity is AutonomousEntity {
+  return entity?.kind === "player" || entity?.kind === "companion";
 }
 
 function stepToward(current: Position, target: Position): Position {

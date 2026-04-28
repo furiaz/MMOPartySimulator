@@ -16,6 +16,7 @@ export type GameEntity = {
 
 export type Player = GameEntity & {
   kind: "player";
+  currentTargetId: string | null;
 };
 
 export type Enemy = GameEntity & {
@@ -27,3 +28,5 @@ export type Companion = GameEntity & {
   followTargetId: string;
   currentTargetId: string | null;
 };
+
+export type AutonomousEntity = Player | Companion;

@@ -1,7 +1,19 @@
+import { isAutonomousEntity } from "./entities";
 import { getEntityById, updateEntity, type GameState } from "./state";
-import type { Companion, EntityState } from "./types";
+import type { AutonomousEntity, EntityState } from "./types";
 
-type TargetedCompanionCommandType = Exclude<EntityState, "idle">;
+type TargetedEntityCommandType = Exclude<EntityState, "idle">;
+
+export type EntityCommand =
+  | {
+      type: "idle";
+      entityId: string;
+    }
+  | {
+      type: TargetedEntityCommandType;
+      entityId: string;
+      targetId: string;
+    };
 
 export type CompanionCommand =
   | {
@@ -9,47 +21,58 @@ export type CompanionCommand =
       companionId: string;
     }
   | {
-      type: TargetedCompanionCommandType;
+      type: TargetedEntityCommandType;
       companionId: string;
       targetId: string;
     };
+
+export function issueEntityCommand(
+  state: GameState,
+  command: EntityCommand,
+): GameState {
+  const entity = getEntityById(state, command.entityId);
+
+  if (!isAutonomousEntity(entity)) {
+    return state;
+  }
+
+  if (command.type === "idle") {
+    const updatedEntity: AutonomousEntity = {
+      ...entity,
+      state: "idle",
+      currentTargetId: null,
+    };
+
+    return updateEntity(state, updatedEntity);
+  }
+
+  const updatedEntity: AutonomousEntity = {
+    ...entity,
+    state: command.type,
+    currentTargetId: command.targetId,
+    ...(entity.kind === "companion" && command.type === "follow"
+      ? { followTargetId: command.targetId }
+      : {}),
+  };
+
+  return updateEntity(state, updatedEntity);
+}
 
 export function issueCompanionCommand(
   state: GameState,
   command: CompanionCommand,
 ): GameState {
-  const companion = getEntityById(state, command.companionId);
+  const entityCommand =
+    command.type === "idle"
+      ? {
+          type: command.type,
+          entityId: command.companionId,
+        }
+      : {
+          type: command.type,
+          entityId: command.companionId,
+          targetId: command.targetId,
+        };
 
-  if (!isCompanion(companion)) {
-    return state;
-  }
-
-  if (command.type === "idle") {
-    const updatedCompanion: Companion = {
-      ...companion,
-      state: "idle",
-      currentTargetId: null,
-    };
-
-    return updateEntity(state, updatedCompanion);
-  }
-
-  const updatedCompanion: Companion = {
-    ...companion,
-    state: command.type,
-    currentTargetId: command.targetId,
-    followTargetId:
-      command.type === "follow" ? command.targetId : companion.followTargetId,
-  };
-
-  return updateEntity(state, updatedCompanion);
-}
-
-function isCompanion(entity: unknown): entity is Companion {
-  return (
-    typeof entity === "object" &&
-    entity !== null &&
-    "kind" in entity &&
-    entity.kind === "companion"
-  );
+  return issueEntityCommand(state, entityCommand);
 }

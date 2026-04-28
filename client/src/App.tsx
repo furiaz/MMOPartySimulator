@@ -7,6 +7,7 @@ import {
   createEnemy,
   createPlayer,
   issueCompanionCommand,
+  issueEntityCommand,
   startGameLoop,
   type Companion,
   type Enemy,
@@ -73,14 +74,20 @@ function App() {
     );
   }
 
-  function commandCompanionToTargetEnemy() {
-    setGameState((state) =>
-      issueCompanionCommand(state, {
+  function commandPartyToTargetEnemy() {
+    setGameState((state) => {
+      const playerAttackState = issueEntityCommand(state, {
         type: "attack",
-        companionId,
+        entityId: playerId,
         targetId: enemyId,
-      }),
-    );
+      });
+
+      return issueEntityCommand(playerAttackState, {
+        type: "attack",
+        entityId: companionId,
+        targetId: enemyId,
+      });
+    });
   }
 
   return (
@@ -109,6 +116,7 @@ function App() {
           />
           <div
             className="entity enemy"
+            onClick={commandPartyToTargetEnemy}
             style={{
               transform: `translate(${enemy.position.x * cellSize}px, ${
                 enemy.position.y * cellSize
@@ -124,10 +132,11 @@ function App() {
           </button>
           <button onClick={commandCompanionToFollow}>Follow</button>
           <button onClick={commandCompanionToIdle}>Idle</button>
-          <button onClick={commandCompanionToTargetEnemy}>Target Enemy</button>
+          <button onClick={commandPartyToTargetEnemy}>Target Enemy</button>
           <span>
-            Player ({player.position.x}, {player.position.y}) | Companion (
-            {companion.position.x}, {companion.position.y}) | State{" "}
+            Player ({player.position.x}, {player.position.y}) | State{" "}
+            {player.state} | Target {player.currentTargetId ?? "none"} |
+            Companion ({companion.position.x}, {companion.position.y}) | State{" "}
             {companion.state} | Target {companion.currentTargetId ?? "none"}
           </span>
         </div>

@@ -1,12 +1,12 @@
+import { isAutonomousEntity, moveEntityToward } from "./entities";
 import { getEntityById, updateEntity, type GameState } from "./state";
-import { isAutonomousEntity, updateAutonomousEntityFollow } from "./entities";
 import type { AutonomousEntity, GameEntity } from "./types";
 
-export function updateFollowSystem(state: GameState): GameState {
+export function updateAttackSystem(state: GameState): GameState {
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
-    if (!isFollowingAutonomousEntity(entity)) {
+    if (!isAttackingAutonomousEntity(entity)) {
       continue;
     }
 
@@ -20,17 +20,14 @@ export function updateFollowSystem(state: GameState): GameState {
       continue;
     }
 
-    nextState = updateEntity(
-      nextState,
-      updateAutonomousEntityFollow(entity, target),
-    );
+    nextState = updateEntity(nextState, moveEntityToward(entity, target));
   }
 
   return nextState;
 }
 
-function isFollowingAutonomousEntity(
+function isAttackingAutonomousEntity(
   entity: GameEntity,
 ): entity is AutonomousEntity {
-  return isAutonomousEntity(entity) && entity.state === "follow";
+  return isAutonomousEntity(entity) && entity.state === "attack";
 }

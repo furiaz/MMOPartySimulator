@@ -173,3 +173,10 @@ Always build:
 4. Then UI
 
 Never skip this order.
+
+### Player
+
+- Controlled directly by the user (future)
+- Can also act autonomously (idle/AFK behavior)
+- Uses the same state-driven system as companions (idle, follow, attack, etc.)
+- Manual controls (e.g. WASD, clicking) will override or influence autonomous behavior
