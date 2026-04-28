@@ -12,7 +12,10 @@ const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
 const ATTACK_COOLDOWN_MS = 1000;
 
-export function updateAttackSystem(state: GameState): GameState {
+export function updateAttackSystem(
+  state: GameState,
+  movedEntityIds = new Set<string>(),
+): GameState {
   let nextState = state;
   const now = Date.now();
 
@@ -50,7 +53,12 @@ export function updateAttackSystem(state: GameState): GameState {
       continue;
     }
 
+    if (movedEntityIds.has(attacker.id)) {
+      continue;
+    }
+
     nextState = updateEntity(nextState, moveEntityToward(attacker, target));
+    movedEntityIds.add(attacker.id);
   }
 
   return nextState;

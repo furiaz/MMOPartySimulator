@@ -2,7 +2,10 @@ import { getEntityById, updateEntity, type GameState } from "./state";
 import { isAutonomousEntity, updateAutonomousEntityFollow } from "./entities";
 import type { AutonomousEntity, GameEntity } from "./types";
 
-export function updateFollowSystem(state: GameState): GameState {
+export function updateFollowSystem(
+  state: GameState,
+  movedEntityIds = new Set<string>(),
+): GameState {
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
@@ -20,10 +23,15 @@ export function updateFollowSystem(state: GameState): GameState {
       continue;
     }
 
+    if (movedEntityIds.has(entity.id)) {
+      continue;
+    }
+
     nextState = updateEntity(
       nextState,
       updateAutonomousEntityFollow(entity, target),
     );
+    movedEntityIds.add(entity.id);
   }
 
   return nextState;

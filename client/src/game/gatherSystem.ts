@@ -12,7 +12,10 @@ const GATHER_RANGE = 1;
 const GATHER_AMOUNT = 1;
 const GATHER_COOLDOWN_MS = 1000;
 
-export function updateGatherSystem(state: GameState): GameState {
+export function updateGatherSystem(
+  state: GameState,
+  movedEntityIds = new Set<string>(),
+): GameState {
   let nextState = state;
   const now = Date.now();
 
@@ -39,7 +42,12 @@ export function updateGatherSystem(state: GameState): GameState {
     }
 
     if (!isInGatherRange(gatherer, resource)) {
+      if (movedEntityIds.has(gatherer.id)) {
+        continue;
+      }
+
       nextState = updateEntity(nextState, moveEntityToward(gatherer, resource));
+      movedEntityIds.add(gatherer.id);
       continue;
     }
 

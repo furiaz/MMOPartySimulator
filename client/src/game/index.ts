@@ -46,3 +46,13 @@ export { updateAttackSystem } from "./attackSystem";
 export { updateEnemyAISystem } from "./enemyAISystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
+export {
+  debugAddCompanion,
+  debugAddCompanionToParty,
+  debugRefreshResources,
+  debugRandomizeLocations,
+  debugRemoveCompanion,
+  debugRemoveCompanionFromParty,
+  debugResurrectEnemy,
+  debugRestorePartyHealth,
+} from "./debugTools";

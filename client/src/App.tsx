@@ -7,6 +7,12 @@ import {
   createEnemy,
   createPlayer,
   createResource,
+  debugAddCompanionToParty,
+  debugRefreshResources,
+  debugRandomizeLocations,
+  debugRemoveCompanionFromParty,
+  debugResurrectEnemy,
+  debugRestorePartyHealth,
   issueCompanionCommand,
   issueEntityCommand,
   startGameLoop,
@@ -18,14 +24,25 @@ import {
 } from "./game";
 
 const playerId = "test-player";
-const companionId = "test-companion";
+const companionIds = ["test-companion", "test-companion-2", "test-companion-3"];
 const enemyId = "test-enemy";
 const resourceId = "test-resource";
 const cellSize = 36;
+const gridColumns = 12;
+const gridRows = 9;
+const companionStartPositions = [
+  { x: 2, y: 2 },
+  { x: 2, y: 3 },
+  { x: 2, y: 4 },
+];
 
 function createInitialState(): GameState {
   const player = createPlayer(playerId, { x: 8, y: 5 });
-  const companion = createCompanion(companionId, { x: 2, y: 2 }, playerId);
+  const companion = createCompanion(
+    companionIds[0],
+    companionStartPositions[0],
+    playerId,
+  );
   const enemy = createEnemy(enemyId, { x: 10, y: 7 });
   const resource = createResource(resourceId, { x: 3, y: 7 });
 
@@ -41,7 +58,10 @@ function App() {
   const stopLoopRef = useRef<(() => void) | null>(null);
 
   const player = gameState.entities[playerId] as Player;
-  const companion = gameState.entities[companionId] as Companion;
+  const companions = companionIds
+    .map((id) => gameState.entities[id] as Companion | undefined)
+    .filter((companion): companion is Companion => Boolean(companion));
+  const primaryCompanion = companions[0];
   const enemy = gameState.entities[enemyId] as Enemy;
   const resource = gameState.entities[resourceId] as ResourceEntity;
 
@@ -64,20 +84,28 @@ function App() {
   }
 
   function commandCompanionToFollow() {
+    if (!primaryCompanion) {
+      return;
+    }
+
     setGameState((state) =>
       issueCompanionCommand(state, {
         type: "follow",
-        companionId,
+        companionId: primaryCompanion.id,
         targetId: playerId,
       }),
     );
   }
 
   function commandCompanionToIdle() {
+    if (!primaryCompanion) {
+      return;
+    }
+
     setGameState((state) =>
       issueCompanionCommand(state, {
         type: "idle",
-        companionId,
+        companionId: primaryCompanion.id,
       }),
     );
   }
@@ -90,22 +118,66 @@ function App() {
         targetId: enemyId,
       });
 
-      return issueEntityCommand(playerAttackState, {
-        type: "attack",
-        entityId: companionId,
-        targetId: enemyId,
-      });
+      if (!primaryCompanion) {
+        return playerAttackState;
+      }
+
+      return issueEntityCommand(
+        playerAttackState,
+        {
+          type: "attack",
+          entityId: primaryCompanion.id,
+          targetId: enemyId,
+        },
+      );
     });
   }
 
   function commandCompanionToGatherResource() {
+    if (!primaryCompanion) {
+      return;
+    }
+
     setGameState((state) =>
       issueCompanionCommand(state, {
         type: "gather",
-        companionId,
+        companionId: primaryCompanion.id,
         targetId: resourceId,
       }),
     );
+  }
+
+  function addCompanionToParty() {
+    setGameState((state) =>
+      debugAddCompanionToParty(
+        state,
+        companionIds,
+        playerId,
+        companionStartPositions,
+      ),
+    );
+  }
+
+  function removeCompanionFromParty() {
+    setGameState((state) => debugRemoveCompanionFromParty(state, companionIds));
+  }
+
+  function randomizeLocations() {
+    setGameState((state) =>
+      debugRandomizeLocations(state, gridColumns, gridRows),
+    );
+  }
+
+  function resurrectEnemy() {
+    setGameState((state) => debugResurrectEnemy(state, enemyId));
+  }
+
+  function refreshGatherPoints() {
+    setGameState(debugRefreshResources);
+  }
+
+  function restorePartyHealth() {
+    setGameState(debugRestorePartyHealth);
   }
 
   return (
@@ -125,17 +197,22 @@ function App() {
           >
             <span className="entity-label">Player HP {player.health}</span>
           </div>
-          <div
-            className="entity-marker companion"
-            style={{
-              transform: `translate(${companion.position.x * cellSize}px, ${
-                companion.position.y * cellSize
-              }px)`,
-            }}
-            title="Companion"
-          >
-            <span className="entity-label">Companion HP {companion.health}</span>
-          </div>
+          {companions.map((companion, index) => (
+            <div
+              key={companion.id}
+              className="entity-marker companion"
+              style={{
+                transform: `translate(${companion.position.x * cellSize}px, ${
+                  companion.position.y * cellSize
+                }px)`,
+              }}
+              title="Companion"
+            >
+              <span className="entity-label">
+                C{index + 1} HP {companion.health}
+              </span>
+            </div>
+          ))}
           {enemy.state === "dead" ? (
             <div
               className="dead-label"
@@ -203,14 +280,34 @@ function App() {
             Player ({player.position.x}, {player.position.y}) | State{" "}
             {player.state} | HP {player.health} | Target{" "}
             {player.currentTargetId ?? "none"} |
-            Companion ({companion.position.x}, {companion.position.y}) | State{" "}
-            {companion.state} | HP {companion.health} | Target{" "}
-            {companion.currentTargetId ?? "none"} | Enemy ({enemy.position.x},{" "}
+            Party {companions.length + 1}/4 | Companion{" "}
+            {primaryCompanion
+              ? `(${primaryCompanion.position.x}, ${primaryCompanion.position.y}) | State ${primaryCompanion.state} | HP ${primaryCompanion.health} | Target ${primaryCompanion.currentTargetId ?? "none"}`
+              : "not in party"}{" "}
+            | Enemy ({enemy.position.x},{" "}
             {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
             Resource ({resource.position.x}, {resource.position.y}) | Durability{" "}
             {resource.durability} | Depleted {resource.isDepleted ? "yes" : "no"}
           </span>
         </div>
+
+        <section className="debug-tools" aria-label="Debug tools">
+          <h2>Debug Tools</h2>
+          <div className="test-controls">
+            <button onClick={addCompanionToParty}>Add Companion to Party</button>
+            <button onClick={removeCompanionFromParty}>
+              Remove Companion from Party
+            </button>
+            <button onClick={randomizeLocations}>
+              Randomize Locations
+            </button>
+            <button onClick={resurrectEnemy}>Resurrect Enemy</button>
+            <button onClick={restorePartyHealth}>Restore Party HP</button>
+            <button onClick={refreshGatherPoints}>
+              Refresh Gather Points
+            </button>
+          </div>
+        </section>
       </section>
     </main>
   );
