@@ -2,10 +2,14 @@ import {
   damageEntity,
   isAutonomousEntity,
   isCombatEntity,
-  moveEntityToward,
   setLastAttackAt,
 } from "./entities";
-import { getEntityById, updateEntity, type GameState } from "./state";
+import {
+  getEntityById,
+  moveEntityTowardIfUnoccupied,
+  updateEntity,
+  type GameState,
+} from "./state";
 import type { CombatEntity, Enemy, GameEntity } from "./types";
 
 const ATTACK_RANGE = 1;
@@ -57,7 +61,7 @@ export function updateAttackSystem(
       continue;
     }
 
-    nextState = updateEntity(nextState, moveEntityToward(attacker, target));
+    nextState = moveEntityTowardIfUnoccupied(nextState, attacker, target);
     movedEntityIds.add(attacker.id);
   }
 

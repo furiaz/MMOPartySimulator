@@ -1,5 +1,9 @@
-import { getEntityById, updateEntity, type GameState } from "./state";
-import { isAutonomousEntity, updateAutonomousEntityFollow } from "./entities";
+import {
+  getEntityById,
+  moveEntityTowardIfUnoccupied,
+  type GameState,
+} from "./state";
+import { isAutonomousEntity } from "./entities";
 import type { AutonomousEntity, GameEntity } from "./types";
 
 export function updateFollowSystem(
@@ -27,10 +31,7 @@ export function updateFollowSystem(
       continue;
     }
 
-    nextState = updateEntity(
-      nextState,
-      updateAutonomousEntityFollow(entity, target),
-    );
+    nextState = moveEntityTowardIfUnoccupied(nextState, entity, target);
     movedEntityIds.add(entity.id);
   }
 

@@ -2,10 +2,14 @@ import {
   gatherResource,
   isAutonomousEntity,
   isResourceEntity,
-  moveEntityToward,
   setLastGatherAt,
 } from "./entities";
-import { getEntityById, updateEntity, type GameState } from "./state";
+import {
+  getEntityById,
+  moveEntityTowardIfUnoccupied,
+  updateEntity,
+  type GameState,
+} from "./state";
 import type { AutonomousEntity, GameEntity } from "./types";
 
 const GATHER_RANGE = 1;
@@ -46,7 +50,7 @@ export function updateGatherSystem(
         continue;
       }
 
-      nextState = updateEntity(nextState, moveEntityToward(gatherer, resource));
+      nextState = moveEntityTowardIfUnoccupied(nextState, gatherer, resource);
       movedEntityIds.add(gatherer.id);
       continue;
     }
