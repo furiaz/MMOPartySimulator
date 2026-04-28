@@ -16,3 +16,4 @@ export {
   updateCompanionFollow,
 } from "./entities";
 export { addEntity, getEntityById, updateEntity } from "./state";
+export { updateFollowSystem } from "./followSystem";
