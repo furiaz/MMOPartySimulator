@@ -2,7 +2,7 @@ import { isAutonomousEntity } from "./entities";
 import { getEntityById, updateEntity, type GameState } from "./state";
 import type { AutonomousEntity, EntityState } from "./types";
 
-type TargetedEntityCommandType = Exclude<EntityState, "idle">;
+type TargetedEntityCommandType = Exclude<EntityState, "idle" | "dead">;
 
 export type EntityCommand =
   | {
@@ -33,6 +33,10 @@ export function issueEntityCommand(
   const entity = getEntityById(state, command.entityId);
 
   if (!isAutonomousEntity(entity)) {
+    return state;
+  }
+
+  if (entity.state === "dead") {
     return state;
   }
 

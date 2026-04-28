@@ -1,4 +1,10 @@
-export type EntityState = "idle" | "follow" | "attack" | "gather" | "defend";
+export type EntityState =
+  | "idle"
+  | "follow"
+  | "attack"
+  | "gather"
+  | "defend"
+  | "dead";
 
 export type EntityKind = "player" | "companion" | "enemy";
 
@@ -12,6 +18,7 @@ export type GameEntity = {
   kind: EntityKind;
   position: Position;
   state: EntityState;
+  health: number;
 };
 
 export type Player = GameEntity & {

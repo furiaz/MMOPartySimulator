@@ -97,33 +97,52 @@ function App() {
 
         <div className="test-area" aria-label="Follow system top-down test area">
           <div
-            className="entity player"
+            className="entity-marker player"
             style={{
               transform: `translate(${player.position.x * cellSize}px, ${
                 player.position.y * cellSize
               }px)`,
             }}
             title="Player"
-          />
+          >
+            <span className="entity-label">Player HP {player.health}</span>
+          </div>
           <div
-            className="entity companion"
+            className="entity-marker companion"
             style={{
               transform: `translate(${companion.position.x * cellSize}px, ${
                 companion.position.y * cellSize
               }px)`,
             }}
             title="Companion"
-          />
-          <div
-            className="entity enemy"
-            onClick={commandPartyToTargetEnemy}
-            style={{
-              transform: `translate(${enemy.position.x * cellSize}px, ${
-                enemy.position.y * cellSize
-              }px)`,
-            }}
-            title="Enemy"
-          />
+          >
+            <span className="entity-label">Companion HP {companion.health}</span>
+          </div>
+          {enemy.state === "dead" ? (
+            <div
+              className="dead-label"
+              style={{
+                transform: `translate(${enemy.position.x * cellSize}px, ${
+                  enemy.position.y * cellSize
+                }px)`,
+              }}
+            >
+              Dead
+            </div>
+          ) : (
+            <div
+              className="entity-marker enemy"
+              onClick={commandPartyToTargetEnemy}
+              style={{
+                transform: `translate(${enemy.position.x * cellSize}px, ${
+                  enemy.position.y * cellSize
+                }px)`,
+              }}
+              title="Enemy"
+            >
+              <span className="entity-label">Enemy HP {enemy.health}</span>
+            </div>
+          )}
         </div>
 
         <div className="test-controls">
@@ -135,9 +154,12 @@ function App() {
           <button onClick={commandPartyToTargetEnemy}>Target Enemy</button>
           <span>
             Player ({player.position.x}, {player.position.y}) | State{" "}
-            {player.state} | Target {player.currentTargetId ?? "none"} |
+            {player.state} | HP {player.health} | Target{" "}
+            {player.currentTargetId ?? "none"} |
             Companion ({companion.position.x}, {companion.position.y}) | State{" "}
-            {companion.state} | Target {companion.currentTargetId ?? "none"}
+            {companion.state} | HP {companion.health} | Target{" "}
+            {companion.currentTargetId ?? "none"} | Enemy ({enemy.position.x},{" "}
+            {enemy.position.y}) | State {enemy.state} | HP {enemy.health}
           </span>
         </div>
       </section>

@@ -14,6 +14,7 @@ export {
   createCompanion,
   createEnemy,
   createPlayer,
+  damageEntity,
   isAutonomousEntity,
   moveEntityTo,
   moveEntityToward,

@@ -9,6 +9,7 @@ import type {
 } from "./types";
 
 const FOLLOW_DISTANCE = 1;
+const STARTING_HEALTH = 10;
 
 export function createPlayer(id: string, position: Position): Player {
   return {
@@ -16,6 +17,7 @@ export function createPlayer(id: string, position: Position): Player {
     kind: "player",
     position,
     state: "idle",
+    health: STARTING_HEALTH,
     currentTargetId: null,
   };
 }
@@ -26,6 +28,7 @@ export function createEnemy(id: string, position: Position): Enemy {
     kind: "enemy",
     position,
     state: "idle",
+    health: STARTING_HEALTH,
   };
 }
 
@@ -39,6 +42,7 @@ export function createCompanion(
     kind: "companion",
     position,
     state: "follow",
+    health: STARTING_HEALTH,
     followTargetId,
     currentTargetId: followTargetId,
   };
@@ -69,6 +73,16 @@ export function moveEntityToward<T extends GameEntity>(
   target: GameEntity,
 ): T {
   return moveEntityTo(entity, stepToward(entity.position, target.position));
+}
+
+export function damageEntity<T extends GameEntity>(entity: T, damage: number): T {
+  const health = Math.max(0, entity.health - damage);
+
+  return {
+    ...entity,
+    health,
+    state: health === 0 ? "dead" : entity.state,
+  };
 }
 
 export function updateCompanionFollow(

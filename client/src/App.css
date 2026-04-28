@@ -29,13 +29,33 @@
   overflow: hidden;
 }
 
-.entity {
+.entity-marker,
+.dead-label {
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.entity-marker {
   width: 28px;
   height: 28px;
   margin: 4px;
+}
+
+.entity-label {
+  position: absolute;
+  left: 50%;
+  bottom: 32px;
+  min-width: 88px;
+  padding: 2px 4px;
+  transform: translateX(-50%);
+  border: 1px solid #94a3b8;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
 }
 
 .player {
@@ -48,6 +68,17 @@
 
 .enemy {
   background: #dc2626;
+  cursor: pointer;
+}
+
+.dead-label {
+  padding: 4px 6px;
+  margin: 4px;
+  border: 1px solid #991b1b;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .test-controls {
