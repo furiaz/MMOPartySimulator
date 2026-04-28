@@ -1,6 +1,6 @@
 export type EntityState = "idle" | "follow" | "attack" | "gather" | "defend";
 
-export type EntityKind = "player" | "companion";
+export type EntityKind = "player" | "companion" | "enemy";
 
 export type Position = {
   x: number;
@@ -18,7 +18,12 @@ export type Player = GameEntity & {
   kind: "player";
 };
 
+export type Enemy = GameEntity & {
+  kind: "enemy";
+};
+
 export type Companion = GameEntity & {
   kind: "companion";
   followTargetId: string;
+  currentTargetId: string | null;
 };

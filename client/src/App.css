@@ -46,6 +46,10 @@
   background: #16a34a;
 }
 
+.enemy {
+  background: #dc2626;
+}
+
 .test-controls {
   display: flex;
   align-items: center;

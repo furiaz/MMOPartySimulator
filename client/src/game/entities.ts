@@ -1,5 +1,6 @@
 import type {
   Companion,
+  Enemy,
   EntityState,
   GameEntity,
   Player,
@@ -17,6 +18,15 @@ export function createPlayer(id: string, position: Position): Player {
   };
 }
 
+export function createEnemy(id: string, position: Position): Enemy {
+  return {
+    id,
+    kind: "enemy",
+    position,
+    state: "idle",
+  };
+}
+
 export function createCompanion(
   id: string,
   position: Position,
@@ -28,6 +38,7 @@ export function createCompanion(
     position,
     state: "follow",
     followTargetId,
+    currentTargetId: followTargetId,
   };
 }
 

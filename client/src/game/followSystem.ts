@@ -10,7 +10,11 @@ export function updateFollowSystem(state: GameState): GameState {
       continue;
     }
 
-    const target = getEntityById(nextState, entity.followTargetId);
+    if (!entity.currentTargetId) {
+      continue;
+    }
+
+    const target = getEntityById(nextState, entity.currentTargetId);
 
     if (!target) {
       continue;

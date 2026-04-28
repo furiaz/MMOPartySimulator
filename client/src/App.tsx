@@ -4,22 +4,27 @@ import "./App.css";
 import {
   addEntity,
   createCompanion,
+  createEnemy,
   createPlayer,
+  issueCompanionCommand,
   startGameLoop,
   type Companion,
+  type Enemy,
   type GameState,
   type Player,
 } from "./game";
 
 const playerId = "test-player";
 const companionId = "test-companion";
+const enemyId = "test-enemy";
 const cellSize = 36;
 
 function createInitialState(): GameState {
   const player = createPlayer(playerId, { x: 8, y: 5 });
   const companion = createCompanion(companionId, { x: 2, y: 2 }, playerId);
+  const enemy = createEnemy(enemyId, { x: 10, y: 7 });
 
-  return addEntity(addEntity({ entities: {} }, player), companion);
+  return addEntity(addEntity(addEntity({ entities: {} }, player), companion), enemy);
 }
 
 function App() {
@@ -29,6 +34,7 @@ function App() {
 
   const player = gameState.entities[playerId] as Player;
   const companion = gameState.entities[companionId] as Companion;
+  const enemy = gameState.entities[enemyId] as Enemy;
 
   useEffect(() => {
     return () => {
@@ -46,6 +52,35 @@ function App() {
 
     stopLoopRef.current = startGameLoop(setGameState);
     setIsSimulationRunning(true);
+  }
+
+  function commandCompanionToFollow() {
+    setGameState((state) =>
+      issueCompanionCommand(state, {
+        type: "follow",
+        companionId,
+        targetId: playerId,
+      }),
+    );
+  }
+
+  function commandCompanionToIdle() {
+    setGameState((state) =>
+      issueCompanionCommand(state, {
+        type: "idle",
+        companionId,
+      }),
+    );
+  }
+
+  function commandCompanionToTargetEnemy() {
+    setGameState((state) =>
+      issueCompanionCommand(state, {
+        type: "attack",
+        companionId,
+        targetId: enemyId,
+      }),
+    );
   }
 
   return (
@@ -72,15 +107,28 @@ function App() {
             }}
             title="Companion"
           />
+          <div
+            className="entity enemy"
+            style={{
+              transform: `translate(${enemy.position.x * cellSize}px, ${
+                enemy.position.y * cellSize
+              }px)`,
+            }}
+            title="Enemy"
+          />
         </div>
 
         <div className="test-controls">
           <button onClick={toggleSimulationLoop}>
             {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
           </button>
+          <button onClick={commandCompanionToFollow}>Follow</button>
+          <button onClick={commandCompanionToIdle}>Idle</button>
+          <button onClick={commandCompanionToTargetEnemy}>Target Enemy</button>
           <span>
             Player ({player.position.x}, {player.position.y}) | Companion (
-            {companion.position.x}, {companion.position.y})
+            {companion.position.x}, {companion.position.y}) | State{" "}
+            {companion.state} | Target {companion.currentTargetId ?? "none"}
           </span>
         </div>
       </section>
