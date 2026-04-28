@@ -1,5 +1,5 @@
 import { isAutonomousEntity } from "./entities";
-import { updateEntity, type GameState } from "./state";
+import { getEntityById, updateEntity, type GameState } from "./state";
 import type { Enemy, GameEntity } from "./types";
 
 const ENEMY_DETECTION_RANGE = 5;
@@ -12,20 +12,36 @@ export function updateEnemyAISystem(state: GameState): GameState {
       continue;
     }
 
-    const target = findClosestTarget(entity, Object.values(nextState.entities));
+    const currentTarget = entity.currentTargetId
+      ? getEntityById(nextState, entity.currentTargetId)
+      : undefined;
 
-    if (!target) {
-      if (entity.state === "idle" && entity.currentTargetId === null) {
+    if (currentTarget && isValidEnemyTarget(currentTarget)) {
+      if (entity.state === "attack") {
         continue;
       }
 
       const updatedEnemy: Enemy = {
         ...entity,
-        state: "idle",
-        currentTargetId: null,
+        state: "attack",
       };
 
       nextState = updateEntity(nextState, updatedEnemy);
+      continue;
+    }
+
+    if (entity.currentTargetId) {
+      nextState = updateEntity(nextState, clearEnemyTarget(entity));
+      continue;
+    }
+
+    if (entity.aggressionMode === "passive") {
+      continue;
+    }
+
+    const target = findClosestTarget(entity, Object.values(nextState.entities));
+
+    if (!target) {
       continue;
     }
 
@@ -39,6 +55,14 @@ export function updateEnemyAISystem(state: GameState): GameState {
   }
 
   return nextState;
+}
+
+function clearEnemyTarget(enemy: Enemy): Enemy {
+  return {
+    ...enemy,
+    state: "idle",
+    currentTargetId: null,
+  };
 }
 
 function findClosestTarget(

@@ -131,3 +131,6 @@ The player should feel like they are leading a small expedition:
 - Strong system interaction (combat + AI + gathering)
 - Emergent gameplay situations
 - Scalable systems for future expansion
+
+- Early-game enemies are passive by default and only fight back after being attacked.
+- Aggressive enemies may be introduced later by enemy type, zone, or event.

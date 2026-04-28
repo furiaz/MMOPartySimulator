@@ -3,6 +3,7 @@ export type {
   CombatEntity,
   Companion,
   Enemy,
+  EnemyAggressionMode,
   EntityKind,
   EntityState,
   GameEntity,

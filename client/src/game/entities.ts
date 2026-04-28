@@ -3,6 +3,7 @@ import type {
   CombatEntity,
   Companion,
   Enemy,
+  EnemyAggressionMode,
   EntityState,
   GameEntity,
   Player,
@@ -24,7 +25,11 @@ export function createPlayer(id: string, position: Position): Player {
   };
 }
 
-export function createEnemy(id: string, position: Position): Enemy {
+export function createEnemy(
+  id: string,
+  position: Position,
+  aggressionMode: EnemyAggressionMode = "passive",
+): Enemy {
   return {
     id,
     kind: "enemy",
@@ -33,6 +38,7 @@ export function createEnemy(id: string, position: Position): Enemy {
     health: STARTING_HEALTH,
     lastAttackAt: 0,
     currentTargetId: null,
+    aggressionMode,
   };
 }
 

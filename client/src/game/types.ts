@@ -8,6 +8,8 @@ export type EntityState =
 
 export type EntityKind = "player" | "companion" | "enemy";
 
+export type EnemyAggressionMode = "passive" | "aggressive";
+
 export type Position = {
   x: number;
   y: number;
@@ -30,6 +32,7 @@ export type Player = GameEntity & {
 export type Enemy = GameEntity & {
   kind: "enemy";
   currentTargetId: string | null;
+  aggressionMode: EnemyAggressionMode;
 };
 
 export type Companion = GameEntity & {

@@ -1,11 +1,12 @@
 import {
   damageEntity,
+  isAutonomousEntity,
   isCombatEntity,
   moveEntityToward,
   setLastAttackAt,
 } from "./entities";
 import { getEntityById, updateEntity, type GameState } from "./state";
-import type { CombatEntity, GameEntity } from "./types";
+import type { CombatEntity, Enemy, GameEntity } from "./types";
 
 const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
@@ -41,7 +42,10 @@ export function updateAttackSystem(state: GameState): GameState {
         continue;
       }
 
-      nextState = updateEntity(nextState, damageEntity(target, ATTACK_DAMAGE));
+      nextState = updateEntity(
+        nextState,
+        updateTargetAfterDamage(target, attacker),
+      );
       nextState = updateEntity(nextState, setLastAttackAt(attacker, now));
       continue;
     }
@@ -65,4 +69,31 @@ function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
 
 function canAttack(entity: GameEntity, now: number): boolean {
   return now - entity.lastAttackAt >= ATTACK_COOLDOWN_MS;
+}
+
+function updateTargetAfterDamage(
+  target: GameEntity,
+  attacker: CombatEntity,
+): GameEntity {
+  const damagedTarget = damageEntity(target, ATTACK_DAMAGE);
+
+  if (
+    !isEnemy(damagedTarget) ||
+    damagedTarget.state === "dead" ||
+    !isAutonomousEntity(attacker)
+  ) {
+    return damagedTarget;
+  }
+
+  const enemy: Enemy = {
+    ...damagedTarget,
+    state: "attack",
+    currentTargetId: attacker.id,
+  };
+
+  return enemy;
+}
+
+function isEnemy(entity: GameEntity): entity is Enemy {
+  return entity.kind === "enemy";
 }
