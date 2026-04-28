@@ -180,3 +180,10 @@ Never skip this order.
 - Can also act autonomously (idle/AFK behavior)
 - Uses the same state-driven system as companions (idle, follow, attack, etc.)
 - Manual controls (e.g. WASD, clicking) will override or influence autonomous behavior
+
+## Command Priority
+
+- Commands may be group-based or entity-specific.
+- Entity-specific direct commands override that entity’s current behavior.
+- Direct commands should not automatically change other entities.
+- Future UI may issue direct commands through click-and-drag interactions.

@@ -33,7 +33,7 @@ export function updateAttackSystem(state: GameState): GameState {
       continue;
     }
 
-    if (target.state === "dead") {
+    if (!isCombatEntity(target) || target.state === "dead") {
       continue;
     }
 
@@ -67,14 +67,14 @@ function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
   return xDistance <= ATTACK_RANGE && yDistance <= ATTACK_RANGE;
 }
 
-function canAttack(entity: GameEntity, now: number): boolean {
+function canAttack(entity: CombatEntity, now: number): boolean {
   return now - entity.lastAttackAt >= ATTACK_COOLDOWN_MS;
 }
 
 function updateTargetAfterDamage(
-  target: GameEntity,
+  target: CombatEntity,
   attacker: CombatEntity,
-): GameEntity {
+): CombatEntity {
   const damagedTarget = damageEntity(target, ATTACK_DAMAGE);
 
   if (

@@ -8,10 +8,12 @@ import type {
   GameEntity,
   Player,
   Position,
+  ResourceEntity,
 } from "./types";
 
 const FOLLOW_DISTANCE = 1;
 const STARTING_HEALTH = 10;
+const STARTING_RESOURCE_DURABILITY = 5;
 
 export function createPlayer(id: string, position: Position): Player {
   return {
@@ -22,6 +24,8 @@ export function createPlayer(id: string, position: Position): Player {
     health: STARTING_HEALTH,
     lastAttackAt: 0,
     currentTargetId: null,
+    lastGatherAt: 0,
+    commandPriority: "direct",
   };
 }
 
@@ -56,6 +60,23 @@ export function createCompanion(
     lastAttackAt: 0,
     followTargetId,
     currentTargetId: followTargetId,
+    lastGatherAt: 0,
+    commandPriority: "autonomous",
+  };
+}
+
+export function createResource(
+  id: string,
+  position: Position,
+  durability = STARTING_RESOURCE_DURABILITY,
+): ResourceEntity {
+  return {
+    id,
+    kind: "resource",
+    position,
+    state: "idle",
+    durability,
+    isDepleted: false,
   };
 }
 
@@ -86,7 +107,10 @@ export function moveEntityToward<T extends GameEntity>(
   return moveEntityTo(entity, stepToward(entity.position, target.position));
 }
 
-export function damageEntity<T extends GameEntity>(entity: T, damage: number): T {
+export function damageEntity<T extends CombatEntity>(
+  entity: T,
+  damage: number,
+): T {
   const health = Math.max(0, entity.health - damage);
 
   return {
@@ -96,13 +120,36 @@ export function damageEntity<T extends GameEntity>(entity: T, damage: number): T
   };
 }
 
-export function setLastAttackAt<T extends GameEntity>(
+export function setLastAttackAt<T extends CombatEntity>(
   entity: T,
   lastAttackAt: number,
 ): T {
   return {
     ...entity,
     lastAttackAt,
+  };
+}
+
+export function gatherResource(
+  resource: ResourceEntity,
+  gatherAmount: number,
+): ResourceEntity {
+  const durability = Math.max(0, resource.durability - gatherAmount);
+
+  return {
+    ...resource,
+    durability,
+    isDepleted: durability === 0,
+  };
+}
+
+export function setLastGatherAt<T extends AutonomousEntity>(
+  entity: T,
+  lastGatherAt: number,
+): T {
+  return {
+    ...entity,
+    lastGatherAt,
   };
 }
 
@@ -138,6 +185,12 @@ export function isCombatEntity(
   entity: GameEntity | undefined,
 ): entity is CombatEntity {
   return isAutonomousEntity(entity) || entity?.kind === "enemy";
+}
+
+export function isResourceEntity(
+  entity: GameEntity | undefined,
+): entity is ResourceEntity {
+  return entity?.kind === "resource";
 }
 
 function stepToward(current: Position, target: Position): Position {

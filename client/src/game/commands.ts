@@ -1,6 +1,6 @@
 import { isAutonomousEntity } from "./entities";
 import { getEntityById, updateEntity, type GameState } from "./state";
-import type { AutonomousEntity, EntityState } from "./types";
+import type { AutonomousEntity, CommandPriority, EntityState } from "./types";
 
 type TargetedEntityCommandType = Exclude<EntityState, "idle" | "dead">;
 
@@ -8,22 +8,26 @@ export type EntityCommand =
   | {
       type: "idle";
       entityId: string;
+      priority?: CommandPriority;
     }
   | {
       type: TargetedEntityCommandType;
       entityId: string;
       targetId: string;
+      priority?: CommandPriority;
     };
 
 export type CompanionCommand =
   | {
       type: "idle";
       companionId: string;
+      priority?: CommandPriority;
     }
   | {
       type: TargetedEntityCommandType;
       companionId: string;
       targetId: string;
+      priority?: CommandPriority;
     };
 
 export function issueEntityCommand(
@@ -40,11 +44,18 @@ export function issueEntityCommand(
     return state;
   }
 
+  const commandPriority = command.priority ?? "direct";
+
+  if (!canApplyCommand(entity, commandPriority)) {
+    return state;
+  }
+
   if (command.type === "idle") {
     const updatedEntity: AutonomousEntity = {
       ...entity,
       state: "idle",
       currentTargetId: null,
+      commandPriority,
     };
 
     return updateEntity(state, updatedEntity);
@@ -54,6 +65,7 @@ export function issueEntityCommand(
     ...entity,
     state: command.type,
     currentTargetId: command.targetId,
+    commandPriority,
     ...(entity.kind === "companion" && command.type === "follow"
       ? { followTargetId: command.targetId }
       : {}),
@@ -71,12 +83,21 @@ export function issueCompanionCommand(
       ? {
           type: command.type,
           entityId: command.companionId,
+          priority: command.priority,
         }
       : {
           type: command.type,
           entityId: command.companionId,
           targetId: command.targetId,
+          priority: command.priority,
         };
 
   return issueEntityCommand(state, entityCommand);
+}
+
+function canApplyCommand(
+  entity: AutonomousEntity,
+  commandPriority: CommandPriority,
+): boolean {
+  return commandPriority === "direct" || entity.commandPriority !== "direct";
 }

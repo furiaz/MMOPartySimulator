@@ -134,3 +134,10 @@ The player should feel like they are leading a small expedition:
 
 - Early-game enemies are passive by default and only fight back after being attacked.
 - Aggressive enemies may be introduced later by enemy type, zone, or event.
+
+## Direct Orders
+
+- The player can give direct orders to specific party members.
+- Direct orders override that unit’s current autonomous behavior.
+- Example: if the party is attacking but the player orders one companion to gather, that companion gathers while the rest continue fighting.
+- Future input may include click-and-drag commands from a unit to a target.

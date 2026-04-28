@@ -30,7 +30,8 @@
 }
 
 .entity-marker,
-.dead-label {
+.dead-label,
+.depleted-label {
   position: absolute;
   top: 0;
   left: 0;
@@ -71,14 +72,28 @@
   cursor: pointer;
 }
 
-.dead-label {
+.resource {
+  background: #92400e;
+}
+
+.dead-label,
+.depleted-label {
   padding: 4px 6px;
   margin: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dead-label {
   border: 1px solid #991b1b;
   background: #fee2e2;
   color: #991b1b;
-  font-size: 12px;
-  font-weight: 700;
+}
+
+.depleted-label {
+  border: 1px solid #713f12;
+  background: #fef3c7;
+  color: #713f12;
 }
 
 .test-controls {
