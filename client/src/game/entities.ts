@@ -1,5 +1,6 @@
 import type {
   AutonomousEntity,
+  CombatEntity,
   Companion,
   Enemy,
   EntityState,
@@ -18,6 +19,7 @@ export function createPlayer(id: string, position: Position): Player {
     position,
     state: "idle",
     health: STARTING_HEALTH,
+    lastAttackAt: 0,
     currentTargetId: null,
   };
 }
@@ -29,6 +31,8 @@ export function createEnemy(id: string, position: Position): Enemy {
     position,
     state: "idle",
     health: STARTING_HEALTH,
+    lastAttackAt: 0,
+    currentTargetId: null,
   };
 }
 
@@ -43,6 +47,7 @@ export function createCompanion(
     position,
     state: "follow",
     health: STARTING_HEALTH,
+    lastAttackAt: 0,
     followTargetId,
     currentTargetId: followTargetId,
   };
@@ -85,6 +90,16 @@ export function damageEntity<T extends GameEntity>(entity: T, damage: number): T
   };
 }
 
+export function setLastAttackAt<T extends GameEntity>(
+  entity: T,
+  lastAttackAt: number,
+): T {
+  return {
+    ...entity,
+    lastAttackAt,
+  };
+}
+
 export function updateCompanionFollow(
   companion: Companion,
   target: GameEntity,
@@ -111,6 +126,12 @@ export function isAutonomousEntity(
   entity: GameEntity | undefined,
 ): entity is AutonomousEntity {
   return entity?.kind === "player" || entity?.kind === "companion";
+}
+
+export function isCombatEntity(
+  entity: GameEntity | undefined,
+): entity is CombatEntity {
+  return isAutonomousEntity(entity) || entity?.kind === "enemy";
 }
 
 function stepToward(current: Position, target: Position): Position {

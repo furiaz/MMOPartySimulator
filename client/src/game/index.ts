@@ -1,5 +1,6 @@
 export type {
   AutonomousEntity,
+  CombatEntity,
   Companion,
   Enemy,
   EntityKind,
@@ -15,9 +16,11 @@ export {
   createEnemy,
   createPlayer,
   damageEntity,
+  isCombatEntity,
   isAutonomousEntity,
   moveEntityTo,
   moveEntityToward,
+  setLastAttackAt,
   setEntityState,
   updateAutonomousEntityFollow,
   updateCompanionFollow,
@@ -31,4 +34,5 @@ export {
 } from "./commands";
 export { updateGame } from "./updateGame";
 export { updateAttackSystem } from "./attackSystem";
+export { updateEnemyAISystem } from "./enemyAISystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";

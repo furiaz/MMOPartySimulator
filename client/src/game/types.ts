@@ -19,6 +19,7 @@ export type GameEntity = {
   position: Position;
   state: EntityState;
   health: number;
+  lastAttackAt: number;
 };
 
 export type Player = GameEntity & {
@@ -28,6 +29,7 @@ export type Player = GameEntity & {
 
 export type Enemy = GameEntity & {
   kind: "enemy";
+  currentTargetId: string | null;
 };
 
 export type Companion = GameEntity & {
@@ -37,3 +39,5 @@ export type Companion = GameEntity & {
 };
 
 export type AutonomousEntity = Player | Companion;
+
+export type CombatEntity = Player | Companion | Enemy;
