@@ -187,3 +187,37 @@ Never skip this order.
 - Entity-specific direct commands override that entity’s current behavior.
 - Direct commands should not automatically change other entities.
 - Future UI may issue direct commands through click-and-drag interactions.
+
+### Party Management (Current)
+
+- GameState supports a party composed of:
+  - Player (main entity)
+  - Companion entities
+- Initial party limit:
+  - 1 player + up to 3 companions
+- Party size may change in the future
+
+### Command Scope
+
+- Commands can be:
+  - Global (affect multiple entities)
+  - Direct (affect a single entity)
+- Direct commands override only the targeted entity
+- Other entities continue their current behavior
+
+### Behavior Priority
+
+- Each entity executes only one behavior per tick
+- Behavior is determined by entity state
+- Systems must not conflict when updating entity position
+
+## Debug Utilities (Temporary)
+
+- Debug/testing helpers may exist for development:
+  - Add/remove entities
+  - Reset health
+  - Reset resources
+  - Randomize positions
+- These should be isolated from core systems
+- They must not affect final game architecture
+

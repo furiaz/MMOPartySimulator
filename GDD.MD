@@ -141,3 +141,25 @@ The player should feel like they are leading a small expedition:
 - Direct orders override that unit’s current autonomous behavior.
 - Example: if the party is attacking but the player orders one companion to gather, that companion gathers while the rest continue fighting.
 - Future input may include click-and-drag commands from a unit to a target.
+
+## Party System
+
+- The player leads a party consisting of:
+  - 1 main character
+  - Up to 3 companions (initial limit)
+- Companions act independently based on assigned commands
+- The player can issue:
+  - group commands
+  - direct orders to specific companions
+
+---
+
+## Debug / Development Tools (Temporary)
+
+- The game includes temporary debug tools for development:
+  - Add/remove companions
+  - Randomize entity positions
+  - Reset enemy and resource states
+  - Restore party health
+- These tools are NOT part of final gameplay
+
