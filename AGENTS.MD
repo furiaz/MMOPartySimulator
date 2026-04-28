@@ -6,7 +6,10 @@ This is a browser-based game built with:
 - TypeScript (shared logic)
 - Future backend: Node.js + Fastify (server-authoritative, not yet implemented)
 
-The game will support autoplay/idle mechanics with optional active player control.
+The game is primarily idle/AFK, with optional active player control.
+
+For game design, refer to GDD.md  
+For technical architecture, refer to GTD.md
 
 ---
 
@@ -15,15 +18,15 @@ The game will support autoplay/idle mechanics with optional active player contro
 - Keep code simple and modular
 - Avoid overengineering
 - Prefer small, focused functions
-- Use clear naming (no abbreviations unless standard)
-- Separate UI from game logic
+- Use clear naming (no unnecessary abbreviations)
+- Separate UI from game logic at all times
 
 ---
 
 ## File Structure Rules
 
-- UI components stay in React components
-- Game logic should be isolated (eventually moved to a separate module/system)
+- UI must stay inside React components
+- Game logic must stay inside src/game/
 - Do NOT mix rendering logic with simulation logic
 
 ---
@@ -35,7 +38,8 @@ When making changes:
 - Only modify what is requested
 - Do NOT rewrite entire files unless explicitly asked
 - Prefer minimal diffs over large changes
-- Explain changes briefly if not obvious
+- Do NOT change project structure without being asked
+- Do NOT assume missing systems — ask or keep it minimal
 
 ---
 
@@ -43,8 +47,8 @@ When making changes:
 
 - Work in small steps
 - One system at a time
-- Test frequently in browser
-- Keep features isolated before combining systems
+- Test frequently
+- Build systems before UI when possible
 
 ---
 
@@ -57,14 +61,10 @@ When making changes:
 
 ---
 
-## Future Systems (high-level)
+## World Structure
 
-- Player system
-- Enemy system
-- Combat system
-- Loot system
-- Party system
-- Autoplay/AI behavior
-- UI systems
-
-(Do NOT implement all at once — build incrementally)
+- The world is divided into large zones/fields
+- Zones are connected via teleport points
+- Each zone is a separate map space
+- Entities will eventually include a zoneId in addition to position (x, y)
+- Do not implement zone or teleport logic unless explicitly requested
