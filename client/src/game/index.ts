@@ -16,4 +16,5 @@ export {
   updateCompanionFollow,
 } from "./entities";
 export { addEntity, getEntityById, updateEntity } from "./state";
-export { updateFollowSystem } from "./followSystem";
+export { updateGame } from "./updateGame";
+export { startGameLoop, type GameStateUpdater } from "./gameLoop";

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 import {
   addEntity,
   createCompanion,
   createPlayer,
-  updateFollowSystem,
+  startGameLoop,
   type Companion,
   type GameState,
   type Player,
@@ -24,12 +24,28 @@ function createInitialState(): GameState {
 
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
+  const stopLoopRef = useRef<(() => void) | null>(null);
 
   const player = gameState.entities[playerId] as Player;
   const companion = gameState.entities[companionId] as Companion;
 
-  function stepFollowSystem() {
-    setGameState((currentState) => updateFollowSystem(currentState));
+  useEffect(() => {
+    return () => {
+      stopLoopRef.current?.();
+    };
+  }, []);
+
+  function toggleSimulationLoop() {
+    if (stopLoopRef.current) {
+      stopLoopRef.current();
+      stopLoopRef.current = null;
+      setIsSimulationRunning(false);
+      return;
+    }
+
+    stopLoopRef.current = startGameLoop(setGameState);
+    setIsSimulationRunning(true);
   }
 
   return (
@@ -59,7 +75,9 @@ function App() {
         </div>
 
         <div className="test-controls">
-          <button onClick={stepFollowSystem}>Step Follow System</button>
+          <button onClick={toggleSimulationLoop}>
+            {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
+          </button>
           <span>
             Player ({player.position.x}, {player.position.y}) | Companion (
             {companion.position.x}, {companion.position.y})
