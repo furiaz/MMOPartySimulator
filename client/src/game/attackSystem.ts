@@ -7,7 +7,12 @@ import {
 import {
   addCombatFeedback,
   getEntityById,
+  isActiveResourcePosition,
+  isWallPosition,
   moveEntityTowardIfUnoccupied,
+  moveEntityTowardPositionIfUnoccupied,
+  previewMoveTowardPosition,
+  reservePositionForTick,
   updateEntity,
   type GameState,
 } from "./state";
@@ -23,6 +28,7 @@ import type {
   Enemy,
   GameEntity,
   Player,
+  Position,
 } from "./types";
 
 const ATTACK_RANGE = 1;
@@ -97,15 +103,39 @@ export function updateAttackSystem(
       continue;
     }
 
-    nextState = moveEntityTowardIfUnoccupied(
-      nextState,
-      attacker,
-      getCombatMovementTarget(nextState, attacker, target),
-    );
+    nextState = moveAttackerTowardCombatPosition(nextState, attacker, target);
     movedEntityIds.add(attacker.id);
   }
 
   return nextState;
+}
+
+function moveAttackerTowardCombatPosition(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+): GameState {
+  const movementTarget = getCombatMovementTarget(state, attacker, target);
+
+  if (
+    movementTarget.id !== target.id ||
+    !isPartyCombatEntity(attacker) ||
+    !isEnemy(target)
+  ) {
+    return moveEntityTowardIfUnoccupied(state, attacker, movementTarget);
+  }
+
+  const attackPosition = chooseAttackPosition(state, attacker, target);
+
+  if (!attackPosition) {
+    return moveEntityTowardIfUnoccupied(state, attacker, target);
+  }
+
+  return moveEntityTowardPositionIfUnoccupied(
+    reservePositionForTick(state, attacker.id, attackPosition),
+    attacker,
+    attackPosition,
+  );
 }
 
 function addAttackFeedback(
@@ -149,6 +179,168 @@ function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
   const yDistance = Math.abs(target.position.y - attacker.position.y);
 
   return xDistance <= ATTACK_RANGE && yDistance <= ATTACK_RANGE;
+}
+
+function chooseAttackPosition(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+): Position | null {
+  return (
+    getSortedCombatPositions(
+      getAttackPositions(target.position),
+      attacker,
+      target.position,
+    ).find((position) =>
+      isReachableCombatPosition(state, attacker, position),
+    ) ??
+    getSortedCombatPositions(
+      getNearbyCombatPositions(target.position),
+      attacker,
+      target.position,
+    ).find((position) =>
+      isReachableCombatPosition(state, attacker, position),
+    ) ??
+    null
+  );
+}
+
+function getAttackPositions(targetPosition: Position): Position[] {
+  const positions: Position[] = [];
+
+  for (
+    let y = targetPosition.y - ATTACK_RANGE;
+    y <= targetPosition.y + ATTACK_RANGE;
+    y += 1
+  ) {
+    for (
+      let x = targetPosition.x - ATTACK_RANGE;
+      x <= targetPosition.x + ATTACK_RANGE;
+      x += 1
+    ) {
+      const position = { x, y };
+
+      if (isSamePosition(position, targetPosition)) {
+        continue;
+      }
+
+      positions.push(position);
+    }
+  }
+
+  return positions;
+}
+
+function getNearbyCombatPositions(targetPosition: Position): Position[] {
+  const positions: Position[] = [];
+
+  for (let radius = ATTACK_RANGE + 1; radius <= ATTACK_RANGE + 3; radius += 1) {
+    for (
+      let y = targetPosition.y - radius;
+      y <= targetPosition.y + radius;
+      y += 1
+    ) {
+      for (
+        let x = targetPosition.x - radius;
+        x <= targetPosition.x + radius;
+        x += 1
+      ) {
+        if (
+          Math.max(
+            Math.abs(targetPosition.x - x),
+            Math.abs(targetPosition.y - y),
+          ) !== radius
+        ) {
+          continue;
+        }
+
+        positions.push({ x, y });
+      }
+    }
+  }
+
+  return positions;
+}
+
+function getSortedCombatPositions(
+  positions: Position[],
+  attacker: CombatEntity,
+  targetPosition: Position,
+): Position[] {
+  return [...positions].sort(
+    (a, b) =>
+      getGridDistance(a, targetPosition) - getGridDistance(b, targetPosition) ||
+      getManhattanDistance(a, targetPosition) -
+        getManhattanDistance(b, targetPosition) ||
+      getGridDistance(a, attacker.position) -
+        getGridDistance(b, attacker.position) ||
+      getManhattanDistance(a, attacker.position) -
+        getManhattanDistance(b, attacker.position) ||
+      a.y - b.y ||
+      a.x - b.x,
+  );
+}
+
+function isReachableCombatPosition(
+  state: GameState,
+  attacker: CombatEntity,
+  position: Position,
+): boolean {
+  return (
+    isCombatPositionAvailable(state, attacker, position) &&
+    (isSamePosition(attacker.position, position) ||
+      previewMoveTowardPosition(state, attacker, position) !== null)
+  );
+}
+
+function isCombatPositionAvailable(
+  state: GameState,
+  attacker: CombatEntity,
+  position: Position,
+): boolean {
+  return (
+    isInMapBounds(state, position) &&
+    !isWallPosition(state, position) &&
+    !isActiveResourcePosition(state, position, attacker.id) &&
+    !isReservedByOtherEntity(state, attacker, position) &&
+    !isOccupiedByOtherEntity(state, attacker, position)
+  );
+}
+
+function isInMapBounds(state: GameState, position: Position): boolean {
+  return (
+    !state.map ||
+    (position.x >= 0 &&
+      position.x < state.map.columns &&
+      position.y >= 0 &&
+      position.y < state.map.rows)
+  );
+}
+
+function isReservedByOtherEntity(
+  state: GameState,
+  attacker: CombatEntity,
+  position: Position,
+): boolean {
+  return Object.entries(state.reservedPositionsByEntityId ?? {}).some(
+    ([entityId, reservedPosition]) =>
+      entityId !== attacker.id && isSamePosition(reservedPosition, position),
+  );
+}
+
+function isOccupiedByOtherEntity(
+  state: GameState,
+  attacker: CombatEntity,
+  position: Position,
+): boolean {
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.id !== attacker.id && isSamePosition(entity.position, position),
+  );
+}
+
+function isSamePosition(a: Position, b: Position): boolean {
+  return a.x === b.x && a.y === b.y;
 }
 
 function canAttack(entity: CombatEntity, now: number): boolean {
@@ -239,6 +431,10 @@ function isPlayer(entity: GameEntity): entity is Player {
   return entity.kind === "player";
 }
 
+function isPartyCombatEntity(entity: CombatEntity): entity is Player | Companion {
+  return entity.kind === "player" || entity.kind === "companion";
+}
+
 function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
   if (!isAutonomousEntity(attacker)) {
     return {
@@ -320,4 +516,11 @@ function getGridDistance(
   to: { x: number; y: number },
 ): number {
   return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+}
+
+function getManhattanDistance(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): number {
+  return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
 }

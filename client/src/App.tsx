@@ -50,12 +50,24 @@ const enemyIds = [
   "test-enemy-6",
   "test-enemy-7",
   "test-enemy-8",
+  "test-enemy-9",
+  "test-enemy-10",
+  "test-enemy-11",
+  "test-enemy-12",
+  "test-enemy-13",
+  "test-enemy-14",
 ];
 const resourceIds = [
   "test-resource-wood",
   "test-resource-ore",
   "test-resource-herb",
   "test-resource-wood-2",
+  "test-resource-ore-2",
+  "test-resource-herb-2",
+  "test-resource-wood-3",
+  "test-resource-ore-3",
+  "test-resource-herb-3",
+  "test-resource-wood-4",
 ];
 const debugMap = createDebugMap();
 const cellSize = 28;
@@ -67,14 +79,20 @@ const companionStartPositions = [
   { x: 4, y: 2 },
 ];
 const enemyStartPositions = [
-  { x: 20, y: 2 },
-  { x: 15, y: 8 },
-  { x: 21, y: 13 },
-  { x: 9, y: 15 },
-  { x: 18, y: 3 },
-  { x: 19, y: 10 },
-  { x: 14, y: 15 },
-  { x: 6, y: 16 },
+  { x: 30, y: 2 },
+  { x: 22, y: 5 },
+  { x: 32, y: 8 },
+  { x: 14, y: 10 },
+  { x: 2, y: 15 },
+  { x: 24, y: 13 },
+  { x: 31, y: 16 },
+  { x: 5, y: 20 },
+  { x: 17, y: 20 },
+  { x: 29, y: 22 },
+  { x: 11, y: 24 },
+  { x: 20, y: 25 },
+  { x: 33, y: 5 },
+  { x: 4, y: 7 },
 ];
 const resourceStartData: {
   id: string;
@@ -82,9 +100,15 @@ const resourceStartData: {
   resourceType: ResourceType;
 }[] = [
   { id: resourceIds[0], position: { x: 2, y: 5 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 11, y: 2 }, resourceType: "ore" },
+  { id: resourceIds[1], position: { x: 12, y: 2 }, resourceType: "ore" },
   { id: resourceIds[2], position: { x: 17, y: 5 }, resourceType: "herb" },
   { id: resourceIds[3], position: { x: 6, y: 13 }, resourceType: "wood" },
+  { id: resourceIds[4], position: { x: 30, y: 10 }, resourceType: "ore" },
+  { id: resourceIds[5], position: { x: 25, y: 15 }, resourceType: "herb" },
+  { id: resourceIds[6], position: { x: 9, y: 22 }, resourceType: "wood" },
+  { id: resourceIds[7], position: { x: 16, y: 24 }, resourceType: "ore" },
+  { id: resourceIds[8], position: { x: 32, y: 24 }, resourceType: "herb" },
+  { id: resourceIds[9], position: { x: 22, y: 12 }, resourceType: "wood" },
 ];
 
 function createInitialState(): GameState {
@@ -422,6 +446,7 @@ function App() {
               }}
               title="Companion"
             >
+              <span className="companion-map-id">{index + 1}</span>
               <EntityDebugLabel
                 name={`C${index + 1}`}
                 entity={companion}

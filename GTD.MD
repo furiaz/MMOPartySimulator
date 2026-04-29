@@ -138,7 +138,7 @@ Entities act based on state:
 - follow → move toward target
 - attack → engage enemy
 - gather → interact with resource
-- defend → protect area
+- defend → frontline behavior, position in front of leader and engage leader’s target
 
 State-driven behavior is the core of automation.
 
@@ -246,8 +246,10 @@ Never skip this order.
 - follow → entity follows assigned target (usually main character)
 - attack → entity moves toward and attacks target
 - gather → entity gathers from a resource
-- defend → (planned) area control behavior
-
+- defend → frontline role:
+  - positions ahead of leader
+  - engages leader’s target
+  - does not chase far from leader
 ---
 
 ### Command Rules
@@ -347,8 +349,7 @@ Companions:
 - can follow
 - can attack
 - can gather
-- can defend
-- can be damaged
+- can defend (frontline role, not area guard)- can be damaged
 - have health
 - have combat stats
 - have gatherSpeed
@@ -408,3 +409,30 @@ Resources use a two-layer depletion model:
 - Current resource types include wood, ore, and herb
 - Future systems may modify gatherSpeed based on skills/tools
 - Resources may later have different maxDurability and quantity values
+
+## Formation Rules (Current)
+
+- Leader selects targets
+- Defenders:
+  - receive leader’s target
+  - move first toward intercept
+  - stay within short distance (~2 tiles) of leader
+- Leader:
+  - follows behind defenders during engagement
+- Fighters:
+  - follow leader and assist combat
+- Gatherers:
+  - operate around leader and commit to resource gathering
+
+### Movement Priority
+
+- Defender moves first
+- Leader moves after defender
+- Fighters follow leader
+- Gatherers act independently unless commanded
+
+### Constraints
+
+- No entity stacking
+- Avoid oscillation and body-block loops
+- Formation adapts naturally in narrow spaces (single-file movement)

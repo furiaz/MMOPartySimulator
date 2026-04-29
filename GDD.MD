@@ -70,9 +70,19 @@ Focus is on task assignment, not manual gathering.
 
 ## Defend System
 
-- Companions can guard an area or resource
-- They react to nearby threats autonomously
-- This enables area control and emergent gameplay
+- Defenders act as the frontline of the party
+- They position themselves in front of the main character
+- Defenders engage enemies first using the leader’s current target
+- They do not wander or chase enemies across the map
+- They remain close to the leader (short leash)
+- They initiate combat and absorb first contact
+
+This creates a party formation:
+
+Front: Defender  
+Middle: Main Character  
+Support: Fighters  
+Periphery: Gatherers
 
 ---
 
