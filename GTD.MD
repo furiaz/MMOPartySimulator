@@ -382,3 +382,29 @@ Resources:
 - do not attack
 - do not have health
 - do not gather
+
+## Resource Node Model
+
+Resources use a two-layer depletion model:
+
+- durability/currentDurability = progress toward extracting 1 resource
+- maxDurability = durability reset value
+- quantity/remainingAmount = number of resources still available in the node
+- depleted = true when no resources remain
+
+### Gathering Flow
+
+1. Gatherer reduces resource durability based on gatherSpeed
+2. When durability reaches 0 or less:
+   - add 1 resource to inventory based on resourceType
+   - reduce node quantity by 1
+3. If node quantity is still above 0:
+   - reset durability to maxDurability
+4. If node quantity is 0 or less:
+   - mark node as depleted or remove it
+
+### Notes
+
+- Current resource types include wood, ore, and herb
+- Future systems may modify gatherSpeed based on skills/tools
+- Resources may later have different maxDurability and quantity values
