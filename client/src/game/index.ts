@@ -5,6 +5,8 @@ export type {
   CommandPriority,
   Companion,
   CompanionRole,
+  CombatFeedbackEvent,
+  CombatFeedbackType,
   Enemy,
   EnemyAggressionMode,
   EntityKind,
@@ -42,8 +44,10 @@ export {
 } from "./entities";
 export {
   addEnemy,
+  addCombatFeedback,
   addEntity,
   addResourceToInventory,
+  clearExpiredCombatFeedback,
   createEmptyResourceInventory,
   getEntityById,
   setAutoModeEnabled,

@@ -5,6 +5,7 @@ import {
   setLastAttackAt,
 } from "./entities";
 import {
+  addCombatFeedback,
   getEntityById,
   moveEntityTowardIfUnoccupied,
   updateEntity,
@@ -75,6 +76,7 @@ export function updateAttackSystem(
       const updatedTarget = updateTargetAfterDamage(target, attacker);
       const updatedAttacker = setLastAttackAt(attacker, now);
 
+      nextState = addAttackFeedback(nextState, attacker, updatedTarget, now);
       nextState = updateEntity(
         nextState,
         updatedTarget,
@@ -101,6 +103,38 @@ export function updateAttackSystem(
       getCombatMovementTarget(nextState, attacker, target),
     );
     movedEntityIds.add(attacker.id);
+  }
+
+  return nextState;
+}
+
+function addAttackFeedback(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+  now: number,
+): GameState {
+  let nextState = addCombatFeedback(state, {
+    type: "attack",
+    entityId: attacker.id,
+    text: "Attack",
+    now,
+  });
+
+  nextState = addCombatFeedback(nextState, {
+    type: "damage",
+    entityId: target.id,
+    text: `-${ATTACK_DAMAGE} HP`,
+    now,
+  });
+
+  if (target.state === "dead") {
+    nextState = addCombatFeedback(nextState, {
+      type: "death",
+      entityId: target.id,
+      text: "Defeated",
+      now,
+    });
   }
 
   return nextState;

@@ -1,5 +1,7 @@
 import { isCombatEntity, moveEntityTo, moveEntityToward } from "./entities";
 import type {
+  CombatFeedbackEvent,
+  CombatFeedbackType,
   GameMap,
   GameEntity,
   Enemy,
@@ -11,6 +13,7 @@ import type {
 } from "./types";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
+const COMBAT_FEEDBACK_DURATION_MS = 900;
 
 type FindAvailablePositionOptions = {
   blockedPositions?: Position[];
@@ -31,6 +34,7 @@ export type GameState = {
   reservedPositionsByEntityId?: Record<string, Position>;
   defenderWaitTicksByLeaderId?: Record<string, number>;
   defenderBlockedTicksByEntityId?: Record<string, number>;
+  combatFeedbackEvents: CombatFeedbackEvent[];
 };
 
 export function createEmptyResourceInventory(): ResourceInventory {
@@ -84,6 +88,49 @@ export function updateEntity(state: GameState, entity: GameEntity): GameState {
             ),
           }
         : state.followTrailsByEntityId,
+  };
+}
+
+export function addCombatFeedback(
+  state: GameState,
+  event: {
+    type: CombatFeedbackType;
+    entityId: string;
+    text: string;
+    now: number;
+  },
+): GameState {
+  return {
+    ...state,
+    combatFeedbackEvents: [
+      ...state.combatFeedbackEvents,
+      {
+        id: `${event.now}-${event.type}-${event.entityId}-${state.combatFeedbackEvents.length}`,
+        type: event.type,
+        entityId: event.entityId,
+        text: event.text,
+        createdAt: event.now,
+        expiresAt: event.now + COMBAT_FEEDBACK_DURATION_MS,
+      },
+    ],
+  };
+}
+
+export function clearExpiredCombatFeedback(
+  state: GameState,
+  now = Date.now(),
+): GameState {
+  const combatFeedbackEvents = state.combatFeedbackEvents.filter(
+    (event) => event.expiresAt > now,
+  );
+
+  if (combatFeedbackEvents.length === state.combatFeedbackEvents.length) {
+    return state;
+  }
+
+  return {
+    ...state,
+    combatFeedbackEvents,
   };
 }
 

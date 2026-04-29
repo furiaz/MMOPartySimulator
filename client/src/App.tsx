@@ -18,11 +18,13 @@ import {
   debugRestorePartyHealth,
   issueCompanionCommands,
   issueEntityCommand,
+  isCombatEntity,
   setAutoModeEnabled,
   setCompanionRole,
   startGameLoop,
   type Companion,
   type CompanionRole,
+  type CombatEntity,
   type Enemy,
   type GameEntity,
   type GameState,
@@ -116,6 +118,7 @@ function createInitialState(): GameState {
       [`${player.position.x},${player.position.y}`]: true,
     },
     followTrailsByEntityId: {},
+    combatFeedbackEvents: [],
   });
 
   return enemies.reduce(addEnemy, baseState);
@@ -150,10 +153,59 @@ function EntityDebugLabel({
   );
 }
 
+type HealthBarEntity = GameEntity & {
+  health: number;
+  maxHealth: number;
+};
+
+function hasHealthBar(entity: GameEntity): entity is HealthBarEntity {
+  return "health" in entity && "maxHealth" in entity;
+}
+
+function HealthBar({ entity }: { entity: HealthBarEntity }) {
+  const healthPercent =
+    entity.maxHealth > 0
+      ? Math.max(0, Math.min(100, (entity.health / entity.maxHealth) * 100))
+      : 0;
+
+  return (
+    <span
+      className="health-bar"
+      title={`HP ${entity.health}/${entity.maxHealth}`}
+    >
+      <span style={{ width: `${healthPercent}%` }} />
+    </span>
+  );
+}
+
+function AttackCooldownIndicator({
+  entity,
+  currentTime,
+}: {
+  entity: CombatEntity;
+  currentTime: number;
+}) {
+  const cooldownProgress = Math.max(
+    0,
+    1 - (currentTime - entity.lastAttackAt) / 1000,
+  );
+
+  if (cooldownProgress <= 0 || entity.state === "dead") {
+    return null;
+  }
+
+  return (
+    <span className="attack-cooldown">
+      <span style={{ width: `${cooldownProgress * 100}%` }} />
+    </span>
+  );
+}
+
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(true);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const stopLoopRef = useRef<(() => void) | null>(null);
 
   const player = gameState.entities[playerId] as Player;
@@ -172,7 +224,12 @@ function App() {
   const inventory = gameState.inventory;
 
   useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 100);
+
     return () => {
+      window.clearInterval(intervalId);
       stopLoopRef.current?.();
     };
   }, []);
@@ -315,6 +372,27 @@ function App() {
               }}
             />
           ))}
+          {gameState.combatFeedbackEvents.map((event) => {
+            const entity = gameState.entities[event.entityId];
+
+            if (!entity) {
+              return null;
+            }
+
+            return (
+              <div
+                key={event.id}
+                className={`combat-feedback ${event.type}`}
+                style={{
+                  transform: `translate(${entity.position.x * cellSize}px, ${
+                    entity.position.y * cellSize
+                  }px)`,
+                }}
+              >
+                {event.text}
+              </div>
+            );
+          })}
           <div
             className="entity-marker player"
             style={{
@@ -330,6 +408,8 @@ function App() {
               detail={`HP ${player.health} GS ${player.gatherSpeed}`}
               isVisible={showEntityInfo}
             />
+            <HealthBar entity={player} />
+            <AttackCooldownIndicator entity={player} currentTime={currentTime} />
           </div>
           {companions.map((companion, index) => (
             <div
@@ -347,6 +427,11 @@ function App() {
                 entity={companion}
                 detail={`HP ${companion.health} GS ${companion.gatherSpeed} Role ${companion.role}`}
                 isVisible={showEntityInfo}
+              />
+              <HealthBar entity={companion} />
+              <AttackCooldownIndicator
+                entity={companion}
+                currentTime={currentTime}
               />
             </div>
           ))}
@@ -370,6 +455,7 @@ function App() {
                     Target {enemy.currentTargetId ?? "none"}
                   </>
                 ) : null}
+                <HealthBar entity={enemy} />
               </div>
             ) : (
               <div
@@ -389,6 +475,13 @@ function App() {
                   detail={`HP ${enemy.health} Aggro ${enemy.aggressionMode}`}
                   isVisible={showEntityInfo}
                 />
+                {hasHealthBar(enemy) ? <HealthBar entity={enemy} /> : null}
+                {isCombatEntity(enemy) ? (
+                  <AttackCooldownIndicator
+                    entity={enemy}
+                    currentTime={currentTime}
+                  />
+                ) : null}
               </div>
             ),
           )}

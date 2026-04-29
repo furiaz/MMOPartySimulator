@@ -30,6 +30,7 @@
 }
 
 .entity-marker,
+.combat-feedback,
 .dead-label,
 .depleted-label,
 .wall-tile {
@@ -38,10 +39,73 @@
   left: 0;
 }
 
+.combat-feedback {
+  z-index: 3;
+  min-width: 48px;
+  margin: -18px 0 0 -10px;
+  padding: 2px 4px;
+  border: 1px solid #334155;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
+.combat-feedback.attack {
+  border-color: #1d4ed8;
+  color: #1d4ed8;
+}
+
+.combat-feedback.damage {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.combat-feedback.death {
+  border-color: #111827;
+  background: #fee2e2;
+  color: #111827;
+}
+
 .entity-marker {
   width: 22px;
   height: 22px;
   margin: 3px;
+}
+
+.attack-cooldown {
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 22px;
+  height: 3px;
+  border: 1px solid #334155;
+  background: #ffffff;
+}
+
+.attack-cooldown span {
+  display: block;
+  height: 100%;
+  background: #f59e0b;
+}
+
+.health-bar {
+  position: absolute;
+  left: -4px;
+  top: -8px;
+  width: 30px;
+  height: 4px;
+  border: 1px solid #334155;
+  background: #ffffff;
+  pointer-events: none;
+}
+
+.health-bar span {
+  display: block;
+  height: 100%;
+  background: #22c55e;
 }
 
 .wall-tile {

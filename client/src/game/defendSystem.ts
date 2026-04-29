@@ -1,5 +1,6 @@
 import { damageEntity, setLastAttackAt } from "./entities";
 import {
+  addCombatFeedback,
   moveEntityTowardIfUnoccupied,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
@@ -168,7 +169,29 @@ function attackDefenderTarget(
     currentTargetId: damagedTarget.state === "dead" ? null : target.id,
   }, now);
 
-  let nextState = updateEntity(state, damagedTarget);
+  let nextState = addCombatFeedback(state, {
+    type: "attack",
+    entityId: defender.id,
+    text: "Attack",
+    now,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "damage",
+    entityId: damagedTarget.id,
+    text: `-${DEFENDER_ATTACK_DAMAGE} HP`,
+    now,
+  });
+
+  if (damagedTarget.state === "dead") {
+    nextState = addCombatFeedback(nextState, {
+      type: "death",
+      entityId: damagedTarget.id,
+      text: "Defeated",
+      now,
+    });
+  }
+
+  nextState = updateEntity(nextState, damagedTarget);
 
   if (damagedTarget.state !== "dead") {
     nextState = updateEntity(nextState, {

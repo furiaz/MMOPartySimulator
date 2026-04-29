@@ -8,10 +8,14 @@ import {
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updateRoleSystem } from "./roleSystem";
-import { clearTickMovementPlanning, type GameState } from "./state";
+import {
+  clearExpiredCombatFeedback,
+  clearTickMovementPlanning,
+  type GameState,
+} from "./state";
 
 export function updateGame(state: GameState): GameState {
-  let nextState = clearTickMovementPlanning(state);
+  let nextState = clearExpiredCombatFeedback(clearTickMovementPlanning(state));
   const movedEntityIds = new Set<string>();
 
   if (nextState.autoModeEnabled) {
@@ -28,5 +32,5 @@ export function updateGame(state: GameState): GameState {
   nextState = updateAttackSystem(nextState, movedEntityIds);
   nextState = updateGatherSystem(nextState, movedEntityIds);
 
-  return nextState;
+  return clearExpiredCombatFeedback(nextState);
 }

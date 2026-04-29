@@ -9,7 +9,6 @@ import {
 } from "./state";
 import type { Companion, Enemy, Player, Position, ResourceEntity } from "./types";
 
-const DEBUG_HEALTH = 10;
 const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
 const DEBUG_RESOURCE_QUANTITY = 3;
@@ -113,7 +112,8 @@ export function debugResurrectEnemy(
   const enemy: Enemy = {
     ...entity,
     state: "idle",
-    health: DEBUG_ENEMY_HEALTH,
+    health: entity.maxHealth || DEBUG_ENEMY_HEALTH,
+    maxHealth: entity.maxHealth || DEBUG_ENEMY_HEALTH,
     currentTargetId: null,
     lastAttackAt: 0,
   };
@@ -194,7 +194,7 @@ function resetResource(resource: ResourceEntity): ResourceEntity {
 function restorePartyMember<T extends Player | Companion>(entity: T): T {
   return {
     ...entity,
-    health: DEBUG_HEALTH,
+    health: entity.maxHealth,
     state: entity.state === "dead" ? "idle" : entity.state,
   };
 }

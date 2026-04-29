@@ -35,6 +35,17 @@ export type LeaderIntent = {
   targetPosition: Position | null;
 };
 
+export type CombatFeedbackType = "attack" | "damage" | "death";
+
+export type CombatFeedbackEvent = {
+  id: string;
+  type: CombatFeedbackType;
+  entityId: string;
+  text: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
 export type GameMap = {
   columns: number;
   rows: number;
@@ -50,6 +61,7 @@ export type BaseEntity = {
 
 export type LivingEntity = BaseEntity & {
   health: number;
+  maxHealth: number;
   lastAttackAt: number;
 };
 
