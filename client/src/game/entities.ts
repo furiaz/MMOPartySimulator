@@ -69,6 +69,7 @@ export function createResource(
   id: string,
   position: Position,
   durability = STARTING_RESOURCE_DURABILITY,
+  maxGatherers = 1,
 ): ResourceEntity {
   return {
     id,
@@ -76,6 +77,7 @@ export function createResource(
     position,
     state: "idle",
     durability,
+    maxGatherers,
     isDepleted: false,
   };
 }

@@ -53,6 +53,7 @@ export type Companion = LivingEntity & {
 export type ResourceEntity = BaseEntity & {
   kind: "resource";
   durability: number;
+  maxGatherers: number;
   isDepleted: boolean;
 };
 

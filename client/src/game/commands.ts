@@ -30,6 +30,17 @@ export type CompanionCommand =
       priority?: CommandPriority;
     };
 
+export type CompanionGroupCommand =
+  | {
+      type: "idle";
+      priority?: CommandPriority;
+    }
+  | {
+      type: TargetedEntityCommandType;
+      targetId: string;
+      priority?: CommandPriority;
+    };
+
 export function issueEntityCommand(
   state: GameState,
   command: EntityCommand,
@@ -93,6 +104,30 @@ export function issueCompanionCommand(
         };
 
   return issueEntityCommand(state, entityCommand);
+}
+
+export function issueCompanionCommands(
+  state: GameState,
+  companionIds: string[],
+  command: CompanionGroupCommand,
+): GameState {
+  return companionIds.reduce((nextState, companionId) => {
+    const companionCommand =
+      command.type === "idle"
+        ? {
+            type: command.type,
+            companionId,
+            priority: command.priority,
+          }
+        : {
+            type: command.type,
+            companionId,
+            targetId: command.targetId,
+            priority: command.priority,
+          };
+
+    return issueCompanionCommand(nextState, companionCommand);
+  }, state);
 }
 
 function canApplyCommand(

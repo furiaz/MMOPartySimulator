@@ -1,6 +1,7 @@
 import { isAutonomousEntity } from "./entities";
+import { protectLeader } from "./partyProtectionSystem";
 import { getEntityById, updateEntity, type GameState } from "./state";
-import type { Enemy, GameEntity } from "./types";
+import type { Enemy, GameEntity, Player } from "./types";
 
 const ENEMY_DETECTION_RANGE = 5;
 
@@ -18,6 +19,10 @@ export function updateEnemyAISystem(state: GameState): GameState {
 
     if (currentTarget && isValidEnemyTarget(currentTarget)) {
       if (entity.state === "attack") {
+        if (isPlayer(currentTarget)) {
+          nextState = protectLeader(nextState, currentTarget, entity);
+        }
+
         continue;
       }
 
@@ -27,6 +32,9 @@ export function updateEnemyAISystem(state: GameState): GameState {
       };
 
       nextState = updateEntity(nextState, updatedEnemy);
+      if (isPlayer(currentTarget)) {
+        nextState = protectLeader(nextState, currentTarget, updatedEnemy);
+      }
       continue;
     }
 
@@ -52,6 +60,9 @@ export function updateEnemyAISystem(state: GameState): GameState {
     };
 
     nextState = updateEntity(nextState, updatedEnemy);
+    if (isPlayer(target)) {
+      nextState = protectLeader(nextState, target, updatedEnemy);
+    }
   }
 
   return nextState;
@@ -104,4 +115,8 @@ function getDistanceSquared(a: GameEntity, b: GameEntity): number {
 
 function isEnemy(entity: GameEntity): entity is Enemy {
   return entity.kind === "enemy";
+}
+
+function isPlayer(entity: GameEntity): entity is Player {
+  return entity.kind === "player";
 }

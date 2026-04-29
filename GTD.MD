@@ -221,3 +221,19 @@ Never skip this order.
 - These should be isolated from core systems
 - They must not affect final game architecture
 
+## Behavior End Rules
+
+- Idle entities do nothing.
+- Follow entities follow their assigned follow target.
+- Gather ends when the target resource is depleted, then switches to follow.
+- Attack ends when target is dead or gone.
+- After attack ends, entity helps another party member still in combat if possible; otherwise it switches to follow.
+- Defend is a toggle/explicit role, not automatic.
+- Auto-retaliate is planned later and should only affect party members that are not actively busy.
+
+## Gathering Limits
+
+- Resources can define how many entities may gather them at once.
+- Current default is 1 gatherer per resource.
+- If extra entities are ordered to gather a full resource, they switch to follow the leader.
+- Future resources may require or allow multiple gatherers.

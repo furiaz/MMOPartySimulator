@@ -10,7 +10,14 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import type { CombatEntity, Enemy, GameEntity } from "./types";
+import { protectLeader } from "./partyProtectionSystem";
+import type {
+  AutonomousEntity,
+  CombatEntity,
+  Enemy,
+  GameEntity,
+  Player,
+} from "./types";
 
 const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
@@ -31,16 +38,19 @@ export function updateAttackSystem(
     }
 
     if (!attacker.currentTargetId) {
+      nextState = updateEntity(nextState, finishAttack(nextState, attacker));
       continue;
     }
 
     const target = getEntityById(nextState, attacker.currentTargetId);
 
     if (!target) {
+      nextState = updateEntity(nextState, finishAttack(nextState, attacker));
       continue;
     }
 
     if (!isCombatEntity(target) || target.state === "dead") {
+      nextState = updateEntity(nextState, finishAttack(nextState, attacker));
       continue;
     }
 
@@ -49,11 +59,22 @@ export function updateAttackSystem(
         continue;
       }
 
+      const updatedTarget = updateTargetAfterDamage(target, attacker);
+      const updatedAttacker = setLastAttackAt(attacker, now);
+
       nextState = updateEntity(
         nextState,
-        updateTargetAfterDamage(target, attacker),
+        updatedTarget,
       );
-      nextState = updateEntity(nextState, setLastAttackAt(attacker, now));
+      if (isEnemy(attacker) && isPlayer(updatedTarget)) {
+        nextState = protectLeader(nextState, updatedTarget, attacker);
+      }
+      nextState = updateEntity(
+        nextState,
+        updatedTarget.state === "dead"
+          ? finishAttack(nextState, updatedAttacker)
+          : updatedAttacker,
+      );
       continue;
     }
 
@@ -108,4 +129,62 @@ function updateTargetAfterDamage(
 
 function isEnemy(entity: GameEntity): entity is Enemy {
   return entity.kind === "enemy";
+}
+
+function isPlayer(entity: GameEntity): entity is Player {
+  return entity.kind === "player";
+}
+
+function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
+  if (!isAutonomousEntity(attacker)) {
+    return {
+      ...attacker,
+      state: "idle",
+      currentTargetId: null,
+    };
+  }
+
+  const sharedTarget = findPartyCombatTarget(state, attacker.id);
+
+  if (sharedTarget) {
+    return {
+      ...attacker,
+      state: "attack",
+      currentTargetId: sharedTarget.id,
+    };
+  }
+
+  return switchToFollow(attacker);
+}
+
+function findPartyCombatTarget(
+  state: GameState,
+  attackerId: string,
+): CombatEntity | undefined {
+  for (const entity of Object.values(state.entities)) {
+    if (
+      entity.id === attackerId ||
+      !isAutonomousEntity(entity) ||
+      entity.state !== "attack" ||
+      !entity.currentTargetId
+    ) {
+      continue;
+    }
+
+    const target = getEntityById(state, entity.currentTargetId);
+
+    if (isCombatEntity(target) && target.state !== "dead") {
+      return target;
+    }
+  }
+
+  return undefined;
+}
+
+function switchToFollow(entity: AutonomousEntity): AutonomousEntity {
+  return {
+    ...entity,
+    state: "follow",
+    currentTargetId: entity.kind === "companion" ? entity.followTargetId : null,
+  };
 }

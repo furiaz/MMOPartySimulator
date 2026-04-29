@@ -13,7 +13,7 @@ import {
   debugRemoveCompanionFromParty,
   debugResurrectEnemy,
   debugRestorePartyHealth,
-  issueCompanionCommand,
+  issueCompanionCommands,
   issueEntityCommand,
   startGameLoop,
   type Companion,
@@ -61,9 +61,13 @@ function App() {
   const companions = companionIds
     .map((id) => gameState.entities[id] as Companion | undefined)
     .filter((companion): companion is Companion => Boolean(companion));
-  const primaryCompanion = companions[0];
+  const activeCompanionIds = companions.map((companion) => companion.id);
   const enemy = gameState.entities[enemyId] as Enemy;
   const resource = gameState.entities[resourceId] as ResourceEntity;
+  const resourceGathererCount = [player, ...companions].filter(
+    (entity) =>
+      entity.state === "gather" && entity.currentTargetId === resourceId,
+  ).length;
 
   useEffect(() => {
     return () => {
@@ -83,29 +87,27 @@ function App() {
     setIsSimulationRunning(true);
   }
 
-  function commandCompanionToFollow() {
-    if (!primaryCompanion) {
+  function commandCompanionsToFollow() {
+    if (activeCompanionIds.length === 0) {
       return;
     }
 
     setGameState((state) =>
-      issueCompanionCommand(state, {
+      issueCompanionCommands(state, activeCompanionIds, {
         type: "follow",
-        companionId: primaryCompanion.id,
         targetId: playerId,
       }),
     );
   }
 
-  function commandCompanionToIdle() {
-    if (!primaryCompanion) {
+  function commandCompanionsToIdle() {
+    if (activeCompanionIds.length === 0) {
       return;
     }
 
     setGameState((state) =>
-      issueCompanionCommand(state, {
+      issueCompanionCommands(state, activeCompanionIds, {
         type: "idle",
-        companionId: primaryCompanion.id,
       }),
     );
   }
@@ -118,30 +120,21 @@ function App() {
         targetId: enemyId,
       });
 
-      if (!primaryCompanion) {
-        return playerAttackState;
-      }
-
-      return issueEntityCommand(
-        playerAttackState,
-        {
-          type: "attack",
-          entityId: primaryCompanion.id,
-          targetId: enemyId,
-        },
-      );
+      return issueCompanionCommands(playerAttackState, activeCompanionIds, {
+        type: "attack",
+        targetId: enemyId,
+      });
     });
   }
 
-  function commandCompanionToGatherResource() {
-    if (!primaryCompanion) {
+  function commandCompanionsToGatherResource() {
+    if (activeCompanionIds.length === 0) {
       return;
     }
 
     setGameState((state) =>
-      issueCompanionCommand(state, {
+      issueCompanionCommands(state, activeCompanionIds, {
         type: "gather",
-        companionId: primaryCompanion.id,
         targetId: resourceId,
       }),
     );
@@ -270,25 +263,35 @@ function App() {
           <button onClick={toggleSimulationLoop}>
             {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
           </button>
-          <button onClick={commandCompanionToFollow}>Follow</button>
-          <button onClick={commandCompanionToIdle}>Idle</button>
+          <button onClick={commandCompanionsToFollow}>Follow All</button>
+          <button onClick={commandCompanionsToIdle}>Idle All</button>
           <button onClick={commandPartyToTargetEnemy}>Target Enemy</button>
-          <button onClick={commandCompanionToGatherResource}>
-            Gather Resource
+          <button onClick={commandCompanionsToGatherResource}>
+            Gather Resource All
           </button>
           <span>
             Player ({player.position.x}, {player.position.y}) | State{" "}
             {player.state} | HP {player.health} | Target{" "}
             {player.currentTargetId ?? "none"} |
-            Party {companions.length + 1}/4 | Companion{" "}
-            {primaryCompanion
-              ? `(${primaryCompanion.position.x}, ${primaryCompanion.position.y}) | State ${primaryCompanion.state} | HP ${primaryCompanion.health} | Target ${primaryCompanion.currentTargetId ?? "none"}`
-              : "not in party"}{" "}
-            | Enemy ({enemy.position.x},{" "}
+            Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
             {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
             Resource ({resource.position.x}, {resource.position.y}) | Durability{" "}
-            {resource.durability} | Depleted {resource.isDepleted ? "yes" : "no"}
+            {resource.durability} | Gatherers {resourceGathererCount}/
+            {resource.maxGatherers} | Depleted{" "}
+            {resource.isDepleted ? "yes" : "no"}
           </span>
+          <div className="companion-status-list">
+            {companions.length > 0
+              ? companions.map((companion, index) => (
+                  <span key={companion.id}>
+                    C{index + 1} ({companion.position.x},{" "}
+                    {companion.position.y}) | State {companion.state} | HP{" "}
+                    {companion.health} | Target{" "}
+                    {companion.currentTargetId ?? "none"}
+                  </span>
+                ))
+              : "No companions in party"}
+          </div>
         </div>
 
         <section className="debug-tools" aria-label="Debug tools">

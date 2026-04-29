@@ -103,6 +103,13 @@
   flex-wrap: wrap;
 }
 
+.companion-status-list {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+  font-size: 14px;
+}
+
 .debug-tools {
   margin-top: 20px;
   padding-top: 16px;

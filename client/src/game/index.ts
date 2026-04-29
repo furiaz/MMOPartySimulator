@@ -38,7 +38,9 @@ export { addEntity, getEntityById, updateEntity } from "./state";
 export {
   issueEntityCommand,
   issueCompanionCommand,
+  issueCompanionCommands,
   type CompanionCommand,
+  type CompanionGroupCommand,
   type EntityCommand,
 } from "./commands";
 export { updateGame } from "./updateGame";
