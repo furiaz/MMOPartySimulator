@@ -237,3 +237,75 @@ Never skip this order.
 - Current default is 1 gatherer per resource.
 - If extra entities are ordered to gather a full resource, they switch to follow the leader.
 - Future resources may require or allow multiple gatherers.
+
+## Behavior Rules (Current)
+
+### States
+
+- idle → entity does nothing
+- follow → entity follows assigned target (usually main character)
+- attack → entity moves toward and attacks target
+- gather → entity gathers from a resource
+- defend → (planned) area control behavior
+
+---
+
+### Command Rules
+
+- Commands can be:
+  - direct (single entity)
+  - group (multiple entities)
+- Direct commands override only the targeted entity
+- Extra entities (e.g. over-cap gatherers) fallback to follow
+
+---
+
+### Behavior Priority
+
+- Each entity executes only ONE behavior per tick
+- Behavior is determined strictly by entity state
+- Systems must not conflict
+
+---
+
+### Behavior End Rules
+
+- gather → ends when resource is depleted → switch to follow
+- attack → ends when target is dead or gone:
+  - if another party member is in combat → assist
+  - otherwise → switch to follow
+- idle → remains idle until commanded
+
+---
+
+### Movement Rules
+
+- Entities cannot occupy the same tile
+- If destination is occupied:
+  - try simple alternative positions
+  - otherwise stay in place
+
+---
+
+### Gathering Rules
+
+- Resources define maxGatherers (default = 1)
+- If too many entities try to gather:
+  - allowed entities gather
+  - extra entities fallback to follow
+
+---
+
+### Party Protection
+
+- When main character is attacked:
+  - companions in idle or follow switch to attack
+  - companions already busy (gather/attack/defend) are NOT interrupted
+
+---
+
+### Future Rules (Planned)
+
+- Defend is a toggle/assigned role, not automatic
+- Auto-retaliate will only affect idle/follow entities
+- Player manual input (WASD, click) will override autonomous behavior
