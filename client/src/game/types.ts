@@ -27,6 +27,12 @@ export type Position = {
   y: number;
 };
 
+export type GameMap = {
+  columns: number;
+  rows: number;
+  walls: Position[];
+};
+
 export type BaseEntity = {
   id: string;
   kind: EntityKind;

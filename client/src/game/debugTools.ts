@@ -1,5 +1,12 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
-import { addEntity, getEntityById, updateEntity, type GameState } from "./state";
+import {
+  addEntity,
+  findClosestAvailablePosition,
+  getEntityById,
+  isWallPosition,
+  updateEntity,
+  type GameState,
+} from "./state";
 import type { Companion, Enemy, Player, Position, ResourceEntity } from "./types";
 
 const DEBUG_HEALTH = 10;
@@ -47,9 +54,12 @@ export function debugRemoveCompanion(
     return state;
   }
 
-  const { [companionId]: _removed, ...entities } = state.entities;
+  const entities = { ...state.entities };
+  const followTrailsByEntityId = { ...state.followTrailsByEntityId };
+  delete entities[companionId];
+  delete followTrailsByEntityId[companionId];
 
-  return { ...state, entities };
+  return { ...state, entities, followTrailsByEntityId };
 }
 
 export function debugRemoveCompanionFromParty(
@@ -74,14 +84,15 @@ export function debugRandomizeLocations(
   maxY: number,
 ): GameState {
   let nextState = state;
+  const usedPositions = new Set<string>();
 
   for (const entity of Object.values(state.entities)) {
+    const position = getRandomOpenPosition(nextState, maxX, maxY, usedPositions);
+    usedPositions.add(getPositionKey(position));
+
     nextState = updateEntity(
       nextState,
-      moveEntityTo(entity, {
-        x: getRandomInt(maxX),
-        y: getRandomInt(maxY),
-      }),
+      moveEntityTo(entity, position),
     );
   }
 
@@ -131,7 +142,38 @@ export function debugRefreshResources(state: GameState): GameState {
       continue;
     }
 
+    nextState = moveEntitiesOffResourcePosition(nextState, entity);
     nextState = updateEntity(nextState, resetResource(entity));
+  }
+
+  return nextState;
+}
+
+function moveEntitiesOffResourcePosition(
+  state: GameState,
+  resource: ResourceEntity,
+): GameState {
+  let nextState = state;
+
+  for (const entity of Object.values(state.entities)) {
+    if (
+      entity.id === resource.id ||
+      entity.kind === "resource" ||
+      !isSamePosition(entity.position, resource.position)
+    ) {
+      continue;
+    }
+
+    nextState = updateEntity(
+      nextState,
+      moveEntityTo(
+        entity,
+        findClosestAvailablePosition(nextState, entity.position, {
+          blockedPositions: [resource.position],
+          ignoredEntityId: entity.id,
+        }),
+      ),
+    );
   }
 
   return nextState;
@@ -158,4 +200,38 @@ function restorePartyMember<T extends Player | Companion>(entity: T): T {
 
 function getRandomInt(maxExclusive: number): number {
   return Math.floor(Math.random() * maxExclusive);
+}
+
+function getRandomOpenPosition(
+  state: GameState,
+  maxX: number,
+  maxY: number,
+  usedPositions: Set<string>,
+): Position {
+  const openPositions: Position[] = [];
+
+  for (let y = 0; y < maxY; y += 1) {
+    for (let x = 0; x < maxX; x += 1) {
+      const position = { x, y };
+
+      if (
+        isWallPosition(state, position) ||
+        usedPositions.has(getPositionKey(position))
+      ) {
+        continue;
+      }
+
+      openPositions.push(position);
+    }
+  }
+
+  return openPositions[getRandomInt(openPositions.length)] ?? { x: 0, y: 0 };
+}
+
+function getPositionKey(position: Position): string {
+  return `${position.x},${position.y}`;
+}
+
+function isSamePosition(a: Position, b: Position): boolean {
+  return a.x === b.x && a.y === b.y;
 }

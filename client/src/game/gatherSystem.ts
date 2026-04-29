@@ -11,6 +11,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
+import { isResourceTargetInRange } from "./targetSelection";
 import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = 1;
@@ -43,10 +44,28 @@ export function updateGatherSystem(
     }
 
     if (
+      gatherer.kind === "companion" &&
+      gatherer.commandPriority === "autonomous" &&
+      !isResourceTargetInRange(
+        nextState,
+        resource,
+        gatherer.position,
+        { maxDistance: getReachableSearchLimit(nextState) },
+      )
+    ) {
+      nextState = updateEntity(nextState, switchToFollow(gatherer));
+      continue;
+    }
+
+    if (
       !allowedGathererIdsByResource
         .get(resource.id)
         ?.has(gatherer.id)
     ) {
+      if (isCommittedGatherer(gatherer)) {
+        continue;
+      }
+
       nextState = updateEntity(nextState, switchToFollow(gatherer));
       continue;
     }
@@ -94,6 +113,14 @@ export function updateGatherSystem(
 
 function isGatheringEntity(entity: GameEntity): entity is AutonomousEntity {
   return isAutonomousEntity(entity) && entity.state === "gather";
+}
+
+function isCommittedGatherer(entity: AutonomousEntity): boolean {
+  return (
+    entity.kind === "companion" &&
+    entity.role === "gatherer" &&
+    entity.commandPriority === "autonomous"
+  );
 }
 
 function getAllowedGathererIdsByResource(
@@ -147,6 +174,12 @@ function canGather(entity: AutonomousEntity, now: number): boolean {
 
 function getGatherAmount(gatherer: AutonomousEntity): number {
   return Math.max(0, gatherer.gatherSpeed);
+}
+
+function getReachableSearchLimit(state: GameState): number {
+  return state.map
+    ? state.map.columns * state.map.rows
+    : Number.POSITIVE_INFINITY;
 }
 
 function switchToFollow(entity: AutonomousEntity): AutonomousEntity {

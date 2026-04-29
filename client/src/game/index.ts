@@ -10,6 +10,7 @@ export type {
   EntityKind,
   EntityState,
   GameEntity,
+  GameMap,
   LivingEntity,
   Player,
   Position,
@@ -38,10 +39,13 @@ export {
   updateCompanionFollow,
 } from "./entities";
 export {
+  addEnemy,
   addEntity,
   addResourceToInventory,
   createEmptyResourceInventory,
   getEntityById,
+  setAutoModeEnabled,
+  setCompanionRole,
   updateEntity,
 } from "./state";
 export {
@@ -55,9 +59,11 @@ export {
 export { updateGame } from "./updateGame";
 export { updateAttackSystem } from "./attackSystem";
 export { updateEnemyAISystem } from "./enemyAISystem";
+export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
+export { createDebugMap } from "./debugMap";
 export {
   debugAddCompanion,
   debugAddCompanionToParty,

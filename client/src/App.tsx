@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 import {
+  addEnemy,
   addEntity,
   createCompanion,
+  createDebugMap,
   createEmptyResourceInventory,
   createEnemy,
   createPlayer,
@@ -16,52 +18,93 @@ import {
   debugRestorePartyHealth,
   issueCompanionCommands,
   issueEntityCommand,
+  setAutoModeEnabled,
+  setCompanionRole,
   startGameLoop,
   type Companion,
+  type CompanionRole,
   type Enemy,
   type GameEntity,
   type GameState,
   type Player,
   type ResourceEntity,
+  type ResourceType,
 } from "./game";
 
 const playerId = "test-player";
 const companionIds = ["test-companion", "test-companion-2", "test-companion-3"];
-const enemyId = "test-enemy";
-const resourceId = "test-resource";
-const cellSize = 36;
-const gridColumns = 12;
-const gridRows = 9;
+const companionRoleOptions: CompanionRole[] = [
+  "none",
+  "fighter",
+  "gatherer",
+  "defender",
+];
+const enemyIds = ["test-enemy", "test-enemy-2", "test-enemy-3", "test-enemy-4"];
+const resourceIds = [
+  "test-resource-wood",
+  "test-resource-ore",
+  "test-resource-herb",
+  "test-resource-wood-2",
+];
+const debugMap = createDebugMap();
+const cellSize = 28;
+const gridColumns = debugMap.columns;
+const gridRows = debugMap.rows;
 const companionStartPositions = [
-  { x: 2, y: 2 },
-  { x: 2, y: 3 },
-  { x: 2, y: 4 },
+  { x: 3, y: 2 },
+  { x: 3, y: 3 },
+  { x: 4, y: 2 },
+];
+const enemyStartPositions = [
+  { x: 20, y: 2 },
+  { x: 15, y: 8 },
+  { x: 21, y: 13 },
+  { x: 9, y: 15 },
+];
+const resourceStartData: {
+  id: string;
+  position: { x: number; y: number };
+  resourceType: ResourceType;
+}[] = [
+  { id: resourceIds[0], position: { x: 2, y: 5 }, resourceType: "wood" },
+  { id: resourceIds[1], position: { x: 11, y: 2 }, resourceType: "ore" },
+  { id: resourceIds[2], position: { x: 17, y: 5 }, resourceType: "herb" },
+  { id: resourceIds[3], position: { x: 6, y: 13 }, resourceType: "wood" },
 ];
 
 function createInitialState(): GameState {
-  const player = createPlayer(playerId, { x: 8, y: 5 });
+  const player = createPlayer(playerId, { x: 2, y: 2 });
   const companion = createCompanion(
     companionIds[0],
     companionStartPositions[0],
     playerId,
     "gatherer",
   );
-  const enemy = createEnemy(enemyId, { x: 10, y: 7 }, "aggressive");
-  const resource = createResource(resourceId, { x: 3, y: 7 });
-
-  return addEntity(
-    addEntity(
-      addEntity(
-        addEntity(
-          { entities: {}, inventory: createEmptyResourceInventory() },
-          player,
-        ),
-        companion,
-      ),
-      enemy,
+  const enemies = enemyIds.map((enemyId, index) =>
+    createEnemy(
+      enemyId,
+      enemyStartPositions[index],
+      index === 0 ? "aggressive" : "passive",
     ),
-    resource,
   );
+  const resources = resourceStartData.map((resource) =>
+    createResource(resource.id, resource.position, {
+      resourceType: resource.resourceType,
+    }),
+  );
+
+  const baseState = [player, companion, ...resources].reduce(addEntity, {
+    entities: {},
+    inventory: createEmptyResourceInventory(),
+    map: debugMap,
+    autoModeEnabled: false,
+    exploredTiles: {
+      [`${player.position.x},${player.position.y}`]: true,
+    },
+    followTrailsByEntityId: {},
+  });
+
+  return enemies.reduce(addEnemy, baseState);
 }
 
 function EntityDebugLabel({
@@ -104,14 +147,15 @@ function App() {
     .map((id) => gameState.entities[id] as Companion | undefined)
     .filter((companion): companion is Companion => Boolean(companion));
   const activeCompanionIds = companions.map((companion) => companion.id);
-  const enemy = gameState.entities[enemyId] as Enemy;
-  const resource = gameState.entities[resourceId] as ResourceEntity;
+  const enemies = enemyIds
+    .map((id) => gameState.entities[id] as Enemy | undefined)
+    .filter((enemy): enemy is Enemy => Boolean(enemy));
+  const resources = resourceIds
+    .map((id) => gameState.entities[id] as ResourceEntity | undefined)
+    .filter((resource): resource is ResourceEntity => Boolean(resource));
+  const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
+  const targetResource = resources.find((resource) => !resource.isDepleted);
   const inventory = gameState.inventory;
-  const resourceGathererCount = [player, ...companions].filter(
-    (entity) =>
-      entity.state === "gather" && entity.currentTargetId === resourceId,
-  ).length;
-  const resourceDebugDetail = `${resource.resourceType} ${resource.durability}/${resource.maxDurability} Qty ${resource.quantity}`;
 
   useEffect(() => {
     return () => {
@@ -129,6 +173,19 @@ function App() {
 
     stopLoopRef.current = startGameLoop(setGameState);
     setIsSimulationRunning(true);
+  }
+
+  function toggleAutoMode() {
+    setGameState((state) =>
+      setAutoModeEnabled(state, !state.autoModeEnabled),
+    );
+  }
+
+  function changeCompanionRole(
+    companionId: string,
+    role: CompanionRole,
+  ) {
+    setGameState((state) => setCompanionRole(state, companionId, role));
   }
 
   function commandCompanionsToFollow() {
@@ -156,30 +213,34 @@ function App() {
     );
   }
 
-  function commandPartyToTargetEnemy() {
+  function commandPartyToTargetEnemy(targetEnemyId = targetEnemy?.id) {
+    if (!targetEnemyId) {
+      return;
+    }
+
     setGameState((state) => {
       const playerAttackState = issueEntityCommand(state, {
         type: "attack",
         entityId: playerId,
-        targetId: enemyId,
+        targetId: targetEnemyId,
       });
 
       return issueCompanionCommands(playerAttackState, activeCompanionIds, {
         type: "attack",
-        targetId: enemyId,
+        targetId: targetEnemyId,
       });
     });
   }
 
-  function commandCompanionsToGatherResource() {
-    if (activeCompanionIds.length === 0) {
+  function commandCompanionsToGatherResource(targetResourceId = targetResource?.id) {
+    if (activeCompanionIds.length === 0 || !targetResourceId) {
       return;
     }
 
     setGameState((state) =>
       issueCompanionCommands(state, activeCompanionIds, {
         type: "gather",
-        targetId: resourceId,
+        targetId: targetResourceId,
       }),
     );
   }
@@ -206,7 +267,9 @@ function App() {
   }
 
   function resurrectEnemy() {
-    setGameState((state) => debugResurrectEnemy(state, enemyId));
+    setGameState((state) =>
+      enemyIds.reduce(debugResurrectEnemy, state),
+    );
   }
 
   function refreshGatherPoints() {
@@ -227,6 +290,17 @@ function App() {
         <h1>Follow System Test</h1>
 
         <div className="test-area" aria-label="Follow system top-down test area">
+          {debugMap.walls.map((wall) => (
+            <div
+              key={`${wall.x}-${wall.y}`}
+              className="wall-tile"
+              style={{
+                transform: `translate(${wall.x * cellSize}px, ${
+                  wall.y * cellSize
+                }px)`,
+              }}
+            />
+          ))}
           <div
             className="entity-marker player"
             style={{
@@ -262,84 +336,89 @@ function App() {
               />
             </div>
           ))}
-          {enemy.state === "dead" ? (
-            <div
-              className="dead-label"
-              style={{
-                transform: `translate(${enemy.position.x * cellSize}px, ${
-                  enemy.position.y * cellSize
-                }px)`,
-              }}
-            >
-              {showEntityInfo ? (
-                <>
-                  Enemy
-                  <br />
-                  State {enemy.state}
-                  <br />
-                  Target {enemy.currentTargetId ?? "none"}
-                </>
-              ) : null}
-            </div>
-          ) : (
-            <div
-              className="entity-marker enemy"
-              onClick={commandPartyToTargetEnemy}
-              style={{
-                transform: `translate(${enemy.position.x * cellSize}px, ${
-                  enemy.position.y * cellSize
-                }px)`,
-              }}
-              title="Enemy"
-            >
-              <EntityDebugLabel
-                name="Enemy"
-                entity={enemy}
-                detail={`HP ${enemy.health} Aggro ${enemy.aggressionMode}`}
-                isVisible={showEntityInfo}
-              />
-            </div>
+          {enemies.map((enemy, index) =>
+            enemy.state === "dead" ? (
+              <div
+                key={enemy.id}
+                className="dead-label"
+                style={{
+                  transform: `translate(${enemy.position.x * cellSize}px, ${
+                    enemy.position.y * cellSize
+                  }px)`,
+                }}
+              >
+                {showEntityInfo ? (
+                  <>
+                    E{index + 1}
+                    <br />
+                    State {enemy.state}
+                    <br />
+                    Target {enemy.currentTargetId ?? "none"}
+                  </>
+                ) : null}
+              </div>
+            ) : (
+              <div
+                key={enemy.id}
+                className="entity-marker enemy"
+                onClick={() => commandPartyToTargetEnemy(enemy.id)}
+                style={{
+                  transform: `translate(${enemy.position.x * cellSize}px, ${
+                    enemy.position.y * cellSize
+                  }px)`,
+                }}
+                title="Enemy"
+              >
+                <EntityDebugLabel
+                  name={`E${index + 1}`}
+                  entity={enemy}
+                  detail={`HP ${enemy.health} Aggro ${enemy.aggressionMode}`}
+                  isVisible={showEntityInfo}
+                />
+              </div>
+            ),
           )}
-          {resource.isDepleted ? (
-            <div
-              className="depleted-label"
-              style={{
-                transform: `translate(${resource.position.x * cellSize}px, ${
-                  resource.position.y * cellSize
-                }px)`,
-              }}
-            >
-              {showEntityInfo ? (
-                <>
-                  Depleted
-                  <br />
-                  State {resource.state}
-                  <br />
-                  Durability {resource.durability}/{resource.maxDurability}
-                  <br />
-                  Quantity {resource.quantity}
-                  <br />
-                  Target none
-                </>
-              ) : null}
-            </div>
-          ) : (
-            <div
-              className="entity-marker resource"
-              style={{
-                transform: `translate(${resource.position.x * cellSize}px, ${
-                  resource.position.y * cellSize
-                }px)`,
-              }}
-              title="Resource"
-            >
-              <EntityDebugLabel
-                name="Resource"
-                entity={resource}
-                detail={resourceDebugDetail}
-                isVisible={showEntityInfo}
-              />
-            </div>
+          {resources.map((resource) =>
+            resource.isDepleted ? (
+              <div
+                key={resource.id}
+                className="depleted-label"
+                style={{
+                  transform: `translate(${resource.position.x * cellSize}px, ${
+                    resource.position.y * cellSize
+                  }px)`,
+                }}
+              >
+                {showEntityInfo ? (
+                  <>
+                    {resource.resourceType}
+                    <br />
+                    Depleted
+                    <br />
+                    Quantity {resource.quantity}
+                  </>
+                ) : null}
+              </div>
+            ) : (
+              <div
+                key={resource.id}
+                className={`entity-marker resource ${resource.resourceType}`}
+                onClick={() => commandCompanionsToGatherResource(resource.id)}
+                style={{
+                  transform: `translate(${resource.position.x * cellSize}px, ${
+                    resource.position.y * cellSize
+                  }px)`,
+                }}
+                title="Resource"
+              >
+                <EntityDebugLabel
+                  name={resource.resourceType}
+                  entity={resource}
+                  detail={`${resource.durability}/${resource.maxDurability} Qty ${resource.quantity}`}
+                  isVisible={showEntityInfo}
+                />
+              </div>
+            ),
           )}
         </div>
 
@@ -347,10 +426,15 @@ function App() {
           <button onClick={toggleSimulationLoop}>
             {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
           </button>
+          <button onClick={toggleAutoMode}>
+            Auto Mode {gameState.autoModeEnabled ? "On" : "Off"}
+          </button>
           <button onClick={commandCompanionsToFollow}>Follow All</button>
           <button onClick={commandCompanionsToIdle}>Idle All</button>
-          <button onClick={commandPartyToTargetEnemy}>Target Enemy</button>
-          <button onClick={commandCompanionsToGatherResource}>
+          <button onClick={() => commandPartyToTargetEnemy()}>
+            Target Enemy
+          </button>
+          <button onClick={() => commandCompanionsToGatherResource()}>
             Gather Resource All
           </button>
           {showEntityInfo ? (
@@ -360,27 +444,45 @@ function App() {
                 {player.state} | HP {player.health} | Target{" "}
                 {player.currentTargetId ?? "none"} | Gather Speed{" "}
                 {player.gatherSpeed} |
-                Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
-                {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
-                Aggro {enemy.aggressionMode} |
-                Resource ({resource.position.x}, {resource.position.y}) | Type{" "}
-                {resource.resourceType} | Durability {resource.durability}/
-                {resource.maxDurability} | Quantity {resource.quantity} |
-                Gatherers {resourceGathererCount}/
-                {resource.maxGatherers} | Depleted{" "}
-                {resource.isDepleted ? "yes" : "no"} | Inventory Wood{" "}
-                {inventory.wood} Ore {inventory.ore} Herb {inventory.herb}
+                Party {companions.length + 1}/4 | Enemies Alive{" "}
+                {enemies.filter((enemy) => enemy.state !== "dead").length}/
+                {enemies.length} | Resources Available{" "}
+                {resources.filter((resource) => !resource.isDepleted).length}/
+                {resources.length} | Inventory Wood{" "}
+                {inventory.wood} Ore {inventory.ore} Herb {inventory.herb} |
+                Auto Mode {gameState.autoModeEnabled ? "On" : "Off"} |
+                Explored {Object.keys(gameState.exploredTiles).length}
               </span>
               <div className="companion-status-list">
                 {companions.length > 0
                   ? companions.map((companion, index) => (
-                      <span key={companion.id}>
-                        C{index + 1} ({companion.position.x},{" "}
-                        {companion.position.y}) | State {companion.state} | HP{" "}
-                        {companion.health} | Target{" "}
-                        {companion.currentTargetId ?? "none"} | Gather Speed{" "}
-                        {companion.gatherSpeed}
-                      </span>
+                      <label
+                        key={companion.id}
+                        className="companion-role-control"
+                      >
+                        <span>
+                          C{index + 1} ({companion.position.x},{" "}
+                          {companion.position.y}) | State {companion.state} |
+                          HP {companion.health} | Target{" "}
+                          {companion.currentTargetId ?? "none"} | Gather Speed{" "}
+                          {companion.gatherSpeed}
+                        </span>
+                        <select
+                          value={companion.role}
+                          onChange={(event) =>
+                            changeCompanionRole(
+                              companion.id,
+                              event.target.value as CompanionRole,
+                            )
+                          }
+                        >
+                          {companionRoleOptions.map((role) => (
+                            <option key={role} value={role}>
+                              {role}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     ))
                   : "No companions in party"}
               </div>

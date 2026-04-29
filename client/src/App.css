@@ -7,7 +7,7 @@
 }
 
 .game-panel {
-  width: 800px;
+  width: 960px;
   max-width: 95vw;
   padding: 24px;
   border: 1px solid #c8d0dc;
@@ -16,31 +16,38 @@
 
 .test-area {
   position: relative;
-  width: 432px;
+  width: 672px;
   max-width: 100%;
-  height: 324px;
+  height: 504px;
   margin: 20px 0;
   border: 1px solid #6b7280;
   background-color: #eef2f7;
   background-image:
     linear-gradient(#cbd5e1 1px, transparent 1px),
     linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
-  background-size: 36px 36px;
-  overflow: hidden;
+  background-size: 28px 28px;
+  overflow: auto;
 }
 
 .entity-marker,
 .dead-label,
-.depleted-label {
+.depleted-label,
+.wall-tile {
   position: absolute;
   top: 0;
   left: 0;
 }
 
 .entity-marker {
+  width: 22px;
+  height: 22px;
+  margin: 3px;
+}
+
+.wall-tile {
   width: 28px;
   height: 28px;
-  margin: 4px;
+  background: #334155;
 }
 
 .entity-label {
@@ -76,11 +83,20 @@
   background: #92400e;
 }
 
+.resource.ore {
+  background: #64748b;
+}
+
+.resource.herb {
+  background: #15803d;
+}
+
 .dead-label,
 .depleted-label {
-  padding: 4px 6px;
-  margin: 4px;
-  font-size: 12px;
+  max-width: 48px;
+  padding: 2px 3px;
+  margin: 3px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -110,6 +126,13 @@
   font-size: 14px;
 }
 
+.companion-role-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .debug-tools {
   margin-top: 20px;
   padding-top: 16px;
@@ -124,6 +147,13 @@
 button {
   padding: 10px 16px;
   cursor: pointer;
+  border: 1px solid #334155;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+select {
+  padding: 6px 8px;
   border: 1px solid #334155;
   background: #ffffff;
   color: #1f2937;

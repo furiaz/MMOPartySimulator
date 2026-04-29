@@ -1,7 +1,11 @@
-import { isCombatEntity, isResourceEntity } from "./entities";
 import { isWithinFollowLeash } from "./followSystem";
 import { updateEntity, type GameState } from "./state";
-import type { Companion, GameEntity } from "./types";
+import { findEnemyTarget, findResourceTarget } from "./targetSelection";
+import type { Companion, GameEntity, Player, Position, ResourceEntity } from "./types";
+
+export const GATHERER_RESOURCE_SEARCH_PATH_DISTANCE = 30;
+const GATHERER_COMBAT_ASSIST_RADIUS = 8;
+const FIGHTER_ENEMY_SEARCH_RADIUS = 8;
 
 export function updateRoleSystem(state: GameState): GameState {
   let nextState = state;
@@ -46,60 +50,70 @@ function canUseRoleBehavior(
 
   const followTarget = state.entities[entity.followTargetId];
 
-  return Boolean(followTarget && isWithinFollowLeash(entity, followTarget));
+  return Boolean(followTarget && isWithinFollowLeash(state, entity, followTarget));
 }
 
 function getRoleTarget(
   state: GameState,
   companion: Companion,
-): { state: "attack" | "gather"; targetId: string } | null {
+): { state: "attack" | "gather" | "follow"; targetId: string } | null {
   if (companion.role === "fighter") {
-    const enemy = findNearestEntity(
-      companion,
-      Object.values(state.entities).filter(
-        (entity) =>
-          entity.kind === "enemy" &&
-          isCombatEntity(entity) &&
-          entity.state !== "dead",
-      ),
-    );
+    const followTarget = state.entities[companion.followTargetId];
 
-    return enemy ? { state: "attack", targetId: enemy.id } : null;
+    if (!followTarget) {
+      return null;
+    }
+
+    const enemy = findEnemyTarget(state, followTarget, {
+      maxDistance: FIGHTER_ENEMY_SEARCH_RADIUS,
+    });
+
+    return enemy
+      ? { state: "attack", targetId: enemy.id }
+      : { state: "follow", targetId: companion.followTargetId };
   }
 
   if (companion.role === "gatherer") {
-    const resource = findNearestEntity(
-      companion,
-      Object.values(state.entities).filter(
-        (entity) => isResourceEntity(entity) && !entity.isDepleted,
-      ),
-    );
+    const resource = findGathererTarget(state, companion);
 
-    return resource ? { state: "gather", targetId: resource.id } : null;
+    if (resource) {
+      return { state: "gather", targetId: resource.id };
+    }
+
+    const enemy = findEnemyTarget(state, companion, {
+      maxDistance: GATHERER_COMBAT_ASSIST_RADIUS,
+      includeEngagedOutsideRange: true,
+    });
+
+    return enemy ? { state: "attack", targetId: enemy.id } : null;
   }
 
   return null;
 }
 
-function findNearestEntity<T extends GameEntity>(
+function findGathererTarget(
+  state: GameState,
   companion: Companion,
-  candidates: T[],
-): T | undefined {
-  return candidates.reduce<T | undefined>((nearestEntity, candidate) => {
-    if (!nearestEntity) {
-      return candidate;
-    }
-
-    return getDistance(companion, candidate) <
-      getDistance(companion, nearestEntity)
-      ? candidate
-      : nearestEntity;
-  }, undefined);
+): ResourceEntity | undefined {
+  return findResourceTarget(
+    state,
+    companion,
+    getGathererWorkOrigin(state, companion),
+    { maxDistance: GATHERER_RESOURCE_SEARCH_PATH_DISTANCE },
+  );
 }
 
-function getDistance(a: GameEntity, b: GameEntity): number {
+export function getGathererWorkOrigin(
+  state: GameState,
+  companion: Companion,
+): Position {
   return (
-    Math.abs(a.position.x - b.position.x) +
-    Math.abs(a.position.y - b.position.y)
+    Object.values(state.entities).find(isPlayer)?.position ??
+    state.entities[companion.followTargetId]?.position ??
+    companion.position
   );
+}
+
+function isPlayer(entity: GameEntity): entity is Player {
+  return entity.kind === "player";
 }

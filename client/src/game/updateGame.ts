@@ -1,5 +1,6 @@
 import { updateAttackSystem } from "./attackSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { updateExplorationSystem } from "./explorationSystem";
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updateRoleSystem } from "./roleSystem";
@@ -9,7 +10,11 @@ export function updateGame(state: GameState): GameState {
   let nextState = state;
   const movedEntityIds = new Set<string>();
 
-  nextState = updateRoleSystem(nextState);
+  if (nextState.autoModeEnabled) {
+    nextState = updateRoleSystem(nextState);
+    nextState = updateExplorationSystem(nextState, movedEntityIds);
+  }
+
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState);
   nextState = updateAttackSystem(nextState, movedEntityIds);

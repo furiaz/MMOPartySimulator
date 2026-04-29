@@ -1,3 +1,4 @@
+import { isWithinFollowLeash } from "./followSystem";
 import { updateEntity, type GameState } from "./state";
 import type { AutonomousEntity, Enemy, GameEntity, Player } from "./types";
 
@@ -13,7 +14,7 @@ export function protectLeader(
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
-    if (!canProtectLeader(entity, leader.id)) {
+    if (!canProtectLeader(state, entity, leader)) {
       continue;
     }
 
@@ -29,8 +30,9 @@ export function protectLeader(
 }
 
 function canProtectLeader(
+  state: GameState,
   entity: GameEntity,
-  leaderId: string,
+  leader: Player,
 ): entity is AutonomousEntity {
   if (entity.kind !== "player" && entity.kind !== "companion") {
     return false;
@@ -42,14 +44,22 @@ function canProtectLeader(
 
   if (entity.kind === "player") {
     return (
-      entity.id === leaderId &&
+      entity.id === leader.id &&
       (entity.state === "idle" || entity.state === "follow")
     );
   }
 
-  if (entity.followTargetId !== leaderId) {
+  if (entity.followTargetId !== leader.id) {
     return false;
   }
 
-  return entity.state === "idle" || entity.state === "follow";
+  if (!isWithinFollowLeash(state, entity, leader)) {
+    return false;
+  }
+
+  return (
+    entity.state === "idle" ||
+    entity.state === "follow" ||
+    entity.role === "fighter"
+  );
 }
