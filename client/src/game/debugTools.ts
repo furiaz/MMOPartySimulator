@@ -4,6 +4,7 @@ import type { Companion, Enemy, Player, Position, ResourceEntity } from "./types
 
 const DEBUG_HEALTH = 10;
 const DEBUG_RESOURCE_DURABILITY = 5;
+const DEBUG_RESOURCE_QUANTITY = 3;
 
 export function debugAddCompanion(
   state: GameState,
@@ -141,6 +142,8 @@ function resetResource(resource: ResourceEntity): ResourceEntity {
     ...resource,
     state: "idle",
     durability: DEBUG_RESOURCE_DURABILITY,
+    maxDurability: DEBUG_RESOURCE_DURABILITY,
+    quantity: DEBUG_RESOURCE_QUANTITY,
     isDepleted: false,
   };
 }

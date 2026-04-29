@@ -14,6 +14,12 @@ export type CommandPriority = "autonomous" | "direct";
 
 export type ResourceType = "wood" | "ore" | "herb";
 
+export type ResourceInventory = {
+  wood: number;
+  ore: number;
+  herb: number;
+};
+
 export type Position = {
   x: number;
   y: number;
@@ -58,6 +64,8 @@ export type ResourceEntity = BaseEntity & {
   kind: "resource";
   resourceType: ResourceType;
   durability: number;
+  maxDurability: number;
+  quantity: number;
   maxGatherers: number;
   isDepleted: boolean;
 };

@@ -5,6 +5,7 @@ import {
   setLastGatherAt,
 } from "./entities";
 import {
+  addResourceToInventory,
   getEntityById,
   moveEntityTowardIfUnoccupied,
   updateEntity,
@@ -64,12 +65,22 @@ export function updateGatherSystem(
       continue;
     }
 
-    const gatheredResource = gatherResource(
-      resource,
-      getGatherAmount(gatherer),
-    );
+    const gatherAmount = getGatherAmount(gatherer);
+    const didYieldResource =
+      resource.quantity > 0 &&
+      resource.durability > 0 &&
+      gatherAmount >= resource.durability;
+    const gatheredResource = gatherResource(resource, gatherAmount);
 
     nextState = updateEntity(nextState, gatheredResource);
+    if (didYieldResource) {
+      nextState = addResourceToInventory(
+        nextState,
+        gatheredResource.resourceType,
+        1,
+      );
+    }
+
     nextState = updateEntity(
       nextState,
       gatheredResource.isDepleted

@@ -16,10 +16,13 @@ const FOLLOW_DISTANCE = 1;
 const STARTING_HEALTH = 10;
 const STARTING_GATHER_SPEED = 1;
 const STARTING_RESOURCE_DURABILITY = 5;
+const STARTING_RESOURCE_QUANTITY = 3;
 const DEFAULT_RESOURCE_TYPE: ResourceType = "wood";
 
 type CreateResourceOptions = {
   durability?: number;
+  maxDurability?: number;
+  quantity?: number;
   maxGatherers?: number;
   resourceType?: ResourceType;
 };
@@ -82,7 +85,9 @@ export function createResource(
   options: CreateResourceOptions = {},
 ): ResourceEntity {
   const {
-    durability = STARTING_RESOURCE_DURABILITY,
+    maxDurability = STARTING_RESOURCE_DURABILITY,
+    durability = maxDurability,
+    quantity = STARTING_RESOURCE_QUANTITY,
     maxGatherers = 1,
     resourceType = DEFAULT_RESOURCE_TYPE,
   } = options;
@@ -94,6 +99,8 @@ export function createResource(
     position,
     state: "idle",
     durability,
+    maxDurability,
+    quantity,
     maxGatherers,
     isDepleted: false,
   };
@@ -155,10 +162,20 @@ export function gatherResource(
 ): ResourceEntity {
   const durability = Math.max(0, resource.durability - gatherAmount);
 
+  if (durability > 0) {
+    return {
+      ...resource,
+      durability,
+    };
+  }
+
+  const quantity = Math.max(0, resource.quantity - 1);
+
   return {
     ...resource,
-    durability,
-    isDepleted: durability === 0,
+    durability: quantity > 0 ? resource.maxDurability : 0,
+    quantity,
+    isDepleted: quantity <= 0,
   };
 }
 

@@ -1,9 +1,23 @@
 import { isCombatEntity, moveEntityTo, moveEntityToward } from "./entities";
-import type { GameEntity, Position } from "./types";
+import type {
+  GameEntity,
+  Position,
+  ResourceInventory,
+  ResourceType,
+} from "./types";
 
 export type GameState = {
   entities: Record<string, GameEntity>;
+  inventory: ResourceInventory;
 };
+
+export function createEmptyResourceInventory(): ResourceInventory {
+  return {
+    wood: 0,
+    ore: 0,
+    herb: 0,
+  };
+}
 
 export function addEntity(state: GameState, entity: GameEntity): GameState {
   return {
@@ -21,6 +35,20 @@ export function updateEntity(state: GameState, entity: GameEntity): GameState {
     entities: {
       ...state.entities,
       [entity.id]: entity,
+    },
+  };
+}
+
+export function addResourceToInventory(
+  state: GameState,
+  resourceType: ResourceType,
+  amount: number,
+): GameState {
+  return {
+    ...state,
+    inventory: {
+      ...state.inventory,
+      [resourceType]: state.inventory[resourceType] + amount,
     },
   };
 }

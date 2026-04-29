@@ -12,6 +12,7 @@ export type {
   LivingEntity,
   Player,
   Position,
+  ResourceInventory,
   ResourceEntity,
   ResourceType,
 } from "./types";
@@ -35,7 +36,13 @@ export {
   updateAutonomousEntityFollow,
   updateCompanionFollow,
 } from "./entities";
-export { addEntity, getEntityById, updateEntity } from "./state";
+export {
+  addEntity,
+  addResourceToInventory,
+  createEmptyResourceInventory,
+  getEntityById,
+  updateEntity,
+} from "./state";
 export {
   issueEntityCommand,
   issueCompanionCommand,

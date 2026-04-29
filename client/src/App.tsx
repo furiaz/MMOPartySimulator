@@ -4,6 +4,7 @@ import "./App.css";
 import {
   addEntity,
   createCompanion,
+  createEmptyResourceInventory,
   createEnemy,
   createPlayer,
   createResource,
@@ -48,7 +49,16 @@ function createInitialState(): GameState {
   const resource = createResource(resourceId, { x: 3, y: 7 });
 
   return addEntity(
-    addEntity(addEntity(addEntity({ entities: {} }, player), companion), enemy),
+    addEntity(
+      addEntity(
+        addEntity(
+          { entities: {}, inventory: createEmptyResourceInventory() },
+          player,
+        ),
+        companion,
+      ),
+      enemy,
+    ),
     resource,
   );
 }
@@ -88,10 +98,12 @@ function App() {
   const activeCompanionIds = companions.map((companion) => companion.id);
   const enemy = gameState.entities[enemyId] as Enemy;
   const resource = gameState.entities[resourceId] as ResourceEntity;
+  const inventory = gameState.inventory;
   const resourceGathererCount = [player, ...companions].filter(
     (entity) =>
       entity.state === "gather" && entity.currentTargetId === resourceId,
   ).length;
+  const resourceDebugDetail = `${resource.resourceType} ${resource.durability}/${resource.maxDurability} Qty ${resource.quantity}`;
 
   useEffect(() => {
     return () => {
@@ -282,6 +294,10 @@ function App() {
               <br />
               State {resource.state}
               <br />
+              Durability {resource.durability}/{resource.maxDurability}
+              <br />
+              Quantity {resource.quantity}
+              <br />
               Target none
             </div>
           ) : (
@@ -297,7 +313,7 @@ function App() {
               <EntityDebugLabel
                 name="Resource"
                 entity={resource}
-                detail={`${resource.resourceType} ${resource.durability}`}
+                detail={resourceDebugDetail}
               />
             </div>
           )}
@@ -321,10 +337,12 @@ function App() {
             Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
             {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
             Resource ({resource.position.x}, {resource.position.y}) | Type{" "}
-            {resource.resourceType} | Durability {resource.durability} |
-            Gatherers {resourceGathererCount}/
+            {resource.resourceType} | Durability {resource.durability}/
+            {resource.maxDurability} | Quantity {resource.quantity} | Gatherers{" "}
+            {resourceGathererCount}/
             {resource.maxGatherers} | Depleted{" "}
-            {resource.isDepleted ? "yes" : "no"}
+            {resource.isDepleted ? "yes" : "no"} | Inventory Wood{" "}
+            {inventory.wood} Ore {inventory.ore} Herb {inventory.herb}
           </span>
           <div className="companion-status-list">
             {companions.length > 0
