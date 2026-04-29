@@ -73,6 +73,7 @@ Focus is on task assignment, not manual gathering.
 - Defenders act as the frontline of the party
 - They position themselves in front of the main character
 - Defenders engage enemies first using the leader’s current target
+- Defenders follow the leader’s target, not independent targets
 - They do not wander or chase enemies across the map
 - They remain close to the leader (short leash)
 - They initiate combat and absorb first contact

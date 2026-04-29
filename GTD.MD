@@ -221,16 +221,6 @@ Never skip this order.
 - These should be isolated from core systems
 - They must not affect final game architecture
 
-## Behavior End Rules
-
-- Idle entities do nothing.
-- Follow entities follow their assigned follow target.
-- Gather ends when the target resource is depleted, then switches to follow.
-- Attack ends when target is dead or gone.
-- After attack ends, entity helps another party member still in combat if possible; otherwise it switches to follow.
-- Defend is a toggle/explicit role, not automatic.
-- Auto-retaliate is planned later and should only affect party members that are not actively busy.
-
 ## Gathering Limits
 
 - Resources can define how many entities may gather them at once.
@@ -250,6 +240,7 @@ Never skip this order.
   - positions ahead of leader
   - engages leader’s target
   - does not chase far from leader
+
 ---
 
 ### Command Rules
@@ -349,7 +340,8 @@ Companions:
 - can follow
 - can attack
 - can gather
-- can defend (frontline role, not area guard)- can be damaged
+- can defend (frontline role, not area guard)
+- can be damaged
 - have health
 - have combat stats
 - have gatherSpeed
@@ -413,16 +405,23 @@ Resources use a two-layer depletion model:
 ## Formation Rules (Current)
 
 - Leader selects targets
+
 - Defenders:
-  - receive leader’s target
+  - receive and lock to leader’s target
   - move first toward intercept
   - stay within short distance (~2 tiles) of leader
+  - do not select independent targets
+
 - Leader:
   - follows behind defenders during engagement
+
 - Fighters:
-  - follow leader and assist combat
+  - follow leader
+  - assist combat
+
 - Gatherers:
-  - operate around leader and commit to resource gathering
+  - operate around leader
+  - commit to resource gathering
 
 ### Movement Priority
 
