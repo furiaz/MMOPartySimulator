@@ -12,6 +12,8 @@ export type EnemyAggressionMode = "passive" | "aggressive";
 
 export type CommandPriority = "autonomous" | "direct";
 
+export type ResourceType = "wood" | "ore" | "herb";
+
 export type Position = {
   x: number;
   y: number;
@@ -52,6 +54,7 @@ export type Companion = LivingEntity & {
 
 export type ResourceEntity = BaseEntity & {
   kind: "resource";
+  resourceType: ResourceType;
   durability: number;
   maxGatherers: number;
   isDepleted: boolean;

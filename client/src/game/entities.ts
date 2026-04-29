@@ -9,11 +9,19 @@ import type {
   Player,
   Position,
   ResourceEntity,
+  ResourceType,
 } from "./types";
 
 const FOLLOW_DISTANCE = 1;
 const STARTING_HEALTH = 10;
 const STARTING_RESOURCE_DURABILITY = 5;
+const DEFAULT_RESOURCE_TYPE: ResourceType = "wood";
+
+type CreateResourceOptions = {
+  durability?: number;
+  maxGatherers?: number;
+  resourceType?: ResourceType;
+};
 
 export function createPlayer(id: string, position: Position): Player {
   return {
@@ -68,12 +76,18 @@ export function createCompanion(
 export function createResource(
   id: string,
   position: Position,
-  durability = STARTING_RESOURCE_DURABILITY,
-  maxGatherers = 1,
+  options: CreateResourceOptions = {},
 ): ResourceEntity {
+  const {
+    durability = STARTING_RESOURCE_DURABILITY,
+    maxGatherers = 1,
+    resourceType = DEFAULT_RESOURCE_TYPE,
+  } = options;
+
   return {
     id,
     kind: "resource",
+    resourceType,
     position,
     state: "idle",
     durability,

@@ -297,7 +297,7 @@ function App() {
               <EntityDebugLabel
                 name="Resource"
                 entity={resource}
-                detail={`${resource.durability}`}
+                detail={`${resource.resourceType} ${resource.durability}`}
               />
             </div>
           )}
@@ -319,8 +319,9 @@ function App() {
             {player.currentTargetId ?? "none"} |
             Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
             {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
-            Resource ({resource.position.x}, {resource.position.y}) | Durability{" "}
-            {resource.durability} | Gatherers {resourceGathererCount}/
+            Resource ({resource.position.x}, {resource.position.y}) | Type{" "}
+            {resource.resourceType} | Durability {resource.durability} |
+            Gatherers {resourceGathererCount}/
             {resource.maxGatherers} | Depleted{" "}
             {resource.isDepleted ? "yes" : "no"}
           </span>

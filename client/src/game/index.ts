@@ -13,6 +13,7 @@ export type {
   Player,
   Position,
   ResourceEntity,
+  ResourceType,
 } from "./types";
 export type { GameState } from "./state";
 
