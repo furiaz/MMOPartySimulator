@@ -18,6 +18,7 @@ import {
   startGameLoop,
   type Companion,
   type Enemy,
+  type GameEntity,
   type GameState,
   type Player,
   type ResourceEntity,
@@ -49,6 +50,29 @@ function createInitialState(): GameState {
   return addEntity(
     addEntity(addEntity(addEntity({ entities: {} }, player), companion), enemy),
     resource,
+  );
+}
+
+function EntityDebugLabel({
+  name,
+  entity,
+  detail,
+}: {
+  name: string;
+  entity: GameEntity;
+  detail?: string;
+}) {
+  const targetId = "currentTargetId" in entity ? entity.currentTargetId : null;
+
+  return (
+    <span className="entity-label">
+      {name}
+      {detail ? ` ${detail}` : ""}
+      <br />
+      State {entity.state}
+      <br />
+      Target {targetId ?? "none"}
+    </span>
   );
 }
 
@@ -188,7 +212,11 @@ function App() {
             }}
             title="Player"
           >
-            <span className="entity-label">Player HP {player.health}</span>
+            <EntityDebugLabel
+              name="Player"
+              entity={player}
+              detail={`HP ${player.health}`}
+            />
           </div>
           {companions.map((companion, index) => (
             <div
@@ -201,9 +229,11 @@ function App() {
               }}
               title="Companion"
             >
-              <span className="entity-label">
-                C{index + 1} HP {companion.health}
-              </span>
+              <EntityDebugLabel
+                name={`C${index + 1}`}
+                entity={companion}
+                detail={`HP ${companion.health}`}
+              />
             </div>
           ))}
           {enemy.state === "dead" ? (
@@ -215,7 +245,11 @@ function App() {
                 }px)`,
               }}
             >
-              Dead
+              Enemy
+              <br />
+              State {enemy.state}
+              <br />
+              Target {enemy.currentTargetId ?? "none"}
             </div>
           ) : (
             <div
@@ -228,7 +262,11 @@ function App() {
               }}
               title="Enemy"
             >
-              <span className="entity-label">Enemy HP {enemy.health}</span>
+              <EntityDebugLabel
+                name="Enemy"
+                entity={enemy}
+                detail={`HP ${enemy.health}`}
+              />
             </div>
           )}
           {resource.isDepleted ? (
@@ -241,6 +279,10 @@ function App() {
               }}
             >
               Depleted
+              <br />
+              State {resource.state}
+              <br />
+              Target none
             </div>
           ) : (
             <div
@@ -252,9 +294,11 @@ function App() {
               }}
               title="Resource"
             >
-              <span className="entity-label">
-                Resource {resource.durability}
-              </span>
+              <EntityDebugLabel
+                name="Resource"
+                entity={resource}
+                detail={`${resource.durability}`}
+              />
             </div>
           )}
         </div>
