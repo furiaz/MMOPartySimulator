@@ -27,6 +27,14 @@ export type Position = {
   y: number;
 };
 
+export type LeaderIntentType = "attack" | "move" | "gather" | "explore";
+
+export type LeaderIntent = {
+  type: LeaderIntentType;
+  targetId: string | null;
+  targetPosition: Position | null;
+};
+
 export type GameMap = {
   columns: number;
   rows: number;
@@ -63,6 +71,7 @@ export type Companion = LivingEntity & {
   kind: "companion";
   role: CompanionRole;
   followTargetId: string;
+  defendPosition: Position | null;
   currentTargetId: string | null;
   lastGatherAt: number;
   gatherSpeed: number;

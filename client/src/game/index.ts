@@ -11,6 +11,8 @@ export type {
   EntityState,
   GameEntity,
   GameMap,
+  LeaderIntent,
+  LeaderIntentType,
   LivingEntity,
   Player,
   Position,
@@ -45,7 +47,9 @@ export {
   createEmptyResourceInventory,
   getEntityById,
   setAutoModeEnabled,
+  setCompanionDefendPosition,
   setCompanionRole,
+  setLeaderIntent,
   updateEntity,
 } from "./state";
 export {
@@ -58,6 +62,7 @@ export {
 } from "./commands";
 export { updateGame } from "./updateGame";
 export { updateAttackSystem } from "./attackSystem";
+export { updateDefendSystem } from "./defendSystem";
 export { updateEnemyAISystem } from "./enemyAISystem";
 export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";

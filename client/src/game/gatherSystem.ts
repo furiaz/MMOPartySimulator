@@ -53,6 +53,10 @@ export function updateGatherSystem(
         { maxDistance: getReachableSearchLimit(nextState) },
       )
     ) {
+      if (isCommittedGatherer(gatherer)) {
+        continue;
+      }
+
       nextState = updateEntity(nextState, switchToFollow(gatherer));
       continue;
     }

@@ -1,20 +1,28 @@
 import { updateAttackSystem } from "./attackSystem";
+import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
-import { updateExplorationSystem } from "./explorationSystem";
+import {
+  reserveExploringPlayerNextTile,
+  updateExplorationSystem,
+} from "./explorationSystem";
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updateRoleSystem } from "./roleSystem";
-import type { GameState } from "./state";
+import { clearTickMovementPlanning, type GameState } from "./state";
 
 export function updateGame(state: GameState): GameState {
-  let nextState = state;
+  let nextState = clearTickMovementPlanning(state);
   const movedEntityIds = new Set<string>();
 
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState);
-    nextState = updateExplorationSystem(nextState, movedEntityIds);
+    nextState = reserveExploringPlayerNextTile(nextState);
   }
 
+  nextState = updateDefendSystem(nextState, movedEntityIds);
+  if (nextState.autoModeEnabled) {
+    nextState = updateExplorationSystem(nextState, movedEntityIds);
+  }
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState);
   nextState = updateAttackSystem(nextState, movedEntityIds);

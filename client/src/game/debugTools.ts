@@ -10,6 +10,7 @@ import {
 import type { Companion, Enemy, Player, Position, ResourceEntity } from "./types";
 
 const DEBUG_HEALTH = 10;
+const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
 const DEBUG_RESOURCE_QUANTITY = 3;
 
@@ -112,7 +113,7 @@ export function debugResurrectEnemy(
   const enemy: Enemy = {
     ...entity,
     state: "idle",
-    health: DEBUG_HEALTH,
+    health: DEBUG_ENEMY_HEALTH,
     currentTargetId: null,
     lastAttackAt: 0,
   };

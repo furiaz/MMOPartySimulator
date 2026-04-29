@@ -3,6 +3,7 @@ import type {
   GameMap,
   GameEntity,
   Enemy,
+  LeaderIntent,
   Position,
   ResourceInventory,
   ResourceType,
@@ -21,8 +22,15 @@ export type GameState = {
   inventory: ResourceInventory;
   map?: GameMap;
   autoModeEnabled: boolean;
+  leaderIntent: LeaderIntent | null;
   exploredTiles: Record<string, true>;
   followTrailsByEntityId: Record<string, Position[]>;
+  lastPositionsByEntityId?: Record<string, Position>;
+  failedMoveByEntityId?: Record<string, true>;
+  moveIntentsByEntityId?: Record<string, Position>;
+  reservedPositionsByEntityId?: Record<string, Position>;
+  defenderWaitTicksByLeaderId?: Record<string, number>;
+  defenderBlockedTicksByEntityId?: Record<string, number>;
 };
 
 export function createEmptyResourceInventory(): ResourceInventory {
@@ -117,6 +125,16 @@ export function setAutoModeEnabled(
   };
 }
 
+export function setLeaderIntent(
+  state: GameState,
+  leaderIntent: LeaderIntent | null,
+): GameState {
+  return {
+    ...state,
+    leaderIntent,
+  };
+}
+
 export function setCompanionRole(
   state: GameState,
   companionId: string,
@@ -134,6 +152,23 @@ export function setCompanionRole(
   });
 }
 
+export function setCompanionDefendPosition(
+  state: GameState,
+  companionId: string,
+  defendPosition: Position | null,
+): GameState {
+  const companion = state.entities[companionId];
+
+  if (companion?.kind !== "companion") {
+    return state;
+  }
+
+  return updateEntity(state, {
+    ...companion,
+    defendPosition,
+  });
+}
+
 export function getEntityById(
   state: GameState,
   entityId: string,
@@ -146,13 +181,29 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   entity: T,
   target: GameEntity,
 ): GameState {
-  const nextPosition = getNextMovePosition(state, entity, target);
+  const nextStateWithIntent = recordMoveIntent(state, entity, target);
+  const moveResolution = getNextMoveResolution(nextStateWithIntent, entity, target);
 
-  if (!nextPosition || isSamePosition(nextPosition, entity.position)) {
-    return state;
+  if (!moveResolution || isSamePosition(moveResolution.position, entity.position)) {
+    return markMoveFailed(nextStateWithIntent, entity.id);
   }
 
-  return updateEntity(state, moveEntityTo(entity, nextPosition));
+  if (moveResolution.swapWithEntityId) {
+    return swapEntityPositions(
+      nextStateWithIntent,
+      entity.id,
+      moveResolution.swapWithEntityId,
+    );
+  }
+
+  return markMoveSucceeded(
+    updateEntity(
+      nextStateWithIntent,
+      moveEntityTo(entity, moveResolution.position),
+    ),
+    entity.id,
+    entity.position,
+  );
 }
 
 export function moveEntityTowardPositionIfUnoccupied<T extends GameEntity>(
@@ -174,6 +225,49 @@ export function moveEntityTowardPositionIfUnoccupied<T extends GameEntity>(
   };
 
   return moveEntityTowardIfUnoccupied(state, entity, target);
+}
+
+export function clearTickMovementPlanning(state: GameState): GameState {
+  return {
+    ...state,
+    moveIntentsByEntityId: {},
+    reservedPositionsByEntityId: {},
+  };
+}
+
+export function reservePositionForTick(
+  state: GameState,
+  entityId: string,
+  position: Position,
+): GameState {
+  return {
+    ...state,
+    reservedPositionsByEntityId: {
+      ...(state.reservedPositionsByEntityId ?? {}),
+      [entityId]: position,
+    },
+  };
+}
+
+export function previewMoveTowardPosition(
+  state: GameState,
+  entity: GameEntity,
+  position: Position,
+): Position | null {
+  const target: GameEntity = {
+    id: "__position_target__",
+    kind: "resource",
+    position,
+    state: "idle",
+    resourceType: "wood",
+    durability: 1,
+    maxDurability: 1,
+    quantity: 1,
+    maxGatherers: 1,
+    isDepleted: false,
+  };
+
+  return getIntendedMovePosition(state, entity, target);
 }
 
 export function isWallPosition(state: GameState, position: Position): boolean {
@@ -219,15 +313,15 @@ export function findClosestAvailablePosition(
   return intendedPosition;
 }
 
-function getNextMovePosition(
+function getNextMoveResolution(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
-): Position | null {
+): { position: Position; swapWithEntityId?: string } | null {
   const pathPosition = findNextPathPosition(state, entity, target);
 
   if (pathPosition) {
-    return pathPosition;
+    return { position: pathPosition };
   }
 
   const movedEntity = moveEntityToward(entity, target);
@@ -237,7 +331,20 @@ function getNextMovePosition(
   }
 
   if (isWalkablePosition(state, movedEntity.position, entity.id)) {
-    return movedEntity.position;
+    return { position: movedEntity.position };
+  }
+
+  const swapWithEntity = getSwapCandidate(
+    state,
+    entity,
+    movedEntity.position,
+  );
+
+  if (swapWithEntity) {
+    return {
+      position: movedEntity.position,
+      swapWithEntityId: swapWithEntity.id,
+    };
   }
 
   return findAlternativeMovePosition(state, entity, target);
@@ -315,15 +422,25 @@ function findAlternativeMovePosition(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
-): Position | null {
-  const candidates = getAlternativeMoveCandidates(entity.position, target.position);
+): { position: Position } | null {
+  if (state.failedMoveByEntityId?.[entity.id]) {
+    return null;
+  }
 
-  return (
-    candidates.find(
-      (position) =>
-        isWalkablePosition(state, position, entity.id),
-    ) ?? null
+  const candidates = getAlternativeMoveCandidates(entity.position, target.position);
+  const previousPosition = state.lastPositionsByEntityId?.[entity.id];
+  const validCandidates = candidates.filter((position) =>
+    isWalkablePosition(state, position, entity.id),
   );
+  const preferredCandidate = validCandidates.find(
+    (position) => !previousPosition || !isSamePosition(position, previousPosition),
+  );
+
+  return preferredCandidate
+    ? { position: preferredCandidate }
+    : validCandidates[0]
+      ? { position: validCandidates[0] }
+      : null;
 }
 
 function getAlternativeMoveCandidates(
@@ -437,7 +554,19 @@ function isWalkablePosition(
     isInMapBounds(state, position) &&
     !isWallPosition(state, position) &&
     !isActiveResourcePosition(state, position, ignoredEntityId) &&
+    !isReservedPosition(state, position, ignoredEntityId) &&
     !isPositionOccupiedByLivingEntity(state, position, ignoredEntityId)
+  );
+}
+
+function isReservedPosition(
+  state: GameState,
+  position: Position,
+  ignoredEntityId: string,
+): boolean {
+  return Object.entries(state.reservedPositionsByEntityId ?? {}).some(
+    ([entityId, reservedPosition]) =>
+      entityId !== ignoredEntityId && isSamePosition(position, reservedPosition),
   );
 }
 
@@ -524,6 +653,122 @@ function isPositionOccupiedByLivingEntity(
       entity.position.x === position.x &&
       entity.position.y === position.y,
   );
+}
+
+function getSwapCandidate(
+  state: GameState,
+  entity: GameEntity,
+  targetPosition: Position,
+): GameEntity | undefined {
+  const occupyingEntity = Object.values(state.entities).find(
+    (candidate) =>
+      candidate.id !== entity.id &&
+      isCombatEntity(candidate) &&
+      candidate.state !== "dead" &&
+      isSamePosition(candidate.position, targetPosition),
+  );
+
+  if (!occupyingEntity) {
+    return undefined;
+  }
+
+  const occupyingIntent = state.moveIntentsByEntityId?.[occupyingEntity.id];
+
+  return occupyingIntent && isSamePosition(occupyingIntent, entity.position)
+    ? occupyingEntity
+    : undefined;
+}
+
+function recordMoveIntent(
+  state: GameState,
+  entity: GameEntity,
+  target: GameEntity,
+): GameState {
+  const intendedPosition = getIntendedMovePosition(state, entity, target);
+
+  if (!intendedPosition) {
+    return state;
+  }
+
+  return {
+    ...state,
+    moveIntentsByEntityId: {
+      ...(state.moveIntentsByEntityId ?? {}),
+      [entity.id]: intendedPosition,
+    },
+  };
+}
+
+function getIntendedMovePosition(
+  state: GameState,
+  entity: GameEntity,
+  target: GameEntity,
+): Position | null {
+  const pathPosition = findNextPathPosition(state, entity, target);
+
+  if (pathPosition) {
+    return pathPosition;
+  }
+
+  const movedEntity = moveEntityToward(entity, target);
+
+  return isSamePosition(movedEntity.position, entity.position)
+    ? null
+    : movedEntity.position;
+}
+
+function markMoveSucceeded(
+  state: GameState,
+  entityId: string,
+  previousPosition: Position,
+): GameState {
+  const failedMoveByEntityId = { ...(state.failedMoveByEntityId ?? {}) };
+  delete failedMoveByEntityId[entityId];
+
+  return {
+    ...state,
+    lastPositionsByEntityId: {
+      ...(state.lastPositionsByEntityId ?? {}),
+      [entityId]: previousPosition,
+    },
+    failedMoveByEntityId,
+  };
+}
+
+function markMoveFailed(state: GameState, entityId: string): GameState {
+  return {
+    ...state,
+    failedMoveByEntityId: {
+      ...(state.failedMoveByEntityId ?? {}),
+      [entityId]: true,
+    },
+  };
+}
+
+function swapEntityPositions(
+  state: GameState,
+  firstEntityId: string,
+  secondEntityId: string,
+): GameState {
+  const firstEntity = state.entities[firstEntityId];
+  const secondEntity = state.entities[secondEntityId];
+
+  if (!firstEntity || !secondEntity) {
+    return markMoveFailed(state, firstEntityId);
+  }
+
+  let nextState = updateEntity(
+    state,
+    moveEntityTo(firstEntity, secondEntity.position),
+  );
+  nextState = updateEntity(
+    nextState,
+    moveEntityTo(secondEntity, firstEntity.position),
+  );
+  nextState = markMoveSucceeded(nextState, firstEntity.id, firstEntity.position);
+  nextState = markMoveSucceeded(nextState, secondEntity.id, secondEntity.position);
+
+  return nextState;
 }
 
 const FOLLOW_TRAIL_LENGTH = 12;

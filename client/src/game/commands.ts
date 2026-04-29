@@ -1,6 +1,16 @@
 import { isAutonomousEntity } from "./entities";
-import { getEntityById, updateEntity, type GameState } from "./state";
-import type { AutonomousEntity, CommandPriority, EntityState } from "./types";
+import {
+  getEntityById,
+  setLeaderIntent,
+  updateEntity,
+  type GameState,
+} from "./state";
+import type {
+  AutonomousEntity,
+  CommandPriority,
+  EntityState,
+  LeaderIntent,
+} from "./types";
 
 type TargetedEntityCommandType = Exclude<EntityState, "idle" | "dead">;
 
@@ -69,7 +79,11 @@ export function issueEntityCommand(
       commandPriority,
     };
 
-    return updateEntity(state, updatedEntity);
+    const nextState = updateEntity(state, updatedEntity);
+
+    return entity.kind === "player"
+      ? setLeaderIntent(nextState, null)
+      : nextState;
   }
 
   const updatedEntity: AutonomousEntity = {
@@ -82,7 +96,11 @@ export function issueEntityCommand(
       : {}),
   };
 
-  return updateEntity(state, updatedEntity);
+  const nextState = updateEntity(state, updatedEntity);
+
+  return entity.kind === "player"
+    ? setLeaderIntent(nextState, getLeaderIntentFromCommand(state, command))
+    : nextState;
 }
 
 export function issueCompanionCommand(
@@ -135,4 +153,31 @@ function canApplyCommand(
   commandPriority: CommandPriority,
 ): boolean {
   return commandPriority === "direct" || entity.commandPriority !== "direct";
+}
+
+function getLeaderIntentFromCommand(
+  state: GameState,
+  command: Extract<EntityCommand, { targetId: string }>,
+): LeaderIntent {
+  const targetPosition = getEntityById(state, command.targetId)?.position ?? null;
+
+  return {
+    type: getLeaderIntentType(command.type),
+    targetId: command.targetId,
+    targetPosition,
+  };
+}
+
+function getLeaderIntentType(
+  commandType: Exclude<EntityState, "idle" | "dead">,
+): LeaderIntent["type"] {
+  if (commandType === "attack") {
+    return "attack";
+  }
+
+  if (commandType === "gather") {
+    return "gather";
+  }
+
+  return "move";
 }

@@ -39,7 +39,16 @@ const companionRoleOptions: CompanionRole[] = [
   "gatherer",
   "defender",
 ];
-const enemyIds = ["test-enemy", "test-enemy-2", "test-enemy-3", "test-enemy-4"];
+const enemyIds = [
+  "test-enemy",
+  "test-enemy-2",
+  "test-enemy-3",
+  "test-enemy-4",
+  "test-enemy-5",
+  "test-enemy-6",
+  "test-enemy-7",
+  "test-enemy-8",
+];
 const resourceIds = [
   "test-resource-wood",
   "test-resource-ore",
@@ -60,6 +69,10 @@ const enemyStartPositions = [
   { x: 15, y: 8 },
   { x: 21, y: 13 },
   { x: 9, y: 15 },
+  { x: 18, y: 3 },
+  { x: 19, y: 10 },
+  { x: 14, y: 15 },
+  { x: 6, y: 16 },
 ];
 const resourceStartData: {
   id: string;
@@ -98,6 +111,7 @@ function createInitialState(): GameState {
     inventory: createEmptyResourceInventory(),
     map: debugMap,
     autoModeEnabled: false,
+    leaderIntent: null,
     exploredTiles: {
       [`${player.position.x},${player.position.y}`]: true,
     },

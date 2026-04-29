@@ -15,6 +15,7 @@ import type {
 
 const FOLLOW_DISTANCE = 1;
 const STARTING_HEALTH = 10;
+const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
 const STARTING_RESOURCE_DURABILITY = 5;
 const STARTING_RESOURCE_QUANTITY = 3;
@@ -53,7 +54,7 @@ export function createEnemy(
     kind: "enemy",
     position,
     state: "idle",
-    health: STARTING_HEALTH,
+    health: STARTING_ENEMY_HEALTH,
     lastAttackAt: 0,
     currentTargetId: null,
     aggressionMode,
@@ -75,6 +76,7 @@ export function createCompanion(
     health: STARTING_HEALTH,
     lastAttackAt: 0,
     followTargetId,
+    defendPosition: null,
     currentTargetId: followTargetId,
     lastGatherAt: 0,
     gatherSpeed: STARTING_GATHER_SPEED,

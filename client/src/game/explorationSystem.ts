@@ -3,6 +3,9 @@ import {
   isActiveResourcePosition,
   isWallPosition,
   moveEntityTowardPositionIfUnoccupied,
+  previewMoveTowardPosition,
+  reservePositionForTick,
+  setLeaderIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -31,12 +34,19 @@ export function updateExplorationSystem(
   });
 
   if (enemyTarget) {
-    return updateEntity(nextState, {
-      ...explorer,
-      state: "attack",
-      currentTargetId: enemyTarget.id,
-      commandPriority: "autonomous",
-    });
+    return setLeaderIntent(
+      updateEntity(nextState, {
+        ...explorer,
+        state: "attack",
+        currentTargetId: enemyTarget.id,
+        commandPriority: "autonomous",
+      }),
+      {
+        type: "attack",
+        targetId: enemyTarget.id,
+        targetPosition: enemyTarget.position,
+      },
+    );
   }
 
   const targetPosition = findNearestUnexploredReachablePosition(
@@ -45,9 +55,14 @@ export function updateExplorationSystem(
   );
 
   if (!targetPosition) {
-    return nextState;
+    return setLeaderIntent(nextState, null);
   }
 
+  nextState = setLeaderIntent(nextState, {
+    type: "explore",
+    targetId: null,
+    targetPosition,
+  });
   nextState = moveEntityTowardPositionIfUnoccupied(
     nextState,
     explorer,
@@ -56,6 +71,33 @@ export function updateExplorationSystem(
   movedEntityIds.add(explorer.id);
 
   return markAutonomousEntityTilesExplored(nextState);
+}
+
+export function reserveExploringPlayerNextTile(state: GameState): GameState {
+  if (!state.autoModeEnabled || !state.map) {
+    return state;
+  }
+
+  const explorer = getExploringPlayer(state);
+
+  if (!explorer) {
+    return state;
+  }
+
+  const targetPosition = findNearestUnexploredReachablePosition(
+    state,
+    explorer.position,
+  );
+
+  if (!targetPosition) {
+    return state;
+  }
+
+  const nextTile = previewMoveTowardPosition(state, explorer, targetPosition);
+
+  return nextTile
+    ? reservePositionForTick(state, explorer.id, nextTile)
+    : state;
 }
 
 function markAutonomousEntityTilesExplored(state: GameState): GameState {

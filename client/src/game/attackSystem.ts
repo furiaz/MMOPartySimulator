@@ -11,8 +11,13 @@ import {
   type GameState,
 } from "./state";
 import { protectLeader } from "./partyProtectionSystem";
+import {
+  getLeaderEnemyTarget,
+  isDefenderAttackTargetRelevant,
+} from "./roleSystem";
 import type {
   AutonomousEntity,
+  Companion,
   CombatEntity,
   Enemy,
   GameEntity,
@@ -54,6 +59,14 @@ export function updateAttackSystem(
       continue;
     }
 
+    if (
+      isAutonomousDefender(attacker) &&
+      !isDefenderAttackTargetRelevant(nextState, attacker, target)
+    ) {
+      nextState = updateEntity(nextState, switchToFollow(attacker));
+      continue;
+    }
+
     if (isInAttackRange(attacker, target)) {
       if (!canAttack(attacker, now)) {
         continue;
@@ -82,7 +95,11 @@ export function updateAttackSystem(
       continue;
     }
 
-    nextState = moveEntityTowardIfUnoccupied(nextState, attacker, target);
+    nextState = moveEntityTowardIfUnoccupied(
+      nextState,
+      attacker,
+      getCombatMovementTarget(nextState, attacker, target),
+    );
     movedEntityIds.add(attacker.id);
   }
 
@@ -127,6 +144,59 @@ function updateTargetAfterDamage(
   return enemy;
 }
 
+function getCombatMovementTarget(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+): CombatEntity {
+  if (!isAutonomousEntity(attacker) || attacker.commandPriority === "direct") {
+    return target;
+  }
+
+  if (attacker.kind === "player" && isEnemy(target)) {
+    return findLeadingDefender(state, attacker.id, target.id) ?? target;
+  }
+
+  if (attacker.kind === "companion" && attacker.role === "fighter") {
+    const leader = state.entities[attacker.followTargetId];
+    const leaderTarget = leader ? getLeaderEnemyTarget(state, leader) : undefined;
+
+    if (leaderTarget?.id === target.id && isCombatEntity(leader)) {
+      return leader;
+    }
+  }
+
+  return target;
+}
+
+function findLeadingDefender(
+  state: GameState,
+  leaderId: string,
+  targetId: string,
+): Companion | undefined {
+  const target = state.entities[targetId];
+
+  if (!target) {
+    return undefined;
+  }
+
+  return Object.values(state.entities)
+    .filter(
+      (entity): entity is Companion =>
+        entity.kind === "companion" &&
+        entity.role === "defender" &&
+        entity.state === "defend" &&
+        entity.commandPriority !== "direct" &&
+        entity.followTargetId === leaderId &&
+        entity.currentTargetId === targetId,
+    )
+    .sort(
+      (a, b) =>
+        getGridDistance(a.position, target.position) -
+        getGridDistance(b.position, target.position),
+    )[0];
+}
+
 function isEnemy(entity: GameEntity): entity is Enemy {
   return entity.kind === "enemy";
 }
@@ -142,6 +212,10 @@ function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
       state: "idle",
       currentTargetId: null,
     };
+  }
+
+  if (isAutonomousDefender(attacker)) {
+    return switchToFollow(attacker);
   }
 
   const sharedTarget = findPartyCombatTarget(state, attacker.id);
@@ -182,10 +256,34 @@ function findPartyCombatTarget(
 }
 
 function switchToFollow(entity: AutonomousEntity): AutonomousEntity {
+  if (entity.kind === "companion" && entity.role === "defender") {
+    return {
+      ...entity,
+      state: "defend",
+      currentTargetId: null,
+      commandPriority: "autonomous",
+    };
+  }
+
   return {
     ...entity,
     state: "follow",
     currentTargetId: entity.kind === "companion" ? entity.followTargetId : null,
     commandPriority: "autonomous",
   };
+}
+
+function isAutonomousDefender(entity: CombatEntity): entity is Companion {
+  return (
+    entity.kind === "companion" &&
+    entity.role === "defender" &&
+    entity.commandPriority !== "direct"
+  );
+}
+
+function getGridDistance(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): number {
+  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
 }
