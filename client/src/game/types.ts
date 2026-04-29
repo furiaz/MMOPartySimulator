@@ -12,6 +12,8 @@ export type EnemyAggressionMode = "passive" | "aggressive";
 
 export type CommandPriority = "autonomous" | "direct";
 
+export type CompanionRole = "fighter" | "gatherer" | "defender" | "none";
+
 export type ResourceType = "wood" | "ore" | "herb";
 
 export type ResourceInventory = {
@@ -53,6 +55,7 @@ export type Enemy = LivingEntity & {
 
 export type Companion = LivingEntity & {
   kind: "companion";
+  role: CompanionRole;
   followTargetId: string;
   currentTargetId: string | null;
   lastGatherAt: number;

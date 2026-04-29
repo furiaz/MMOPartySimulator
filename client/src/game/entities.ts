@@ -2,6 +2,7 @@ import type {
   AutonomousEntity,
   CombatEntity,
   Companion,
+  CompanionRole,
   Enemy,
   EnemyAggressionMode,
   EntityState,
@@ -38,7 +39,7 @@ export function createPlayer(id: string, position: Position): Player {
     currentTargetId: null,
     lastGatherAt: 0,
     gatherSpeed: STARTING_GATHER_SPEED,
-    commandPriority: "direct",
+    commandPriority: "autonomous",
   };
 }
 
@@ -63,10 +64,12 @@ export function createCompanion(
   id: string,
   position: Position,
   followTargetId: string,
+  role: CompanionRole = "none",
 ): Companion {
   return {
     id,
     kind: "companion",
+    role,
     position,
     state: "follow",
     health: STARTING_HEALTH,

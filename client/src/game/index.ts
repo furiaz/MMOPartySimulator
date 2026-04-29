@@ -4,6 +4,7 @@ export type {
   CombatEntity,
   CommandPriority,
   Companion,
+  CompanionRole,
   Enemy,
   EnemyAggressionMode,
   EntityKind,
@@ -55,6 +56,7 @@ export { updateGame } from "./updateGame";
 export { updateAttackSystem } from "./attackSystem";
 export { updateEnemyAISystem } from "./enemyAISystem";
 export { updateGatherSystem } from "./gatherSystem";
+export { updateRoleSystem } from "./roleSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
 export {
   debugAddCompanion,

@@ -154,5 +154,6 @@ function switchToFollow(entity: AutonomousEntity): AutonomousEntity {
     ...entity,
     state: "follow",
     currentTargetId: entity.kind === "companion" ? entity.followTargetId : null,
+    commandPriority: "autonomous",
   };
 }

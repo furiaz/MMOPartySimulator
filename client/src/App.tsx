@@ -44,8 +44,9 @@ function createInitialState(): GameState {
     companionIds[0],
     companionStartPositions[0],
     playerId,
+    "gatherer",
   );
-  const enemy = createEnemy(enemyId, { x: 10, y: 7 });
+  const enemy = createEnemy(enemyId, { x: 10, y: 7 }, "aggressive");
   const resource = createResource(resourceId, { x: 3, y: 7 });
 
   return addEntity(
@@ -67,12 +68,18 @@ function EntityDebugLabel({
   name,
   entity,
   detail,
+  isVisible,
 }: {
   name: string;
   entity: GameEntity;
   detail?: string;
+  isVisible: boolean;
 }) {
   const targetId = "currentTargetId" in entity ? entity.currentTargetId : null;
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <span className="entity-label">
@@ -89,6 +96,7 @@ function EntityDebugLabel({
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
+  const [showEntityInfo, setShowEntityInfo] = useState(true);
   const stopLoopRef = useRef<(() => void) | null>(null);
 
   const player = gameState.entities[playerId] as Player;
@@ -209,6 +217,10 @@ function App() {
     setGameState(debugRestorePartyHealth);
   }
 
+  function toggleEntityInfo() {
+    setShowEntityInfo((isVisible) => !isVisible);
+  }
+
   return (
     <main className="game-page">
       <section className="game-panel">
@@ -228,6 +240,7 @@ function App() {
               name="Player"
               entity={player}
               detail={`HP ${player.health} GS ${player.gatherSpeed}`}
+              isVisible={showEntityInfo}
             />
           </div>
           {companions.map((companion, index) => (
@@ -244,7 +257,8 @@ function App() {
               <EntityDebugLabel
                 name={`C${index + 1}`}
                 entity={companion}
-                detail={`HP ${companion.health} GS ${companion.gatherSpeed}`}
+                detail={`HP ${companion.health} GS ${companion.gatherSpeed} Role ${companion.role}`}
+                isVisible={showEntityInfo}
               />
             </div>
           ))}
@@ -257,11 +271,15 @@ function App() {
                 }px)`,
               }}
             >
-              Enemy
-              <br />
-              State {enemy.state}
-              <br />
-              Target {enemy.currentTargetId ?? "none"}
+              {showEntityInfo ? (
+                <>
+                  Enemy
+                  <br />
+                  State {enemy.state}
+                  <br />
+                  Target {enemy.currentTargetId ?? "none"}
+                </>
+              ) : null}
             </div>
           ) : (
             <div
@@ -277,7 +295,8 @@ function App() {
               <EntityDebugLabel
                 name="Enemy"
                 entity={enemy}
-                detail={`HP ${enemy.health}`}
+                detail={`HP ${enemy.health} Aggro ${enemy.aggressionMode}`}
+                isVisible={showEntityInfo}
               />
             </div>
           )}
@@ -290,15 +309,19 @@ function App() {
                 }px)`,
               }}
             >
-              Depleted
-              <br />
-              State {resource.state}
-              <br />
-              Durability {resource.durability}/{resource.maxDurability}
-              <br />
-              Quantity {resource.quantity}
-              <br />
-              Target none
+              {showEntityInfo ? (
+                <>
+                  Depleted
+                  <br />
+                  State {resource.state}
+                  <br />
+                  Durability {resource.durability}/{resource.maxDurability}
+                  <br />
+                  Quantity {resource.quantity}
+                  <br />
+                  Target none
+                </>
+              ) : null}
             </div>
           ) : (
             <div
@@ -314,6 +337,7 @@ function App() {
                 name="Resource"
                 entity={resource}
                 detail={resourceDebugDetail}
+                isVisible={showEntityInfo}
               />
             </div>
           )}
@@ -329,34 +353,39 @@ function App() {
           <button onClick={commandCompanionsToGatherResource}>
             Gather Resource All
           </button>
-          <span>
-            Player ({player.position.x}, {player.position.y}) | State{" "}
-            {player.state} | HP {player.health} | Target{" "}
-            {player.currentTargetId ?? "none"} | Gather Speed{" "}
-            {player.gatherSpeed} |
-            Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
-            {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
-            Resource ({resource.position.x}, {resource.position.y}) | Type{" "}
-            {resource.resourceType} | Durability {resource.durability}/
-            {resource.maxDurability} | Quantity {resource.quantity} | Gatherers{" "}
-            {resourceGathererCount}/
-            {resource.maxGatherers} | Depleted{" "}
-            {resource.isDepleted ? "yes" : "no"} | Inventory Wood{" "}
-            {inventory.wood} Ore {inventory.ore} Herb {inventory.herb}
-          </span>
-          <div className="companion-status-list">
-            {companions.length > 0
-              ? companions.map((companion, index) => (
-                  <span key={companion.id}>
-                    C{index + 1} ({companion.position.x},{" "}
-                    {companion.position.y}) | State {companion.state} | HP{" "}
-                    {companion.health} | Target{" "}
-                    {companion.currentTargetId ?? "none"} | Gather Speed{" "}
-                    {companion.gatherSpeed}
-                  </span>
-                ))
-              : "No companions in party"}
-          </div>
+          {showEntityInfo ? (
+            <>
+              <span>
+                Player ({player.position.x}, {player.position.y}) | State{" "}
+                {player.state} | HP {player.health} | Target{" "}
+                {player.currentTargetId ?? "none"} | Gather Speed{" "}
+                {player.gatherSpeed} |
+                Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
+                {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
+                Aggro {enemy.aggressionMode} |
+                Resource ({resource.position.x}, {resource.position.y}) | Type{" "}
+                {resource.resourceType} | Durability {resource.durability}/
+                {resource.maxDurability} | Quantity {resource.quantity} |
+                Gatherers {resourceGathererCount}/
+                {resource.maxGatherers} | Depleted{" "}
+                {resource.isDepleted ? "yes" : "no"} | Inventory Wood{" "}
+                {inventory.wood} Ore {inventory.ore} Herb {inventory.herb}
+              </span>
+              <div className="companion-status-list">
+                {companions.length > 0
+                  ? companions.map((companion, index) => (
+                      <span key={companion.id}>
+                        C{index + 1} ({companion.position.x},{" "}
+                        {companion.position.y}) | State {companion.state} | HP{" "}
+                        {companion.health} | Target{" "}
+                        {companion.currentTargetId ?? "none"} | Gather Speed{" "}
+                        {companion.gatherSpeed}
+                      </span>
+                    ))
+                  : "No companions in party"}
+              </div>
+            </>
+          ) : null}
         </div>
 
         <section className="debug-tools" aria-label="Debug tools">
@@ -373,6 +402,9 @@ function App() {
             <button onClick={restorePartyHealth}>Restore Party HP</button>
             <button onClick={refreshGatherPoints}>
               Refresh Gather Points
+            </button>
+            <button onClick={toggleEntityInfo}>
+              {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
             </button>
           </div>
         </section>

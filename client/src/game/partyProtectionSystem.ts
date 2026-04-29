@@ -1,5 +1,5 @@
 import { updateEntity, type GameState } from "./state";
-import type { Companion, Enemy, GameEntity, Player } from "./types";
+import type { AutonomousEntity, Enemy, GameEntity, Player } from "./types";
 
 export function protectLeader(
   state: GameState,
@@ -31,13 +31,25 @@ export function protectLeader(
 function canProtectLeader(
   entity: GameEntity,
   leaderId: string,
-): entity is Companion {
-  if (entity.kind !== "companion") {
+): entity is AutonomousEntity {
+  if (entity.kind !== "player" && entity.kind !== "companion") {
     return false;
   }
 
-  return (
-    entity.followTargetId === leaderId &&
-    (entity.state === "idle" || entity.state === "follow")
-  );
+  if (entity.commandPriority === "direct") {
+    return false;
+  }
+
+  if (entity.kind === "player") {
+    return (
+      entity.id === leaderId &&
+      (entity.state === "idle" || entity.state === "follow")
+    );
+  }
+
+  if (entity.followTargetId !== leaderId) {
+    return false;
+  }
+
+  return entity.state === "idle" || entity.state === "follow";
 }
