@@ -215,7 +215,7 @@ function App() {
             <EntityDebugLabel
               name="Player"
               entity={player}
-              detail={`HP ${player.health}`}
+              detail={`HP ${player.health} GS ${player.gatherSpeed}`}
             />
           </div>
           {companions.map((companion, index) => (
@@ -232,7 +232,7 @@ function App() {
               <EntityDebugLabel
                 name={`C${index + 1}`}
                 entity={companion}
-                detail={`HP ${companion.health}`}
+                detail={`HP ${companion.health} GS ${companion.gatherSpeed}`}
               />
             </div>
           ))}
@@ -316,7 +316,8 @@ function App() {
           <span>
             Player ({player.position.x}, {player.position.y}) | State{" "}
             {player.state} | HP {player.health} | Target{" "}
-            {player.currentTargetId ?? "none"} |
+            {player.currentTargetId ?? "none"} | Gather Speed{" "}
+            {player.gatherSpeed} |
             Party {companions.length + 1}/4 | Enemy ({enemy.position.x},{" "}
             {enemy.position.y}) | State {enemy.state} | HP {enemy.health} |
             Resource ({resource.position.x}, {resource.position.y}) | Type{" "}
@@ -332,7 +333,8 @@ function App() {
                     C{index + 1} ({companion.position.x},{" "}
                     {companion.position.y}) | State {companion.state} | HP{" "}
                     {companion.health} | Target{" "}
-                    {companion.currentTargetId ?? "none"}
+                    {companion.currentTargetId ?? "none"} | Gather Speed{" "}
+                    {companion.gatherSpeed}
                   </span>
                 ))
               : "No companions in party"}

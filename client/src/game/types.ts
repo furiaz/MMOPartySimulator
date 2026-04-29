@@ -35,6 +35,7 @@ export type Player = LivingEntity & {
   kind: "player";
   currentTargetId: string | null;
   lastGatherAt: number;
+  gatherSpeed: number;
   commandPriority: CommandPriority;
 };
 
@@ -49,6 +50,7 @@ export type Companion = LivingEntity & {
   followTargetId: string;
   currentTargetId: string | null;
   lastGatherAt: number;
+  gatherSpeed: number;
   commandPriority: CommandPriority;
 };
 

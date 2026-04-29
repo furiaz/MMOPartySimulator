@@ -309,3 +309,76 @@ Never skip this order.
 - Defend is a toggle/assigned role, not automatic
 - Auto-retaliate will only affect idle/follow entities
 - Player manual input (WASD, click) will override autonomous behavior
+
+## Entity Type Responsibilities
+
+### Base Entity
+
+All world entities share:
+- id
+- kind
+- position
+- state/status if applicable
+
+Base entities should stay minimal.
+
+---
+
+### Player
+
+The player:
+- is the main controllable character
+- can receive autonomous commands
+- can attack
+- can gather
+- can be damaged
+- can use future manual input
+- has health
+- has combat stats
+- has gatherSpeed
+- may later have skills/proficiencies
+
+---
+
+### Companion
+
+Companions:
+- can receive commands
+- can follow
+- can attack
+- can gather
+- can defend
+- can be damaged
+- have health
+- have combat stats
+- have gatherSpeed
+- may later have skills/proficiencies
+
+---
+
+### Enemy
+
+Enemies:
+- can move
+- can attack
+- can be damaged
+- have health
+- have combat stats
+- may be passive or aggressive
+- should not gather
+- should not receive gathering stats
+
+---
+
+### Resource
+
+Resources:
+- can be targeted for gathering
+- have resourceType
+- have durability/remaining amount
+- have maxGatherers
+- may be depleted/refreshed
+- do not move
+- do not attack
+- do not have health
+- do not gather

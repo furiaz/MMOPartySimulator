@@ -14,6 +14,7 @@ import type {
 
 const FOLLOW_DISTANCE = 1;
 const STARTING_HEALTH = 10;
+const STARTING_GATHER_SPEED = 1;
 const STARTING_RESOURCE_DURABILITY = 5;
 const DEFAULT_RESOURCE_TYPE: ResourceType = "wood";
 
@@ -33,6 +34,7 @@ export function createPlayer(id: string, position: Position): Player {
     lastAttackAt: 0,
     currentTargetId: null,
     lastGatherAt: 0,
+    gatherSpeed: STARTING_GATHER_SPEED,
     commandPriority: "direct",
   };
 }
@@ -69,6 +71,7 @@ export function createCompanion(
     followTargetId,
     currentTargetId: followTargetId,
     lastGatherAt: 0,
+    gatherSpeed: STARTING_GATHER_SPEED,
     commandPriority: "autonomous",
   };
 }

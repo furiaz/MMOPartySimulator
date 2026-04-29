@@ -13,7 +13,6 @@ import {
 import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = 1;
-const GATHER_AMOUNT = 1;
 const GATHER_COOLDOWN_MS = 1000;
 
 export function updateGatherSystem(
@@ -65,7 +64,10 @@ export function updateGatherSystem(
       continue;
     }
 
-    const gatheredResource = gatherResource(resource, GATHER_AMOUNT);
+    const gatheredResource = gatherResource(
+      resource,
+      getGatherAmount(gatherer),
+    );
 
     nextState = updateEntity(nextState, gatheredResource);
     nextState = updateEntity(
@@ -130,6 +132,10 @@ function isInGatherRange(gatherer: GameEntity, resource: GameEntity): boolean {
 
 function canGather(entity: AutonomousEntity, now: number): boolean {
   return now - entity.lastGatherAt >= GATHER_COOLDOWN_MS;
+}
+
+function getGatherAmount(gatherer: AutonomousEntity): number {
+  return Math.max(0, gatherer.gatherSpeed);
 }
 
 function switchToFollow(entity: AutonomousEntity): AutonomousEntity {
