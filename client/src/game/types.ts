@@ -46,6 +46,68 @@ export type CombatFeedbackEvent = {
   expiresAt: number;
 };
 
+export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
+
+export type DebugTelemetryEventType =
+  | "target_acquired"
+  | "target_changed"
+  | "movement_failed"
+  | "attack_started"
+  | "damage_dealt"
+  | "entity_died"
+  | "gather_started"
+  | "resource_depleted"
+  | "role_changed";
+
+export type DebugTelemetryEntitySnapshot = {
+  tick: number;
+  entityId: string;
+  kind: EntityKind;
+  role?: CompanionRole;
+  state: EntityState;
+  position: Position;
+  currentTargetId?: string | null;
+  commandPriority?: CommandPriority;
+  movementResult: DebugMovementResult;
+  reason?: string;
+};
+
+export type DebugTelemetryEvent = {
+  tick: number;
+  type: DebugTelemetryEventType;
+  entityId: string;
+  targetId?: string | null;
+  previousTargetId?: string | null;
+  amount?: number;
+  previousRole?: CompanionRole;
+  nextRole?: CompanionRole;
+  reason?: string;
+};
+
+export type DebugTelemetryTick = {
+  tick: number;
+  recordedAt: number;
+  entities: DebugTelemetryEntitySnapshot[];
+  events: DebugTelemetryEvent[];
+};
+
+export type DebugTelemetryState = {
+  isRecording: boolean;
+  tickNumber: number;
+  maxTicks: number;
+  ticks: DebugTelemetryTick[];
+  events: DebugTelemetryEvent[];
+  startedAt: number | null;
+  stoppedAt: number | null;
+};
+
+export type DebugTelemetryReport = {
+  exportedAt: number;
+  tickCount: number;
+  eventCount: number;
+  telemetry: DebugTelemetryState;
+};
+
 export type GameMap = {
   columns: number;
   rows: number;

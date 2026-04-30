@@ -7,6 +7,13 @@ export type {
   CompanionRole,
   CombatFeedbackEvent,
   CombatFeedbackType,
+  DebugMovementResult,
+  DebugTelemetryEntitySnapshot,
+  DebugTelemetryEvent,
+  DebugTelemetryEventType,
+  DebugTelemetryReport,
+  DebugTelemetryState,
+  DebugTelemetryTick,
   Enemy,
   EnemyAggressionMode,
   EntityKind,
@@ -83,3 +90,12 @@ export {
   debugResurrectEnemy,
   debugRestorePartyHealth,
 } from "./debugTools";
+export {
+  appendDebugTelemetryEvent,
+  clearDebugTelemetry,
+  createDebugTelemetryState,
+  exportDebugTelemetryReport,
+  recordDebugTelemetryTick,
+  startDebugTelemetryRecording,
+  stopDebugTelemetryRecording,
+} from "./debugTelemetry";

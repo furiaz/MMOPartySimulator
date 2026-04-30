@@ -1,7 +1,9 @@
 import { isCombatEntity, moveEntityTo, moveEntityToward } from "./entities";
+import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import type {
   CombatFeedbackEvent,
   CombatFeedbackType,
+  DebugTelemetryState,
   Companion,
   GameMap,
   GameEntity,
@@ -41,6 +43,7 @@ export type GameState = {
   defenderWaitTicksByLeaderId?: Record<string, number>;
   defenderBlockedTicksByEntityId?: Record<string, number>;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  debugTelemetry?: DebugTelemetryState;
 };
 
 export function createEmptyResourceInventory(): ResourceInventory {
@@ -199,9 +202,20 @@ export function setCompanionRole(
     return state;
   }
 
-  return updateEntity(state, {
+  const nextState = updateEntity(state, {
     ...companion,
     role,
+  });
+
+  if (companion.role === role) {
+    return nextState;
+  }
+
+  return appendDebugTelemetryEvent(nextState, {
+    type: "role_changed",
+    entityId: companion.id,
+    previousRole: companion.role,
+    nextRole: role,
   });
 }
 

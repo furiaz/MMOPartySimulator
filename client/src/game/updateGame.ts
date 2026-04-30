@@ -8,6 +8,7 @@ import {
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updateRoleSystem } from "./roleSystem";
+import { recordDebugTelemetryTick } from "./debugTelemetry";
 import {
   clearExpiredCombatFeedback,
   clearTickMovementPlanning,
@@ -32,5 +33,8 @@ export function updateGame(state: GameState): GameState {
   nextState = updateAttackSystem(nextState, movedEntityIds);
   nextState = updateGatherSystem(nextState, movedEntityIds);
 
-  return clearExpiredCombatFeedback(nextState);
+  return recordDebugTelemetryTick(
+    state,
+    clearExpiredCombatFeedback(nextState),
+  );
 }

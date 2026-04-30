@@ -10,18 +10,22 @@ import {
   createEnemy,
   createPlayer,
   createResource,
+  clearDebugTelemetry,
   debugAddCompanionToParty,
   debugRefreshResources,
   debugRandomizeLocations,
   debugRemoveCompanionFromParty,
   debugResurrectEnemy,
   debugRestorePartyHealth,
+  exportDebugTelemetryReport,
   issueCompanionCommands,
   issueEntityCommand,
   isCombatEntity,
   setAutoModeEnabled,
   setCompanionRole,
   startGameLoop,
+  startDebugTelemetryRecording,
+  stopDebugTelemetryRecording,
   type Companion,
   type CompanionRole,
   type CombatEntity,
@@ -379,6 +383,34 @@ function App() {
     setShowEntityInfo((isVisible) => !isVisible);
   }
 
+  function toggleDebugTelemetryRecording() {
+    setGameState((state) =>
+      state.debugTelemetry?.isRecording
+        ? stopDebugTelemetryRecording(state)
+        : startDebugTelemetryRecording(state),
+    );
+  }
+
+  function clearDebugTelemetryReport() {
+    setGameState(clearDebugTelemetry);
+  }
+
+  function exportDebugTelemetryJson() {
+    const report = exportDebugTelemetryReport(gameState);
+    const blob = new Blob([JSON.stringify(report, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `debug-telemetry-${new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="game-page">
       <section className="game-panel">
@@ -640,6 +672,24 @@ function App() {
             <button onClick={toggleEntityInfo}>
               {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
             </button>
+            <button onClick={toggleDebugTelemetryRecording}>
+              {gameState.debugTelemetry?.isRecording
+                ? "Stop Debug Recording"
+                : "Start Debug Recording"}
+            </button>
+            <button onClick={exportDebugTelemetryJson}>
+              Export Debug JSON
+            </button>
+            <button onClick={clearDebugTelemetryReport}>
+              Clear Debug Report
+            </button>
+            <span>
+              Debug Recording{" "}
+              {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Ticks{" "}
+              {gameState.debugTelemetry?.ticks.length ?? 0}/
+              {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
+              {gameState.debugTelemetry?.events.length ?? 0}
+            </span>
           </div>
         </section>
       </section>
