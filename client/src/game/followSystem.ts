@@ -13,15 +13,53 @@ import type { AutonomousEntity, Companion, GameEntity, Player, Position } from "
 export const FOLLOW_LEASH_RADIUS = 2;
 const DOUBLE_SPEED_DISTANCE = 10;
 const FOLLOW_TRAIL_SPACING = 1;
+const LINE_FORMATION_SPACING = 1;
 
 export function updateFollowSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
 ): GameState {
   let nextState = state;
+  const lineCompanionIds = new Set(
+    getLineFormationCompanions(nextState).map((companion) => companion.id),
+  );
+
+  for (const companionId of lineCompanionIds) {
+    const companion = getEntityById(nextState, companionId);
+
+    if (!companion || companion.kind !== "companion") {
+      continue;
+    }
+
+    if (movedEntityIds.has(companion.id)) {
+      continue;
+    }
+
+    const lineTargetPosition = getLineFormationTargetPosition(
+      nextState,
+      companion,
+    );
+
+    if (!lineTargetPosition || isWithinLineSpacing(companion, lineTargetPosition)) {
+      continue;
+    }
+
+    nextState = moveFollowingEntityTowardPosition(
+      nextState,
+      companion,
+      lineTargetPosition,
+    );
+    if (didEntityMove(nextState, companion)) {
+      movedEntityIds.add(companion.id);
+    }
+  }
 
   for (const entity of Object.values(state.entities)) {
     if (!isFollowingAutonomousEntity(entity)) {
+      continue;
+    }
+
+    if (lineCompanionIds.has(entity.id)) {
       continue;
     }
 
@@ -54,7 +92,9 @@ export function updateFollowSystem(
         entity,
         trailPosition,
       );
-      movedEntityIds.add(entity.id);
+      if (didEntityMove(nextState, entity)) {
+        movedEntityIds.add(entity.id);
+      }
       continue;
     }
 
@@ -63,16 +103,191 @@ export function updateFollowSystem(
     }
 
     nextState = moveFollowingEntityTowardTarget(nextState, entity, target);
-    movedEntityIds.add(entity.id);
+    if (didEntityMove(nextState, entity)) {
+      movedEntityIds.add(entity.id);
+    }
   }
 
   return nextState;
+}
+
+function didEntityMove(state: GameState, entity: GameEntity): boolean {
+  const currentEntity = getEntityById(state, entity.id);
+
+  return Boolean(
+    currentEntity &&
+      (currentEntity.position.x !== entity.position.x ||
+        currentEntity.position.y !== entity.position.y),
+  );
 }
 
 function isFollowingAutonomousEntity(
   entity: GameEntity,
 ): entity is AutonomousEntity {
   return isAutonomousEntity(entity) && entity.state === "follow";
+}
+
+function getLineFormationCompanions(state: GameState): Companion[] {
+  const companions = Object.values(state.entities).filter(
+    (entity): entity is Companion =>
+      entity.kind === "companion" &&
+      entity.commandPriority !== "direct" &&
+      isLineFormationState(entity),
+  );
+
+  return companions
+    .map((companion, index) => ({ companion, index }))
+    .sort(
+      (a, b) =>
+        getLineRolePriority(a.companion) - getLineRolePriority(b.companion) ||
+        getCompanionPartyNumber(a.companion) -
+          getCompanionPartyNumber(b.companion) ||
+        a.index - b.index,
+    )
+    .map(({ companion }) => companion);
+}
+
+function isLineFormationState(companion: Companion): boolean {
+  if (companion.role === "defender") {
+    return companion.state === "defend" || companion.state === "follow";
+  }
+
+  return companion.state === "follow";
+}
+
+function getLineRolePriority(companion: Companion): number {
+  if (companion.role === "defender") {
+    return 0;
+  }
+
+  if (companion.role === "fighter") {
+    return 2;
+  }
+
+  if (companion.role === "gatherer") {
+    return 3;
+  }
+
+  return 4;
+}
+
+function getCompanionPartyNumber(companion: Companion): number {
+  const match = companion.id.match(/(\d+)$/);
+
+  return match ? Number(match[1]) : 1;
+}
+
+function getLineFormationTargetPosition(
+  state: GameState,
+  companion: Companion,
+): Position | null {
+  const leader = state.entities[companion.followTargetId];
+
+  if (leader?.kind !== "player") {
+    return null;
+  }
+
+  const lineCompanions = getLineFormationCompanions(state);
+  const companionIndex = lineCompanions.findIndex(
+    (lineCompanion) => lineCompanion.id === companion.id,
+  );
+
+  if (companionIndex < 0) {
+    return null;
+  }
+
+  const defenderCount = lineCompanions.filter(
+    (lineCompanion) => lineCompanion.role === "defender",
+  ).length;
+
+  if (companionIndex === 0 && companion.role === "defender") {
+    return getLeaderLineLeadPosition(state, leader);
+  }
+
+  if (companionIndex < defenderCount) {
+    return getTrailPositionForLineMember(state, lineCompanions[companionIndex - 1]);
+  }
+
+  if (companionIndex === defenderCount) {
+    return getTrailPositionForLineMember(state, leader);
+  }
+
+  return getTrailPositionForLineMember(state, lineCompanions[companionIndex - 1]);
+}
+
+function getLeaderLineLeadPosition(state: GameState, leader: Player): Position {
+  const direction = getLeaderLineDirection(state, leader);
+
+  if (direction.x === 0 && direction.y === 0) {
+    return getTrailPositionForLineMember(state, leader);
+  }
+
+  return {
+    x: leader.position.x + direction.x,
+    y: leader.position.y + direction.y,
+  };
+}
+
+function getLeaderLineDirection(state: GameState, leader: Player): Position {
+  const targetPosition = getLeaderTargetPosition(state, leader);
+
+  if (targetPosition) {
+    return {
+      x: Math.sign(targetPosition.x - leader.position.x),
+      y: Math.sign(targetPosition.y - leader.position.y),
+    };
+  }
+
+  const previousPosition = getFollowTrailPosition(state, leader.id, 0);
+
+  if (!previousPosition) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: Math.sign(leader.position.x - previousPosition.x),
+    y: Math.sign(leader.position.y - previousPosition.y),
+  };
+}
+
+function getLeaderTargetPosition(state: GameState, leader: Player): Position | null {
+  const currentTarget = leader.currentTargetId
+    ? state.entities[leader.currentTargetId]
+    : undefined;
+
+  if (
+    (leader.state === "attack" || leader.state === "gather") &&
+    currentTarget &&
+    currentTarget.state !== "dead"
+  ) {
+    return currentTarget.position;
+  }
+
+  const intent = state.leaderIntent;
+
+  if (!intent) {
+    return null;
+  }
+
+  const target = intent.targetId ? state.entities[intent.targetId] : undefined;
+
+  return target && target.state !== "dead"
+    ? target.position
+    : intent.targetPosition;
+}
+
+function getTrailPositionForLineMember(
+  state: GameState,
+  entity: Player | Companion,
+): Position {
+  return (
+    getFollowTrailPosition(state, entity.id, LINE_FORMATION_SPACING - 1) ??
+    entity.position
+  );
+}
+
+function isWithinLineSpacing(entity: GameEntity, targetPosition: Position): boolean {
+  return getGridDistance(entity.position, targetPosition) <= LINE_FORMATION_SPACING;
 }
 
 function moveFollowingEntityTowardPosition(
@@ -86,7 +301,7 @@ function moveFollowingEntityTowardPosition(
   for (let step = 0; step < stepCount; step += 1) {
     const currentEntity = getEntityById(nextState, entity.id);
 
-    if (!currentEntity || !isFollowingAutonomousEntity(currentEntity)) {
+    if (!currentEntity || !canMoveTowardLinePosition(currentEntity)) {
       break;
     }
 
@@ -117,6 +332,25 @@ function moveFollowingEntityTowardPosition(
   }
 
   return nextState;
+}
+
+function canMoveTowardLinePosition(
+  entity: GameEntity,
+): entity is AutonomousEntity {
+  if (entity.kind === "player") {
+    return entity.state === "follow";
+  }
+
+  if (entity.kind !== "companion") {
+    return false;
+  }
+
+  return (
+    entity.state === "follow" ||
+    (entity.role === "defender" &&
+      entity.state === "defend" &&
+      entity.commandPriority !== "direct")
+  );
 }
 
 function moveFollowingEntityTowardTarget(

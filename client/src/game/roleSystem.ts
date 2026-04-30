@@ -100,10 +100,13 @@ function getRoleTarget(
       return { state: "gather", targetId: resource.id };
     }
 
-    const enemy = findEnemyTarget(state, companion, {
-      maxDistance: GATHERER_COMBAT_ASSIST_RADIUS,
-      includeEngagedOutsideRange: true,
-    });
+    const followTarget = state.entities[companion.followTargetId];
+    const enemy =
+      (followTarget ? getLeaderCombatTarget(state, followTarget) : undefined) ??
+      findEnemyTarget(state, companion, {
+        maxDistance: GATHERER_COMBAT_ASSIST_RADIUS,
+        includeEngagedOutsideRange: true,
+      });
 
     return enemy ? { state: "attack", targetId: enemy.id } : null;
   }
@@ -166,17 +169,7 @@ function getLeaderCombatTarget(
   state: GameState,
   leader: GameEntity,
 ): Enemy | undefined {
-  const target = getLeaderEnemyTarget(state, leader);
-
-  if (!target) {
-    return undefined;
-  }
-
-  const nearbyLeaderTarget = findEnemyTarget(state, leader, {
-    maxDistance: FIGHTER_ENEMY_SEARCH_RADIUS,
-  });
-
-  return nearbyLeaderTarget?.id === target.id ? target : undefined;
+  return getLeaderEnemyTarget(state, leader);
 }
 
 export function getLeaderEnemyTarget(

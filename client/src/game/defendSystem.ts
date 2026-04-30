@@ -1,12 +1,15 @@
 import { damageEntity, setLastAttackAt } from "./entities";
 import {
   addCombatFeedback,
-  moveEntityTowardIfUnoccupied,
+  getBoundedPathDistance,
+  isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
+  reservePositionForTick,
   updateEntity,
   type GameState,
 } from "./state";
+import { chooseAttackSlot } from "./attackSlots";
 import {
   getDefenderAnchorPosition,
   getLeaderEnemyTarget,
@@ -16,7 +19,7 @@ import {
 import type { Companion, Enemy, GameEntity, Player, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
-const MAX_DEFENDER_MOVE_STEPS = 3;
+const DEFENDER_CATCH_UP_MOVE_STEPS = 2;
 const DEFENDER_ATTACK_RANGE = 1;
 const DEFENDER_ATTACK_DAMAGE = 1;
 const DEFENDER_ATTACK_COOLDOWN_MS = 1000;
@@ -26,6 +29,11 @@ const DEFENDER_INTERCEPT_READY_DISTANCE = 1;
 const DEFENDER_LEADER_WAIT_TICKS = 3;
 const DEFENDER_BLOCKED_FALLBACK_TICKS = 3;
 const DEFENDER_MAX_PREFERRED_LEADER_DISTANCE = 2;
+const DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE = 4;
+const DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE = 2;
+const DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE = 3;
+const DEFENDER_ANCHOR_SEARCH_RADIUS = 2;
+const DEFENDER_ANCHOR_MAX_PATH_DISTANCE = 6;
 
 export function updateDefendSystem(
   state: GameState,
@@ -47,13 +55,24 @@ export function updateDefendSystem(
     }
 
     const leader = nextState.entities[defender.followTargetId];
-    const defendPosition = getDefenderAnchorPosition(nextState, defender);
+    const preferredDefendPosition = getDefenderAnchorPosition(nextState, defender);
+    const defendPosition = leader
+      ? getValidDefenderAnchorPosition(
+          nextState,
+          defender,
+          leader,
+          preferredDefendPosition,
+        )
+      : null;
+    const targetAnchorPosition =
+      defendPosition ?? leader?.position ?? defender.position;
     const target = leader
-      ? getDefenderTarget(nextState, defender, leader, defendPosition)
+      ? getDefenderTarget(nextState, defender, leader, targetAnchorPosition)
       : undefined;
     const shouldWaitForIntercept =
       target &&
       leader &&
+      defendPosition &&
       shouldLeaderWaitForDefender(nextState, defender, leader, defendPosition);
 
     if (shouldWaitForIntercept) {
@@ -62,6 +81,7 @@ export function updateDefendSystem(
     } else if (
       leader &&
       (!target ||
+        !defendPosition ||
         !isWithinLeaderLeash(defender, leader) ||
         getGridDistance(defender.position, defendPosition) <=
           DEFENDER_INTERCEPT_READY_DISTANCE)
@@ -96,45 +116,23 @@ export function updateDefendSystem(
         syncedDefender,
         target,
         leader,
-        defendPosition,
+        defendPosition ?? leader?.position ?? defender.position,
         Boolean(shouldWaitForIntercept),
       );
-      movedEntityIds.add(defender.id);
+      if (didEntityMove(nextState, defender) || shouldHoldDefenderLine(syncedDefender, leader, target)) {
+        movedEntityIds.add(defender.id);
+      }
       continue;
     }
 
-    let guardDefender = syncedDefender;
-
-    if (
-      !target &&
-      (guardDefender.currentTargetId ||
-        guardDefender.position.x !== defendPosition.x ||
-        guardDefender.position.y !== defendPosition.y)
-    ) {
-      guardDefender = {
-        ...guardDefender,
+    if (syncedDefender.currentTargetId) {
+      nextState = updateEntity(nextState, {
+        ...syncedDefender,
         currentTargetId: null,
-      };
-
-      nextState = updateEntity(nextState, guardDefender);
+      });
     }
 
-    nextState = updateDefenderBlockedTicks(nextState, guardDefender.id, false);
-
-    if (
-      defender.position.x === defendPosition.x &&
-      defender.position.y === defendPosition.y
-    ) {
-      continue;
-    }
-
-    nextState = moveDefenderTowardPosition(
-      nextState,
-      guardDefender,
-      defendPosition,
-      Boolean(shouldWaitForIntercept),
-    );
-    movedEntityIds.add(defender.id);
+    nextState = updateDefenderBlockedTicks(nextState, defender.id, false);
   }
 
   for (const leaderId of waitingLeaderIds) {
@@ -148,6 +146,105 @@ export function updateDefendSystem(
   }
 
   return nextState;
+}
+
+function getValidDefenderAnchorPosition(
+  state: GameState,
+  defender: Companion,
+  leader: GameEntity,
+  preferredPosition: Position,
+): Position | null {
+  if (isReachableDefenderAnchor(state, defender, preferredPosition)) {
+    return preferredPosition;
+  }
+
+  const frontDirection = getFrontDirection(leader, preferredPosition);
+
+  return getAnchorCandidates(preferredPosition, DEFENDER_ANCHOR_SEARCH_RADIUS)
+    .filter((position) => isReachableDefenderAnchor(state, defender, position))
+    .sort(
+      (a, b) =>
+        getBehindLeaderPenalty(a, leader, frontDirection) -
+          getBehindLeaderPenalty(b, leader, frontDirection) ||
+        getGridDistance(a, preferredPosition) -
+          getGridDistance(b, preferredPosition) ||
+        getGridDistance(a, defender.position) -
+          getGridDistance(b, defender.position) ||
+        a.y - b.y ||
+        a.x - b.x,
+    )[0] ?? null;
+}
+
+function isReachableDefenderAnchor(
+  state: GameState,
+  defender: Companion,
+  position: Position,
+): boolean {
+  return (
+    isWalkablePosition(state, position, defender.id) &&
+    getBoundedPathDistance(
+      state,
+      defender,
+      position,
+      DEFENDER_ANCHOR_MAX_PATH_DISTANCE,
+    ) !== null
+  );
+}
+
+function getAnchorCandidates(center: Position, radius: number): Position[] {
+  const positions: Position[] = [];
+
+  for (let y = center.y - radius; y <= center.y + radius; y += 1) {
+    for (let x = center.x - radius; x <= center.x + radius; x += 1) {
+      positions.push({ x, y });
+    }
+  }
+
+  return positions;
+}
+
+function getFrontDirection(leader: GameEntity, preferredPosition: Position): Position {
+  const direction = {
+    x: Math.sign(preferredPosition.x - leader.position.x),
+    y: Math.sign(preferredPosition.y - leader.position.y),
+  };
+
+  if (direction.x !== 0 || direction.y !== 0) {
+    return direction;
+  }
+
+  if (leader.kind === "player") {
+    return { x: 0, y: 0 };
+  }
+
+  return direction;
+}
+
+function getBehindLeaderPenalty(
+  position: Position,
+  leader: GameEntity,
+  frontDirection: Position,
+): number {
+  if (frontDirection.x === 0 && frontDirection.y === 0) {
+    return 0;
+  }
+
+  const offset = {
+    x: position.x - leader.position.x,
+    y: position.y - leader.position.y,
+  };
+
+  return offset.x * frontDirection.x + offset.y * frontDirection.y < 0 ? 1 : 0;
+}
+
+function didEntityMove(state: GameState, entity: GameEntity): boolean {
+  const currentEntity = state.entities[entity.id];
+
+  return Boolean(
+    currentEntity &&
+      (currentEntity.position.x !== entity.position.x ||
+        currentEntity.position.y !== entity.position.y),
+  );
 }
 
 function attackDefenderTarget(
@@ -370,10 +467,33 @@ function moveDefenderTowardCommittedTarget(
       break;
     }
 
-    const nextPosition = previewMoveTowardPosition(
+    const attackPosition = chooseAttackSlot(
       nextState,
       currentDefender,
       target.position,
+      DEFENDER_ATTACK_RANGE,
+      {
+        maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+        leader,
+        leaderSafeDistance: DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE,
+        leaderMaxPathDistance: DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+      },
+    );
+
+    if (!attackPosition) {
+      return moveDefenderTowardPosition(
+        updateDefenderBlockedTicks(nextState, defender.id, false),
+        currentDefender,
+        fallbackPosition,
+        false,
+      );
+    }
+
+    const movementTarget = attackPosition;
+    const nextPosition = previewMoveTowardPosition(
+      reservePositionForTick(nextState, currentDefender.id, attackPosition),
+      currentDefender,
+      movementTarget,
     );
 
     if (
@@ -385,10 +505,10 @@ function moveDefenderTowardCommittedTarget(
 
     const previousPosition = currentDefender.position;
 
-    nextState = moveEntityTowardIfUnoccupied(
-      nextState,
+    nextState = moveEntityTowardPositionIfUnoccupied(
+      reservePositionForTick(nextState, currentDefender.id, attackPosition),
       currentDefender,
-      target,
+      attackPosition,
     );
 
     const movedDefender = nextState.entities[defender.id];
@@ -420,7 +540,10 @@ function getCommittedTargetStepCount(
     return 1;
   }
 
-  return getDefenderStepCount(state, defender, target.position, true);
+  return Math.min(
+    DEFENDER_CATCH_UP_MOVE_STEPS,
+    getGridDistance(defender.position, target.position),
+  );
 }
 
 function shouldBoostCommittedTargetStep(
@@ -565,23 +688,20 @@ function getDefenderStepCount(
   const followTarget = state.entities[defender.followTargetId];
 
   if (followTarget?.kind !== "player") {
-    return useInterceptBoost ? 2 : 1;
+    return 1;
   }
 
   const distanceToIntent = getGridDistance(defender.position, targetPosition);
+  const canCatchUp =
+    useInterceptBoost &&
+    distanceToIntent >= DEFENDER_CATCH_UP_DISTANCE &&
+    isBehindLeader(defender, followTarget, state);
 
-  if (distanceToIntent < DEFENDER_CATCH_UP_DISTANCE) {
-    return useInterceptBoost ? 2 : 1;
+  if (!canCatchUp) {
+    return 1;
   }
 
-  if (!isBehindLeader(defender, followTarget, state)) {
-    return Math.min(useInterceptBoost ? 3 : 2, MAX_DEFENDER_MOVE_STEPS);
-  }
-
-  return Math.min(
-    useInterceptBoost ? MAX_DEFENDER_MOVE_STEPS + 1 : MAX_DEFENDER_MOVE_STEPS,
-    distanceToIntent,
-  );
+  return Math.min(DEFENDER_CATCH_UP_MOVE_STEPS, distanceToIntent);
 }
 
 function isBehindLeader(

@@ -68,9 +68,21 @@ export function updateExplorationSystem(
     explorer,
     targetPosition,
   );
-  movedEntityIds.add(explorer.id);
+  if (didEntityMove(nextState, explorer)) {
+    movedEntityIds.add(explorer.id);
+  }
 
   return markAutonomousEntityTilesExplored(nextState);
+}
+
+function didEntityMove(state: GameState, entity: Player): boolean {
+  const currentEntity = state.entities[entity.id];
+
+  return Boolean(
+    currentEntity &&
+      (currentEntity.position.x !== entity.position.x ||
+        currentEntity.position.y !== entity.position.y),
+  );
 }
 
 export function reserveExploringPlayerNextTile(state: GameState): GameState {

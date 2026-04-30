@@ -80,7 +80,9 @@ export function updateGatherSystem(
       }
 
       nextState = moveEntityTowardIfUnoccupied(nextState, gatherer, resource);
-      movedEntityIds.add(gatherer.id);
+      if (didEntityMove(nextState, gatherer)) {
+        movedEntityIds.add(gatherer.id);
+      }
       continue;
     }
 
@@ -113,6 +115,16 @@ export function updateGatherSystem(
   }
 
   return nextState;
+}
+
+function didEntityMove(state: GameState, entity: GameEntity): boolean {
+  const currentEntity = getEntityById(state, entity.id);
+
+  return Boolean(
+    currentEntity &&
+      (currentEntity.position.x !== entity.position.x ||
+        currentEntity.position.y !== entity.position.y),
+  );
 }
 
 function isGatheringEntity(entity: GameEntity): entity is AutonomousEntity {

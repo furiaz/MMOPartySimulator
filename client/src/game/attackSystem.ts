@@ -7,15 +7,13 @@ import {
 import {
   addCombatFeedback,
   getEntityById,
-  isActiveResourcePosition,
-  isWallPosition,
   moveEntityTowardIfUnoccupied,
   moveEntityTowardPositionIfUnoccupied,
-  previewMoveTowardPosition,
   reservePositionForTick,
   updateEntity,
   type GameState,
 } from "./state";
+import { chooseAttackSlot } from "./attackSlots";
 import { protectLeader } from "./partyProtectionSystem";
 import {
   getLeaderEnemyTarget,
@@ -28,12 +26,21 @@ import type {
   Enemy,
   GameEntity,
   Player,
-  Position,
 } from "./types";
+
+type MovementResult = {
+  state: GameState;
+  didHold?: boolean;
+};
 
 const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
 const ATTACK_COOLDOWN_MS = 1000;
+const PARTY_ASSIST_LEASH_RADIUS = 3;
+const MAX_ATTACK_SLOT_PATH_DISTANCE = 5;
+const LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE_SELF = 2;
+const LEADER_SAFE_ATTACK_SLOT_DISTANCE = 3;
+const LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE = 4;
 
 export function updateAttackSystem(
   state: GameState,
@@ -42,7 +49,7 @@ export function updateAttackSystem(
   let nextState = state;
   const now = Date.now();
 
-  for (const entity of Object.values(state.entities)) {
+  for (const entity of getCombatMovementOrder(state)) {
     const attacker = getEntityById(nextState, entity.id);
 
     if (!attacker || !isAttackingCombatEntity(attacker)) {
@@ -69,6 +76,14 @@ export function updateAttackSystem(
     if (
       isAutonomousDefender(attacker) &&
       !isDefenderAttackTargetRelevant(nextState, attacker, target)
+    ) {
+      nextState = updateEntity(nextState, switchToFollow(attacker));
+      continue;
+    }
+
+    if (
+      isAutonomousEntity(attacker) &&
+      shouldRegroupPartyAttacker(nextState, attacker, target)
     ) {
       nextState = updateEntity(nextState, switchToFollow(attacker));
       continue;
@@ -103,38 +118,118 @@ export function updateAttackSystem(
       continue;
     }
 
-    nextState = moveAttackerTowardCombatPosition(nextState, attacker, target);
-    movedEntityIds.add(attacker.id);
+    const movementResult = moveAttackerTowardCombatPosition(
+      nextState,
+      attacker,
+      target,
+    );
+
+    nextState = movementResult.state;
+
+    if (movementResult.didHold || didEntityMove(nextState, attacker)) {
+      movedEntityIds.add(attacker.id);
+    }
   }
 
   return nextState;
+}
+
+function getCombatMovementOrder(state: GameState): GameEntity[] {
+  return [...Object.values(state.entities)].sort(
+    (a, b) => getCombatOrderPriority(a) - getCombatOrderPriority(b),
+  );
+}
+
+function getCombatOrderPriority(entity: GameEntity): number {
+  if (entity.kind === "player") {
+    return 0;
+  }
+
+  if (entity.kind === "companion" && entity.role === "fighter") {
+    return 1;
+  }
+
+  if (entity.kind === "companion" && entity.role === "gatherer") {
+    return 2;
+  }
+
+  if (entity.kind === "companion") {
+    return 2;
+  }
+
+  return 3;
 }
 
 function moveAttackerTowardCombatPosition(
   state: GameState,
   attacker: CombatEntity,
   target: CombatEntity,
-): GameState {
+): MovementResult {
   const movementTarget = getCombatMovementTarget(state, attacker, target);
 
   if (
-    movementTarget.id !== target.id ||
-    !isPartyCombatEntity(attacker) ||
-    !isEnemy(target)
+    !shouldUseAttackSlot(attacker, target, movementTarget)
   ) {
-    return moveEntityTowardIfUnoccupied(state, attacker, movementTarget);
+    return {
+      state: moveEntityTowardIfUnoccupied(state, attacker, movementTarget),
+    };
   }
 
-  const attackPosition = chooseAttackPosition(state, attacker, target);
+  const attackPosition = chooseAttackSlot(
+    state,
+    attacker,
+    target.position,
+    ATTACK_RANGE,
+    {
+      maxPathDistance: getAttackSlotPathLimit(attacker),
+      leader: getAttackSlotLeader(state, attacker),
+      leaderSafeDistance: LEADER_SAFE_ATTACK_SLOT_DISTANCE,
+      leaderMaxPathDistance: LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+    },
+  );
 
   if (!attackPosition) {
-    return moveEntityTowardIfUnoccupied(state, attacker, target);
+    return moveAttackerTowardSafeFallback(state, attacker, movementTarget);
   }
 
-  return moveEntityTowardPositionIfUnoccupied(
-    reservePositionForTick(state, attacker.id, attackPosition),
-    attacker,
-    attackPosition,
+  return {
+    state: moveEntityTowardPositionIfUnoccupied(
+      reservePositionForTick(state, attacker.id, attackPosition),
+      attacker,
+      attackPosition,
+    ),
+  };
+}
+
+function moveAttackerTowardSafeFallback(
+  state: GameState,
+  attacker: CombatEntity,
+  movementTarget: CombatEntity,
+): MovementResult {
+  const leader = getAttackSlotLeader(state, attacker);
+
+  if (leader && movementTarget.id !== leader.id) {
+    return {
+      state: moveEntityTowardIfUnoccupied(state, attacker, leader),
+    };
+  }
+
+  if (movementTarget.id !== attacker.id && movementTarget.id !== attacker.currentTargetId) {
+    return {
+      state: moveEntityTowardIfUnoccupied(state, attacker, movementTarget),
+    };
+  }
+
+  return { state, didHold: true };
+}
+
+function didEntityMove(state: GameState, entity: GameEntity): boolean {
+  const currentEntity = getEntityById(state, entity.id);
+
+  return Boolean(
+    currentEntity &&
+      (currentEntity.position.x !== entity.position.x ||
+        currentEntity.position.y !== entity.position.y),
   );
 }
 
@@ -181,166 +276,45 @@ function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
   return xDistance <= ATTACK_RANGE && yDistance <= ATTACK_RANGE;
 }
 
-function chooseAttackPosition(
-  state: GameState,
+function getAttackSlotPathLimit(attacker: CombatEntity): number {
+  return attacker.kind === "player"
+    ? LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE_SELF
+    : MAX_ATTACK_SLOT_PATH_DISTANCE;
+}
+
+function shouldUseAttackSlot(
   attacker: CombatEntity,
   target: CombatEntity,
-): Position | null {
-  return (
-    getSortedCombatPositions(
-      getAttackPositions(target.position),
-      attacker,
-      target.position,
-    ).find((position) =>
-      isReachableCombatPosition(state, attacker, position),
-    ) ??
-    getSortedCombatPositions(
-      getNearbyCombatPositions(target.position),
-      attacker,
-      target.position,
-    ).find((position) =>
-      isReachableCombatPosition(state, attacker, position),
-    ) ??
-    null
-  );
-}
-
-function getAttackPositions(targetPosition: Position): Position[] {
-  const positions: Position[] = [];
-
-  for (
-    let y = targetPosition.y - ATTACK_RANGE;
-    y <= targetPosition.y + ATTACK_RANGE;
-    y += 1
+  movementTarget: CombatEntity,
+): boolean {
+  if (
+    attacker.kind === "player" &&
+    movementTarget.id !== target.id &&
+    getGridDistance(attacker.position, target.position) > ATTACK_RANGE + 1
   ) {
-    for (
-      let x = targetPosition.x - ATTACK_RANGE;
-      x <= targetPosition.x + ATTACK_RANGE;
-      x += 1
-    ) {
-      const position = { x, y };
-
-      if (isSamePosition(position, targetPosition)) {
-        continue;
-      }
-
-      positions.push(position);
-    }
+    return false;
   }
 
-  return positions;
+  return (
+    isPartyCombatEntity(attacker) &&
+    isEnemy(target) &&
+    (movementTarget.id === target.id ||
+      getGridDistance(attacker.position, target.position) <=
+        PARTY_ASSIST_LEASH_RADIUS ||
+      getGridDistance(movementTarget.position, target.position) <=
+        PARTY_ASSIST_LEASH_RADIUS)
+  );
 }
 
-function getNearbyCombatPositions(targetPosition: Position): Position[] {
-  const positions: Position[] = [];
-
-  for (let radius = ATTACK_RANGE + 1; radius <= ATTACK_RANGE + 3; radius += 1) {
-    for (
-      let y = targetPosition.y - radius;
-      y <= targetPosition.y + radius;
-      y += 1
-    ) {
-      for (
-        let x = targetPosition.x - radius;
-        x <= targetPosition.x + radius;
-        x += 1
-      ) {
-        if (
-          Math.max(
-            Math.abs(targetPosition.x - x),
-            Math.abs(targetPosition.y - y),
-          ) !== radius
-        ) {
-          continue;
-        }
-
-        positions.push({ x, y });
-      }
-    }
+function getAttackSlotLeader(
+  state: GameState,
+  attacker: CombatEntity,
+): GameEntity | undefined {
+  if (attacker.kind !== "companion") {
+    return undefined;
   }
 
-  return positions;
-}
-
-function getSortedCombatPositions(
-  positions: Position[],
-  attacker: CombatEntity,
-  targetPosition: Position,
-): Position[] {
-  return [...positions].sort(
-    (a, b) =>
-      getGridDistance(a, targetPosition) - getGridDistance(b, targetPosition) ||
-      getManhattanDistance(a, targetPosition) -
-        getManhattanDistance(b, targetPosition) ||
-      getGridDistance(a, attacker.position) -
-        getGridDistance(b, attacker.position) ||
-      getManhattanDistance(a, attacker.position) -
-        getManhattanDistance(b, attacker.position) ||
-      a.y - b.y ||
-      a.x - b.x,
-  );
-}
-
-function isReachableCombatPosition(
-  state: GameState,
-  attacker: CombatEntity,
-  position: Position,
-): boolean {
-  return (
-    isCombatPositionAvailable(state, attacker, position) &&
-    (isSamePosition(attacker.position, position) ||
-      previewMoveTowardPosition(state, attacker, position) !== null)
-  );
-}
-
-function isCombatPositionAvailable(
-  state: GameState,
-  attacker: CombatEntity,
-  position: Position,
-): boolean {
-  return (
-    isInMapBounds(state, position) &&
-    !isWallPosition(state, position) &&
-    !isActiveResourcePosition(state, position, attacker.id) &&
-    !isReservedByOtherEntity(state, attacker, position) &&
-    !isOccupiedByOtherEntity(state, attacker, position)
-  );
-}
-
-function isInMapBounds(state: GameState, position: Position): boolean {
-  return (
-    !state.map ||
-    (position.x >= 0 &&
-      position.x < state.map.columns &&
-      position.y >= 0 &&
-      position.y < state.map.rows)
-  );
-}
-
-function isReservedByOtherEntity(
-  state: GameState,
-  attacker: CombatEntity,
-  position: Position,
-): boolean {
-  return Object.entries(state.reservedPositionsByEntityId ?? {}).some(
-    ([entityId, reservedPosition]) =>
-      entityId !== attacker.id && isSamePosition(reservedPosition, position),
-  );
-}
-
-function isOccupiedByOtherEntity(
-  state: GameState,
-  attacker: CombatEntity,
-  position: Position,
-): boolean {
-  return Object.values(state.entities).some(
-    (entity) =>
-      entity.id !== attacker.id && isSamePosition(entity.position, position),
-  );
-}
-
-function isSamePosition(a: Position, b: Position): boolean {
-  return a.x === b.x && a.y === b.y;
+  return state.entities[attacker.followTargetId];
 }
 
 function canAttack(entity: CombatEntity, now: number): boolean {
@@ -392,7 +366,52 @@ function getCombatMovementTarget(
     }
   }
 
+  if (
+    attacker.kind === "companion" &&
+    (attacker.role === "fighter" || attacker.role === "gatherer")
+  ) {
+    const leader = state.entities[attacker.followTargetId];
+
+    if (isCombatEntity(leader)) {
+      return leader;
+    }
+  }
+
   return target;
+}
+
+function shouldRegroupPartyAttacker(
+  state: GameState,
+  attacker: CombatEntity,
+  target: GameEntity,
+): boolean {
+  if (
+    attacker.kind !== "companion" ||
+    attacker.commandPriority === "direct" ||
+    (attacker.role !== "fighter" && attacker.role !== "gatherer")
+  ) {
+    return false;
+  }
+
+  const leader = state.entities[attacker.followTargetId];
+
+  if (!leader) {
+    return true;
+  }
+
+  const leaderTarget = getLeaderEnemyTarget(state, leader);
+
+  if (
+    leaderTarget?.id !== target.id &&
+    getGridDistance(target.position, leader.position) > PARTY_ASSIST_LEASH_RADIUS
+  ) {
+    return true;
+  }
+
+  return (
+    getGridDistance(attacker.position, leader.position) >
+    PARTY_ASSIST_LEASH_RADIUS
+  );
 }
 
 function findLeadingDefender(
@@ -516,11 +535,4 @@ function getGridDistance(
   to: { x: number; y: number },
 ): number {
   return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-}
-
-function getManhattanDistance(
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): number {
-  return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
 }
