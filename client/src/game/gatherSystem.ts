@@ -6,6 +6,7 @@ import {
 } from "./entities";
 import {
   addResourceToInventory,
+  getBoundedPathDistance,
   getEntityById,
   moveEntityTowardIfUnoccupied,
   updateEntity,
@@ -16,6 +17,7 @@ import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = 1;
 const GATHER_COOLDOWN_MS = 1000;
+const GATHERER_PARTY_RETURN_DISTANCE = 15;
 
 export function updateGatherSystem(
   state: GameState,
@@ -106,11 +108,17 @@ export function updateGatherSystem(
       );
     }
 
+    const updatedGatherer = setLastGatherAt(gatherer, now);
+    const shouldReturnToParty =
+      gatheredResource.isDepleted ||
+      (didYieldResource &&
+        gatherer.kind === "companion" &&
+        gatherer.role === "gatherer" &&
+        shouldGathererReturnToParty(nextState, gatherer));
+
     nextState = updateEntity(
       nextState,
-      gatheredResource.isDepleted
-        ? switchToFollow(setLastGatherAt(gatherer, now))
-        : setLastGatherAt(gatherer, now),
+      shouldReturnToParty ? switchToFollow(updatedGatherer) : updatedGatherer,
     );
   }
 
@@ -196,6 +204,30 @@ function getReachableSearchLimit(state: GameState): number {
   return state.map
     ? state.map.columns * state.map.rows
     : Number.POSITIVE_INFINITY;
+}
+
+function shouldGathererReturnToParty(
+  state: GameState,
+  gatherer: GameEntity,
+): boolean {
+  if (gatherer.kind !== "companion") {
+    return false;
+  }
+
+  const leader = state.entities[gatherer.followTargetId];
+
+  if (!leader) {
+    return true;
+  }
+
+  return (
+    getBoundedPathDistance(
+      state,
+      gatherer,
+      leader.position,
+      GATHERER_PARTY_RETURN_DISTANCE,
+    ) === null
+  );
 }
 
 function switchToFollow(entity: AutonomousEntity): AutonomousEntity {

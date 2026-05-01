@@ -22,6 +22,10 @@ export function updateExplorationSystem(
     return state;
   }
 
+  if (isPartyFormationActive(state)) {
+    return markAutonomousEntityTilesExplored(state);
+  }
+
   let nextState = markAutonomousEntityTilesExplored(state);
   const explorer = getExploringPlayer(nextState);
 
@@ -90,6 +94,10 @@ export function reserveExploringPlayerNextTile(state: GameState): GameState {
     return state;
   }
 
+  if (isPartyFormationActive(state)) {
+    return state;
+  }
+
   const explorer = getExploringPlayer(state);
 
   if (!explorer) {
@@ -110,6 +118,14 @@ export function reserveExploringPlayerNextTile(state: GameState): GameState {
   return nextTile
     ? reservePositionForTick(state, explorer.id, nextTile)
     : state;
+}
+
+function isPartyFormationActive(state: GameState): boolean {
+  return Boolean(
+    state.partyFormation &&
+      state.partyFormation.phase !== "idle" &&
+      state.partyFormation.targetId,
+  );
 }
 
 function markAutonomousEntityTilesExplored(state: GameState): GameState {

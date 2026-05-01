@@ -135,6 +135,26 @@ export function updateDefendSystem(
       });
     }
 
+    if (
+      defendPosition &&
+      getGridDistance(defender.position, defendPosition) >
+        DEFENDER_INTERCEPT_READY_DISTANCE
+    ) {
+      const currentDefender = nextState.entities[defender.id];
+
+      if (isDefendingCompanion(currentDefender)) {
+        nextState = moveDefenderTowardPosition(
+          nextState,
+          currentDefender,
+          defendPosition,
+          false,
+        );
+        if (didEntityMove(nextState, currentDefender)) {
+          movedEntityIds.add(defender.id);
+        }
+      }
+    }
+
     nextState = updateDefenderBlockedTicks(nextState, defender.id, false);
   }
 

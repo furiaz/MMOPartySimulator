@@ -116,7 +116,11 @@ export function recordDebugTelemetryTick(
   }
 
   const tick = debugTelemetry.tickNumber + 1;
-  const events = getTelemetryEvents(previousState, nextState, tick);
+  const appendedEvents = getAppendedTelemetryEvents(debugTelemetry, nextState, tick);
+  const events = [
+    ...appendedEvents,
+    ...getTelemetryEvents(previousState, nextState, tick),
+  ];
   const telemetryTick = {
     tick,
     recordedAt: Date.now(),
@@ -143,6 +147,38 @@ export function recordDebugTelemetryTick(
   };
 }
 
+function getAppendedTelemetryEvents(
+  previousDebugTelemetry: DebugTelemetryState,
+  nextState: GameState,
+  tick: number,
+): DebugTelemetryEvent[] {
+  const nextDebugTelemetry = nextState.debugTelemetry;
+
+  if (!nextDebugTelemetry || nextDebugTelemetry === previousDebugTelemetry) {
+    return [];
+  }
+
+  const previousEventKeys = new Set(
+    previousDebugTelemetry.events.map(getTelemetryEventKey),
+  );
+
+  return nextDebugTelemetry.events
+    .filter((event) => !previousEventKeys.has(getTelemetryEventKey(event)))
+    .map((event) => ({ ...event, tick }));
+}
+
+function getTelemetryEventKey(event: DebugTelemetryEvent): string {
+  return [
+    event.tick,
+    event.type,
+    event.entityId,
+    event.targetId ?? "",
+    event.previousTargetId ?? "",
+    event.formationPhase ?? "",
+    event.reason ?? "",
+  ].join("|");
+}
+
 function getEntitySnapshot(
   previousState: GameState,
   nextState: GameState,
@@ -163,6 +199,10 @@ function getEntitySnapshot(
     commandPriority: getCommandPriority(entity),
     movementResult,
     reason: getReason(nextState, entity, movementResult),
+    formationPhase: nextState.partyFormation?.phase,
+    formationSlot: nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
+    formationSlotReason:
+      nextState.partyFormation?.slotReasonsByEntityId[entity.id],
   };
 }
 
@@ -422,6 +462,15 @@ function getReason(
 
   if (state.defenderWaitTicksByLeaderId?.[entity.id]) {
     return "waiting for formation";
+  }
+
+  if (
+    state.partyFormation &&
+    state.partyFormation.phase !== "idle" &&
+    (entity.id in state.partyFormation.slotsByEntityId ||
+      getCurrentTargetId(entity) === state.partyFormation.targetId)
+  ) {
+    return `formation:${state.partyFormation.phase}`;
   }
 
   if (

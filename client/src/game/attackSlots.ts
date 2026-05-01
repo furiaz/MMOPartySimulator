@@ -39,15 +39,7 @@ export function chooseAttackSlot(
       targetPosition,
     ).find((position) =>
       isReachableCombatPosition(state, attacker, position, options),
-    ) ??
-    getSortedCombatPositions(
-      getNearbyCombatPositions(targetPosition, attackRange),
-      attacker,
-      targetPosition,
-    ).find((position) =>
-      isReachableCombatPosition(state, attacker, position, options),
-    ) ??
-    null
+    ) ?? null
   );
 }
 
@@ -59,40 +51,6 @@ function getAttackSlotPositions(
     x: targetPosition.x + direction.x * attackRange,
     y: targetPosition.y + direction.y * attackRange,
   }));
-}
-
-function getNearbyCombatPositions(
-  targetPosition: Position,
-  attackRange: number,
-): Position[] {
-  const positions: Position[] = [];
-
-  for (let radius = attackRange + 1; radius <= attackRange + 3; radius += 1) {
-    for (
-      let y = targetPosition.y - radius;
-      y <= targetPosition.y + radius;
-      y += 1
-    ) {
-      for (
-        let x = targetPosition.x - radius;
-        x <= targetPosition.x + radius;
-        x += 1
-      ) {
-        if (
-          Math.max(
-            Math.abs(targetPosition.x - x),
-            Math.abs(targetPosition.y - y),
-          ) !== radius
-        ) {
-          continue;
-        }
-
-        positions.push({ x, y });
-      }
-    }
-  }
-
-  return positions;
 }
 
 function getSortedCombatPositions(

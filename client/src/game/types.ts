@@ -51,6 +51,8 @@ export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 export type DebugTelemetryEventType =
   | "target_acquired"
   | "target_changed"
+  | "formation_changed"
+  | "target_skipped"
   | "movement_failed"
   | "attack_started"
   | "damage_dealt"
@@ -70,6 +72,9 @@ export type DebugTelemetryEntitySnapshot = {
   commandPriority?: CommandPriority;
   movementResult: DebugMovementResult;
   reason?: string;
+  formationPhase?: FormationPhase;
+  formationSlot?: Position | null;
+  formationSlotReason?: string;
 };
 
 export type DebugTelemetryEvent = {
@@ -82,6 +87,8 @@ export type DebugTelemetryEvent = {
   previousRole?: CompanionRole;
   nextRole?: CompanionRole;
   reason?: string;
+  formationPhase?: FormationPhase;
+  approachPoint?: Position | null;
 };
 
 export type DebugTelemetryTick = {
@@ -112,6 +119,28 @@ export type GameMap = {
   columns: number;
   rows: number;
   walls: Position[];
+};
+
+export type FormationPhase =
+  | "idle"
+  | "forming"
+  | "traveling"
+  | "engaging"
+  | "combat";
+
+export type PartyFormationMemberSlot = {
+  entityId: string;
+  position: Position;
+};
+
+export type PartyFormationState = {
+  phase: FormationPhase;
+  targetId: string | null;
+  approachPoint: Position | null;
+  direction: Position;
+  slotsByEntityId: Record<string, Position>;
+  slotReasonsByEntityId: Record<string, string>;
+  skippedTargetIds: string[];
 };
 
 export type BaseEntity = {

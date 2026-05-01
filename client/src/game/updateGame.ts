@@ -7,6 +7,7 @@ import {
 } from "./explorationSystem";
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
+import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { updateRoleSystem } from "./roleSystem";
 import { recordDebugTelemetryTick } from "./debugTelemetry";
 import {
@@ -21,6 +22,7 @@ export function updateGame(state: GameState): GameState {
 
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState);
+    nextState = updatePartyFormationSystem(nextState, movedEntityIds);
     nextState = reserveExploringPlayerNextTile(nextState);
   }
 

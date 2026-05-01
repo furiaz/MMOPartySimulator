@@ -10,6 +10,7 @@ import type {
   Enemy,
   Player,
   LeaderIntent,
+  PartyFormationState,
   Position,
   ResourceInventory,
   ResourceType,
@@ -28,6 +29,8 @@ type WalkablePositionOptions = {
   allowPartyPassThrough?: boolean;
 };
 
+type MovementOptions = WalkablePositionOptions;
+
 export type GameState = {
   entities: Record<string, GameEntity>;
   inventory: ResourceInventory;
@@ -42,6 +45,7 @@ export type GameState = {
   reservedPositionsByEntityId?: Record<string, Position>;
   defenderWaitTicksByLeaderId?: Record<string, number>;
   defenderBlockedTicksByEntityId?: Record<string, number>;
+  partyFormation?: PartyFormationState;
   combatFeedbackEvents: CombatFeedbackEvent[];
   debugTelemetry?: DebugTelemetryState;
 };
@@ -247,9 +251,15 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   state: GameState,
   entity: T,
   target: GameEntity,
+  options: MovementOptions = {},
 ): GameState {
-  const nextStateWithIntent = recordMoveIntent(state, entity, target);
-  const moveResolution = getNextMoveResolution(nextStateWithIntent, entity, target);
+  const nextStateWithIntent = recordMoveIntent(state, entity, target, options);
+  const moveResolution = getNextMoveResolution(
+    nextStateWithIntent,
+    entity,
+    target,
+    options,
+  );
 
   if (!moveResolution || isSamePosition(moveResolution.position, entity.position)) {
     return markMoveFailed(nextStateWithIntent, entity.id);
@@ -273,7 +283,14 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     );
   }
 
-  if (!isMoveDestinationAvailable(nextStateWithIntent, entity, moveResolution.position)) {
+  if (
+    !isMoveDestinationAvailable(
+      nextStateWithIntent,
+      entity,
+      moveResolution.position,
+      options,
+    )
+  ) {
     return markMoveFailed(nextStateWithIntent, entity.id);
   }
 
@@ -281,6 +298,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     nextStateWithIntent,
     entity.id,
     moveResolution.position,
+    options,
   );
 
   if (reservedState === nextStateWithIntent) {
@@ -301,6 +319,7 @@ export function moveEntityTowardPositionIfUnoccupied<T extends GameEntity>(
   state: GameState,
   entity: T,
   position: Position,
+  options: MovementOptions = {},
 ): GameState {
   const target: GameEntity = {
     id: "__position_target__",
@@ -315,7 +334,7 @@ export function moveEntityTowardPositionIfUnoccupied<T extends GameEntity>(
     isDepleted: false,
   };
 
-  return moveEntityTowardIfUnoccupied(state, entity, target);
+  return moveEntityTowardIfUnoccupied(state, entity, target, options);
 }
 
 export function clearTickMovementPlanning(state: GameState): GameState {
@@ -331,12 +350,13 @@ export function reservePositionForTick(
   state: GameState,
   entityId: string,
   position: Position,
+  options: MovementOptions = {},
 ): GameState {
   const entity = state.entities[entityId];
 
   if (
     !entity ||
-    !isMoveDestinationAvailable(state, entity, position)
+    !isMoveDestinationAvailable(state, entity, position, options)
   ) {
     return state;
   }
@@ -474,10 +494,14 @@ function getNextMoveResolution(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
 ): { position: Position; swapWithEntityId?: string } | null {
-  const pathPosition = findNextPathPosition(state, entity, target);
+  const pathPosition = findNextPathPosition(state, entity, target, options);
 
-  if (pathPosition && isMoveDestinationAvailable(state, entity, pathPosition)) {
+  if (
+    pathPosition &&
+    isMoveDestinationAvailable(state, entity, pathPosition, options)
+  ) {
     return { position: pathPosition };
   }
 
@@ -517,27 +541,29 @@ function getNextMoveResolution(
     };
   }
 
-  return findAlternativeMovePosition(state, entity, target);
+  return findAlternativeMovePosition(state, entity, target, options);
 }
 
 function isMoveDestinationAvailable(
   state: GameState,
   entity: GameEntity,
   position: Position,
+  options: MovementOptions = {},
 ): boolean {
-  return isWalkablePosition(state, position, entity.id);
+  return isWalkablePosition(state, position, entity.id, options);
 }
 
 function findNextPathPosition(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
 ): Position | null {
   if (!state.map) {
     return null;
   }
 
-  const goals = getPathGoals(state, entity, target);
+  const goals = getPathGoals(state, entity, target, options);
   const goalKeys = new Set(goals.map(getPositionKey));
 
   if (goalKeys.size === 0) {
@@ -560,7 +586,7 @@ function findNextPathPosition(
     if (
       goalKeys.has(getPositionKey(current.position)) &&
       (!current.firstStep ||
-        isMoveDestinationAvailable(state, entity, current.firstStep))
+        isMoveDestinationAvailable(state, entity, current.firstStep, options))
     ) {
       return current.firstStep;
     }
@@ -592,13 +618,14 @@ function getPathGoals(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
 ): Position[] {
-  if (isWalkablePosition(state, target.position, entity.id)) {
+  if (isWalkablePosition(state, target.position, entity.id, options)) {
     return [target.position];
   }
 
   return getNeighborPositions(target.position).filter((position) =>
-    isWalkablePosition(state, position, entity.id),
+    isWalkablePosition(state, position, entity.id, options),
   );
 }
 
@@ -606,6 +633,7 @@ function findAlternativeMovePosition(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
 ): { position: Position } | null {
   if (state.failedMoveByEntityId?.[entity.id]) {
     return null;
@@ -614,7 +642,7 @@ function findAlternativeMovePosition(
   const candidates = getAlternativeMoveCandidates(entity.position, target.position);
   const previousPosition = state.lastPositionsByEntityId?.[entity.id];
   const validCandidates = candidates.filter((position) =>
-    isWalkablePosition(state, position, entity.id),
+    isWalkablePosition(state, position, entity.id, options),
   );
   const preferredCandidate = validCandidates.find(
     (position) => !previousPosition || !isSamePosition(position, previousPosition),
@@ -992,8 +1020,9 @@ function recordMoveIntent(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
 ): GameState {
-  const intendedPosition = getIntendedMovePosition(state, entity, target);
+  const intendedPosition = getIntendedMovePosition(state, entity, target, options);
 
   if (!intendedPosition) {
     return state;
@@ -1012,8 +1041,9 @@ function getIntendedMovePosition(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
 ): Position | null {
-  const moveResolution = getNextMoveResolution(state, entity, target);
+  const moveResolution = getNextMoveResolution(state, entity, target, options);
 
   return moveResolution?.position ?? null;
 }
