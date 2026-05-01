@@ -40,7 +40,7 @@ export function updateFollowSystem(
       companion,
     );
 
-    if (!lineTargetPosition || isWithinLineSpacing(companion, lineTargetPosition)) {
+    if (!lineTargetPosition) {
       continue;
     }
 
@@ -150,6 +150,10 @@ function getLineFormationCompanions(state: GameState): Companion[] {
 function isLineFormationState(companion: Companion): boolean {
   if (companion.role === "defender") {
     return companion.state === "defend" || companion.state === "follow";
+  }
+
+  if (companion.role === "fighter" || companion.role === "gatherer") {
+    return companion.state === "follow" || companion.state === "attack";
   }
 
   return companion.state === "follow";
@@ -286,10 +290,6 @@ function getTrailPositionForLineMember(
   );
 }
 
-function isWithinLineSpacing(entity: GameEntity, targetPosition: Position): boolean {
-  return getGridDistance(entity.position, targetPosition) <= LINE_FORMATION_SPACING;
-}
-
 function moveFollowingEntityTowardPosition(
   state: GameState,
   entity: AutonomousEntity,
@@ -347,6 +347,7 @@ function canMoveTowardLinePosition(
 
   return (
     entity.state === "follow" ||
+    entity.state === "attack" ||
     (entity.role === "defender" &&
       entity.state === "defend" &&
       entity.commandPriority !== "direct")

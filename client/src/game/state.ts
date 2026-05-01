@@ -332,7 +332,12 @@ export function reservePositionForTick(
   entityId: string,
   position: Position,
 ): GameState {
-  if (isReservedPosition(state, position, entityId)) {
+  const entity = state.entities[entityId];
+
+  if (
+    !entity ||
+    !isMoveDestinationAvailable(state, entity, position)
+  ) {
     return state;
   }
 
@@ -735,7 +740,7 @@ export function isWalkablePosition(
     !isWallPosition(state, position) &&
     !isActiveResourcePosition(state, position, ignoredEntityId) &&
     !isReservedPosition(state, position, ignoredEntityId) &&
-    !isPositionOccupiedByBlockingLivingEntity(
+    !isPositionOccupiedByBlockingEntity(
       state,
       position,
       ignoredEntityId,
@@ -825,7 +830,7 @@ function isPositionBlocked(
   );
 }
 
-function isPositionOccupiedByBlockingLivingEntity(
+function isPositionOccupiedByBlockingEntity(
   state: GameState,
   position: Position,
   ignoredEntityId: string,
@@ -836,7 +841,7 @@ function isPositionOccupiedByBlockingLivingEntity(
   return Object.values(state.entities).some(
     (entity) =>
       entity.id !== ignoredEntityId &&
-      isCombatEntity(entity) &&
+      entity.kind !== "resource" &&
       entity.state !== "dead" &&
       !canPassThroughPartyEntity(movingEntity, entity, options) &&
       entity.position.x === position.x &&
@@ -1008,17 +1013,9 @@ function getIntendedMovePosition(
   entity: GameEntity,
   target: GameEntity,
 ): Position | null {
-  const pathPosition = findNextPathPosition(state, entity, target);
+  const moveResolution = getNextMoveResolution(state, entity, target);
 
-  if (pathPosition && isMoveDestinationAvailable(state, entity, pathPosition)) {
-    return pathPosition;
-  }
-
-  const movedEntity = moveEntityToward(entity, target);
-
-  return isSamePosition(movedEntity.position, entity.position)
-    ? null
-    : movedEntity.position;
+  return moveResolution?.position ?? null;
 }
 
 function markMoveSucceeded(

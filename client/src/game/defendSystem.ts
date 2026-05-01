@@ -119,7 +119,10 @@ export function updateDefendSystem(
         defendPosition ?? leader?.position ?? defender.position,
         Boolean(shouldWaitForIntercept),
       );
-      if (didEntityMove(nextState, defender) || shouldHoldDefenderLine(syncedDefender, leader, target)) {
+      if (
+        didEntityMove(nextState, defender) ||
+        shouldHoldDefenderLine(nextState, syncedDefender, leader, target)
+      ) {
         movedEntityIds.add(defender.id);
       }
       continue;
@@ -385,6 +388,10 @@ function shouldLeaderWaitForDefender(
     return false;
   }
 
+  if (canLeaderStepTowardDefender(state, leader, defender)) {
+    return false;
+  }
+
   if (
     getGridDistance(defender.position, defendPosition) <=
     DEFENDER_INTERCEPT_READY_DISTANCE
@@ -463,7 +470,7 @@ function moveDefenderTowardCommittedTarget(
       break;
     }
 
-    if (shouldHoldDefenderLine(currentDefender, leader, target)) {
+    if (shouldHoldDefenderLine(nextState, currentDefender, leader, target)) {
       break;
     }
 
@@ -498,7 +505,13 @@ function moveDefenderTowardCommittedTarget(
 
     if (
       nextPosition &&
-      wouldExceedDefenderLineAtPosition(nextPosition, leader, target)
+      wouldExceedDefenderLineAtPosition(
+        nextState,
+        nextPosition,
+        currentDefender,
+        leader,
+        target,
+      )
     ) {
       break;
     }
@@ -560,32 +573,24 @@ function shouldBoostCommittedTargetStep(
 }
 
 function shouldHoldDefenderLine(
+  state: GameState,
   defender: Companion,
   leader: GameEntity | undefined,
   target: Enemy,
 ): boolean {
-  return shouldHoldDefenderLineAtPosition(defender.position, leader, target);
-}
-
-function shouldHoldDefenderLineAtPosition(
-  defenderPosition: Position,
-  leader: GameEntity | undefined,
-  target: Enemy,
-): boolean {
-  if (!leader) {
-    return false;
-  }
-
-  return (
-    getGridDistance(defenderPosition, leader.position) >=
-      DEFENDER_MAX_PREFERRED_LEADER_DISTANCE &&
-    getGridDistance(defenderPosition, target.position) <
-      getGridDistance(leader.position, target.position)
+  return shouldHoldDefenderLineAtPosition(
+    state,
+    defender.position,
+    defender,
+    leader,
+    target,
   );
 }
 
-function wouldExceedDefenderLineAtPosition(
+function shouldHoldDefenderLineAtPosition(
+  state: GameState,
   defenderPosition: Position,
+  defender: Companion,
   leader: GameEntity | undefined,
   target: Enemy,
 ): boolean {
@@ -597,8 +602,67 @@ function wouldExceedDefenderLineAtPosition(
     getGridDistance(defenderPosition, leader.position) >
       DEFENDER_MAX_PREFERRED_LEADER_DISTANCE &&
     getGridDistance(defenderPosition, target.position) <
-      getGridDistance(leader.position, target.position)
+      getGridDistance(leader.position, target.position) &&
+    !canLeaderStepTowardDefender(state, leader, defender)
   );
+}
+
+function wouldExceedDefenderLineAtPosition(
+  state: GameState,
+  defenderPosition: Position,
+  defender: Companion,
+  leader: GameEntity | undefined,
+  target: Enemy,
+): boolean {
+  if (!leader) {
+    return false;
+  }
+
+  return (
+    getGridDistance(defenderPosition, leader.position) >
+      DEFENDER_MAX_PREFERRED_LEADER_DISTANCE &&
+    getGridDistance(defenderPosition, target.position) <
+      getGridDistance(leader.position, target.position) &&
+    !canLeaderStepTowardDefender(state, leader, defender)
+  );
+}
+
+function canLeaderStepTowardDefender(
+  state: GameState,
+  leader: GameEntity,
+  defender: Companion,
+): boolean {
+  if (leader.kind !== "player" || leader.commandPriority === "direct") {
+    return true;
+  }
+
+  const nextPosition = previewMoveTowardPosition(state, leader, defender.position);
+
+  if (nextPosition && !isSamePosition(nextPosition, leader.position)) {
+    return true;
+  }
+
+  const stepTowardDefenderTrail = getStepTowardPosition(
+    leader.position,
+    defender.position,
+  );
+
+  return (
+    !isSamePosition(stepTowardDefenderTrail, leader.position) &&
+    (isSamePosition(stepTowardDefenderTrail, defender.position) ||
+      isWalkablePosition(state, stepTowardDefenderTrail, leader.id))
+  );
+}
+
+function getStepTowardPosition(from: Position, to: Position): Position {
+  return {
+    x: from.x + Math.sign(to.x - from.x),
+    y: from.y + Math.sign(to.y - from.y),
+  };
+}
+
+function isSamePosition(a: Position, b: Position): boolean {
+  return a.x === b.x && a.y === b.y;
 }
 
 function updateDefenderBlockedTicks(
