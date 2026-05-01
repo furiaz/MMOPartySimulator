@@ -400,13 +400,20 @@ function movePartyInFormation(
   }
 
   if (phase === "traveling" && leadEntity && plan.approachPoint) {
+    const previousPosition = leadEntity.position;
+
     nextState = moveEntityTowardPositionIfUnoccupied(
       nextState,
       leadEntity,
       plan.approachPoint,
       { allowPartyPassThrough },
     );
-    movedEntityIds.add(leadEntity.id);
+
+    const movedLeadEntity = getEntityById(nextState, leadEntity.id);
+
+    if (movedLeadEntity && !isSamePosition(movedLeadEntity.position, previousPosition)) {
+      movedEntityIds.add(leadEntity.id);
+    }
   }
 
   for (const [entityId, slot] of Object.entries(plan.slotsByEntityId)) {
@@ -420,13 +427,28 @@ function movePartyInFormation(
       continue;
     }
 
+    if (shouldFollowLineTrailDuringTravel(entity)) {
+      continue;
+    }
+
+    const previousPosition = entity.position;
+
     nextState = moveEntityTowardPositionIfUnoccupied(nextState, entity, slot, {
       allowPartyPassThrough,
     });
-    movedEntityIds.add(entity.id);
+
+    const movedEntity = getEntityById(nextState, entity.id);
+
+    if (movedEntity && !isSamePosition(movedEntity.position, previousPosition)) {
+      movedEntityIds.add(entity.id);
+    }
   }
 
   return nextState;
+}
+
+function shouldFollowLineTrailDuringTravel(entity: Player | Companion): boolean {
+  return entity.kind === "companion" && entity.role !== "defender";
 }
 
 function movePartyIntoEngagement(
@@ -593,17 +615,20 @@ function getFormationSlots(
     ]);
   }
 
-  assignRoleSlots(idealSlotsByEntityId, fighters, anchor, direction, [
-    { forward: -1, side: -1 },
-    { forward: -1, side: 1 },
-    { forward: -2, side: -1 },
-    { forward: -2, side: 1 },
-  ]);
-  assignRoleSlots(idealSlotsByEntityId, gatherers, anchor, direction, [
-    { forward: -2, side: 0 },
-    { forward: -3, side: -1 },
-    { forward: -3, side: 1 },
-  ]);
+  assignRoleSlots(
+    idealSlotsByEntityId,
+    fighters,
+    anchor,
+    direction,
+    getLineOffsets(-1, fighters.length),
+  );
+  assignRoleSlots(
+    idealSlotsByEntityId,
+    gatherers,
+    anchor,
+    direction,
+    getLineOffsets(-1 - fighters.length, gatherers.length),
+  );
 
   return resolveFormationSlots(
     state,
@@ -628,6 +653,16 @@ function assignRoleSlots(
     };
     slotsByEntityId[companion.id] = getOffsetPosition(anchor, direction, offset);
   });
+}
+
+function getLineOffsets(
+  firstForwardOffset: number,
+  count: number,
+): { forward: number; side: number }[] {
+  return Array.from({ length: count }, (_, index) => ({
+    forward: firstForwardOffset - index,
+    side: 0,
+  }));
 }
 
 function resolveFormationSlots(

@@ -128,6 +128,13 @@ function isFollowingAutonomousEntity(
 }
 
 function getLineFormationCompanions(state: GameState): Companion[] {
+  if (
+    state.partyFormation?.phase === "engaging" ||
+    state.partyFormation?.phase === "combat"
+  ) {
+    return [];
+  }
+
   const companions = Object.values(state.entities).filter(
     (entity): entity is Companion =>
       entity.kind === "companion" &&
@@ -153,7 +160,7 @@ function isLineFormationState(companion: Companion): boolean {
   }
 
   if (companion.role === "fighter" || companion.role === "gatherer") {
-    return companion.state === "follow" || companion.state === "attack";
+    return companion.state === "follow";
   }
 
   return companion.state === "follow";
