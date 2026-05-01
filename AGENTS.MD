@@ -33,6 +33,17 @@ For technical architecture, refer to GTD.md
 
 ## Codex Instructions (IMPORTANT)
 
+Before making any changes:
+
+- ALWAYS read:
+  - AGENTS.md (this file)
+  - GDD.md (game design rules)
+  - GTD.md (technical architecture rules)
+
+These documents define expected behavior and must be respected.
+
+---
+
 When making changes:
 
 - Only modify what is requested
@@ -40,6 +51,24 @@ When making changes:
 - Prefer minimal diffs over large changes
 - Do NOT change project structure without being asked
 - Do NOT assume missing systems — ask or keep it minimal
+
+---
+
+Behavior Alignment Rules:
+
+- Game behavior must match GDD.md
+- System implementation must match GTD.md
+- If code conflicts with GDD/GTD:
+  - prefer aligning code to those documents
+  - do NOT invent new behavior without instruction
+
+---
+
+Debugging / Fixing:
+
+- Prefer small, targeted fixes over system rewrites
+- Identify root cause before modifying code
+- Do NOT introduce large refactors unless explicitly requested
 
 ---
 
@@ -68,3 +97,11 @@ When making changes:
 - Each zone is a separate map space
 - Entities will eventually include a zoneId in addition to position (x, y)
 - Do not implement zone or teleport logic unless explicitly requested
+
+### Conflict Resolution Rule
+
+- If prompt instructions conflict with GDD.md or GTD.md:
+  - STOP
+  - Explain the conflict clearly
+  - Ask for confirmation before proceeding
+- Do NOT guess or silently override behavior
