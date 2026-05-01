@@ -59,7 +59,6 @@ function canProtectLeader(
 
   return (
     entity.state === "idle" ||
-    entity.state === "follow" ||
-    entity.role === "fighter"
+    entity.state === "follow"
   );
 }

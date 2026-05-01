@@ -48,6 +48,8 @@ Control is intent-based, not direct control of each unit.
 - Target-based system
 - Party focuses on selected targets
 - Combat is mostly automated once engaged
+- Early-game enemies are passive by default and only fight back after being attacked
+- Aggressive enemies may be introduced later by enemy type, zone, event, or explicit debug scenario
 
 Future expansion:
 - Skills
@@ -143,9 +145,6 @@ The player should feel like they are leading a small expedition:
 - Emergent gameplay situations
 - Scalable systems for future expansion
 
-- Early-game enemies are passive by default and only fight back after being attacked.
-- Aggressive enemies may be introduced later by enemy type, zone, or event.
-
 ## Direct Orders
 
 - The player can give direct orders to specific party members.
@@ -172,5 +171,5 @@ The player should feel like they are leading a small expedition:
   - Randomize entity positions
   - Reset enemy and resource states
   - Restore party health
-- These tools are NOT part of final gameplay
-
+- Debug scenarios may explicitly introduce aggressive enemies for testing.
+- These tools are NOT part of final gameplay.
