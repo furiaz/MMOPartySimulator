@@ -124,11 +124,7 @@ function createInitialState(): GameState {
     "gatherer",
   );
   const enemies = enemyIds.map((enemyId, index) =>
-    createEnemy(
-      enemyId,
-      enemyStartPositions[index],
-      index === 0 ? "aggressive" : "passive",
-    ),
+    createEnemy(enemyId, enemyStartPositions[index], "aggressive"),
   );
   const resources = resourceStartData.map((resource) =>
     createResource(resource.id, resource.position, {
