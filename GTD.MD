@@ -1,664 +1,622 @@
-# GTD.md
-
-## Overview
-
-This document defines the technical structure of the game.
+GTD.md
+Overview
+This document defines the current technical structure of the game.
 
 The project follows a simulation-first architecture:
-- Game logic runs independently of the UI
-- UI reads and displays game state
-- Systems update the world over time for idle/AFK play
 
-Design intent is defined in `GDD.md`. This document defines how that intent should be represented technically.
+Game logic runs independently of the UI
+UI reads and displays game state
+Systems update the world over time for idle/AFK play
+Design intent is defined in GDD.md. This document defines how that intent is represented technically.
 
----
-
-## Core Architecture
-
+Core Architecture
 The game is divided into:
 
-- Game Logic: `client/src/game/`
-- UI Layer: React components in `client/src/`
-
+Game Logic: client/src/game/
+UI Layer: React components in client/src/
 Game logic must NOT depend on React.
 
 React may:
-- display game state
-- issue commands into game logic
-- start/stop the simulation loop for development
-- expose temporary debug controls
 
+display game state
+issue commands into game logic
+start/stop the simulation loop for development
+expose temporary debug controls
 React must NOT contain core simulation rules.
 
----
+Folder Structure
+Current game logic is organized as flat TypeScript modules under client/src/game/.
 
-## Folder Structure
+Current files include:
 
-Current game logic is organized as flat TypeScript modules under `client/src/game/`.
-
-Important current files include:
-
-- `types.ts`
-- `entities.ts`
-- `state.ts`
-- `commands.ts`
-- `gameLoop.ts`
-- `updateGame.ts`
-- `followSystem.ts`
-- `attackSystem.ts`
-- `gatherSystem.ts`
-- `defendSystem.ts`
-- `enemyAISystem.ts`
-- `roleSystem.ts`
-- `partyFormationSystem.ts`
-- `partyProtectionSystem.ts`
-- `targetSelection.ts`
-- `debugTools.ts`
-- `debugTelemetry.ts`
-- `debugMap.ts`
-
+types.ts
+entities.ts
+state.ts
+commands.ts
+gameLoop.ts
+updateGame.ts
+movementCadence.ts
+followSystem.ts
+attackSystem.ts
+gatherSystem.ts
+defendSystem.ts
+enemyAISystem.ts
+roleSystem.ts
+roleProfiles.ts
+partySystem.ts
+partyFormationSystem.ts
+partyProtectionSystem.ts
+targetSelection.ts
+explorationSystem.ts
+attackSlots.ts
+debugTools.ts
+debugTelemetry.ts
+debugMap.ts
+index.ts
 Do not restructure the project unless explicitly requested.
 
-New helper modules may be added when they keep responsibilities clear. Good candidates:
-- `partySystem.ts`
-- `roleProfiles.ts`
-- `roleDecisionSystem.ts`
+New helper modules may be added when they keep responsibilities clear.
 
----
-
-## Entity Model
-
+Entity Model
 Entities represent world objects and actors.
 
-### Entity Kinds
-
+Entity Kinds
 Current entity kinds:
-- player
-- companion
-- enemy
-- resource
 
-### Entity States
-
+player
+companion
+enemy
+resource
+Entity States
 Current execution states:
-- idle
-- follow
-- attack
-- gather
-- defend
-- dead
 
+idle
+follow
+attack
+gather
+defend
+dead
 States describe what an entity is currently doing.
 
 Roles describe behavior priorities and should not be confused with states.
 
----
+Position Model
+Positions use numeric x and y coordinates.
 
-## Party Members
+Movement is continuous-style step movement, not strict tile-by-tile movement.
 
+Entities move toward target positions by a small fixed step amount.
+
+The current map/debug map may still provide:
+
+bounds
+walls
+debug layout data
+These are used for simple collision, wall checks, exploration, and movement validation.
+
+Do not treat the map as a final grid-based gameplay system.
+
+Party Members
 The player and companions are party members.
 
-Party members should support:
-- id
-- kind
-- position
-- state
-- health
-- maxHealth
-- combat stats
-- gatherSpeed
-- currentTargetId
-- commandPriority
-- role
-- partyOrder
+Party members currently support:
 
-The code may keep separate `Player` and `Companion` types for now, but shared party-member behavior should use helper functions instead of duplicating logic.
+id
+kind
+position
+state
+health
+maxHealth
+combat timing
+gather timing
+gatherSpeed
+currentTargetId
+commandPriority
+role
+partyOrder
+Companions also currently support:
 
-Recommended helpers:
-- `isPartyMember(entity)`
-- `getPartyMembers(state)`
-- `getPartyLeader(state)`
-- `getOrderedPartyMembers(state)`
-- `getOrderedFormationMembers(state)`
-- `isGathererBusy(entity)`
+followTargetId
+defendPosition
+Shared party-member behavior is handled through partySystem.ts.
 
----
+Current helper responsibilities include:
 
-## Leader
-
+identify party members
+get living party members
+get the current party leader
+sort party members by role priority and party order
+identify busy gatherers
+set party leader
+set party member role
+set party order
+Leader
 Leader is not a role.
 
-Leader should be stored as party state:
+Leader is stored in game state as:
 
-```ts
 partyLeaderId: string;
-```
-
 The current leader:
-- provides party intent
-- selects point of interest
-- selects enemy target
-- may later be manually controlled by the player
 
-Systems must not assume the `player` entity is always the formation anchor.
+provides party intent
+selects point of interest
+selects enemy target
+may later be manually controlled by the player
+Systems must not assume the player entity is always the leader.
 
-For the next implementation phase, the existing player may remain the default leader until leader switching is implemented.
+If the configured leader is missing or dead, party helper logic falls back to the first living party member.
 
----
-
-## Roles
-
+Roles
 Roles apply to party members.
 
 Role values:
 
-```ts
 type PartyMemberRole =
   | "defender"
   | "fighter"
   | "support"
   | "gatherer"
   | "none";
-```
+none is a safe default/unassigned role.
 
-`none` is a safe default/unassigned role.
+Current role ownership:
 
-Current `CompanionRole` should eventually be generalized to a party-member role concept. This can be done incrementally to avoid a large refactor.
+Player has role
+Companions have role
+CompanionRole aliases PartyMemberRole
+Role behavior is handled by:
 
-Recommended next step:
-- add support for `support`
-- add `role` to `Player`
-- keep existing behavior stable while expanding role ownership
-
----
-
-## Party Order
-
-Party order should be adjustable.
-
+roleSystem.ts
+roleProfiles.ts
+role-specific systems such as defendSystem.ts and gatherSystem.ts
+Party Order
 Party order determines ordering within a role group.
 
-Recommended field:
+Party members use:
 
-```ts
 partyOrder: number;
-```
+Formation/member ordering sorts by:
 
-Formation ordering should sort by:
-1. role priority
-2. party order
+role priority
+party order
+id
+Current role priority:
 
-Suggested role priority:
-
-```ts
 defender: 0
 fighter: 1
 support: 2
 gatherer: 3
 none: 4
-```
-
----
-
-## Game State
-
-`GameState` is the central simulation container.
+Game State
+GameState is the central simulation container.
 
 Current responsibilities:
-- stores all entities
-- stores inventory counters
-- stores map/debug map data
-- stores auto-mode state
-- stores leader intent
-- stores explored tiles
-- stores movement planning data for the current tick
-- stores formation state
-- stores combat feedback events
-- stores debug telemetry
 
-Next-phase additions:
+stores all entities
+stores inventory counters
+stores optional map/debug map data
+stores auto-mode state
+stores simulation tick
+stores party leader id
+stores leader intent
+stores explored position records
+stores follow trail records
+stores movement planning data for the current tick
+stores defender wait/blocking state
+stores party formation state
+stores combat feedback events
+stores debug telemetry
+Current movement planning fields include:
 
-```ts
-partyLeaderId: string;
-```
-
-Party order may live on party member entities or a party-specific structure. Prefer the simpler option unless a stronger need appears.
-
+failedMoveByEntityId
+moveIntentsByEntityId
+reservedPositionsByEntityId
+lastPositionsByEntityId
 State helpers should remain low-level and safe. Systems should own behavior decisions.
 
----
-
-## Commands
-
+Commands
 Commands can be:
-- group commands
-- direct entity commands
-- future leader-selection commands
-- future party-order commands
 
+direct entity commands
+companion commands
+companion group commands
+future leader-selection commands
+future party-order commands
 Rules:
-- direct commands override autonomous behavior for the targeted entity
-- direct commands should not automatically change other entities
-- direct commands are absolute for this phase and are not interrupted by emergency survival behavior
-- commands should update leader intent only when issued by or for the current leader
 
-Recommended future command helpers:
-- `setPartyLeader(state, entityId)`
-- `setPartyMemberRole(state, entityId, role)`
-- `setPartyOrder(state, entityId, partyOrder)`
+direct commands override autonomous behavior for the targeted entity
+direct commands should not automatically change other entities
+direct commands are absolute for this phase
+commands update leader intent only when issued by or for the current leader
+Current command priority values:
 
----
+type CommandPriority = "autonomous" | "direct";
+Current command types use entity states except dead.
 
-## Systems
+Leader Intent
+Leader intent is stored as:
 
-Systems operate on `GameState`.
+type LeaderIntent = {
+  type: "attack" | "move" | "gather" | "explore";
+  targetId: string | null;
+  targetPosition: Position | null;
+};
+Leader intent is used by:
+
+party movement
+role behavior
+combat targeting
+exploration
+defender positioning
+Leader intent may be cleared when a point of interest is reached or combat ends.
+
+Systems
+Systems operate on GameState.
 
 Current systems include:
-- Follow System
-- Attack System
-- Gathering System
-- Defend System
-- Enemy AI System
-- Role System
-- Party Formation System
-- Party Protection System
-- Exploration System
 
+Role System
+Party Formation System
+Exploration System
+Defend System
+Follow System
+Enemy AI System
+Attack System
+Gathering System
+Party Protection System
+Debug Telemetry
 Each system:
-- reads `GameState`
-- updates entities through state helpers
-- runs during simulation ticks
-- keeps behavior focused and simple
 
-Recommended responsibility split:
-
-### Party System
-
-Owns:
-- party leader lookup
-- party member lookup
-- party order helpers
-- role-order sorting
-- leader assignment helpers
-
-### Role Profile System
-
-Owns:
-- role parameters
-- symbolic role behavior values
-- role priority metadata
-
-### Role Decision System
-
-Owns:
-- role-based autonomous decisions
-- simple interrupt checks
-- fallback selection
-- AI decision reasons
-
-### Party Formation System
-
-Owns:
-- role-order formation
-- party cohesion
-- travel formation
-- transition to combat positioning
-
-### Attack System
-
-Owns:
-- attack execution
-- attack cooldowns
-- damage
-- combat target validity
-- attack slot movement
-
-### Gather System
-
-Owns:
-- gathering execution
-- resource depletion
-- gatherer commitment
-- gatherer return behavior
-
----
-
-## Game Loop
-
-The game loop:
-- runs continuously while enabled
-- executes systems in order
-- updates `GameState`
-- supports idle/AFK simulation
-
+reads GameState
+updates entities through state helpers
+runs during simulation ticks
+keeps behavior focused and simple
 Systems must avoid conflicting movement updates.
 
-Each entity should perform only one movement behavior per tick.
-
-Recommended high-level order:
-1. Clear tick movement planning
-2. Resolve leader intent / point of interest
-3. Resolve role decisions and simple interrupts
-4. Update party formation and cohesion
-5. Run movement/behavior systems
-6. Resolve combat and gathering
-7. Record debug telemetry
-
-Exact order may change as systems mature, but movement conflicts must stay guarded.
-
----
-
-## Behavior Priority
-
-Global AI priority:
-
-1. Direct player command
-2. Emergency survival action
-3. Primary role action
-4. Secondary role action
-5. Fallback action
-6. Idle / follow
-
-Interrupt rule:
-
-```ts
-newActionPriority > currentActionPriority + roleCommitmentBuffer
-```
-
-Keep the first implementation simple. Do not build a complex behavior tree unless explicitly requested.
-
----
-
-## Role Profiles
-
-Role profile data should be centralized rather than scattered across systems.
-
-Suggested shape:
-
-```ts
-type RoleProfile = {
-  positionBias: "front" | "mid" | "back" | "free";
-  followDistance: "tight" | "normal" | "loose";
-  aggression: "veryLow" | "low" | "medium" | "high";
-  taskCommitment: "low" | "medium" | "high";
-  riskTolerance: "veryLow" | "low" | "medium" | "high";
-  movementPriority: "lead" | "follow" | "adaptive" | "independent";
-  cooldownUsage: "minimal" | "conservative" | "defensive" | "aggressive";
-  resourceSpending: "minimal" | "conservative" | "moderate" | "aggressive";
-};
-```
-
-Initial numeric parameters should be conservative and easy to tune.
-
-Suggested starting values:
-
-```ts
-fighter: {
-  engageRange: 8,
-  chaseLimit: 6,
-  leashDistance: 8,
-  interruptBuffer: 20,
-  dangerThreshold: 4,
-}
-
-defender: {
-  engageRange: 6,
-  chaseLimit: 3,
-  leashDistance: 4,
-  protectionRadius: 6,
-  interruptBuffer: 10,
-  dangerThreshold: 6,
-}
-
-support: {
-  engageRange: 3,
-  chaseLimit: 0,
-  leashDistance: 6,
-  criticalHpPercent: 0.35,
-  preferredHealHpPercent: 0.65,
-  interruptBuffer: 10,
-  dangerThreshold: 3,
-}
-
-gatherer: {
-  resourceSearchRange: 30,
-  combatAssistRange: 3,
-  chaseLimit: 0,
-  leashDistance: 15,
-  interruptBuffer: 30,
-  dangerThreshold: 2,
-}
-```
-
-These values are placeholders for tuning.
-
----
-
-## Formation
-
-Formation must be based on role order and party order, not leader position.
-
-Formation order:
-
-```ts
-defender -> fighter -> support -> gatherer -> none
-```
-
-If a role group is empty, the next available role group leads.
-
-Formation members should be ordered by:
-
-```ts
-rolePriority + partyOrder
-```
-
-The current leader should not automatically be placed at the front, center, or anchor.
-
-Gatherers:
-- are excluded from formation while actively gathering or moving to a resource
-- rejoin formation when not actively gathering
-- appear near/behind supports when included
-
----
-
-## Formation Cohesion
-
-Formation uses path-distance cohesion.
-
-Default cohesion distance:
-
-```ts
-FORMATION_COHESION_PATH_DISTANCE = 5;
-```
-
-Required members:
-- alive/non-dead defenders
-- alive/non-dead fighters
-- alive/non-dead supports
-- alive/non-dead gatherers only when not actively gathering or moving to a resource
-
-Cohesion rule:
-- required members must remain connected through path-distance links
-- if cohesion breaks, forward travel pauses
-- members catch up before travel resumes
-
-Avoid direct-distance checks for cohesion. Walls and obstacles must be considered.
-
-Do not allow two disconnected clusters to count as cohesive just because each member is close to someone. Cohesion should validate that the required formation group is connected.
-
----
-
-## Formation Travel
-
-Travel flow:
-
-1. Current leader sets target or point of interest.
-2. Party computes or receives path information.
-3. Ordered formation members are calculated.
-4. The first available ordered member leads movement.
-5. Following members maintain role/party order behind or near the previous formation member.
-6. If cohesion breaks, forward movement pauses.
-7. Once close enough to an enemy target, formation transitions into combat positioning.
-
-Formation travel should remain fluid. Do not require perfect slot placement before movement unless cohesion is broken.
-
----
-
-## Combat Approach
-
-Leader-selected enemy target is shared with party members.
-
-Role behavior during approach:
-- defenders target the enemy and lead engagement
-- fighters target the enemy and follow defenders/frontline
-- supports target the enemy and follow fighters/backline
-- gatherers keep gathering behavior unless included in formation or forced into fallback combat
-
-Combat transition distance:
-
-```ts
-COMBAT_APPROACH_DISTANCE = 3;
-```
-
-When close enough:
-- units choose combat positions
-- attack range must be considered
-- melee units use adjacent slots
-- future ranged units should use valid ranged slots
-
-Current attack range may remain 1 until ranged classes exist.
-
----
-
-## Party Protection
-
-When any party member is attacked:
-
-- attacker becomes a high-priority party target
-- leader intent may switch to the attacker
-- role decisions may respond based on priority and interrupt rules
-- direct-commanded members should not be overridden by autonomous role, formation, protection, or emergency behavior
-- busy gatherers should not be interrupted by distant threats
-
-This should replace player-only protection assumptions over time.
-
----
-
-## Gathering
-
-Resources use the existing depletion model.
-
-Gatherers:
-- prioritize resources within their search/gathering range
-- can leave formation while gathering or moving to a resource
-- are excluded from formation cohesion while actively gathering
-- rejoin formation when no valid gathering task exists
-- may fallback to combat only when appropriate
-
-Gathering limits:
-- resources define `maxGatherers`
-- default remains 1 gatherer per resource
-- excess gatherers should fallback to role behavior
-
----
-
-## Movement
-
+Each entity should perform only one movement behavior per tick unless a system explicitly uses multi-step catch-up behavior.
+
+Game Loop
+The game loop:
+
+runs continuously while enabled
+executes systems in order
+updates GameState
+supports idle/AFK simulation
+Current high-level order:
+
+Clear expired combat feedback
+Advance simulation tick
+Clear tick movement planning
+If auto mode is enabled, update role behavior
+If auto mode is enabled, update party formation movement
+If auto mode is enabled, reserve exploration movement
+Update defender behavior
+If auto mode is enabled, update exploration
+Update follow behavior
+Update enemy AI
+Update attacks
+Update gathering
+Record debug telemetry
+Movement conflicts are guarded with per-tick moved entity ids and reserved positions.
+
+Movement
 Movement rules:
-- top-down 2D
-- step-based
-- no entity stacking
-- path distance preferred for formation cohesion
-- movement reservations prevent conflicts
-- one movement behavior per entity per tick
 
-If movement/pathfinding grows significantly, move pathing logic out of `state.ts` into a dedicated module.
+top-down 2D
+numeric positions
+fixed step movement toward targets
+no entity stacking
+resources and living entities block movement
+walls block movement when map data exists
+map bounds apply when map data exists
+party members may pass through each other in some party movement cases
+movement reservations prevent conflicts
+swap handling exists for party movement edge cases
+failed movement is tracked per tick
+Movement helpers live in state.ts.
 
----
+If movement logic grows significantly, pathing and collision helpers may be moved to a dedicated module, but no restructure is required now.
 
-## Support Role Implementation
+Party Movement
+Party movement is simple and leader-centered.
 
-Support can be added before a full skill system exists.
+partyFormationSystem.ts currently owns:
 
-Initial support behavior may include:
-- formation positioning behind fighters
-- safe combat fallback
-- target awareness
-- avoiding unnecessary danger
+reading leader intent
+selecting a target position
+deciding travel or combat phase
+assigning travel follow targets
+assigning shared combat targets
+moving the leader toward the point of interest
+moving followers toward the leader
+clearing completed movement or combat state
+Current party movement constants:
 
-Do not implement healing, shielding, buffs, cleanses, or summons unless explicitly requested.
+PARTY_COHESION_DISTANCE = 4
+FOLLOW_DISTANCE = 1.5
+FOLLOW_CATCHUP_DISTANCE = 5
+COMBAT_BREAK_DISTANCE = 3
+POI_REACHED_DISTANCE = 1
+GATHERER_REJOIN_DISTANCE = 6
+Current party movement does not use strict formation slots.
 
-Support thresholds can exist as profile placeholders but should not drive missing systems.
+The party leader moves toward the point of interest only when the party is cohesive.
 
----
+Followers move toward the leader when outside follow distance.
 
-## Debug Telemetry
+Busy gatherers and direct-commanded members are excluded from normal party movement.
 
-AI behavior should expose decision reasons when practical.
+Party Cohesion
+Party cohesion is currently based on simple distance from the leader.
 
-Useful reason labels:
-- leader_target_changed
-- party_member_attacked
-- target_dead
-- ally_threatened
-- danger_too_close
-- resource_found
-- resource_depleted
-- no_primary_action
-- fallback_combat
-- return_to_formation
-- direct_command
-- cohesion_broken
-- cohesion_restored
-- formation_order_changed
-- combat_positioning_started
+A party member counts as cohesive when:
 
-Telemetry should help explain:
-- why a unit changed state
-- why a unit changed target
-- why formation paused
-- why a unit left or rejoined formation
+it is the leader, or
+it is close enough to the leader
+Gatherers are excluded from cohesion while actively gathering a valid resource.
 
----
+A gatherer rejoins normal cohesion when:
 
-## Debug Utilities
+not actively gathering, and
+close enough to rejoin party behavior
+Direct-commanded members are excluded from autonomous cohesion behavior.
 
+Follow System
+followSystem.ts keeps autonomous followers near the current party leader.
+
+A follower may move when:
+
+it is a party member
+it is in follow state
+it is not the leader
+it is not direct-commanded
+it is not a busy gatherer
+it has not already moved this tick
+it is outside follow leash distance
+Current follow constants:
+
+FOLLOW_LEASH_RADIUS = 1.5
+FOLLOW_CATCHUP_DISTANCE = 5
+Followers that are far away may take extra catch-up steps.
+
+Role System
+roleSystem.ts assigns autonomous role targets when party members are available for role behavior.
+
+Role behavior does not apply when:
+
+the entity is not a party member
+the entity is direct-commanded
+the entity is already doing a non-interruptible current action
+Current role behavior:
+
+Fighters follow during travel and attack the leader's combat target when available
+Gatherers search for resources and gather when possible
+Supports avoid overriding travel movement and may attack the leader's target when not traveling
+Defenders enter defend behavior as companions
+None has no special autonomous role target
+Role Profiles
+roleProfiles.ts centralizes role metadata and tuning.
+
+Current profile fields include:
+
+positionBias
+followDistance
+aggression
+taskCommitment
+riskTolerance
+movementPriority
+cooldownUsage
+resourceSpending
+Current tuning fields include:
+
+engageRange
+chaseLimit
+leashDistance
+interruptBuffer
+dangerThreshold
+protectionRadius
+support health threshold placeholders
+resourceSearchRange
+combatAssistRange
+Support healing, shielding, buffs, cleanses, and summons are not implemented.
+
+Defender System
+defendSystem.ts owns defender-specific behavior.
+
+Current defender behavior:
+
+defenders guard near the leader
+defenders use leader intent to choose a guard position
+defenders can stand ahead or to the side of leader movement
+defenders target the leader's enemy target
+defenders can intercept nearby enemies threatening the leader or party
+defenders attack in melee range
+defenders may cause the leader to wait briefly so they can intercept
+defenders avoid chasing too far away from the leader
+Defender behavior is skipped during active party travel movement.
+
+Direct-commanded defenders are not controlled by autonomous defend behavior.
+
+Attack System
+attackSystem.ts owns combat execution.
+
+Current attack behavior:
+
+attackers require a valid combat target
+attackers move toward targets if out of range
+attackers attack when in range and cooldown is ready
+damage is applied directly
+defeated targets enter dead state
+enemies attacked by party members fight back
+party members may assist nearby party combat targets
+party protection is triggered when enemies damage party members
+Current combat constants:
+
+ATTACK_RANGE = 1
+ATTACK_DAMAGE = 1
+ATTACK_COOLDOWN_MS = 1000
+TARGET_SWITCH_DISTANCE = 6
+Combat movement order uses role priority for party members.
+
+Enemy AI System
+enemyAISystem.ts owns enemy autonomous targeting.
+
+Current enemy behavior:
+
+passive enemies do not seek targets on their own
+aggressive enemies search for nearby party targets
+enemies with valid targets enter or remain in attack state
+enemies clear invalid targets
+enemies attacking party members trigger party protection
+Current enemy detection range:
+
+ENEMY_DETECTION_RANGE = 5
+Party Protection
+partyProtectionSystem.ts responds when a party member is attacked.
+
+Current behavior:
+
+leader intent switches to attack the attacker
+nearby idle/follow party members may switch to attack the attacker
+direct-commanded party members are not overridden
+busy gatherers are not pulled by distant threats
+protection requires party members to be close enough to the attacked member
+protectLeader currently aliases protectPartyMember.
+
+Gathering System
+gatherSystem.ts owns gathering execution.
+
+Current gathering behavior:
+
+gatherers require a valid resource target
+gatherers move toward resources when out of range
+gatherers gather when in range and cooldown is ready
+resource durability is reduced
+inventory increases when a resource yield is produced
+depleted resources become invalid
+gatherers return to follow when their target is depleted or invalid
+resources limit how many gatherers may gather at once
+Current gathering constants:
+
+GATHER_RANGE = 1
+GATHER_COOLDOWN_MS = 1000
+GATHERER_PARTY_RETURN_DISTANCE = 15
+Gatherers with autonomous gatherer behavior may stay committed to a resource task unless it becomes invalid or unsafe by current checks.
+
+Exploration System
+explorationSystem.ts owns current auto-exploration behavior.
+
+Current exploration behavior:
+
+only runs when auto mode is enabled
+requires map/debug map data
+records explored positions for autonomous entities
+avoids active resources and walls
+finds nearby enemies before unexplored positions
+sets leader intent to attack when an enemy target is found
+otherwise sets leader intent to explore toward the nearest reachable unexplored position
+does not run movement while party formation has an active target
+Current auto enemy target radius:
+
+AUTO_ENEMY_TARGET_RADIUS = 48
+Exploration still uses explored position records named exploredTiles in code.
+
+Resources
+Resources are entities.
+
+Current resource fields:
+
+resourceType
+durability
+maxDurability
+quantity
+maxGatherers
+isDepleted
+Current resource types:
+
+wood
+ore
+herb
+Gathering reduces durability. When durability reaches zero, quantity decreases and inventory may increase.
+
+A resource is depleted when quantity reaches zero.
+
+Combat Feedback
+Combat feedback events are stored in game state.
+
+Current feedback event types:
+
+attack
+damage
+death
+gather
+Feedback events expire automatically.
+
+Current feedback duration:
+
+COMBAT_FEEDBACK_DURATION_MS = 900
+Debug Telemetry
+Debug telemetry records simulation information for inspection.
+
+Current telemetry can track:
+
+target acquisition
+target changes
+formation changes
+skipped targets
+movement failure
+attack start
+damage dealt
+entity death
+gathering start
+resource depletion
+role changes
+Telemetry snapshots may include:
+
+tick
+entity id
+kind
+role
+state
+position
+target
+command priority
+movement result
+reason
+formation phase
+formation slot data when present
+Debug telemetry should remain development-only.
+
+Debug Utilities
 Debug/testing helpers may exist for development:
-- Add/remove companions
-- Change roles
-- Change party order
-- Set current leader
-- Reset health
-- Reset resources
-- Randomize positions
-- Debug telemetry
-- Debug maps
-- Explicit aggressive-enemy test setups
 
+Add/remove companions
+Change roles
+Change party order
+Set current leader
+Reset health
+Reset resources
+Randomize positions
+Debug telemetry
+Debug maps
+Explicit aggressive-enemy test setups
 These should remain isolated from core systems and must not define final gameplay behavior.
 
----
-
-## World Structure Future Work
-
-- World is divided into zones.
-- Each entity will later include `zoneId`.
-- Teleport points connect zones.
-
+World Structure Future Work
+World is divided into zones.
+Each entity will later include zoneId.
+Teleport points connect zones.
 Do NOT implement zones unless explicitly requested.
 
----
-
-## Future Expansion
-
+Future Expansion
 Do NOT implement unless requested:
 
-- Zones and teleport points
-- Full skill system
-- Inventory items/equipment
-- Class/subclass progression
-- Networking/server authority
-- Backend persistence
-- Advanced aggro/threat systems
-- Advanced ranged combat
-- Advanced support mechanics
+Zones and teleport points
+Full skill system
+Inventory items/equipment
+Class/subclass progression
+Networking/server authority
+Backend persistence
+Advanced aggro/threat systems
+Advanced ranged combat
+Advanced support mechanics
