@@ -2,18 +2,18 @@ import type {
   AutonomousEntity,
   CombatEntity,
   Companion,
-  CompanionRole,
   Enemy,
   EnemyAggressionMode,
   EntityState,
   GameEntity,
+  PartyMemberRole,
   Player,
   Position,
   ResourceEntity,
   ResourceType,
 } from "./types";
 
-const FOLLOW_DISTANCE = 1;
+const MOVEMENT_STEP_DISTANCE = 0.455;
 const STARTING_HEALTH = 10;
 const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
@@ -33,6 +33,8 @@ export function createPlayer(id: string, position: Position): Player {
   return {
     id,
     kind: "player",
+    role: "none",
+    partyOrder: 0,
     position,
     state: "idle",
     health: STARTING_HEALTH,
@@ -67,12 +69,14 @@ export function createCompanion(
   id: string,
   position: Position,
   followTargetId: string,
-  role: CompanionRole = "none",
+  role: PartyMemberRole = "none",
+  partyOrder = 1,
 ): Companion {
   return {
     id,
     kind: "companion",
     role,
+    partyOrder,
     position,
     state: "follow",
     health: STARTING_HEALTH,
@@ -240,16 +244,14 @@ export function isResourceEntity(
 function stepToward(current: Position, target: Position): Position {
   const xDistance = target.x - current.x;
   const yDistance = target.y - current.y;
+  const distance = Math.hypot(xDistance, yDistance);
 
-  if (
-    Math.abs(xDistance) <= FOLLOW_DISTANCE &&
-    Math.abs(yDistance) <= FOLLOW_DISTANCE
-  ) {
+  if (distance <= MOVEMENT_STEP_DISTANCE) {
     return current;
   }
 
   return {
-    x: current.x + Math.sign(xDistance),
-    y: current.y + Math.sign(yDistance),
+    x: current.x + (xDistance / distance) * MOVEMENT_STEP_DISTANCE,
+    y: current.y + (yDistance / distance) * MOVEMENT_STEP_DISTANCE,
   };
 }

@@ -12,7 +12,14 @@ export type EnemyAggressionMode = "passive" | "aggressive";
 
 export type CommandPriority = "autonomous" | "direct";
 
-export type CompanionRole = "fighter" | "gatherer" | "defender" | "none";
+export type PartyMemberRole =
+  | "defender"
+  | "fighter"
+  | "support"
+  | "gatherer"
+  | "none";
+
+export type CompanionRole = PartyMemberRole;
 
 export type ResourceType = "wood" | "ore" | "herb";
 
@@ -35,7 +42,7 @@ export type LeaderIntent = {
   targetPosition: Position | null;
 };
 
-export type CombatFeedbackType = "attack" | "damage" | "death";
+export type CombatFeedbackType = "attack" | "damage" | "death" | "gather";
 
 export type CombatFeedbackEvent = {
   id: string;
@@ -65,7 +72,7 @@ export type DebugTelemetryEntitySnapshot = {
   tick: number;
   entityId: string;
   kind: EntityKind;
-  role?: CompanionRole;
+  role?: PartyMemberRole;
   state: EntityState;
   position: Position;
   currentTargetId?: string | null;
@@ -84,8 +91,8 @@ export type DebugTelemetryEvent = {
   targetId?: string | null;
   previousTargetId?: string | null;
   amount?: number;
-  previousRole?: CompanionRole;
-  nextRole?: CompanionRole;
+  previousRole?: PartyMemberRole;
+  nextRole?: PartyMemberRole;
   reason?: string;
   formationPhase?: FormationPhase;
   approachPoint?: Position | null;
@@ -125,7 +132,6 @@ export type FormationPhase =
   | "idle"
   | "forming"
   | "traveling"
-  | "engaging"
   | "combat";
 
 export type PartyFormationMemberSlot = {
@@ -158,6 +164,8 @@ export type LivingEntity = BaseEntity & {
 
 export type Player = LivingEntity & {
   kind: "player";
+  role: PartyMemberRole;
+  partyOrder: number;
   currentTargetId: string | null;
   lastGatherAt: number;
   gatherSpeed: number;
@@ -172,7 +180,8 @@ export type Enemy = LivingEntity & {
 
 export type Companion = LivingEntity & {
   kind: "companion";
-  role: CompanionRole;
+  role: PartyMemberRole;
+  partyOrder: number;
   followTargetId: string;
   defendPosition: Position | null;
   currentTargetId: string | null;

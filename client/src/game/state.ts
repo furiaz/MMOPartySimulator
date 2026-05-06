@@ -11,14 +11,17 @@ import type {
   Player,
   LeaderIntent,
   PartyFormationState,
+  PartyMemberRole,
   Position,
   ResourceInventory,
   ResourceType,
-  CompanionRole,
 } from "./types";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const COMBAT_FEEDBACK_DURATION_MS = 900;
+const POSITION_EPSILON = 0.001;
+const ENTITY_COLLISION_DISTANCE = 0.7;
+const RESOURCE_COLLISION_DISTANCE = 0.7;
 
 type FindAvailablePositionOptions = {
   blockedPositions?: Position[];
@@ -36,6 +39,8 @@ export type GameState = {
   inventory: ResourceInventory;
   map?: GameMap;
   autoModeEnabled: boolean;
+  simulationTick: number;
+  partyLeaderId: string;
   leaderIntent: LeaderIntent | null;
   exploredTiles: Record<string, true>;
   followTrailsByEntityId: Record<string, Position[]>;
@@ -198,28 +203,76 @@ export function setLeaderIntent(
 export function setCompanionRole(
   state: GameState,
   companionId: string,
-  role: CompanionRole,
+  role: PartyMemberRole,
 ): GameState {
-  const companion = state.entities[companionId];
+  return setPartyMemberRole(state, companionId, role);
+}
 
-  if (companion?.kind !== "companion") {
+export function setPartyLeader(
+  state: GameState,
+  entityId: string,
+): GameState {
+  const entity = state.entities[entityId];
+
+  if (entity?.kind !== "player" && entity?.kind !== "companion") {
+    return state;
+  }
+
+  return {
+    ...state,
+    partyLeaderId: entity.id,
+  };
+}
+
+export function advanceSimulationTick(state: GameState): GameState {
+  return {
+    ...state,
+    simulationTick: state.simulationTick + 1,
+  };
+}
+
+export function setPartyMemberRole(
+  state: GameState,
+  entityId: string,
+  role: PartyMemberRole,
+): GameState {
+  const partyMember = state.entities[entityId];
+
+  if (partyMember?.kind !== "player" && partyMember?.kind !== "companion") {
     return state;
   }
 
   const nextState = updateEntity(state, {
-    ...companion,
+    ...partyMember,
     role,
   });
 
-  if (companion.role === role) {
+  if (partyMember.role === role) {
     return nextState;
   }
 
   return appendDebugTelemetryEvent(nextState, {
     type: "role_changed",
-    entityId: companion.id,
-    previousRole: companion.role,
+    entityId: partyMember.id,
+    previousRole: partyMember.role,
     nextRole: role,
+  });
+}
+
+export function setPartyOrder(
+  state: GameState,
+  entityId: string,
+  partyOrder: number,
+): GameState {
+  const partyMember = state.entities[entityId];
+
+  if (partyMember?.kind !== "player" && partyMember?.kind !== "companion") {
+    return state;
+  }
+
+  return updateEntity(state, {
+    ...partyMember,
+    partyOrder,
   });
 }
 
@@ -464,7 +517,7 @@ export function isActiveResourcePosition(
       entity.kind === "resource" &&
       !entity.isDepleted &&
       entity.quantity > 0 &&
-      isSamePosition(entity.position, position),
+      getEuclideanDistance(entity.position, position) < RESOURCE_COLLISION_DISTANCE,
   );
 }
 
@@ -496,6 +549,16 @@ function getNextMoveResolution(
   target: GameEntity,
   options: MovementOptions = {},
 ): { position: Position; swapWithEntityId?: string } | null {
+  const movedEntity = moveEntityToward(entity, target);
+
+  if (isSamePosition(movedEntity.position, entity.position)) {
+    return null;
+  }
+
+  if (isWalkablePosition(state, movedEntity.position, entity.id, options)) {
+    return { position: movedEntity.position };
+  }
+
   const pathPosition = findNextPathPosition(state, entity, target, options);
 
   if (
@@ -503,16 +566,6 @@ function getNextMoveResolution(
     isMoveDestinationAvailable(state, entity, pathPosition, options)
   ) {
     return { position: pathPosition };
-  }
-
-  const movedEntity = moveEntityToward(entity, target);
-
-  if (isSamePosition(movedEntity.position, entity.position)) {
-    return null;
-  }
-
-  if (isWalkablePosition(state, movedEntity.position, entity.id)) {
-    return { position: movedEntity.position };
   }
 
   const swapWithEntity = getSwapCandidate(
@@ -802,7 +855,7 @@ function isInMapBounds(state: GameState, position: Position): boolean {
 }
 
 function isSamePosition(a: Position, b: Position): boolean {
-  return a.x === b.x && a.y === b.y;
+  return getEuclideanDistance(a, b) <= POSITION_EPSILON;
 }
 
 function getPositionRing(center: Position, radius: number): Position[] {
@@ -845,7 +898,7 @@ function isPositionOccupiedByEntity(
   return Object.values(state.entities).some(
     (entity) =>
       entity.id !== ignoredEntityId &&
-      isSamePosition(entity.position, position),
+      getEuclideanDistance(entity.position, position) < ENTITY_COLLISION_DISTANCE,
   );
 }
 
@@ -872,8 +925,7 @@ function isPositionOccupiedByBlockingEntity(
       entity.kind !== "resource" &&
       entity.state !== "dead" &&
       !canPassThroughPartyEntity(movingEntity, entity, options) &&
-      entity.position.x === position.x &&
-      entity.position.y === position.y,
+      getEuclideanDistance(entity.position, position) < ENTITY_COLLISION_DISTANCE,
   );
 }
 
@@ -1012,7 +1064,7 @@ function isPositionOccupiedByEntityOtherThan(
   return Object.values(state.entities).some(
     (entity) =>
       !ignoredEntityIds.includes(entity.id) &&
-      isSamePosition(entity.position, position),
+      getEuclideanDistance(entity.position, position) < ENTITY_COLLISION_DISTANCE,
   );
 }
 
@@ -1114,4 +1166,8 @@ function getUpdatedFollowTrail(
   ];
 
   return nextTrail.slice(0, FOLLOW_TRAIL_LENGTH);
+}
+
+function getEuclideanDistance(from: Position, to: Position): number {
+  return Math.hypot(to.x - from.x, to.y - from.y);
 }

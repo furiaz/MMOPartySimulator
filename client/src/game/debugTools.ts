@@ -23,7 +23,14 @@ export function debugAddCompanion(
     return state;
   }
 
-  return addEntity(state, createCompanion(companionId, position, followTargetId));
+  const partyOrder = Object.values(state.entities).filter(
+    (entity) => entity.kind === "player" || entity.kind === "companion",
+  ).length;
+
+  return addEntity(
+    state,
+    createCompanion(companionId, position, followTargetId, "none", partyOrder),
+  );
 }
 
 export function debugAddCompanionToParty(
@@ -59,7 +66,13 @@ export function debugRemoveCompanion(
   delete entities[companionId];
   delete followTrailsByEntityId[companionId];
 
-  return { ...state, entities, followTrailsByEntityId };
+  return {
+    ...state,
+    entities,
+    followTrailsByEntityId,
+    partyLeaderId:
+      state.partyLeaderId === companionId ? getFallbackLeaderId(entities) : state.partyLeaderId,
+  };
 }
 
 export function debugRemoveCompanionFromParty(
@@ -199,8 +212,12 @@ function restorePartyMember<T extends Player | Companion>(entity: T): T {
   };
 }
 
-function getRandomInt(maxExclusive: number): number {
-  return Math.floor(Math.random() * maxExclusive);
+function getFallbackLeaderId(entities: Record<string, Player | Companion | Enemy | ResourceEntity>): string {
+  return (
+    Object.values(entities).find(
+      (entity) => entity.kind === "player" || entity.kind === "companion",
+    )?.id ?? ""
+  );
 }
 
 function getRandomOpenPosition(
@@ -209,28 +226,27 @@ function getRandomOpenPosition(
   maxY: number,
   usedPositions: Set<string>,
 ): Position {
-  const openPositions: Position[] = [];
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const position = {
+      x: Math.random() * maxX,
+      y: Math.random() * maxY,
+    };
 
-  for (let y = 0; y < maxY; y += 1) {
-    for (let x = 0; x < maxX; x += 1) {
-      const position = { x, y };
-
-      if (
-        isWallPosition(state, position) ||
-        usedPositions.has(getPositionKey(position))
-      ) {
-        continue;
-      }
-
-      openPositions.push(position);
+    if (
+      isWallPosition(state, position) ||
+      usedPositions.has(getPositionKey(position))
+    ) {
+      continue;
     }
+
+    return position;
   }
 
-  return openPositions[getRandomInt(openPositions.length)] ?? { x: 0, y: 0 };
+  return { x: 0, y: 0 };
 }
 
 function getPositionKey(position: Position): string {
-  return `${position.x},${position.y}`;
+  return `${Math.round(position.x)},${Math.round(position.y)}`;
 }
 
 function isSamePosition(a: Position, b: Position): boolean {

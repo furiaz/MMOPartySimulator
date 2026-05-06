@@ -1,9 +1,5 @@
 import { isCombatEntity, isResourceEntity } from "./entities";
-import {
-  isActiveResourcePosition,
-  isWallPosition,
-  type GameState,
-} from "./state";
+import type { GameState } from "./state";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
 
 type EnemyTargetOptions = {
@@ -155,95 +151,12 @@ function isPositionReachableWithin(
   maxDistance: number,
   ignoredResourceId?: string,
 ): boolean {
-  if (!state.map) {
-    return getPositionDistance(start, target) <= maxDistance;
-  }
+  void state;
+  void ignoredResourceId;
 
-  return (
-    getReachableDistance(
-      state,
-      start,
-      target,
-      maxDistance,
-      ignoredResourceId,
-    ) !== null
-  );
-}
-
-function getReachableDistance(
-  state: GameState,
-  start: Position,
-  target: Position,
-  maxDistance: number,
-  ignoredResourceId?: string,
-): number | null {
-  const targetKey = getPositionKey(target);
-  const visited = new Set<string>([getPositionKey(start)]);
-  const queue: { position: Position; distance: number }[] = [
-    { position: start, distance: 0 },
-  ];
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-
-    if (!current) {
-      continue;
-    }
-
-    if (getPositionKey(current.position) === targetKey) {
-      return current.distance;
-    }
-
-    if (current.distance >= maxDistance) {
-      continue;
-    }
-
-    for (const neighbor of getNeighborPositions(current.position)) {
-      const key = getPositionKey(neighbor);
-
-      if (
-        visited.has(key) ||
-        !isInMapBounds(state, neighbor) ||
-        isWallPosition(state, neighbor) ||
-        isActiveResourcePosition(state, neighbor, ignoredResourceId)
-      ) {
-        continue;
-      }
-
-      visited.add(key);
-      queue.push({
-        position: neighbor,
-        distance: current.distance + 1,
-      });
-    }
-  }
-
-  return null;
-}
-
-function getNeighborPositions(position: Position): Position[] {
-  return [
-    { x: position.x + 1, y: position.y },
-    { x: position.x - 1, y: position.y },
-    { x: position.x, y: position.y + 1 },
-    { x: position.x, y: position.y - 1 },
-  ];
-}
-
-function isInMapBounds(state: GameState, position: Position): boolean {
-  return Boolean(
-    state.map &&
-      position.x >= 0 &&
-      position.x < state.map.columns &&
-      position.y >= 0 &&
-      position.y < state.map.rows,
-  );
-}
-
-function getPositionKey(position: Position): string {
-  return `${position.x},${position.y}`;
+  return getPositionDistance(start, target) <= maxDistance;
 }
 
 function getPositionDistance(a: Position, b: Position): number {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }

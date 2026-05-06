@@ -239,7 +239,7 @@ Commands can be:
 Rules:
 - direct commands override autonomous behavior for the targeted entity
 - direct commands should not automatically change other entities
-- emergency survival behavior may interrupt direct commands only when explicitly allowed
+- direct commands are absolute for this phase and are not interrupted by emergency survival behavior
 - commands should update leader intent only when issued by or for the current leader
 
 Recommended future command helpers:
@@ -517,7 +517,7 @@ Role behavior during approach:
 Combat transition distance:
 
 ```ts
-COMBAT_APPROACH_DISTANCE = 2 or 3;
+COMBAT_APPROACH_DISTANCE = 3;
 ```
 
 When close enough:
@@ -537,7 +537,7 @@ When any party member is attacked:
 - attacker becomes a high-priority party target
 - leader intent may switch to the attacker
 - role decisions may respond based on priority and interrupt rules
-- direct-commanded members should not be overridden except by explicitly allowed emergency survival behavior
+- direct-commanded members should not be overridden by autonomous role, formation, protection, or emergency behavior
 - busy gatherers should not be interrupted by distant threats
 
 This should replace player-only protection assumptions over time.

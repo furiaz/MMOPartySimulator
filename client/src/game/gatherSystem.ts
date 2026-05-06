@@ -5,6 +5,7 @@ import {
   setLastGatherAt,
 } from "./entities";
 import {
+  addCombatFeedback,
   addResourceToInventory,
   getBoundedPathDistance,
   getEntityById,
@@ -100,6 +101,13 @@ export function updateGatherSystem(
     const gatheredResource = gatherResource(resource, gatherAmount);
 
     nextState = updateEntity(nextState, gatheredResource);
+    nextState = addCombatFeedback(nextState, {
+      type: "gather",
+      entityId: gatherer.id,
+      text: "Gather",
+      now,
+    });
+
     if (didYieldResource) {
       nextState = addResourceToInventory(
         nextState,

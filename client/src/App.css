@@ -21,11 +21,11 @@
   height: 756px;
   margin: 20px 0;
   border: 1px solid #6b7280;
-  background-color: #eef2f7;
-  background-image:
-    linear-gradient(#cbd5e1 1px, transparent 1px),
-    linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
-  background-size: 28px 28px;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(34, 197, 94, 0.16), transparent 22%),
+    radial-gradient(circle at 78% 35%, rgba(59, 130, 246, 0.12), transparent 24%),
+    radial-gradient(circle at 45% 82%, rgba(245, 158, 11, 0.14), transparent 26%),
+    #eef2f7;
   overflow: auto;
 }
 
@@ -69,14 +69,41 @@
   color: #111827;
 }
 
+.combat-feedback.gather {
+  border-color: #047857;
+  color: #047857;
+}
+
+.poi-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  margin: -4px 0 0 -4px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  pointer-events: none;
+  transition: transform 120ms linear;
+}
+
+.poi-ring.enemy-poi {
+  color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.16);
+}
+
 .entity-marker {
   width: 22px;
   height: 22px;
   margin: 3px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #ffffff, 0 1px 4px rgba(15, 23, 42, 0.32);
   transition: transform 120ms linear;
 }
 
-.companion-map-id {
+.map-marker-id {
   position: absolute;
   inset: 0;
   display: grid;
@@ -124,6 +151,7 @@
 .wall-tile {
   width: 28px;
   height: 28px;
+  border-radius: 999px;
   background: #334155;
 }
 
@@ -149,12 +177,12 @@
   pointer-events: none;
 }
 
-.player {
-  background: #2563eb;
-}
-
 .companion {
   background: #16a34a;
+}
+
+.leader {
+  background: #2563eb;
 }
 
 .enemy {
@@ -179,6 +207,7 @@
   max-width: 48px;
   padding: 2px 3px;
   margin: 3px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
 }

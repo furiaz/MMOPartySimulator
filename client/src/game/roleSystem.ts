@@ -5,7 +5,9 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { findEnemyTarget, findResourceTarget } from "./targetSelection";
+import { getPartyLeader, isPartyMember, type PartyMember } from "./partySystem";
+import { ROLE_TUNING } from "./roleProfiles";
+import { findResourceTarget } from "./targetSelection";
 import type {
   Companion,
   Enemy,
@@ -15,10 +17,9 @@ import type {
   ResourceEntity,
 } from "./types";
 
-export const GATHERER_RESOURCE_SEARCH_PATH_DISTANCE = 30;
-const GATHERER_COMBAT_ASSIST_RADIUS = 8;
-const FIGHTER_ENEMY_SEARCH_RADIUS = 8;
-const DEFENDER_ENEMY_SEARCH_RADIUS = 6;
+export const GATHERER_RESOURCE_SEARCH_PATH_DISTANCE =
+  ROLE_TUNING.gatherer.resourceSearchRange ?? 30;
+const DEFENDER_ENEMY_SEARCH_RADIUS = ROLE_TUNING.defender.engageRange ?? 6;
 const DEFENDER_ANCHOR_LEASH_DISTANCE = 6;
 const DEFENDER_LEADER_LEASH_DISTANCE = 8;
 const LEADER_INTENT_DISTANCE = 1;
@@ -51,9 +52,9 @@ export function updateRoleSystem(state: GameState): GameState {
 function canUseRoleBehavior(
   state: GameState,
   entity: GameEntity,
-): entity is Companion {
+): entity is PartyMember {
   if (
-    entity.kind !== "companion" ||
+    !isPartyMember(entity) ||
     entity.commandPriority === "direct" ||
     (entity.state !== "idle" &&
       entity.state !== "follow" &&
@@ -66,53 +67,64 @@ function canUseRoleBehavior(
     return true;
   }
 
-  const followTarget = state.entities[entity.followTargetId];
+  const followTarget = getPartyLeader(state);
 
   return Boolean(followTarget && isWithinFollowLeash(state, entity, followTarget));
 }
 
 function getRoleTarget(
   state: GameState,
-  companion: Companion,
+  partyMember: PartyMember,
 ): { state: "attack" | "gather" | "follow" | "defend"; targetId: string | null } | null {
-  if (companion.role === "fighter") {
-    const followTarget = state.entities[companion.followTargetId];
+  const leader = getPartyLeader(state);
+  const isTravelFormation = isFormationTravelMovementActive(state);
+
+  if (partyMember.role === "fighter") {
+    const followTarget = leader;
 
     if (!followTarget) {
       return null;
     }
 
-    const enemy =
-      getLeaderCombatTarget(state, followTarget) ??
-      findEnemyTarget(state, followTarget, {
-        maxDistance: FIGHTER_ENEMY_SEARCH_RADIUS,
-      });
+    if (isTravelFormation) {
+      return getFollowTarget(partyMember, followTarget);
+    }
+
+    const enemy = getLeaderCombatTarget(state, followTarget);
 
     return enemy
       ? { state: "attack", targetId: enemy.id }
-      : { state: "follow", targetId: companion.followTargetId };
+      : getFollowTarget(partyMember, followTarget);
   }
 
-  if (companion.role === "gatherer") {
-    const resource = findGathererTarget(state, companion);
+  if (partyMember.role === "gatherer") {
+    const resource = findGathererTarget(state, partyMember);
 
     if (resource) {
       return { state: "gather", targetId: resource.id };
     }
 
-    const followTarget = state.entities[companion.followTargetId];
-    const enemy =
-      (followTarget ? getLeaderCombatTarget(state, followTarget) : undefined) ??
-      findEnemyTarget(state, companion, {
-        maxDistance: GATHERER_COMBAT_ASSIST_RADIUS,
-        includeEngagedOutsideRange: true,
-      });
+    if (isTravelFormation) {
+      return null;
+    }
+
+    return leader ? getFollowTarget(partyMember, leader) : null;
+  }
+
+  if (partyMember.role === "support") {
+    if (isTravelFormation) {
+      return null;
+    }
+
+    const enemy = leader ? getLeaderCombatTarget(state, leader) : undefined;
 
     return enemy ? { state: "attack", targetId: enemy.id } : null;
   }
 
-  if (companion.role === "defender") {
-    return { state: "defend", targetId: null };
+  if (partyMember.role === "defender") {
+    return partyMember.kind === "companion"
+      ? { state: "defend", targetId: null }
+      : null;
   }
 
   return null;
@@ -120,25 +132,41 @@ function getRoleTarget(
 
 function findGathererTarget(
   state: GameState,
-  companion: Companion,
+  partyMember: PartyMember,
 ): ResourceEntity | undefined {
   return findResourceTarget(
     state,
-    companion,
-    getGathererWorkOrigin(state, companion),
+    partyMember,
+    getGathererWorkOrigin(state, partyMember),
     { maxDistance: GATHERER_RESOURCE_SEARCH_PATH_DISTANCE },
+  );
+}
+
+function isFormationTravelMovementActive(state: GameState): boolean {
+  return (
+    state.partyFormation?.phase === "forming" ||
+    state.partyFormation?.phase === "traveling"
   );
 }
 
 export function getGathererWorkOrigin(
   state: GameState,
-  companion: Companion,
+  partyMember: PartyMember,
 ): Position {
   return (
-    Object.values(state.entities).find(isPlayer)?.position ??
-    state.entities[companion.followTargetId]?.position ??
-    companion.position
+    getPartyLeader(state)?.position ??
+    partyMember.position
   );
+}
+
+function getFollowTarget(
+  partyMember: PartyMember,
+  leader: PartyMember,
+): { state: "follow"; targetId: string | null } {
+  return {
+    state: "follow",
+    targetId: partyMember.kind === "companion" ? leader.id : null,
+  };
 }
 
 export function getDefenderAnchorPosition(
@@ -149,7 +177,7 @@ export function getDefenderAnchorPosition(
     return companion.defendPosition;
   }
 
-  const followTarget = state.entities[companion.followTargetId];
+  const followTarget = getPartyLeader(state) ?? state.entities[companion.followTargetId];
 
   if (followTarget?.kind === "player") {
     return getLeaderIntentAnchorPosition(state, companion, followTarget);
@@ -159,10 +187,6 @@ export function getDefenderAnchorPosition(
     followTarget?.position ??
     companion.position
   );
-}
-
-function isPlayer(entity: GameEntity): entity is Player {
-  return entity.kind === "player";
 }
 
 function getLeaderCombatTarget(
@@ -184,7 +208,7 @@ export function getLeaderEnemyTarget(
     }
   }
 
-  if (leader.kind !== "player") {
+  if (!isPartyMember(leader)) {
     return undefined;
   }
 
@@ -281,10 +305,7 @@ function isThreateningLeaderFrontArea(
 }
 
 function isPartyEntityForLeader(entity: GameEntity, leaderId: string): boolean {
-  return (
-    entity.id === leaderId ||
-    (entity.kind === "companion" && entity.followTargetId === leaderId)
-  );
+  return isPartyMember(entity) && (entity.id === leaderId || entity.state !== "dead");
 }
 
 function getLeaderIntentAnchorPosition(

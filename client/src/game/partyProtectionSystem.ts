@@ -1,20 +1,25 @@
 import { isWithinFollowLeash } from "./followSystem";
-import { updateEntity, type GameState } from "./state";
-import type { AutonomousEntity, Enemy, GameEntity, Player } from "./types";
+import { setLeaderIntent, updateEntity, type GameState } from "./state";
+import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
+import type { AutonomousEntity, Enemy, GameEntity } from "./types";
 
-export function protectLeader(
+export function protectPartyMember(
   state: GameState,
-  leader: Player,
+  attackedMember: AutonomousEntity,
   attacker: Enemy,
 ): GameState {
-  if (leader.state === "dead" || attacker.state === "dead") {
+  if (attackedMember.state === "dead" || attacker.state === "dead") {
     return state;
   }
 
-  let nextState = state;
+  let nextState = setLeaderIntent(state, {
+    type: "attack",
+    targetId: attacker.id,
+    targetPosition: attacker.position,
+  });
 
   for (const entity of Object.values(state.entities)) {
-    if (!canProtectLeader(state, entity, leader)) {
+    if (!canProtectPartyMember(state, entity, attackedMember, attacker)) {
       continue;
     }
 
@@ -29,10 +34,13 @@ export function protectLeader(
   return nextState;
 }
 
-function canProtectLeader(
+export const protectLeader = protectPartyMember;
+
+function canProtectPartyMember(
   state: GameState,
   entity: GameEntity,
-  leader: Player,
+  attackedMember: AutonomousEntity,
+  attacker: Enemy,
 ): entity is AutonomousEntity {
   if (entity.kind !== "player" && entity.kind !== "companion") {
     return false;
@@ -42,18 +50,19 @@ function canProtectLeader(
     return false;
   }
 
-  if (entity.kind === "player") {
-    return (
-      entity.id === leader.id &&
-      (entity.state === "idle" || entity.state === "follow")
-    );
+  if (entity.kind === "companion" && isGathererBusy(state, entity)) {
+    const leader = getPartyLeader(state);
+
+    if (leader && !isWithinFollowLeash(state, attacker, leader)) {
+      return false;
+    }
   }
 
-  if (entity.followTargetId !== leader.id) {
+  if (!isPartyMember(attackedMember)) {
     return false;
   }
 
-  if (!isWithinFollowLeash(state, entity, leader)) {
+  if (entity.id !== attackedMember.id && !isWithinFollowLeash(state, entity, attackedMember)) {
     return false;
   }
 

@@ -23,6 +23,7 @@ export type {
   LeaderIntent,
   LeaderIntentType,
   LivingEntity,
+  PartyMemberRole,
   Player,
   Position,
   ResourceInventory,
@@ -61,8 +62,27 @@ export {
   setCompanionDefendPosition,
   setCompanionRole,
   setLeaderIntent,
+  setPartyLeader,
+  setPartyMemberRole,
+  setPartyOrder,
   updateEntity,
 } from "./state";
+export {
+  getOrderedFormationMembers,
+  getOrderedPartyMembers,
+  getPartyLeader,
+  getPartyMembers,
+  isGathererBusy,
+  isPartyMember,
+} from "./partySystem";
+export {
+  COMBAT_APPROACH_DISTANCE,
+  FORMATION_COHESION_PATH_DISTANCE,
+  ROLE_PRIORITY,
+  ROLE_PROFILES,
+  ROLE_TUNING,
+  getRolePriority,
+} from "./roleProfiles";
 export {
   issueEntityCommand,
   issueCompanionCommand,

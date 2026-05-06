@@ -1,13 +1,13 @@
 import type { GameState } from "./state";
 import type {
   CommandPriority,
-  CompanionRole,
   DebugMovementResult,
   DebugTelemetryEntitySnapshot,
   DebugTelemetryEvent,
   DebugTelemetryReport,
   DebugTelemetryState,
   GameEntity,
+  PartyMemberRole,
   Position,
 } from "./types";
 
@@ -281,6 +281,14 @@ function getCombatFeedbackEvents(
         };
       }
 
+      if (event.type === "gather") {
+        return {
+          tick,
+          type: "gather_started",
+          entityId: event.entityId,
+        };
+      }
+
       return null;
     })
     .filter((event): event is DebugTelemetryEvent => Boolean(event));
@@ -524,8 +532,10 @@ function getCommandPriority(entity: GameEntity): CommandPriority | undefined {
   return "commandPriority" in entity ? entity.commandPriority : undefined;
 }
 
-function getRole(entity: GameEntity): CompanionRole | undefined {
-  return entity.kind === "companion" ? entity.role : undefined;
+function getRole(entity: GameEntity): PartyMemberRole | undefined {
+  return entity.kind === "player" || entity.kind === "companion"
+    ? entity.role
+    : undefined;
 }
 
 function getHealth(entity: GameEntity): number | null {

@@ -81,7 +81,7 @@ export function issueEntityCommand(
 
     const nextState = updateEntity(state, updatedEntity);
 
-    return entity.kind === "player"
+    return entity.id === state.partyLeaderId
       ? setLeaderIntent(nextState, null)
       : nextState;
   }
@@ -98,7 +98,7 @@ export function issueEntityCommand(
 
   const nextState = updateEntity(state, updatedEntity);
 
-  return entity.kind === "player"
+  return entity.id === state.partyLeaderId
     ? setLeaderIntent(nextState, getLeaderIntentFromCommand(state, command))
     : nextState;
 }

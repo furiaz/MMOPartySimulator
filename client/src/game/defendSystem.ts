@@ -10,6 +10,7 @@ import {
   type GameState,
 } from "./state";
 import { chooseAttackSlot } from "./attackSlots";
+import { getPartyLeader } from "./partySystem";
 import {
   getDefenderAnchorPosition,
   getLeaderEnemyTarget,
@@ -54,7 +55,11 @@ export function updateDefendSystem(
       continue;
     }
 
-    const leader = nextState.entities[defender.followTargetId];
+    if (isFormationTravelMovementActive(nextState)) {
+      continue;
+    }
+
+    const leader = getDefenderLeader(nextState, defender);
     const preferredDefendPosition = getDefenderAnchorPosition(nextState, defender);
     const defendPosition = leader
       ? getValidDefenderAnchorPosition(
@@ -607,6 +612,13 @@ function shouldHoldDefenderLine(
   );
 }
 
+function getDefenderLeader(
+  state: GameState,
+  defender: Companion,
+): GameEntity | undefined {
+  return getPartyLeader(state) ?? state.entities[defender.followTargetId];
+}
+
 function shouldHoldDefenderLineAtPosition(
   state: GameState,
   defenderPosition: Position,
@@ -824,5 +836,12 @@ function isDefendingCompanion(entity: Companion | object): entity is Companion {
     entity.state === "defend" &&
     "commandPriority" in entity &&
     entity.commandPriority !== "direct"
+  );
+}
+
+function isFormationTravelMovementActive(state: GameState): boolean {
+  return (
+    state.partyFormation?.phase === "forming" ||
+    state.partyFormation?.phase === "traveling"
   );
 }

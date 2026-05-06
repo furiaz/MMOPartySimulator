@@ -11,13 +11,16 @@ import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { updateRoleSystem } from "./roleSystem";
 import { recordDebugTelemetryTick } from "./debugTelemetry";
 import {
+  advanceSimulationTick,
   clearExpiredCombatFeedback,
   clearTickMovementPlanning,
   type GameState,
 } from "./state";
 
 export function updateGame(state: GameState): GameState {
-  let nextState = clearExpiredCombatFeedback(clearTickMovementPlanning(state));
+  let nextState = clearExpiredCombatFeedback(
+    clearTickMovementPlanning(advanceSimulationTick(state)),
+  );
   const movedEntityIds = new Set<string>();
 
   if (nextState.autoModeEnabled) {

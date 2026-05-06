@@ -19,19 +19,22 @@ import {
   debugRestorePartyHealth,
   exportDebugTelemetryReport,
   issueCompanionCommands,
-  issueEntityCommand,
   isCombatEntity,
   setAutoModeEnabled,
-  setCompanionRole,
+  setLeaderIntent,
+  setPartyLeader,
+  setPartyMemberRole,
+  setPartyOrder,
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
+  updateEntity,
   type Companion,
-  type CompanionRole,
   type CombatEntity,
   type Enemy,
   type GameEntity,
   type GameState,
+  type PartyMemberRole,
   type Player,
   type ResourceEntity,
   type ResourceType,
@@ -39,11 +42,12 @@ import {
 
 const playerId = "test-player";
 const companionIds = ["test-companion", "test-companion-2", "test-companion-3"];
-const companionRoleOptions: CompanionRole[] = [
+const partyMemberRoleOptions: PartyMemberRole[] = [
   "none",
-  "fighter",
-  "gatherer",
   "defender",
+  "fighter",
+  "support",
+  "gatherer",
 ];
 const enemyIds = [
   "test-enemy",
@@ -115,6 +119,14 @@ const resourceStartData: {
   { id: resourceIds[9], position: { x: 22, y: 12 }, resourceType: "wood" },
 ];
 
+function formatCoordinate(value: number): string {
+  return value.toFixed(1);
+}
+
+function getPartyMarkerClass(entityId: string, leaderId: string): string {
+  return `entity-marker companion${entityId === leaderId ? " leader" : ""}`;
+}
+
 function createInitialState(): GameState {
   const player = createPlayer(playerId, { x: 2, y: 2 });
   const companion = createCompanion(
@@ -137,6 +149,8 @@ function createInitialState(): GameState {
     inventory: createEmptyResourceInventory(),
     map: debugMap,
     autoModeEnabled: false,
+    simulationTick: 0,
+    partyLeaderId: player.id,
     leaderIntent: null,
     exploredTiles: {
       [`${player.position.x},${player.position.y}`]: true,
@@ -245,6 +259,13 @@ function App() {
     .filter((resource): resource is ResourceEntity => Boolean(resource));
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find((resource) => !resource.isDepleted);
+  const poiTarget = gameState.leaderIntent?.targetId
+    ? gameState.entities[gameState.leaderIntent.targetId]
+    : null;
+  const enemyPoiPosition =
+    poiTarget?.kind === "enemy" && poiTarget.state !== "dead"
+      ? poiTarget.position
+      : null;
   const inventory = gameState.inventory;
 
   useEffect(() => {
@@ -276,11 +297,19 @@ function App() {
     );
   }
 
-  function changeCompanionRole(
-    companionId: string,
-    role: CompanionRole,
+  function changePartyMemberRole(
+    entityId: string,
+    role: PartyMemberRole,
   ) {
-    setGameState((state) => setCompanionRole(state, companionId, role));
+    setGameState((state) => setPartyMemberRole(state, entityId, role));
+  }
+
+  function changePartyOrder(entityId: string, partyOrder: number) {
+    setGameState((state) => setPartyOrder(state, entityId, partyOrder));
+  }
+
+  function changePartyLeader(entityId: string) {
+    setGameState((state) => setPartyLeader(state, entityId));
   }
 
   function commandCompanionsToFollow() {
@@ -314,16 +343,22 @@ function App() {
     }
 
     setGameState((state) => {
-      const playerAttackState = issueEntityCommand(state, {
+      const target = state.entities[targetEnemyId];
+      const leader = state.entities[state.partyLeaderId];
+      const leaderIntentState = setLeaderIntent(state, {
         type: "attack",
-        entityId: playerId,
         targetId: targetEnemyId,
+        targetPosition: target?.position ?? null,
       });
 
-      return issueCompanionCommands(playerAttackState, activeCompanionIds, {
-        type: "attack",
-        targetId: targetEnemyId,
-      });
+      return (leader?.kind === "player" || leader?.kind === "companion")
+        ? updateEntity(leaderIntentState, {
+            ...leader,
+            state: "follow",
+            currentTargetId: targetEnemyId,
+            commandPriority: "autonomous",
+          })
+        : leaderIntentState;
     });
   }
 
@@ -445,8 +480,19 @@ function App() {
               </div>
             );
           })}
+          {enemyPoiPosition ? (
+            <div
+              className="poi-ring enemy-poi"
+              style={{
+                transform: `translate(${enemyPoiPosition.x * cellSize}px, ${
+                  enemyPoiPosition.y * cellSize
+                }px)`,
+              }}
+              title="Enemy point of interest"
+            />
+          ) : null}
           <div
-            className="entity-marker player"
+            className={getPartyMarkerClass(player.id, gameState.partyLeaderId)}
             style={{
               transform: `translate(${player.position.x * cellSize}px, ${
                 player.position.y * cellSize
@@ -454,6 +500,7 @@ function App() {
             }}
             title="Player"
           >
+            <span className="map-marker-id">1</span>
             <EntityDebugLabel
               name="Player"
               entity={player}
@@ -466,7 +513,7 @@ function App() {
           {companions.map((companion, index) => (
             <div
               key={companion.id}
-              className="entity-marker companion"
+              className={getPartyMarkerClass(companion.id, gameState.partyLeaderId)}
               style={{
                 transform: `translate(${companion.position.x * cellSize}px, ${
                   companion.position.y * cellSize
@@ -474,9 +521,9 @@ function App() {
               }}
               title="Companion"
             >
-              <span className="companion-map-id">{index + 1}</span>
+              <span className="map-marker-id">{index + 2}</span>
               <EntityDebugLabel
-                name={`C${index + 1}`}
+                name={`C${index + 2}`}
                 entity={companion}
                 detail={`HP ${companion.health} GS ${companion.gatherSpeed} Role ${companion.role}`}
                 isVisible={showEntityInfo}
@@ -522,6 +569,7 @@ function App() {
                 }}
                 title="Enemy"
               >
+                <span className="map-marker-id">{index + 1}</span>
                 <EntityDebugLabel
                   name={`E${index + 1}`}
                   entity={enemy}
@@ -600,10 +648,13 @@ function App() {
           {showEntityInfo ? (
             <>
               <span>
-                Player ({player.position.x}, {player.position.y}) | State{" "}
+                Player ({formatCoordinate(player.position.x)},{" "}
+                {formatCoordinate(player.position.y)}) | State{" "}
                 {player.state} | HP {player.health} | Target{" "}
                 {player.currentTargetId ?? "none"} | Gather Speed{" "}
-                {player.gatherSpeed} |
+                {player.gatherSpeed} | Role {player.role} | Order{" "}
+                {player.partyOrder} | Leader{" "}
+                {gameState.partyLeaderId === player.id ? "yes" : "no"} |
                 Party {companions.length + 1}/4 | Enemies Alive{" "}
                 {enemies.filter((enemy) => enemy.state !== "dead").length}/
                 {enemies.length} | Resources Available{" "}
@@ -614,6 +665,34 @@ function App() {
                 Explored {Object.keys(gameState.exploredTiles).length}
               </span>
               <div className="companion-status-list">
+                <label className="companion-role-control">
+                  <span>Player role/order</span>
+                  <select
+                    value={player.role}
+                    onChange={(event) =>
+                      changePartyMemberRole(
+                        player.id,
+                        event.target.value as PartyMemberRole,
+                      )
+                    }
+                  >
+                    {partyMemberRoleOptions.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    value={player.partyOrder}
+                    onChange={(event) =>
+                      changePartyOrder(player.id, Number(event.target.value))
+                    }
+                  />
+                  <button onClick={() => changePartyLeader(player.id)}>
+                    Set Leader
+                  </button>
+                </label>
                 {companions.length > 0
                   ? companions.map((companion, index) => (
                       <label
@@ -621,27 +700,42 @@ function App() {
                         className="companion-role-control"
                       >
                         <span>
-                          C{index + 1} ({companion.position.x},{" "}
-                          {companion.position.y}) | State {companion.state} |
+                          C{index + 1} ({formatCoordinate(companion.position.x)},{" "}
+                          {formatCoordinate(companion.position.y)}) | State {companion.state} |
                           HP {companion.health} | Target{" "}
                           {companion.currentTargetId ?? "none"} | Gather Speed{" "}
-                          {companion.gatherSpeed}
+                          {companion.gatherSpeed} | Order{" "}
+                          {companion.partyOrder} | Leader{" "}
+                          {gameState.partyLeaderId === companion.id ? "yes" : "no"}
                         </span>
                         <select
                           value={companion.role}
                           onChange={(event) =>
-                            changeCompanionRole(
+                            changePartyMemberRole(
                               companion.id,
-                              event.target.value as CompanionRole,
+                              event.target.value as PartyMemberRole,
                             )
                           }
                         >
-                          {companionRoleOptions.map((role) => (
+                          {partyMemberRoleOptions.map((role) => (
                             <option key={role} value={role}>
                               {role}
                             </option>
                           ))}
                         </select>
+                        <input
+                          type="number"
+                          value={companion.partyOrder}
+                          onChange={(event) =>
+                            changePartyOrder(
+                              companion.id,
+                              Number(event.target.value),
+                            )
+                          }
+                        />
+                        <button onClick={() => changePartyLeader(companion.id)}>
+                          Set Leader
+                        </button>
                       </label>
                     ))
                   : "No companions in party"}
