@@ -115,6 +115,12 @@ export function updateGatherSystem(
         gatheredResource.resourceType,
         1,
       );
+      nextState = addCombatFeedback(nextState, {
+        type: "gather",
+        entityId: gatheredResource.id,
+        text: formatResourceName(gatheredResource.resourceType),
+        now,
+      });
     }
 
     const updatedGatherer = setLastGatherAt(gatherer, now);
@@ -209,6 +215,10 @@ function canGather(entity: AutonomousEntity, now: number): boolean {
 
 function getGatherAmount(gatherer: AutonomousEntity): number {
   return Math.max(0, gatherer.gatherSpeed);
+}
+
+function formatResourceName(resourceType: ResourceEntity["resourceType"]): string {
+  return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
 }
 
 function getReachableSearchLimit(state: GameState): number {

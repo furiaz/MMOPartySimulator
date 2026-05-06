@@ -266,6 +266,16 @@ function App() {
     poiTarget?.kind === "enemy" && poiTarget.state !== "dead"
       ? poiTarget.position
       : null;
+  const gathererTargetResourceIds = new Set(
+    [player, ...companions]
+      .filter(
+        (entity) =>
+          entity.role === "gatherer" &&
+          entity.state === "gather" &&
+          Boolean(entity.currentTargetId),
+      )
+      .map((entity) => entity.currentTargetId),
+  );
   const inventory = gameState.inventory;
 
   useEffect(() => {
@@ -610,7 +620,11 @@ function App() {
             ) : (
               <div
                 key={resource.id}
-                className={`entity-marker resource ${resource.resourceType}`}
+                className={`entity-marker resource ${resource.resourceType}${
+                  gathererTargetResourceIds.has(resource.id)
+                    ? " gatherer-target"
+                    : ""
+                }`}
                 onClick={() => commandCompanionsToGatherResource(resource.id)}
                 style={{
                   transform: `translate(${resource.position.x * cellSize}px, ${
