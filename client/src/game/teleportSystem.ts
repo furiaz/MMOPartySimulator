@@ -53,7 +53,10 @@ export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
 ): GameState {
-  const activatedState = getActivatedTeleportState(state);
+  const poiState = shouldSelectTeleportPoi(state)
+    ? setMapTeleportPoi(state)
+    : state;
+  const activatedState = getActivatedTeleportState(poiState);
 
   if (!activatedState.activeTeleport) {
     return activatedState;
@@ -74,22 +77,19 @@ export function isMapTeleportPoiActive(state: GameState): boolean {
   return isTeleportPoiActive(state);
 }
 
-function shouldAutoTriggerTeleport(state: GameState): boolean {
+function shouldSelectTeleportPoi(state: GameState): boolean {
   return (
     state.autoModeEnabled &&
     state.currentMapId === MAP_ONE_ID &&
     !state.activeTeleport &&
+    !isTeleportPoiActive(state) &&
     getLivingEnemies(state).length === 0
   );
 }
 
 function getActivatedTeleportState(state: GameState): GameState {
-  if (shouldAutoTriggerTeleport(state)) {
-    return triggerMapTeleport(state, "ai");
-  }
-
   if (shouldPartyMemberTriggerTeleport(state)) {
-    return triggerMapTeleport(state, "player");
+    return triggerMapTeleport(state, getTeleportTriggerSource(state));
   }
 
   return state;
@@ -101,9 +101,15 @@ function shouldPartyMemberTriggerTeleport(state: GameState): boolean {
     !state.activeTeleport &&
     isTeleportPoiActive(state) &&
     getLivingPartyMembers(state).some(
-      (partyMember) => getDistance(partyMember.position, teleporterPosition) <= 1,
+      (partyMember) => getDistance(partyMember.position, teleporterPosition) <= 2,
     )
   );
+}
+
+function getTeleportTriggerSource(state: GameState): "ai" | "player" {
+  return state.autoModeEnabled && getLivingEnemies(state).length === 0
+    ? "ai"
+    : "player";
 }
 
 function isTeleportPoiActive(state: GameState): boolean {
