@@ -12,7 +12,6 @@ import type {
   Companion,
   Enemy,
   GameEntity,
-  Player,
   Position,
   ResourceEntity,
 } from "./types";
@@ -165,7 +164,7 @@ function getFollowTarget(
 ): { state: "follow"; targetId: string | null } {
   return {
     state: "follow",
-    targetId: partyMember.kind === "companion" ? leader.id : null,
+    targetId: partyMember.id === leader.id ? null : leader.id,
   };
 }
 
@@ -179,7 +178,7 @@ export function getDefenderAnchorPosition(
 
   const followTarget = getPartyLeader(state) ?? state.entities[companion.followTargetId];
 
-  if (followTarget?.kind === "player") {
+  if (followTarget && isPartyMember(followTarget)) {
     return getLeaderIntentAnchorPosition(state, companion, followTarget);
   }
 
@@ -311,7 +310,7 @@ function isPartyEntityForLeader(entity: GameEntity, leaderId: string): boolean {
 function getLeaderIntentAnchorPosition(
   state: GameState,
   companion: Companion,
-  leader: Player,
+  leader: PartyMember,
 ): Position {
   const leaderIntent = getLeaderIntentPosition(state, leader);
   const movementDirection = getLeaderMovementDirection(state, leader);
@@ -331,7 +330,7 @@ function getLeaderIntentAnchorPosition(
 
 export function getLeaderIntentPosition(
   state: GameState,
-  leader: Player,
+  leader: PartyMember,
 ): Position {
   const movementDirection = getLeaderMovementDirection(state, leader);
 
@@ -343,7 +342,7 @@ export function getLeaderIntentPosition(
 
 export function getLeaderMovementDirection(
   state: GameState,
-  leader: Player,
+  leader: PartyMember,
 ): Position {
   const targetPosition = getResolvedLeaderIntentTargetPosition(state, leader);
 
@@ -376,7 +375,7 @@ export function getLeaderMovementDirection(
 
 export function getResolvedLeaderIntentTargetPosition(
   state: GameState,
-  leader?: Player,
+  leader?: PartyMember,
 ): Position | null {
   const currentTarget = leader?.currentTargetId
     ? state.entities[leader.currentTargetId]

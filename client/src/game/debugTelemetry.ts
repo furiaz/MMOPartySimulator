@@ -1,7 +1,15 @@
 import type { GameState } from "./state";
+import {
+  getNavigationDistance,
+  getNavigationGrid,
+  getNavigationPositionKey,
+  isNavigationCellWalkable,
+  toNavigationNode,
+} from "./navigation";
 import type {
   CommandPriority,
   DebugMovementResult,
+  DebugNavigationTelemetry,
   DebugTelemetryEntitySnapshot,
   DebugTelemetryEvent,
   DebugTelemetryReport,
@@ -187,6 +195,13 @@ function getEntitySnapshot(
 ): DebugTelemetryEntitySnapshot {
   const previousEntity = previousState.entities[entity.id];
   const movementResult = getMovementResult(previousEntity, nextState, entity);
+  const movementFailure = nextState.movementFailuresByEntityId?.[entity.id];
+  const navigation = getNavigationTelemetry(
+    nextState,
+    previousEntity ?? entity,
+    entity,
+    movementResult,
+  );
 
   return {
     tick,
@@ -203,7 +218,79 @@ function getEntitySnapshot(
     formationSlot: nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
     formationSlotReason:
       nextState.partyFormation?.slotReasonsByEntityId[entity.id],
+    targetDistance: movementFailure?.targetDistance,
+    intendedPosition: movementFailure?.intendedPosition,
+    blockerId: movementFailure?.blockerId,
+    blockerKind: movementFailure?.blockerKind,
+    navigation,
   };
+}
+
+function getNavigationTelemetry(
+  state: GameState,
+  previousEntity: GameEntity,
+  entity: GameEntity,
+  movementResult: DebugMovementResult,
+): DebugNavigationTelemetry | undefined {
+  if (!state.map) {
+    return undefined;
+  }
+
+  const movementPath = state.movementPathsByEntityId?.[entity.id];
+  const movementFailure = state.movementFailuresByEntityId?.[entity.id];
+  const decisionReason = state.movementDecisionsByEntityId?.[entity.id];
+  const startCell = toNavigationNode(previousEntity.position);
+  const targetCell = state.moveIntentsByEntityId?.[entity.id]
+    ? toNavigationNode(state.moveIntentsByEntityId[entity.id])
+    : null;
+  const nextCell = getNavigationNextCell(
+    entity,
+    movementResult,
+    movementPath?.waypoints[0],
+    movementFailure?.intendedPosition,
+  );
+  const nextNavigationCell = nextCell
+    ? getNavigationGrid(state.map).cellsByKey[getNavigationPositionKey(nextCell)]
+    : undefined;
+  const maxPathDistance = state.map.columns * state.map.rows * 2;
+
+  return {
+    startCell,
+    targetCell,
+    nextCell,
+    pathLength: movementPath?.waypoints.length,
+    targetPathDistance: targetCell
+      ? getNavigationDistance(
+          state.map,
+          startCell,
+          targetCell,
+          maxPathDistance,
+        )
+      : undefined,
+    nextCellWalkable: nextCell
+      ? isNavigationCellWalkable(state.map, nextCell)
+      : undefined,
+    nextCellWallAdjacent: nextNavigationCell?.wallAdjacent,
+    blockedBy: movementFailure?.blockerKind ?? "none",
+    reason: decisionReason,
+  };
+}
+
+function getNavigationNextCell(
+  entity: GameEntity,
+  movementResult: DebugMovementResult,
+  waypoint?: Position,
+  intendedPosition?: Position | null,
+): Position | null {
+  if (intendedPosition) {
+    return toNavigationNode(intendedPosition);
+  }
+
+  if (waypoint) {
+    return toNavigationNode(waypoint);
+  }
+
+  return movementResult === "moved" ? toNavigationNode(entity.position) : null;
 }
 
 function getTelemetryEvents(
@@ -231,12 +318,26 @@ function getTelemetryEvents(
     addResourceEvents(events, previousEntity, entity, tick);
 
     if (nextState.failedMoveByEntityId?.[entity.id]) {
+      const movementFailure = nextState.movementFailuresByEntityId?.[entity.id];
+      const navigation = getNavigationTelemetry(
+        nextState,
+        previousEntity,
+        entity,
+        "blocked",
+      );
+
       events.push({
         tick,
         type: "movement_failed",
         entityId: entity.id,
-        targetId: getCurrentTargetId(entity),
+        targetId: movementFailure?.targetId ?? getCurrentTargetId(entity),
         reason: getReason(nextState, entity, "blocked"),
+        targetDistance: movementFailure?.targetDistance,
+        intendedPosition: movementFailure?.intendedPosition,
+        blockerId: movementFailure?.blockerId,
+        blockerKind: movementFailure?.blockerKind,
+        attackSlot: nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
+        navigation,
       });
     }
   }
@@ -533,9 +634,7 @@ function getCommandPriority(entity: GameEntity): CommandPriority | undefined {
 }
 
 function getRole(entity: GameEntity): PartyMemberRole | undefined {
-  return entity.kind === "player" || entity.kind === "companion"
-    ? entity.role
-    : undefined;
+  return entity.kind === "companion" ? entity.role : undefined;
 }
 
 function getHealth(entity: GameEntity): number | null {

@@ -6,7 +6,7 @@ export type EntityState =
   | "defend"
   | "dead";
 
-export type EntityKind = "player" | "companion" | "enemy" | "resource";
+export type EntityKind = "companion" | "enemy" | "resource";
 
 export type EnemyAggressionMode = "passive" | "aggressive";
 
@@ -55,6 +55,34 @@ export type CombatFeedbackEvent = {
 
 export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 
+export type DebugNavigationReason =
+  | "path"
+  | "direct_step"
+  | "swap"
+  | "fallback"
+  | "blocked"
+  | "no_path";
+
+export type DebugNavigationBlocker =
+  | EntityKind
+  | "wall"
+  | "bounds"
+  | "reserved"
+  | "unknown"
+  | "none";
+
+export type DebugNavigationTelemetry = {
+  startCell?: Position;
+  targetCell?: Position | null;
+  nextCell?: Position | null;
+  pathLength?: number;
+  targetPathDistance?: number | null;
+  nextCellWalkable?: boolean;
+  nextCellWallAdjacent?: boolean;
+  blockedBy?: DebugNavigationBlocker;
+  reason?: DebugNavigationReason;
+};
+
 export type DebugTelemetryEventType =
   | "target_acquired"
   | "target_changed"
@@ -82,6 +110,11 @@ export type DebugTelemetryEntitySnapshot = {
   formationPhase?: FormationPhase;
   formationSlot?: Position | null;
   formationSlotReason?: string;
+  targetDistance?: number;
+  intendedPosition?: Position | null;
+  blockerId?: string;
+  blockerKind?: EntityKind | "wall" | "bounds" | "reserved" | "unknown";
+  navigation?: DebugNavigationTelemetry;
 };
 
 export type DebugTelemetryEvent = {
@@ -96,6 +129,12 @@ export type DebugTelemetryEvent = {
   reason?: string;
   formationPhase?: FormationPhase;
   approachPoint?: Position | null;
+  targetDistance?: number;
+  intendedPosition?: Position | null;
+  blockerId?: string;
+  blockerKind?: EntityKind | "wall" | "bounds" | "reserved" | "unknown";
+  attackSlot?: Position | null;
+  navigation?: DebugNavigationTelemetry;
 };
 
 export type DebugTelemetryTick = {
@@ -126,6 +165,20 @@ export type GameMap = {
   columns: number;
   rows: number;
   walls: Position[];
+  navigationGrid?: NavigationGrid;
+};
+
+export type NavigationGridCell = {
+  position: Position;
+  walkable: boolean;
+  wallAdjacent: boolean;
+  movementCost: number;
+};
+
+export type NavigationGrid = {
+  columns: number;
+  rows: number;
+  cellsByKey: Record<string, NavigationGridCell>;
 };
 
 export type FormationPhase =
@@ -162,16 +215,6 @@ export type LivingEntity = BaseEntity & {
   lastAttackAt: number;
 };
 
-export type Player = LivingEntity & {
-  kind: "player";
-  role: PartyMemberRole;
-  partyOrder: number;
-  currentTargetId: string | null;
-  lastGatherAt: number;
-  gatherSpeed: number;
-  commandPriority: CommandPriority;
-};
-
 export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
@@ -200,8 +243,8 @@ export type ResourceEntity = BaseEntity & {
   isDepleted: boolean;
 };
 
-export type GameEntity = Player | Enemy | Companion | ResourceEntity;
+export type GameEntity = Enemy | Companion | ResourceEntity;
 
-export type AutonomousEntity = Player | Companion;
+export type AutonomousEntity = Companion;
 
-export type CombatEntity = Player | Companion | Enemy;
+export type CombatEntity = Companion | Enemy;

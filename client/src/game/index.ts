@@ -24,7 +24,6 @@ export type {
   LeaderIntentType,
   LivingEntity,
   PartyMemberRole,
-  Player,
   Position,
   ResourceInventory,
   ResourceEntity,
@@ -35,7 +34,6 @@ export type { GameState } from "./state";
 export {
   createCompanion,
   createEnemy,
-  createPlayer,
   createResource,
   damageEntity,
   gatherResource,

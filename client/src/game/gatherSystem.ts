@@ -20,6 +20,7 @@ import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
 const GATHER_COOLDOWN_MS = 1000;
 const GATHERER_PARTY_RETURN_DISTANCE = 15;
+const GATHER_APPROACH_BUFFER = 0.15;
 
 export function updateGatherSystem(
   state: GameState,
@@ -206,7 +207,7 @@ function isInGatherRange(gatherer: GameEntity, resource: GameEntity): boolean {
     resource.position.y - gatherer.position.y,
   );
 
-  return distance <= GATHER_RANGE;
+  return distance <= GATHER_RANGE + GATHER_APPROACH_BUFFER;
 }
 
 function canGather(entity: AutonomousEntity, now: number): boolean {

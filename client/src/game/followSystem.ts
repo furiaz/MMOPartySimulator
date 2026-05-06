@@ -4,6 +4,7 @@ import {
   moveEntityTowardPositionIfUnoccupied,
   type GameState,
 } from "./state";
+import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
 import type { AutonomousEntity, GameEntity, Position } from "./types";
 
@@ -33,7 +34,10 @@ export function updateFollowSystem(
       continue;
     }
 
-    if (isWithinFollowLeash(nextState, follower, leader)) {
+    if (
+      isWithinFollowLeash(nextState, follower, leader) &&
+      !isStackedWithPartyMember(nextState, follower)
+    ) {
       continue;
     }
 
@@ -51,7 +55,8 @@ export function updateFollowSystem(
         !currentFollower ||
         !currentLeader ||
         !isFollowingAutonomousEntity(currentFollower) ||
-        isWithinFollowLeash(nextState, currentFollower, currentLeader)
+        (isWithinFollowLeash(nextState, currentFollower, currentLeader) &&
+          !isStackedWithPartyMember(nextState, currentFollower))
       ) {
         break;
       }
@@ -59,7 +64,12 @@ export function updateFollowSystem(
       nextState = moveEntityTowardPositionIfUnoccupied(
         nextState,
         currentFollower,
-        currentLeader.position,
+        getSoftFollowPosition(
+          nextState,
+          currentFollower,
+          currentLeader,
+          nextState.leaderIntent?.targetPosition,
+        ),
         { allowPartyPassThrough: true },
       );
     }

@@ -7,13 +7,12 @@ import type {
   EntityState,
   GameEntity,
   PartyMemberRole,
-  Player,
   Position,
   ResourceEntity,
   ResourceType,
 } from "./types";
 
-const MOVEMENT_STEP_DISTANCE = 0.455;
+export const MOVEMENT_STEP_DISTANCE = 0.455;
 const STARTING_HEALTH = 10;
 const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
@@ -28,24 +27,6 @@ type CreateResourceOptions = {
   maxGatherers?: number;
   resourceType?: ResourceType;
 };
-
-export function createPlayer(id: string, position: Position): Player {
-  return {
-    id,
-    kind: "player",
-    role: "none",
-    partyOrder: 0,
-    position,
-    state: "idle",
-    health: STARTING_HEALTH,
-    maxHealth: STARTING_HEALTH,
-    lastAttackAt: 0,
-    currentTargetId: null,
-    lastGatherAt: 0,
-    gatherSpeed: STARTING_GATHER_SPEED,
-    commandPriority: "autonomous",
-  };
-}
 
 export function createEnemy(
   id: string,
@@ -226,7 +207,7 @@ export function updateAutonomousEntityFollow<T extends AutonomousEntity>(
 export function isAutonomousEntity(
   entity: GameEntity | undefined,
 ): entity is AutonomousEntity {
-  return entity?.kind === "player" || entity?.kind === "companion";
+  return entity?.kind === "companion";
 }
 
 export function isCombatEntity(
@@ -247,7 +228,7 @@ function stepToward(current: Position, target: Position): Position {
   const distance = Math.hypot(xDistance, yDistance);
 
   if (distance <= MOVEMENT_STEP_DISTANCE) {
-    return current;
+    return target;
   }
 
   return {

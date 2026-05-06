@@ -1,7 +1,10 @@
 import { isAutonomousEntity } from "./entities";
 import {
+  getPartyLeader,
+  type PartyMember,
+} from "./partySystem";
+import {
   isActiveResourcePosition,
-  isWallPosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
   reservePositionForTick,
@@ -10,7 +13,10 @@ import {
   type GameState,
 } from "./state";
 import { findEnemyTarget } from "./targetSelection";
-import type { Player, Position } from "./types";
+import {
+  findNearestReachableNavigationPosition,
+  getNavigationPositionKey,
+} from "./navigation";
 
 const AUTO_ENEMY_TARGET_RADIUS = 48;
 
@@ -27,7 +33,7 @@ export function updateExplorationSystem(
   }
 
   let nextState = markAutonomousEntityTilesExplored(state);
-  const explorer = getExploringPlayer(nextState);
+  const explorer = getExploringPartyMember(nextState);
 
   if (!explorer || movedEntityIds.has(explorer.id)) {
     return nextState;
@@ -79,7 +85,7 @@ export function updateExplorationSystem(
   return markAutonomousEntityTilesExplored(nextState);
 }
 
-function didEntityMove(state: GameState, entity: Player): boolean {
+function didEntityMove(state: GameState, entity: PartyMember): boolean {
   const currentEntity = state.entities[entity.id];
 
   return Boolean(
@@ -89,7 +95,7 @@ function didEntityMove(state: GameState, entity: Player): boolean {
   );
 }
 
-export function reserveExploringPlayerNextTile(state: GameState): GameState {
+export function reserveExploringPartyMemberNextTile(state: GameState): GameState {
   if (!state.autoModeEnabled || !state.map) {
     return state;
   }
@@ -98,7 +104,7 @@ export function reserveExploringPlayerNextTile(state: GameState): GameState {
     return state;
   }
 
-  const explorer = getExploringPlayer(state);
+  const explorer = getExploringPartyMember(state);
 
   if (!explorer) {
     return state;
@@ -136,7 +142,7 @@ function markAutonomousEntityTilesExplored(state: GameState): GameState {
       continue;
     }
 
-    const key = getPositionKey(entity.position);
+    const key = getNavigationPositionKey(entity.position);
 
     if (exploredTiles[key]) {
       continue;
@@ -156,10 +162,19 @@ function markAutonomousEntityTilesExplored(state: GameState): GameState {
       };
 }
 
-function getExploringPlayer(state: GameState): Player | undefined {
+function getExploringPartyMember(state: GameState): PartyMember | undefined {
+  const leader = getPartyLeader(state);
+
+  if (
+    leader?.commandPriority === "autonomous" &&
+    (leader.state === "idle" || leader.state === "follow")
+  ) {
+    return leader;
+  }
+
   return Object.values(state.entities).find(
-    (entity): entity is Player =>
-      entity.kind === "player" &&
+    (entity): entity is PartyMember =>
+      entity.kind === "companion" &&
       entity.commandPriority === "autonomous" &&
       (entity.state === "idle" || entity.state === "follow"),
   );
@@ -167,64 +182,20 @@ function getExploringPlayer(state: GameState): Player | undefined {
 
 function findNearestUnexploredReachablePosition(
   state: GameState,
-  start: Position,
-): Position | null {
-  const visited = new Set<string>([getPositionKey(start)]);
-  const queue: Position[] = [start];
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-
-    if (!current) {
-      continue;
-    }
-
-    if (
-      !state.exploredTiles[getPositionKey(current)] &&
-      !isActiveResourcePosition(state, current)
-    ) {
-      return current;
-    }
-
-    for (const neighbor of getNeighborPositions(current)) {
-      const key = getPositionKey(neighbor);
-
-      if (
-        visited.has(key) ||
-        !isInMapBounds(state, neighbor) ||
-        isWallPosition(state, neighbor) ||
-        isActiveResourcePosition(state, neighbor)
-      ) {
-        continue;
-      }
-
-      visited.add(key);
-      queue.push(neighbor);
-    }
+  start: { x: number; y: number },
+): { x: number; y: number } | null {
+  if (!state.map) {
+    return null;
   }
 
-  return null;
-}
-
-function getNeighborPositions(position: Position): Position[] {
-  return [
-    { x: position.x + 1, y: position.y },
-    { x: position.x - 1, y: position.y },
-    { x: position.x, y: position.y + 1 },
-    { x: position.x, y: position.y - 1 },
-  ];
-}
-
-function isInMapBounds(state: GameState, position: Position): boolean {
-  return Boolean(
-    state.map &&
-      position.x >= 0 &&
-      position.x < state.map.columns &&
-      position.y >= 0 &&
-      position.y < state.map.rows,
+  return findNearestReachableNavigationPosition(
+    state.map,
+    start,
+    (position) =>
+      !state.exploredTiles[getNavigationPositionKey(position)] &&
+      !isActiveResourcePosition(state, position),
+    {
+      isBlocked: (position) => isActiveResourcePosition(state, position),
+    },
   );
-}
-
-function getPositionKey(position: Position): string {
-  return `${position.x},${position.y}`;
 }

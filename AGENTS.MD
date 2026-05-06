@@ -98,6 +98,14 @@ Debugging / Fixing:
 - Entities will eventually include a zoneId in addition to position (x, y)
 - Do not implement zone or teleport logic unless explicitly requested
 
+## Map Creation Rules
+
+- Rooms must be large enough for party members and enemies to move without clogging
+- Every room must be reachable from every other room
+- Connect rooms with open passages, not doors
+- Do not place passages close to map edges
+- Do not place entities inside walls or directly against walls
+
 ### Conflict Resolution Rule
 
 - If prompt instructions conflict with GDD.md or GTD.md:

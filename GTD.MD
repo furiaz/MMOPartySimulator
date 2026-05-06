@@ -63,10 +63,12 @@ Entities represent world objects and actors.
 Entity Kinds
 Current entity kinds:
 
-player
 companion
 enemy
 resource
+
+The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
+
 Entity States
 Current execution states:
 
@@ -94,10 +96,8 @@ walls
 debug layout data
 These are used for simple collision, wall checks, exploration, and movement validation.
 
-Do not treat the map as a final grid-based gameplay system.
-
 Party Members
-The player and companions are party members.
+Companions are the physical party members.
 
 Party members currently support:
 
@@ -114,10 +114,9 @@ currentTargetId
 commandPriority
 role
 partyOrder
-Companions also currently support:
-
 followTargetId
 defendPosition
+
 Shared party-member behavior is handled through partySystem.ts.
 
 Current helper responsibilities include:
@@ -136,13 +135,16 @@ Leader is not a role.
 Leader is stored in game state as:
 
 partyLeaderId: string;
+
+
 The current leader:
 
 provides party intent
 selects point of interest
 selects enemy target
-may later be manually controlled by the player
-Systems must not assume the player entity is always the leader.
+is a companion / physical party member
+Systems must not assume any separate player entity exists.
+
 
 If the configured leader is missing or dead, party helper logic falls back to the first living party member.
 
@@ -161,9 +163,9 @@ none is a safe default/unassigned role.
 
 Current role ownership:
 
-Player has role
-Companions have role
+Party members have roles
 CompanionRole aliases PartyMemberRole
+
 Role behavior is handled by:
 
 roleSystem.ts
@@ -218,8 +220,8 @@ Commands
 Commands can be:
 
 direct entity commands
-companion commands
-companion group commands
+Party member commands
+Party member group commands
 future leader-selection commands
 future party-order commands
 Rules:

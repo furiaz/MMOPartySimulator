@@ -42,7 +42,7 @@ function canProtectPartyMember(
   attackedMember: AutonomousEntity,
   attacker: Enemy,
 ): entity is AutonomousEntity {
-  if (entity.kind !== "player" && entity.kind !== "companion") {
+  if (entity.kind !== "companion") {
     return false;
   }
 

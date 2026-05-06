@@ -23,15 +23,16 @@ Explore the world
 -> Continue toward the next point of interest
 
 Player & Party
-The player leads a party of physical characters in the world.
+The player is the party manager, not a physical character in the world.
 
 The party has:
 
 one current leader
-multiple party members
+up to 4 physical party members
 adjustable party order
 assignable roles for each party member
-The current leader is the party member the player would control during active gameplay. Leader is not a role.
+The current leader is one of the physical party members. Leader is not a role.
+
 
 Every party member can have a role:
 
@@ -49,8 +50,7 @@ The leader:
 
 selects the current point of interest
 selects the current enemy target
-defines the direction of party travel
-represents the character the player would control manually
+represents the party member receiving the party's primary intent
 Leader identity and combat role are separate.
 
 A leader can be a Defender, Fighter, Support, Gatherer, or None.
@@ -253,11 +253,11 @@ If the party is attacking but the player orders one party member to gather, that
 
 Future input may include click-and-drag commands from a unit to a target.
 
-Party System
 Initial party:
 
+
 1 current leader
-up to 3 companions
+up to 4 party members
 Party size may change later.
 
 The player can issue:

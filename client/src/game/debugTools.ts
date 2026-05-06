@@ -7,7 +7,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import type { Companion, Enemy, Player, Position, ResourceEntity } from "./types";
+import type { Companion, Enemy, GameEntity, Position, ResourceEntity } from "./types";
 
 const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
@@ -24,7 +24,7 @@ export function debugAddCompanion(
   }
 
   const partyOrder = Object.values(state.entities).filter(
-    (entity) => entity.kind === "player" || entity.kind === "companion",
+    (entity) => entity.kind === "companion",
   ).length;
   const availablePosition = findClosestAvailablePosition(state, position);
 
@@ -145,7 +145,7 @@ export function debugRestorePartyHealth(state: GameState): GameState {
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
-    if (entity.kind !== "player" && entity.kind !== "companion") {
+    if (entity.kind !== "companion") {
       continue;
     }
 
@@ -211,7 +211,7 @@ function resetResource(resource: ResourceEntity): ResourceEntity {
   };
 }
 
-function restorePartyMember<T extends Player | Companion>(entity: T): T {
+function restorePartyMember<T extends Companion>(entity: T): T {
   return {
     ...entity,
     health: entity.maxHealth,
@@ -219,10 +219,10 @@ function restorePartyMember<T extends Player | Companion>(entity: T): T {
   };
 }
 
-function getFallbackLeaderId(entities: Record<string, Player | Companion | Enemy | ResourceEntity>): string {
+function getFallbackLeaderId(entities: Record<string, GameEntity>): string {
   return (
     Object.values(entities).find(
-      (entity) => entity.kind === "player" || entity.kind === "companion",
+      (entity) => entity.kind === "companion",
     )?.id ?? ""
   );
 }

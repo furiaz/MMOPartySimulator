@@ -2,7 +2,7 @@ import { updateAttackSystem } from "./attackSystem";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import {
-  reserveExploringPlayerNextTile,
+  reserveExploringPartyMemberNextTile,
   updateExplorationSystem,
 } from "./explorationSystem";
 import { updateFollowSystem } from "./followSystem";
@@ -26,7 +26,7 @@ export function updateGame(state: GameState): GameState {
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState);
     nextState = updatePartyFormationSystem(nextState, movedEntityIds);
-    nextState = reserveExploringPlayerNextTile(nextState);
+    nextState = reserveExploringPartyMemberNextTile(nextState);
   }
 
   nextState = updateDefendSystem(nextState, movedEntityIds);

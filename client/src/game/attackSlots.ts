@@ -23,6 +23,8 @@ type AttackSlotOptions = {
   leader?: GameEntity;
   leaderSafeDistance?: number;
   leaderMaxPathDistance?: number;
+  preferredSlotIndex?: number;
+  allowPartyPassThrough?: boolean;
 };
 
 export function chooseAttackSlot(
@@ -34,9 +36,12 @@ export function chooseAttackSlot(
 ): Position | null {
   return (
     getSortedCombatPositions(
+      state,
       getAttackSlotPositions(targetPosition, attackRange),
       attacker,
       targetPosition,
+      options,
+      options.preferredSlotIndex,
     ).find((position) =>
       isReachableCombatPosition(state, attacker, position, options),
     ) ?? null
@@ -54,21 +59,65 @@ function getAttackSlotPositions(
 }
 
 function getSortedCombatPositions(
+  state: GameState,
   positions: Position[],
   attacker: CombatEntity,
   targetPosition: Position,
+  options: AttackSlotOptions,
+  preferredSlotIndex = 0,
 ): Position[] {
-  return [...positions].sort(
-    (a, b) =>
-      getGridDistance(a, targetPosition) - getGridDistance(b, targetPosition) ||
-      getManhattanDistance(a, targetPosition) -
-        getManhattanDistance(b, targetPosition) ||
-      getGridDistance(a, attacker.position) -
-        getGridDistance(b, attacker.position) ||
-      getManhattanDistance(a, attacker.position) -
-        getManhattanDistance(b, attacker.position) ||
-      a.y - b.y ||
-      a.x - b.x,
+  return [...positions]
+    .map((position, index) => ({
+      position,
+      index,
+      pathDistance: getAttackSlotPathDistance(state, attacker, position, options),
+    }))
+    .sort(
+      (a, b) =>
+        a.pathDistance - b.pathDistance ||
+        getGridDistance(a.position, targetPosition) -
+          getGridDistance(b.position, targetPosition) ||
+        getManhattanDistance(a.position, targetPosition) -
+          getManhattanDistance(b.position, targetPosition) ||
+        getGridDistance(a.position, attacker.position) -
+          getGridDistance(b.position, attacker.position) ||
+        getManhattanDistance(a.position, attacker.position) -
+          getManhattanDistance(b.position, attacker.position) ||
+        getSlotPreferenceDistance(a.index, preferredSlotIndex, positions.length) -
+          getSlotPreferenceDistance(b.index, preferredSlotIndex, positions.length) ||
+        a.position.y - b.position.y ||
+        a.position.x - b.position.x,
+    )
+    .map(({ position }) => position);
+}
+
+function getAttackSlotPathDistance(
+  state: GameState,
+  attacker: CombatEntity,
+  position: Position,
+  options: AttackSlotOptions,
+): number {
+  if (isSamePosition(attacker.position, position)) {
+    return 0;
+  }
+
+  const maxDistance = options.maxPathDistance ?? Number.POSITIVE_INFINITY;
+  const pathDistance = getBoundedPathDistance(state, attacker, position, maxDistance);
+
+  return pathDistance ?? Number.POSITIVE_INFINITY;
+}
+
+function getSlotPreferenceDistance(
+  index: number,
+  preferredSlotIndex: number,
+  slotCount: number,
+): number {
+  const normalizedPreference =
+    ((preferredSlotIndex % slotCount) + slotCount) % slotCount;
+
+  return Math.min(
+    Math.abs(index - normalizedPreference),
+    slotCount - Math.abs(index - normalizedPreference),
   );
 }
 
@@ -83,7 +132,9 @@ function isReachableCombatPosition(
     isWithinAttackerPathLimit(state, attacker, position, options) &&
     isLeaderSafeAttackSlot(state, position, options) &&
     (isSamePosition(attacker.position, position) ||
-      previewMoveTowardPosition(state, attacker, position) !== null)
+      previewMoveTowardPosition(state, attacker, position, {
+        allowPartyPassThrough: options.allowPartyPassThrough,
+      }) !== null)
   );
 }
 

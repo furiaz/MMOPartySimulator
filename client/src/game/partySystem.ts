@@ -4,16 +4,15 @@ import type {
   Companion,
   GameEntity,
   PartyMemberRole,
-  Player,
   ResourceEntity,
 } from "./types";
 
-export type PartyMember = Player | Companion;
+export type PartyMember = Companion;
 
 export function isPartyMember(
   entity: GameEntity | undefined,
 ): entity is PartyMember {
-  return entity?.kind === "player" || entity?.kind === "companion";
+  return entity?.kind === "companion";
 }
 
 export function getPartyMembers(state: GameState): PartyMember[] {

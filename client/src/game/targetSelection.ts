@@ -1,5 +1,5 @@
 import { isCombatEntity, isResourceEntity } from "./entities";
-import type { GameState } from "./state";
+import { getBoundedNavigationDistance, type GameState } from "./state";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
 
 type EnemyTargetOptions = {
@@ -18,7 +18,7 @@ export function findEnemyTarget(
 ): Enemy | undefined {
   const enemies = Object.values(state.entities).filter(isValidEnemyTarget);
   const reachableEnemies = enemies.filter((enemy) =>
-    isEnemyInRange(state, seeker.position, enemy.position, options.maxDistance),
+    isEnemyInRange(state, seeker.position, enemy, options.maxDistance),
   );
   const engagedEnemies = enemies.filter(
     (enemy) =>
@@ -89,7 +89,7 @@ function isEnemyEngagedWithParty(state: GameState, enemy: Enemy): boolean {
   return Object.values(state.entities).some((entity) => {
     if (
       entity.state === "dead" ||
-      (entity.kind !== "player" && entity.kind !== "companion")
+      entity.kind !== "companion"
     ) {
       return false;
     }
@@ -104,7 +104,7 @@ function isEnemyEngagedWithParty(state: GameState, enemy: Enemy): boolean {
 function isEnemyInRange(
   state: GameState,
   start: Position,
-  target: Position,
+  target: Enemy,
   maxDistance: number | undefined,
 ): boolean {
   const searchLimit =
@@ -116,8 +116,9 @@ function isEnemyInRange(
   return isPositionReachableWithin(
     state,
     start,
-    target,
+    target.position,
     searchLimit,
+    target.id,
   );
 }
 
@@ -149,12 +150,17 @@ function isPositionReachableWithin(
   start: Position,
   target: Position,
   maxDistance: number,
-  ignoredResourceId?: string,
+  ignoredEntityId?: string,
 ): boolean {
-  void state;
-  void ignoredResourceId;
-
-  return getPositionDistance(start, target) <= maxDistance;
+  return (
+    getBoundedNavigationDistance(
+      state,
+      start,
+      target,
+      maxDistance,
+      ignoredEntityId,
+    ) !== null
+  );
 }
 
 function getPositionDistance(a: Position, b: Position): number {

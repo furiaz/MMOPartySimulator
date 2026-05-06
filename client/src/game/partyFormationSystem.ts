@@ -1,5 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
+import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
   getPartyLeader,
   getPartyMembers,
@@ -60,13 +61,16 @@ export function updatePartyFormationSystem(
 
   nextState = assignPartyTravelTargets(nextState, leader, plan);
 
-  if (isPartyCohesive(nextState, leader)) {
+  if (isPartyCohesive(nextState, leader) || isLeaderHandoffActive(nextState, leader)) {
     nextState = moveLeaderTowardPoi(nextState, leader.id, plan, movedEntityIds);
   }
 
   nextState = moveFollowersTowardLeader(nextState, leader.id, movedEntityIds);
 
-  return maybeFinishReachedPoi(nextState, leader.id, plan);
+  return consumeLeaderHandoffTick(
+    maybeFinishReachedPoi(nextState, leader.id, plan),
+    leader.id,
+  );
 }
 
 function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
@@ -211,7 +215,10 @@ function moveFollowersTowardLeader(
       continue;
     }
 
-    if (getDistance(member.position, leader.position) <= FOLLOW_DISTANCE) {
+    if (
+      getDistance(member.position, leader.position) <= FOLLOW_DISTANCE &&
+      !isStackedWithPartyMember(nextState, member)
+    ) {
       continue;
     }
 
@@ -221,10 +228,21 @@ function moveFollowersTowardLeader(
       continue;
     }
 
+    const shouldCatchUp =
+      getDistance(currentMember.position, leader.position) >
+      PARTY_COHESION_DISTANCE;
+    const followPosition = shouldCatchUp
+      ? leader.position
+      : getSoftFollowPosition(
+          nextState,
+          currentMember,
+          leader,
+          nextState.leaderIntent?.targetPosition,
+        );
     const nextMemberState = moveEntityTowardPositionIfUnoccupied(
       nextState,
       currentMember,
-      leader.position,
+      followPosition,
       { allowPartyPassThrough: true },
     );
 
@@ -304,6 +322,24 @@ function isPartyCohesive(state: GameState, leader: PartyMember): boolean {
         member.id === leader.id ||
         getDistance(member.position, leader.position) <= PARTY_COHESION_DISTANCE,
     );
+}
+
+function isLeaderHandoffActive(state: GameState, leader: PartyMember): boolean {
+  return state.partyLeaderId === leader.id && (state.leaderHandoffTicks ?? 0) > 0;
+}
+
+function consumeLeaderHandoffTick(
+  state: GameState,
+  leaderId: string,
+): GameState {
+  if (state.partyLeaderId !== leaderId || !state.leaderHandoffTicks) {
+    return state;
+  }
+
+  return {
+    ...state,
+    leaderHandoffTicks: Math.max(0, state.leaderHandoffTicks - 1),
+  };
 }
 
 function setFormationState(state: GameState, plan: PartyPlan): GameState {

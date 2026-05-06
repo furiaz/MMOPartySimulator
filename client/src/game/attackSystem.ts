@@ -2,13 +2,18 @@ import {
   damageEntity,
   isAutonomousEntity,
   isCombatEntity,
+  moveEntityTo,
+  MOVEMENT_STEP_DISTANCE,
   setLastAttackAt,
 } from "./entities";
+import { chooseAttackSlot } from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import {
   addCombatFeedback,
   getEntityById,
-  moveEntityTowardIfUnoccupied,
+  isWalkablePosition,
+  moveEntityTowardPositionIfUnoccupied,
+  reservePositionForTick,
   updateEntity,
   type GameState,
 } from "./state";
@@ -18,14 +23,16 @@ import type {
   CombatEntity,
   Enemy,
   GameEntity,
-  Player,
   Companion,
+  Position,
 } from "./types";
 
 const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
 const ATTACK_COOLDOWN_MS = 1000;
 const TARGET_SWITCH_DISTANCE = 6;
+const MAX_ATTACK_SLOT_PATH_DISTANCE = 6;
+const FINAL_STEP_ATTACK_DISTANCE = MOVEMENT_STEP_DISTANCE * 0.5;
 
 export function updateAttackSystem(
   state: GameState,
@@ -61,19 +68,30 @@ export function updateAttackSystem(
       continue;
     }
 
-    if (isInAttackRange(currentAttacker, target)) {
+    const finalStepPosition = getFinalStepAttackPosition(nextState, currentAttacker, target);
+    const attackReadyAttacker = finalStepPosition
+      ? moveEntityTo(currentAttacker, finalStepPosition)
+      : currentAttacker;
+
+    if (finalStepPosition) {
+      nextState = reservePositionForTick(nextState, currentAttacker.id, finalStepPosition);
+      nextState = updateEntity(nextState, attackReadyAttacker);
+      movedEntityIds.add(currentAttacker.id);
+    }
+
+    if (isInAttackRange(attackReadyAttacker, target)) {
       if (!canAttack(currentAttacker, now)) {
         continue;
       }
 
-      const updatedTarget = updateTargetAfterDamage(target, currentAttacker);
-      const updatedAttacker = setLastAttackAt(currentAttacker, now);
+      const updatedTarget = updateTargetAfterDamage(target, attackReadyAttacker);
+      const updatedAttacker = setLastAttackAt(attackReadyAttacker, now);
 
-      nextState = addAttackFeedback(nextState, currentAttacker, updatedTarget, now);
+      nextState = addAttackFeedback(nextState, attackReadyAttacker, updatedTarget, now);
       nextState = updateEntity(nextState, updatedTarget);
 
-      if (isEnemy(currentAttacker) && isPartyCombatEntity(updatedTarget)) {
-        nextState = protectPartyMember(nextState, updatedTarget, currentAttacker);
+      if (isEnemy(attackReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
+        nextState = protectPartyMember(nextState, updatedTarget, attackReadyAttacker);
       }
 
       nextState = updateEntity(
@@ -89,9 +107,29 @@ export function updateAttackSystem(
       continue;
     }
 
+    const attackSlot = chooseAttackSlot(
+      nextState,
+      currentAttacker,
+      target.position,
+      ATTACK_RANGE,
+      {
+        allowPartyPassThrough: true,
+        maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
+        preferredSlotIndex: getAttackSlotPreference(currentAttacker),
+      },
+    );
+
+    const movementTarget = attackSlot ?? target.position;
     const previousPosition = currentAttacker.position;
 
-    nextState = moveEntityTowardIfUnoccupied(nextState, currentAttacker, target, {
+    if (attackSlot) {
+      nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
+      nextState = reservePositionForTick(nextState, currentAttacker.id, attackSlot, {
+        allowPartyPassThrough: true,
+      });
+    }
+
+    nextState = moveEntityTowardPositionIfUnoccupied(nextState, currentAttacker, movementTarget, {
       allowPartyPassThrough: true,
     });
 
@@ -129,7 +167,7 @@ function getValidTarget(
 
 function findPartyAssistTarget(
   state: GameState,
-  attacker: Player | Companion,
+  attacker: Companion,
 ): CombatEntity | undefined {
   for (const member of getPartyMembers(state)) {
     if (
@@ -160,7 +198,7 @@ function getCombatMovementOrder(state: GameState): GameEntity[] {
 }
 
 function getCombatOrderPriority(entity: GameEntity): number {
-  if (entity.kind === "player" || entity.kind === "companion") {
+  if (entity.kind === "companion") {
     return getRolePriority(entity.role);
   }
 
@@ -270,8 +308,87 @@ function isEnemy(entity: GameEntity): entity is Enemy {
   return entity.kind === "enemy";
 }
 
-function isPartyCombatEntity(entity: CombatEntity): entity is Player | Companion {
-  return entity.kind === "player" || entity.kind === "companion";
+function isPartyCombatEntity(entity: CombatEntity): entity is Companion {
+  return entity.kind === "companion";
+}
+
+function getFinalStepAttackPosition(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+): Position | null {
+  if (isInAttackRange(attacker, target)) {
+    return null;
+  }
+
+  const euclideanDistance = getEuclideanDistance(attacker.position, target.position);
+  const gap = euclideanDistance - ATTACK_RANGE;
+
+  if (gap <= 0 || gap > FINAL_STEP_ATTACK_DISTANCE) {
+    return null;
+  }
+
+  const direction = {
+    x: attacker.position.x - target.position.x,
+    y: attacker.position.y - target.position.y,
+  };
+  const directionLength = Math.hypot(direction.x, direction.y);
+
+  if (directionLength === 0) {
+    return null;
+  }
+
+  const finalPosition = {
+    x: target.position.x + (direction.x / directionLength) * ATTACK_RANGE,
+    y: target.position.y + (direction.y / directionLength) * ATTACK_RANGE,
+  };
+
+  if (
+    getEuclideanDistance(attacker.position, finalPosition) >
+      FINAL_STEP_ATTACK_DISTANCE ||
+    !isWalkablePosition(state, finalPosition, attacker.id)
+  ) {
+    return null;
+  }
+
+  return finalPosition;
+}
+
+function setCombatSlot(
+  state: GameState,
+  entityId: string,
+  attackSlot: Position,
+): GameState {
+  if (!state.partyFormation || state.partyFormation.phase === "idle") {
+    return state;
+  }
+
+  return {
+    ...state,
+    partyFormation: {
+      ...state.partyFormation,
+      slotsByEntityId: {
+        ...state.partyFormation.slotsByEntityId,
+        [entityId]: attackSlot,
+      },
+      slotReasonsByEntityId: {
+        ...state.partyFormation.slotReasonsByEntityId,
+        [entityId]: "combat attack slot",
+      },
+    },
+  };
+}
+
+function getAttackSlotPreference(attacker: CombatEntity): number {
+  if (attacker.kind === "companion") {
+    return attacker.partyOrder;
+  }
+
+  return hashId(attacker.id);
+}
+
+function hashId(id: string): number {
+  return [...id].reduce((hash, character) => hash + character.charCodeAt(0), 0);
 }
 
 function getDistance(
@@ -279,6 +396,13 @@ function getDistance(
   to: { x: number; y: number },
 ): number {
   return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+}
+
+function getEuclideanDistance(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): number {
+  return Math.hypot(to.x - from.x, to.y - from.y);
 }
 
 function isSamePosition(

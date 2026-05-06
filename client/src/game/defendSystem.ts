@@ -17,7 +17,7 @@ import {
   getLeaderIntentPosition,
   getLeaderMovementDirection,
 } from "./roleSystem";
-import type { Companion, Enemy, GameEntity, Player, Position } from "./types";
+import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
 const DEFENDER_CATCH_UP_MOVE_STEPS = 2;
@@ -241,10 +241,6 @@ function getFrontDirection(leader: GameEntity, preferredPosition: Position): Pos
     return direction;
   }
 
-  if (leader.kind === "player") {
-    return { x: 0, y: 0 };
-  }
-
   return direction;
 }
 
@@ -405,7 +401,7 @@ function shouldLeaderWaitForDefender(
   leader: GameEntity,
   defendPosition: Position,
 ): boolean {
-  if (leader.kind === "player" && leader.commandPriority === "direct") {
+  if (leader.kind === "companion" && leader.commandPriority === "direct") {
     return false;
   }
 
@@ -593,7 +589,7 @@ function shouldBoostCommittedTargetStep(
   return (
     getGridDistance(defender.position, target.position) >
       getGridDistance(leader.position, target.position) ||
-    (leader.kind === "player" && isBehindLeader(defender, leader, state))
+    (leader.kind === "companion" && isBehindLeader(defender, leader, state))
   );
 }
 
@@ -664,7 +660,7 @@ function canLeaderStepTowardDefender(
   leader: GameEntity,
   defender: Companion,
 ): boolean {
-  if (leader.kind !== "player" || leader.commandPriority === "direct") {
+  if (leader.kind !== "companion" || leader.commandPriority === "direct") {
     return true;
   }
 
@@ -783,7 +779,7 @@ function getDefenderStepCount(
 ): number {
   const followTarget = state.entities[defender.followTargetId];
 
-  if (followTarget?.kind !== "player") {
+  if (followTarget?.kind !== "companion") {
     return 1;
   }
 
@@ -802,7 +798,7 @@ function getDefenderStepCount(
 
 function isBehindLeader(
   defender: Companion,
-  leader: Player,
+  leader: Companion,
   state: GameState,
 ): boolean {
   const movementDirection = getLeaderMovementDirection(state, leader);
