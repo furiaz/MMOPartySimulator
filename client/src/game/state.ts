@@ -20,7 +20,7 @@ import type {
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const COMBAT_FEEDBACK_DURATION_MS = 900;
 const POSITION_EPSILON = 0.001;
-const ENTITY_COLLISION_DISTANCE = 0.7;
+export const ENTITY_COLLISION_DISTANCE = 0.7;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 
 type FindAvailablePositionOptions = {

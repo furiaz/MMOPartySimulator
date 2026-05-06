@@ -7,6 +7,7 @@ import {
 import {
   addCombatFeedback,
   addResourceToInventory,
+  ENTITY_COLLISION_DISTANCE,
   getBoundedPathDistance,
   getEntityById,
   moveEntityTowardIfUnoccupied,
@@ -16,7 +17,7 @@ import {
 import { isResourceTargetInRange } from "./targetSelection";
 import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
-const GATHER_RANGE = 1;
+const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
 const GATHER_COOLDOWN_MS = 1000;
 const GATHERER_PARTY_RETURN_DISTANCE = 15;
 
@@ -194,10 +195,12 @@ function getMaxGatherers(resource: ResourceEntity): number {
 }
 
 function isInGatherRange(gatherer: GameEntity, resource: GameEntity): boolean {
-  const xDistance = Math.abs(resource.position.x - gatherer.position.x);
-  const yDistance = Math.abs(resource.position.y - gatherer.position.y);
+  const distance = Math.hypot(
+    resource.position.x - gatherer.position.x,
+    resource.position.y - gatherer.position.y,
+  );
 
-  return xDistance <= GATHER_RANGE && yDistance <= GATHER_RANGE;
+  return distance <= GATHER_RANGE;
 }
 
 function canGather(entity: AutonomousEntity, now: number): boolean {
