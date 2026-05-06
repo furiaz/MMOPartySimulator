@@ -1,4 +1,5 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { MAP_ONE_ID, teleporterPosition } from "./debugMap";
 import { isCombatEntity } from "./entities";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
@@ -275,6 +276,10 @@ function maybeFinishReachedPoi(
     return state;
   }
 
+  if (isTeleportPoi(state, plan.targetPosition)) {
+    return state;
+  }
+
   return setLeaderIntent(clearFormationTarget(state), null);
 }
 
@@ -461,4 +466,11 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
 
 function getDistance(from: Position, to: Position): number {
   return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+}
+
+function isTeleportPoi(state: GameState, position: Position): boolean {
+  return (
+    state.currentMapId === MAP_ONE_ID &&
+    getDistance(position, teleporterPosition) <= 0
+  );
 }

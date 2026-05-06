@@ -8,6 +8,7 @@ export type {
   CombatFeedbackEvent,
   CombatFeedbackType,
   DebugMovementResult,
+  DebugMapId,
   DebugTelemetryEntitySnapshot,
   DebugTelemetryEvent,
   DebugTelemetryEventType,
@@ -20,6 +21,7 @@ export type {
   EntityState,
   GameEntity,
   GameMap,
+  ActiveTeleport,
   LeaderIntent,
   LeaderIntentType,
   LivingEntity,
@@ -96,8 +98,29 @@ export { updateEnemyAISystem } from "./enemyAISystem";
 export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
+export {
+  isMapTeleportPoiActive,
+  isTeleportRallyActive,
+  setMapTeleportPoi,
+  triggerMapTeleport,
+  updateTeleportSystem,
+} from "./teleportSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
-export { createDebugMap } from "./debugMap";
+export {
+  companionIds,
+  companionStartPositions,
+  createDebugMap,
+  DEBUG_MAP_COLUMNS,
+  DEBUG_MAP_ROWS,
+  enemyIds,
+  mapOneEnemyStartPositions,
+  mapOneResourceStartData,
+  MAP_ONE_ID,
+  MAP_TWO_ID,
+  resourceIds,
+  teleporterPosition,
+  TELEPORTER_RANGE,
+} from "./debugMap";
 export {
   debugAddCompanion,
   debugAddCompanionToParty,

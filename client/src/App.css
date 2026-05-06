@@ -30,6 +30,8 @@
 }
 
 .entity-marker,
+.teleporter,
+.teleport-range,
 .combat-feedback,
 .dead-label,
 .depleted-label,
@@ -37,6 +39,27 @@
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.teleporter {
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 2px solid #581c87;
+  border-radius: 999px;
+  background: #a855f7;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.18);
+  cursor: pointer;
+}
+
+.teleport-range {
+  z-index: 1;
+  border: 2px solid rgba(126, 34, 206, 0.58);
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.14);
+  pointer-events: none;
 }
 
 .combat-feedback {
@@ -92,6 +115,11 @@
 .poi-ring.enemy-poi {
   color: #ef4444;
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.16);
+}
+
+.poi-ring.teleport-poi {
+  color: #7e22ce;
+  box-shadow: 0 0 0 2px rgba(126, 34, 206, 0.16);
 }
 
 .entity-marker {

@@ -4,11 +4,15 @@ import "./App.css";
 import {
   addEnemy,
   addEntity,
+  companionIds,
+  companionStartPositions,
   createCompanion,
   createDebugMap,
   createEmptyResourceInventory,
   createEnemy,
   createResource,
+  DEBUG_MAP_COLUMNS,
+  DEBUG_MAP_ROWS,
   clearDebugTelemetry,
   debugAddCompanionToParty,
   debugRefreshResources,
@@ -16,9 +20,15 @@ import {
   debugRemoveCompanionFromParty,
   debugResurrectEnemy,
   debugRestorePartyHealth,
+  enemyIds,
   exportDebugTelemetryReport,
   issueCompanionCommands,
   isCombatEntity,
+  mapOneEnemyStartPositions,
+  mapOneResourceStartData,
+  MAP_ONE_ID,
+  resourceIds,
+  setMapTeleportPoi,
   setAutoModeEnabled,
   setLeaderIntent,
   setPartyLeader,
@@ -27,6 +37,8 @@ import {
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
+  teleporterPosition,
+  TELEPORTER_RANGE,
   updateEntity,
   type Companion,
   type CombatEntity,
@@ -35,15 +47,8 @@ import {
   type GameState,
   type PartyMemberRole,
   type ResourceEntity,
-  type ResourceType,
 } from "./game";
 
-const companionIds = [
-  "test-companion-1",
-  "test-companion-2",
-  "test-companion-3",
-  "test-companion-4",
-];
 const partyMemberRoleOptions: PartyMemberRole[] = [
   "none",
   "defender",
@@ -51,76 +56,8 @@ const partyMemberRoleOptions: PartyMemberRole[] = [
   "support",
   "gatherer",
 ];
-const enemyIds = [
-  "test-enemy",
-  "test-enemy-2",
-  "test-enemy-3",
-  "test-enemy-4",
-  "test-enemy-5",
-  "test-enemy-6",
-  "test-enemy-7",
-  "test-enemy-8",
-  "test-enemy-9",
-  "test-enemy-10",
-  "test-enemy-11",
-  "test-enemy-12",
-  "test-enemy-13",
-  "test-enemy-14",
-];
-const resourceIds = [
-  "test-resource-wood",
-  "test-resource-ore",
-  "test-resource-herb",
-  "test-resource-wood-2",
-  "test-resource-ore-2",
-  "test-resource-herb-2",
-  "test-resource-wood-3",
-  "test-resource-ore-3",
-  "test-resource-herb-3",
-  "test-resource-wood-4",
-];
 const debugMap = createDebugMap();
 const cellSize = 28;
-const gridColumns = debugMap.columns;
-const gridRows = debugMap.rows;
-const companionStartPositions = [
-  { x: 2, y: 2 },
-  { x: 3, y: 2 },
-  { x: 3, y: 3 },
-  { x: 4, y: 2 },
-];
-const enemyStartPositions = [
-  { x: 30, y: 2 },
-  { x: 22, y: 5 },
-  { x: 32, y: 11 },
-  { x: 14, y: 10 },
-  { x: 2, y: 15 },
-  { x: 24, y: 13 },
-  { x: 31, y: 16 },
-  { x: 5, y: 20 },
-  { x: 17, y: 20 },
-  { x: 29, y: 22 },
-  { x: 11, y: 24 },
-  { x: 20, y: 25 },
-  { x: 33, y: 5 },
-  { x: 4, y: 7 },
-];
-const resourceStartData: {
-  id: string;
-  position: { x: number; y: number };
-  resourceType: ResourceType;
-}[] = [
-  { id: resourceIds[0], position: { x: 2, y: 5 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 15, y: 2 }, resourceType: "ore" },
-  { id: resourceIds[2], position: { x: 17, y: 5 }, resourceType: "herb" },
-  { id: resourceIds[3], position: { x: 6, y: 13 }, resourceType: "wood" },
-  { id: resourceIds[4], position: { x: 30, y: 10 }, resourceType: "ore" },
-  { id: resourceIds[5], position: { x: 25, y: 15 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 9, y: 22 }, resourceType: "wood" },
-  { id: resourceIds[7], position: { x: 16, y: 24 }, resourceType: "ore" },
-  { id: resourceIds[8], position: { x: 32, y: 24 }, resourceType: "herb" },
-  { id: resourceIds[9], position: { x: 22, y: 12 }, resourceType: "wood" },
-];
 
 function formatCoordinate(value: number): string {
   return value.toFixed(1);
@@ -146,9 +83,9 @@ function createInitialState(): GameState {
     1,
   );
   const enemies = enemyIds.map((enemyId, index) =>
-    createEnemy(enemyId, enemyStartPositions[index], "aggressive"),
+    createEnemy(enemyId, mapOneEnemyStartPositions[index], "aggressive"),
   );
-  const resources = resourceStartData.map((resource) =>
+  const resources = mapOneResourceStartData.map((resource) =>
     createResource(resource.id, resource.position, {
       resourceType: resource.resourceType,
     }),
@@ -158,6 +95,8 @@ function createInitialState(): GameState {
     entities: {},
     inventory: createEmptyResourceInventory(),
     map: debugMap,
+    currentMapId: MAP_ONE_ID,
+    activeTeleport: null,
     autoModeEnabled: false,
     simulationTick: 0,
     partyLeaderId: leader.id,
@@ -255,6 +194,7 @@ function App() {
   const [showEntityInfo, setShowEntityInfo] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const stopLoopRef = useRef<(() => void) | null>(null);
+  const currentMap = gameState.map ?? debugMap;
 
   const partyMembers = companionIds
     .map((id) => gameState.entities[id] as Companion | undefined)
@@ -289,6 +229,15 @@ function App() {
       .map((entity) => entity.currentTargetId),
   );
   const inventory = gameState.inventory;
+  const showTeleporter = gameState.currentMapId === MAP_ONE_ID;
+  const activeTeleport = gameState.activeTeleport;
+  const isTeleporterPoi =
+    gameState.leaderIntent?.type === "move" &&
+    gameState.leaderIntent.targetPosition &&
+    Math.hypot(
+      gameState.leaderIntent.targetPosition.x - teleporterPosition.x,
+      gameState.leaderIntent.targetPosition.y - teleporterPosition.y,
+    ) <= 0.001;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -420,7 +369,7 @@ function App() {
 
   function randomizeLocations() {
     setGameState((state) =>
-      debugRandomizeLocations(state, gridColumns, gridRows),
+      debugRandomizeLocations(state, DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
     );
   }
 
@@ -470,13 +419,21 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  function triggerTeleport() {
+    setGameState(setMapTeleportPoi);
+  }
+
   return (
     <main className="game-page">
       <section className="game-panel">
         <h1>Follow System Test</h1>
 
-        <div className="test-area" aria-label="Follow system top-down test area">
-          {debugMap.walls.map((wall) => (
+        <div
+          key={gameState.currentMapId ?? MAP_ONE_ID}
+          className="test-area"
+          aria-label="Follow system top-down test area"
+        >
+          {currentMap.walls.map((wall) => (
             <div
               key={`${wall.x}-${wall.y}`}
               className="wall-tile"
@@ -487,6 +444,47 @@ function App() {
               }}
             />
           ))}
+          {showTeleporter ? (
+            <>
+              {activeTeleport ? (
+                <div
+                  className="teleport-range"
+                  style={{
+                    width: TELEPORTER_RANGE * cellSize * 2,
+                    height: TELEPORTER_RANGE * cellSize * 2,
+                    transform: `translate(${
+                      (teleporterPosition.x - TELEPORTER_RANGE) * cellSize
+                    }px, ${
+                      (teleporterPosition.y - TELEPORTER_RANGE) * cellSize
+                    }px)`,
+                  }}
+                  title="Teleport rally range"
+                />
+              ) : null}
+              {isTeleporterPoi && !activeTeleport ? (
+                <div
+                  className="poi-ring teleport-poi"
+                  style={{
+                    transform: `translate(${teleporterPosition.x * cellSize}px, ${
+                      teleporterPosition.y * cellSize
+                    }px)`,
+                  }}
+                  title="Teleport point of interest"
+                />
+              ) : null}
+              <button
+                className="teleporter"
+                onClick={triggerTeleport}
+                style={{
+                  transform: `translate(${teleporterPosition.x * cellSize}px, ${
+                    teleporterPosition.y * cellSize
+                  }px)`,
+                }}
+                title="Teleport to map 2"
+                type="button"
+              />
+            </>
+          ) : null}
           {gameState.combatFeedbackEvents.map((event) => {
             const entity = gameState.entities[event.entityId];
 
@@ -547,7 +545,7 @@ function App() {
           {enemies.map((enemy, index) =>
             enemy.state === "dead" ? (
               <div
-                key={enemy.id}
+                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${enemy.id}`}
                 className="dead-label"
                 style={{
                   transform: `translate(${enemy.position.x * cellSize}px, ${
@@ -568,7 +566,7 @@ function App() {
               </div>
             ) : (
               <div
-                key={enemy.id}
+                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${enemy.id}`}
                 className="entity-marker enemy"
                 onClick={() => commandPartyToTargetEnemy(enemy.id)}
                 style={{
@@ -598,7 +596,7 @@ function App() {
           {resources.map((resource) =>
             resource.isDepleted ? (
               <div
-                key={resource.id}
+                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${resource.id}`}
                 className="depleted-label"
                 style={{
                   transform: `translate(${resource.position.x * cellSize}px, ${
@@ -618,7 +616,7 @@ function App() {
               </div>
             ) : (
               <div
-                key={resource.id}
+                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${resource.id}`}
                 className={`entity-marker resource ${resource.resourceType}${
                   gathererTargetResourceIds.has(resource.id)
                     ? " gatherer-target"
@@ -668,6 +666,8 @@ function App() {
                 {resources.filter((resource) => !resource.isDepleted).length}/
                 {resources.length} | Inventory Wood{" "}
                 {inventory.wood} Ore {inventory.ore} Herb {inventory.herb} |
+                Map {gameState.currentMapId ?? MAP_ONE_ID} |
+                Teleport {activeTeleport ? "Rallying" : isTeleporterPoi ? "POI" : "Idle"} |
                 Auto Mode {gameState.autoModeEnabled ? "On" : "Off"} |
                 Explored {Object.keys(gameState.exploredTiles).length}
               </span>

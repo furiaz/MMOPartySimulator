@@ -29,6 +29,8 @@ export type ResourceInventory = {
   herb: number;
 };
 
+export type DebugMapId = "map-1" | "map-2";
+
 export type Position = {
   x: number;
   y: number;
@@ -162,10 +164,19 @@ export type DebugTelemetryReport = {
 };
 
 export type GameMap = {
+  id?: DebugMapId;
   columns: number;
   rows: number;
   walls: Position[];
   navigationGrid?: NavigationGrid;
+};
+
+export type ActiveTeleport = {
+  id: string;
+  position: Position;
+  range: number;
+  targetMapId: DebugMapId;
+  triggeredBy: "ai" | "player";
 };
 
 export type NavigationGridCell = {

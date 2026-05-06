@@ -18,7 +18,9 @@ import type {
   CombatFeedbackType,
   DebugNavigationReason,
   DebugTelemetryState,
+  ActiveTeleport,
   Companion,
+  DebugMapId,
   GameMap,
   GameEntity,
   Enemy,
@@ -71,7 +73,9 @@ export type MovementFailureDetail = {
 export type GameState = {
   entities: Record<string, GameEntity>;
   inventory: ResourceInventory;
+  currentMapId?: DebugMapId;
   map?: GameMap;
+  activeTeleport?: ActiveTeleport | null;
   autoModeEnabled: boolean;
   simulationTick: number;
   partyLeaderId: string;
