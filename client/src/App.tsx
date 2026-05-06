@@ -63,6 +63,32 @@ function formatCoordinate(value: number): string {
   return value.toFixed(1);
 }
 
+function formatResourceName(resourceType: ResourceEntity["resourceType"]): string {
+  return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
+}
+
+function formatTargetId(entity: CombatEntity): string {
+  return entity.currentTargetId ?? "none";
+}
+
+function getResourceTooltip(resource: ResourceEntity): string {
+  return [
+    formatResourceName(resource.resourceType),
+    `Durability ${resource.durability}/${resource.maxDurability}`,
+    `Resources left ${resource.quantity}`,
+  ].join("\n");
+}
+
+function getEnemyTooltip(enemy: Enemy): string {
+  return [
+    "Enemy",
+    `HP ${enemy.health}/${enemy.maxHealth}`,
+    `State ${enemy.state}`,
+    `Target ${formatTargetId(enemy)}`,
+    `Aggression ${enemy.aggressionMode}`,
+  ].join("\n");
+}
+
 function getPartyMarkerClass(entityId: string, leaderId: string): string {
   return `entity-marker companion${entityId === leaderId ? " leader" : ""}`;
 }
@@ -552,6 +578,7 @@ function App() {
                     enemy.position.y * cellSize
                   }px)`,
                 }}
+                title={getEnemyTooltip(enemy)}
               >
                 {showEntityInfo ? (
                   <>
@@ -574,7 +601,7 @@ function App() {
                     enemy.position.y * cellSize
                   }px)`,
                 }}
-                title="Enemy"
+                title={getEnemyTooltip(enemy)}
               >
                 <span className="map-marker-id">{index + 1}</span>
                 <EntityDebugLabel
@@ -603,6 +630,7 @@ function App() {
                     resource.position.y * cellSize
                   }px)`,
                 }}
+                title={getResourceTooltip(resource)}
               >
                 {showEntityInfo ? (
                   <>
@@ -628,7 +656,7 @@ function App() {
                     resource.position.y * cellSize
                   }px)`,
                 }}
-                title="Resource"
+                title={getResourceTooltip(resource)}
               >
                 <EntityDebugLabel
                   name={resource.resourceType}
