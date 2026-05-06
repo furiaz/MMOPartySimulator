@@ -341,7 +341,6 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
       nextStateWithIntent,
       entity,
       moveResolution.position,
-      options,
     )
   ) {
     return markMoveFailed(nextStateWithIntent, entity.id);
@@ -351,7 +350,6 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     nextStateWithIntent,
     entity.id,
     moveResolution.position,
-    options,
   );
 
   if (reservedState === nextStateWithIntent) {
@@ -403,13 +401,12 @@ export function reservePositionForTick(
   state: GameState,
   entityId: string,
   position: Position,
-  options: MovementOptions = {},
 ): GameState {
   const entity = state.entities[entityId];
 
   if (
     !entity ||
-    !isMoveDestinationAvailable(state, entity, position, options)
+    !isMoveDestinationAvailable(state, entity, position)
   ) {
     return state;
   }
@@ -555,7 +552,7 @@ function getNextMoveResolution(
     return null;
   }
 
-  if (isWalkablePosition(state, movedEntity.position, entity.id, options)) {
+  if (isMoveDestinationAvailable(state, entity, movedEntity.position)) {
     return { position: movedEntity.position };
   }
 
@@ -563,7 +560,7 @@ function getNextMoveResolution(
 
   if (
     pathPosition &&
-    isMoveDestinationAvailable(state, entity, pathPosition, options)
+    isMoveDestinationAvailable(state, entity, pathPosition)
   ) {
     return { position: pathPosition };
   }
@@ -594,16 +591,15 @@ function getNextMoveResolution(
     };
   }
 
-  return findAlternativeMovePosition(state, entity, target, options);
+  return findAlternativeMovePosition(state, entity, target);
 }
 
 function isMoveDestinationAvailable(
   state: GameState,
   entity: GameEntity,
   position: Position,
-  options: MovementOptions = {},
 ): boolean {
-  return isWalkablePosition(state, position, entity.id, options);
+  return isWalkablePosition(state, position, entity.id);
 }
 
 function findNextPathPosition(
@@ -616,7 +612,7 @@ function findNextPathPosition(
     return null;
   }
 
-  const goals = getPathGoals(state, entity, target, options);
+  const goals = getPathGoals(state, entity, target);
   const goalKeys = new Set(goals.map(getPositionKey));
 
   if (goalKeys.size === 0) {
@@ -639,7 +635,7 @@ function findNextPathPosition(
     if (
       goalKeys.has(getPositionKey(current.position)) &&
       (!current.firstStep ||
-        isMoveDestinationAvailable(state, entity, current.firstStep, options))
+        isMoveDestinationAvailable(state, entity, current.firstStep))
     ) {
       return current.firstStep;
     }
@@ -650,7 +646,7 @@ function findNextPathPosition(
       if (
         visited.has(key) ||
         !isWalkablePosition(state, neighbor, entity.id, {
-          allowPartyPassThrough: true,
+          allowPartyPassThrough: options.allowPartyPassThrough,
         })
       ) {
         continue;
@@ -671,14 +667,13 @@ function getPathGoals(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
-  options: MovementOptions = {},
 ): Position[] {
-  if (isWalkablePosition(state, target.position, entity.id, options)) {
+  if (isMoveDestinationAvailable(state, entity, target.position)) {
     return [target.position];
   }
 
   return getNeighborPositions(target.position).filter((position) =>
-    isWalkablePosition(state, position, entity.id, options),
+    isMoveDestinationAvailable(state, entity, position),
   );
 }
 
@@ -686,7 +681,6 @@ function findAlternativeMovePosition(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
-  options: MovementOptions = {},
 ): { position: Position } | null {
   if (state.failedMoveByEntityId?.[entity.id]) {
     return null;
@@ -695,7 +689,7 @@ function findAlternativeMovePosition(
   const candidates = getAlternativeMoveCandidates(entity.position, target.position);
   const previousPosition = state.lastPositionsByEntityId?.[entity.id];
   const validCandidates = candidates.filter((position) =>
-    isWalkablePosition(state, position, entity.id, options),
+    isMoveDestinationAvailable(state, entity, position),
   );
   const preferredCandidate = validCandidates.find(
     (position) => !previousPosition || !isSamePosition(position, previousPosition),

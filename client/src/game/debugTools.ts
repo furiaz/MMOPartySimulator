@@ -26,10 +26,17 @@ export function debugAddCompanion(
   const partyOrder = Object.values(state.entities).filter(
     (entity) => entity.kind === "player" || entity.kind === "companion",
   ).length;
+  const availablePosition = findClosestAvailablePosition(state, position);
 
   return addEntity(
     state,
-    createCompanion(companionId, position, followTargetId, "none", partyOrder),
+    createCompanion(
+      companionId,
+      availablePosition,
+      followTargetId,
+      "none",
+      partyOrder,
+    ),
   );
 }
 
