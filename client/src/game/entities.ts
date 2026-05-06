@@ -18,6 +18,7 @@ const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
 const STARTING_RESOURCE_DURABILITY = 5;
 const STARTING_RESOURCE_QUANTITY = 3;
+const STARTING_RESOURCE_MAX_GATHERERS = 4;
 const DEFAULT_RESOURCE_TYPE: ResourceType = "wood";
 
 type CreateResourceOptions = {
@@ -81,7 +82,7 @@ export function createResource(
     maxDurability = STARTING_RESOURCE_DURABILITY,
     durability = maxDurability,
     quantity = STARTING_RESOURCE_QUANTITY,
-    maxGatherers = 1,
+    maxGatherers = STARTING_RESOURCE_MAX_GATHERERS,
     resourceType = DEFAULT_RESOURCE_TYPE,
   } = options;
 
