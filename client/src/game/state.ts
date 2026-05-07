@@ -31,6 +31,12 @@ import type {
   Position,
   ResourceInventory,
   ResourceType,
+  SkillBindState,
+  SkillCooldownState,
+  SkillMarkState,
+  SkillSelfBuffState,
+  SkillShieldBlockState,
+  SkillVisualEvent,
 } from "./types";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
@@ -95,6 +101,12 @@ export type GameState = {
   defenderBlockedTicksByEntityId?: Record<string, number>;
   partyFormation?: PartyFormationState;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  skillMarksByEnemyId?: Record<string, SkillMarkState>;
+  skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
+  skillBindsByEnemyId?: Record<string, SkillBindState>;
+  skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
+  skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
+  skillVisualEvents?: SkillVisualEvent[];
   debugTelemetry?: DebugTelemetryState;
 };
 
@@ -193,6 +205,78 @@ export function clearExpiredCombatFeedback(
     ...state,
     combatFeedbackEvents,
   };
+}
+
+export function addSkillVisualEvent(
+  state: GameState,
+  event: Omit<SkillVisualEvent, "id" | "createdAt" | "expiresAt"> & {
+    now: number;
+    durationMs: number;
+  },
+): GameState {
+  return {
+    ...state,
+    skillVisualEvents: [
+      ...(state.skillVisualEvents ?? []),
+      {
+        id: `${event.now}-${event.type}-${event.sourceId}-${state.skillVisualEvents?.length ?? 0}`,
+        type: event.type,
+        sourceId: event.sourceId,
+        targetId: event.targetId,
+        position: event.position,
+        createdAt: event.now,
+        expiresAt: event.now + event.durationMs,
+      },
+    ],
+  };
+}
+
+export function clearExpiredSkillRuntimeState(
+  state: GameState,
+  now = Date.now(),
+): GameState {
+  const skillMarksByEnemyId = filterExpiredRecord(
+    state.skillMarksByEnemyId,
+    now,
+  );
+  const skillSelfBuffsByCompanionId = filterExpiredRecord(
+    state.skillSelfBuffsByCompanionId,
+    now,
+  );
+  const skillBindsByEnemyId = filterExpiredRecord(
+    state.skillBindsByEnemyId,
+    now,
+  );
+  const skillShieldBlocksById = filterExpiredRecord(
+    state.skillShieldBlocksById,
+    now,
+  );
+  const skillCooldownsByCompanionId = filterExpiredRecord(
+    state.skillCooldownsByCompanionId,
+    now,
+  );
+  const skillVisualEvents = (state.skillVisualEvents ?? []).filter(
+    (event) => event.expiresAt > now,
+  );
+
+  return {
+    ...state,
+    skillMarksByEnemyId,
+    skillSelfBuffsByCompanionId,
+    skillBindsByEnemyId,
+    skillShieldBlocksById,
+    skillCooldownsByCompanionId,
+    skillVisualEvents,
+  };
+}
+
+function filterExpiredRecord<T extends { expiresAt: number }>(
+  record: Record<string, T> | undefined,
+  now: number,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(record ?? {}).filter(([, value]) => value.expiresAt > now),
+  );
 }
 
 export function getFollowTrailPosition(

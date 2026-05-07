@@ -74,6 +74,116 @@ export type CombatFeedbackEvent = {
   expiresAt: number;
 };
 
+export type SkillId =
+  | "sweeping_strike"
+  | "guard_wall"
+  | "mark_target"
+  | "feral_surge"
+  | "elemental_bolt"
+  | "binding_rune"
+  | "light_mend"
+  | "penitents_gift";
+
+export type SkillTag =
+  | "Offensive"
+  | "Damage"
+  | "DoT"
+  | "Single Target"
+  | "Multi Target"
+  | "AoE"
+  | "Trap"
+  | "Summon - Attack"
+  | "Defensive"
+  | "Shield"
+  | "Heal"
+  | "Safety"
+  | "Damage Mitigation"
+  | "Elemental Mitigation"
+  | "Summon - Defense"
+  | "Control"
+  | "Taunt"
+  | "Aggro"
+  | "Buff"
+  | "Cleanse"
+  | "Summon - Support"
+  | "Mobility"
+  | "Dash"
+  | "Jump"
+  | "Escape"
+  | "Gathering"
+  | "Resource Buff"
+  | "Tool Buff"
+  | "Self Cost - HP"
+  | "Self Buff"
+  | "Light Damage";
+
+export type SkillDefinition = {
+  id: SkillId;
+  classId: ClassId;
+  displayName: string;
+  tags: SkillTag[];
+  type: "active";
+  range: number;
+  effect:
+    | { type: "damage"; damage: number }
+    | { type: "sweepingDamage"; mainDamage: number; splashDamage: number; splashRange: number }
+    | { type: "mark"; bonusDamage: number; durationMs: number }
+    | { type: "selfBuff"; bonusDamage: number; durationMs: number; hpCost: number }
+    | { type: "shieldBlock"; durationMs: number; blocks: number }
+    | { type: "bind"; durationMs: number }
+    | { type: "heal"; amount: number }
+    | { type: "selfCostHeal"; amount: number; hpCost: number };
+};
+
+export type SkillMarkState = {
+  sourceId: string;
+  targetId: string;
+  bonusDamage: number;
+  expiresAt: number;
+};
+
+export type SkillSelfBuffState = {
+  companionId: string;
+  bonusDamage: number;
+  expiresAt: number;
+};
+
+export type SkillBindState = {
+  sourceId: string;
+  targetId: string;
+  expiresAt: number;
+};
+
+export type SkillShieldBlockState = {
+  id: string;
+  ownerId: string;
+  position: Position;
+  expiresAt: number;
+  remainingBlocks: number;
+};
+
+export type SkillCooldownState = {
+  companionId: string;
+  skillId: SkillId;
+  expiresAt: number;
+};
+
+export type SkillVisualType =
+  | "slash"
+  | "projectile"
+  | "red_flash"
+  | "heal";
+
+export type SkillVisualEvent = {
+  id: string;
+  type: SkillVisualType;
+  sourceId: string;
+  targetId?: string;
+  position?: Position;
+  createdAt: number;
+  expiresAt: number;
+};
+
 export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 
 export type DebugNavigationReason =

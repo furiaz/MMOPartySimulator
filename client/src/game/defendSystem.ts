@@ -17,6 +17,7 @@ import {
   getLeaderIntentPosition,
   getLeaderMovementDirection,
 } from "./roleSystem";
+import { getPrototypeAttackDamage } from "./skillRuntime";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
@@ -284,7 +285,13 @@ function attackDefenderTarget(
     });
   }
 
-  const damagedTarget = damageEntity(target, DEFENDER_ATTACK_DAMAGE);
+  const attackDamage = getPrototypeAttackDamage(
+    state,
+    defender,
+    target,
+    DEFENDER_ATTACK_DAMAGE,
+  );
+  const damagedTarget = damageEntity(target, attackDamage);
   const updatedDefender = setLastAttackAt({
     ...defender,
     currentTargetId: damagedTarget.state === "dead" ? null : target.id,
@@ -299,7 +306,7 @@ function attackDefenderTarget(
   nextState = addCombatFeedback(nextState, {
     type: "damage",
     entityId: damagedTarget.id,
-    text: `-${DEFENDER_ATTACK_DAMAGE} HP`,
+    text: `-${attackDamage} HP`,
     now,
   });
 

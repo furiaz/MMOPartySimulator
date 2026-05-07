@@ -9,6 +9,7 @@ import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { updateRoleSystem } from "./roleSystem";
+import { updateSkillSystem } from "./skillSystem";
 import {
   isMapTeleportPoiActive,
   updateTeleportSystem,
@@ -17,13 +18,16 @@ import { recordDebugTelemetryTick } from "./debugTelemetry";
 import {
   advanceSimulationTick,
   clearExpiredCombatFeedback,
+  clearExpiredSkillRuntimeState,
   clearTickMovementPlanning,
   type GameState,
 } from "./state";
 
 export function updateGame(state: GameState): GameState {
-  let nextState = clearExpiredCombatFeedback(
-    clearTickMovementPlanning(advanceSimulationTick(state)),
+  let nextState = clearExpiredSkillRuntimeState(
+    clearExpiredCombatFeedback(
+      clearTickMovementPlanning(advanceSimulationTick(state)),
+    ),
   );
   const movedEntityIds = new Set<string>();
   const mapIdBeforeTeleport = nextState.currentMapId;
@@ -47,6 +51,7 @@ export function updateGame(state: GameState): GameState {
 
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState);
+    nextState = updateSkillSystem(nextState);
   }
 
   if (shouldMovePartyTowardPoi) {

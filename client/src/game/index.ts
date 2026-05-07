@@ -33,6 +33,16 @@ export type {
   ResourceInventory,
   ResourceEntity,
   ResourceType,
+  SkillBindState,
+  SkillCooldownState,
+  SkillDefinition,
+  SkillId,
+  SkillMarkState,
+  SkillSelfBuffState,
+  SkillShieldBlockState,
+  SkillTag,
+  SkillVisualEvent,
+  SkillVisualType,
 } from "./types";
 export type { GameState } from "./state";
 
@@ -57,8 +67,10 @@ export {
   addEnemy,
   addCombatFeedback,
   addEntity,
+  addSkillVisualEvent,
   addResourceToInventory,
   clearExpiredCombatFeedback,
+  clearExpiredSkillRuntimeState,
   createEmptyResourceInventory,
   getEntityById,
   setAutoModeEnabled,
@@ -72,6 +84,12 @@ export {
   updateEntity,
 } from "./state";
 export { CLASS_DEFINITIONS } from "./classes";
+export { SKILL_DEFINITIONS, getSkillsForClass } from "./skills";
+export {
+  SKILL_ROLE_PREFERENCES,
+  getSkillRoleScore,
+  type SkillRolePreference,
+} from "./skillRolePreferences";
 export {
   getOrderedFormationMembers,
   getOrderedPartyMembers,
@@ -103,6 +121,7 @@ export { updateEnemyAISystem } from "./enemyAISystem";
 export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
+export { updateSkillSystem } from "./skillSystem";
 export {
   isMapTeleportPoiActive,
   isTeleportRallyActive,

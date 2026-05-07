@@ -32,6 +32,9 @@
 .entity-marker,
 .teleporter,
 .teleport-range,
+.skill-link,
+.skill-shield-block,
+.skill-slash,
 .combat-feedback,
 .dead-label,
 .depleted-label,
@@ -39,6 +42,45 @@
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.skill-shield-block {
+  z-index: 2;
+  width: 24px;
+  height: 10px;
+  margin: 9px 0 0 2px;
+  border: 2px solid #38bdf8;
+  background: rgba(125, 211, 252, 0.34);
+  pointer-events: none;
+}
+
+.skill-link {
+  z-index: 2;
+  height: 3px;
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+.skill-link.projectile {
+  background: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.7);
+}
+
+.skill-link.heal {
+  height: 8px;
+  background: rgba(250, 204, 21, 0.38);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.45);
+}
+
+.skill-slash {
+  z-index: 2;
+  width: 34px;
+  height: 24px;
+  margin: -1px 0 0 -4px;
+  border-top: 3px solid #f97316;
+  border-radius: 999px;
+  transform-origin: center;
+  pointer-events: none;
 }
 
 .teleporter {
@@ -129,6 +171,14 @@
   border-radius: 999px;
   box-shadow: 0 0 0 2px #ffffff, 0 1px 4px rgba(15, 23, 42, 0.32);
   transition: transform 120ms linear;
+}
+
+.entity-marker.skill-red-flash {
+  box-shadow: 0 0 0 3px #ef4444, 0 0 12px rgba(239, 68, 68, 0.85);
+}
+
+.entity-marker.skill-heal-outline {
+  box-shadow: 0 0 0 3px #facc15, 0 0 12px rgba(250, 204, 21, 0.72);
 }
 
 .map-marker-id {
@@ -239,6 +289,26 @@
 .enemy {
   background: #dc2626;
   cursor: pointer;
+}
+
+.skill-mark-target {
+  position: absolute;
+  top: -12px;
+  left: 7px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #7f1d1d;
+  background: #ef4444;
+  pointer-events: none;
+}
+
+.skill-bind-target {
+  position: absolute;
+  inset: -7px;
+  border: 2px solid #facc15;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.16);
+  pointer-events: none;
 }
 
 .resource {

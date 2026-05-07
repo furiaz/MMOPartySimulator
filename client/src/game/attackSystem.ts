@@ -19,6 +19,11 @@ import {
 } from "./state";
 import { protectPartyMember } from "./partyProtectionSystem";
 import { getRolePriority } from "./roleProfiles";
+import {
+  blockIncomingAttackIfShielded,
+  getPrototypeAttackDamage,
+  isEnemyBound,
+} from "./skillRuntime";
 import type {
   CombatEntity,
   Enemy,
@@ -68,6 +73,14 @@ export function updateAttackSystem(
       continue;
     }
 
+    if (
+      isEnemy(currentAttacker) &&
+      isEnemyBound(nextState, currentAttacker) &&
+      !isInAttackRange(currentAttacker, target)
+    ) {
+      continue;
+    }
+
     const finalStepPosition = getFinalStepAttackPosition(nextState, currentAttacker, target);
     const attackReadyAttacker = finalStepPosition
       ? moveEntityTo(currentAttacker, finalStepPosition)
@@ -84,10 +97,41 @@ export function updateAttackSystem(
         continue;
       }
 
-      const updatedTarget = updateTargetAfterDamage(target, attackReadyAttacker);
+      const attackDamage = getPrototypeAttackDamage(
+        nextState,
+        attackReadyAttacker,
+        target,
+        ATTACK_DAMAGE,
+      );
+      const shieldResult =
+        isEnemy(attackReadyAttacker) && isPartyCombatEntity(target)
+          ? blockIncomingAttackIfShielded(nextState, attackReadyAttacker, target, now)
+          : { state: nextState, blocked: false };
+
+      nextState = shieldResult.state;
+
+      if (shieldResult.blocked) {
+        nextState = updateEntity(
+          nextState,
+          setLastAttackAt(attackReadyAttacker, now),
+        );
+        continue;
+      }
+
+      const updatedTarget = updateTargetAfterDamage(
+        target,
+        attackReadyAttacker,
+        attackDamage,
+      );
       const updatedAttacker = setLastAttackAt(attackReadyAttacker, now);
 
-      nextState = addAttackFeedback(nextState, attackReadyAttacker, updatedTarget, now);
+      nextState = addAttackFeedback(
+        nextState,
+        attackReadyAttacker,
+        updatedTarget,
+        attackDamage,
+        now,
+      );
       nextState = updateEntity(nextState, updatedTarget);
 
       if (isEnemy(attackReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
@@ -209,6 +253,7 @@ function addAttackFeedback(
   state: GameState,
   attacker: CombatEntity,
   target: CombatEntity,
+  damage: number,
   now: number,
 ): GameState {
   let nextState = addCombatFeedback(state, {
@@ -221,7 +266,7 @@ function addAttackFeedback(
   nextState = addCombatFeedback(nextState, {
     type: "damage",
     entityId: target.id,
-    text: `-${ATTACK_DAMAGE} HP`,
+    text: `-${damage} HP`,
     now,
   });
 
@@ -258,8 +303,9 @@ function canAttack(entity: CombatEntity, now: number): boolean {
 function updateTargetAfterDamage(
   target: CombatEntity,
   attacker: CombatEntity,
+  damage: number,
 ): CombatEntity {
-  const damagedTarget = damageEntity(target, ATTACK_DAMAGE);
+  const damagedTarget = damageEntity(target, damage);
 
   if (
     !isEnemy(damagedTarget) ||

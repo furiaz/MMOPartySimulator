@@ -153,6 +153,12 @@ function createInitialState(): GameState {
     },
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
+    skillMarksByEnemyId: {},
+    skillSelfBuffsByCompanionId: {},
+    skillBindsByEnemyId: {},
+    skillShieldBlocksById: {},
+    skillCooldownsByCompanionId: {},
+    skillVisualEvents: [],
   });
 
   return enemies.reduce(addEnemy, baseState);
@@ -285,6 +291,25 @@ function App() {
       gameState.leaderIntent.targetPosition.x - teleporterPosition.x,
       gameState.leaderIntent.targetPosition.y - teleporterPosition.y,
     ) <= 0.001;
+  const activeSkillVisualEvents = (gameState.skillVisualEvents ?? []).filter(
+    (event) => event.expiresAt > currentTime,
+  );
+  const redFlashEntityIds = new Set(
+    activeSkillVisualEvents
+      .filter((event) => event.type === "red_flash")
+      .map((event) => event.sourceId),
+  );
+  const healedEntityIds = new Set(
+    activeSkillVisualEvents
+      .filter((event) => event.type === "heal" && event.targetId)
+      .map((event) => event.targetId),
+  );
+  const projectileVisuals = activeSkillVisualEvents.filter(
+    (event) => event.type === "projectile" || event.type === "heal",
+  );
+  const slashVisuals = activeSkillVisualEvents.filter(
+    (event) => event.type === "slash",
+  );
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -536,6 +561,67 @@ function App() {
               />
             </>
           ) : null}
+          {Object.values(gameState.skillShieldBlocksById ?? {}).map((shield) => (
+            <div
+              key={shield.id}
+              className="skill-shield-block"
+              style={{
+                transform: `translate(${shield.position.x * cellSize}px, ${
+                  shield.position.y * cellSize
+                }px)`,
+              }}
+              title="Guard Wall"
+            />
+          ))}
+          {projectileVisuals.map((event) => {
+            const source = gameState.entities[event.sourceId];
+            const target = event.targetId
+              ? gameState.entities[event.targetId]
+              : undefined;
+
+            if (!source || !target) {
+              return null;
+            }
+
+            const xDistance = target.position.x - source.position.x;
+            const yDistance = target.position.y - source.position.y;
+            const length = Math.hypot(xDistance, yDistance) * cellSize;
+            const angle = Math.atan2(yDistance, xDistance);
+
+            return (
+              <div
+                key={event.id}
+                className={`skill-link ${event.type}`}
+                style={{
+                  width: length,
+                  transform: `translate(${
+                    source.position.x * cellSize + cellSize / 2
+                  }px, ${
+                    source.position.y * cellSize + cellSize / 2
+                  }px) rotate(${angle}rad)`,
+                }}
+              />
+            );
+          })}
+          {slashVisuals.map((event) => {
+            const source = gameState.entities[event.sourceId];
+
+            if (!source) {
+              return null;
+            }
+
+            return (
+              <div
+                key={event.id}
+                className="skill-slash"
+                style={{
+                  transform: `translate(${source.position.x * cellSize}px, ${
+                    source.position.y * cellSize
+                  }px)`,
+                }}
+              />
+            );
+          })}
           {gameState.combatFeedbackEvents.map((event) => {
             const entity = gameState.entities[event.entityId];
 
@@ -571,7 +657,9 @@ function App() {
           {partyMembers.map((member, index) => (
             <div
               key={member.id}
-              className={getPartyMarkerClass(member, gameState.partyLeaderId)}
+              className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
+                redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
+              }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
               style={{
                 transform: `translate(${member.position.x * cellSize}px, ${
                   member.position.y * cellSize
@@ -636,6 +724,12 @@ function App() {
                   isVisible={showEntityInfo}
                 />
                 {hasHealthBar(enemy) ? <HealthBar entity={enemy} /> : null}
+                {gameState.skillMarksByEnemyId?.[enemy.id] ? (
+                  <span className="skill-mark-target" title="Marked target" />
+                ) : null}
+                {gameState.skillBindsByEnemyId?.[enemy.id] ? (
+                  <span className="skill-bind-target" title="Binding Rune" />
+                ) : null}
                 {isCombatEntity(enemy) ? (
                   <AttackCooldownIndicator
                     entity={enemy}
