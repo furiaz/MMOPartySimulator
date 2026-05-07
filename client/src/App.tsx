@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
+import SpriteAnimation from "./SpriteAnimation";
 
 import {
   addEnemy,
@@ -49,8 +50,16 @@ import {
   type GameEntity,
   type GameState,
   type PartyMemberRole,
+  type Position,
   type ResourceEntity,
 } from "./game";
+import {
+  getEntityVisualAsset,
+  getEntityVisualClassName,
+  getSpriteAnimation,
+  mapTileVisualAssets,
+  type SpriteDirection,
+} from "./visualAssets";
 
 const partyMemberRoleOptions: PartyMemberRole[] = [
   "none",
@@ -72,6 +81,13 @@ const partyMemberClassOptions: ClassId[] = [
 ];
 const debugMap = createDebugMap();
 const cellSize = 28;
+const visualMovementGraceMs = 560;
+const visualMovementReachedDistance = 1;
+
+type EntityVisualMovement = {
+  direction: SpriteDirection;
+  expiresAt: number;
+};
 
 function formatCoordinate(value: number): string {
   return value.toFixed(1);
@@ -112,6 +128,28 @@ function getPartyMarkerClass(member: Companion, leaderId: string): string {
   const classPathClass = classPath ? ` class-path-${classPath}` : "";
 
   return `entity-marker companion${classPathClass}`;
+}
+
+function isSamePosition(first: Position, second: Position): boolean {
+  return first.x === second.x && first.y === second.y;
+}
+
+function getMovementDirection(
+  previousPosition: Position,
+  currentPosition: Position,
+): SpriteDirection {
+  const xDelta = currentPosition.x - previousPosition.x;
+  const yDelta = currentPosition.y - previousPosition.y;
+
+  if (Math.abs(xDelta) >= Math.abs(yDelta)) {
+    return xDelta >= 0 ? "east" : "west";
+  }
+
+  return yDelta >= 0 ? "south" : "north";
+}
+
+function getPositionDistance(first: Position, second: Position): number {
+  return Math.hypot(first.x - second.x, first.y - second.y);
 }
 
 function createInitialState(): GameState {
@@ -246,7 +284,13 @@ function App() {
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [
+    visualMovementByEntityId,
+    setVisualMovementByEntityId,
+  ] = useState<Record<string, EntityVisualMovement>>({});
   const stopLoopRef = useRef<(() => void) | null>(null);
+  const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
+  const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const currentMap = gameState.map ?? debugMap;
 
   const partyMembers = companionIds
@@ -313,7 +357,39 @@ function App() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setCurrentTime(Date.now());
+      const now = Date.now();
+      const latestPositions = latestAnimatedEntityPositionsRef.current;
+      const previousPositions = previousAnimatedEntityPositionsRef.current;
+      const movedEntityIds = Object.keys(latestPositions).filter(
+        (entityId) =>
+          previousPositions[entityId] &&
+          !isSamePosition(
+            previousPositions[entityId],
+            latestPositions[entityId],
+          ),
+      );
+
+      setCurrentTime(now);
+
+      if (movedEntityIds.length > 0) {
+        setVisualMovementByEntityId((currentVisualMovement) => {
+          const nextVisualMovement = { ...currentVisualMovement };
+
+          for (const entityId of movedEntityIds) {
+            nextVisualMovement[entityId] = {
+              direction: getMovementDirection(
+                previousPositions[entityId],
+                latestPositions[entityId],
+              ),
+              expiresAt: now + visualMovementGraceMs,
+            };
+          }
+
+          return nextVisualMovement;
+        });
+      }
+
+      previousAnimatedEntityPositionsRef.current = { ...latestPositions };
     }, 100);
 
     return () => {
@@ -321,6 +397,15 @@ function App() {
       stopLoopRef.current?.();
     };
   }, []);
+
+  useEffect(() => {
+    latestAnimatedEntityPositionsRef.current = [...partyMembers, ...enemies]
+      .filter((entity) => entity.state !== "dead")
+      .reduce<Record<string, Position>>((positionsById, entity) => {
+        positionsById[entity.id] = entity.position;
+        return positionsById;
+      }, {});
+  }, [enemies, partyMembers]);
 
   function toggleSimulationLoop() {
     if (stopLoopRef.current) {
@@ -499,6 +584,83 @@ function App() {
     setGameState(setMapTeleportPoi);
   }
 
+  function getCompanionMovementTarget(member: Companion): Position | null {
+    if (member.state === "idle" || member.state === "dead") {
+      return null;
+    }
+
+    if (member.state === "defend") {
+      return member.defendPosition;
+    }
+
+    const targetId =
+      member.currentTargetId ??
+      (member.state === "follow" ? member.followTargetId : null);
+    const target = targetId ? gameState.entities[targetId] : null;
+
+    if (target) {
+      return target.position;
+    }
+
+    return gameState.leaderIntent?.targetPosition ?? null;
+  }
+
+  function isCompanionTryingToMove(member: Companion): boolean {
+    const targetPosition = getCompanionMovementTarget(member);
+
+    return targetPosition
+      ? getPositionDistance(member.position, targetPosition) >
+          visualMovementReachedDistance
+      : false;
+  }
+
+  function getCompanionAnimationDirection(
+    member: Companion,
+    visualMovement?: EntityVisualMovement,
+  ): SpriteDirection | undefined {
+    if (visualMovement) {
+      return visualMovement.direction;
+    }
+
+    const targetPosition = getCompanionMovementTarget(member);
+
+    return targetPosition
+      ? getMovementDirection(member.position, targetPosition)
+      : undefined;
+  }
+
+  function getEnemyMovementTarget(enemy: Enemy): Position | null {
+    if (enemy.state === "dead" || !enemy.currentTargetId) {
+      return null;
+    }
+
+    return gameState.entities[enemy.currentTargetId]?.position ?? null;
+  }
+
+  function isEnemyTryingToMove(enemy: Enemy): boolean {
+    const targetPosition = getEnemyMovementTarget(enemy);
+
+    return targetPosition
+      ? getPositionDistance(enemy.position, targetPosition) >
+          visualMovementReachedDistance
+      : false;
+  }
+
+  function getEnemyAnimationDirection(
+    enemy: Enemy,
+    visualMovement?: EntityVisualMovement,
+  ): SpriteDirection | undefined {
+    if (visualMovement) {
+      return visualMovement.direction;
+    }
+
+    const targetPosition = getEnemyMovementTarget(enemy);
+
+    return targetPosition
+      ? getMovementDirection(enemy.position, targetPosition)
+      : undefined;
+  }
+
   return (
     <main className="game-page">
       <section className="game-panel">
@@ -506,13 +668,13 @@ function App() {
 
         <div
           key={gameState.currentMapId ?? MAP_ONE_ID}
-          className="test-area"
+          className={`test-area ${mapTileVisualAssets.floor.className}`}
           aria-label="Follow system top-down test area"
         >
           {currentMap.walls.map((wall) => (
             <div
               key={`${wall.x}-${wall.y}`}
-              className="wall-tile"
+              className={`wall-tile ${mapTileVisualAssets.wall.className}`}
               style={{
                 transform: `translate(${wall.x * cellSize}px, ${
                   wall.y * cellSize
@@ -654,35 +816,62 @@ function App() {
               title="Enemy point of interest"
             />
           ) : null}
-          {partyMembers.map((member, index) => (
-            <div
-              key={member.id}
-              className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
-                redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
-              }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
-              style={{
-                transform: `translate(${member.position.x * cellSize}px, ${
-                  member.position.y * cellSize
-                }px)`,
-              }}
-              title="Party member"
-            >
-              <span className="map-marker-id">{index + 1}</span>
-              <EntityDebugLabel
-                name={`C${index + 1}`}
-                entity={member}
-                detail={`HP ${member.health} GS ${member.gatherSpeed} Role ${member.role}`}
-                isVisible={showEntityInfo}
-              />
-              <HealthBar entity={member} />
-              <AttackCooldownIndicator
-                entity={member}
-                currentTime={currentTime}
-              />
-            </div>
-          ))}
-          {enemies.map((enemy, index) =>
-            enemy.state === "dead" ? (
+          {partyMembers.map((member, index) => {
+            const visualAsset = getEntityVisualAsset(member);
+            const visualMovement =
+              visualMovementByEntityId[member.id];
+            const isVisuallyMoving =
+              Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
+            const shouldRunAnimation =
+              isVisuallyMoving || isCompanionTryingToMove(member);
+            const animation =
+              visualAsset.kind === "sprite"
+                ? getSpriteAnimation(
+                    visualAsset,
+                    shouldRunAnimation,
+                    getCompanionAnimationDirection(member, visualMovement),
+                  )
+                : null;
+
+            return (
+              <div
+                key={member.id}
+                className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
+                  redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
+                }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
+                style={{
+                  transform: `translate(${member.position.x * cellSize}px, ${
+                    member.position.y * cellSize
+                  }px)`,
+                }}
+                title="Party member"
+              >
+                {animation ? (
+                  <SpriteAnimation
+                    alt={`Party member ${index + 1}`}
+                    animation={animation}
+                    className="entity-sprite"
+                    currentTime={currentTime}
+                  />
+                ) : null}
+                <span className="map-marker-id">{index + 1}</span>
+                <EntityDebugLabel
+                  name={`C${index + 1}`}
+                  entity={member}
+                  detail={`HP ${member.health} GS ${member.gatherSpeed} Role ${member.role}`}
+                  isVisible={showEntityInfo}
+                />
+                <HealthBar entity={member} />
+                <AttackCooldownIndicator
+                  entity={member}
+                  currentTime={currentTime}
+                />
+              </div>
+            );
+          })}
+          {enemies.map((enemy, index) => {
+            if (enemy.state === "dead") {
+              return (
               <div
                 key={`${gameState.currentMapId ?? MAP_ONE_ID}-${enemy.id}`}
                 className="dead-label"
@@ -704,10 +893,32 @@ function App() {
                 ) : null}
                 <HealthBar entity={enemy} />
               </div>
-            ) : (
+              );
+            }
+
+            const visualAsset = getEntityVisualAsset(enemy);
+            const visualMovement = visualMovementByEntityId[enemy.id];
+            const isVisuallyMoving =
+              Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
+            const shouldRunAnimation =
+              isVisuallyMoving || isEnemyTryingToMove(enemy);
+            const animation =
+              visualAsset.kind === "sprite"
+                ? getSpriteAnimation(
+                    visualAsset,
+                    shouldRunAnimation,
+                    getEnemyAnimationDirection(enemy, visualMovement),
+                  )
+                : null;
+
+            return (
               <div
                 key={`${gameState.currentMapId ?? MAP_ONE_ID}-${enemy.id}`}
-                className="entity-marker enemy"
+                className={`entity-marker ${
+                  visualAsset.kind === "sprite"
+                    ? "enemy sprite-entity"
+                    : getEntityVisualClassName(enemy)
+                }`}
                 onClick={() => commandPartyToTargetEnemy(enemy.id)}
                 style={{
                   transform: `translate(${enemy.position.x * cellSize}px, ${
@@ -716,6 +927,14 @@ function App() {
                 }}
                 title={getEnemyTooltip(enemy)}
               >
+                {animation ? (
+                  <SpriteAnimation
+                    alt={`Enemy ${index + 1}`}
+                    animation={animation}
+                    className="entity-sprite"
+                    currentTime={currentTime}
+                  />
+                ) : null}
                 <span className="map-marker-id">{index + 1}</span>
                 <EntityDebugLabel
                   name={`E${index + 1}`}
@@ -737,8 +956,8 @@ function App() {
                   />
                 ) : null}
               </div>
-            ),
-          )}
+            );
+          })}
           {resources.map((resource) =>
             resource.isDepleted ? (
               <div
@@ -764,7 +983,7 @@ function App() {
             ) : (
               <div
                 key={`${gameState.currentMapId ?? MAP_ONE_ID}-${resource.id}`}
-                className={`entity-marker resource ${resource.resourceType}${
+                className={`entity-marker ${getEntityVisualClassName(resource)}${
                   gathererTargetResourceIds.has(resource.id)
                     ? " gatherer-target"
                     : ""
