@@ -102,6 +102,7 @@ Companions are the physical party members.
 Party members currently support:
 
 id
+classId
 kind
 position
 state
@@ -215,6 +216,55 @@ moveIntentsByEntityId
 reservedPositionsByEntityId
 lastPositionsByEntityId
 State helpers should remain low-level and safe. Systems should own behavior decisions.
+
+Classes
+
+Classes represent party member capabilities.
+
+Roles represent behavior priorities.
+
+Class data should stay in game logic under client/src/game/.
+
+Current class model should remain structural only.
+
+Initial class-related types:
+
+type ClassPath =
+  | "honor"
+  | "primal"
+  | "arcane"
+  | "holy";
+
+type ClassId =
+  | "beginner"
+  | "blade"
+  | "aegis"
+  | "hunter"
+  | "beast"
+  | "elementalist"
+  | "runecaster"
+  | "lightbearer"
+  | "painbound";
+
+type ClassDefinition = {
+  id: ClassId;
+  path: ClassPath | null;
+  displayName: string;
+};
+
+Companions should store:
+
+classId: ClassId;
+
+Class definitions should live in:
+
+classes.ts
+
+Do not implement full ability systems, mana, resources, cooldowns, class progression, subclasses, or UI complexity until explicitly requested.
+
+Classes must not depend on specific weapons.
+Weapons are modifiers, not class identity.
+
 
 Commands
 Commands can be:

@@ -9,6 +9,7 @@ Party members exist physically in the world
 Low input, high control
 Command-based control instead of micromanagement
 Simple autonomous behavior
+
 Roles define priorities, not restrictions
 Classes define what a party member can do
 Exploration, combat, gathering, and party movement interact as one system
@@ -58,9 +59,8 @@ A leader can be a Defender, Fighter, Support, Gatherer, or None.
 If a party member is attacked, the party may switch target priority to that attacker.
 
 Roles
-Roles define behavior priorities.
+Roles should use skill tags and current context to prioritize actions when skill systems exist.
 
-Classes define available tools, stats, and abilities. Roles define how those tools are preferred.
 
 If a role has no valid high-priority action, the party member falls back to lower-priority behavior.
 
@@ -295,15 +295,118 @@ Exploration includes:
 hidden paths
 caves
 secret areas
+
 Classes
-Three main paths:
 
-Martial: Sword / Shield / Spear
-Arcane: Fire / Water / Wind
-Divine: Nature / Light / Pain
-Each path branches into subclasses later.
+Classes define what a party member can do: available tools, stats, and abilities.
 
-Classes define what a party member can do. Roles define how they prefer to behave.
+Roles define how a party member behaves and prioritizes those tools.
+
+Classes do not override role behavior.
+Roles do not restrict class capabilities.
+
+Skill usage is determined by:
+
+role priorities
+skill tags
+current context such as combat, danger, gathering, or party safety
+
+Starting Class
+
+Party members may begin as:
+
+Beginner
+
+Beginner is the starting class before choosing a class path.
+
+Class Paths
+
+There are four class paths:
+
+Honor Path
+Primal Path
+Arcane Path
+Holy Path
+
+Each path has two base classes.
+
+Honor Path
+
+Theme:
+
+discipline
+training
+control
+technique
+
+Base classes:
+
+Blade
+Aegis
+
+Blade is an offensive melee and precision combat class focused on fast, consistent damage.
+
+Aegis is a defensive combat class focused on mitigation, protection, and frontline control.
+
+Primal Path
+
+Theme:
+
+instinct
+survival
+natural power
+adaptability
+
+Base classes:
+
+Hunter
+Beast
+
+Hunter is a tracking, positioning, precision, hybrid combat, and utility class.
+
+Beast is a raw aggression class focused on sustain, feral combat, and resilience.
+
+Arcane Path
+
+Theme:
+
+learned magic
+reality manipulation
+
+Base classes:
+
+Elementalist
+Runecaster
+
+Elementalist is a damage-focused magic class with future support for AoE, DoT, and burst damage.
+
+Runecaster is a control and utility magic class focused on traps, buffs, preparation, and battlefield manipulation.
+
+Holy Path
+
+Theme:
+
+faith
+devotion
+divine power
+
+Base classes:
+
+Lightbearer
+Penitent
+
+Lightbearer is a healing, protection, and stabilization class.
+
+Penitent is a high-risk, high-reward class based on self-sacrifice mechanics.
+
+Class Rules
+
+Classes must not depend on specific weapons.
+
+Weapons are modifiers, not class identity.
+
+Class and subclass progression is future-facing and should not be implemented until explicitly requested.
+
 
 Player Experience
 The player should feel like they are leading a small expedition:
