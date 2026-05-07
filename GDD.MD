@@ -61,6 +61,21 @@ If a party member is attacked, the party may switch target priority to that atta
 Roles
 Roles should use skill tags and current context to prioritize actions when skill systems exist.
 
+Fallback Behavior Rule
+
+Roles define priorities, not exclusivity.
+
+If a role has no valid primary or secondary action,
+the party member may fall back to light combat participation.
+
+Fallback combat must respect role identity:
+
+- Fighters: full combat participation
+- Defenders: moderate combat participation
+- Supports: light, safe combat participation
+- Gatherers: only when forced or idle
+
+Fallback actions must never override higher-priority role actions.
 
 If a role has no valid high-priority action, the party member falls back to lower-priority behavior.
 
@@ -302,8 +317,17 @@ Classes define what a party member can do: available tools, stats, and abilities
 
 Roles define how a party member behaves and prioritizes those tools.
 
+Classes define what a party member can do (tools, abilities, stats).
+
+Roles define how a party member behaves and prioritizes those tools.
+
 Classes do not override role behavior.
 Roles do not restrict class capabilities.
+
+Skill usage is determined by:
+- role priorities
+- skill tags
+- current context
 
 Skill usage is determined by:
 
@@ -407,6 +431,71 @@ Weapons are modifiers, not class identity.
 
 Class and subclass progression is future-facing and should not be implemented until explicitly requested.
 
+Skills (Prototype Phase)
+
+Skills are simple abilities tied to classes.
+
+Skills:
+- are defined by tags
+- do not yet use full cooldown, mana, or advanced systems
+- are used as simple extensions of existing behavior
+
+Skill usage is determined by:
+- role priorities
+- skill tags
+- current context (combat, danger, gathering, safety)
+
+Skill Tags
+
+Skills use tag categories:
+
+Offensive:
+- Offensive
+- Damage
+- DoT
+- Single Target
+- Multi Target
+- AoE
+- Trap
+- Summon — Attack
+
+Defensive:
+- Defensive
+- Shield
+- Heal
+- Safety
+- Damage Mitigation
+- Elemental Mitigation
+- Summon — Defense
+
+Control / Utility:
+- Control
+- Taunt
+- Aggro
+- Buff
+- Cleanse
+- Summon — Support
+
+Movement:
+- Mobility
+- Dash
+- Jump
+- Escape
+
+Gathering:
+- Gathering
+- Resource Buff
+- Tool Buff
+
+Cost:
+- Self Cost — HP
+
+Important Rules:
+
+- Roles determine preferred skill usage, not classes
+- Classes define available skills, not behavior
+- Skills must remain simple during this phase
+- This is a prototype system, not a full ability system
 
 Player Experience
 The player should feel like they are leading a small expedition:
