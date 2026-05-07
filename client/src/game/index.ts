@@ -1,6 +1,9 @@
 export type {
   AutonomousEntity,
   BaseEntity,
+  ClassDefinition,
+  ClassId,
+  ClassPath,
   CombatEntity,
   CommandPriority,
   Companion,
@@ -63,10 +66,12 @@ export {
   setCompanionRole,
   setLeaderIntent,
   setPartyLeader,
+  setPartyMemberClass,
   setPartyMemberRole,
   setPartyOrder,
   updateEntity,
 } from "./state";
+export { CLASS_DEFINITIONS } from "./classes";
 export {
   getOrderedFormationMembers,
   getOrderedPartyMembers,

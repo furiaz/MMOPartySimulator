@@ -4,6 +4,7 @@ import "./App.css";
 import {
   addEnemy,
   addEntity,
+  CLASS_DEFINITIONS,
   companionIds,
   companionStartPositions,
   createCompanion,
@@ -32,6 +33,7 @@ import {
   setAutoModeEnabled,
   setLeaderIntent,
   setPartyLeader,
+  setPartyMemberClass,
   setPartyMemberRole,
   setPartyOrder,
   startGameLoop,
@@ -41,6 +43,7 @@ import {
   TELEPORTER_RANGE,
   updateEntity,
   type Companion,
+  type ClassId,
   type CombatEntity,
   type Enemy,
   type GameEntity,
@@ -55,6 +58,17 @@ const partyMemberRoleOptions: PartyMemberRole[] = [
   "fighter",
   "support",
   "gatherer",
+];
+const partyMemberClassOptions: ClassId[] = [
+  "beginner",
+  "blade",
+  "aegis",
+  "hunter",
+  "beast",
+  "elementalist",
+  "runecaster",
+  "lightbearer",
+  "penitent",
 ];
 const debugMap = createDebugMap();
 const cellSize = 28;
@@ -89,8 +103,15 @@ function getEnemyTooltip(enemy: Enemy): string {
   ].join("\n");
 }
 
-function getPartyMarkerClass(entityId: string, leaderId: string): string {
-  return `entity-marker companion${entityId === leaderId ? " leader" : ""}`;
+function getPartyMarkerClass(member: Companion, leaderId: string): string {
+  if (member.id === leaderId) {
+    return "entity-marker companion leader";
+  }
+
+  const classPath = CLASS_DEFINITIONS[member.classId].path;
+  const classPathClass = classPath ? ` class-path-${classPath}` : "";
+
+  return `entity-marker companion${classPathClass}`;
 }
 
 function createInitialState(): GameState {
@@ -299,6 +320,10 @@ function App() {
     role: PartyMemberRole,
   ) {
     setGameState((state) => setPartyMemberRole(state, entityId, role));
+  }
+
+  function changePartyMemberClass(entityId: string, classId: ClassId) {
+    setGameState((state) => setPartyMemberClass(state, entityId, classId));
   }
 
   function changePartyOrder(entityId: string, partyOrder: number) {
@@ -546,7 +571,7 @@ function App() {
           {partyMembers.map((member, index) => (
             <div
               key={member.id}
-              className={getPartyMarkerClass(member.id, gameState.partyLeaderId)}
+              className={getPartyMarkerClass(member, gameState.partyLeaderId)}
               style={{
                 transform: `translate(${member.position.x * cellSize}px, ${
                   member.position.y * cellSize
@@ -711,10 +736,27 @@ function App() {
                           {formatCoordinate(member.position.y)}) | State {member.state} |
                           HP {member.health} | Target{" "}
                           {member.currentTargetId ?? "none"} | Gather Speed{" "}
-                          {member.gatherSpeed} | Role {member.role} | Order{" "}
+                          {member.gatherSpeed} | Class{" "}
+                          {CLASS_DEFINITIONS[member.classId].displayName} | Role{" "}
+                          {member.role} | Order{" "}
                           {member.partyOrder} | Leader{" "}
                           {gameState.partyLeaderId === member.id ? "yes" : "no"}
                         </span>
+                        <select
+                          value={member.classId}
+                          onChange={(event) =>
+                            changePartyMemberClass(
+                              member.id,
+                              event.target.value as ClassId,
+                            )
+                          }
+                        >
+                          {partyMemberClassOptions.map((classId) => (
+                            <option key={classId} value={classId}>
+                              {CLASS_DEFINITIONS[classId].displayName}
+                            </option>
+                          ))}
+                        </select>
                         <select
                           value={member.role}
                           onChange={(event) =>

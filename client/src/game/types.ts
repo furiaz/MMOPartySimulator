@@ -12,6 +12,25 @@ export type EnemyAggressionMode = "passive" | "aggressive";
 
 export type CommandPriority = "autonomous" | "direct";
 
+export type ClassPath = "honor" | "primal" | "arcane" | "holy";
+
+export type ClassId =
+  | "beginner"
+  | "blade"
+  | "aegis"
+  | "hunter"
+  | "beast"
+  | "elementalist"
+  | "runecaster"
+  | "lightbearer"
+  | "penitent";
+
+export type ClassDefinition = {
+  id: ClassId;
+  path: ClassPath | null;
+  displayName: string;
+};
+
 export type PartyMemberRole =
   | "defender"
   | "fighter"
@@ -96,12 +115,14 @@ export type DebugTelemetryEventType =
   | "entity_died"
   | "gather_started"
   | "resource_depleted"
+  | "class_changed"
   | "role_changed";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
   entityId: string;
   kind: EntityKind;
+  classId?: ClassId;
   role?: PartyMemberRole;
   state: EntityState;
   position: Position;
@@ -126,6 +147,8 @@ export type DebugTelemetryEvent = {
   targetId?: string | null;
   previousTargetId?: string | null;
   amount?: number;
+  previousClassId?: ClassId;
+  nextClassId?: ClassId;
   previousRole?: PartyMemberRole;
   nextRole?: PartyMemberRole;
   reason?: string;
@@ -234,6 +257,7 @@ export type Enemy = LivingEntity & {
 
 export type Companion = LivingEntity & {
   kind: "companion";
+  classId: ClassId;
   role: PartyMemberRole;
   partyOrder: number;
   followTargetId: string;

@@ -30,6 +30,7 @@ Current game logic is organized as flat TypeScript modules under client/src/game
 Current files include:
 
 types.ts
+classes.ts
 entities.ts
 state.ts
 commands.ts
@@ -129,6 +130,7 @@ sort party members by role priority and party order
 identify busy gatherers
 set party leader
 set party member role
+set party member class
 set party order
 Leader
 Leader is not a role.
@@ -244,7 +246,7 @@ type ClassId =
   | "elementalist"
   | "runecaster"
   | "lightbearer"
-  | "painbound";
+  | "penitent";
 
 type ClassDefinition = {
   id: ClassId;
@@ -260,7 +262,43 @@ Class definitions should live in:
 
 classes.ts
 
-Do not implement full ability systems, mana, resources, cooldowns, class progression, subclasses, or UI complexity until explicitly requested.
+Skills (Prototype Phase)
+
+Skills are simple class-based actions used to extend existing behavior.
+
+Skill definitions should live in:
+client/src/game/skills.ts
+
+Skills should:
+- be data-driven
+- use simple tag arrays
+- avoid complex systems (no mana, no full cooldown framework)
+
+Skill execution should reuse existing systems where possible:
+- attackSystem.ts for damage
+- defendSystem.ts for defensive effects
+- gatherSystem.ts for gathering effects
+
+Skill visuals should be represented through:
+- combat feedback events
+- temporary state flags
+
+Do NOT implement:
+- full ability frameworks
+- casting systems
+- advanced targeting systems
+
+Skill Range Standard
+
+All skill ranges must use numeric values.
+
+Examples:
+- Melee: 1
+- Short range: 3–4
+- Medium range: 4–6
+- Long range: 6+
+
+Do not use vague terms like "short" or "medium" in implementation.
 
 Classes must not depend on specific weapons.
 Weapons are modifiers, not class identity.
@@ -622,12 +660,14 @@ damage dealt
 entity death
 gathering start
 resource depletion
+class changes
 role changes
 Telemetry snapshots may include:
 
 tick
 entity id
 kind
+class id
 role
 state
 position
@@ -666,7 +706,7 @@ Do NOT implement unless requested:
 Zones and teleport points
 Full skill system
 Inventory items/equipment
-Class/subclass progression
+Class/subclass progression beyond structural class identity
 Networking/server authority
 Backend persistence
 Advanced aggro/threat systems

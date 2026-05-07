@@ -41,6 +41,7 @@ Before making any changes:
   - GTD.md (technical architecture rules)
 
 These documents define expected behavior and must be respected.
+You are not to edit those documents. Ask the user to do it.
 
 ---
 

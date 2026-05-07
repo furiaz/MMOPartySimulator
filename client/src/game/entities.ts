@@ -1,5 +1,6 @@
 import type {
   AutonomousEntity,
+  ClassId,
   CombatEntity,
   Companion,
   Enemy,
@@ -53,10 +54,12 @@ export function createCompanion(
   followTargetId: string,
   role: PartyMemberRole = "none",
   partyOrder = 1,
+  classId: ClassId = "beginner",
 ): Companion {
   return {
     id,
     kind: "companion",
+    classId,
     role,
     partyOrder,
     position,

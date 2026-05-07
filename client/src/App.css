@@ -210,6 +210,28 @@
   background: #16a34a;
 }
 
+.companion.class-path-honor {
+  background: #7f1d1d;
+}
+
+.companion.class-path-primal {
+  background: #14532d;
+}
+
+.companion.class-path-arcane {
+  background: #7dd3fc;
+}
+
+.companion.class-path-holy {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px #facc15, 0 1px 4px rgba(15, 23, 42, 0.32);
+}
+
+.companion.class-path-holy .map-marker-id,
+.companion.class-path-arcane .map-marker-id {
+  color: #1f2937;
+}
+
 .leader {
   background: #2563eb;
 }

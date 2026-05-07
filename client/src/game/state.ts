@@ -16,6 +16,7 @@ import {
 import type {
   CombatFeedbackEvent,
   CombatFeedbackType,
+  ClassId,
   DebugNavigationReason,
   DebugTelemetryState,
   ActiveTeleport,
@@ -302,6 +303,34 @@ export function setPartyMemberRole(
     entityId: partyMember.id,
     previousRole: partyMember.role,
     nextRole: role,
+  });
+}
+
+export function setPartyMemberClass(
+  state: GameState,
+  entityId: string,
+  classId: ClassId,
+): GameState {
+  const partyMember = state.entities[entityId];
+
+  if (partyMember?.kind !== "companion") {
+    return state;
+  }
+
+  const nextState = updateEntity(state, {
+    ...partyMember,
+    classId,
+  });
+
+  if (partyMember.classId === classId) {
+    return nextState;
+  }
+
+  return appendDebugTelemetryEvent(nextState, {
+    type: "class_changed",
+    entityId: partyMember.id,
+    previousClassId: partyMember.classId,
+    nextClassId: classId,
   });
 }
 

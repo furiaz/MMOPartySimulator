@@ -7,6 +7,7 @@ import {
   toNavigationNode,
 } from "./navigation";
 import type {
+  ClassId,
   CommandPriority,
   DebugMovementResult,
   DebugNavigationTelemetry,
@@ -182,6 +183,8 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.entityId,
     event.targetId ?? "",
     event.previousTargetId ?? "",
+    event.previousClassId ?? "",
+    event.nextClassId ?? "",
     event.formationPhase ?? "",
     event.reason ?? "",
   ].join("|");
@@ -207,6 +210,7 @@ function getEntitySnapshot(
     tick,
     entityId: entity.id,
     kind: entity.kind,
+    classId: getClassId(entity),
     role: getRole(entity),
     state: entity.state,
     position: { ...entity.position },
@@ -635,6 +639,10 @@ function getCommandPriority(entity: GameEntity): CommandPriority | undefined {
 
 function getRole(entity: GameEntity): PartyMemberRole | undefined {
   return entity.kind === "companion" ? entity.role : undefined;
+}
+
+function getClassId(entity: GameEntity): ClassId | undefined {
+  return entity.kind === "companion" ? entity.classId : undefined;
 }
 
 function getHealth(entity: GameEntity): number | null {
