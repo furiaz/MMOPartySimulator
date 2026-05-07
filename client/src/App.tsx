@@ -80,7 +80,7 @@ const partyMemberClassOptions: ClassId[] = [
   "penitent",
 ];
 const debugMap = createDebugMap();
-const cellSize = 28;
+const cellSize = 36;
 const visualMovementGraceMs = 560;
 const visualMovementReachedDistance = 1;
 
