@@ -158,6 +158,7 @@ export type SkillShieldBlockState = {
   id: string;
   ownerId: string;
   position: Position;
+  rotationRadians: number;
   expiresAt: number;
   remainingBlocks: number;
 };

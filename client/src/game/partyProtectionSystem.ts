@@ -50,7 +50,11 @@ function canProtectPartyMember(
     return false;
   }
 
-  if (entity.kind === "companion" && isGathererBusy(state, entity)) {
+  if (
+    entity.kind === "companion" &&
+    entity.id !== attackedMember.id &&
+    isGathererBusy(state, entity)
+  ) {
     const leader = getPartyLeader(state);
 
     if (leader && !isWithinFollowLeash(state, attacker, leader)) {
@@ -66,8 +70,9 @@ function canProtectPartyMember(
     return false;
   }
 
-  return (
-    entity.state === "idle" ||
-    entity.state === "follow"
-  );
+  if (entity.id === attackedMember.id) {
+    return entity.state === "idle" || entity.state === "follow" || entity.state === "gather";
+  }
+
+  return entity.state === "idle" || entity.state === "follow";
 }

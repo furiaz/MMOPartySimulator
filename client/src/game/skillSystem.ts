@@ -7,7 +7,6 @@ import {
   addCombatFeedback,
   addSkillVisualEvent,
   getEntityById,
-  isWalkablePosition,
   updateEntity,
   type GameState,
 } from "./state";
@@ -21,11 +20,14 @@ import type {
   GameEntity,
   Position,
   SkillDefinition,
+  SkillShieldBlockState,
 } from "./types";
 
 const SKILL_COOLDOWN_MS = 5000;
 const LOW_HEALTH_BUFFER = 1;
 const VISUAL_DURATION_MS = 600;
+const SHIELD_OFFSET_DISTANCE = 1;
+const DEFAULT_SHIELD_DIRECTION: Position = { x: 0, y: -1 };
 
 type SkillUse = {
   skill: SkillDefinition;
@@ -54,6 +56,27 @@ export function updateSkillSystem(state: GameState): GameState {
   }
 
   return nextState;
+}
+
+export function updateSkillShieldBlockPositions(state: GameState): GameState {
+  const skillShieldBlocksById = Object.fromEntries(
+    Object.entries(state.skillShieldBlocksById ?? {})
+      .map(([shieldId, shield]) => {
+        const owner = state.entities[shield.ownerId];
+
+        if (!isCompanion(owner)) {
+          return null;
+        }
+
+        return [shieldId, getUpdatedShieldBlock(state, owner, shield)];
+      })
+      .filter((entry): entry is [string, SkillShieldBlockState] => Boolean(entry)),
+  );
+
+  return {
+    ...state,
+    skillShieldBlocksById,
+  };
 }
 
 function canUsePrototypeSkill(
@@ -426,7 +449,7 @@ function applyShieldBlock(
     return state;
   }
 
-  const position = getShieldPosition(state, caster);
+  const shieldPlacement = getShieldPlacement(state, caster);
   const shieldId = `${caster.id}-${skill.id}`;
   let nextState: GameState = {
     ...state,
@@ -435,7 +458,8 @@ function applyShieldBlock(
       [shieldId]: {
         id: shieldId,
         ownerId: caster.id,
-        position,
+        position: shieldPlacement.position,
+        rotationRadians: shieldPlacement.rotationRadians,
         expiresAt: now + skill.effect.durationMs,
         remainingBlocks: skill.effect.blocks,
       },
@@ -654,7 +678,85 @@ function hasActiveShield(state: GameState, caster: Companion): boolean {
   );
 }
 
-function getShieldPosition(state: GameState, caster: Companion): Position {
+function getUpdatedShieldBlock(
+  state: GameState,
+  owner: Companion,
+  shield: SkillShieldBlockState,
+): SkillShieldBlockState {
+  const shieldPlacement = getShieldPlacement(
+    state,
+    owner,
+    getDirectionFromShieldRotation(shield.rotationRadians),
+  );
+
+  return {
+    ...shield,
+    position: shieldPlacement.position,
+    rotationRadians: shieldPlacement.rotationRadians,
+  };
+}
+
+function getShieldPlacement(
+  state: GameState,
+  caster: Companion,
+  fallbackDirection = DEFAULT_SHIELD_DIRECTION,
+): { position: Position; rotationRadians: number } {
+  const direction = getUnitDirection(
+    getShieldDirection(state, caster),
+    fallbackDirection,
+  );
+
+  if (direction.x === 0 && direction.y === 0) {
+    return {
+      position: caster.position,
+      rotationRadians: 0,
+    };
+  }
+
+  return {
+    position: {
+      x: caster.position.x + direction.x * SHIELD_OFFSET_DISTANCE,
+      y: caster.position.y + direction.y * SHIELD_OFFSET_DISTANCE,
+    },
+    rotationRadians: Math.atan2(direction.y, direction.x) - Math.PI / 2,
+  };
+}
+
+function getUnitDirection(
+  direction: Position,
+  fallbackDirection: Position,
+): Position {
+  const directionLength = Math.hypot(direction.x, direction.y);
+
+  if (directionLength > 0) {
+    return {
+      x: direction.x / directionLength,
+      y: direction.y / directionLength,
+    };
+  }
+
+  const fallbackLength = Math.hypot(fallbackDirection.x, fallbackDirection.y);
+
+  if (fallbackLength === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: fallbackDirection.x / fallbackLength,
+    y: fallbackDirection.y / fallbackLength,
+  };
+}
+
+function getDirectionFromShieldRotation(rotationRadians: number): Position {
+  const directionRadians = rotationRadians + Math.PI / 2;
+
+  return {
+    x: Math.cos(directionRadians),
+    y: Math.sin(directionRadians),
+  };
+}
+
+function getShieldDirection(state: GameState, caster: Companion): Position {
   const enemy = findEnemyTarget(state, caster, 5);
   const direction = enemy
     ? {
@@ -663,18 +765,20 @@ function getShieldPosition(state: GameState, caster: Companion): Position {
       }
     : getLeaderMovementDirection(state, caster);
 
-  if (direction.x === 0 && direction.y === 0) {
-    return caster.position;
+  if (direction.x !== 0 || direction.y !== 0) {
+    return direction;
   }
 
-  const position = {
-    x: caster.position.x + direction.x,
-    y: caster.position.y + direction.y,
-  };
+  const previousPosition = state.followTrailsByEntityId[caster.id]?.[0];
 
-  return isWalkablePosition(state, position, caster.id)
-    ? position
-    : caster.position;
+  if (!previousPosition) {
+    return direction;
+  }
+
+  return {
+    x: Math.sign(caster.position.x - previousPosition.x),
+    y: Math.sign(caster.position.y - previousPosition.y),
+  };
 }
 
 function isHealingSkill(skill: SkillDefinition): boolean {

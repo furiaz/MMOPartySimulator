@@ -568,7 +568,7 @@ function App() {
               style={{
                 transform: `translate(${shield.position.x * cellSize}px, ${
                   shield.position.y * cellSize
-                }px)`,
+                }px) rotate(${shield.rotationRadians}rad)`,
               }}
               title="Guard Wall"
             />

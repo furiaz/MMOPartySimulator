@@ -9,7 +9,10 @@ import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { updateRoleSystem } from "./roleSystem";
-import { updateSkillSystem } from "./skillSystem";
+import {
+  updateSkillShieldBlockPositions,
+  updateSkillSystem,
+} from "./skillSystem";
 import {
   isMapTeleportPoiActive,
   updateTeleportSystem,
@@ -70,6 +73,7 @@ export function updateGame(state: GameState): GameState {
   nextState = updateEnemyAISystem(nextState);
   nextState = updateAttackSystem(nextState, movedEntityIds);
   nextState = updateGatherSystem(nextState, movedEntityIds);
+  nextState = updateSkillShieldBlockPositions(nextState);
 
   return recordDebugTelemetryTick(
     state,
