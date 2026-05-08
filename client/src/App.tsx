@@ -42,7 +42,6 @@ import {
   setPartyLeader,
   setPartyMemberClass,
   setPartyMemberRole,
-  setPartyOrder,
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
@@ -324,15 +323,8 @@ function createInitialState(): GameState {
     companionIds[0],
     companionStartPositions[0],
     companionIds[0],
-    "none",
+    "fighter",
     0,
-  );
-  const gatherer = createCompanion(
-    companionIds[1],
-    companionStartPositions[1],
-    leader.id,
-    "gatherer",
-    1,
   );
   const enemies = enemyIds.map((enemyId, index) =>
     createEnemy(enemyId, mapOneEnemyStartPositions[index], "aggressive"),
@@ -343,7 +335,7 @@ function createInitialState(): GameState {
     }),
   );
 
-  const baseState = [leader, gatherer, ...resources].reduce(addEntity, {
+  const baseState = [leader, ...resources].reduce(addEntity, {
     entities: {},
     inventory: createEmptyPartyInventory(),
     map: debugMap,
@@ -606,10 +598,6 @@ function App() {
 
   function changePartyMemberClass(entityId: string, classId: ClassId) {
     setGameState((state) => setPartyMemberClass(state, entityId, classId));
-  }
-
-  function changePartyOrder(entityId: string, partyOrder: number) {
-    setGameState((state) => setPartyOrder(state, entityId, partyOrder));
   }
 
   function changePartyLeader(entityId: string) {
@@ -1195,6 +1183,12 @@ function App() {
           inventory={inventory}
           isVisible={showInventoryDebug}
         />
+        <button
+          className="inventory-toggle-button"
+          onClick={toggleInventoryDebug}
+        >
+          {showInventoryDebug ? "Close Inventory" : "Open Inventory"}
+        </button>
         <CompanionVitalsPanel members={partyMembers} />
 
         <div
@@ -1297,16 +1291,6 @@ function App() {
                             </option>
                           ))}
                         </select>
-                        <input
-                          type="number"
-                          value={member.partyOrder}
-                          onChange={(event) =>
-                            changePartyOrder(
-                              member.id,
-                              Number(event.target.value),
-                            )
-                          }
-                        />
                         <button onClick={() => changePartyLeader(member.id)}>
                           Set Leader
                         </button>
@@ -1345,9 +1329,6 @@ function App() {
                   Refresh Gather Points
                 </button>
                 <button onClick={addTestWoodToInventory}>Add Test Wood</button>
-                <button onClick={toggleInventoryDebug}>
-                  {showInventoryDebug ? "Close Inventory" : "Open Inventory"}
-                </button>
                 <button onClick={toggleEntityInfo}>
                   {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
                 </button>

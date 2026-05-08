@@ -544,9 +544,16 @@
   left: auto;
 }
 
-.inventory-debug-panel {
+.inventory-toggle-button {
   position: fixed;
   top: 16px;
+  right: 16px;
+  z-index: 13;
+}
+
+.inventory-debug-panel {
+  position: fixed;
+  top: 64px;
   right: 16px;
   z-index: 12;
   width: min(360px, calc(100vw - 32px));

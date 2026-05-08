@@ -1,6 +1,5 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
 import { addItemToInventoryState } from "./inventory";
-import { getPartySizeLimit } from "./leveling";
 import {
   addEntity,
   findClosestAvailablePosition,
@@ -30,23 +29,21 @@ export function debugAddCompanion(
     (entity) => entity.kind === "companion",
   ).length;
 
-  if (companionCount >= getPartySizeLimit(state)) {
-    return state;
-  }
-
   const partyOrder = companionCount;
   const availablePosition = findClosestAvailablePosition(state, position);
 
-  return addEntity(
+  const nextState = addEntity(
     state,
     createCompanion(
       companionId,
       availablePosition,
       followTargetId,
-      "none",
+      "fighter",
       partyOrder,
     ),
   );
+
+  return ensurePartyLeader(nextState);
 }
 
 export function debugAddCompanionToParty(
@@ -75,6 +72,14 @@ export function debugRemoveCompanion(
 ): GameState {
   if (!getEntityById(state, companionId)) {
     return state;
+  }
+
+  const companionCount = Object.values(state.entities).filter(
+    (entity) => entity.kind === "companion",
+  ).length;
+
+  if (companionCount <= 1) {
+    return ensurePartyLeader(state);
   }
 
   const entities = { ...state.entities };
@@ -243,6 +248,19 @@ function getFallbackLeaderId(entities: Record<string, GameEntity>): string {
       (entity) => entity.kind === "companion",
     )?.id ?? ""
   );
+}
+
+function ensurePartyLeader(state: GameState): GameState {
+  const leader = getEntityById(state, state.partyLeaderId);
+
+  if (leader?.kind === "companion") {
+    return state;
+  }
+
+  return {
+    ...state,
+    partyLeaderId: getFallbackLeaderId(state.entities),
+  };
 }
 
 function getRandomOpenPosition(
