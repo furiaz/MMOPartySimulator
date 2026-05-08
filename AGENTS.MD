@@ -51,7 +51,8 @@ When making changes:
 - Do NOT rewrite entire files unless explicitly asked
 - Prefer minimal diffs over large changes
 - Do NOT change project structure without being asked
-- Do NOT assume missing systems — ask or keep it minimal
+- Do NOT assume missing systems - ask or keep it minimal
+
 
 ---
 
@@ -93,11 +94,13 @@ Debugging / Fixing:
 
 ## World Structure
 
-- The world is divided into large zones/fields
+- The final world is divided into large zones/fields
 - Zones are connected via teleport points
 - Each zone is a separate map space
 - Entities will eventually include a zoneId in addition to position (x, y)
-- Do not implement zone or teleport logic unless explicitly requested
+- Prototype/debug map transitions may exist only when documented in GDD.md and GTD.md
+- Do not implement the final zone system, persistent zone state, or a full teleport network unless explicitly requested
+
 
 ## Map Creation Rules
 

@@ -1,242 +1,276 @@
-GTD.md
-Overview
+# GTD.md
+
+## Overview
+
 This document defines the current technical structure of the game.
 
 The project follows a simulation-first architecture:
 
-Game logic runs independently of the UI
-UI reads and displays game state
-Systems update the world over time for idle/AFK play
-Design intent is defined in GDD.md. This document defines how that intent is represented technically.
+- Game logic runs independently of the UI
+- UI reads and displays game state
+- Systems update the world over time for idle/AFK play
 
-Core Architecture
+Design intent is defined in `GDD.md`. This document defines how that intent is represented technically.
+
+---
+
+## Core Architecture
+
 The game is divided into:
 
-Game Logic: client/src/game/
-UI Layer: React components in client/src/
-Game logic must NOT depend on React.
+- Game Logic: `client/src/game/`
+- UI Layer: React components in `client/src/`
+- Visual asset registry and sprite helpers: `client/src/visualAssets.ts` and `client/src/SpriteAnimation.tsx`
 
-React may:
+Game logic must not depend on React.
 
-display game state
-issue commands into game logic
-start/stop the simulation loop for development
-expose temporary debug controls
-React must NOT contain core simulation rules.
+React may display game state, issue commands into game logic, start/stop the simulation loop for development, expose temporary debug controls, and render temporary visual effects and sprite animations from game state.
 
-Folder Structure
-Current game logic is organized as flat TypeScript modules under client/src/game/.
+React must not contain core simulation rules.
+
+---
+
+## Folder Structure
+
+Current game logic is organized as flat TypeScript modules under `client/src/game/`.
 
 Current files include:
 
-types.ts
-classes.ts
-entities.ts
-state.ts
-commands.ts
-gameLoop.ts
-updateGame.ts
-movementCadence.ts
-followSystem.ts
-attackSystem.ts
-gatherSystem.ts
-defendSystem.ts
-enemyAISystem.ts
-roleSystem.ts
-roleProfiles.ts
-partySystem.ts
-partyFormationSystem.ts
-partyProtectionSystem.ts
-targetSelection.ts
-explorationSystem.ts
-attackSlots.ts
-debugTools.ts
-debugTelemetry.ts
-debugMap.ts
-index.ts
+- `attackSlots.ts`
+- `attackSystem.ts`
+- `classes.ts`
+- `commands.ts`
+- `debugMap.ts`
+- `debugTelemetry.ts`
+- `debugTools.ts`
+- `defendSystem.ts`
+- `enemyAISystem.ts`
+- `entities.ts`
+- `explorationSystem.ts`
+- `followSystem.ts`
+- `gameLoop.ts`
+- `gatherSystem.ts`
+- `index.ts`
+- `leveling.ts`
+- `movementCadence.ts`
+- `navigation.ts`
+- `partyFormationSystem.ts`
+- `partyProtectionSystem.ts`
+- `partySpacing.ts`
+- `partySystem.ts`
+- `roleProfiles.ts`
+- `roleSystem.ts`
+- `skillRolePreferences.ts`
+- `skillRuntime.ts`
+- `skills.ts`
+- `skillSystem.ts`
+- `state.ts`
+- `targetSelection.ts`
+- `teleportSystem.ts`
+- `types.ts`
+- `updateGame.ts`
+
 Do not restructure the project unless explicitly requested.
 
 New helper modules may be added when they keep responsibilities clear.
 
-Entity Model
+---
+
+## Entity Model
+
 Entities represent world objects and actors.
 
-Entity Kinds
 Current entity kinds:
 
-companion
-enemy
-resource
+```ts
+type EntityKind = "companion" | "enemy" | "resource";
+```
 
 The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
 
-Entity States
 Current execution states:
 
-idle
-follow
-attack
-gather
-defend
-dead
+```ts
+type EntityState =
+  | "idle"
+  | "follow"
+  | "attack"
+  | "gather"
+  | "defend"
+  | "dead";
+```
+
 States describe what an entity is currently doing.
 
 Roles describe behavior priorities and should not be confused with states.
 
-Position Model
-Positions use numeric x and y coordinates.
+---
+
+## Position Model
+
+Positions use numeric `x` and `y` coordinates.
 
 Movement is continuous-style step movement, not strict tile-by-tile movement.
 
-Entities move toward target positions by a small fixed step amount.
+Entities move toward target positions by a fixed step amount.
 
-The current map/debug map may still provide:
+Current movement step constants live in `entities.ts`.
 
-bounds
-walls
-debug layout data
-These are used for simple collision, wall checks, exploration, and movement validation.
+Current movement model supports bounds checks, wall checks, collision checks, movement reservations, simple pathing, fallback movement, party pass-through in specific party movement cases, and party swaps in specific movement edge cases.
 
-Party Members
+---
+
+## Party Members
+
 Companions are the physical party members.
 
 Party members currently support:
 
-id
-classId
-kind
-position
-state
-health
-maxHealth
-combat timing
-gather timing
-gatherSpeed
-currentTargetId
-commandPriority
-role
-partyOrder
-followTargetId
-defendPosition
+- `id`
+- `kind`
+- `position`
+- `state`
+- `health`
+- `maxHealth`
+- `lastAttackAt`
+- `classId`
+- `characterLevel`
+- `characterXp`
+- `lastCharacterXpGained`
+- `role`
+- `partyOrder`
+- `followTargetId`
+- `defendPosition`
+- `currentTargetId`
+- `lastGatherAt`
+- `gatherSpeed`
+- `commandPriority`
 
-Shared party-member behavior is handled through partySystem.ts.
+Shared party-member behavior is handled through `partySystem.ts`.
 
-Current helper responsibilities include:
+Current helper responsibilities include identifying party members, getting living party members, getting the current party leader, sorting party members, identifying busy gatherers, setting party leader, setting role, setting class, and setting party order.
 
-identify party members
-get living party members
-get the current party leader
-sort party members by role priority and party order
-identify busy gatherers
-set party leader
-set party member role
-set party member class
-set party order
-Leader
+---
+
+## Leader
+
 Leader is not a role.
 
 Leader is stored in game state as:
 
+```ts
 partyLeaderId: string;
+```
 
+The current leader provides party intent, selects points of interest, selects enemy targets, and is a companion / physical party member.
 
-The current leader:
-
-provides party intent
-selects point of interest
-selects enemy target
-is a companion / physical party member
 Systems must not assume any separate player entity exists.
-
 
 If the configured leader is missing or dead, party helper logic falls back to the first living party member.
 
-Roles
+Leader handoff uses a short tick buffer so systems can settle after leader changes.
+
+---
+
+## Roles
+
 Roles apply to party members.
 
-Role values:
+Current role values:
 
+```ts
 type PartyMemberRole =
   | "defender"
   | "fighter"
   | "support"
   | "gatherer"
   | "none";
-none is a safe default/unassigned role.
+```
 
-Current role ownership:
+`none` is a safe default/unassigned role.
 
-Party members have roles
-CompanionRole aliases PartyMemberRole
+Party members have roles, and `CompanionRole` aliases `PartyMemberRole`.
 
-Role behavior is handled by:
+Role behavior is handled by `roleSystem.ts`, `roleProfiles.ts`, and role-specific systems such as `defendSystem.ts` and `gatherSystem.ts`.
 
-roleSystem.ts
-roleProfiles.ts
-role-specific systems such as defendSystem.ts and gatherSystem.ts
-Party Order
+Roles define priorities. Classes define available capabilities.
+
+---
+
+## Party Order
+
 Party order determines ordering within a role group.
 
 Party members use:
 
+```ts
 partyOrder: number;
-Formation/member ordering sorts by:
+```
 
-role priority
-party order
-id
+Formation/member ordering sorts by role priority, party order, and id.
+
 Current role priority:
 
-defender: 0
-fighter: 1
-support: 2
-gatherer: 3
-none: 4
-Game State
-GameState is the central simulation container.
+- defender: 0
+- fighter: 1
+- support: 2
+- gatherer: 3
+- none: 4
 
-Current responsibilities:
+---
 
-stores all entities
-stores inventory counters
-stores optional map/debug map data
-stores auto-mode state
-stores simulation tick
-stores party leader id
-stores leader intent
-stores explored position records
-stores follow trail records
-stores movement planning data for the current tick
-stores defender wait/blocking state
-stores party formation state
-stores combat feedback events
-stores debug telemetry
+## Game State
+
+`GameState` is the central simulation container.
+
+Current responsibilities include storing entities, inventory counters, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick, party leader id, leader handoff ticks, leader intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, and debug telemetry.
+
 Current movement planning fields include:
 
-failedMoveByEntityId
-moveIntentsByEntityId
-reservedPositionsByEntityId
-lastPositionsByEntityId
+- `failedMoveByEntityId`
+- `movementFailuresByEntityId`
+- `moveIntentsByEntityId`
+- `reservedPositionsByEntityId`
+- `movementPathsByEntityId`
+- `movementDecisionsByEntityId`
+- `lastPositionsByEntityId`
+
+Current prototype skill runtime fields include:
+
+- `skillMarksByEnemyId`
+- `skillSelfBuffsByCompanionId`
+- `skillBindsByEnemyId`
+- `skillShieldBlocksById`
+- `skillCooldownsByCompanionId`
+- `skillVisualEvents`
+
 State helpers should remain low-level and safe. Systems should own behavior decisions.
 
-Classes
+---
+
+## Classes
 
 Classes represent party member capabilities.
 
 Roles represent behavior priorities.
 
-Class data should stay in game logic under client/src/game/.
+Class data stays in game logic under `client/src/game/`.
 
-Current class model should remain structural only.
+Class definitions live in `classes.ts`.
 
-Initial class-related types:
+Current class path type:
 
+```ts
 type ClassPath =
   | "honor"
   | "primal"
   | "arcane"
   | "holy";
+```
 
+Current class id type:
+
+```ts
 type ClassId =
   | "beginner"
   | "blade"
@@ -247,187 +281,308 @@ type ClassId =
   | "runecaster"
   | "lightbearer"
   | "penitent";
+```
 
+Current class definition type:
+
+```ts
 type ClassDefinition = {
   id: ClassId;
   path: ClassPath | null;
   displayName: string;
 };
+```
 
-Companions should store:
+Companions store:
 
+```ts
 classId: ClassId;
+```
 
-Class definitions should live in:
+Classes must not depend on specific weapons.
 
-classes.ts
+Weapons are modifiers, not class identity.
 
-Skills (Prototype Phase)
+Current class implementation is still lightweight and structural, but classes now provide prototype skills through `skills.ts`.
+
+Subclass progression is not implemented.
+
+---
+
+## Leveling
+
+Character leveling is implemented in `leveling.ts`.
+
+Current companion leveling fields:
+
+```ts
+characterLevel: number;
+characterXp: number;
+lastCharacterXpGained?: number;
+```
+
+Current enemy leveling fields:
+
+```ts
+level: number;
+xpReward?: number;
+```
+
+Current leveling constants:
+
+- `MAX_CHARACTER_LEVEL = 200`
+- `BEGINNER_CLASS_UNLOCK_LEVEL = 10`
+
+Current leveling behavior:
+
+- enemies grant XP when killed by party combat or prototype skills
+- XP is granted to living companions
+- dead companions do not receive XP
+- max-level companions do not receive XP
+- XP reward defaults from enemy level if `xpReward` is not set
+- XP to next level uses anchored progression values with interpolation
+- same-level enemy XP uses anchored progression values with interpolation
+- companion XP rolls over through multiple level-ups if enough XP is gained
+- max-level companions have `characterXp` reset to 0
+- debug telemetry records XP awarded, XP reduced, XP skipped, and level-up events
+
+Current level-gap XP modifier:
+
+- companion level up to 10 above enemy level: 100 percent XP
+- companion level 11-20 above enemy level: 50 percent XP
+- companion level 21-30 above enemy level: 25 percent XP
+- companion level more than 30 above enemy level: 0 percent XP
+
+Current party size limit is based on total party character level:
+
+- total party level below 10: 1 party member
+- total party level 10 or higher: 2 party members
+- total party level 50 or higher: 3 party members
+- total party level 100 or higher: 4 party members
+
+Beginner class eligibility is currently:
+
+- companion class is `beginner`
+- companion level is at least 10
+
+Leveling is a prototype progression system. It should remain simple unless expanded intentionally.
+
+---
+
+## Skills Prototype
 
 Skills are simple class-based actions used to extend existing behavior.
 
-Skill definitions should live in:
-client/src/game/skills.ts
+Skill definitions live in `skills.ts`.
 
-Skills should:
-- be data-driven
-- use simple tag arrays
-- avoid complex systems (no mana, no full cooldown framework)
+Skill selection and execution live in:
 
-Skill execution should reuse existing systems where possible:
-- attackSystem.ts for damage
-- defendSystem.ts for defensive effects
-- gatherSystem.ts for gathering effects
+- `skillSystem.ts`
+- `skillRolePreferences.ts`
+- `skillRuntime.ts`
 
-Skill visuals should be represented through:
-- combat feedback events
-- temporary state flags
+Current skill runtime is prototype-only. It is not a full ability framework.
 
-Do NOT implement:
-- full ability frameworks
-- casting systems
-- advanced targeting systems
+Current skill ids:
 
-Skill Range Standard
+```ts
+type SkillId =
+  | "sweeping_strike"
+  | "guard_wall"
+  | "mark_target"
+  | "feral_surge"
+  | "elemental_bolt"
+  | "binding_rune"
+  | "light_mend"
+  | "penitents_gift";
+```
 
-All skill ranges must use numeric values.
+Current prototype skills:
 
-Examples:
-- Melee: 1
-- Short range: 3–4
-- Medium range: 4–6
-- Long range: 6+
+- Blade: Sweeping Strike
+- Aegis: Guard Wall
+- Hunter: Mark Target
+- Beast: Feral Surge
+- Elementalist: Elemental Bolt
+- Runecaster: Binding Rune
+- Lightbearer: Light Mend
+- Penitent: Penitent's Gift
 
-Do not use vague terms like "short" or "medium" in implementation.
+Current skill effects include direct damage, sweeping/splash damage, enemy mark bonus damage, self damage buff with HP cost, shield block, bind, heal, and self-cost heal.
 
-Classes must not depend on specific weapons.
-Weapons are modifiers, not class identity.
+Current skill rules:
 
+- skills are tied to classes
+- roles determine preferred skill usage
+- skill tags affect role scoring
+- direct-commanded companions do not use autonomous prototype skills
+- dead companions do not use skills
+- skills have a shared prototype cooldown
+- current shared prototype cooldown is 5000ms
+- skill ranges use numeric values
+- runtime skill effects expire through game-state cleanup
+- skill visuals are represented through temporary visual events
+- skill feedback may use combat feedback events
 
-Commands
-Commands can be:
+Current skill visual event types:
 
-direct entity commands
-Party member commands
-Party member group commands
-future leader-selection commands
-future party-order commands
+```ts
+type SkillVisualType =
+  | "slash"
+  | "projectile"
+  | "red_flash"
+  | "heal";
+```
+
+Current skill runtime state includes marks, self buffs, binds, shield blocks, cooldowns, and visual events.
+
+Do not expand this into a full ability framework unless explicitly requested.
+
+Do not add mana, casting, advanced targeting, equipment requirements, or complex cooldown systems unless explicitly requested.
+
+---
+
+## Commands
+
+Commands can be direct entity commands, party member commands, party member group commands, leader-selection commands, and party-order commands.
+
 Rules:
 
-direct commands override autonomous behavior for the targeted entity
-direct commands should not automatically change other entities
-direct commands are absolute for this phase
-commands update leader intent only when issued by or for the current leader
+- direct commands override autonomous behavior for the targeted entity
+- direct commands should not automatically change other entities
+- direct commands are absolute for this phase
+- commands update leader intent only when issued by or for the current leader
+
 Current command priority values:
 
+```ts
 type CommandPriority = "autonomous" | "direct";
-Current command types use entity states except dead.
+```
 
-Leader Intent
+Current command types use entity states except `dead`.
+
+---
+
+## Leader Intent
+
 Leader intent is stored as:
 
+```ts
 type LeaderIntent = {
   type: "attack" | "move" | "gather" | "explore";
   targetId: string | null;
   targetPosition: Position | null;
 };
-Leader intent is used by:
+```
 
-party movement
-role behavior
-combat targeting
-exploration
-defender positioning
-Leader intent may be cleared when a point of interest is reached or combat ends.
+Leader intent is used by party movement, role behavior, combat targeting, exploration, defender positioning, and teleport point movement.
 
-Systems
-Systems operate on GameState.
+Leader intent may be cleared when a point of interest is reached, combat ends, or a map transition completes.
+
+---
+
+## Systems
+
+Systems operate on `GameState`.
 
 Current systems include:
 
-Role System
-Party Formation System
-Exploration System
-Defend System
-Follow System
-Enemy AI System
-Attack System
-Gathering System
-Party Protection System
-Debug Telemetry
-Each system:
+- Teleport System
+- Role System
+- Skill System
+- Party Formation System
+- Exploration System
+- Defend System
+- Follow System
+- Enemy AI System
+- Attack System
+- Gathering System
+- Party Protection System
+- Debug Telemetry
 
-reads GameState
-updates entities through state helpers
-runs during simulation ticks
-keeps behavior focused and simple
+Each system reads `GameState`, updates entities through state helpers, runs during simulation ticks, and keeps behavior focused and simple.
+
 Systems must avoid conflicting movement updates.
 
 Each entity should perform only one movement behavior per tick unless a system explicitly uses multi-step catch-up behavior.
 
-Game Loop
-The game loop:
+---
 
-runs continuously while enabled
-executes systems in order
-updates GameState
-supports idle/AFK simulation
+## Game Loop
+
+The game loop runs continuously while enabled, executes systems in order, updates `GameState`, and supports idle/AFK simulation.
+
 Current high-level order:
 
-Clear expired combat feedback
-Advance simulation tick
-Clear tick movement planning
-If auto mode is enabled, update role behavior
-If auto mode is enabled, update party formation movement
-If auto mode is enabled, reserve exploration movement
-Update defender behavior
-If auto mode is enabled, update exploration
-Update follow behavior
-Update enemy AI
-Update attacks
-Update gathering
-Record debug telemetry
-Movement conflicts are guarded with per-tick moved entity ids and reserved positions.
+1. Clear expired skill runtime state
+2. Clear expired combat feedback
+3. Clear tick movement planning
+4. Advance simulation tick
+5. Update teleport system
+6. If teleport is active or map transition happened, record telemetry and stop the tick early
+7. If auto mode is enabled, update role behavior
+8. If auto mode is enabled, update prototype skills
+9. If auto mode is enabled or teleport POI movement is active, update party formation movement
+10. If auto mode is enabled, reserve exploration movement
+11. Update defender behavior
+12. If auto mode is enabled, update exploration
+13. Update follow behavior
+14. Update enemy AI
+15. Update attacks
+16. Update gathering
+17. Update skill shield block positions
+18. Record debug telemetry
 
-Movement
+Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, and reserved positions.
+
+---
+
+## Movement
+
 Movement rules:
 
-top-down 2D
-numeric positions
-fixed step movement toward targets
-no entity stacking
-resources and living entities block movement
-walls block movement when map data exists
-map bounds apply when map data exists
-party members may pass through each other in some party movement cases
-movement reservations prevent conflicts
-swap handling exists for party movement edge cases
-failed movement is tracked per tick
-Movement helpers live in state.ts.
+- top-down 2D
+- numeric positions
+- fixed step movement toward targets
+- no entity stacking
+- resources and living entities block movement
+- walls block movement when map data exists
+- map bounds apply when map data exists
+- party members may pass through each other in some party movement cases
+- movement reservations prevent conflicts
+- swap handling exists for party movement edge cases
+- failed movement is tracked per tick
+- pathfinding is used when map data exists and direct movement is blocked or unsuitable
+- fallback movement is attempted when direct/path movement fails
 
-If movement logic grows significantly, pathing and collision helpers may be moved to a dedicated module, but no restructure is required now.
+Movement helpers live primarily in `state.ts`.
 
-Party Movement
+Navigation helpers live in `navigation.ts`.
+
+If movement logic grows significantly, pathing and collision helpers may be moved to dedicated modules, but no restructure is required now.
+
+---
+
+## Navigation
+
+Navigation is implemented in `navigation.ts`.
+
+Current navigation supports baking a navigation grid from map walls, walkable cell checks, wall-adjacent movement cost, A-style path search to one of several goals, bounded navigation distance checks, nearest reachable navigation position search, and conversion from continuous positions to rounded navigation nodes.
+
+Current navigation uses four-direction neighbors: east, west, south, and north.
+
+Navigation is used by movement, targeting, exploration, and slot selection helpers.
+
+Navigation remains a simple prototype pathing system and should not become a complex pathfinding framework unless explicitly requested.
+
+---
+
+## Party Movement
+
 Party movement is simple and leader-centered.
 
-partyFormationSystem.ts currently owns:
+`partyFormationSystem.ts` currently owns reading leader intent, selecting a target position, deciding travel or combat phase, assigning travel follow targets, assigning shared combat targets, moving the leader toward the point of interest, moving followers toward the leader, and clearing completed movement or combat state.
 
-reading leader intent
-selecting a target position
-deciding travel or combat phase
-assigning travel follow targets
-assigning shared combat targets
-moving the leader toward the point of interest
-moving followers toward the leader
-clearing completed movement or combat state
-Current party movement constants:
-
-PARTY_COHESION_DISTANCE = 4
-FOLLOW_DISTANCE = 1.5
-FOLLOW_CATCHUP_DISTANCE = 5
-COMBAT_BREAK_DISTANCE = 3
-POI_REACHED_DISTANCE = 1
-GATHERER_REJOIN_DISTANCE = 6
 Current party movement does not use strict formation slots.
 
 The party leader moves toward the point of interest only when the party is cohesive.
@@ -436,279 +591,442 @@ Followers move toward the leader when outside follow distance.
 
 Busy gatherers and direct-commanded members are excluded from normal party movement.
 
-Party Cohesion
+Party movement can also guide the party toward a teleport point when a teleport POI is active.
+
+---
+
+## Party Cohesion
+
 Party cohesion is currently based on simple distance from the leader.
 
-A party member counts as cohesive when:
+A party member counts as cohesive when it is the leader or close enough to the leader.
 
-it is the leader, or
-it is close enough to the leader
 Gatherers are excluded from cohesion while actively gathering a valid resource.
 
-A gatherer rejoins normal cohesion when:
+A gatherer rejoins normal cohesion when not actively gathering and close enough to rejoin party behavior.
 
-not actively gathering, and
-close enough to rejoin party behavior
 Direct-commanded members are excluded from autonomous cohesion behavior.
 
-Follow System
-followSystem.ts keeps autonomous followers near the current party leader.
+---
 
-A follower may move when:
+## Follow System
 
-it is a party member
-it is in follow state
-it is not the leader
-it is not direct-commanded
-it is not a busy gatherer
-it has not already moved this tick
-it is outside follow leash distance
-Current follow constants:
+`followSystem.ts` keeps autonomous followers near the current party leader.
 
-FOLLOW_LEASH_RADIUS = 1.5
-FOLLOW_CATCHUP_DISTANCE = 5
+A follower may move when it is a party member, is in follow state, is not the leader, is not direct-commanded, is not a busy gatherer, has not already moved this tick, and is outside follow leash distance.
+
 Followers that are far away may take extra catch-up steps.
 
-Role System
-roleSystem.ts assigns autonomous role targets when party members are available for role behavior.
+---
 
-Role behavior does not apply when:
+## Role System
 
-the entity is not a party member
-the entity is direct-commanded
-the entity is already doing a non-interruptible current action
+`roleSystem.ts` assigns autonomous role targets when party members are available for role behavior.
+
+Role behavior does not apply when the entity is not a party member, is direct-commanded, or is already doing a non-interruptible current action.
+
 Current role behavior:
 
-Fighters follow during travel and attack the leader's combat target when available
-Gatherers search for resources and gather when possible
-Supports avoid overriding travel movement and may attack the leader's target when not traveling
-Defenders enter defend behavior as companions
-None has no special autonomous role target
-Role Profiles
-roleProfiles.ts centralizes role metadata and tuning.
+- Fighters follow during travel and attack the leader's combat target when available
+- Gatherers search for resources and gather when possible
+- Supports avoid overriding travel movement and may attack the leader's target when not traveling
+- Defenders enter defend behavior as companions
+- None has no special autonomous role target
+
+Skill usage is handled separately by `skillSystem.ts`, but role preferences influence skill scoring through `skillRolePreferences.ts`.
+
+---
+
+## Role Profiles
+
+`roleProfiles.ts` centralizes role metadata and tuning.
 
 Current profile fields include:
 
-positionBias
-followDistance
-aggression
-taskCommitment
-riskTolerance
-movementPriority
-cooldownUsage
-resourceSpending
+- `positionBias`
+- `followDistance`
+- `aggression`
+- `taskCommitment`
+- `riskTolerance`
+- `movementPriority`
+- `cooldownUsage`
+- `resourceSpending`
+
 Current tuning fields include:
 
-engageRange
-chaseLimit
-leashDistance
-interruptBuffer
-dangerThreshold
-protectionRadius
-support health threshold placeholders
-resourceSearchRange
-combatAssistRange
-Support healing, shielding, buffs, cleanses, and summons are not implemented.
+- `engageRange`
+- `chaseLimit`
+- `leashDistance`
+- `interruptBuffer`
+- `dangerThreshold`
+- `protectionRadius`
+- support health threshold placeholders
+- `resourceSearchRange`
+- `combatAssistRange`
 
-Defender System
-defendSystem.ts owns defender-specific behavior.
+Role profiles should remain data-focused.
+
+---
+
+## Defender System
+
+`defendSystem.ts` owns defender-specific behavior.
 
 Current defender behavior:
 
-defenders guard near the leader
-defenders use leader intent to choose a guard position
-defenders can stand ahead or to the side of leader movement
-defenders target the leader's enemy target
-defenders can intercept nearby enemies threatening the leader or party
-defenders attack in melee range
-defenders may cause the leader to wait briefly so they can intercept
-defenders avoid chasing too far away from the leader
+- defenders guard near the leader
+- defenders use leader intent to choose a guard position
+- defenders can stand ahead or to the side of leader movement
+- defenders target the leader's enemy target
+- defenders can intercept nearby enemies threatening the leader or party
+- defenders attack in melee range
+- defenders may cause the leader to wait briefly so they can intercept
+- defenders avoid chasing too far away from the leader
+
 Defender behavior is skipped during active party travel movement.
 
 Direct-commanded defenders are not controlled by autonomous defend behavior.
 
-Attack System
-attackSystem.ts owns combat execution.
+Aegis shield-block skill behavior is handled by the prototype skill system, not by the defender system directly.
+
+---
+
+## Attack System
+
+`attackSystem.ts` owns combat execution.
 
 Current attack behavior:
 
-attackers require a valid combat target
-attackers move toward targets if out of range
-attackers attack when in range and cooldown is ready
-damage is applied directly
-defeated targets enter dead state
-enemies attacked by party members fight back
-party members may assist nearby party combat targets
-party protection is triggered when enemies damage party members
-Current combat constants:
+- attackers require a valid combat target
+- attackers move toward targets if out of range
+- attackers can select attack slots around a target
+- attackers attack when in range and cooldown is ready
+- damage is applied directly
+- prototype skill damage modifiers can increase damage
+- shield blocks can block incoming enemy attacks
+- defeated targets enter dead state
+- enemies attacked by party members fight back
+- party members may assist nearby party combat targets
+- party protection is triggered when enemies damage party members
+- party members gain XP when enemies are defeated by party attacks
 
-ATTACK_RANGE = 1
-ATTACK_DAMAGE = 1
-ATTACK_COOLDOWN_MS = 1000
-TARGET_SWITCH_DISTANCE = 6
+Current basic attack constants:
+
+- `ATTACK_RANGE = 1`
+- `ATTACK_DAMAGE = 1`
+- `ATTACK_COOLDOWN_MS = 1000`
+- `TARGET_SWITCH_DISTANCE = 6`
+
 Combat movement order uses role priority for party members.
 
-Enemy AI System
-enemyAISystem.ts owns enemy autonomous targeting.
+---
+
+## Enemy AI System
+
+`enemyAISystem.ts` owns enemy autonomous targeting.
 
 Current enemy behavior:
 
-passive enemies do not seek targets on their own
-aggressive enemies search for nearby party targets
-enemies with valid targets enter or remain in attack state
-enemies clear invalid targets
-enemies attacking party members trigger party protection
+- passive enemies do not seek targets on their own
+- aggressive enemies search for nearby party targets
+- enemies with valid targets enter or remain in attack state
+- enemies clear invalid targets
+- enemies attacking party members trigger party protection
+- bound enemies cannot chase targets while out of attack range
+- enemies respect a home leash distance
+
 Current enemy detection range:
 
-ENEMY_DETECTION_RANGE = 5
-Party Protection
-partyProtectionSystem.ts responds when a party member is attacked.
+- `ENEMY_DETECTION_RANGE = 5`
+
+---
+
+## Party Protection
+
+`partyProtectionSystem.ts` responds when a party member is attacked.
 
 Current behavior:
 
-leader intent switches to attack the attacker
-nearby idle/follow party members may switch to attack the attacker
-direct-commanded party members are not overridden
-busy gatherers are not pulled by distant threats
-protection requires party members to be close enough to the attacked member
-protectLeader currently aliases protectPartyMember.
+- leader intent switches to attack the attacker
+- nearby idle/follow party members may switch to attack the attacker
+- direct-commanded party members are not overridden
+- busy gatherers are not pulled by distant threats
+- protection requires party members to be close enough to the attacked member
+- `protectLeader` currently aliases `protectPartyMember`
 
-Gathering System
-gatherSystem.ts owns gathering execution.
+---
+
+## Gathering System
+
+`gatherSystem.ts` owns gathering execution.
 
 Current gathering behavior:
 
-gatherers require a valid resource target
-gatherers move toward resources when out of range
-gatherers gather when in range and cooldown is ready
-resource durability is reduced
-inventory increases when a resource yield is produced
-depleted resources become invalid
-gatherers return to follow when their target is depleted or invalid
-resources limit how many gatherers may gather at once
+- gatherers require a valid resource target
+- gatherers move toward resources when out of range
+- gatherers gather when in range and cooldown is ready
+- resource durability is reduced
+- inventory increases when a resource yield is produced
+- depleted resources become invalid
+- gatherers return to follow when their target is depleted or invalid
+- resources limit how many gatherers may gather them at once
+
 Current gathering constants:
 
-GATHER_RANGE = 1
-GATHER_COOLDOWN_MS = 1000
-GATHERER_PARTY_RETURN_DISTANCE = 15
+- `GATHER_RANGE = 1`
+- `GATHER_COOLDOWN_MS = 1000`
+- `GATHERER_PARTY_RETURN_DISTANCE = 15`
+
 Gatherers with autonomous gatherer behavior may stay committed to a resource task unless it becomes invalid or unsafe by current checks.
 
-Exploration System
-explorationSystem.ts owns current auto-exploration behavior.
+---
+
+## Exploration System
+
+`explorationSystem.ts` owns current auto-exploration behavior.
 
 Current exploration behavior:
 
-only runs when auto mode is enabled
-requires map/debug map data
-records explored positions for autonomous entities
-avoids active resources and walls
-finds nearby enemies before unexplored positions
-sets leader intent to attack when an enemy target is found
-otherwise sets leader intent to explore toward the nearest reachable unexplored position
-does not run movement while party formation has an active target
+- only runs when auto mode is enabled
+- requires map/debug map data
+- records explored positions for autonomous entities
+- avoids active resources and walls
+- finds nearby enemies before unexplored positions
+- sets leader intent to attack when an enemy target is found
+- otherwise sets leader intent to explore toward the nearest reachable unexplored position
+- does not run movement while party formation has an active target
+
 Current auto enemy target radius:
 
-AUTO_ENEMY_TARGET_RADIUS = 48
-Exploration still uses explored position records named exploredTiles in code.
+- `AUTO_ENEMY_TARGET_RADIUS = 48`
 
-Resources
+Exploration still uses explored position records named `exploredTiles` in code.
+
+---
+
+## Resources
+
 Resources are entities.
 
 Current resource fields:
 
-resourceType
-durability
-maxDurability
-quantity
-maxGatherers
-isDepleted
+- `resourceType`
+- `durability`
+- `maxDurability`
+- `quantity`
+- `maxGatherers`
+- `isDepleted`
+
 Current resource types:
 
-wood
-ore
-herb
-Gathering reduces durability. When durability reaches zero, quantity decreases and inventory may increase.
+```ts
+type ResourceType = "wood" | "ore" | "herb";
+```
 
-A resource is depleted when quantity reaches zero.
+Gathering reduces durability.
 
-Combat Feedback
+When durability reaches zero, quantity decreases, inventory may increase, durability resets if quantity remains, and the resource becomes depleted when quantity reaches zero.
+
+---
+
+## Map Data
+
+Current map data is debug/prototype map data.
+
+Current map fields:
+
+```ts
+type GameMap = {
+  id?: DebugMapId;
+  columns: number;
+  rows: number;
+  walls: Position[];
+  navigationGrid?: NavigationGrid;
+};
+```
+
+Current debug map ids:
+
+```ts
+type DebugMapId = "map-1" | "map-2";
+```
+
+Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, and prototype teleport position.
+
+Map data is still development/prototype data and should not define final world content.
+
+---
+
+## Teleport System
+
+`teleportSystem.ts` implements a prototype/debug map transition between current debug maps.
+
+This is not the final zone system.
+
+Current teleport behavior:
+
+- only operates from `map-1` to `map-2`
+- can be triggered by player/debug action or AI conditions
+- can set a teleport point as party movement intent
+- auto mode may select the teleport point after living enemies are cleared
+- party members rally to the teleport point
+- teleport completes when living party members are within teleport range
+- on completion, current map changes to `map-2`
+- map state, enemies, resources, explored tiles, movement planning, formation state, combat feedback, and follow trails are reset or rebuilt for the new map
+- companion progression, class, role, health, and party identity are preserved
+
+Current active teleport state:
+
+```ts
+type ActiveTeleport = {
+  id: string;
+  position: Position;
+  range: number;
+  targetMapId: DebugMapId;
+  triggeredBy: "ai" | "player";
+};
+```
+
+Do not expand this into full zones, persistent world streaming, or a final teleport network unless explicitly requested.
+
+---
+
+## Combat Feedback
+
 Combat feedback events are stored in game state.
 
 Current feedback event types:
 
-attack
-damage
-death
-gather
+```ts
+type CombatFeedbackType = "attack" | "damage" | "death" | "gather";
+```
+
 Feedback events expire automatically.
 
 Current feedback duration:
 
-COMBAT_FEEDBACK_DURATION_MS = 900
-Debug Telemetry
+- `COMBAT_FEEDBACK_DURATION_MS = 900`
+
+Combat feedback may be used by attacks, gathering, skill effects, and temporary UI feedback.
+
+---
+
+## Visual Assets
+
+Visual assets are currently UI-facing and are not part of core simulation rules.
+
+Current visual asset files:
+
+- `client/src/visualAssets.ts`
+- `client/src/SpriteAnimation.tsx`
+
+Current public asset path root:
+
+- `client/public/Asserts/`
+
+Current sprite asset groups:
+
+- `Asserts/Characters/Test-Character`
+- `Asserts/Characters/Test-Enemy`
+
+Current companion visuals:
+
+- companions use the test character sprite
+- idle uses a single idle frame
+- run uses directional frame sequences for north, south, west, and east
+
+Current enemy visuals:
+
+- enemies use the test enemy sprite
+- idle uses south-facing run-style frames as temporary idle animation
+- run uses directional frame sequences for north, south, west, and east
+
+Current resource visuals use placeholder class names by resource type.
+
+Current map tile visuals use placeholder class names.
+
+Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, and placeholder class names.
+
+Simulation logic must not depend on sprite assets.
+
+---
+
+## Debug Telemetry
+
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track:
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, and character XP skipped.
 
-target acquisition
-target changes
-formation changes
-skipped targets
-movement failure
-attack start
-damage dealt
-entity death
-gathering start
-resource depletion
-class changes
-role changes
-Telemetry snapshots may include:
+Telemetry snapshots may include tick, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 
-tick
-entity id
-kind
-class id
-role
-state
-position
-target
-command priority
-movement result
-reason
-formation phase
-formation slot data when present
 Debug telemetry should remain development-only.
 
-Debug Utilities
+---
+
+## Debug Utilities
+
 Debug/testing helpers may exist for development:
 
-Add/remove companions
-Change roles
-Change party order
-Set current leader
-Reset health
-Reset resources
-Randomize positions
-Debug telemetry
-Debug maps
-Explicit aggressive-enemy test setups
+- add/remove companions
+- change roles
+- change classes
+- change party order
+- set current leader
+- reset health
+- reset resources
+- randomize positions
+- debug telemetry recording/export
+- debug maps
+- explicit aggressive-enemy test setups
+- prototype teleport/map transition testing
+
 These should remain isolated from core systems and must not define final gameplay behavior.
 
-World Structure Future Work
-World is divided into zones.
-Each entity will later include zoneId.
-Teleport points connect zones.
-Do NOT implement zones unless explicitly requested.
+---
 
-Future Expansion
-Do NOT implement unless requested:
+## Current UI Responsibilities
 
-Zones and teleport points
-Full skill system
-Inventory items/equipment
-Class/subclass progression beyond structural class identity
-Networking/server authority
-Backend persistence
-Advanced aggro/threat systems
-Advanced ranged combat
-Advanced support mechanics
+The React UI currently may display and control map/debug map view, party members, enemies, resources, sprite animation, combat feedback, skill visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, XP and level progress, party size limit, debug controls, and debug telemetry export.
+
+UI should remain a consumer/controller of game state, not the owner of simulation behavior.
+
+---
+
+## World Structure Future Work
+
+The final world is expected to be divided into zones/fields.
+
+Future world systems may include:
+
+- `zoneId` on entities
+- teleport points connecting zones
+- persistent zone state
+- central hub and outward regions
+- final map/zone content pipeline
+
+Current `teleportSystem.ts` is only a prototype/debug map transition and should not be treated as the final zone system.
+
+Do not implement full zones or final teleport networks unless explicitly requested.
+
+---
+
+## Future Expansion
+
+Do not implement unless requested:
+
+- full zone system
+- persistent teleport network
+- backend persistence
+- networking/server authority
+- inventory items/equipment
+- weapons as gameplay modifiers
+- subclass progression
+- full ability framework
+- mana/resource cost system
+- casting system
+- advanced targeting system
+- advanced aggro/threat systems
+- advanced ranged combat
+- advanced support mechanics
+- production asset pipeline
+- final world content pipeline
