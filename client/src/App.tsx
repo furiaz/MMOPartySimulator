@@ -238,6 +238,54 @@ function InventoryDebugPanel({
   );
 }
 
+function CompanionVitalsPanel({ members }: { members: Companion[] }) {
+  if (members.length === 0) {
+    return null;
+  }
+
+  const orderedMembers = [...members].sort(
+    (a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id),
+  );
+
+  return (
+    <section className="companion-vitals-panel" aria-label="Companion vitals">
+      {orderedMembers.map((member) => {
+        const healthPercent =
+          member.maxHealth > 0
+            ? Math.max(0, Math.min(100, (member.health / member.maxHealth) * 100))
+            : 0;
+        const characterXpProgress = getCharacterXpProgress(member);
+        const companionNumber = companionIds.indexOf(member.id) + 1;
+
+        return (
+          <div key={member.id} className="companion-vitals-row">
+            <div className="companion-vitals-header">
+              <span>C{companionNumber}</span>
+              <span>
+                {member.health}/{member.maxHealth} HP
+              </span>
+            </div>
+            <span
+              className="companion-vitals-bar companion-vitals-hp"
+              title={`HP ${member.health}/${member.maxHealth}`}
+            >
+              <span style={{ width: `${healthPercent}%` }} />
+            </span>
+            <span
+              className={`companion-vitals-bar companion-vitals-xp${
+                characterXpProgress.isMaxLevel ? " companion-vitals-xp-max" : ""
+              }`}
+              title={`Character XP ${getCharacterXpText(member)}`}
+            >
+              <span style={{ width: `${characterXpProgress.percent}%` }} />
+            </span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function getPartyMarkerClass(member: Companion, leaderId: string): string {
   if (member.id === leaderId) {
     return "entity-marker companion leader";
@@ -403,6 +451,7 @@ function App() {
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(true);
   const [showInventoryDebug, setShowInventoryDebug] = useState(false);
+  const [showDebugTools, setShowDebugTools] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [
     visualMovementByEntityId,
@@ -681,6 +730,10 @@ function App() {
 
   function toggleInventoryDebug() {
     setShowInventoryDebug((isVisible) => !isVisible);
+  }
+
+  function toggleDebugTools() {
+    setShowDebugTools((isVisible) => !isVisible);
   }
 
   function toggleDebugTelemetryRecording() {
@@ -1142,8 +1195,13 @@ function App() {
           inventory={inventory}
           isVisible={showInventoryDebug}
         />
+        <CompanionVitalsPanel members={partyMembers} />
 
-        <div className="test-controls">
+        <div
+          className={`test-controls${
+            showDebugTools ? "" : " test-controls-debug-hidden"
+          }`}
+        >
           <button onClick={toggleSimulationLoop}>
             {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
           </button>
@@ -1261,46 +1319,58 @@ function App() {
           ) : null}
         </div>
 
-        <section className="debug-tools" aria-label="Debug tools">
+        <section
+          className={`debug-tools${showDebugTools ? "" : " debug-tools-hidden"}`}
+          aria-label="Debug tools"
+        >
           <h2>Debug Tools</h2>
           <div className="test-controls">
-            <button onClick={addCompanionToParty}>Add Companion to Party</button>
-            <button onClick={removeCompanionFromParty}>
-              Remove Companion from Party
+            <button onClick={toggleDebugTools}>
+              {showDebugTools ? "Hide Debug UI" : "Show Debug UI"}
             </button>
-            <button onClick={randomizeLocations}>
-              Randomize Locations
-            </button>
-            <button onClick={resurrectEnemy}>Resurrect Enemy</button>
-            <button onClick={restorePartyHealth}>Restore Party HP</button>
-            <button onClick={refreshGatherPoints}>
-              Refresh Gather Points
-            </button>
-            <button onClick={addTestWoodToInventory}>Add Test Wood</button>
-            <button onClick={toggleInventoryDebug}>
-              {showInventoryDebug ? "Close Inventory" : "Open Inventory"}
-            </button>
-            <button onClick={toggleEntityInfo}>
-              {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
-            </button>
-            <button onClick={toggleDebugTelemetryRecording}>
-              {gameState.debugTelemetry?.isRecording
-                ? "Stop Debug Recording"
-                : "Start Debug Recording"}
-            </button>
-            <button onClick={exportDebugTelemetryJson}>
-              Export Debug JSON
-            </button>
-            <button onClick={clearDebugTelemetryReport}>
-              Clear Debug Report
-            </button>
-            <span>
-              Debug Recording{" "}
-              {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Ticks{" "}
-              {gameState.debugTelemetry?.ticks.length ?? 0}/
-              {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
-              {gameState.debugTelemetry?.events.length ?? 0}
-            </span>
+            {showDebugTools ? (
+              <>
+                <button onClick={addCompanionToParty}>
+                  Add Companion to Party
+                </button>
+                <button onClick={removeCompanionFromParty}>
+                  Remove Companion from Party
+                </button>
+                <button onClick={randomizeLocations}>
+                  Randomize Locations
+                </button>
+                <button onClick={resurrectEnemy}>Resurrect Enemy</button>
+                <button onClick={restorePartyHealth}>Restore Party HP</button>
+                <button onClick={refreshGatherPoints}>
+                  Refresh Gather Points
+                </button>
+                <button onClick={addTestWoodToInventory}>Add Test Wood</button>
+                <button onClick={toggleInventoryDebug}>
+                  {showInventoryDebug ? "Close Inventory" : "Open Inventory"}
+                </button>
+                <button onClick={toggleEntityInfo}>
+                  {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
+                </button>
+                <button onClick={toggleDebugTelemetryRecording}>
+                  {gameState.debugTelemetry?.isRecording
+                    ? "Stop Debug Recording"
+                    : "Start Debug Recording"}
+                </button>
+                <button onClick={exportDebugTelemetryJson}>
+                  Export Debug JSON
+                </button>
+                <button onClick={clearDebugTelemetryReport}>
+                  Clear Debug Report
+                </button>
+                <span>
+                  Debug Recording{" "}
+                  {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Ticks{" "}
+                  {gameState.debugTelemetry?.ticks.length ?? 0}/
+                  {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
+                  {gameState.debugTelemetry?.events.length ?? 0}
+                </span>
+              </>
+            ) : null}
           </div>
         </section>
       </section>

@@ -264,6 +264,65 @@
   background: #facc15;
 }
 
+.companion-vitals-panel {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 11;
+  display: grid;
+  width: 176px;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(51, 65, 85, 0.62);
+  background: rgba(191, 219, 254, 0.3);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+}
+
+.companion-vitals-row {
+  display: grid;
+  grid-template-rows: 14px 6px 5px;
+  gap: 3px;
+  min-width: 0;
+}
+
+.companion-vitals-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.companion-vitals-bar {
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #334155;
+  background: #e2e8f0;
+}
+
+.companion-vitals-bar span {
+  display: block;
+  height: 100%;
+}
+
+.companion-vitals-hp span {
+  background: #22c55e;
+}
+
+.companion-vitals-xp span {
+  background: #38bdf8;
+}
+
+.companion-vitals-xp-max span {
+  background: #facc15;
+}
+
 .wall-tile {
   width: 36px;
   height: 36px;
@@ -443,6 +502,10 @@
   flex-wrap: wrap;
 }
 
+.test-controls-debug-hidden {
+  bottom: 72px;
+}
+
 .companion-status-list {
   display: grid;
   width: 100%;
@@ -475,6 +538,10 @@
 
 .debug-tools .test-controls {
   position: static;
+}
+
+.debug-tools-hidden {
+  left: auto;
 }
 
 .inventory-debug-panel {

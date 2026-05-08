@@ -47,16 +47,16 @@ export const resourceIds = [
 
 export const companionStartPositions: Position[] = [
   { x: 3, y: 3 },
-  { x: 3, y: 3 },
-  { x: 3, y: 3 },
-  { x: 3, y: 3 },
+  { x: 4, y: 3 },
+  { x: 3, y: 4 },
+  { x: 4, y: 4 },
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
   { x: 3, y: 22 },
-  { x: 3, y: 22 },
-  { x: 3, y: 22 },
-  { x: 3, y: 22 },
+  { x: 4, y: 22 },
+  { x: 3, y: 21 },
+  { x: 4, y: 21 },
 ];
 
 export const teleporterPosition: Position = { x: 46, y: 22 };
