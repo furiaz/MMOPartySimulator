@@ -223,7 +223,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, inventory counters, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick, party leader id, leader handoff ticks, leader intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick, party leader id, leader handoff ticks, leader intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -766,7 +766,7 @@ Current gathering behavior:
 - gatherers move toward resources when out of range
 - gatherers gather when in range and cooldown is ready
 - resource durability is reduced
-- inventory increases when a resource yield is produced
+- resource yields are routed through prototype inventory helpers
 - depleted resources become invalid
 - gatherers return to follow when their target is depleted or invalid
 - resources limit how many gatherers may gather them at once
@@ -825,7 +825,63 @@ type ResourceType = "wood" | "ore" | "herb";
 
 Gathering reduces durability.
 
-When durability reaches zero, quantity decreases, inventory may increase, durability resets if quantity remains, and the resource becomes depleted when quantity reaches zero.
+When durability reaches zero, quantity decreases, resource yield is routed through prototype inventory helpers, durability resets if quantity remains, and the resource becomes depleted when quantity reaches zero.
+
+## Prototype Inventory
+
+Prototype inventory game logic lives under `client/src/game/`.
+
+Current intended modules may include:
+
+- `items.ts`
+- `inventory.ts`
+
+Inventory state is stored on `GameState` as shared party state.
+
+Inventory is slot-based with a temporary starting capacity of 10 slots.
+
+Item definitions include:
+
+- item id
+- display name
+- category
+- stack behavior
+- max stack size when stackable
+
+Current item categories are:
+
+- material
+- consumable
+- equipment
+- quest
+- event
+
+Inventory slots store item stacks.
+
+Inventory helper responsibilities include:
+
+- checking stack compatibility
+- adding items
+- removing items
+- counting items
+- checking available capacity
+- returning partial/full add results without silently deleting overflow
+
+Stacking rules:
+
+- materials stack to 250
+- consumables stack to 99
+- equipment does not stack
+- quest items can stack only if the item definition allows it
+- event items can stack only if the item definition allows it
+
+Currency does not use inventory slots.
+
+React UI may display inventory state and issue debug commands, but inventory rules must remain in game logic.
+
+This prototype inventory does not include bank storage, ground loot, equipment slots, item effects, consumable use, selling, shops, crafting, trading, save/load, backend persistence, or full wallet UI.
+
+
 
 ---
 
@@ -959,6 +1015,20 @@ Current telemetry can track target acquisition, target changes, formation change
 
 Telemetry snapshots may include tick, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 
+Prototype inventory telemetry may include:
+
+- `item_add_attempt`
+- `item_added`
+- `item_add_partial`
+- `item_add_failed_full`
+- `item_removed`
+- `inventory_stack_created`
+- `inventory_stack_updated`
+- `inventory_capacity_checked`
+
+Inventory telemetry should remain development-only and may include tick, item id, item category, requested quantity, added quantity, removed quantity, overflow quantity, slot index, stack quantity before, stack quantity after, used slots, capacity, and source.
+
+
 Debug telemetry should remain development-only.
 
 ---
@@ -1018,7 +1088,7 @@ Do not implement unless requested:
 - persistent teleport network
 - backend persistence
 - networking/server authority
-- inventory items/equipment
+- full inventory/equipment economy beyond the current prototype shared party inventory
 - weapons as gameplay modifiers
 - subclass progression
 - full ability framework

@@ -6,7 +6,6 @@ import {
 } from "./entities";
 import {
   addCombatFeedback,
-  addResourceToInventory,
   ENTITY_COLLISION_DISTANCE,
   getBoundedPathDistance,
   getEntityById,
@@ -14,6 +13,8 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
+import { addItemToInventoryState } from "./inventory";
+import { getItemDefinitionForResourceType } from "./items";
 import { isResourceTargetInRange } from "./targetSelection";
 import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
@@ -111,15 +112,23 @@ export function updateGatherSystem(
     });
 
     if (didYieldResource) {
-      nextState = addResourceToInventory(
-        nextState,
+      const itemDefinition = getItemDefinitionForResourceType(
         gatheredResource.resourceType,
-        1,
       );
+      const itemAdd = addItemToInventoryState(
+        nextState,
+        itemDefinition.id,
+        1,
+        "gathering",
+      );
+      nextState = itemAdd.state;
       nextState = addCombatFeedback(nextState, {
         type: "gather",
         entityId: gatheredResource.id,
-        text: formatResourceName(gatheredResource.resourceType),
+        text:
+          itemAdd.result.addedQuantity > 0
+            ? itemDefinition.displayName
+            : "Inventory Full",
         now,
       });
     }
@@ -216,10 +225,6 @@ function canGather(entity: AutonomousEntity, now: number): boolean {
 
 function getGatherAmount(gatherer: AutonomousEntity): number {
   return Math.max(0, gatherer.gatherSpeed);
-}
-
-function formatResourceName(resourceType: ResourceEntity["resourceType"]): string {
-  return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
 }
 
 function getReachableSearchLimit(state: GameState): number {

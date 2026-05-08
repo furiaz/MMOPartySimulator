@@ -10,13 +10,14 @@ import {
   companionStartPositions,
   createCompanion,
   createDebugMap,
-  createEmptyResourceInventory,
+  createEmptyPartyInventory,
   createEnemy,
   createResource,
   DEBUG_MAP_COLUMNS,
   DEBUG_MAP_ROWS,
   clearDebugTelemetry,
   debugAddCompanionToParty,
+  debugAddTestWoodToInventory,
   debugRefreshResources,
   debugRandomizeLocations,
   debugRemoveCompanionFromParty,
@@ -25,6 +26,7 @@ import {
   enemyIds,
   exportDebugTelemetryReport,
   getCharacterXpProgress,
+  getItemDefinition,
   issueCompanionCommands,
   isCombatEntity,
   mapOneEnemyStartPositions,
@@ -34,6 +36,7 @@ import {
   setMapTeleportPoi,
   setAutoModeEnabled,
   getPartySizeLimit,
+  getUsedInventorySlots,
   getTotalPartyCharacterLevel,
   setLeaderIntent,
   setPartyLeader,
@@ -52,7 +55,9 @@ import {
   type Enemy,
   type GameEntity,
   type GameState,
+  type ItemId,
   type PartyMemberRole,
+  type PartyInventory,
   type Position,
   type ResourceEntity,
 } from "./game";
@@ -134,6 +139,105 @@ function getCharacterXpText(member: Companion): string {
   return `${progress.xp}/${progress.xpToNextLevel} XP`;
 }
 
+function getInventorySummary(inventory: PartyInventory): string {
+  if (inventory.slots.length === 0) {
+    return "Empty";
+  }
+
+  const quantityByItemId = new Map<ItemId, number>();
+
+  for (const slot of inventory.slots) {
+    quantityByItemId.set(
+      slot.itemId,
+      (quantityByItemId.get(slot.itemId) ?? 0) + slot.quantity,
+    );
+  }
+
+  return [...quantityByItemId.entries()]
+    .map(([itemId, quantity]) => {
+      const itemDefinition = getItemDefinition(itemId);
+      return `${itemDefinition.displayName} ${quantity}`;
+    })
+    .join(", ");
+}
+
+function getInventorySlotTitle(slot: PartyInventory["slots"][number]): string {
+  const itemDefinition = getItemDefinition(slot.itemId);
+
+  return [
+    itemDefinition.displayName,
+    `Category ${itemDefinition.category}`,
+    `Quantity ${slot.quantity}/${itemDefinition.maxStack}`,
+  ].join("\n");
+}
+
+function getInventoryResourceShapeClass(itemId: ItemId): string {
+  return `inventory-resource-shape ${itemId}`;
+}
+
+function InventoryDebugPanel({
+  inventory,
+  isVisible,
+}: {
+  inventory: PartyInventory;
+  isVisible: boolean;
+}) {
+  if (!isVisible) {
+    return null;
+  }
+
+  const slots = Array.from({ length: inventory.capacity }, (_, index) => ({
+    index,
+    slot: inventory.slots[index] ?? null,
+  }));
+
+  return (
+    <section className="inventory-debug-panel" aria-label="Inventory debug panel">
+      <div className="inventory-debug-header">
+        <h2>Inventory</h2>
+        <span>
+          {getUsedInventorySlots(inventory)}/{inventory.capacity}
+        </span>
+      </div>
+      <div className="inventory-slot-grid">
+        {slots.map(({ index, slot }) => {
+          if (!slot) {
+            return (
+              <div
+                key={index}
+                className="inventory-slot empty"
+                title={`Empty slot ${index + 1}`}
+              >
+                <span className="inventory-slot-index">{index + 1}</span>
+              </div>
+            );
+          }
+
+          const itemDefinition = getItemDefinition(slot.itemId);
+
+          return (
+            <div
+              key={index}
+              className="inventory-slot filled"
+              title={getInventorySlotTitle(slot)}
+            >
+              <span className="inventory-slot-index">{index + 1}</span>
+              <span
+                className={getInventoryResourceShapeClass(slot.itemId)}
+                aria-hidden="true"
+              />
+              <span className="inventory-slot-name">
+                {itemDefinition.displayName}
+              </span>
+              <span className="inventory-slot-quantity">x{slot.quantity}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function getPartyMarkerClass(member: Companion, leaderId: string): string {
   if (member.id === leaderId) {
     return "entity-marker companion leader";
@@ -193,7 +297,7 @@ function createInitialState(): GameState {
 
   const baseState = [leader, gatherer, ...resources].reduce(addEntity, {
     entities: {},
-    inventory: createEmptyResourceInventory(),
+    inventory: createEmptyPartyInventory(),
     map: debugMap,
     currentMapId: MAP_ONE_ID,
     activeTeleport: null,
@@ -298,6 +402,7 @@ function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(true);
+  const [showInventoryDebug, setShowInventoryDebug] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [
     visualMovementByEntityId,
@@ -343,6 +448,7 @@ function App() {
       .map((entity) => entity.currentTargetId),
   );
   const inventory = gameState.inventory;
+  const inventorySummary = getInventorySummary(inventory);
   const showTeleporter = gameState.currentMapId === MAP_ONE_ID;
   const activeTeleport = gameState.activeTeleport;
   const isTeleporterPoi =
@@ -565,8 +671,16 @@ function App() {
     setGameState(debugRestorePartyHealth);
   }
 
+  function addTestWoodToInventory() {
+    setGameState(debugAddTestWoodToInventory);
+  }
+
   function toggleEntityInfo() {
     setShowEntityInfo((isVisible) => !isVisible);
+  }
+
+  function toggleInventoryDebug() {
+    setShowInventoryDebug((isVisible) => !isVisible);
   }
 
   function toggleDebugTelemetryRecording() {
@@ -1024,6 +1138,11 @@ function App() {
           )}
         </div>
 
+        <InventoryDebugPanel
+          inventory={inventory}
+          isVisible={showInventoryDebug}
+        />
+
         <div className="test-controls">
           <button onClick={toggleSimulationLoop}>
             {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
@@ -1048,8 +1167,9 @@ function App() {
                 {enemies.filter((enemy) => enemy.state !== "dead").length}/
                 {enemies.length} | Resources Available{" "}
                 {resources.filter((resource) => !resource.isDepleted).length}/
-                {resources.length} | Inventory Wood{" "}
-                {inventory.wood} Ore {inventory.ore} Herb {inventory.herb} |
+                {resources.length} | Inventory{" "}
+                {getUsedInventorySlots(inventory)}/{inventory.capacity}{" "}
+                {inventorySummary} |
                 Map {gameState.currentMapId ?? MAP_ONE_ID} |
                 Teleport {activeTeleport ? "Rallying" : isTeleporterPoi ? "POI" : "Idle"} |
                 Auto Mode {gameState.autoModeEnabled ? "On" : "Off"} |
@@ -1155,6 +1275,10 @@ function App() {
             <button onClick={restorePartyHealth}>Restore Party HP</button>
             <button onClick={refreshGatherPoints}>
               Refresh Gather Points
+            </button>
+            <button onClick={addTestWoodToInventory}>Add Test Wood</button>
+            <button onClick={toggleInventoryDebug}>
+              {showInventoryDebug ? "Close Inventory" : "Open Inventory"}
             </button>
             <button onClick={toggleEntityInfo}>
               {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}

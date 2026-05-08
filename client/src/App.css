@@ -477,6 +477,113 @@
   position: static;
 }
 
+.inventory-debug-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 12;
+  width: min(360px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid #334155;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+.inventory-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inventory-debug-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.inventory-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inventory-slot {
+  position: relative;
+  display: grid;
+  grid-template-rows: 20px 18px 16px;
+  place-items: center;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 5px;
+  border: 1px solid #94a3b8;
+  background: #f8fafc;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.inventory-slot.empty {
+  border-style: dashed;
+  background: rgba(241, 245, 249, 0.76);
+  color: #64748b;
+}
+
+.inventory-slot.filled {
+  background: #ffffff;
+}
+
+.inventory-slot-index {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.inventory-resource-shape {
+  width: 22px;
+  height: 22px;
+  margin-top: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.42);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28);
+}
+
+.inventory-resource-shape.wood {
+  border-radius: 4px;
+  background: #92400e;
+}
+
+.inventory-resource-shape.ore {
+  clip-path: polygon(50% 0, 94% 28%, 82% 88%, 18% 88%, 6% 28%);
+  background: #64748b;
+}
+
+.inventory-resource-shape.herb {
+  border-radius: 999px 999px 999px 0;
+  background: #15803d;
+  transform: rotate(-45deg);
+}
+
+.inventory-slot-name,
+.inventory-slot-quantity {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-slot-name {
+  color: #1f2937;
+}
+
+.inventory-slot-quantity {
+  color: #334155;
+}
+
 button {
   padding: 10px 16px;
   cursor: pointer;

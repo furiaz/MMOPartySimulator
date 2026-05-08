@@ -1,4 +1,5 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
+import { addItemToInventoryState } from "./inventory";
 import { getPartySizeLimit } from "./leveling";
 import {
   addEntity,
@@ -13,6 +14,7 @@ import type { Companion, Enemy, GameEntity, Position, ResourceEntity } from "./t
 const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
 const DEBUG_RESOURCE_QUANTITY = 3;
+const DEBUG_TEST_ITEM_QUANTITY = 1;
 
 export function debugAddCompanion(
   state: GameState,
@@ -160,6 +162,15 @@ export function debugRestorePartyHealth(state: GameState): GameState {
   }
 
   return nextState;
+}
+
+export function debugAddTestWoodToInventory(state: GameState): GameState {
+  return addItemToInventoryState(
+    state,
+    "wood",
+    DEBUG_TEST_ITEM_QUANTITY,
+    "debug",
+  ).state;
 }
 
 export function debugRefreshResources(state: GameState): GameState {

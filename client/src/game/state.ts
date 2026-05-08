@@ -26,11 +26,10 @@ import type {
   GameEntity,
   Enemy,
   LeaderIntent,
+  PartyInventory,
   PartyFormationState,
   PartyMemberRole,
   Position,
-  ResourceInventory,
-  ResourceType,
   SkillBindState,
   SkillCooldownState,
   SkillMarkState,
@@ -79,7 +78,7 @@ export type MovementFailureDetail = {
 
 export type GameState = {
   entities: Record<string, GameEntity>;
-  inventory: ResourceInventory;
+  inventory: PartyInventory;
   currentMapId?: DebugMapId;
   map?: GameMap;
   activeTeleport?: ActiveTeleport | null;
@@ -109,14 +108,6 @@ export type GameState = {
   skillVisualEvents?: SkillVisualEvent[];
   debugTelemetry?: DebugTelemetryState;
 };
-
-export function createEmptyResourceInventory(): ResourceInventory {
-  return {
-    wood: 0,
-    ore: 0,
-    herb: 0,
-  };
-}
 
 export function addEntity(state: GameState, entity: GameEntity): GameState {
   return {
@@ -294,20 +285,6 @@ export function getFollowTrailPosition(
   }
 
   return trail[trailIndex] ?? null;
-}
-
-export function addResourceToInventory(
-  state: GameState,
-  resourceType: ResourceType,
-  amount: number,
-): GameState {
-  return {
-    ...state,
-    inventory: {
-      ...state.inventory,
-      [resourceType]: state.inventory[resourceType] + amount,
-    },
-  };
 }
 
 export function setAutoModeEnabled(

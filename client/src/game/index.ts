@@ -28,9 +28,18 @@ export type {
   LeaderIntent,
   LeaderIntentType,
   LivingEntity,
+  InventoryAddResult,
+  InventoryMutationSource,
+  InventoryMutationStatus,
+  InventoryRemoveResult,
+  InventorySlot,
+  ItemCategory,
+  ItemDefinition,
+  ItemId,
+  ItemRarity,
   PartyMemberRole,
+  PartyInventory,
   Position,
-  ResourceInventory,
   ResourceEntity,
   ResourceType,
   SkillBindState,
@@ -68,10 +77,8 @@ export {
   addCombatFeedback,
   addEntity,
   addSkillVisualEvent,
-  addResourceToInventory,
   clearExpiredCombatFeedback,
   clearExpiredSkillRuntimeState,
-  createEmptyResourceInventory,
   getEntityById,
   setAutoModeEnabled,
   setCompanionDefendPosition,
@@ -83,6 +90,21 @@ export {
   setPartyOrder,
   updateEntity,
 } from "./state";
+export {
+  ITEM_DEFINITIONS,
+  getItemDefinition,
+  getItemDefinitionForResourceType,
+} from "./items";
+export {
+  STARTING_INVENTORY_CAPACITY,
+  addItemToInventoryState,
+  canStackItems,
+  countInventoryItem,
+  createEmptyPartyInventory,
+  getAvailableInventorySlots,
+  getUsedInventorySlots,
+  removeItemFromInventoryState,
+} from "./inventory";
 export { CLASS_DEFINITIONS } from "./classes";
 export { SKILL_DEFINITIONS, getSkillsForClass } from "./skills";
 export {
@@ -148,6 +170,7 @@ export {
 export {
   debugAddCompanion,
   debugAddCompanionToParty,
+  debugAddTestWoodToInventory,
   debugRefreshResources,
   debugRandomizeLocations,
   debugRemoveCompanion,

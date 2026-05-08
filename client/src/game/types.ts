@@ -42,10 +42,70 @@ export type CompanionRole = PartyMemberRole;
 
 export type ResourceType = "wood" | "ore" | "herb";
 
-export type ResourceInventory = {
-  wood: number;
-  ore: number;
-  herb: number;
+export type ItemCategory =
+  | "material"
+  | "consumable"
+  | "equipment"
+  | "quest"
+  | "event";
+
+export type ItemId = ResourceType;
+
+export type ItemRarity =
+  | "common"
+  | "uncommon"
+  | "rare"
+  | "epic"
+  | "legendary";
+
+export type ItemDefinition = {
+  id: ItemId;
+  displayName: string;
+  category: ItemCategory;
+  description?: string;
+  rarity?: ItemRarity;
+  stackable: boolean;
+  maxStack: number;
+  value?: number;
+  effectId?: string;
+};
+
+export type InventorySlot = {
+  itemId: ItemId;
+  quantity: number;
+};
+
+export type PartyInventory = {
+  capacity: number;
+  slots: InventorySlot[];
+};
+
+export type InventoryMutationSource =
+  | "gathering"
+  | "debug"
+  | "combat_loot"
+  | "unknown";
+
+export type InventoryMutationStatus =
+  | "success"
+  | "partial"
+  | "failed_full"
+  | "failed_invalid";
+
+export type InventoryAddResult = {
+  status: InventoryMutationStatus;
+  itemId: ItemId;
+  requestedQuantity: number;
+  addedQuantity: number;
+  overflowQuantity: number;
+};
+
+export type InventoryRemoveResult = {
+  status: InventoryMutationStatus;
+  itemId: ItemId;
+  requestedQuantity: number;
+  removedQuantity: number;
+  remainingQuantity: number;
 };
 
 export type DebugMapId = "map-1" | "map-2";
@@ -231,7 +291,15 @@ export type DebugTelemetryEventType =
   | "character_xp_awarded"
   | "character_xp_reduced"
   | "character_level_up"
-  | "character_xp_skipped";
+  | "character_xp_skipped"
+  | "item_add_attempt"
+  | "item_added"
+  | "item_add_partial"
+  | "item_add_failed_full"
+  | "item_removed"
+  | "inventory_stack_created"
+  | "inventory_stack_updated"
+  | "inventory_capacity_checked";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -288,6 +356,18 @@ export type DebugTelemetryEvent = {
   blockerKind?: EntityKind | "wall" | "bounds" | "reserved" | "unknown";
   attackSlot?: Position | null;
   navigation?: DebugNavigationTelemetry;
+  itemId?: ItemId;
+  itemCategory?: ItemCategory;
+  requestedQuantity?: number;
+  addedQuantity?: number;
+  removedQuantity?: number;
+  overflowQuantity?: number;
+  slotIndex?: number;
+  stackQuantityBefore?: number;
+  stackQuantityAfter?: number;
+  inventoryUsedSlots?: number;
+  inventoryCapacity?: number;
+  source?: InventoryMutationSource;
 };
 
 export type DebugTelemetryTick = {

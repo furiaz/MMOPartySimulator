@@ -383,7 +383,50 @@ Current resource categories:
 - Ore
 - Herb
 
-Resources are currently simple inventory counters, not full item objects.
+Resources currently grant prototype item stacks into the shared party inventory.
+
+## Prototype Inventory
+
+The party has a shared prototype inventory.
+
+Inventory is slot-based and belongs to the party, not individual companions.
+
+Current prototype inventory rules:
+
+- starting capacity is 10 slots
+- currency does not use inventory slots
+- item gains go directly into shared inventory for now
+- materials stack to 250
+- consumables stack to 99
+- equipment does not stack
+- quest items can stack only if their item definition allows it
+- event items can stack only if their item definition allows it
+
+Current item categories:
+
+- material
+- consumable
+- equipment
+- quest
+- event
+
+This is not the full inventory, equipment, wallet, shop, crafting, trading, bank, loot, or persistence system.
+
+Do not implement these unless explicitly requested:
+
+- bank storage
+- ground loot
+- equipment slots
+- item effects
+- consumable use
+- selling
+- shops
+- crafting
+- trading
+- save/load
+- backend persistence
+- full wallet UI
+
 
 ---
 
@@ -923,7 +966,7 @@ Do not implement these unless explicitly requested:
 - full teleport network
 - subclass progression
 - weapons and equipment
-- full inventory item system
+- full inventory/equipment economy beyond the current prototype shared party inventory
 - advanced ability framework
 - mana or complex resource costs
 - advanced support mechanics
