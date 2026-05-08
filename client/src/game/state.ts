@@ -135,9 +135,12 @@ export function addEntity(state: GameState, entity: GameEntity): GameState {
 }
 
 export function addEnemy(state: GameState, enemy: Enemy): GameState {
+  const position = findClosestAvailablePosition(state, enemy.position);
+
   return addEntity(state, {
     ...enemy,
-    position: findClosestAvailablePosition(state, enemy.position),
+    position,
+    homePosition: position,
   });
 }
 

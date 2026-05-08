@@ -364,6 +364,7 @@ export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  homePosition: Position;
 };
 
 export type Companion = LivingEntity & {

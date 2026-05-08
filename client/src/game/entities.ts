@@ -14,7 +14,8 @@ import type {
 } from "./types";
 
 export const MOVEMENT_STEP_DISTANCE = 0.455;
-export const COMPANION_MOVEMENT_STEP_DISTANCE = MOVEMENT_STEP_DISTANCE * 1.3;
+export const ENEMY_MOVEMENT_STEP_DISTANCE = 0.58;
+export const COMPANION_MOVEMENT_STEP_DISTANCE = MOVEMENT_STEP_DISTANCE * 1.69;
 const STARTING_HEALTH = 10;
 const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
@@ -46,6 +47,7 @@ export function createEnemy(
     lastAttackAt: 0,
     currentTargetId: null,
     aggressionMode,
+    homePosition: position,
   };
 }
 
@@ -231,9 +233,15 @@ export function isResourceEntity(
 }
 
 export function getMovementStepDistance(entity: GameEntity): number {
-  return entity.kind === "companion"
-    ? COMPANION_MOVEMENT_STEP_DISTANCE
-    : MOVEMENT_STEP_DISTANCE;
+  if (entity.kind === "companion") {
+    return COMPANION_MOVEMENT_STEP_DISTANCE;
+  }
+
+  if (entity.kind === "enemy") {
+    return ENEMY_MOVEMENT_STEP_DISTANCE;
+  }
+
+  return MOVEMENT_STEP_DISTANCE;
 }
 
 function stepToward(

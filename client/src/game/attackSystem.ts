@@ -24,6 +24,7 @@ import {
   getPrototypeAttackDamage,
   isEnemyBound,
 } from "./skillRuntime";
+import { getEnemyHomeLeashDistance } from "./enemyAISystem";
 import type {
   CombatEntity,
   Enemy,
@@ -70,6 +71,15 @@ export function updateAttackSystem(
     const currentAttacker = getEntityById(nextState, attacker.id);
 
     if (!currentAttacker || !isAttackingCombatEntity(currentAttacker)) {
+      continue;
+    }
+
+    if (
+      isEnemy(currentAttacker) &&
+      !canEnemyChaseTarget(currentAttacker, target) &&
+      !isInAttackRange(currentAttacker, target)
+    ) {
+      nextState = updateEntity(nextState, finishAttack(nextState, currentAttacker));
       continue;
     }
 
@@ -178,6 +188,19 @@ export function updateAttackSystem(
     });
 
     const movedAttacker = getEntityById(nextState, currentAttacker.id);
+
+    if (
+      movedAttacker &&
+      isEnemy(currentAttacker) &&
+      getEuclideanDistance(currentAttacker.homePosition, movedAttacker.position) >
+        getEnemyHomeLeashDistance()
+    ) {
+      nextState = updateEntity(
+        nextState,
+        moveEntityTo(movedAttacker, previousPosition),
+      );
+      continue;
+    }
 
     if (
       movedAttacker &&
@@ -449,6 +472,13 @@ function getEuclideanDistance(
   to: { x: number; y: number },
 ): number {
   return Math.hypot(to.x - from.x, to.y - from.y);
+}
+
+function canEnemyChaseTarget(enemy: Enemy, target: CombatEntity): boolean {
+  return (
+    getEuclideanDistance(enemy.homePosition, target.position) <=
+    getEnemyHomeLeashDistance()
+  );
 }
 
 function isSamePosition(
