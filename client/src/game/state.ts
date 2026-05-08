@@ -1,8 +1,8 @@
 import {
+  getMovementStepDistance,
   isCombatEntity,
   moveEntityTo,
   moveEntityToward,
-  MOVEMENT_STEP_DISTANCE,
 } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import {
@@ -972,7 +972,10 @@ function findAlternativeMovePosition(
     return null;
   }
 
-  const candidates = getAlternativeMoveCandidates(entity.position, target.position);
+  const candidates = getAlternativeMoveCandidates(
+    entity,
+    target.position,
+  );
   const previousPosition = state.lastPositionsByEntityId?.[entity.id];
   const validCandidates = candidates
     .filter((position) =>
@@ -997,14 +1000,22 @@ function findAlternativeMovePosition(
 }
 
 function getAlternativeMoveCandidates(
-  current: Position,
+  entity: GameEntity,
   target: Position,
 ): Position[] {
+  const current = entity.position;
   const xStep = Math.sign(target.x - current.x);
   const yStep = Math.sign(target.y - current.y);
   const candidates: Position[] = [];
+  const stepDistance = getMovementStepDistance(entity);
 
-  addAlternativeStepCandidates(candidates, current, xStep, yStep);
+  addAlternativeStepCandidates(
+    candidates,
+    current,
+    xStep,
+    yStep,
+    stepDistance,
+  );
 
   return dedupePositions(candidates).filter(
     (position) => !isSamePosition(position, current),
@@ -1016,6 +1027,7 @@ function addAlternativeStepCandidates(
   current: Position,
   xStep: number,
   yStep: number,
+  stepDistance: number,
 ): void {
   const directions = [
     { x: xStep, y: yStep },
@@ -1036,8 +1048,8 @@ function addAlternativeStepCandidates(
     }
 
     candidates.push({
-      x: current.x + (direction.x / length) * MOVEMENT_STEP_DISTANCE,
-      y: current.y + (direction.y / length) * MOVEMENT_STEP_DISTANCE,
+      x: current.x + (direction.x / length) * stepDistance,
+      y: current.y + (direction.y / length) * stepDistance,
     });
   }
 }

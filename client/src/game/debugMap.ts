@@ -1,8 +1,8 @@
 import type { DebugMapId, GameMap, Position, ResourceType } from "./types";
 import { bakeNavigationGrid } from "./navigation";
 
-export const DEBUG_MAP_COLUMNS = 36;
-export const DEBUG_MAP_ROWS = 27;
+export const DEBUG_MAP_COLUMNS = 50;
+export const DEBUG_MAP_ROWS = 26;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const TELEPORTER_RANGE = 10;
 export const MAP_ONE_ID: DebugMapId = "map-1";
@@ -46,79 +46,79 @@ export const resourceIds = [
 ];
 
 export const companionStartPositions: Position[] = [
-  { x: 2, y: 2 },
-  { x: 3, y: 2 },
   { x: 3, y: 3 },
-  { x: 4, y: 2 },
+  { x: 3, y: 3 },
+  { x: 3, y: 3 },
+  { x: 3, y: 3 },
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
-  { x: 4, y: 23 },
-  { x: 5, y: 23 },
-  { x: 5, y: 22 },
-  { x: 6, y: 23 },
+  { x: 3, y: 22 },
+  { x: 3, y: 22 },
+  { x: 3, y: 22 },
+  { x: 3, y: 22 },
 ];
 
-export const teleporterPosition: Position = { x: 18, y: 13 };
+export const teleporterPosition: Position = { x: 46, y: 22 };
 
 export const mapOneEnemyStartPositions: Position[] = [
-  { x: 30, y: 2 },
+  { x: 5, y: 4 },
+  { x: 10, y: 6 },
   { x: 22, y: 5 },
-  { x: 32, y: 11 },
-  { x: 14, y: 10 },
-  { x: 2, y: 15 },
-  { x: 24, y: 13 },
-  { x: 31, y: 16 },
-  { x: 5, y: 20 },
-  { x: 17, y: 20 },
-  { x: 29, y: 22 },
-  { x: 11, y: 24 },
-  { x: 20, y: 25 },
-  { x: 33, y: 5 },
-  { x: 4, y: 7 },
+  { x: 28, y: 7 },
+  { x: 39, y: 5 },
+  { x: 45, y: 6 },
+  { x: 6, y: 15 },
+  { x: 20, y: 14 },
+  { x: 27, y: 15 },
+  { x: 38, y: 14 },
+  { x: 45, y: 15 },
+  { x: 5, y: 22 },
+  { x: 18, y: 23 },
+  { x: 29, y: 23 },
 ];
 
 export const mapTwoEnemyStartPositions: Position[] = [
-  { x: 31, y: 24 },
-  { x: 18, y: 22 },
-  { x: 28, y: 16 },
-  { x: 10, y: 18 },
-  { x: 3, y: 11 },
-  { x: 15, y: 12 },
-  { x: 27, y: 8 },
-  { x: 7, y: 5 },
-  { x: 20, y: 4 },
-  { x: 33, y: 6 },
-  { x: 12, y: 24 },
-  { x: 24, y: 20 },
-  { x: 30, y: 12 },
-  { x: 5, y: 17 },
+  { x: 5, y: 5 },
+  { x: 16, y: 4 },
+  { x: 31, y: 5 },
+  { x: 45, y: 5 },
+  { x: 5, y: 13 },
+  { x: 18, y: 13 },
+  { x: 32, y: 13 },
+  { x: 45, y: 13 },
+  { x: 6, y: 20 },
+  { x: 17, y: 20 },
+  { x: 28, y: 20 },
+  { x: 43, y: 20 },
+  { x: 46, y: 23 },
+  { x: 33, y: 11 },
 ];
 
 export const mapOneResourceStartData: ResourceStartData[] = [
-  { id: resourceIds[0], position: { x: 2, y: 5 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 15, y: 2 }, resourceType: "ore" },
-  { id: resourceIds[2], position: { x: 17, y: 5 }, resourceType: "herb" },
-  { id: resourceIds[3], position: { x: 6, y: 13 }, resourceType: "wood" },
-  { id: resourceIds[4], position: { x: 30, y: 10 }, resourceType: "ore" },
-  { id: resourceIds[5], position: { x: 25, y: 15 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 9, y: 22 }, resourceType: "wood" },
-  { id: resourceIds[7], position: { x: 16, y: 24 }, resourceType: "ore" },
-  { id: resourceIds[8], position: { x: 32, y: 24 }, resourceType: "herb" },
-  { id: resourceIds[9], position: { x: 22, y: 12 }, resourceType: "wood" },
+  { id: resourceIds[0], position: { x: 4, y: 6 }, resourceType: "wood" },
+  { id: resourceIds[1], position: { x: 11, y: 4 }, resourceType: "ore" },
+  { id: resourceIds[2], position: { x: 23, y: 7 }, resourceType: "herb" },
+  { id: resourceIds[3], position: { x: 40, y: 7 }, resourceType: "wood" },
+  { id: resourceIds[4], position: { x: 46, y: 4 }, resourceType: "ore" },
+  { id: resourceIds[5], position: { x: 5, y: 17 }, resourceType: "herb" },
+  { id: resourceIds[6], position: { x: 21, y: 16 }, resourceType: "wood" },
+  { id: resourceIds[7], position: { x: 29, y: 14 }, resourceType: "ore" },
+  { id: resourceIds[8], position: { x: 38, y: 16 }, resourceType: "herb" },
+  { id: resourceIds[9], position: { x: 44, y: 22 }, resourceType: "wood" },
 ];
 
 export const mapTwoResourceStartData: ResourceStartData[] = [
-  { id: resourceIds[0], position: { x: 8, y: 24 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 14, y: 21 }, resourceType: "ore" },
-  { id: resourceIds[2], position: { x: 22, y: 23 }, resourceType: "herb" },
-  { id: resourceIds[3], position: { x: 3, y: 18 }, resourceType: "wood" },
-  { id: resourceIds[4], position: { x: 25, y: 18 }, resourceType: "ore" },
-  { id: resourceIds[5], position: { x: 31, y: 14 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 6, y: 8 }, resourceType: "wood" },
-  { id: resourceIds[7], position: { x: 18, y: 7 }, resourceType: "ore" },
-  { id: resourceIds[8], position: { x: 30, y: 4 }, resourceType: "herb" },
-  { id: resourceIds[9], position: { x: 12, y: 13 }, resourceType: "wood" },
+  { id: resourceIds[0], position: { x: 4, y: 4 }, resourceType: "wood" },
+  { id: resourceIds[1], position: { x: 15, y: 6 }, resourceType: "ore" },
+  { id: resourceIds[2], position: { x: 30, y: 6 }, resourceType: "herb" },
+  { id: resourceIds[3], position: { x: 45, y: 4 }, resourceType: "wood" },
+  { id: resourceIds[4], position: { x: 4, y: 15 }, resourceType: "ore" },
+  { id: resourceIds[5], position: { x: 18, y: 15 }, resourceType: "herb" },
+  { id: resourceIds[6], position: { x: 32, y: 15 }, resourceType: "wood" },
+  { id: resourceIds[7], position: { x: 45, y: 15 }, resourceType: "ore" },
+  { id: resourceIds[8], position: { x: 5, y: 20 }, resourceType: "herb" },
+  { id: resourceIds[9], position: { x: 34, y: 20 }, resourceType: "wood" },
 ];
 
 export type ResourceStartData = {
@@ -128,55 +128,54 @@ export type ResourceStartData = {
 };
 
 const MAP_ONE_WALLS = dedupeWalls([
-  ...createVerticalWall(12, 0, DEBUG_MAP_ROWS - 1, [
-    [5, 7],
-    [12, 15],
-    [20, 21],
+  ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
+  ...createVerticalWall(14, 4, DEBUG_MAP_ROWS - 5, [
+    [7, 9],
+    [15, 17],
   ]),
-  ...createVerticalWall(24, 0, DEBUG_MAP_ROWS - 1, [
-    [5, 7],
-    [12, 15],
-    [20, 21],
+  ...createVerticalWall(32, 4, DEBUG_MAP_ROWS - 5, [
+    [6, 8],
+    [14, 16],
   ]),
-  ...createHorizontalWall(9, 0, DEBUG_MAP_COLUMNS - 1, [
-    [5, 8],
-    [15, 20],
-    [27, 30],
+  ...createHorizontalWall(11, 5, DEBUG_MAP_COLUMNS - 5, [
+    [8, 12],
+    [25, 29],
+    [40, 44],
   ]),
-  ...createHorizontalWall(18, 0, DEBUG_MAP_COLUMNS - 1, [
-    [5, 8],
-    [15, 20],
-    [27, 30],
+  ...createHorizontalWall(19, 5, DEBUG_MAP_COLUMNS - 5, [
+    [6, 10],
+    [22, 26],
+    [37, 41],
   ]),
 ]);
 
 const MAP_TWO_WALLS = dedupeWalls([
-  ...createVerticalWall(9, 2, DEBUG_MAP_ROWS - 3, [
-    [7, 10],
+  ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
+  ...createVerticalWall(10, 4, DEBUG_MAP_ROWS - 4, [
+    [7, 9],
+    [17, 19],
+  ]),
+  ...createVerticalWall(25, 3, DEBUG_MAP_ROWS - 4, [
+    [5, 7],
+    [14, 16],
+  ]),
+  ...createVerticalWall(39, 4, DEBUG_MAP_ROWS - 4, [
+    [10, 12],
     [18, 20],
   ]),
-  ...createVerticalWall(19, 0, DEBUG_MAP_ROWS - 4, [
-    [4, 6],
-    [13, 16],
+  ...createHorizontalWall(8, 4, DEBUG_MAP_COLUMNS - 4, [
+    [6, 11],
+    [22, 27],
+    [37, 42],
   ]),
-  ...createVerticalWall(29, 3, DEBUG_MAP_ROWS - 1, [
-    [10, 13],
-    [21, 23],
+  ...createHorizontalWall(17, 4, DEBUG_MAP_COLUMNS - 4, [
+    [7, 11],
+    [23, 27],
+    [38, 42],
   ]),
-  ...createHorizontalWall(6, 3, DEBUG_MAP_COLUMNS - 4, [
-    [6, 8],
-    [16, 21],
-    [28, 31],
-  ]),
-  ...createHorizontalWall(15, 0, DEBUG_MAP_COLUMNS - 6, [
-    [3, 6],
-    [13, 17],
-    [25, 28],
-  ]),
-  ...createHorizontalWall(22, 6, DEBUG_MAP_COLUMNS - 1, [
-    [11, 14],
-    [21, 24],
-    [31, 33],
+  ...createHorizontalWall(22, 5, DEBUG_MAP_COLUMNS - 6, [
+    [14, 18],
+    [30, 34],
   ]),
 ]);
 
@@ -230,6 +229,15 @@ function createHorizontalWall(
   }
 
   return walls;
+}
+
+function createPerimeterWalls(columns: number, rows: number) {
+  return [
+    ...createHorizontalWall(0, 0, columns - 1, []),
+    ...createHorizontalWall(rows - 1, 0, columns - 1, []),
+    ...createVerticalWall(0, 1, rows - 2, []),
+    ...createVerticalWall(columns - 1, 1, rows - 2, []),
+  ];
 }
 
 function isInOpening(value: number, openings: [number, number][]): boolean {

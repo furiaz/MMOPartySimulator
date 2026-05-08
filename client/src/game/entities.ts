@@ -14,6 +14,7 @@ import type {
 } from "./types";
 
 export const MOVEMENT_STEP_DISTANCE = 0.455;
+export const COMPANION_MOVEMENT_STEP_DISTANCE = MOVEMENT_STEP_DISTANCE * 1.3;
 const STARTING_HEALTH = 10;
 const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
@@ -127,7 +128,10 @@ export function moveEntityToward<T extends GameEntity>(
   entity: T,
   target: GameEntity,
 ): T {
-  return moveEntityTo(entity, stepToward(entity.position, target.position));
+  return moveEntityTo(
+    entity,
+    stepToward(entity.position, target.position, getMovementStepDistance(entity)),
+  );
 }
 
 export function damageEntity<T extends CombatEntity>(
@@ -226,17 +230,27 @@ export function isResourceEntity(
   return entity?.kind === "resource";
 }
 
-function stepToward(current: Position, target: Position): Position {
+export function getMovementStepDistance(entity: GameEntity): number {
+  return entity.kind === "companion"
+    ? COMPANION_MOVEMENT_STEP_DISTANCE
+    : MOVEMENT_STEP_DISTANCE;
+}
+
+function stepToward(
+  current: Position,
+  target: Position,
+  stepDistance: number,
+): Position {
   const xDistance = target.x - current.x;
   const yDistance = target.y - current.y;
   const distance = Math.hypot(xDistance, yDistance);
 
-  if (distance <= MOVEMENT_STEP_DISTANCE) {
+  if (distance <= stepDistance) {
     return target;
   }
 
   return {
-    x: current.x + (xDistance / distance) * MOVEMENT_STEP_DISTANCE,
-    y: current.y + (yDistance / distance) * MOVEMENT_STEP_DISTANCE,
+    x: current.x + (xDistance / distance) * stepDistance,
+    y: current.y + (yDistance / distance) * stepDistance,
   };
 }
