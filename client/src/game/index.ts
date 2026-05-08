@@ -164,3 +164,19 @@ export {
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
 } from "./debugTelemetry";
+export type { CharacterXpProgress } from "./leveling";
+export {
+  BEGINNER_CLASS_UNLOCK_LEVEL,
+  MAX_CHARACTER_LEVEL,
+  getCharacterXpProgress,
+  getCharacterXpToNextLevel,
+  getEnemyXpReward,
+  getLevelGapXpModifier,
+  getPartySizeLimit,
+  getSameLevelEnemyXp,
+  getTotalCharacterXpForLevel,
+  getTotalPartyCharacterLevel,
+  grantCharacterXpToCompanion,
+  grantCharacterXpToParty,
+  isBeginnerClassEligible,
+} from "./leveling";

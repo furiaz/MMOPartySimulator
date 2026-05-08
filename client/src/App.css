@@ -246,6 +246,24 @@
   background: #22c55e;
 }
 
+.xp-bar {
+  width: 86px;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid #334155;
+  background: #e2e8f0;
+}
+
+.xp-bar span {
+  display: block;
+  height: 100%;
+  background: #38bdf8;
+}
+
+.xp-bar-max span {
+  background: #facc15;
+}
+
 .wall-tile {
   width: 36px;
   height: 36px;

@@ -24,6 +24,7 @@ import {
   debugRestorePartyHealth,
   enemyIds,
   exportDebugTelemetryReport,
+  getCharacterXpProgress,
   issueCompanionCommands,
   isCombatEntity,
   mapOneEnemyStartPositions,
@@ -32,6 +33,8 @@ import {
   resourceIds,
   setMapTeleportPoi,
   setAutoModeEnabled,
+  getPartySizeLimit,
+  getTotalPartyCharacterLevel,
   setLeaderIntent,
   setPartyLeader,
   setPartyMemberClass,
@@ -112,11 +115,23 @@ function getResourceTooltip(resource: ResourceEntity): string {
 function getEnemyTooltip(enemy: Enemy): string {
   return [
     "Enemy",
+    `Level ${enemy.level}`,
+    `XP ${enemy.xpReward ?? "auto"}`,
     `HP ${enemy.health}/${enemy.maxHealth}`,
     `State ${enemy.state}`,
     `Target ${formatTargetId(enemy)}`,
     `Aggression ${enemy.aggressionMode}`,
   ].join("\n");
+}
+
+function getCharacterXpText(member: Companion): string {
+  const progress = getCharacterXpProgress(member);
+
+  if (progress.isMaxLevel) {
+    return "MAX";
+  }
+
+  return `${progress.xp}/${progress.xpToNextLevel} XP`;
 }
 
 function getPartyMarkerClass(member: Companion, leaderId: string): string {
@@ -297,6 +312,8 @@ function App() {
     .map((id) => gameState.entities[id] as Companion | undefined)
     .filter((companion): companion is Companion => Boolean(companion));
   const activePartyMemberIds = partyMembers.map((companion) => companion.id);
+  const partySizeLimit = getPartySizeLimit(gameState);
+  const totalPartyCharacterLevel = getTotalPartyCharacterLevel(gameState);
   const leader = partyMembers.find(
     (member) => member.id === gameState.partyLeaderId,
   ) ?? partyMembers[0];
@@ -1026,7 +1043,8 @@ function App() {
             <>
               <span>
                 Leader {leader ? `C${partyMembers.indexOf(leader) + 1}` : "none"} |
-                Party {partyMembers.length}/4 | Enemies Alive{" "}
+                Party {partyMembers.length}/{partySizeLimit} | Total Level{" "}
+                {totalPartyCharacterLevel} | Enemies Alive{" "}
                 {enemies.filter((enemy) => enemy.state !== "dead").length}/
                 {enemies.length} | Resources Available{" "}
                 {resources.filter((resource) => !resource.isDepleted).length}/
@@ -1039,21 +1057,37 @@ function App() {
               </span>
               <div className="companion-status-list">
                 {partyMembers.length > 0
-                  ? partyMembers.map((member, index) => (
-                      <label
-                        key={member.id}
-                        className="companion-role-control"
-                      >
+                  ? partyMembers.map((member, index) => {
+                      const characterXpProgress = getCharacterXpProgress(member);
+
+                      return (
+                        <label
+                          key={member.id}
+                          className="companion-role-control"
+                        >
                         <span>
                           C{index + 1} ({formatCoordinate(member.position.x)},{" "}
                           {formatCoordinate(member.position.y)}) | State {member.state} |
                           HP {member.health} | Target{" "}
                           {member.currentTargetId ?? "none"} | Gather Speed{" "}
-                          {member.gatherSpeed} | Class{" "}
+                          {member.gatherSpeed} | Level {member.characterLevel} | XP{" "}
+                          {getCharacterXpText(member)} | Class{" "}
                           {CLASS_DEFINITIONS[member.classId].displayName} | Role{" "}
                           {member.role} | Order{" "}
                           {member.partyOrder} | Leader{" "}
                           {gameState.partyLeaderId === member.id ? "yes" : "no"}
+                        </span>
+                        <span
+                          className={`xp-bar${
+                            characterXpProgress.isMaxLevel ? " xp-bar-max" : ""
+                          }`}
+                          title={`Character XP ${getCharacterXpText(member)}`}
+                        >
+                          <span
+                            style={{
+                              width: `${characterXpProgress.percent}%`,
+                            }}
+                          />
                         </span>
                         <select
                           value={member.classId}
@@ -1098,8 +1132,9 @@ function App() {
                         <button onClick={() => changePartyLeader(member.id)}>
                           Set Leader
                         </button>
-                      </label>
-                    ))
+                        </label>
+                      );
+                    })
                   : "No companions in party"}
               </div>
             </>

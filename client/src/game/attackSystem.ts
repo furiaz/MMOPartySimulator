@@ -8,6 +8,7 @@ import {
 } from "./entities";
 import { chooseAttackSlot } from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
+import { grantCharacterXpToParty } from "./leveling";
 import {
   addCombatFeedback,
   getEntityById,
@@ -144,15 +145,32 @@ export function updateAttackSystem(
       );
       nextState = updateEntity(nextState, updatedTarget);
 
+      if (
+        isPartyCombatEntity(attackReadyAttacker) &&
+        isEnemy(updatedTarget) &&
+        updatedTarget.state === "dead"
+      ) {
+        nextState = grantCharacterXpToParty(
+          nextState,
+          updatedTarget,
+          attackReadyAttacker.id,
+        );
+      }
+
       if (isEnemy(attackReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
         nextState = protectPartyMember(nextState, updatedTarget, attackReadyAttacker);
       }
 
+      const currentUpdatedAttacker = getEntityById(nextState, updatedAttacker.id);
+      const finalUpdatedAttacker = isCombatEntity(currentUpdatedAttacker)
+        ? setLastAttackAt(currentUpdatedAttacker, now)
+        : updatedAttacker;
+
       nextState = updateEntity(
         nextState,
         updatedTarget.state === "dead"
-          ? finishAttack(nextState, updatedAttacker)
-          : updatedAttacker,
+          ? finishAttack(nextState, finalUpdatedAttacker)
+          : finalUpdatedAttacker,
       );
       continue;
     }

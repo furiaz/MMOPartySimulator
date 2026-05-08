@@ -1,4 +1,5 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
+import { getPartySizeLimit } from "./leveling";
 import {
   addEntity,
   findClosestAvailablePosition,
@@ -23,9 +24,15 @@ export function debugAddCompanion(
     return state;
   }
 
-  const partyOrder = Object.values(state.entities).filter(
+  const companionCount = Object.values(state.entities).filter(
     (entity) => entity.kind === "companion",
   ).length;
+
+  if (companionCount >= getPartySizeLimit(state)) {
+    return state;
+  }
+
+  const partyOrder = companionCount;
   const availablePosition = findClosestAvailablePosition(state, position);
 
   return addEntity(

@@ -1,5 +1,6 @@
 import { damageEntity, setLastAttackAt } from "./entities";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
+import { grantCharacterXpToParty } from "./leveling";
 import { getSkillRoleScore } from "./skillRolePreferences";
 import { getPrototypeAttackDamage } from "./skillRuntime";
 import { getSkillsForClass } from "./skills";
@@ -304,7 +305,7 @@ function applyDamageSkill(
     durationMs: VISUAL_DURATION_MS,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return updateCasterLastAttackAt(nextState, caster.id, now);
 }
 
 function applySweepingStrike(
@@ -356,7 +357,7 @@ function applySweepingStrike(
     durationMs: VISUAL_DURATION_MS,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return updateCasterLastAttackAt(nextState, caster.id, now);
 }
 
 function applyMarkTarget(
@@ -601,6 +602,10 @@ function damageEnemy(
 
   nextState = updateEntity(nextState, damagedTarget);
 
+  if (damagedTarget.state === "dead") {
+    nextState = grantCharacterXpToParty(nextState, damagedTarget, caster.id);
+  }
+
   if (damagedTarget.state !== "dead") {
     nextState = updateEntity(nextState, {
       ...damagedTarget,
@@ -610,6 +615,18 @@ function damageEnemy(
   }
 
   return nextState;
+}
+
+function updateCasterLastAttackAt(
+  state: GameState,
+  casterId: string,
+  now: number,
+): GameState {
+  const currentCaster = state.entities[casterId];
+
+  return isCompanion(currentCaster)
+    ? updateEntity(state, setLastAttackAt(currentCaster, now))
+    : state;
 }
 
 function findEnemyTarget(

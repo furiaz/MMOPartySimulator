@@ -23,6 +23,9 @@ const STARTING_RESOURCE_DURABILITY = 5;
 const STARTING_RESOURCE_QUANTITY = 3;
 const STARTING_RESOURCE_MAX_GATHERERS = 4;
 const DEFAULT_RESOURCE_TYPE: ResourceType = "wood";
+const STARTING_CHARACTER_LEVEL = 1;
+const STARTING_CHARACTER_XP = 0;
+const STARTING_ENEMY_LEVEL = 1;
 
 type CreateResourceOptions = {
   durability?: number;
@@ -32,10 +35,16 @@ type CreateResourceOptions = {
   resourceType?: ResourceType;
 };
 
+type CreateEnemyOptions = {
+  level?: number;
+  xpReward?: number;
+};
+
 export function createEnemy(
   id: string,
   position: Position,
   aggressionMode: EnemyAggressionMode = "passive",
+  options: CreateEnemyOptions = {},
 ): Enemy {
   return {
     id,
@@ -48,6 +57,8 @@ export function createEnemy(
     currentTargetId: null,
     aggressionMode,
     homePosition: position,
+    level: options.level ?? STARTING_ENEMY_LEVEL,
+    xpReward: options.xpReward,
   };
 }
 
@@ -63,6 +74,9 @@ export function createCompanion(
     id,
     kind: "companion",
     classId,
+    characterLevel: STARTING_CHARACTER_LEVEL,
+    characterXp: STARTING_CHARACTER_XP,
+    lastCharacterXpGained: 0,
     role,
     partyOrder,
     position,

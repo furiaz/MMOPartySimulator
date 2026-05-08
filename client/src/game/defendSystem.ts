@@ -11,6 +11,7 @@ import {
 } from "./state";
 import { chooseAttackSlot } from "./attackSlots";
 import { getPartyLeader } from "./partySystem";
+import { grantCharacterXpToParty } from "./leveling";
 import {
   getDefenderAnchorPosition,
   getLeaderEnemyTarget,
@@ -292,11 +293,6 @@ function attackDefenderTarget(
     DEFENDER_ATTACK_DAMAGE,
   );
   const damagedTarget = damageEntity(target, attackDamage);
-  const updatedDefender = setLastAttackAt({
-    ...defender,
-    currentTargetId: damagedTarget.state === "dead" ? null : target.id,
-  }, now);
-
   let nextState = addCombatFeedback(state, {
     type: "attack",
     entityId: defender.id,
@@ -321,6 +317,14 @@ function attackDefenderTarget(
 
   nextState = updateEntity(nextState, damagedTarget);
 
+  if (damagedTarget.state === "dead") {
+    nextState = grantCharacterXpToParty(
+      nextState,
+      damagedTarget,
+      defender.id,
+    );
+  }
+
   if (damagedTarget.state !== "dead") {
     nextState = updateEntity(nextState, {
       ...damagedTarget,
@@ -329,7 +333,17 @@ function attackDefenderTarget(
     });
   }
 
-  return updateEntity(nextState, updatedDefender);
+  const currentDefender = nextState.entities[defender.id];
+
+  return currentDefender?.kind === "companion"
+    ? updateEntity(
+        nextState,
+        setLastAttackAt({
+          ...currentDefender,
+          currentTargetId: damagedTarget.state === "dead" ? null : target.id,
+        }, now),
+      )
+    : nextState;
 }
 
 function getDefenderTarget(

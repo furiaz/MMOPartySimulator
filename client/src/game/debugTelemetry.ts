@@ -1,4 +1,5 @@
 import type { GameState } from "./state";
+import { getCharacterXpProgress } from "./leveling";
 import {
   getNavigationDistance,
   getNavigationGrid,
@@ -185,6 +186,14 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.previousTargetId ?? "",
     event.previousClassId ?? "",
     event.nextClassId ?? "",
+    event.xpAmount ?? "",
+    event.baseXpAmount ?? "",
+    event.modifiedXpAmount ?? "",
+    event.xpModifier ?? "",
+    event.previousLevel ?? "",
+    event.nextLevel ?? "",
+    event.previousXp ?? "",
+    event.nextXp ?? "",
     event.formationPhase ?? "",
     event.reason ?? "",
   ].join("|");
@@ -216,6 +225,11 @@ function getEntitySnapshot(
     position: { ...entity.position },
     currentTargetId: getCurrentTargetId(entity),
     commandPriority: getCommandPriority(entity),
+    characterLevel: getCharacterLevel(entity),
+    characterXp: getCharacterXp(entity),
+    characterXpToNextLevel: getCharacterXpToNextLevel(entity),
+    characterXpProgressPercent: getCharacterXpProgressPercent(entity),
+    lastCharacterXpGained: getLastCharacterXpGained(entity),
     movementResult,
     reason: getReason(nextState, entity, movementResult),
     formationPhase: nextState.partyFormation?.phase,
@@ -643,6 +657,30 @@ function getRole(entity: GameEntity): PartyMemberRole | undefined {
 
 function getClassId(entity: GameEntity): ClassId | undefined {
   return entity.kind === "companion" ? entity.classId : undefined;
+}
+
+function getCharacterLevel(entity: GameEntity): number | undefined {
+  return entity.kind === "companion" ? entity.characterLevel : undefined;
+}
+
+function getCharacterXp(entity: GameEntity): number | undefined {
+  return entity.kind === "companion" ? entity.characterXp : undefined;
+}
+
+function getCharacterXpToNextLevel(entity: GameEntity): number | null | undefined {
+  return entity.kind === "companion"
+    ? getCharacterXpProgress(entity).xpToNextLevel
+    : undefined;
+}
+
+function getCharacterXpProgressPercent(entity: GameEntity): number | undefined {
+  return entity.kind === "companion"
+    ? getCharacterXpProgress(entity).percent
+    : undefined;
+}
+
+function getLastCharacterXpGained(entity: GameEntity): number | undefined {
+  return entity.kind === "companion" ? entity.lastCharacterXpGained : undefined;
 }
 
 function getHealth(entity: GameEntity): number | null {

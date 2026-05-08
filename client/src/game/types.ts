@@ -227,7 +227,11 @@ export type DebugTelemetryEventType =
   | "gather_started"
   | "resource_depleted"
   | "class_changed"
-  | "role_changed";
+  | "role_changed"
+  | "character_xp_awarded"
+  | "character_xp_reduced"
+  | "character_level_up"
+  | "character_xp_skipped";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -239,6 +243,11 @@ export type DebugTelemetryEntitySnapshot = {
   position: Position;
   currentTargetId?: string | null;
   commandPriority?: CommandPriority;
+  characterLevel?: number;
+  characterXp?: number;
+  characterXpToNextLevel?: number | null;
+  characterXpProgressPercent?: number;
+  lastCharacterXpGained?: number;
   movementResult: DebugMovementResult;
   reason?: string;
   formationPhase?: FormationPhase;
@@ -258,6 +267,14 @@ export type DebugTelemetryEvent = {
   targetId?: string | null;
   previousTargetId?: string | null;
   amount?: number;
+  xpAmount?: number;
+  baseXpAmount?: number;
+  modifiedXpAmount?: number;
+  xpModifier?: number;
+  previousLevel?: number;
+  nextLevel?: number;
+  previousXp?: number;
+  nextXp?: number;
   previousClassId?: ClassId;
   nextClassId?: ClassId;
   previousRole?: PartyMemberRole;
@@ -365,11 +382,16 @@ export type Enemy = LivingEntity & {
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
   homePosition: Position;
+  level: number;
+  xpReward?: number;
 };
 
 export type Companion = LivingEntity & {
   kind: "companion";
   classId: ClassId;
+  characterLevel: number;
+  characterXp: number;
+  lastCharacterXpGained?: number;
   role: PartyMemberRole;
   partyOrder: number;
   followTargetId: string;
