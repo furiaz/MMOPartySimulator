@@ -83,8 +83,11 @@ Entities represent world objects and actors.
 Current entity kinds:
 
 ```ts
-type EntityKind = "companion" | "enemy" | "resource";
+type EntityKind = "companion" | "enemy" | "resource" | "npc";
 ```
+
+NPC entities are prototype placeholders for safe hub map visuals. They do not implement dialogue, shops, quests, crafting, recruitment, or interaction behavior.
+
 
 The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
 
@@ -355,10 +358,10 @@ Current level-gap XP modifier:
 
 Current party size limit is based on total party character level:
 
-- total party level below 10: 1 party member
-- total party level 10 or higher: 2 party members
-- total party level 50 or higher: 3 party members
-- total party level 100 or higher: 4 party members
+- total party level below 10: 2 party members
+- total party level 10 or higher: 3 party members
+- total party level 30 or higher: 4 party members
+- total party level 60 or higher: 5 party members
 
 Beginner class eligibility is currently:
 
@@ -894,9 +897,12 @@ Current map fields:
 ```ts
 type GameMap = {
   id?: DebugMapId;
+  displayName: string;
+  debugName: string;
   columns: number;
   rows: number;
   walls: Position[];
+  teleports: DebugTeleportPoint[];
   navigationGrid?: NavigationGrid;
 };
 ```
@@ -904,32 +910,46 @@ type GameMap = {
 Current debug map ids:
 
 ```ts
-type DebugMapId = "map-1" | "map-2";
+type DebugMapId = "hub" | "map-1" | "map-2";
 ```
 
-Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, and prototype teleport position.
+Current readable map names:
+
+- `hub`: Harbor Union Bastion
+- `map-1`: First Wild Map
+- `map-2`: Second Wild Map
+
+Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, display/debug names, and prototype teleport points.
 
 Map data is still development/prototype data and should not define final world content.
+
 
 ---
 
 ## Teleport System
 
-`teleportSystem.ts` implements a prototype/debug map transition between current debug maps.
+`teleportSystem.ts` implements prototype/debug map transitions between current debug maps.
 
 This is not the final zone system.
 
+Current prototype/debug routes:
+
+- `hub` -> `map-1`
+- `map-1` -> `hub`
+- `map-1` -> `map-2`
+- `map-2` -> `map-1`
+
 Current teleport behavior:
 
-- only operates from `map-1` to `map-2`
+- uses a small debug map teleport table
 - can be triggered by player/debug action or AI conditions
 - can set a teleport point as party movement intent
-- auto mode may select the teleport point after living enemies are cleared
+- auto mode may select eligible teleport points after living enemies are cleared
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
-- on completion, current map changes to `map-2`
-- map state, enemies, resources, explored tiles, movement planning, formation state, combat feedback, and follow trails are reset or rebuilt for the new map
-- companion progression, class, role, health, and party identity are preserved
+- on completion, current map changes to the teleport target map
+- map-local enemies, resources, hub placeholders, explored tiles, movement planning, formation state, combat feedback, skill visuals, and follow trails are reset or rebuilt for the new map
+- companion progression, class, role, level, XP, health, party identity, and party order are preserved
 
 Current active teleport state:
 
@@ -938,12 +958,14 @@ type ActiveTeleport = {
   id: string;
   position: Position;
   range: number;
+  sourceMapId: DebugMapId;
   targetMapId: DebugMapId;
   triggeredBy: "ai" | "player";
 };
 ```
 
 Do not expand this into full zones, persistent world streaming, or a final teleport network unless explicitly requested.
+
 
 ---
 
@@ -998,6 +1020,7 @@ Current enemy visuals:
 - run uses directional frame sequences for north, south, west, and east
 
 Current resource visuals use placeholder class names by resource type.
+Current hub NPC and dog visuals use placeholder class names.
 
 Current map tile visuals use placeholder class names.
 
@@ -1011,9 +1034,12 @@ Simulation logic must not depend on sprite assets.
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, and character XP skipped.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, teleport start, teleport completion, teleport skips, and map transitions.
 
-Telemetry snapshots may include tick, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
+Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
+
+Teleport/map transition telemetry may include previous map id, next map id, previous/next map display names, active teleport id, teleport source map, teleport target map, trigger source, entity positions before transition, entity positions after transition, and skip reason when available.
+
 
 Prototype inventory telemetry may include:
 

@@ -44,7 +44,7 @@ The player is the party manager, not a physical character in the world.
 The party has:
 
 - one current leader
-- up to 4 physical party members
+- up to 5 physical party members through progression
 - adjustable party order
 - assignable roles for each party member
 - class identity for each party member
@@ -451,12 +451,12 @@ Future input may include click-and-drag commands from a unit to a target.
 
 ## Party Management
 
-Initial party:
+Initial prototype party:
 
 - 1 current leader
-- up to 4 party members
+- 2 starting party members
 
-Party size may increase through progression.
+Party size may increase through total party level progression.
 
 The player can issue:
 
@@ -603,14 +603,14 @@ Party size is tied to total party character level.
 
 Current party size progression:
 
-- Total party level below 10: 1 party member
-- Total party level 10 or higher: 2 party members
-- Total party level 50 or higher: 3 party members
-- Total party level 100 or higher: 4 party members
+- Total party level below 10: 2 party members
+- Total party level 10 or higher: 3 party members
+- Total party level 30 or higher: 4 party members
+- Total party level 60 or higher: 5 party members
 
 Party size progression should support the feeling of building an expedition over time.
 
-Party size must not exceed 4 unless explicitly redesigned.
+Current intended party size must not exceed 5 unless explicitly redesigned.
 
 ---
 
@@ -914,7 +914,17 @@ The game begins on a newly discovered continent.
 
 The player arrives by boat.
 
-A central port town acts as the main hub.
+A central port town acts as the main hub. The current prototype hub is Harbor Union Bastion, a small safe port/peninsula settlement with placeholder town entities only.
+
+Current prototype hub:
+
+- Harbor Union Bastion is the first prototype hub map.
+- It is a safe port/peninsula settlement.
+- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, and a clear exit to the first wild map.
+- Current placeholders may include Quest Giver, Merchant, Smith, and Dog.
+- The prototype hub should not spawn hostile enemies for now.
+- The prototype hub must not implement full town systems, interiors, quests, shops, crafting, dialogue, or NPC interaction unless explicitly requested.
+
 
 The expedition expands outward into regions such as:
 
@@ -950,9 +960,15 @@ Teleport points should feel like physical world transitions, such as:
 
 Prototype/debug map transitions may exist during development.
 
+Current prototype/debug map routes are:
+
+- `hub` <-> `map-1`
+- `map-1` <-> `map-2`
+
 Prototype teleport behavior should not define the final world structure.
 
-Do not build the final zone system unless explicitly requested.
+Do not build the final zone system, persistent zone state, or full production teleport network unless explicitly requested.
+
 
 ---
 
