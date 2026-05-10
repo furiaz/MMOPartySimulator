@@ -479,6 +479,91 @@ Party members act independently based on:
 - nearby threats
 - current task validity
 
+## Main Menu and Party UI
+
+The main gameplay UI may include a simple menu system for inspecting and managing the party.
+
+Current intended main menu entries:
+
+- Party
+- Party Management
+- Inventory
+
+The player is the party manager, not a physical character. Menus should support party oversight, planning, and decision-making without implying the player is a world entity.
+
+### Party Menu
+
+The Party menu is for quick inspection and overview.
+
+It may show:
+
+- current companions in the party
+- selected companion summary
+- basic stats preview
+- current role preview
+- equipment preview, if equipment data exists
+
+The Party menu is not the primary place for role decisions, equipment decisions, class decisions, party order changes, or advanced management.
+
+To reduce unnecessary backtracking, the Party menu may provide contextual shortcuts for the selected companion:
+
+- View Full Stats
+- Change Role
+- Manage Equipment
+
+Shortcut intent:
+
+- View Full Stats opens the full stats view for the selected companion
+- Change Role opens Party Management for the selected companion with Role Select visible
+- Manage Equipment opens Party Management for the selected companion with Equipment visible
+
+If the target system does not exist yet, the shortcut may open a placeholder section only.
+
+### Party Management Menu
+
+The Party Management menu is for companion decisions and management.
+
+It may show:
+
+- companion list
+- selected companion management options
+- Role Select
+- Equipment
+- Full Stats
+
+Role Select must use the existing party role values:
+
+- Defender
+- Fighter
+- Support
+- Gatherer
+- None / Unassigned
+
+Role changes affect role priority behavior. Leader identity remains separate from role.
+
+Future-facing sections may appear as placeholders only:
+
+- Party Order
+- Formation
+- Skill Preferences
+- Behavior Settings
+
+Placeholder sections must not implement future systems unless explicitly requested.
+
+### Inventory Menu
+
+The Inventory menu displays the shared prototype party inventory.
+
+It may show:
+
+- inventory slots
+- item stacks
+- item categories already supported by the current prototype inventory
+
+The Inventory menu must not implement the full inventory, equipment, wallet, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
+
+
+
 ---
 
 ## Leveling

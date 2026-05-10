@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./App.css";
 import SpriteAnimation from "./SpriteAnimation";
 
@@ -27,6 +27,7 @@ import {
   exportDebugTelemetryReport,
   getCharacterXpProgress,
   getItemDefinition,
+  ITEM_DEFINITIONS,
   issueCompanionCommands,
   isCombatEntity,
   mapOneEnemyStartPositions,
@@ -35,12 +36,8 @@ import {
   resourceIds,
   setMapTeleportPoi,
   setAutoModeEnabled,
-  getPartySizeLimit,
   getUsedInventorySlots,
-  getTotalPartyCharacterLevel,
   setLeaderIntent,
-  setPartyLeader,
-  setPartyMemberClass,
   setPartyMemberRole,
   startGameLoop,
   startDebugTelemetryRecording,
@@ -49,11 +46,11 @@ import {
   TELEPORTER_RANGE,
   updateEntity,
   type Companion,
-  type ClassId,
   type CombatEntity,
   type Enemy,
   type GameEntity,
   type GameState,
+  type ItemCategory,
   type ItemId,
   type PartyMemberRole,
   type PartyInventory,
@@ -75,17 +72,6 @@ const partyMemberRoleOptions: PartyMemberRole[] = [
   "support",
   "gatherer",
 ];
-const partyMemberClassOptions: ClassId[] = [
-  "beginner",
-  "blade",
-  "aegis",
-  "hunter",
-  "beast",
-  "elementalist",
-  "runecaster",
-  "lightbearer",
-  "penitent",
-];
 const debugMap = createDebugMap();
 const cellSize = 36;
 const visualMovementGraceMs = 560;
@@ -96,9 +82,49 @@ type EntityVisualMovement = {
   expiresAt: number;
 };
 
-function formatCoordinate(value: number): string {
-  return value.toFixed(1);
-}
+type GameMenuTab = "party" | "partyManagement" | "inventory";
+
+type PartyManagementSection =
+  | "role"
+  | "equipment"
+  | "stats"
+  | "partyOrder"
+  | "formation"
+  | "skillPreferences"
+  | "behaviorSettings";
+
+type PartyShortcutTarget = Extract<
+  PartyManagementSection,
+  "stats" | "role" | "equipment"
+>;
+
+const partyMemberRoleLabels: Record<PartyMemberRole, string> = {
+  defender: "Defender",
+  fighter: "Fighter",
+  support: "Support",
+  gatherer: "Gatherer",
+  none: "None / Unassigned",
+};
+
+const partyManagementSectionLabels: Record<PartyManagementSection, string> = {
+  role: "Role Select",
+  equipment: "Equipment",
+  stats: "Full Stats",
+  partyOrder: "Party Order",
+  formation: "Formation",
+  skillPreferences: "Skill Preferences",
+  behaviorSettings: "Behavior Settings",
+};
+
+const partyManagementSections: PartyManagementSection[] = [
+  "role",
+  "equipment",
+  "stats",
+  "partyOrder",
+  "formation",
+  "skillPreferences",
+  "behaviorSettings",
+];
 
 function formatResourceName(resourceType: ResourceEntity["resourceType"]): string {
   return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
@@ -138,28 +164,6 @@ function getCharacterXpText(member: Companion): string {
   return `${progress.xp}/${progress.xpToNextLevel} XP`;
 }
 
-function getInventorySummary(inventory: PartyInventory): string {
-  if (inventory.slots.length === 0) {
-    return "Empty";
-  }
-
-  const quantityByItemId = new Map<ItemId, number>();
-
-  for (const slot of inventory.slots) {
-    quantityByItemId.set(
-      slot.itemId,
-      (quantityByItemId.get(slot.itemId) ?? 0) + slot.quantity,
-    );
-  }
-
-  return [...quantityByItemId.entries()]
-    .map(([itemId, quantity]) => {
-      const itemDefinition = getItemDefinition(itemId);
-      return `${itemDefinition.displayName} ${quantity}`;
-    })
-    .join(", ");
-}
-
 function getInventorySlotTitle(slot: PartyInventory["slots"][number]): string {
   const itemDefinition = getItemDefinition(slot.itemId);
 
@@ -174,29 +178,58 @@ function getInventoryResourceShapeClass(itemId: ItemId): string {
   return `inventory-resource-shape ${itemId}`;
 }
 
-function InventoryDebugPanel({
-  inventory,
-  isVisible,
-}: {
-  inventory: PartyInventory;
-  isVisible: boolean;
-}) {
-  if (!isVisible) {
-    return null;
-  }
+function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
+  const [activeCategory, setActiveCategory] = useState<ItemCategory | "all">(
+    "all",
+  );
+  const availableCategories = Array.from(
+    new Set(
+      Object.values(ITEM_DEFINITIONS).map((itemDefinition) =>
+        itemDefinition.category
+      ),
+    ),
+  );
+  const visibleSlots = inventory.slots.filter((slot) => {
+    if (activeCategory === "all") {
+      return true;
+    }
 
+    return getItemDefinition(slot.itemId).category === activeCategory;
+  });
   const slots = Array.from({ length: inventory.capacity }, (_, index) => ({
     index,
-    slot: inventory.slots[index] ?? null,
+    slot:
+      activeCategory === "all"
+        ? inventory.slots[index] ?? null
+        : visibleSlots[index] ?? null,
   }));
 
   return (
-    <section className="inventory-debug-panel" aria-label="Inventory debug panel">
-      <div className="inventory-debug-header">
+    <section className="inventory-panel" aria-label="Inventory">
+      <div className="inventory-header">
         <h2>Inventory</h2>
         <span>
           {getUsedInventorySlots(inventory)}/{inventory.capacity}
         </span>
+      </div>
+      <div className="inventory-category-tabs" aria-label="Inventory categories">
+        <button
+          className={activeCategory === "all" ? "active" : ""}
+          onClick={() => setActiveCategory("all")}
+          type="button"
+        >
+          All
+        </button>
+        {availableCategories.map((category) => (
+          <button
+            key={category}
+            className={activeCategory === category ? "active" : ""}
+            onClick={() => setActiveCategory(category)}
+            type="button"
+          >
+            {formatCategoryLabel(category)}
+          </button>
+        ))}
       </div>
       <div className="inventory-slot-grid">
         {slots.map(({ index, slot }) => {
@@ -234,6 +267,475 @@ function InventoryDebugPanel({
         })}
       </div>
     </section>
+  );
+}
+
+function formatCategoryLabel(category: ItemCategory): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+function getCompanionLabel(member: Companion): string {
+  const companionNumber = companionIds.indexOf(member.id) + 1;
+
+  return companionNumber > 0 ? `C${companionNumber}` : member.id;
+}
+
+function getOrderedMenuMembers(members: Companion[]): Companion[] {
+  return [...members].sort(
+    (a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id),
+  );
+}
+
+function getRoleAccentClass(role: PartyMemberRole): string {
+  return `role-accent-${role}`;
+}
+
+function PartyMenuPanel({
+  members,
+  selectedCompanionId,
+  onSelectCompanion,
+  onShortcut,
+}: {
+  members: Companion[];
+  selectedCompanionId: string | null;
+  onSelectCompanion: (companionId: string) => void;
+  onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
+}) {
+  const orderedMembers = getOrderedMenuMembers(members);
+  const selectedMember =
+    orderedMembers.find((member) => member.id === selectedCompanionId) ?? null;
+
+  return (
+    <section className="party-menu-panel" aria-label="Party">
+      <h2>Party</h2>
+      <div className="menu-split-layout">
+        <CompanionMenuList
+          members={orderedMembers}
+          selectedCompanionId={selectedCompanionId}
+          onSelectCompanion={onSelectCompanion}
+        />
+        <div className="party-selected-summary">
+          {selectedMember ? (
+            <>
+              <div className="menu-section-heading">
+                <span>{getCompanionLabel(selectedMember)} Overview</span>
+                <span
+                  className={`role-pill ${getRoleAccentClass(
+                    selectedMember.role,
+                  )}`}
+                >
+                  {partyMemberRoleLabels[selectedMember.role]}
+                </span>
+              </div>
+              <dl className="compact-stat-grid">
+                <div>
+                  <dt>HP</dt>
+                  <dd>
+                    {selectedMember.health}/{selectedMember.maxHealth}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Level</dt>
+                  <dd>{selectedMember.characterLevel}</dd>
+                </div>
+                <div>
+                  <dt>Class</dt>
+                  <dd>{CLASS_DEFINITIONS[selectedMember.classId].displayName}</dd>
+                </div>
+                <div>
+                  <dt>State</dt>
+                  <dd>{selectedMember.state}</dd>
+                </div>
+              </dl>
+              <div className="placeholder-box">
+                Equipment preview unavailable. Equipment slots are not implemented
+                yet.
+              </div>
+              <div className="party-shortcut-actions">
+                <button
+                  onClick={() => onShortcut(selectedMember.id, "stats")}
+                  type="button"
+                >
+                  View Full Stats
+                </button>
+                <button
+                  onClick={() => onShortcut(selectedMember.id, "role")}
+                  type="button"
+                >
+                  Change Role
+                </button>
+                <button
+                  onClick={() => onShortcut(selectedMember.id, "equipment")}
+                  type="button"
+                >
+                  Manage Equipment
+                </button>
+              </div>
+            </>
+          ) : (
+            <span className="party-menu-empty">Select a companion</span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CompanionMenuList({
+  members,
+  selectedCompanionId,
+  onSelectCompanion,
+}: {
+  members: Companion[];
+  selectedCompanionId: string | null;
+  onSelectCompanion: (companionId: string) => void;
+}) {
+  return (
+    <div className="party-companion-list">
+        {members.length > 0
+          ? members.map((member) => {
+              const characterXpProgress = getCharacterXpProgress(member);
+              const isSelected = member.id === selectedCompanionId;
+              const xpToNextLevelText = characterXpProgress.isMaxLevel ||
+                characterXpProgress.xpToNextLevel === null
+                ? "Max level"
+                : `${characterXpProgress.xpToNextLevel - characterXpProgress.xp} XP to next level`;
+
+              return (
+                <div key={member.id} className="party-companion-list-item">
+                  <button
+                    className={`party-companion-card${
+                      isSelected ? " selected" : ""
+                    }`}
+                    onClick={() => onSelectCompanion(member.id)}
+                    type="button"
+                  >
+                    <span className="party-companion-card-header">
+                      <strong>{getCompanionLabel(member)}</strong>
+                      <span
+                        className={`role-dot ${getRoleAccentClass(member.role)}`}
+                        title={partyMemberRoleLabels[member.role]}
+                      />
+                    </span>
+                    <span className="party-companion-card-detail">
+                      Level {member.characterLevel} |{" "}
+                      {partyMemberRoleLabels[member.role]}
+                    </span>
+                    <span
+                      className={`party-menu-xp-bar${
+                        characterXpProgress.isMaxLevel ? " xp-bar-max" : ""
+                      }`}
+                      title={`Character XP ${getCharacterXpText(member)}`}
+                    >
+                      <span style={{ width: `${characterXpProgress.percent}%` }} />
+                    </span>
+                    <span className="party-companion-xp-text">
+                      {xpToNextLevelText}
+                    </span>
+                  </button>
+                </div>
+              );
+            })
+          : <span className="party-menu-empty">No companions in party</span>}
+      </div>
+  );
+}
+
+function PartyManagementPanel({
+  activeSection,
+  leaderId,
+  members,
+  selectedCompanionId,
+  onChangeRole,
+  onSelectCompanion,
+  onSelectSection,
+}: {
+  activeSection: PartyManagementSection;
+  leaderId: string;
+  members: Companion[];
+  selectedCompanionId: string | null;
+  onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onSelectCompanion: (companionId: string) => void;
+  onSelectSection: (section: PartyManagementSection) => void;
+}) {
+  const orderedMembers = getOrderedMenuMembers(members);
+  const selectedMember =
+    orderedMembers.find((member) => member.id === selectedCompanionId) ?? null;
+
+  return (
+    <section className="party-management-panel" aria-label="Party Management">
+      <h2>Party Management</h2>
+      <div className="menu-split-layout">
+        <CompanionMenuList
+          members={orderedMembers}
+          selectedCompanionId={selectedCompanionId}
+          onSelectCompanion={onSelectCompanion}
+        />
+        <div className="party-management-detail">
+          {selectedMember ? (
+            <>
+              <div className="menu-section-heading">
+                <span>
+                  {getCompanionLabel(selectedMember)} |{" "}
+                  {partyMemberRoleLabels[selectedMember.role]}
+                </span>
+                <span>{selectedMember.id}</span>
+              </div>
+              <nav
+                className="party-management-sections"
+                aria-label="Party management sections"
+              >
+                {partyManagementSections.map((section) => (
+                  <button
+                    key={section}
+                    className={activeSection === section ? "active" : ""}
+                    onClick={() => onSelectSection(section)}
+                    type="button"
+                  >
+                    {partyManagementSectionLabels[section]}
+                  </button>
+                ))}
+              </nav>
+              <PartyManagementSectionPanel
+                activeSection={activeSection}
+                leaderId={leaderId}
+                member={selectedMember}
+                onChangeRole={onChangeRole}
+              />
+            </>
+          ) : (
+            <span className="party-menu-empty">No companion selected</span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PartyManagementSectionPanel({
+  activeSection,
+  leaderId,
+  member,
+  onChangeRole,
+}: {
+  activeSection: PartyManagementSection;
+  leaderId: string;
+  member: Companion;
+  onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+}) {
+  if (activeSection === "role") {
+    return <RoleSelectSection member={member} onChangeRole={onChangeRole} />;
+  }
+
+  if (activeSection === "equipment") {
+    return (
+      <PlaceholderSection title="Equipment">
+        Equipment system not implemented yet. This section is reserved for
+        future equipment management.
+      </PlaceholderSection>
+    );
+  }
+
+  if (activeSection === "stats") {
+    return <FullStatsSection leaderId={leaderId} member={member} />;
+  }
+
+  return (
+    <PlaceholderSection title={partyManagementSectionLabels[activeSection]}>
+      {partyManagementSectionLabels[activeSection]} is a future-facing
+      placeholder and does not change party behavior yet.
+    </PlaceholderSection>
+  );
+}
+
+function RoleSelectSection({
+  member,
+  onChangeRole,
+}: {
+  member: Companion;
+  onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+}) {
+  return (
+    <section className="management-section-card" aria-label="Role Select">
+      <h3>Role Select</h3>
+      <div className="role-select-grid">
+        {partyMemberRoleOptions.map((role) => (
+          <button
+            key={role}
+            className={`role-select-button ${getRoleAccentClass(role)}${
+              member.role === role ? " active" : ""
+            }`}
+            onClick={() => onChangeRole(member.id, role)}
+            type="button"
+          >
+            <span className={`role-dot ${getRoleAccentClass(role)}`} />
+            {partyMemberRoleLabels[role]}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FullStatsSection({
+  leaderId,
+  member,
+}: {
+  leaderId: string;
+  member: Companion;
+}) {
+  return (
+    <section className="management-section-card" aria-label="Full Stats">
+      <h3>Full Stats</h3>
+      <dl className="full-stat-grid">
+        <div>
+          <dt>HP</dt>
+          <dd>
+            {member.health}/{member.maxHealth}
+          </dd>
+        </div>
+        <div>
+          <dt>Level</dt>
+          <dd>{member.characterLevel}</dd>
+        </div>
+        <div>
+          <dt>XP</dt>
+          <dd>{getCharacterXpText(member)}</dd>
+        </div>
+        <div>
+          <dt>Class</dt>
+          <dd>{CLASS_DEFINITIONS[member.classId].displayName}</dd>
+        </div>
+        <div>
+          <dt>Role</dt>
+          <dd>{partyMemberRoleLabels[member.role]}</dd>
+        </div>
+        <div>
+          <dt>State</dt>
+          <dd>{member.state}</dd>
+        </div>
+        <div>
+          <dt>Command</dt>
+          <dd>{member.commandPriority}</dd>
+        </div>
+        <div>
+          <dt>Gather Speed</dt>
+          <dd>{member.gatherSpeed}</dd>
+        </div>
+        <div>
+          <dt>Party Order</dt>
+          <dd>{member.partyOrder}</dd>
+        </div>
+        <div>
+          <dt>Leader</dt>
+          <dd>{leaderId === member.id ? "yes" : "no"}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function PlaceholderSection({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="management-section-card" aria-label={title}>
+      <h3>{title}</h3>
+      <div className="placeholder-box">{children}</div>
+    </section>
+  );
+}
+
+function GameMenu({
+  activeTab,
+  activeManagementSection,
+  inventory,
+  isOpen,
+  leaderId,
+  members,
+  selectedCompanionId,
+  onChangeRole,
+  onSelectCompanion,
+  onSelectManagementSection,
+  onShortcut,
+  onSelectTab,
+  onToggle,
+}: {
+  activeTab: GameMenuTab | null;
+  activeManagementSection: PartyManagementSection;
+  inventory: PartyInventory;
+  isOpen: boolean;
+  leaderId: string;
+  members: Companion[];
+  selectedCompanionId: string | null;
+  onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onSelectCompanion: (companionId: string) => void;
+  onSelectManagementSection: (section: PartyManagementSection) => void;
+  onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
+  onSelectTab: (tab: GameMenuTab | null) => void;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <button className="game-menu-toggle-button" onClick={onToggle} type="button">
+        {isOpen ? "Close Menu" : "Menu"}
+      </button>
+      {isOpen ? (
+        <aside className="game-menu-panel" aria-label="Game menu">
+          <nav className="game-menu-tabs" aria-label="Menu sections">
+            <button
+              className={activeTab === "party" ? "active" : ""}
+              onClick={() => onSelectTab("party")}
+              type="button"
+            >
+              Party
+            </button>
+            <button
+              className={activeTab === "partyManagement" ? "active" : ""}
+              onClick={() => onSelectTab("partyManagement")}
+              type="button"
+            >
+              Party Management
+            </button>
+            <button
+              className={activeTab === "inventory" ? "active" : ""}
+              onClick={() => onSelectTab("inventory")}
+              type="button"
+            >
+              Inventory
+            </button>
+          </nav>
+          {activeTab ? (
+            <div className="game-menu-content">
+              {activeTab === "party" ? (
+                <PartyMenuPanel
+                  members={members}
+                  selectedCompanionId={selectedCompanionId}
+                  onSelectCompanion={onSelectCompanion}
+                  onShortcut={onShortcut}
+                />
+              ) : activeTab === "partyManagement" ? (
+                <PartyManagementPanel
+                  activeSection={activeManagementSection}
+                  leaderId={leaderId}
+                  members={members}
+                  selectedCompanionId={selectedCompanionId}
+                  onChangeRole={onChangeRole}
+                  onSelectCompanion={onSelectCompanion}
+                  onSelectSection={onSelectManagementSection}
+                />
+              ) : (
+                <InventoryPanel inventory={inventory} />
+              )}
+            </div>
+          ) : null}
+        </aside>
+      ) : null}
+    </>
   );
 }
 
@@ -442,8 +944,15 @@ function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(true);
-  const [showInventoryDebug, setShowInventoryDebug] = useState(false);
   const [showDebugTools, setShowDebugTools] = useState(true);
+  const [isGameMenuOpen, setIsGameMenuOpen] = useState(false);
+  const [activeGameMenuTab, setActiveGameMenuTab] =
+    useState<GameMenuTab | null>(null);
+  const [activePartyManagementSection, setActivePartyManagementSection] =
+    useState<PartyManagementSection>("role");
+  const [selectedCompanionId, setSelectedCompanionId] = useState<string | null>(
+    null,
+  );
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [
     visualMovementByEntityId,
@@ -457,9 +966,12 @@ function App() {
   const partyMembers = companionIds
     .map((id) => gameState.entities[id] as Companion | undefined)
     .filter((companion): companion is Companion => Boolean(companion));
+  const selectedMenuCompanionId = partyMembers.some(
+    (member) => member.id === selectedCompanionId,
+  )
+    ? selectedCompanionId
+    : partyMembers[0]?.id ?? null;
   const activePartyMemberIds = partyMembers.map((companion) => companion.id);
-  const partySizeLimit = getPartySizeLimit(gameState);
-  const totalPartyCharacterLevel = getTotalPartyCharacterLevel(gameState);
   const leader = partyMembers.find(
     (member) => member.id === gameState.partyLeaderId,
   ) ?? partyMembers[0];
@@ -489,7 +1001,6 @@ function App() {
       .map((entity) => entity.currentTargetId),
   );
   const inventory = gameState.inventory;
-  const inventorySummary = getInventorySummary(inventory);
   const showTeleporter = gameState.currentMapId === MAP_ONE_ID;
   const activeTeleport = gameState.activeTeleport;
   const isTeleporterPoi =
@@ -594,14 +1105,6 @@ function App() {
     role: PartyMemberRole,
   ) {
     setGameState((state) => setPartyMemberRole(state, entityId, role));
-  }
-
-  function changePartyMemberClass(entityId: string, classId: ClassId) {
-    setGameState((state) => setPartyMemberClass(state, entityId, classId));
-  }
-
-  function changePartyLeader(entityId: string) {
-    setGameState((state) => setPartyLeader(state, entityId));
   }
 
   function commandCompanionsToFollow() {
@@ -716,12 +1219,33 @@ function App() {
     setShowEntityInfo((isVisible) => !isVisible);
   }
 
-  function toggleInventoryDebug() {
-    setShowInventoryDebug((isVisible) => !isVisible);
-  }
-
   function toggleDebugTools() {
     setShowDebugTools((isVisible) => !isVisible);
+  }
+
+  function selectGameMenuTab(tab: GameMenuTab | null) {
+    setActiveGameMenuTab(tab);
+  }
+
+  function navigatePartyShortcut(
+    companionId: string,
+    target: PartyShortcutTarget,
+  ) {
+    setSelectedCompanionId(companionId);
+    setActiveGameMenuTab("partyManagement");
+    setActivePartyManagementSection(target);
+  }
+
+  function toggleGameMenu() {
+    setIsGameMenuOpen((isOpen) => {
+      const nextIsOpen = !isOpen;
+
+      if (nextIsOpen && !activeGameMenuTab) {
+        setActiveGameMenuTab("party");
+      }
+
+      return nextIsOpen;
+    });
   }
 
   function toggleDebugTelemetryRecording() {
@@ -1179,16 +1703,21 @@ function App() {
           )}
         </div>
 
-        <InventoryDebugPanel
+        <GameMenu
+          activeTab={activeGameMenuTab}
+          activeManagementSection={activePartyManagementSection}
           inventory={inventory}
-          isVisible={showInventoryDebug}
+          isOpen={isGameMenuOpen}
+          leaderId={gameState.partyLeaderId}
+          members={partyMembers}
+          selectedCompanionId={selectedMenuCompanionId}
+          onChangeRole={changePartyMemberRole}
+          onSelectCompanion={setSelectedCompanionId}
+          onSelectManagementSection={setActivePartyManagementSection}
+          onSelectTab={selectGameMenuTab}
+          onShortcut={navigatePartyShortcut}
+          onToggle={toggleGameMenu}
         />
-        <button
-          className="inventory-toggle-button"
-          onClick={toggleInventoryDebug}
-        >
-          {showInventoryDebug ? "Close Inventory" : "Open Inventory"}
-        </button>
         <CompanionVitalsPanel members={partyMembers} />
 
         <div
@@ -1210,97 +1739,6 @@ function App() {
           <button onClick={() => commandCompanionsToGatherResource()}>
             Gather Resource All
           </button>
-          {showEntityInfo ? (
-            <>
-              <span>
-                Leader {leader ? `C${partyMembers.indexOf(leader) + 1}` : "none"} |
-                Party {partyMembers.length}/{partySizeLimit} | Total Level{" "}
-                {totalPartyCharacterLevel} | Enemies Alive{" "}
-                {enemies.filter((enemy) => enemy.state !== "dead").length}/
-                {enemies.length} | Resources Available{" "}
-                {resources.filter((resource) => !resource.isDepleted).length}/
-                {resources.length} | Inventory{" "}
-                {getUsedInventorySlots(inventory)}/{inventory.capacity}{" "}
-                {inventorySummary} |
-                Map {gameState.currentMapId ?? MAP_ONE_ID} |
-                Teleport {activeTeleport ? "Rallying" : isTeleporterPoi ? "POI" : "Idle"} |
-                Auto Mode {gameState.autoModeEnabled ? "On" : "Off"} |
-                Explored {Object.keys(gameState.exploredTiles).length}
-              </span>
-              <div className="companion-status-list">
-                {partyMembers.length > 0
-                  ? partyMembers.map((member, index) => {
-                      const characterXpProgress = getCharacterXpProgress(member);
-
-                      return (
-                        <label
-                          key={member.id}
-                          className="companion-role-control"
-                        >
-                        <span>
-                          C{index + 1} ({formatCoordinate(member.position.x)},{" "}
-                          {formatCoordinate(member.position.y)}) | State {member.state} |
-                          HP {member.health} | Target{" "}
-                          {member.currentTargetId ?? "none"} | Gather Speed{" "}
-                          {member.gatherSpeed} | Level {member.characterLevel} | XP{" "}
-                          {getCharacterXpText(member)} | Class{" "}
-                          {CLASS_DEFINITIONS[member.classId].displayName} | Role{" "}
-                          {member.role} | Order{" "}
-                          {member.partyOrder} | Leader{" "}
-                          {gameState.partyLeaderId === member.id ? "yes" : "no"}
-                        </span>
-                        <span
-                          className={`xp-bar${
-                            characterXpProgress.isMaxLevel ? " xp-bar-max" : ""
-                          }`}
-                          title={`Character XP ${getCharacterXpText(member)}`}
-                        >
-                          <span
-                            style={{
-                              width: `${characterXpProgress.percent}%`,
-                            }}
-                          />
-                        </span>
-                        <select
-                          value={member.classId}
-                          onChange={(event) =>
-                            changePartyMemberClass(
-                              member.id,
-                              event.target.value as ClassId,
-                            )
-                          }
-                        >
-                          {partyMemberClassOptions.map((classId) => (
-                            <option key={classId} value={classId}>
-                              {CLASS_DEFINITIONS[classId].displayName}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={member.role}
-                          onChange={(event) =>
-                            changePartyMemberRole(
-                              member.id,
-                              event.target.value as PartyMemberRole,
-                            )
-                          }
-                        >
-                          {partyMemberRoleOptions.map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
-                          ))}
-                        </select>
-                        <button onClick={() => changePartyLeader(member.id)}>
-                          Set Leader
-                        </button>
-                        </label>
-                      );
-                    })
-                  : "No companions in party"}
-              </div>
-            </>
-          ) : null}
         </div>
 
         <section

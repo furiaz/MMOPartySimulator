@@ -246,24 +246,6 @@
   background: #22c55e;
 }
 
-.xp-bar {
-  width: 86px;
-  height: 8px;
-  overflow: hidden;
-  border: 1px solid #334155;
-  background: #e2e8f0;
-}
-
-.xp-bar span {
-  display: block;
-  height: 100%;
-  background: #38bdf8;
-}
-
-.xp-bar-max span {
-  background: #facc15;
-}
-
 .companion-vitals-panel {
   position: fixed;
   top: 12px;
@@ -506,20 +488,6 @@
   bottom: 72px;
 }
 
-.companion-status-list {
-  display: grid;
-  width: 100%;
-  gap: 6px;
-  font-size: 14px;
-}
-
-.companion-role-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .debug-tools {
   position: fixed;
   right: 16px;
@@ -544,44 +512,333 @@
   left: auto;
 }
 
-.inventory-toggle-button {
+.game-menu-toggle-button {
   position: fixed;
   top: 16px;
   right: 16px;
   z-index: 13;
 }
 
-.inventory-debug-panel {
+.game-menu-panel {
   position: fixed;
   top: 64px;
   right: 16px;
-  z-index: 12;
-  width: min(360px, calc(100vw - 32px));
-  padding: 12px;
-  border: 1px solid #334155;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  z-index: 13;
+  display: grid;
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 88px);
+  overflow: hidden;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.3);
+  color: #e6f0f2;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(10px);
 }
 
-.inventory-debug-header {
+.game-menu-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #3a5a60;
+}
+
+.game-menu-tabs button.active {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.54);
+  color: #ffffff;
+}
+
+.game-menu-content {
+  overflow: auto;
+  padding: 12px;
+}
+
+.inventory-panel,
+.party-selected-summary,
+.party-management-detail,
+.management-section-card {
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.3);
+  color: #e6f0f2;
+}
+
+.inventory-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #3a5a60;
   font-size: 13px;
   font-weight: 700;
 }
 
-.inventory-debug-header h2 {
+.inventory-header h2 {
   margin: 0;
   font-size: 15px;
+}
+
+.inventory-category-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border-bottom: 1px solid #3a5a60;
+}
+
+.inventory-category-tabs button.active,
+.party-management-sections button.active {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+  color: #ffffff;
 }
 
 .inventory-slot-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
+  padding: 10px;
+}
+
+.party-menu-panel,
+.party-management-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.party-menu-panel h2,
+.party-management-panel h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.menu-split-layout {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(220px, 1.4fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.party-companion-list {
+  display: grid;
+  gap: 8px;
+}
+
+.party-companion-list-item {
+  display: grid;
+  gap: 6px;
+}
+
+.party-companion-card {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border-color: #3a5a60;
+  background: rgba(26, 42, 47, 0.3);
+  color: #e6f0f2;
+  text-align: left;
+}
+
+.party-companion-card.selected {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.46);
+}
+
+.party-companion-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.party-companion-card-detail {
+  overflow: hidden;
+  color: rgba(230, 240, 242, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.party-menu-xp-bar {
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  height: 10px;
+  border: 1px solid #334155;
+  background: rgba(226, 232, 240, 0.32);
+}
+
+.party-menu-xp-bar span {
+  display: block;
+  height: 100%;
+  background: #38bdf8;
+}
+
+.party-menu-xp-bar.xp-bar-max span {
+  background: #facc15;
+}
+
+.party-companion-xp-text,
+.party-menu-empty {
+  color: rgba(230, 240, 242, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.party-selected-summary,
+.party-management-detail {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.menu-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.compact-stat-grid,
+.full-stat-grid {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.compact-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.full-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compact-stat-grid div,
+.full-stat-grid div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.24);
+}
+
+.compact-stat-grid dt,
+.full-stat-grid dt {
+  color: rgba(230, 240, 242, 0.68);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compact-stat-grid dd,
+.full-stat-grid dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.placeholder-box {
+  padding: 10px;
+  border: 1px dashed rgba(122, 166, 173, 0.76);
+  background: rgba(9, 18, 21, 0.18);
+  color: rgba(230, 240, 242, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.party-shortcut-actions,
+.party-management-sections,
+.role-select-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.party-management-sections {
+  padding-bottom: 2px;
+}
+
+.management-section-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.management-section-card h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.role-select-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.role-select-button.active {
+  background: rgba(58, 90, 96, 0.62);
+  color: #ffffff;
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  background: rgba(9, 18, 21, 0.18);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.role-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.role-accent-defender {
+  color: #7aa6d8;
+  border-color: #547da8;
+}
+
+.role-accent-fighter {
+  color: #c87575;
+  border-color: #9b5353;
+}
+
+.role-accent-support {
+  color: #d8bd73;
+  border-color: #a88d45;
+}
+
+.role-accent-gatherer {
+  color: #7eb58a;
+  border-color: #5e8f68;
+}
+
+.role-accent-none {
+  color: #a6afb2;
+  border-color: #778184;
 }
 
 .inventory-slot {
@@ -592,27 +849,28 @@
   min-width: 0;
   aspect-ratio: 1;
   padding: 5px;
-  border: 1px solid #94a3b8;
-  background: #f8fafc;
+  border: 1px solid #3a5a60;
+  background: rgba(9, 18, 21, 0.2);
+  color: #e6f0f2;
   font-size: 11px;
   line-height: 1;
 }
 
 .inventory-slot.empty {
   border-style: dashed;
-  background: rgba(241, 245, 249, 0.76);
-  color: #64748b;
+  background: rgba(9, 18, 21, 0.14);
+  color: rgba(230, 240, 242, 0.54);
 }
 
 .inventory-slot.filled {
-  background: #ffffff;
+  background: rgba(230, 240, 242, 0.12);
 }
 
 .inventory-slot-index {
   position: absolute;
   top: 4px;
   left: 5px;
-  color: #64748b;
+  color: rgba(230, 240, 242, 0.56);
   font-size: 10px;
   font-weight: 700;
 }
@@ -651,11 +909,11 @@
 }
 
 .inventory-slot-name {
-  color: #1f2937;
+  color: #e6f0f2;
 }
 
 .inventory-slot-quantity {
-  color: #334155;
+  color: rgba(230, 240, 242, 0.78);
 }
 
 button {
@@ -664,6 +922,26 @@ button {
   border: 1px solid #334155;
   background: #ffffff;
   color: #1f2937;
+}
+
+.game-menu-panel button {
+  border-color: #3a5a60;
+  background: rgba(26, 42, 47, 0.58);
+  color: #e6f0f2;
+}
+
+.game-menu-panel button:hover {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+}
+
+@media (max-width: 520px) {
+  .game-menu-tabs,
+  .menu-split-layout,
+  .compact-stat-grid,
+  .full-stat-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 select {

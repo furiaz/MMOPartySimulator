@@ -1060,6 +1060,59 @@ The React UI currently may display and control map/debug map view, party members
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
+
+## Menu UI Technical Structure
+
+The React UI may include a main menu and submenu system for party overview, party management, and prototype inventory display.
+
+Menu UI must remain in React components under `client/src/`.
+
+Game logic must remain under `client/src/game/`.
+
+React may:
+
+- read current game state
+- track selected menu state
+- track selected companion UI state
+- track selected management section UI state
+- call existing game command/helper functions for supported actions
+- display placeholder sections for future systems
+
+React must not:
+
+- define core simulation behavior
+- duplicate role logic
+- invent new role values
+- implement equipment, skills, formation, behavior settings, or advanced inventory rules unless the corresponding game logic exists and the feature is explicitly requested
+
+Current intended main menu views:
+
+- Party
+- Party Management
+- Inventory
+
+Current intended Party Management sections:
+
+- Role Select
+- Equipment
+- Full Stats
+- Party Order placeholder
+- Formation placeholder
+- Skill Preferences placeholder
+- Behavior Settings placeholder
+
+Role Select must use the existing `PartyMemberRole` values:
+
+```ts
+type PartyMemberRole =
+  | "defender"
+  | "fighter"
+  | "support"
+  | "gatherer"
+  | "none";
+
+
+
 ---
 
 ## World Structure Future Work
