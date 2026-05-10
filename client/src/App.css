@@ -48,6 +48,7 @@
 .entity-marker,
 .teleporter,
 .teleport-range,
+.map-label-overlay,
 .skill-link,
 .skill-shield-block,
 .skill-slash,
@@ -58,6 +59,31 @@
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.map-label-overlay {
+  z-index: 12;
+  left: 50%;
+  display: grid;
+  min-width: 210px;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(51, 65, 85, 0.72);
+  background: rgba(255, 255, 255, 0.86);
+  color: #1f2937;
+  text-align: center;
+  pointer-events: none;
+}
+
+.map-label-overlay strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.map-label-overlay span {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .skill-shield-block {
@@ -399,6 +425,16 @@
 
 .enemy:not(.sprite-entity) {
   background: #dc2626;
+}
+
+.npc-placeholder {
+  border-radius: 5px;
+  background: #2563eb;
+}
+
+.npc-placeholder.dog {
+  border-radius: 999px 999px 8px 8px;
+  background: #a16207;
 }
 
 .enemy {

@@ -1,10 +1,17 @@
-import type { DebugMapId, GameMap, Position, ResourceType } from "./types";
+import type {
+  DebugMapId,
+  DebugTeleportPoint,
+  GameMap,
+  Position,
+  ResourceType,
+} from "./types";
 import { bakeNavigationGrid } from "./navigation";
 
 export const DEBUG_MAP_COLUMNS = 50;
 export const DEBUG_MAP_ROWS = 26;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const TELEPORTER_RANGE = 10;
+export const HUB_MAP_ID: DebugMapId = "hub";
 export const MAP_ONE_ID: DebugMapId = "map-1";
 export const MAP_TWO_ID: DebugMapId = "map-2";
 
@@ -45,11 +52,25 @@ export const resourceIds = [
   "test-resource-wood-4",
 ];
 
+export const npcIds = [
+  "hub-quest-giver",
+  "hub-merchant",
+  "hub-smith",
+  "hub-dog",
+];
+
 export const companionStartPositions: Position[] = [
   { x: 3, y: 3 },
   { x: 4, y: 3 },
   { x: 3, y: 4 },
   { x: 4, y: 4 },
+];
+
+export const hubCompanionStartPositions: Position[] = [
+  { x: 7, y: 20 },
+  { x: 8, y: 20 },
+  { x: 7, y: 21 },
+  { x: 8, y: 21 },
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
@@ -60,6 +81,36 @@ export const mapTwoCompanionStartPositions: Position[] = [
 ];
 
 export const teleporterPosition: Position = { x: 46, y: 22 };
+export const hubTeleporterPosition: Position = { x: 22, y: 20 };
+export const mapOneHubTeleporterPosition: Position = { x: 3, y: 22 };
+export const mapTwoReturnTeleporterPosition: Position = { x: 3, y: 22 };
+
+export const hubNpcStartData = [
+  {
+    id: npcIds[0],
+    position: { x: 22, y: 13 },
+    displayName: "Quest Giver",
+    npcRole: "quest_giver",
+  },
+  {
+    id: npcIds[1],
+    position: { x: 18, y: 15 },
+    displayName: "Merchant",
+    npcRole: "merchant",
+  },
+  {
+    id: npcIds[2],
+    position: { x: 26, y: 15 },
+    displayName: "Smith",
+    npcRole: "smith",
+  },
+  {
+    id: npcIds[3],
+    position: { x: 20, y: 17 },
+    displayName: "Dog",
+    npcRole: "dog",
+  },
+] as const;
 
 export const mapOneEnemyStartPositions: Position[] = [
   { x: 5, y: 4 },
@@ -127,6 +178,28 @@ export type ResourceStartData = {
   resourceType: ResourceType;
 };
 
+const HUB_WALLS = dedupeWalls([
+  ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
+  ...createHorizontalWall(6, 12, 35, [
+    [21, 24],
+  ]),
+  ...createHorizontalWall(19, 12, 35, [
+    [20, 24],
+  ]),
+  ...createVerticalWall(12, 6, 19, [
+    [11, 14],
+  ]),
+  ...createVerticalWall(35, 6, 19, [
+    [11, 14],
+  ]),
+  ...createHorizontalWall(22, 2, 12, [
+    [5, 9],
+  ]),
+  ...createVerticalWall(13, 19, 23, [
+    [20, 22],
+  ]),
+]);
+
 const MAP_ONE_WALLS = dedupeWalls([
   ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
   ...createVerticalWall(14, 4, DEBUG_MAP_ROWS - 5, [
@@ -179,18 +252,96 @@ const MAP_TWO_WALLS = dedupeWalls([
   ]),
 ]);
 
-export function createDebugMap(mapId: DebugMapId = MAP_ONE_ID): GameMap {
+export const debugMapDefinitions: Record<
+  DebugMapId,
+  {
+    id: DebugMapId;
+    displayName: string;
+    debugName: string;
+    walls: Position[];
+    teleports: DebugTeleportPoint[];
+  }
+> = {
+  [HUB_MAP_ID]: {
+    id: HUB_MAP_ID,
+    displayName: "Harbor Union Bastion",
+    debugName: "hub",
+    walls: HUB_WALLS,
+    teleports: [
+      {
+        id: "hub-to-map-1",
+        position: hubTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: HUB_MAP_ID,
+        targetMapId: MAP_ONE_ID,
+        arrivalPositions: companionStartPositions,
+      },
+    ],
+  },
+  [MAP_ONE_ID]: {
+    id: MAP_ONE_ID,
+    displayName: "First Wild Map",
+    debugName: "map-1",
+    walls: MAP_ONE_WALLS,
+    teleports: [
+      {
+        id: "map-1-to-hub",
+        position: mapOneHubTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_ONE_ID,
+        targetMapId: HUB_MAP_ID,
+        arrivalPositions: hubCompanionStartPositions,
+      },
+      {
+        id: TELEPORTER_ID,
+        position: teleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_ONE_ID,
+        targetMapId: MAP_TWO_ID,
+        arrivalPositions: mapTwoCompanionStartPositions,
+        autoSelectAfterEnemiesCleared: true,
+      },
+    ],
+  },
+  [MAP_TWO_ID]: {
+    id: MAP_TWO_ID,
+    displayName: "Second Wild Map",
+    debugName: "map-2",
+    walls: MAP_TWO_WALLS,
+    teleports: [
+      {
+        id: "map-2-to-map-1",
+        position: mapTwoReturnTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_TWO_ID,
+        targetMapId: MAP_ONE_ID,
+        arrivalPositions: companionStartPositions,
+        autoSelectAfterEnemiesCleared: true,
+      },
+    ],
+  },
+};
+
+export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
+  const definition = debugMapDefinitions[mapId];
   const map = {
-    id: mapId,
+    id: definition.id,
+    displayName: definition.displayName,
+    debugName: definition.debugName,
     columns: DEBUG_MAP_COLUMNS,
     rows: DEBUG_MAP_ROWS,
-    walls: mapId === MAP_TWO_ID ? MAP_TWO_WALLS : MAP_ONE_WALLS,
+    walls: definition.walls,
+    teleports: definition.teleports,
   };
 
   return {
     ...map,
     navigationGrid: bakeNavigationGrid(map),
   };
+}
+
+export function getDebugMapDefinition(mapId: DebugMapId) {
+  return debugMapDefinitions[mapId];
 }
 
 function createVerticalWall(

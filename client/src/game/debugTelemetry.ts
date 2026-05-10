@@ -80,6 +80,13 @@ export function exportDebugTelemetryReport(
     exportedAt: Date.now(),
     tickCount: debugTelemetry.ticks.length,
     eventCount: debugTelemetry.events.length,
+    currentMapId: state.currentMapId,
+    currentMapDisplayName: state.map?.displayName,
+    currentMapDebugName: state.map?.debugName,
+    activeTeleportId: state.activeTeleport?.id ?? null,
+    activeTeleportSourceMapId: state.activeTeleport?.sourceMapId,
+    activeTeleportTargetMapId: state.activeTeleport?.targetMapId,
+    teleportTriggerSource: state.activeTeleport?.triggeredBy,
     telemetry: debugTelemetry,
   };
 }
@@ -134,6 +141,13 @@ export function recordDebugTelemetryTick(
   const telemetryTick = {
     tick,
     recordedAt: Date.now(),
+    currentMapId: nextState.currentMapId,
+    currentMapDisplayName: nextState.map?.displayName,
+    currentMapDebugName: nextState.map?.debugName,
+    activeTeleportId: nextState.activeTeleport?.id ?? null,
+    activeTeleportSourceMapId: nextState.activeTeleport?.sourceMapId,
+    activeTeleportTargetMapId: nextState.activeTeleport?.targetMapId,
+    teleportTriggerSource: nextState.activeTeleport?.triggeredBy,
     entities: Object.values(nextState.entities).map((entity) =>
       getEntitySnapshot(previousState, nextState, entity, tick),
     ),
@@ -195,6 +209,13 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.previousXp ?? "",
     event.nextXp ?? "",
     event.formationPhase ?? "",
+    event.currentMapId ?? "",
+    event.previousMapId ?? "",
+    event.nextMapId ?? "",
+    event.activeTeleportId ?? "",
+    event.activeTeleportSourceMapId ?? "",
+    event.activeTeleportTargetMapId ?? "",
+    event.teleportTriggerSource ?? "",
     event.reason ?? "",
   ].join("|");
 }

@@ -12,7 +12,12 @@ export function canMoveOnCadence(
   targetPosition: Position,
   options: MovementCadenceOptions = {},
 ): boolean {
-  if (options.alwaysMove || entity.kind === "enemy" || entity.kind === "resource") {
+  if (
+    options.alwaysMove ||
+    entity.kind === "enemy" ||
+    entity.kind === "resource" ||
+    entity.kind !== "companion"
+  ) {
     return true;
   }
 

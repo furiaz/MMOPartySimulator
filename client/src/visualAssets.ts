@@ -113,10 +113,20 @@ export const entityVisualAssets = {
       className: "resource herb",
     },
   },
+  npc: {
+    kind: "placeholder",
+    className: "npc-placeholder",
+  },
+  dog: {
+    kind: "placeholder",
+    className: "npc-placeholder dog",
+  },
 } satisfies {
   testCharacter: SpriteVisualAsset;
   enemy: SpriteVisualAsset;
   resource: Record<string, PlaceholderVisualAsset>;
+  npc: PlaceholderVisualAsset;
+  dog: PlaceholderVisualAsset;
 };
 
 export const mapTileVisualAssets = {
@@ -137,6 +147,12 @@ export function getEntityVisualAsset(entity: GameEntity): EntityVisualAsset {
 
   if (entity.kind === "resource") {
     return entityVisualAssets.resource[entity.resourceType];
+  }
+
+  if (entity.kind === "npc") {
+    return entity.npcRole === "dog"
+      ? entityVisualAssets.dog
+      : entityVisualAssets.npc;
   }
 
   return entityVisualAssets.enemy;

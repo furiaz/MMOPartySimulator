@@ -300,19 +300,19 @@ export function getTotalPartyCharacterLevel(state: GameState): number {
 export function getPartySizeLimit(state: GameState): number {
   const totalPartyLevel = getTotalPartyCharacterLevel(state);
 
-  if (totalPartyLevel >= 100) {
+  if (totalPartyLevel >= 60) {
+    return 5;
+  }
+
+  if (totalPartyLevel >= 30) {
     return 4;
   }
 
-  if (totalPartyLevel >= 50) {
+  if (totalPartyLevel >= 10) {
     return 3;
   }
 
-  if (totalPartyLevel >= 10) {
-    return 2;
-  }
-
-  return 1;
+  return 2;
 }
 
 export function isBeginnerClassEligible(companion: Companion): boolean {

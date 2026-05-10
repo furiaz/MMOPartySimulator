@@ -1,5 +1,4 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { MAP_ONE_ID, teleporterPosition } from "./debugMap";
 import { isCombatEntity } from "./entities";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
@@ -469,8 +468,9 @@ function getDistance(from: Position, to: Position): number {
 }
 
 function isTeleportPoi(state: GameState, position: Position): boolean {
-  return (
-    state.currentMapId === MAP_ONE_ID &&
-    getDistance(position, teleporterPosition) <= 0
+  return Boolean(
+    state.map?.teleports.some(
+      (teleport) => getDistance(position, teleport.position) <= 0,
+    ),
   );
 }

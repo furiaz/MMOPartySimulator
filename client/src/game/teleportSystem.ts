@@ -1,17 +1,18 @@
-import { createEnemy, createResource, moveEntityTo } from "./entities";
+import { createEnemy, createNpc, createResource, moveEntityTo } from "./entities";
+import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import {
   companionIds,
   createDebugMap,
+  debugMapDefinitions,
   enemyIds,
-  mapTwoCompanionStartPositions,
+  hubNpcStartData,
+  HUB_MAP_ID,
+  mapOneEnemyStartPositions,
+  mapOneResourceStartData,
   mapTwoEnemyStartPositions,
   mapTwoResourceStartData,
-  MAP_ONE_ID,
   MAP_TWO_ID,
   resourceIds,
-  teleporterPosition,
-  TELEPORTER_ID,
-  TELEPORTER_RANGE,
 } from "./debugMap";
 import {
   moveEntityTowardPositionIfUnoccupied,
@@ -19,43 +20,77 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import type { Companion, GameEntity, Position } from "./types";
+import type {
+  ActiveTeleport,
+  Companion,
+  DebugMapId,
+  DebugTeleportPoint,
+  GameEntity,
+  Position,
+} from "./types";
 
 export function triggerMapTeleport(
   state: GameState,
   triggeredBy: "ai" | "player",
+  teleportId?: string,
 ): GameState {
-  if (state.currentMapId !== MAP_ONE_ID || state.activeTeleport) {
-    return state;
+  if (state.activeTeleport) {
+    return appendTeleportSkippedEvent(state, "active_teleport_exists", teleportId);
   }
 
-  return {
-    ...setTeleportMoveIntent(state),
-    activeTeleport: {
-      id: TELEPORTER_ID,
-      position: teleporterPosition,
-      range: TELEPORTER_RANGE,
-      targetMapId: MAP_TWO_ID,
-      triggeredBy,
+  const teleport = getTeleportForCurrentMap(state, teleportId);
+
+  if (!teleport) {
+    return appendTeleportSkippedEvent(state, "teleport_not_found", teleportId);
+  }
+
+  const nextState = setTeleportMoveIntent(state, teleport);
+
+  return appendDebugTelemetryEvent(
+    {
+      ...nextState,
+      activeTeleport: {
+        id: teleport.id,
+        position: teleport.position,
+        range: teleport.range,
+        sourceMapId: teleport.sourceMapId,
+        targetMapId: teleport.targetMapId,
+        triggeredBy,
+      },
     },
-  };
+    {
+      type: "teleport_started",
+      entityId: "party",
+      activeTeleportId: teleport.id,
+      activeTeleportSourceMapId: teleport.sourceMapId,
+      activeTeleportTargetMapId: teleport.targetMapId,
+      teleportTriggerSource: triggeredBy,
+      currentMapId: state.currentMapId,
+      currentMapDisplayName: state.map?.displayName,
+      currentMapDebugName: state.map?.debugName,
+    },
+  );
 }
 
-export function setMapTeleportPoi(state: GameState): GameState {
-  if (state.currentMapId !== MAP_ONE_ID || state.activeTeleport) {
+export function setMapTeleportPoi(
+  state: GameState,
+  teleportId?: string,
+): GameState {
+  if (state.activeTeleport) {
     return state;
   }
 
-  return setTeleportMoveIntent(state);
+  const teleport = getTeleportForCurrentMap(state, teleportId);
+
+  return teleport ? setTeleportMoveIntent(state, teleport) : state;
 }
 
 export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
 ): GameState {
-  const poiState = shouldSelectTeleportPoi(state)
-    ? setMapTeleportPoi(state)
-    : state;
+  const autoTeleport = getAutoTeleport(state);
+  const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id) : state;
   const activatedState = getActivatedTeleportState(poiState);
 
   if (!activatedState.activeTeleport) {
@@ -74,35 +109,39 @@ export function isTeleportRallyActive(state: GameState): boolean {
 }
 
 export function isMapTeleportPoiActive(state: GameState): boolean {
-  return isTeleportPoiActive(state);
+  return Boolean(getTeleportPoi(state));
 }
 
-function shouldSelectTeleportPoi(state: GameState): boolean {
-  return (
-    state.autoModeEnabled &&
-    state.currentMapId === MAP_ONE_ID &&
-    !state.activeTeleport &&
-    !isTeleportPoiActive(state) &&
-    getLivingEnemies(state).length === 0
-  );
+function getAutoTeleport(state: GameState): DebugTeleportPoint | null {
+  if (!state.autoModeEnabled || state.activeTeleport || getTeleportPoi(state)) {
+    return null;
+  }
+
+  if (getLivingEnemies(state).length > 0) {
+    return null;
+  }
+
+  return getCurrentTeleports(state).find(
+    (teleport) => teleport.autoSelectAfterEnemiesCleared,
+  ) ?? null;
 }
 
 function getActivatedTeleportState(state: GameState): GameState {
-  if (shouldPartyMemberTriggerTeleport(state)) {
-    return triggerMapTeleport(state, getTeleportTriggerSource(state));
+  const teleport = getTeleportPoi(state);
+
+  if (teleport && shouldPartyMemberTriggerTeleport(state, teleport)) {
+    return triggerMapTeleport(state, getTeleportTriggerSource(state), teleport.id);
   }
 
   return state;
 }
 
-function shouldPartyMemberTriggerTeleport(state: GameState): boolean {
-  return (
-    state.currentMapId === MAP_ONE_ID &&
-    !state.activeTeleport &&
-    isTeleportPoiActive(state) &&
-    getLivingPartyMembers(state).some(
-      (partyMember) => getDistance(partyMember.position, teleporterPosition) <= 2,
-    )
+function shouldPartyMemberTriggerTeleport(
+  state: GameState,
+  teleport: DebugTeleportPoint,
+): boolean {
+  return getLivingPartyMembers(state).some(
+    (partyMember) => getDistance(partyMember.position, teleport.position) <= 2,
   );
 }
 
@@ -112,20 +151,29 @@ function getTeleportTriggerSource(state: GameState): "ai" | "player" {
     : "player";
 }
 
-function isTeleportPoiActive(state: GameState): boolean {
-  return Boolean(
-    state.leaderIntent?.type === "move" &&
-      state.leaderIntent.targetId === null &&
-      state.leaderIntent.targetPosition &&
-      getDistance(state.leaderIntent.targetPosition, teleporterPosition) <= 0.001,
-  );
+function getTeleportPoi(state: GameState): DebugTeleportPoint | null {
+  if (
+    state.leaderIntent?.type !== "move" ||
+    state.leaderIntent.targetId !== null ||
+    !state.leaderIntent.targetPosition
+  ) {
+    return null;
+  }
+
+  return getCurrentTeleports(state).find(
+    (teleport) =>
+      getDistance(state.leaderIntent?.targetPosition ?? teleport.position, teleport.position) <=
+      0.001,
+  ) ?? null;
 }
 
 function movePartyToTeleport(
   state: GameState,
   movedEntityIds: Set<string>,
 ): GameState {
-  let nextState = setTeleportMoveIntent(state);
+  let nextState = state.activeTeleport
+    ? setTeleportMoveIntent(state, state.activeTeleport)
+    : state;
   const teleport = nextState.activeTeleport;
 
   if (!teleport) {
@@ -173,12 +221,28 @@ function movePartyToTeleport(
 }
 
 function completeTeleport(state: GameState): GameState {
-  const entities = getMapTwoEntities(state);
+  const teleport = state.activeTeleport;
+
+  if (!teleport) {
+    return appendTeleportSkippedEvent(state, "no_active_teleport");
+  }
+
+  const teleportDefinition = getTeleportById(teleport.sourceMapId, teleport.id);
+
+  if (!teleportDefinition) {
+    return appendTeleportSkippedEvent(state, "teleport_definition_missing", teleport.id);
+  }
+
+  const previousMapId = state.currentMapId;
+  const previousMap = state.map;
+  const positionsBeforeTransition = getEntityPositions(state.entities);
+  const entities = getMapEntities(state, teleport.targetMapId);
+  const targetMap = createDebugMap(teleport.targetMapId);
   let nextState: GameState = {
     ...state,
     entities,
-    currentMapId: MAP_TWO_ID,
-    map: createDebugMap(MAP_TWO_ID),
+    currentMapId: teleport.targetMapId,
+    map: targetMap,
     activeTeleport: null,
     leaderIntent: null,
     exploredTiles: {},
@@ -190,6 +254,10 @@ function completeTeleport(state: GameState): GameState {
     reservedPositionsByEntityId: {},
     movementPathsByEntityId: {},
     movementDecisionsByEntityId: {},
+    lastPositionsByEntityId: {},
+    defenderWaitTicksByLeaderId: {},
+    defenderBlockedTicksByEntityId: {},
+    skillVisualEvents: [],
     partyFormation: {
       phase: "idle",
       targetId: null,
@@ -209,8 +277,8 @@ function completeTeleport(state: GameState): GameState {
     }
 
     const position =
-      mapTwoCompanionStartPositions[companionIds.indexOf(companionId)] ??
-      mapTwoCompanionStartPositions[0];
+      teleportDefinition.arrivalPositions[companionIds.indexOf(companionId)] ??
+      teleportDefinition.arrivalPositions[0];
 
     nextState = updateEntity(nextState, {
       ...moveEntityTo(companion, position),
@@ -222,16 +290,89 @@ function completeTeleport(state: GameState): GameState {
   }
 
   const leader = nextState.entities[nextState.partyLeaderId];
+  const positionsAfterTransition = getEntityPositions(nextState.entities);
 
-  return {
+  nextState = {
     ...nextState,
     exploredTiles: leader
       ? { [`${Math.round(leader.position.x)},${Math.round(leader.position.y)}`]: true }
       : {},
   };
+
+  nextState = appendDebugTelemetryEvent(nextState, {
+    type: "teleport_completed",
+    entityId: "party",
+    previousMapId,
+    nextMapId: teleport.targetMapId,
+    previousMapDisplayName: previousMap?.displayName,
+    nextMapDisplayName: targetMap.displayName,
+    activeTeleportId: teleport.id,
+    activeTeleportSourceMapId: teleport.sourceMapId,
+    activeTeleportTargetMapId: teleport.targetMapId,
+    teleportTriggerSource: teleport.triggeredBy,
+    positionsBeforeTransition,
+    positionsAfterTransition,
+  });
+
+  return appendDebugTelemetryEvent(nextState, {
+    type: "map_transition",
+    entityId: "party",
+    previousMapId,
+    nextMapId: teleport.targetMapId,
+    previousMapDisplayName: previousMap?.displayName,
+    nextMapDisplayName: targetMap.displayName,
+    activeTeleportId: teleport.id,
+    activeTeleportSourceMapId: teleport.sourceMapId,
+    activeTeleportTargetMapId: teleport.targetMapId,
+    teleportTriggerSource: teleport.triggeredBy,
+    positionsBeforeTransition,
+    positionsAfterTransition,
+  });
 }
 
-function getMapTwoEntities(state: GameState): Record<string, GameEntity> {
+function getMapEntities(
+  state: GameState,
+  mapId: DebugMapId,
+): Record<string, GameEntity> {
+  const entities = getPreservedCompanions(state);
+
+  if (mapId === HUB_MAP_ID) {
+    for (const npc of hubNpcStartData) {
+      entities[npc.id] = createNpc(
+        npc.id,
+        npc.position,
+        npc.displayName,
+        npc.npcRole,
+      );
+    }
+
+    return entities;
+  }
+
+  const enemyStartPositions =
+    mapId === MAP_TWO_ID ? mapTwoEnemyStartPositions : mapOneEnemyStartPositions;
+  const resourceStartData =
+    mapId === MAP_TWO_ID ? mapTwoResourceStartData : mapOneResourceStartData;
+
+  for (const enemyId of enemyIds) {
+    const position =
+      enemyStartPositions[enemyIds.indexOf(enemyId)] ?? enemyStartPositions[0];
+    entities[enemyId] = createEnemy(enemyId, position, "aggressive");
+  }
+
+  for (const resourceId of resourceIds) {
+    const resource =
+      resourceStartData.find((entry) => entry.id === resourceId) ??
+      resourceStartData[0];
+    entities[resourceId] = createResource(resourceId, resource.position, {
+      resourceType: resource.resourceType,
+    });
+  }
+
+  return entities;
+}
+
+function getPreservedCompanions(state: GameState): Record<string, GameEntity> {
   const entities: Record<string, GameEntity> = {};
 
   for (const companionId of companionIds) {
@@ -242,30 +383,66 @@ function getMapTwoEntities(state: GameState): Record<string, GameEntity> {
     }
   }
 
-  for (const enemyId of enemyIds) {
-    const position =
-      mapTwoEnemyStartPositions[enemyIds.indexOf(enemyId)] ??
-      mapTwoEnemyStartPositions[0];
-    entities[enemyId] = createEnemy(enemyId, position, "aggressive");
-  }
-
-  for (const resourceId of resourceIds) {
-    const resource =
-      mapTwoResourceStartData.find((entry) => entry.id === resourceId) ??
-      mapTwoResourceStartData[0];
-    entities[resourceId] = createResource(resourceId, resource.position, {
-      resourceType: resource.resourceType,
-    });
-  }
-
   return entities;
 }
 
-function setTeleportMoveIntent(state: GameState): GameState {
+function setTeleportMoveIntent(
+  state: GameState,
+  teleport: Pick<ActiveTeleport, "position"> | DebugTeleportPoint,
+): GameState {
   return setLeaderIntent(state, {
     type: "move",
     targetId: null,
-    targetPosition: teleporterPosition,
+    targetPosition: teleport.position,
+  });
+}
+
+function getTeleportForCurrentMap(
+  state: GameState,
+  teleportId?: string,
+): DebugTeleportPoint | null {
+  const teleports = getCurrentTeleports(state);
+
+  if (teleportId) {
+    return teleports.find((teleport) => teleport.id === teleportId) ?? null;
+  }
+
+  return teleports[0] ?? null;
+}
+
+function getCurrentTeleports(state: GameState): DebugTeleportPoint[] {
+  if (state.map?.teleports) {
+    return state.map.teleports;
+  }
+
+  return state.currentMapId ? debugMapDefinitions[state.currentMapId].teleports : [];
+}
+
+function getTeleportById(
+  mapId: DebugMapId,
+  teleportId: string,
+): DebugTeleportPoint | null {
+  return debugMapDefinitions[mapId].teleports.find(
+    (teleport) => teleport.id === teleportId,
+  ) ?? null;
+}
+
+function appendTeleportSkippedEvent(
+  state: GameState,
+  reason: string,
+  teleportId?: string,
+): GameState {
+  return appendDebugTelemetryEvent(state, {
+    type: "teleport_skipped",
+    entityId: "party",
+    activeTeleportId: teleportId ?? state.activeTeleport?.id ?? null,
+    activeTeleportSourceMapId: state.activeTeleport?.sourceMapId,
+    activeTeleportTargetMapId: state.activeTeleport?.targetMapId,
+    teleportTriggerSource: state.activeTeleport?.triggeredBy,
+    currentMapId: state.currentMapId,
+    currentMapDisplayName: state.map?.displayName,
+    currentMapDebugName: state.map?.debugName,
+    reason,
   });
 }
 
@@ -302,6 +479,17 @@ function getLivingEnemies(state: GameState): GameEntity[] {
       entity.kind === "enemy" &&
       entity.state !== "dead" &&
       entity.health > 0,
+  );
+}
+
+function getEntityPositions(
+  entities: Record<string, GameEntity>,
+): Record<string, Position> {
+  return Object.fromEntries(
+    Object.values(entities).map((entity) => [
+      entity.id,
+      { ...entity.position },
+    ]),
   );
 }
 

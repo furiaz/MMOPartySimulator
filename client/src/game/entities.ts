@@ -7,6 +7,7 @@ import type {
   EnemyAggressionMode,
   EntityState,
   GameEntity,
+  NpcEntity,
   PartyMemberRole,
   Position,
   ResourceEntity,
@@ -148,6 +149,22 @@ export function moveEntityToward<T extends GameEntity>(
     entity,
     stepToward(entity.position, target.position, getMovementStepDistance(entity)),
   );
+}
+
+export function createNpc(
+  id: string,
+  position: Position,
+  displayName: string,
+  npcRole: NpcEntity["npcRole"],
+): NpcEntity {
+  return {
+    id,
+    kind: "npc",
+    position,
+    state: "idle",
+    displayName,
+    npcRole,
+  };
 }
 
 export function damageEntity<T extends CombatEntity>(

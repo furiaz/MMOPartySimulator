@@ -3,7 +3,6 @@ import "./App.css";
 import SpriteAnimation from "./SpriteAnimation";
 
 import {
-  addEnemy,
   addEntity,
   CLASS_DEFINITIONS,
   companionIds,
@@ -11,8 +10,7 @@ import {
   createCompanion,
   createDebugMap,
   createEmptyPartyInventory,
-  createEnemy,
-  createResource,
+  createNpc,
   DEBUG_MAP_COLUMNS,
   DEBUG_MAP_ROWS,
   clearDebugTelemetry,
@@ -27,14 +25,13 @@ import {
   exportDebugTelemetryReport,
   getCharacterXpProgress,
   getItemDefinition,
+  hubCompanionStartPositions,
+  hubNpcStartData,
+  HUB_MAP_ID,
   ITEM_DEFINITIONS,
   issueCompanionCommands,
   isCombatEntity,
-  mapOneEnemyStartPositions,
-  mapOneResourceStartData,
-  MAP_ONE_ID,
   resourceIds,
-  setMapTeleportPoi,
   setAutoModeEnabled,
   getUsedInventorySlots,
   setLeaderIntent,
@@ -42,16 +39,17 @@ import {
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
-  teleporterPosition,
-  TELEPORTER_RANGE,
+  triggerMapTeleport,
   updateEntity,
   type Companion,
   type CombatEntity,
+  type DebugTeleportPoint,
   type Enemy,
   type GameEntity,
   type GameState,
   type ItemCategory,
   type ItemId,
+  type NpcEntity,
   type PartyMemberRole,
   type PartyInventory,
   type Position,
@@ -823,25 +821,27 @@ function getPositionDistance(first: Position, second: Position): number {
 function createInitialState(): GameState {
   const leader = createCompanion(
     companionIds[0],
-    companionStartPositions[0],
+    hubCompanionStartPositions[0],
     companionIds[0],
     "fighter",
     0,
   );
-  const enemies = enemyIds.map((enemyId, index) =>
-    createEnemy(enemyId, mapOneEnemyStartPositions[index], "aggressive"),
+  const secondCompanion = createCompanion(
+    companionIds[1],
+    hubCompanionStartPositions[1],
+    companionIds[0],
+    "defender",
+    1,
   );
-  const resources = mapOneResourceStartData.map((resource) =>
-    createResource(resource.id, resource.position, {
-      resourceType: resource.resourceType,
-    }),
+  const npcs = hubNpcStartData.map((npc) =>
+    createNpc(npc.id, npc.position, npc.displayName, npc.npcRole),
   );
 
-  const baseState = [leader, ...resources].reduce(addEntity, {
+  return [leader, secondCompanion, ...npcs].reduce(addEntity, {
     entities: {},
     inventory: createEmptyPartyInventory(),
     map: debugMap,
-    currentMapId: MAP_ONE_ID,
+    currentMapId: HUB_MAP_ID,
     activeTeleport: null,
     autoModeEnabled: false,
     simulationTick: 0,
@@ -859,8 +859,6 @@ function createInitialState(): GameState {
     skillCooldownsByCompanionId: {},
     skillVisualEvents: [],
   });
-
-  return enemies.reduce(addEnemy, baseState);
 }
 
 function EntityDebugLabel({
@@ -981,6 +979,9 @@ function App() {
   const resources = resourceIds
     .map((id) => gameState.entities[id] as ResourceEntity | undefined)
     .filter((resource): resource is ResourceEntity => Boolean(resource));
+  const npcs = Object.values(gameState.entities).filter(
+    (entity): entity is NpcEntity => entity.kind === "npc",
+  );
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find((resource) => !resource.isDepleted);
   const poiTarget = gameState.leaderIntent?.targetId
@@ -1001,15 +1002,8 @@ function App() {
       .map((entity) => entity.currentTargetId),
   );
   const inventory = gameState.inventory;
-  const showTeleporter = gameState.currentMapId === MAP_ONE_ID;
   const activeTeleport = gameState.activeTeleport;
-  const isTeleporterPoi =
-    gameState.leaderIntent?.type === "move" &&
-    gameState.leaderIntent.targetPosition &&
-    Math.hypot(
-      gameState.leaderIntent.targetPosition.x - teleporterPosition.x,
-      gameState.leaderIntent.targetPosition.y - teleporterPosition.y,
-    ) <= 0.001;
+  const teleports = currentMap.teleports;
   const activeSkillVisualEvents = (gameState.skillVisualEvents ?? []).filter(
     (event) => event.expiresAt > currentTime,
   );
@@ -1177,12 +1171,17 @@ function App() {
   }
 
   function addCompanionToParty() {
+    const debugCompanionPositions =
+      currentMap.id === HUB_MAP_ID
+        ? hubCompanionStartPositions
+        : companionStartPositions;
+
     setGameState((state) =>
       debugAddCompanionToParty(
         state,
         companionIds,
         state.partyLeaderId,
-        companionStartPositions,
+        debugCompanionPositions,
       ),
     );
   }
@@ -1276,8 +1275,19 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  function triggerTeleport() {
-    setGameState(setMapTeleportPoi);
+  function triggerTeleport(teleportId: string) {
+    setGameState((state) => triggerMapTeleport(state, "player", teleportId));
+  }
+
+  function isTeleportPoi(teleport: DebugTeleportPoint): boolean {
+    return Boolean(
+      gameState.leaderIntent?.type === "move" &&
+        gameState.leaderIntent.targetPosition &&
+        Math.hypot(
+          gameState.leaderIntent.targetPosition.x - teleport.position.x,
+          gameState.leaderIntent.targetPosition.y - teleport.position.y,
+        ) <= 0.001,
+    );
   }
 
   function getCompanionMovementTarget(member: Companion): Position | null {
@@ -1363,10 +1373,14 @@ function App() {
         <h1>Follow System Test</h1>
 
         <div
-          key={gameState.currentMapId ?? MAP_ONE_ID}
+          key={gameState.currentMapId ?? HUB_MAP_ID}
           className={`test-area ${mapTileVisualAssets.floor.className}`}
           aria-label="Follow system top-down test area"
         >
+          <div className="map-label-overlay">
+            <strong>{currentMap.displayName}</strong>
+            <span>debug: {currentMap.debugName}</span>
+          </div>
           {currentMap.walls.map((wall) => (
             <div
               key={`${wall.x}-${wall.y}`}
@@ -1378,47 +1392,47 @@ function App() {
               }}
             />
           ))}
-          {showTeleporter ? (
-            <>
-              {activeTeleport ? (
-                <div
-                  className="teleport-range"
-                  style={{
-                    width: TELEPORTER_RANGE * cellSize * 2,
-                    height: TELEPORTER_RANGE * cellSize * 2,
-                    transform: `translate(${
-                      (teleporterPosition.x - TELEPORTER_RANGE) * cellSize
-                    }px, ${
-                      (teleporterPosition.y - TELEPORTER_RANGE) * cellSize
-                    }px)`,
-                  }}
-                  title="Teleport rally range"
-                />
-              ) : null}
-              {isTeleporterPoi && !activeTeleport ? (
+          {activeTeleport ? (
+            <div
+              className="teleport-range"
+              style={{
+                width: activeTeleport.range * cellSize * 2,
+                height: activeTeleport.range * cellSize * 2,
+                transform: `translate(${
+                  (activeTeleport.position.x - activeTeleport.range) * cellSize
+                }px, ${
+                  (activeTeleport.position.y - activeTeleport.range) * cellSize
+                }px)`,
+              }}
+              title="Teleport rally range"
+            />
+          ) : null}
+          {teleports.map((teleport) => (
+            <div key={teleport.id}>
+              {isTeleportPoi(teleport) && !activeTeleport ? (
                 <div
                   className="poi-ring teleport-poi"
                   style={{
-                    transform: `translate(${teleporterPosition.x * cellSize}px, ${
-                      teleporterPosition.y * cellSize
+                    transform: `translate(${teleport.position.x * cellSize}px, ${
+                      teleport.position.y * cellSize
                     }px)`,
                   }}
-                  title="Teleport point of interest"
+                  title={`${teleport.id} point of interest`}
                 />
               ) : null}
               <button
                 className="teleporter"
-                onClick={triggerTeleport}
+                onClick={() => triggerTeleport(teleport.id)}
                 style={{
-                  transform: `translate(${teleporterPosition.x * cellSize}px, ${
-                    teleporterPosition.y * cellSize
+                  transform: `translate(${teleport.position.x * cellSize}px, ${
+                    teleport.position.y * cellSize
                   }px)`,
                 }}
-                title="Teleport to map 2"
+                title={`${teleport.id}: ${teleport.sourceMapId} to ${teleport.targetMapId}`}
                 type="button"
               />
-            </>
-          ) : null}
+            </div>
+          ))}
           {Object.values(gameState.skillShieldBlocksById ?? {}).map((shield) => (
             <div
               key={shield.id}
@@ -1569,7 +1583,7 @@ function App() {
             if (enemy.state === "dead") {
               return (
               <div
-                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${enemy.id}`}
+                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
                 className="dead-label"
                 style={{
                   transform: `translate(${enemy.position.x * cellSize}px, ${
@@ -1609,7 +1623,7 @@ function App() {
 
             return (
               <div
-                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${enemy.id}`}
+                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
                 className={`entity-marker ${
                   visualAsset.kind === "sprite"
                     ? "enemy sprite-entity"
@@ -1657,7 +1671,7 @@ function App() {
           {resources.map((resource) =>
             resource.isDepleted ? (
               <div
-                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${resource.id}`}
+                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
                 className="depleted-label"
                 style={{
                   transform: `translate(${resource.position.x * cellSize}px, ${
@@ -1678,7 +1692,7 @@ function App() {
               </div>
             ) : (
               <div
-                key={`${gameState.currentMapId ?? MAP_ONE_ID}-${resource.id}`}
+                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
                 className={`entity-marker ${getEntityVisualClassName(resource)}${
                   gathererTargetResourceIds.has(resource.id)
                     ? " gatherer-target"
@@ -1701,6 +1715,28 @@ function App() {
               </div>
             ),
           )}
+          {npcs.map((npc) => (
+            <div
+              key={`${gameState.currentMapId ?? HUB_MAP_ID}-${npc.id}`}
+              className={`entity-marker ${getEntityVisualClassName(npc)}`}
+              style={{
+                transform: `translate(${npc.position.x * cellSize}px, ${
+                  npc.position.y * cellSize
+                }px)`,
+              }}
+              title={`${npc.displayName} placeholder`}
+            >
+              <span className="map-marker-id">
+                {npc.npcRole === "dog" ? "D" : "N"}
+              </span>
+              <EntityDebugLabel
+                name={npc.displayName}
+                entity={npc}
+                detail="Placeholder"
+                isVisible={showEntityInfo}
+              />
+            </div>
+          ))}
         </div>
 
         <GameMenu

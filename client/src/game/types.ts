@@ -6,7 +6,7 @@ export type EntityState =
   | "defend"
   | "dead";
 
-export type EntityKind = "companion" | "enemy" | "resource";
+export type EntityKind = "companion" | "enemy" | "resource" | "npc";
 
 export type EnemyAggressionMode = "passive" | "aggressive";
 
@@ -108,7 +108,7 @@ export type InventoryRemoveResult = {
   remainingQuantity: number;
 };
 
-export type DebugMapId = "map-1" | "map-2";
+export type DebugMapId = "hub" | "map-1" | "map-2";
 
 export type Position = {
   x: number;
@@ -299,7 +299,11 @@ export type DebugTelemetryEventType =
   | "item_removed"
   | "inventory_stack_created"
   | "inventory_stack_updated"
-  | "inventory_capacity_checked";
+  | "inventory_capacity_checked"
+  | "teleport_started"
+  | "teleport_completed"
+  | "teleport_skipped"
+  | "map_transition";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -332,6 +336,19 @@ export type DebugTelemetryEvent = {
   tick: number;
   type: DebugTelemetryEventType;
   entityId: string;
+  currentMapId?: DebugMapId;
+  currentMapDisplayName?: string;
+  currentMapDebugName?: string;
+  previousMapId?: DebugMapId;
+  nextMapId?: DebugMapId;
+  previousMapDisplayName?: string;
+  nextMapDisplayName?: string;
+  activeTeleportId?: string | null;
+  activeTeleportSourceMapId?: DebugMapId;
+  activeTeleportTargetMapId?: DebugMapId;
+  teleportTriggerSource?: "ai" | "player";
+  positionsBeforeTransition?: Record<string, Position>;
+  positionsAfterTransition?: Record<string, Position>;
   targetId?: string | null;
   previousTargetId?: string | null;
   amount?: number;
@@ -373,6 +390,13 @@ export type DebugTelemetryEvent = {
 export type DebugTelemetryTick = {
   tick: number;
   recordedAt: number;
+  currentMapId?: DebugMapId;
+  currentMapDisplayName?: string;
+  currentMapDebugName?: string;
+  activeTeleportId?: string | null;
+  activeTeleportSourceMapId?: DebugMapId;
+  activeTeleportTargetMapId?: DebugMapId;
+  teleportTriggerSource?: "ai" | "player";
   entities: DebugTelemetryEntitySnapshot[];
   events: DebugTelemetryEvent[];
 };
@@ -391,14 +415,34 @@ export type DebugTelemetryReport = {
   exportedAt: number;
   tickCount: number;
   eventCount: number;
+  currentMapId?: DebugMapId;
+  currentMapDisplayName?: string;
+  currentMapDebugName?: string;
+  activeTeleportId?: string | null;
+  activeTeleportSourceMapId?: DebugMapId;
+  activeTeleportTargetMapId?: DebugMapId;
+  teleportTriggerSource?: "ai" | "player";
   telemetry: DebugTelemetryState;
+};
+
+export type DebugTeleportPoint = {
+  id: string;
+  position: Position;
+  range: number;
+  sourceMapId: DebugMapId;
+  targetMapId: DebugMapId;
+  arrivalPositions: Position[];
+  autoSelectAfterEnemiesCleared?: boolean;
 };
 
 export type GameMap = {
   id?: DebugMapId;
+  displayName: string;
+  debugName: string;
   columns: number;
   rows: number;
   walls: Position[];
+  teleports: DebugTeleportPoint[];
   navigationGrid?: NavigationGrid;
 };
 
@@ -406,6 +450,7 @@ export type ActiveTeleport = {
   id: string;
   position: Position;
   range: number;
+  sourceMapId: DebugMapId;
   targetMapId: DebugMapId;
   triggeredBy: "ai" | "player";
 };
@@ -492,7 +537,13 @@ export type ResourceEntity = BaseEntity & {
   isDepleted: boolean;
 };
 
-export type GameEntity = Enemy | Companion | ResourceEntity;
+export type NpcEntity = BaseEntity & {
+  kind: "npc";
+  displayName: string;
+  npcRole: "quest_giver" | "merchant" | "smith" | "dog";
+};
+
+export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity;
 
 export type AutonomousEntity = Companion;
 
