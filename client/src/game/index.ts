@@ -211,7 +211,11 @@ export {
   type EntityCommand,
 } from "./commands";
 export { updateGame } from "./updateGame";
-export { updateAttackSystem } from "./attackSystem";
+export {
+  ATTACK_COOLDOWN_MS,
+  getAttackCooldownMs,
+  updateAttackSystem,
+} from "./attackSystem";
 export { updateDefendSystem } from "./defendSystem";
 export {
   getEnemyAttackLeashDistance,

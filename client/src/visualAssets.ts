@@ -1,17 +1,25 @@
-import type { GameEntity } from "./game";
+import type { DebugMapId, GameEntity } from "./game";
 
 export type SpriteAnimationAsset = {
   frames: string[];
   frameDurationMs: number;
 };
 
-export type SpriteDirection = "north" | "south" | "west" | "east";
+export type SpriteDirection =
+  | "north"
+  | "northEast"
+  | "east"
+  | "southEast"
+  | "south"
+  | "southWest"
+  | "west"
+  | "northWest";
 
 export type SpriteVisualAsset = {
   kind: "sprite";
   animations: {
-    idle: SpriteAnimationAsset;
-    run: Record<SpriteDirection, SpriteAnimationAsset>;
+    idle: SpriteAnimationAsset | Partial<Record<SpriteDirection, SpriteAnimationAsset>>;
+    run: Partial<Record<SpriteDirection, SpriteAnimationAsset>>;
   };
 };
 
@@ -37,6 +45,7 @@ export type MapTileVisualAsset = {
 
 const testCharacterBasePath = "/Asserts/Characters/Test-Character";
 const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
+const testEnemyTwoBasePath = "/Asserts/Characters/Test-Enemy2";
 const testNpcBasePath = "/Asserts/Characters/Test-NPC";
 const defaultFrameDurationMs = 100;
 
@@ -52,6 +61,28 @@ function createFrames(
       `${basePath}/${folderName}/${frameName}_${String(index).padStart(4, "0")}.png`,
   );
 }
+
+function createSingleFrame(src: string): SpriteAnimationAsset {
+  return {
+    frames: [src],
+    frameDurationMs: defaultFrameDurationMs,
+  };
+}
+
+function createEnemyTwoDirectionalFrames() {
+  return {
+    north: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_North.png`),
+    northEast: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_NorthEast.png`),
+    east: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_East.png`),
+    southEast: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_SouthEast.png`),
+    south: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_South.png`),
+    southWest: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_SouthWest.png`),
+    west: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_West.png`),
+    northWest: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_NorthWest.png`),
+  } satisfies Record<SpriteDirection, SpriteAnimationAsset>;
+}
+
+const enemyTwoDirectionalFrames = createEnemyTwoDirectionalFrames();
 
 export const entityVisualAssets = {
   testCharacter: {
@@ -108,6 +139,13 @@ export const entityVisualAssets = {
       },
     },
   },
+  enemy2: {
+    kind: "sprite",
+    animations: {
+      idle: enemyTwoDirectionalFrames,
+      run: enemyTwoDirectionalFrames,
+    },
+  },
   resource: {
     wood: {
       kind: "placeholder",
@@ -141,6 +179,7 @@ export const entityVisualAssets = {
 } satisfies {
   testCharacter: SpriteVisualAsset;
   enemy: SpriteVisualAsset;
+  enemy2: SpriteVisualAsset;
   resource: Record<string, PlaceholderVisualAsset>;
   npc: PlaceholderVisualAsset;
   dog: PlaceholderVisualAsset;
@@ -159,7 +198,10 @@ export const mapTileVisualAssets = {
   },
 } satisfies Record<string, MapTileVisualAsset>;
 
-export function getEntityVisualAsset(entity: GameEntity): EntityVisualAsset {
+export function getEntityVisualAsset(
+  entity: GameEntity,
+  currentMapId?: DebugMapId,
+): EntityVisualAsset {
   if (entity.kind === "companion") {
     return entityVisualAssets.testCharacter;
   }
@@ -182,11 +224,16 @@ export function getEntityVisualAsset(entity: GameEntity): EntityVisualAsset {
       : entityVisualAssets.npc;
   }
 
-  return entityVisualAssets.enemy;
+  return currentMapId === "map-2"
+    ? entityVisualAssets.enemy2
+    : entityVisualAssets.enemy;
 }
 
-export function getEntityVisualClassName(entity: GameEntity): string {
-  const visualAsset = getEntityVisualAsset(entity);
+export function getEntityVisualClassName(
+  entity: GameEntity,
+  currentMapId?: DebugMapId,
+): string {
+  const visualAsset = getEntityVisualAsset(entity, currentMapId);
 
   return visualAsset.kind === "placeholder" ? visualAsset.className : "";
 }
@@ -196,7 +243,45 @@ export function getSpriteAnimation(
   isVisuallyMoving: boolean,
   movementDirection?: SpriteDirection,
 ): SpriteAnimationAsset {
-  return isVisuallyMoving
-    ? visualAsset.animations.run[movementDirection ?? "south"]
-    : visualAsset.animations.idle;
+  const direction = movementDirection ?? "south";
+
+  if (isVisuallyMoving) {
+    return getDirectionalAnimation(visualAsset.animations.run, direction);
+  }
+
+  return getDirectionalAnimation(visualAsset.animations.idle, direction);
+}
+
+function getDirectionalAnimation(
+  animation:
+    | SpriteAnimationAsset
+    | Partial<Record<SpriteDirection, SpriteAnimationAsset>>,
+  direction: SpriteDirection,
+): SpriteAnimationAsset {
+  if ("frames" in animation) {
+    return animation;
+  }
+
+  const fallbackAnimation = animation.south ?? Object.values(animation)[0];
+
+  return (
+    animation[direction] ??
+    animation[getCardinalDirection(direction)] ??
+    fallbackAnimation ?? {
+      frames: [],
+      frameDurationMs: defaultFrameDurationMs,
+    }
+  );
+}
+
+function getCardinalDirection(direction: SpriteDirection): SpriteDirection {
+  if (direction === "northEast" || direction === "northWest") {
+    return "north";
+  }
+
+  if (direction === "southEast" || direction === "southWest") {
+    return "south";
+  }
+
+  return direction;
 }

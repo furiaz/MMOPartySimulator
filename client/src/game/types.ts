@@ -653,6 +653,7 @@ export type Enemy = LivingEntity & {
   roamMoveUntil?: number;
   level: number;
   xpReward?: number;
+  attackCooldownMs?: number;
 };
 
 export type Companion = LivingEntity & {

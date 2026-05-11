@@ -51,6 +51,7 @@ import {
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
   addItemToInventoryState,
+  getAttackCooldownMs,
   getEnemyDetectionRange,
   hasQuestGiverWork,
   issueCompanionCommands,
@@ -148,6 +149,16 @@ function getMovementDirection(
 ): SpriteDirection {
   const xDelta = currentPosition.x - previousPosition.x;
   const yDelta = currentPosition.y - previousPosition.y;
+  const hasHorizontalMovement = Math.abs(xDelta) > 0.01;
+  const hasVerticalMovement = Math.abs(yDelta) > 0.01;
+
+  if (hasHorizontalMovement && hasVerticalMovement) {
+    if (xDelta > 0) {
+      return yDelta > 0 ? "southEast" : "northEast";
+    }
+
+    return yDelta > 0 ? "southWest" : "northWest";
+  }
 
   if (Math.abs(xDelta) >= Math.abs(yDelta)) {
     return xDelta >= 0 ? "east" : "west";
@@ -285,7 +296,7 @@ function AttackCooldownIndicator({
 }) {
   const cooldownProgress = Math.max(
     0,
-    1 - (currentTime - entity.lastAttackAt) / 1000,
+    1 - (currentTime - entity.lastAttackAt) / getAttackCooldownMs(entity),
   );
 
   if (cooldownProgress <= 0 || entity.state === "dead") {
@@ -1051,7 +1062,7 @@ function App() {
             ) : null,
           )}
           {partyMembers.map((member, index) => {
-            const visualAsset = getEntityVisualAsset(member);
+            const visualAsset = getEntityVisualAsset(member, gameState.currentMapId);
             const visualMovement =
               visualMovementByEntityId[member.id];
             const isVisuallyMoving =
@@ -1134,7 +1145,7 @@ function App() {
               );
             }
 
-            const visualAsset = getEntityVisualAsset(enemy);
+            const visualAsset = getEntityVisualAsset(enemy, gameState.currentMapId);
             const visualMovement = visualMovementByEntityId[enemy.id];
             const isVisuallyMoving =
               Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
@@ -1155,7 +1166,7 @@ function App() {
                 className={`entity-marker ${
                   visualAsset.kind === "sprite"
                     ? "enemy sprite-entity"
-                    : getEntityVisualClassName(enemy)
+                    : getEntityVisualClassName(enemy, gameState.currentMapId)
                 }`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -1224,7 +1235,10 @@ function App() {
             ) : (
               <div
                 key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
-                className={`entity-marker ${getEntityVisualClassName(resource)}${
+                className={`entity-marker ${getEntityVisualClassName(
+                  resource,
+                  gameState.currentMapId,
+                )}${
                   gathererTargetResourceIds.has(resource.id)
                     ? " gatherer-target"
                     : ""
@@ -1250,14 +1264,16 @@ function App() {
             ),
           )}
           {npcs.map((npc) => {
-            const visualAsset = getEntityVisualAsset(npc);
+            const visualAsset = getEntityVisualAsset(npc, gameState.currentMapId);
             const isImageNpc = visualAsset.kind === "image";
 
             return (
               <div
                 key={`${gameState.currentMapId ?? HUB_MAP_ID}-${npc.id}`}
                 className={`entity-marker ${
-                  isImageNpc ? "npc-image-entity" : getEntityVisualClassName(npc)
+                  isImageNpc
+                    ? "npc-image-entity"
+                    : getEntityVisualClassName(npc, gameState.currentMapId)
                 }`}
                 onClick={(event) => {
                   event.stopPropagation();

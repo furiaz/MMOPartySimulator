@@ -43,7 +43,7 @@ import type {
 
 const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
-const ATTACK_COOLDOWN_MS = 1000;
+export const ATTACK_COOLDOWN_MS = 1000;
 const TARGET_SWITCH_DISTANCE = 6;
 const MAX_ATTACK_SLOT_PATH_DISTANCE = 6;
 const FINAL_STEP_ATTACK_DISTANCE = MOVEMENT_STEP_DISTANCE * 0.5;
@@ -350,7 +350,13 @@ function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
 }
 
 function canAttack(entity: CombatEntity, now: number): boolean {
-  return now - entity.lastAttackAt >= ATTACK_COOLDOWN_MS;
+  return now - entity.lastAttackAt >= getAttackCooldownMs(entity);
+}
+
+export function getAttackCooldownMs(entity: CombatEntity): number {
+  return entity.kind === "enemy"
+    ? entity.attackCooldownMs ?? ATTACK_COOLDOWN_MS
+    : ATTACK_COOLDOWN_MS;
 }
 
 function updateTargetAfterDamage(

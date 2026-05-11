@@ -41,6 +41,8 @@ type CreateResourceOptions = {
 type CreateEnemyOptions = {
   level?: number;
   xpReward?: number;
+  maxHealth?: number;
+  attackCooldownMs?: number;
 };
 
 export function createEnemy(
@@ -49,19 +51,22 @@ export function createEnemy(
   aggressionMode: EnemyAggressionMode = "passive",
   options: CreateEnemyOptions = {},
 ): Enemy {
+  const maxHealth = options.maxHealth ?? STARTING_ENEMY_HEALTH;
+
   return {
     id,
     kind: "enemy",
     position,
     state: "idle",
-    health: STARTING_ENEMY_HEALTH,
-    maxHealth: STARTING_ENEMY_HEALTH,
+    health: maxHealth,
+    maxHealth,
     lastAttackAt: 0,
     currentTargetId: null,
     aggressionMode,
     homePosition: position,
     level: options.level ?? STARTING_ENEMY_LEVEL,
     xpReward: options.xpReward,
+    attackCooldownMs: options.attackCooldownMs,
   };
 }
 

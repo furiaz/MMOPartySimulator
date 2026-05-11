@@ -30,6 +30,9 @@ import type {
   Position,
 } from "./types";
 
+const MAP_TWO_ENEMY_HEALTH = 6;
+const MAP_TWO_ENEMY_ATTACK_COOLDOWN_MS = 1330;
+
 export function triggerMapTeleport(
   state: GameState,
   triggeredBy: "ai" | "player",
@@ -365,7 +368,17 @@ function getMapEntities(
   for (const enemyId of enemyIds) {
     const position =
       enemyStartPositions[enemyIds.indexOf(enemyId)] ?? enemyStartPositions[0];
-    entities[enemyId] = createEnemy(enemyId, position, "aggressive");
+    entities[enemyId] = createEnemy(
+      enemyId,
+      position,
+      "aggressive",
+      mapId === MAP_TWO_ID
+        ? {
+            maxHealth: MAP_TWO_ENEMY_HEALTH,
+            attackCooldownMs: MAP_TWO_ENEMY_ATTACK_COOLDOWN_MS,
+          }
+        : {},
+    );
   }
 
   for (const resourceId of resourceIds) {
