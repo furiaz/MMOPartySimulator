@@ -8,6 +8,7 @@ import {
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
+import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
 import {
   updateSkillShieldBlockPositions,
@@ -23,6 +24,7 @@ import {
   clearExpiredCombatFeedback,
   clearExpiredSkillRuntimeState,
   clearTickMovementPlanning,
+  updateEntity,
   type GameState,
 } from "./state";
 
@@ -50,7 +52,9 @@ export function updateGame(state: GameState): GameState {
   }
 
   const shouldMovePartyTowardPoi =
-    nextState.autoModeEnabled || isMapTeleportPoiActive(nextState);
+    Boolean(nextState.leaderIntent) ||
+    nextState.autoModeEnabled ||
+    isMapTeleportPoiActive(nextState);
 
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState);
@@ -74,9 +78,38 @@ export function updateGame(state: GameState): GameState {
   nextState = updateAttackSystem(nextState, movedEntityIds);
   nextState = updateGatherSystem(nextState, movedEntityIds);
   nextState = updateSkillShieldBlockPositions(nextState);
+  nextState = idleAutonomousPartyMembersWithoutPoi(nextState);
 
   return recordDebugTelemetryTick(
     state,
     clearExpiredCombatFeedback(nextState),
   );
+}
+
+function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
+  if (state.leaderIntent || state.activeTeleport) {
+    return state;
+  }
+
+  let nextState = state;
+
+  for (const member of getPartyMembers(nextState)) {
+    if (
+      member.commandPriority === "direct" ||
+      member.state === "idle" ||
+      member.state === "dead"
+    ) {
+      continue;
+    }
+
+    nextState = updateEntity(nextState, {
+      ...member,
+      state: "idle",
+      currentTargetId: null,
+      defendPosition: null,
+      commandPriority: "autonomous",
+    });
+  }
+
+  return nextState;
 }

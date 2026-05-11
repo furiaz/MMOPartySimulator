@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import "./App.css";
 import SpriteAnimation from "./SpriteAnimation";
 
@@ -819,20 +825,28 @@ function getPositionDistance(first: Position, second: Position): number {
 }
 
 function createInitialState(): GameState {
-  const leader = createCompanion(
-    companionIds[0],
-    hubCompanionStartPositions[0],
-    companionIds[0],
-    "fighter",
-    0,
-  );
-  const secondCompanion = createCompanion(
-    companionIds[1],
-    hubCompanionStartPositions[1],
-    companionIds[0],
-    "defender",
-    1,
-  );
+  const leader: Companion = {
+    ...createCompanion(
+      companionIds[0],
+      hubCompanionStartPositions[0],
+      companionIds[0],
+      "fighter",
+      0,
+    ),
+    state: "idle",
+    currentTargetId: null,
+  };
+  const secondCompanion: Companion = {
+    ...createCompanion(
+      companionIds[1],
+      hubCompanionStartPositions[1],
+      companionIds[0],
+      "defender",
+      1,
+    ),
+    state: "idle",
+    currentTargetId: null,
+  };
   const npcs = hubNpcStartData.map((npc) =>
     createNpc(npc.id, npc.position, npc.displayName, npc.npcRole),
   );
@@ -1004,6 +1018,12 @@ function App() {
   const inventory = gameState.inventory;
   const activeTeleport = gameState.activeTeleport;
   const teleports = currentMap.teleports;
+  const movePoiPosition =
+    gameState.leaderIntent?.type === "move" &&
+    gameState.leaderIntent.targetPosition &&
+    !isTeleportPosition(gameState.leaderIntent.targetPosition)
+      ? gameState.leaderIntent.targetPosition
+      : null;
   const activeSkillVisualEvents = (gameState.skillVisualEvents ?? []).filter(
     (event) => event.expiresAt > currentTime,
   );
@@ -1247,6 +1267,44 @@ function App() {
     });
   }
 
+  function commandPartyToMoveToPosition(targetPosition: Position) {
+    setGameState((state) => {
+      const leader = state.entities[state.partyLeaderId];
+      const leaderIntentState = setLeaderIntent(state, {
+        type: "move",
+        targetId: null,
+        targetPosition: { ...targetPosition },
+      });
+
+      return leader?.kind === "companion"
+        ? updateEntity(leaderIntentState, {
+            ...leader,
+            state: "follow",
+            currentTargetId: null,
+            commandPriority: "autonomous",
+          })
+        : leaderIntentState;
+    });
+  }
+
+  function commandPartyToMoveFromFloorClick(event: MouseEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const targetPosition = {
+      x: Math.floor((event.clientX - bounds.left) / cellSize),
+      y: Math.floor((event.clientY - bounds.top) / cellSize),
+    };
+
+    if (!isValidFloorPosition(targetPosition)) {
+      return;
+    }
+
+    commandPartyToMoveToPosition(targetPosition);
+  }
+
   function toggleDebugTelemetryRecording() {
     setGameState((state) =>
       state.debugTelemetry?.isRecording
@@ -1287,6 +1345,28 @@ function App() {
           gameState.leaderIntent.targetPosition.x - teleport.position.x,
           gameState.leaderIntent.targetPosition.y - teleport.position.y,
         ) <= 0.001,
+    );
+  }
+
+  function isTeleportPosition(position: Position): boolean {
+    return teleports.some(
+      (teleport) =>
+        Math.hypot(
+          position.x - teleport.position.x,
+          position.y - teleport.position.y,
+        ) <= 0.001,
+    );
+  }
+
+  function isValidFloorPosition(position: Position): boolean {
+    return (
+      position.x >= 0 &&
+      position.x < currentMap.columns &&
+      position.y >= 0 &&
+      position.y < currentMap.rows &&
+      !currentMap.walls.some(
+        (wall) => wall.x === position.x && wall.y === position.y,
+      )
     );
   }
 
@@ -1376,6 +1456,7 @@ function App() {
           key={gameState.currentMapId ?? HUB_MAP_ID}
           className={`test-area ${mapTileVisualAssets.floor.className}`}
           aria-label="Follow system top-down test area"
+          onClick={commandPartyToMoveFromFloorClick}
         >
           <div className="map-label-overlay">
             <strong>{currentMap.displayName}</strong>
@@ -1422,7 +1503,10 @@ function App() {
               ) : null}
               <button
                 className="teleporter"
-                onClick={() => triggerTeleport(teleport.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  triggerTeleport(teleport.id);
+                }}
                 style={{
                   transform: `translate(${teleport.position.x * cellSize}px, ${
                     teleport.position.y * cellSize
@@ -1515,6 +1599,22 @@ function App() {
               </div>
             );
           })}
+          {partyMembers.map((member, index) =>
+            member.state === "idle" ? (
+              <div
+                key={`idle-${member.id}`}
+                className="idle-feedback"
+                style={{
+                  transform: `translate(${member.position.x * cellSize}px, ${
+                    member.position.y * cellSize
+                  }px)`,
+                }}
+                title={`Party member ${index + 1} is idle`}
+              >
+                AFK
+              </div>
+            ) : null,
+          )}
           {enemyPoiPosition ? (
             <div
               className="poi-ring enemy-poi"
@@ -1524,6 +1624,17 @@ function App() {
                 }px)`,
               }}
               title="Enemy point of interest"
+            />
+          ) : null}
+          {movePoiPosition ? (
+            <div
+              className="poi-ring move-poi"
+              style={{
+                transform: `translate(${movePoiPosition.x * cellSize}px, ${
+                  movePoiPosition.y * cellSize
+                }px)`,
+              }}
+              title="Move point of interest"
             />
           ) : null}
           {partyMembers.map((member, index) => {
@@ -1549,12 +1660,16 @@ function App() {
                 className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
                   redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
                 }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  commandPartyToMoveToPosition(member.position);
+                }}
                 style={{
                   transform: `translate(${member.position.x * cellSize}px, ${
                     member.position.y * cellSize
                   }px)`,
                 }}
-                title="Party member"
+                title="Move party POI to this party member"
               >
                 {animation ? (
                   <SpriteAnimation
@@ -1629,7 +1744,10 @@ function App() {
                     ? "enemy sprite-entity"
                     : getEntityVisualClassName(enemy)
                 }`}
-                onClick={() => commandPartyToTargetEnemy(enemy.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  commandPartyToTargetEnemy(enemy.id);
+                }}
                 style={{
                   transform: `translate(${enemy.position.x * cellSize}px, ${
                     enemy.position.y * cellSize
@@ -1698,7 +1816,10 @@ function App() {
                     ? " gatherer-target"
                     : ""
                 }`}
-                onClick={() => commandCompanionsToGatherResource(resource.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  commandCompanionsToGatherResource(resource.id);
+                }}
                 style={{
                   transform: `translate(${resource.position.x * cellSize}px, ${
                     resource.position.y * cellSize
@@ -1715,28 +1836,47 @@ function App() {
               </div>
             ),
           )}
-          {npcs.map((npc) => (
-            <div
-              key={`${gameState.currentMapId ?? HUB_MAP_ID}-${npc.id}`}
-              className={`entity-marker ${getEntityVisualClassName(npc)}`}
-              style={{
-                transform: `translate(${npc.position.x * cellSize}px, ${
-                  npc.position.y * cellSize
-                }px)`,
-              }}
-              title={`${npc.displayName} placeholder`}
-            >
-              <span className="map-marker-id">
-                {npc.npcRole === "dog" ? "D" : "N"}
-              </span>
-              <EntityDebugLabel
-                name={npc.displayName}
-                entity={npc}
-                detail="Placeholder"
-                isVisible={showEntityInfo}
-              />
-            </div>
-          ))}
+          {npcs.map((npc) => {
+            const visualAsset = getEntityVisualAsset(npc);
+            const isImageNpc = visualAsset.kind === "image";
+
+            return (
+              <div
+                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${npc.id}`}
+                className={`entity-marker ${
+                  isImageNpc ? "npc-image-entity" : getEntityVisualClassName(npc)
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  commandPartyToMoveToPosition(npc.position);
+                }}
+                style={{
+                  transform: `translate(${npc.position.x * cellSize}px, ${
+                    npc.position.y * cellSize
+                  }px)`,
+                }}
+                title={`Move party POI to ${npc.displayName}`}
+              >
+                {isImageNpc ? (
+                  <img
+                    alt={npc.displayName}
+                    className="npc-test-image"
+                    src={visualAsset.src}
+                  />
+                ) : (
+                  <span className="map-marker-id">
+                    {npc.npcRole === "dog" ? "D" : "N"}
+                  </span>
+                )}
+                <EntityDebugLabel
+                  name={npc.displayName}
+                  entity={npc}
+                  detail="Placeholder"
+                  isVisible={showEntityInfo}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <GameMenu

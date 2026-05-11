@@ -540,7 +540,7 @@ export type ResourceEntity = BaseEntity & {
 export type NpcEntity = BaseEntity & {
   kind: "npc";
   displayName: string;
-  npcRole: "quest_giver" | "merchant" | "smith" | "dog";
+  npcRole: "quest_giver" | "merchant" | "smith" | "dog" | "test_blade" | "test_hunter";
 };
 
 export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity;

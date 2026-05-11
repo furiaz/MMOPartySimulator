@@ -181,6 +181,26 @@
   color: #047857;
 }
 
+.idle-feedback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  min-width: 32px;
+  margin: 10px 0 0 30px;
+  padding: 1px 4px;
+  border: 1px solid #64748b;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
+  transition: transform 480ms linear;
+}
+
 .poi-ring {
   position: absolute;
   top: 0;
@@ -204,6 +224,11 @@
 .poi-ring.teleport-poi {
   color: #7e22ce;
   box-shadow: 0 0 0 2px rgba(126, 34, 206, 0.16);
+}
+
+.poi-ring.move-poi {
+  color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
 }
 
 .entity-marker {
@@ -373,6 +398,7 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  cursor: pointer;
 }
 
 .entity-marker.sprite-entity {
@@ -430,11 +456,35 @@
 .npc-placeholder {
   border-radius: 5px;
   background: #2563eb;
+  cursor: pointer;
 }
 
 .npc-placeholder.dog {
   border-radius: 999px 999px 8px 8px;
   background: #a16207;
+}
+
+.npc-image-entity {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.npc-test-image {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  z-index: 1;
+  max-width: none;
+  image-rendering: pixelated;
+  pointer-events: none;
+  transform: translateX(-50%);
+  user-select: none;
 }
 
 .enemy {

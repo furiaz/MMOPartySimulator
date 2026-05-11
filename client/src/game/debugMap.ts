@@ -57,6 +57,8 @@ export const npcIds = [
   "hub-merchant",
   "hub-smith",
   "hub-dog",
+  "hub-test-blade",
+  "hub-test-hunter",
 ];
 
 export const companionStartPositions: Position[] = [
@@ -109,6 +111,18 @@ export const hubNpcStartData = [
     position: { x: 20, y: 17 },
     displayName: "Dog",
     npcRole: "dog",
+  },
+  {
+    id: npcIds[4],
+    position: { x: 30, y: 13 },
+    displayName: "Test Blade",
+    npcRole: "test_blade",
+  },
+  {
+    id: npcIds[5],
+    position: { x: 30, y: 17 },
+    displayName: "Test Hunter",
+    npcRole: "test_hunter",
   },
 ] as const;
 

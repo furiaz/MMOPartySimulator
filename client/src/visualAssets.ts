@@ -20,7 +20,15 @@ export type PlaceholderVisualAsset = {
   className: string;
 };
 
-export type EntityVisualAsset = SpriteVisualAsset | PlaceholderVisualAsset;
+export type ImageVisualAsset = {
+  kind: "image";
+  src: string;
+};
+
+export type EntityVisualAsset =
+  | SpriteVisualAsset
+  | PlaceholderVisualAsset
+  | ImageVisualAsset;
 
 export type MapTileVisualAsset = {
   kind: "placeholder";
@@ -29,6 +37,7 @@ export type MapTileVisualAsset = {
 
 const testCharacterBasePath = "/Asserts/Characters/Test-Character";
 const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
+const testNpcBasePath = "/Asserts/Characters/Test-NPC";
 const defaultFrameDurationMs = 100;
 
 function createFrames(
@@ -121,12 +130,22 @@ export const entityVisualAssets = {
     kind: "placeholder",
     className: "npc-placeholder dog",
   },
+  testBlade: {
+    kind: "image",
+    src: `${testNpcBasePath}/Bladesouth.png`,
+  },
+  testHunter: {
+    kind: "image",
+    src: `${testNpcBasePath}/Huntersouth.png`,
+  },
 } satisfies {
   testCharacter: SpriteVisualAsset;
   enemy: SpriteVisualAsset;
   resource: Record<string, PlaceholderVisualAsset>;
   npc: PlaceholderVisualAsset;
   dog: PlaceholderVisualAsset;
+  testBlade: ImageVisualAsset;
+  testHunter: ImageVisualAsset;
 };
 
 export const mapTileVisualAssets = {
@@ -150,6 +169,14 @@ export function getEntityVisualAsset(entity: GameEntity): EntityVisualAsset {
   }
 
   if (entity.kind === "npc") {
+    if (entity.npcRole === "test_blade") {
+      return entityVisualAssets.testBlade;
+    }
+
+    if (entity.npcRole === "test_hunter") {
+      return entityVisualAssets.testHunter;
+    }
+
     return entity.npcRole === "dog"
       ? entityVisualAssets.dog
       : entityVisualAssets.npc;
