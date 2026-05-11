@@ -117,3 +117,49 @@ Debugging / Fixing:
   - Explain the conflict clearly
   - Ask for confirmation before proceeding
 - Do NOT guess or silently override behavior
+
+
+---
+
+---
+
+## Ticket Workflow Rules
+
+Before making any code, asset, or documentation changes:
+
+- A GitHub Issue ticket must exist first.
+- No implementation work may begin without a ticket.
+- Tickets must be created from an implementation plan.
+- Brainstorming, design exploration, research, recommendations, and searches do not authorize code changes.
+- If the user asks for ideas, designs, plans, recommendations, or searches, do not implement changes unless they explicitly approve a ticket and request implementation.
+- If no ticket exists, stop before editing and ask to create one.
+
+Each ticket should include:
+
+- What will happen
+- What will change
+- Objectives
+- Goals
+- Success criteria
+- GDD/GTD alignment
+- Out of scope
+- Implementation notes
+- Verification plan
+
+When implementation begins:
+
+- Reference the ticket number in the work summary.
+- Keep changes scoped to the ticket.
+- Do not expand into future systems unless the ticket explicitly includes them.
+- Update or close the ticket when the work is complete.
+
+## Rollback / Traceability Rules
+
+For each implementation ticket:
+
+- Keep changes scoped so the ticket can be reviewed or reverted independently.
+- Mention the ticket number in the commit message when committing related work.
+- Avoid mixing unrelated tickets in the same commit.
+- If multiple tickets are implemented together, explain why in the ticket and commit message.
+- Completion notes should list the main files changed and any verification performed.
+- If rollback is needed, prefer reverting the commit associated with the ticket instead of manually undoing unrelated code.
