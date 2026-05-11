@@ -1004,7 +1004,7 @@ function App() {
                     enemyAggroRange * cellSize
                   }px)`,
                 }}
-                title="Enemy aggro range"
+                title="Enemy detection range"
               />
             ) : null,
           )}

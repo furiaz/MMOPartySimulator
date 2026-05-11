@@ -175,7 +175,11 @@ export {
 export { updateGame } from "./updateGame";
 export { updateAttackSystem } from "./attackSystem";
 export { updateDefendSystem } from "./defendSystem";
-export { getEnemyDetectionRange, updateEnemyAISystem } from "./enemyAISystem";
+export {
+  getEnemyAttackLeashDistance,
+  getEnemyDetectionRange,
+  updateEnemyAISystem,
+} from "./enemyAISystem";
 export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";

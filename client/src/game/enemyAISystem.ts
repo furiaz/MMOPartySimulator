@@ -1,4 +1,4 @@
-import { isAutonomousEntity } from "./entities";
+import { getMovementStepDistance, isAutonomousEntity } from "./entities";
 import { protectPartyMember } from "./partyProtectionSystem";
 import {
   getEntityById,
@@ -8,14 +8,18 @@ import {
 } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity } from "./entityGuards";
+import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import type { AutonomousEntity, Enemy, GameEntity, Position } from "./types";
 
 const ENEMY_DETECTION_RANGE = 5;
-const ENEMY_HOME_LEASH_DISTANCE = 2;
-const ENEMY_WANDER_MIN_INTERVAL_TICKS = 7;
-const ENEMY_WANDER_INTERVAL_VARIANCE_TICKS = 9;
-const ENEMY_WANDER_RADIUS = 1.9;
-const ENEMY_WANDER_MIN_DISTANCE = 0.8;
+const ENEMY_ROAM_LEASH_DISTANCE = 4;
+const ENEMY_ATTACK_LEASH_DISTANCE = 8;
+const ENEMY_ROAM_MOVE_MIN_MS = 1000;
+const ENEMY_ROAM_MOVE_MAX_MS = 2000;
+const ENEMY_ROAM_IDLE_MIN_MS = 2000;
+const ENEMY_ROAM_IDLE_MAX_MS = 3000;
+const ENEMY_COMBAT_RETAIN_RANGE = 1;
+const ROAM_TARGET_REACHED_DISTANCE = 0.1;
 const ENEMY_WANDER_ATTEMPTS = 5;
 
 export function updateEnemyAISystem(state: GameState): GameState {
@@ -26,11 +30,6 @@ export function updateEnemyAISystem(state: GameState): GameState {
       continue;
     }
 
-    if (getDistance(entity.position, entity.homePosition) > ENEMY_HOME_LEASH_DISTANCE) {
-      nextState = moveEnemyTowardHome(nextState, entity);
-      continue;
-    }
-
     const currentTarget = entity.currentTargetId
       ? getEntityById(nextState, entity.currentTargetId)
       : undefined;
@@ -38,7 +37,7 @@ export function updateEnemyAISystem(state: GameState): GameState {
     if (
       currentTarget &&
       isValidEnemyTarget(currentTarget) &&
-      isInsideHomeLeash(entity, currentTarget.position)
+      canKeepCurrentTarget(entity, currentTarget)
     ) {
       if (entity.state === "attack") {
         if (isAutonomousEntity(currentTarget)) {
@@ -61,7 +60,12 @@ export function updateEnemyAISystem(state: GameState): GameState {
     }
 
     if (entity.currentTargetId) {
-      nextState = updateEntity(nextState, clearEnemyTarget(entity));
+      nextState = updateEntity(nextState, clearEnemyTarget(entity, Date.now()));
+      continue;
+    }
+
+    if (getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
+      nextState = moveEnemyTowardHome(nextState, entity);
       continue;
     }
 
@@ -93,18 +97,25 @@ export function updateEnemyAISystem(state: GameState): GameState {
 }
 
 export function getEnemyHomeLeashDistance(): number {
-  return ENEMY_HOME_LEASH_DISTANCE;
+  return ENEMY_ROAM_LEASH_DISTANCE;
+}
+
+export function getEnemyAttackLeashDistance(): number {
+  return ENEMY_ATTACK_LEASH_DISTANCE;
 }
 
 export function getEnemyDetectionRange(): number {
   return ENEMY_DETECTION_RANGE;
 }
 
-function clearEnemyTarget(enemy: Enemy): Enemy {
+function clearEnemyTarget(enemy: Enemy, now = Date.now()): Enemy {
   return {
     ...enemy,
     state: "idle",
     currentTargetId: null,
+    roamTargetPosition: null,
+    nextRoamAt: getNextRoamIdleTime(now),
+    roamMoveUntil: undefined,
   };
 }
 
@@ -124,7 +135,7 @@ function findClosestTarget(
 
     if (
       distance <= ENEMY_DETECTION_RANGE * ENEMY_DETECTION_RANGE &&
-      isInsideHomeLeash(enemy, entity.position) &&
+      isInsideAttackLeash(enemy, entity.position) &&
       distance < closestDistance
     ) {
       closestTarget = entity;
@@ -147,25 +158,39 @@ function getDistanceSquared(a: GameEntity, b: GameEntity): number {
 }
 
 function updateEnemyWander(state: GameState, enemy: Enemy): GameState {
-  if (!shouldEnemyWanderThisTick(state.simulationTick, enemy)) {
+  const now = Date.now();
+
+  if (enemy.roamTargetPosition && enemy.roamMoveUntil && now <= enemy.roamMoveUntil) {
+    return moveEnemyTowardRoamTarget(state, enemy, now);
+  }
+
+  if (enemy.roamTargetPosition) {
+    return updateEntity(state, finishEnemyRoam(enemy, now));
+  }
+
+  if (!enemy.nextRoamAt) {
+    return updateEntity(state, {
+      ...enemy,
+      nextRoamAt: getNextRoamIdleTime(now),
+    });
+  }
+
+  if (now < enemy.nextRoamAt) {
     return state;
   }
 
-  const wanderTarget = getRandomWanderTarget(enemy);
+  const roamMoveDuration = getRandomDuration(
+    ENEMY_ROAM_MOVE_MIN_MS,
+    ENEMY_ROAM_MOVE_MAX_MS,
+  );
+  const wanderTarget = getRandomWanderTarget(enemy, roamMoveDuration);
 
-  return wanderTarget
-    ? moveEntityTowardPositionIfUnoccupied(state, enemy, wanderTarget)
-    : state;
-}
-
-function shouldEnemyWanderThisTick(tick: number, enemy: Enemy): boolean {
-  const seed = getEnemyWanderSeed(enemy);
-  const interval =
-    ENEMY_WANDER_MIN_INTERVAL_TICKS +
-    (seed % ENEMY_WANDER_INTERVAL_VARIANCE_TICKS);
-  const phase = seed % interval;
-
-  return (tick + phase) % interval === 0;
+  return updateEntity(state, {
+    ...enemy,
+    roamTargetPosition: wanderTarget,
+    nextRoamAt: undefined,
+    roamMoveUntil: wanderTarget ? now + roamMoveDuration : now,
+  });
 }
 
 function moveEnemyTowardHome(state: GameState, enemy: Enemy): GameState {
@@ -178,18 +203,59 @@ function moveEnemyTowardHome(state: GameState, enemy: Enemy): GameState {
   return moveEntityTowardPositionIfUnoccupied(nextState, clearedEnemy, enemy.homePosition);
 }
 
-function getRandomWanderTarget(enemy: Enemy): Position | null {
+function moveEnemyTowardRoamTarget(
+  state: GameState,
+  enemy: Enemy,
+  now: number,
+): GameState {
+  const roamTarget = enemy.roamTargetPosition;
+
+  if (!roamTarget) {
+    return updateEntity(state, finishEnemyRoam(enemy, now));
+  }
+
+  if (getDistance(enemy.position, roamTarget) <= ROAM_TARGET_REACHED_DISTANCE) {
+    return updateEntity(state, finishEnemyRoam(enemy, now));
+  }
+
+  const movedState = moveEntityTowardPositionIfUnoccupied(state, enemy, roamTarget);
+  const movedEnemy = getEntityById(movedState, enemy.id);
+
+  if (!movedEnemy || !isEnemy(movedEnemy)) {
+    return movedState;
+  }
+
+  if (getDistance(movedEnemy.position, enemy.position) <= ROAM_TARGET_REACHED_DISTANCE) {
+    return updateEntity(movedState, finishEnemyRoam(movedEnemy, now));
+  }
+
+  if (getDistance(movedEnemy.position, movedEnemy.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
+    return updateEntity(movedState, finishEnemyRoam(movedEnemy, now));
+  }
+
+  return movedState;
+}
+
+function finishEnemyRoam(enemy: Enemy, now: number): Enemy {
+  return {
+    ...enemy,
+    roamTargetPosition: null,
+    nextRoamAt: getNextRoamIdleTime(now),
+    roamMoveUntil: undefined,
+  };
+}
+
+function getRandomWanderTarget(enemy: Enemy, roamMoveDuration: number): Position | null {
   for (let attempt = 0; attempt < ENEMY_WANDER_ATTEMPTS; attempt += 1) {
     const angle = Math.random() * Math.PI * 2;
-    const distance =
-      ENEMY_WANDER_MIN_DISTANCE +
-      Math.random() * (ENEMY_WANDER_RADIUS - ENEMY_WANDER_MIN_DISTANCE);
-    const position = {
-      x: enemy.homePosition.x + Math.cos(angle) * distance,
-      y: enemy.homePosition.y + Math.sin(angle) * distance,
+    const distance = getRoamDistanceForDuration(enemy, roamMoveDuration);
+    const unclampedPosition = {
+      x: enemy.position.x + Math.cos(angle) * distance,
+      y: enemy.position.y + Math.sin(angle) * distance,
     };
+    const position = clampToRoamLeash(enemy.homePosition, unclampedPosition);
 
-    if (isInsideHomeLeash(enemy, position)) {
+    if (isInsideRoamLeash(enemy, position)) {
       return position;
     }
   }
@@ -197,15 +263,49 @@ function getRandomWanderTarget(enemy: Enemy): Position | null {
   return null;
 }
 
-function getEnemyWanderSeed(enemy: Enemy): number {
-  return [...enemy.id].reduce(
-    (seed, character) => seed + character.charCodeAt(0),
-    0,
+function getRoamDistanceForDuration(enemy: Enemy, roamMoveDuration: number): number {
+  return getMovementStepDistance(enemy) * Math.max(1, roamMoveDuration / GAME_LOOP_TICK_MS);
+}
+
+function clampToRoamLeash(homePosition: Position, position: Position): Position {
+  const xDistance = position.x - homePosition.x;
+  const yDistance = position.y - homePosition.y;
+  const distance = Math.hypot(xDistance, yDistance);
+
+  if (distance <= ENEMY_ROAM_LEASH_DISTANCE || distance === 0) {
+    return position;
+  }
+
+  return {
+    x: homePosition.x + (xDistance / distance) * ENEMY_ROAM_LEASH_DISTANCE,
+    y: homePosition.y + (yDistance / distance) * ENEMY_ROAM_LEASH_DISTANCE,
+  };
+}
+
+function getRandomDuration(minMs: number, maxMs: number): number {
+  return minMs + Math.random() * (maxMs - minMs);
+}
+
+function getNextRoamIdleTime(now: number): number {
+  return now + getRandomDuration(
+    ENEMY_ROAM_IDLE_MIN_MS,
+    ENEMY_ROAM_IDLE_MAX_MS,
   );
 }
 
-function isInsideHomeLeash(enemy: Enemy, position: Position): boolean {
-  return getDistance(enemy.homePosition, position) <= ENEMY_HOME_LEASH_DISTANCE;
+function isInsideRoamLeash(enemy: Enemy, position: Position): boolean {
+  return getDistance(enemy.homePosition, position) <= ENEMY_ROAM_LEASH_DISTANCE;
+}
+
+function isInsideAttackLeash(enemy: Enemy, position: Position): boolean {
+  return getDistance(enemy.homePosition, position) <= ENEMY_ATTACK_LEASH_DISTANCE;
+}
+
+function canKeepCurrentTarget(enemy: Enemy, target: AutonomousEntity): boolean {
+  return (
+    isInsideAttackLeash(enemy, target.position) ||
+    getDistance(enemy.position, target.position) <= ENEMY_COMBAT_RETAIN_RANGE
+  );
 }
 
 function getDistance(from: Position, to: Position): number {

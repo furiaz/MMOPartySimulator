@@ -26,7 +26,7 @@ import {
   getPrototypeAttackDamage,
   isEnemyBound,
 } from "./skillRuntime";
-import { getEnemyHomeLeashDistance } from "./enemyAISystem";
+import { getEnemyAttackLeashDistance } from "./enemyAISystem";
 import {
   arePositionsEqual,
   getEuclideanDistance,
@@ -223,7 +223,7 @@ export function updateAttackSystem(
       movedAttacker &&
       isEnemy(currentAttacker) &&
       getEuclideanDistance(currentAttacker.homePosition, movedAttacker.position) >
-        getEnemyHomeLeashDistance()
+        getEnemyAttackLeashDistance()
     ) {
       nextState = updateEntity(
         nextState,
@@ -500,7 +500,7 @@ function getDistance(
 function canEnemyChaseTarget(enemy: Enemy, target: CombatEntity): boolean {
   return (
     getEuclideanDistance(enemy.homePosition, target.position) <=
-    getEnemyHomeLeashDistance()
+    getEnemyAttackLeashDistance()
   );
 }
 

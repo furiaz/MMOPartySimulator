@@ -547,6 +547,9 @@ export type Enemy = LivingEntity & {
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
   homePosition: Position;
+  roamTargetPosition?: Position | null;
+  nextRoamAt?: number;
+  roamMoveUntil?: number;
   level: number;
   xpReward?: number;
 };
