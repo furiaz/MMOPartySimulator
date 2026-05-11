@@ -401,6 +401,7 @@ Current prototype inventory rules:
 - equipment does not stack
 - quest items can stack only if their item definition allows it
 - event items can stack only if their item definition allows it
+- equipment items may move between shared inventory and companion equipment slots
 
 Current item categories:
 
@@ -410,15 +411,13 @@ Current item categories:
 - quest
 - event
 
-This is not the full inventory, equipment, wallet, shop, crafting, trading, bank, loot, or persistence system.
+This is not the full inventory, equipment economy, wallet, shop, crafting, trading, bank, loot, or persistence system.
 
 Do not implement these unless explicitly requested:
 
 - bank storage
 - ground loot
-- equipment slots
-- item effects
-- consumable use
+- consumable item effects
 - selling
 - shops
 - crafting
@@ -426,9 +425,53 @@ Do not implement these unless explicitly requested:
 - save/load
 - backend persistence
 - full wallet UI
-
+- full equipment economy
+- rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison
 
 ---
+
+## Prototype Equipment
+
+A lightweight prototype equipment foundation exists.
+
+Equipment is gameplay-facing, not sprite-facing.
+
+Equipped items:
+
+- affect data and future stat hooks only
+- do not visually change character sprites
+- do not add visible weapon swaps
+- do not add paper-doll rendering, weapon anchoring, or sprite attachments
+
+Current companion equipment slots:
+
+- Head
+- Chest
+- Legs
+- Gloves
+- Boots
+- Main Hand
+- Offhand
+- Accessory 1
+- Accessory 2
+
+Current prototype class equipment permissions:
+
+- Beginner: Training Sword, no offhand
+- Blade: One-Handed Sword, no offhand
+- Aegis: One-Handed Mace, Shield
+- Hunter: Bow, no offhand
+- Beast: Claw Gauntlets, no offhand
+- Elementalist: Orb, no offhand
+- Runecaster: Rune Lantern, Talisman
+- Lightbearer: Holy Mace, Holy Lantern
+- Penitent: Thorn Whip, Sacrificial Dagger
+
+Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
+
+Do not implement generalized dual wield, arbitrary two-handed combinations, subclass equipment expansion, equipment visuals, full stat scaling, drops, merchant systems, gear recycling, or a full equipment economy unless explicitly requested.
+
+
 
 ## Direct Orders
 
@@ -559,9 +602,11 @@ It may show:
 - inventory slots
 - item stacks
 - item categories already supported by the current prototype inventory
+- basic item details on hover or selection
+- equipment item details such as slot, type, and simple stat modifiers
+- a shortcut from an equipment item to Party Management Equipment
 
-The Inventory menu must not implement the full inventory, equipment, wallet, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
-
+The Inventory menu must not implement the full inventory, equipment economy, wallet, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
 
 
 ---
@@ -630,9 +675,9 @@ Skill usage is determined by:
 - skill tags
 - current context such as combat, danger, gathering, or party safety
 
-Classes must not depend on specific weapons.
+Classes may have restrictive prototype weapon and offhand permissions.
 
-Weapons are modifiers, not class identity.
+Weapons are gameplay-facing stat/data modifiers, not sprite identity. Class sprites already express the class fantasy visually, so equipment must not require visible weapon swaps, paper-doll rendering, weapon anchoring, or sprite attachment work during the prototype phase.
 
 ---
 
@@ -744,9 +789,9 @@ Penitent is a high-risk, high-reward class based on self-sacrifice mechanics.
 
 ## Class Rules
 
-Classes must not depend on specific weapons.
+Classes may have restrictive prototype weapon and offhand permissions.
 
-Weapons are modifiers, not class identity.
+Weapons are gameplay-facing stat/data modifiers, not sprite identity. Class sprites already express the class fantasy visually, so equipment must not require visible weapon swaps, paper-doll rendering, weapon anchoring, or sprite attachment work during the prototype phase.
 
 Base class selection from Beginner may exist during prototype progression.
 
@@ -1066,7 +1111,8 @@ Do not implement these unless explicitly requested:
 - final zone system
 - full teleport network
 - subclass progression
-- weapons and equipment
+- full equipment economy beyond the current prototype equipment foundation
+- equipment visuals, weapon anchoring, paper-doll rendering, or visible weapon swaps
 - full inventory/equipment economy beyond the current prototype shared party inventory
 - advanced ability framework
 - mana or complex resource costs

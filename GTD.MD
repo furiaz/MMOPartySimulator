@@ -148,6 +148,7 @@ Party members currently support:
 - `lastGatherAt`
 - `gatherSpeed`
 - `commandPriority`
+- `equipment`
 
 Shared party-member behavior is handled through `partySystem.ts`.
 
@@ -302,9 +303,10 @@ Companions store:
 classId: ClassId;
 ```
 
-Classes must not depend on specific weapons.
+Classes may have restrictive prototype weapon and offhand permissions.
 
-Weapons are modifiers, not class identity.
+Weapons are gameplay-facing stat/data modifiers, not sprite identity. Equipment rules must not require React rendering logic, sprite swaps, weapon anchoring, or visible attachment systems.
+
 
 Current class implementation is still lightweight and structural, but classes now provide prototype skills through `skills.ts`.
 
@@ -882,8 +884,36 @@ Currency does not use inventory slots.
 
 React UI may display inventory state and issue debug commands, but inventory rules must remain in game logic.
 
-This prototype inventory does not include bank storage, ground loot, equipment slots, item effects, consumable use, selling, shops, crafting, trading, save/load, backend persistence, or full wallet UI.
+This prototype inventory includes non-stacking equipment items that can move between shared inventory and companion equipment slots.
 
+This prototype inventory does not include bank storage, ground loot, consumable item effects, selling, shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
+
+
+## Prototype Equipment
+
+Prototype equipment game logic lives under `client/src/game/`.
+
+Current equipment modules include:
+
+- `equipmentTypes.ts`
+- `equipmentRules.ts`
+- `equipmentSystem.ts`
+
+Companion equipment is stored on the companion entity as `equipment`.
+
+Current equipment slots are:
+
+```ts
+type EquipmentSlot =
+  | "head"
+  | "chest"
+  | "legs"
+  | "gloves"
+  | "boots"
+  | "mainHand"
+  | "offhand"
+  | "accessory1"
+  | "accessory2";
 
 
 ---
@@ -1034,7 +1064,8 @@ Simulation logic must not depend on sprite assets.
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, teleport start, teleport completion, teleport skips, and map transitions.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, and map transitions.
+
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 
@@ -1056,6 +1087,21 @@ Inventory telemetry should remain development-only and may include tick, item id
 
 
 Debug telemetry should remain development-only.
+
+Prototype equipment telemetry may include:
+
+- `equipment_equip_attempt`
+- `equipment_equipped`
+- `equipment_equip_failed`
+- `equipment_unequip_attempt`
+- `equipment_unequipped`
+- `equipment_unequip_failed`
+- `equipment_inventory_return_failed`
+- `equipment_invalid_class`
+- `equipment_invalid_slot`
+
+Equipment telemetry should remain development-only and may include tick, companion id, companion class id, item id, item display name, item category, target slot, equipment type, previous item id, result, reason, used inventory slots, and inventory capacity.
+
 
 ---
 
@@ -1082,7 +1128,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, party members, enemies, resources, sprite animation, combat feedback, skill visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view, party members, enemies, resources, sprite animation, combat feedback, skill visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, XP and level progress, party size limit, debug controls, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -1109,7 +1155,9 @@ React must not:
 - define core simulation behavior
 - duplicate role logic
 - invent new role values
-- implement equipment, skills, formation, behavior settings, or advanced inventory rules unless the corresponding game logic exists and the feature is explicitly requested
+- define equipment rules, skills, formation, behavior settings, or advanced inventory rules inside React components
+- implement equipment UI beyond displaying game state and issuing commands to existing game logic unless explicitly requested
+
 
 Current intended main menu views:
 
@@ -1168,7 +1216,8 @@ Do not implement unless requested:
 - backend persistence
 - networking/server authority
 - full inventory/equipment economy beyond the current prototype shared party inventory
-- weapons as gameplay modifiers
+- full equipment economy beyond the current prototype equipment foundation
+- equipment visuals, weapon anchoring, paper-doll rendering, or visible weapon swaps
 - subclass progression
 - full ability framework
 - mana/resource cost system
