@@ -1,5 +1,4 @@
 import { damageEntity, setLastAttackAt } from "./entities";
-import { getPartyLeader, getPartyMembers } from "./partySystem";
 import { grantCharacterXpToParty } from "./leveling";
 import { getSkillRoleScore } from "./skillRolePreferences";
 import { getPrototypeAttackDamage } from "./skillRuntime";
@@ -7,14 +6,13 @@ import { getSkillsForClass } from "./skills";
 import {
   addCombatFeedback,
   addSkillVisualEvent,
-  getEntityById,
   updateEntity,
   type GameState,
 } from "./state";
-import {
-  getLeaderEnemyTarget,
-  getLeaderMovementDirection,
-} from "./roleSystem";
+import { getLeaderMovementDirection } from "./roleSystem";
+import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
+import { findEnemyTarget, getSkillTarget } from "./skillTargeting";
+import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
   Enemy,
@@ -65,7 +63,7 @@ export function updateSkillShieldBlockPositions(state: GameState): GameState {
       .map(([shieldId, shield]) => {
         const owner = state.entities[shield.ownerId];
 
-        if (!isCompanion(owner)) {
+        if (!isLivingCompanion(owner)) {
           return null;
         }
 
@@ -126,57 +124,6 @@ function chooseSkillUse(state: GameState, caster: Companion): SkillUse | null {
   return skillUses.sort((a, b) => b.score - a.score)[0] ?? null;
 }
 
-function getSkillTarget(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-): Enemy | Companion | undefined {
-  if (isHealingSkill(skill)) {
-    if (
-      skill.effect.type === "selfCostHeal" &&
-      !canPayHpCost(caster, skill.effect.hpCost)
-    ) {
-      return undefined;
-    }
-
-    return findHealingTarget(state, caster, skill.range);
-  }
-
-  if (skill.effect.type === "selfBuff") {
-    return hasValidEnemyContext(state, caster) &&
-      canPayHpCost(caster, skill.effect.hpCost) &&
-      !state.skillSelfBuffsByCompanionId?.[caster.id]
-      ? caster
-      : undefined;
-  }
-
-  if (skill.effect.type === "shieldBlock") {
-    return hasPartyDanger(state, caster) && !hasActiveShield(state, caster)
-      ? caster
-      : undefined;
-  }
-
-  const enemy = findEnemyTarget(state, caster, skill.range);
-
-  if (!enemy) {
-    return undefined;
-  }
-
-  if (skill.effect.type === "mark" && state.skillMarksByEnemyId?.[enemy.id]) {
-    return undefined;
-  }
-
-  if (skill.effect.type === "bind" && state.skillBindsByEnemyId?.[enemy.id]) {
-    return undefined;
-  }
-
-  return enemy;
-}
-
-function canPayHpCost(caster: Companion, hpCost: number): boolean {
-  return caster.health > hpCost + LOW_HEALTH_BUFFER;
-}
-
 function applySkill(
   state: GameState,
   caster: Companion,
@@ -185,7 +132,7 @@ function applySkill(
 ): GameState {
   const { skill, target } = skillUse;
 
-  if (skill.effect.type === "damage" && isEnemy(target)) {
+  if (skill.effect.type === "damage" && isLivingEnemy(target)) {
     return startSkillCooldown(
       applyDamageSkill(state, caster, target, skill, skill.effect.damage, now),
       caster,
@@ -194,7 +141,7 @@ function applySkill(
     );
   }
 
-  if (skill.effect.type === "sweepingDamage" && isEnemy(target)) {
+  if (skill.effect.type === "sweepingDamage" && isLivingEnemy(target)) {
     return startSkillCooldown(
       applySweepingStrike(state, caster, target, skill, now),
       caster,
@@ -203,7 +150,7 @@ function applySkill(
     );
   }
 
-  if (skill.effect.type === "mark" && isEnemy(target)) {
+  if (skill.effect.type === "mark" && isLivingEnemy(target)) {
     return startSkillCooldown(
       applyMarkTarget(state, caster, target, skill, now),
       caster,
@@ -230,7 +177,7 @@ function applySkill(
     );
   }
 
-  if (skill.effect.type === "bind" && isEnemy(target)) {
+  if (skill.effect.type === "bind" && isLivingEnemy(target)) {
     return startSkillCooldown(
       applyBind(state, caster, target, skill, now),
       caster,
@@ -239,7 +186,7 @@ function applySkill(
     );
   }
 
-  if (skill.effect.type === "heal" && isCompanion(target)) {
+  if (skill.effect.type === "heal" && isLivingCompanion(target)) {
     return startSkillCooldown(
       applyHeal(state, caster, target, skill.effect.amount, 0, now),
       caster,
@@ -248,7 +195,7 @@ function applySkill(
     );
   }
 
-  if (skill.effect.type === "selfCostHeal" && isCompanion(target)) {
+  if (skill.effect.type === "selfCostHeal" && isLivingCompanion(target)) {
     return startSkillCooldown(
       applyHeal(
         state,
@@ -334,7 +281,7 @@ function applySweepingStrike(
       enemy.id === target.id ||
       enemy.state === "dead" ||
       !currentTarget ||
-      getDistance(enemy.position, currentTarget.position) > skill.effect.splashRange
+      getGridDistance(enemy.position, currentTarget.position) > skill.effect.splashRange
     ) {
       continue;
     }
@@ -531,7 +478,7 @@ function applyHeal(
   if (hpCost > 0) {
     const currentCaster = nextState.entities[caster.id];
 
-    if (isCompanion(currentCaster)) {
+    if (isLivingCompanion(currentCaster)) {
       const damagedCaster = {
         ...currentCaster,
         health: currentCaster.health - hpCost,
@@ -563,7 +510,7 @@ function applyHeal(
 
   const currentCaster = nextState.entities[caster.id];
 
-  return isCompanion(currentCaster)
+  return isLivingCompanion(currentCaster)
     ? updateEntity(nextState, setLastAttackAt(currentCaster, now))
     : nextState;
 }
@@ -624,75 +571,9 @@ function updateCasterLastAttackAt(
 ): GameState {
   const currentCaster = state.entities[casterId];
 
-  return isCompanion(currentCaster)
+  return isLivingCompanion(currentCaster)
     ? updateEntity(state, setLastAttackAt(currentCaster, now))
     : state;
-}
-
-function findEnemyTarget(
-  state: GameState,
-  caster: Companion,
-  range: number,
-): Enemy | undefined {
-  const currentTarget = caster.currentTargetId
-    ? getEntityById(state, caster.currentTargetId)
-    : undefined;
-
-  if (isEnemy(currentTarget) && isEnemyInRange(caster, currentTarget, range)) {
-    return currentTarget;
-  }
-
-  const leader = getPartyLeader(state);
-  const leaderTarget = leader ? getLeaderEnemyTarget(state, leader) : undefined;
-
-  if (leaderTarget && isEnemyInRange(caster, leaderTarget, range)) {
-    return leaderTarget;
-  }
-
-  return Object.values(state.entities).find(
-    (entity): entity is Enemy =>
-      isEnemy(entity) && isEnemyInRange(caster, entity, range),
-  );
-}
-
-function findHealingTarget(
-  state: GameState,
-  caster: Companion,
-  range: number,
-): Companion | undefined {
-  return getPartyMembers(state)
-    .filter(
-      (member) =>
-        member.state !== "dead" &&
-        member.health < member.maxHealth &&
-        getDistance(caster.position, member.position) <= range,
-    )
-    .sort(
-      (a, b) =>
-        a.health / a.maxHealth - b.health / b.maxHealth ||
-        getDistance(caster.position, a.position) -
-          getDistance(caster.position, b.position),
-    )[0];
-}
-
-function hasValidEnemyContext(state: GameState, caster: Companion): boolean {
-  return Boolean(findEnemyTarget(state, caster, 5));
-}
-
-function hasPartyDanger(state: GameState, caster: Companion): boolean {
-  return Object.values(state.entities).some(
-    (entity) =>
-      entity.kind === "enemy" &&
-      entity.state === "attack" &&
-      entity.currentTargetId &&
-      getDistance(entity.position, caster.position) <= 5,
-  );
-}
-
-function hasActiveShield(state: GameState, caster: Companion): boolean {
-  return Object.values(state.skillShieldBlocksById ?? {}).some(
-    (shield) => shield.ownerId === caster.id,
-  );
 }
 
 function getUpdatedShieldBlock(
@@ -796,33 +677,4 @@ function getShieldDirection(state: GameState, caster: Companion): Position {
     x: Math.sign(caster.position.x - previousPosition.x),
     y: Math.sign(caster.position.y - previousPosition.y),
   };
-}
-
-function isHealingSkill(skill: SkillDefinition): boolean {
-  return skill.effect.type === "heal" || skill.effect.type === "selfCostHeal";
-}
-
-function isEnemyInRange(
-  caster: Companion,
-  enemy: Enemy,
-  range: number,
-): boolean {
-  return enemy.state !== "dead" &&
-    enemy.health > 0 &&
-    getDistance(caster.position, enemy.position) <= range;
-}
-
-function isEnemy(entity: GameEntity | undefined): entity is Enemy {
-  return entity?.kind === "enemy" && entity.state !== "dead" && entity.health > 0;
-}
-
-function isCompanion(entity: GameEntity | undefined): entity is Companion {
-  return entity?.kind === "companion" && entity.state !== "dead" && entity.health > 0;
-}
-
-function getDistance(
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): number {
-  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
 }

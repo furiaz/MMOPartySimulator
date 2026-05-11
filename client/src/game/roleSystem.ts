@@ -8,6 +8,7 @@ import {
 import { getPartyLeader, isPartyMember, type PartyMember } from "./partySystem";
 import { ROLE_TUNING } from "./roleProfiles";
 import { findResourceTarget } from "./targetSelection";
+import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
   Enemy,
@@ -400,10 +401,6 @@ export function getResolvedLeaderIntentTargetPosition(
   }
 
   return leaderIntent.targetPosition;
-}
-
-function getGridDistance(from: Position, to: Position): number {
-  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
 }
 
 function getDefenderSideOffset(

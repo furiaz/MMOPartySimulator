@@ -1,6 +1,4 @@
-import { damageEntity, setLastAttackAt } from "./entities";
 import {
-  addCombatFeedback,
   getBoundedPathDistance,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
@@ -11,21 +9,18 @@ import {
 } from "./state";
 import { chooseAttackSlot } from "./attackSlots";
 import { getPartyLeader } from "./partySystem";
-import { grantCharacterXpToParty } from "./leveling";
+import { attackDefenderTarget } from "./defenderCombat";
 import {
   getDefenderAnchorPosition,
   getLeaderEnemyTarget,
   getLeaderIntentPosition,
   getLeaderMovementDirection,
 } from "./roleSystem";
-import { getPrototypeAttackDamage } from "./skillRuntime";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
 const DEFENDER_CATCH_UP_MOVE_STEPS = 2;
 const DEFENDER_ATTACK_RANGE = 1;
-const DEFENDER_ATTACK_DAMAGE = 1;
-const DEFENDER_ATTACK_COOLDOWN_MS = 1000;
 const DEFENDER_GUARD_RADIUS = 3;
 const DEFENDER_MAX_LEADER_DISTANCE = 4;
 const DEFENDER_INTERCEPT_READY_DISTANCE = 1;
@@ -271,79 +266,6 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
       (currentEntity.position.x !== entity.position.x ||
         currentEntity.position.y !== entity.position.y),
   );
-}
-
-function attackDefenderTarget(
-  state: GameState,
-  defender: Companion,
-  target: Enemy,
-  now: number,
-): GameState {
-  if (now - defender.lastAttackAt < DEFENDER_ATTACK_COOLDOWN_MS) {
-    return updateEntity(state, {
-      ...defender,
-      currentTargetId: target.id,
-    });
-  }
-
-  const attackDamage = getPrototypeAttackDamage(
-    state,
-    defender,
-    target,
-    DEFENDER_ATTACK_DAMAGE,
-  );
-  const damagedTarget = damageEntity(target, attackDamage);
-  let nextState = addCombatFeedback(state, {
-    type: "attack",
-    entityId: defender.id,
-    text: "Attack",
-    now,
-  });
-  nextState = addCombatFeedback(nextState, {
-    type: "damage",
-    entityId: damagedTarget.id,
-    text: `-${attackDamage} HP`,
-    now,
-  });
-
-  if (damagedTarget.state === "dead") {
-    nextState = addCombatFeedback(nextState, {
-      type: "death",
-      entityId: damagedTarget.id,
-      text: "Defeated",
-      now,
-    });
-  }
-
-  nextState = updateEntity(nextState, damagedTarget);
-
-  if (damagedTarget.state === "dead") {
-    nextState = grantCharacterXpToParty(
-      nextState,
-      damagedTarget,
-      defender.id,
-    );
-  }
-
-  if (damagedTarget.state !== "dead") {
-    nextState = updateEntity(nextState, {
-      ...damagedTarget,
-      state: "attack",
-      currentTargetId: defender.id,
-    });
-  }
-
-  const currentDefender = nextState.entities[defender.id];
-
-  return currentDefender?.kind === "companion"
-    ? updateEntity(
-        nextState,
-        setLastAttackAt({
-          ...currentDefender,
-          currentTargetId: damagedTarget.state === "dead" ? null : target.id,
-        }, now),
-      )
-    : nextState;
 }
 
 function getDefenderTarget(

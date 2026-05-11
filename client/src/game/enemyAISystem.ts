@@ -6,6 +6,8 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
+import { getEuclideanDistance } from "./positionUtils";
+import { isEnemyEntity } from "./entityGuards";
 import type { AutonomousEntity, Enemy, GameEntity, Position } from "./types";
 
 const ENEMY_DETECTION_RANGE = 5;
@@ -92,6 +94,10 @@ export function updateEnemyAISystem(state: GameState): GameState {
 
 export function getEnemyHomeLeashDistance(): number {
   return ENEMY_HOME_LEASH_DISTANCE;
+}
+
+export function getEnemyDetectionRange(): number {
+  return ENEMY_DETECTION_RANGE;
 }
 
 function clearEnemyTarget(enemy: Enemy): Enemy {
@@ -203,9 +209,9 @@ function isInsideHomeLeash(enemy: Enemy, position: Position): boolean {
 }
 
 function getDistance(from: Position, to: Position): number {
-  return Math.hypot(to.x - from.x, to.y - from.y);
+  return getEuclideanDistance(from, to);
 }
 
 function isEnemy(entity: GameEntity): entity is Enemy {
-  return entity.kind === "enemy";
+  return isEnemyEntity(entity);
 }

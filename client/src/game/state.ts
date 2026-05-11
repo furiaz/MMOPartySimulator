@@ -13,6 +13,13 @@ import {
   isNavigationCellWalkable,
   toNavigationNode,
 } from "./navigation";
+import {
+  createMovementFailureDetail,
+  getFailedMovementReason,
+  markMoveFailed,
+  markMovementDecision,
+  markMoveSucceeded,
+} from "./movementState";
 import type {
   CombatFeedbackEvent,
   CombatFeedbackType,
@@ -82,6 +89,8 @@ export type MovementFailureDetail = {
   blockerId?: string;
   blockerKind?: GameEntity["kind"] | "wall" | "bounds" | "reserved" | "unknown";
 };
+
+export { clearTickMovementPlanning } from "./movementState";
 
 export type GameState = {
   entities: Record<string, GameEntity>;
@@ -575,17 +584,6 @@ function createPositionTarget(position: Position): GameEntity {
     quantity: 1,
     maxGatherers: 1,
     isDepleted: false,
-  };
-}
-
-export function clearTickMovementPlanning(state: GameState): GameState {
-  return {
-    ...state,
-    failedMoveByEntityId: {},
-    movementFailuresByEntityId: {},
-    movementDecisionsByEntityId: {},
-    moveIntentsByEntityId: {},
-    reservedPositionsByEntityId: {},
   };
 }
 
@@ -1317,73 +1315,6 @@ function getIntendedMovePosition(
   return moveResolution?.position ?? null;
 }
 
-function markMoveSucceeded(
-  state: GameState,
-  entityId: string,
-  previousPosition: Position,
-): GameState {
-  const failedMoveByEntityId = { ...(state.failedMoveByEntityId ?? {}) };
-  const movementFailuresByEntityId = { ...(state.movementFailuresByEntityId ?? {}) };
-  delete failedMoveByEntityId[entityId];
-  delete movementFailuresByEntityId[entityId];
-
-  return {
-    ...state,
-    lastPositionsByEntityId: {
-      ...(state.lastPositionsByEntityId ?? {}),
-      [entityId]: previousPosition,
-    },
-    failedMoveByEntityId,
-    movementFailuresByEntityId,
-  };
-}
-
-function markMovementDecision(
-  state: GameState,
-  entityId: string,
-  reason: DebugNavigationReason,
-): GameState {
-  return {
-    ...state,
-    movementDecisionsByEntityId: {
-      ...(state.movementDecisionsByEntityId ?? {}),
-      [entityId]: reason,
-    },
-  };
-}
-
-function markMoveFailed(
-  state: GameState,
-  entityId: string,
-  detail: MovementFailureDetail = {},
-  reason: DebugNavigationReason = "blocked",
-): GameState {
-  return {
-    ...state,
-    failedMoveByEntityId: {
-      ...(state.failedMoveByEntityId ?? {}),
-      [entityId]: true,
-    },
-    movementFailuresByEntityId: {
-      ...(state.movementFailuresByEntityId ?? {}),
-      [entityId]: detail,
-    },
-    movementDecisionsByEntityId: {
-      ...(state.movementDecisionsByEntityId ?? {}),
-      [entityId]: reason,
-    },
-  };
-}
-
-function getFailedMovementReason(
-  state: GameState,
-  entityId: string,
-): DebugNavigationReason {
-  return state.map && !state.movementPathsByEntityId?.[entityId]
-    ? "no_path"
-    : "blocked";
-}
-
 function getMovementFailureDetail(
   state: GameState,
   entity: GameEntity,
@@ -1394,13 +1325,7 @@ function getMovementFailureDetail(
     ? getPositionBlocker(state, intendedPosition, entity.id)
     : undefined;
 
-  return {
-    targetId: target.id === "__position_target__" ? null : target.id,
-    targetDistance: getGridDistance(entity.position, target.position),
-    intendedPosition: intendedPosition ?? null,
-    blockerId: blocker?.id,
-    blockerKind: blocker?.kind,
-  };
+  return createMovementFailureDetail(entity, target, intendedPosition, blocker);
 }
 
 function getPositionBlocker(

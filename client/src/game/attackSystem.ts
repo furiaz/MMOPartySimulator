@@ -27,6 +27,12 @@ import {
   isEnemyBound,
 } from "./skillRuntime";
 import { getEnemyHomeLeashDistance } from "./enemyAISystem";
+import {
+  arePositionsEqual,
+  getEuclideanDistance,
+  getGridDistance,
+} from "./positionUtils";
+import { isEnemyEntity } from "./entityGuards";
 import type {
   CombatEntity,
   Enemy,
@@ -398,7 +404,7 @@ function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
 }
 
 function isEnemy(entity: GameEntity): entity is Enemy {
-  return entity.kind === "enemy";
+  return isEnemyEntity(entity);
 }
 
 function isPartyCombatEntity(entity: CombatEntity): entity is Companion {
@@ -488,14 +494,7 @@ function getDistance(
   from: { x: number; y: number },
   to: { x: number; y: number },
 ): number {
-  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-}
-
-function getEuclideanDistance(
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): number {
-  return Math.hypot(to.x - from.x, to.y - from.y);
+  return getGridDistance(from, to);
 }
 
 function canEnemyChaseTarget(enemy: Enemy, target: CombatEntity): boolean {
@@ -509,5 +508,5 @@ function isSamePosition(
   a: { x: number; y: number },
   b: { x: number; y: number },
 ): boolean {
-  return a.x === b.x && a.y === b.y;
+  return arePositionsEqual(a, b);
 }

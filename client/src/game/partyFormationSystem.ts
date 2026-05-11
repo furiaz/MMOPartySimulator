@@ -99,6 +99,10 @@ function assignPartyTravelTargets(
   leader: PartyMember,
   plan: PartyPlan,
 ): GameState {
+  const isGatherIntent =
+    !plan.target &&
+    state.leaderIntent?.type === "gather" &&
+    Boolean(state.leaderIntent.targetId);
   let nextState = setLeaderIntent(state, {
     type: plan.target ? "attack" : (state.leaderIntent?.type ?? "move"),
     targetId: plan.target?.id ?? state.leaderIntent?.targetId ?? null,
@@ -111,10 +115,19 @@ function assignPartyTravelTargets(
   if (currentLeader && isPartyMember(currentLeader)) {
     nextState = updateEntity(nextState, {
       ...currentLeader,
-      state: "follow",
-      currentTargetId: plan.target?.id ?? null,
+      state: isGatherIntent ? "gather" : "follow",
+      currentTargetId:
+        plan.target?.id ??
+        (isGatherIntent ? state.leaderIntent?.targetId ?? null : null),
       commandPriority: "autonomous",
     });
+  }
+
+  if (isGatherIntent) {
+    return assignPartyGatherTarget(
+      nextState,
+      state.leaderIntent?.targetId ?? null,
+    );
   }
 
   for (const member of getPartyMembers(nextState)) {
@@ -130,6 +143,32 @@ function assignPartyTravelTargets(
       ...member,
       state: "follow",
       currentTargetId: leader.id,
+      commandPriority: "autonomous",
+    });
+  }
+
+  return nextState;
+}
+
+function assignPartyGatherTarget(
+  state: GameState,
+  targetId: string | null,
+): GameState {
+  let nextState = state;
+
+  if (!targetId) {
+    return nextState;
+  }
+
+  for (const member of getPartyMembers(nextState)) {
+    if (member.commandPriority === "direct") {
+      continue;
+    }
+
+    nextState = updateEntity(nextState, {
+      ...member,
+      state: "gather",
+      currentTargetId: targetId,
       commandPriority: "autonomous",
     });
   }
@@ -278,6 +317,10 @@ function maybeFinishReachedPoi(
   }
 
   if (isTeleportPoi(state, plan.targetPosition)) {
+    return state;
+  }
+
+  if (state.leaderIntent?.type === "gather" && state.leaderIntent.targetId) {
     return state;
   }
 

@@ -5,6 +5,11 @@ import {
   previewMoveTowardPosition,
   type GameState,
 } from "./state";
+import {
+  arePositionsEqual,
+  getGridDistance,
+  getManhattanDistance,
+} from "./positionUtils";
 import type { CombatEntity, GameEntity, Position } from "./types";
 
 const ATTACK_SLOT_DIRECTIONS: Position[] = [
@@ -97,7 +102,7 @@ function getAttackSlotPathDistance(
   position: Position,
   options: AttackSlotOptions,
 ): number {
-  if (isSamePosition(attacker.position, position)) {
+  if (arePositionsEqual(attacker.position, position)) {
     return 0;
   }
 
@@ -131,7 +136,7 @@ function isReachableCombatPosition(
     isCombatPositionAvailable(state, attacker, position) &&
     isWithinAttackerPathLimit(state, attacker, position, options) &&
     isLeaderSafeAttackSlot(state, position, options) &&
-    (isSamePosition(attacker.position, position) ||
+    (arePositionsEqual(attacker.position, position) ||
       previewMoveTowardPosition(state, attacker, position, {
         allowPartyPassThrough: options.allowPartyPassThrough,
       }) !== null)
@@ -210,7 +215,7 @@ function isReservedByOtherEntity(
 ): boolean {
   return Object.entries(state.reservedPositionsByEntityId ?? {}).some(
     ([entityId, reservedPosition]) =>
-      entityId !== attacker.id && isSamePosition(reservedPosition, position),
+      entityId !== attacker.id && arePositionsEqual(reservedPosition, position),
   );
 }
 
@@ -221,18 +226,6 @@ function isOccupiedByOtherEntity(
 ): boolean {
   return Object.values(state.entities).some(
     (entity: GameEntity) =>
-      entity.id !== attacker.id && isSamePosition(entity.position, position),
+      entity.id !== attacker.id && arePositionsEqual(entity.position, position),
   );
-}
-
-function isSamePosition(a: Position, b: Position): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
-function getGridDistance(from: Position, to: Position): number {
-  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-}
-
-function getManhattanDistance(from: Position, to: Position): number {
-  return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
 }

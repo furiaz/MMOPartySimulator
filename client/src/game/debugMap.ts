@@ -87,6 +87,27 @@ export const hubTeleporterPosition: Position = { x: 22, y: 20 };
 export const mapOneHubTeleporterPosition: Position = { x: 3, y: 22 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 3, y: 22 };
 
+const hubArrivalPositions: Position[] = [
+  { x: 22, y: 21 },
+  { x: 23, y: 21 },
+  { x: 21, y: 21 },
+  { x: 22, y: 22 },
+];
+
+const mapOneHubArrivalPositions: Position[] = [
+  { x: 3, y: 21 },
+  { x: 4, y: 21 },
+  { x: 3, y: 22 },
+  { x: 4, y: 22 },
+];
+
+const mapOneMapTwoArrivalPositions: Position[] = [
+  { x: 46, y: 21 },
+  { x: 47, y: 21 },
+  { x: 45, y: 21 },
+  { x: 47, y: 22 },
+];
+
 export const hubNpcStartData = [
   {
     id: npcIds[0],
@@ -288,7 +309,7 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: HUB_MAP_ID,
         targetMapId: MAP_ONE_ID,
-        arrivalPositions: companionStartPositions,
+        arrivalPositions: mapOneHubArrivalPositions,
       },
     ],
   },
@@ -304,7 +325,7 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_ONE_ID,
         targetMapId: HUB_MAP_ID,
-        arrivalPositions: hubCompanionStartPositions,
+        arrivalPositions: hubArrivalPositions,
       },
       {
         id: TELEPORTER_ID,
@@ -329,7 +350,7 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_TWO_ID,
         targetMapId: MAP_ONE_ID,
-        arrivalPositions: companionStartPositions,
+        arrivalPositions: mapOneMapTwoArrivalPositions,
         autoSelectAfterEnemiesCleared: true,
       },
     ],

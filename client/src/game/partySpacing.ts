@@ -1,5 +1,6 @@
 import { getFollowTrailPosition, type GameState } from "./state";
 import { getOrderedPartyMembers, type PartyMember } from "./partySystem";
+import { getEuclideanDistance } from "./positionUtils";
 import type { Position } from "./types";
 
 const SOFT_SIDE_SPACING = 0.9;
@@ -93,8 +94,4 @@ function getFollowOffsetRank(
   const offsetPattern = [-1, 1, -2, 2];
 
   return offsetPattern[index] ?? 0;
-}
-
-function getEuclideanDistance(from: Position, to: Position): number {
-  return Math.hypot(to.x - from.x, to.y - from.y);
 }

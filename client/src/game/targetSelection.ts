@@ -1,5 +1,6 @@
 import { isCombatEntity, isResourceEntity } from "./entities";
 import { getBoundedNavigationDistance, type GameState } from "./state";
+import { getEuclideanDistance } from "./positionUtils";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
 
 type EnemyTargetOptions = {
@@ -138,8 +139,8 @@ function findNearestEntity<T extends GameEntity>(
       return candidate;
     }
 
-    return getPositionDistance(seeker.position, candidate.position) <
-      getPositionDistance(seeker.position, nearestEntity.position)
+    return getEuclideanDistance(seeker.position, candidate.position) <
+      getEuclideanDistance(seeker.position, nearestEntity.position)
       ? candidate
       : nearestEntity;
   }, undefined);
@@ -161,8 +162,4 @@ function isPositionReachableWithin(
       ignoredEntityId,
     ) !== null
   );
-}
-
-function getPositionDistance(a: Position, b: Position): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }

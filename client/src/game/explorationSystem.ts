@@ -9,16 +9,12 @@ import {
   previewMoveTowardPosition,
   reservePositionForTick,
   setLeaderIntent,
-  updateEntity,
   type GameState,
 } from "./state";
-import { findEnemyTarget } from "./targetSelection";
 import {
   findNearestReachableNavigationPosition,
   getNavigationPositionKey,
 } from "./navigation";
-
-const AUTO_ENEMY_TARGET_RADIUS = 48;
 
 export function updateExplorationSystem(
   state: GameState,
@@ -37,26 +33,6 @@ export function updateExplorationSystem(
 
   if (!explorer || movedEntityIds.has(explorer.id)) {
     return nextState;
-  }
-
-  const enemyTarget = findEnemyTarget(nextState, explorer, {
-    maxDistance: AUTO_ENEMY_TARGET_RADIUS,
-  });
-
-  if (enemyTarget) {
-    return setLeaderIntent(
-      updateEntity(nextState, {
-        ...explorer,
-        state: "attack",
-        currentTargetId: enemyTarget.id,
-        commandPriority: "autonomous",
-      }),
-      {
-        type: "attack",
-        targetId: enemyTarget.id,
-        targetPosition: enemyTarget.position,
-      },
-    );
   }
 
   const targetPosition = findNearestUnexploredReachablePosition(
@@ -129,8 +105,7 @@ export function reserveExploringPartyMemberNextTile(state: GameState): GameState
 function isPartyFormationActive(state: GameState): boolean {
   return Boolean(
     state.partyFormation &&
-      state.partyFormation.phase !== "idle" &&
-      state.partyFormation.targetId,
+      state.partyFormation.phase !== "idle",
   );
 }
 

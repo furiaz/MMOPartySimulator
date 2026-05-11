@@ -6,7 +6,8 @@ import {
 } from "./state";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
-import type { AutonomousEntity, GameEntity, Position } from "./types";
+import { arePositionsEqual, getGridDistance } from "./positionUtils";
+import type { AutonomousEntity, GameEntity } from "./types";
 
 export const FOLLOW_LEASH_RADIUS = 1.5;
 const FOLLOW_CATCHUP_DISTANCE = 5;
@@ -43,7 +44,7 @@ export function updateFollowSystem(
 
     const previousPosition = follower.position;
     const stepCount =
-      getDistance(follower.position, leader.position) >= FOLLOW_CATCHUP_DISTANCE
+      getGridDistance(follower.position, leader.position) >= FOLLOW_CATCHUP_DISTANCE
         ? 2
         : 1;
 
@@ -78,7 +79,7 @@ export function updateFollowSystem(
 
     if (
       movedFollower &&
-      !isSamePosition(previousPosition, movedFollower.position)
+      !arePositionsEqual(previousPosition, movedFollower.position)
     ) {
       movedEntityIds.add(follower.id);
     }
@@ -92,19 +93,11 @@ export function isWithinFollowLeash(
   entity: GameEntity,
   target: GameEntity,
 ): boolean {
-  return getDistance(entity.position, target.position) <= FOLLOW_LEASH_RADIUS;
+  return getGridDistance(entity.position, target.position) <= FOLLOW_LEASH_RADIUS;
 }
 
 function isFollowingAutonomousEntity(
   entity: GameEntity,
 ): entity is AutonomousEntity {
   return isAutonomousEntity(entity) && entity.state === "follow";
-}
-
-function getDistance(from: Position, to: Position): number {
-  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-}
-
-function isSamePosition(a: Position, b: Position): boolean {
-  return a.x === b.x && a.y === b.y;
 }

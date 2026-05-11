@@ -126,6 +126,21 @@ export {
   getUsedInventorySlots,
   removeItemFromInventoryState,
 } from "./inventory";
+export {
+  arePositionsEqual,
+  getEuclideanDistance,
+  getGridDistance,
+  getManhattanDistance,
+  getPositionKey,
+} from "./positionUtils";
+export {
+  isActiveResource,
+  isCompanionEntity,
+  isEnemyEntity,
+  isLivingCompanion,
+  isLivingEnemy,
+  isResourceGameEntity,
+} from "./entityGuards";
 export { CLASS_DEFINITIONS } from "./classes";
 export { SKILL_DEFINITIONS, getSkillsForClass } from "./skills";
 export {
@@ -160,7 +175,7 @@ export {
 export { updateGame } from "./updateGame";
 export { updateAttackSystem } from "./attackSystem";
 export { updateDefendSystem } from "./defendSystem";
-export { updateEnemyAISystem } from "./enemyAISystem";
+export { getEnemyDetectionRange, updateEnemyAISystem } from "./enemyAISystem";
 export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";

@@ -1,4 +1,5 @@
 import type { GameState } from "./state";
+import { getGridDistance } from "./positionUtils";
 import type { GameEntity, PartyMemberRole, Position } from "./types";
 
 type MovementCadenceOptions = {
@@ -64,6 +65,3 @@ function getStableOffset(id: string, cadence: number): number {
   return hash;
 }
 
-function getGridDistance(from: Position, to: Position): number {
-  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-}
