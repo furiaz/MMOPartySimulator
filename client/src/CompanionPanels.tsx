@@ -1,9 +1,22 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   CLASS_DEFINITIONS,
   companionIds,
+  EQUIPMENT_SLOT_LABELS,
+  EQUIPMENT_SLOTS,
+  EQUIPMENT_TYPE_LABELS,
   getCharacterXpProgress,
+  getAllowedEquipmentTypeLabels,
+  getCompanionEquipmentStatModifiers,
+  getItemDefinition,
+  validateEquipmentItemForCompanion,
   type Companion,
+  type EquipmentSlot,
+  type EquipmentType,
+  type EquipmentStatModifiers,
+  type ItemDefinition,
+  type ItemId,
+  type PartyInventory,
   type PartyMemberRole,
 } from "./game";
 
@@ -143,8 +156,8 @@ export function PartyMenuPanel({
                 </div>
               </dl>
               <div className="placeholder-box">
-                Equipment preview unavailable. Equipment slots are not implemented
-                yet.
+                <span className="equipment-section-label">Equipped</span>
+                <EquipmentSlotList member={selectedMember} isCompact />
               </div>
               <div className="party-shortcut-actions">
                 <button
@@ -241,20 +254,30 @@ function CompanionMenuList({
 
 export function PartyManagementPanel({
   activeSection,
+  inventory,
   leaderId,
   members,
   selectedCompanionId,
   onChangeRole,
+  onEquipEquipment,
   onSelectCompanion,
   onSelectSection,
+  onUnequipEquipment,
 }: {
   activeSection: PartyManagementSection;
+  inventory: PartyInventory;
   leaderId: string;
   members: Companion[];
   selectedCompanionId: string | null;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectSection: (section: PartyManagementSection) => void;
+  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
   const orderedMembers = getOrderedMenuMembers(members);
   const selectedMember =
@@ -296,9 +319,12 @@ export function PartyManagementPanel({
               </nav>
               <PartyManagementSectionPanel
                 activeSection={activeSection}
+                inventory={inventory}
                 leaderId={leaderId}
                 member={selectedMember}
                 onChangeRole={onChangeRole}
+                onEquipEquipment={onEquipEquipment}
+                onUnequipEquipment={onUnequipEquipment}
               />
             </>
           ) : (
@@ -312,14 +338,24 @@ export function PartyManagementPanel({
 
 function PartyManagementSectionPanel({
   activeSection,
+  inventory,
   leaderId,
   member,
   onChangeRole,
+  onEquipEquipment,
+  onUnequipEquipment,
 }: {
   activeSection: PartyManagementSection;
+  inventory: PartyInventory;
   leaderId: string;
   member: Companion;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
+  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
   if (activeSection === "role") {
     return <RoleSelectSection member={member} onChangeRole={onChangeRole} />;
@@ -327,10 +363,12 @@ function PartyManagementSectionPanel({
 
   if (activeSection === "equipment") {
     return (
-      <PlaceholderSection title="Equipment">
-        Equipment system not implemented yet. This section is reserved for
-        future equipment management.
-      </PlaceholderSection>
+      <EquipmentManagementSection
+        inventory={inventory}
+        member={member}
+        onEquipEquipment={onEquipEquipment}
+        onUnequipEquipment={onUnequipEquipment}
+      />
     );
   }
 
@@ -344,6 +382,262 @@ function PartyManagementSectionPanel({
       placeholder and does not change party behavior yet.
     </PlaceholderSection>
   );
+}
+
+function EquipmentSlotList({
+  isCompact = false,
+  member,
+}: {
+  isCompact?: boolean;
+  member: Companion;
+}) {
+  const visibleSlots = isCompact
+    ? (["mainHand", "offhand", "head", "chest"] as EquipmentSlot[])
+    : EQUIPMENT_SLOTS;
+
+  return (
+    <dl className="equipment-slot-list">
+      {visibleSlots.map((slot) => {
+        const itemId = member.equipment[slot];
+        const itemDefinition = itemId ? getItemDefinition(itemId) : null;
+
+        return (
+          <div key={slot}>
+            <dt>{EQUIPMENT_SLOT_LABELS[slot]}</dt>
+            <dd>{itemDefinition?.displayName ?? "None"}</dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+function EquipmentManagementSection({
+  inventory,
+  member,
+  onEquipEquipment,
+  onUnequipEquipment,
+}: {
+  inventory: PartyInventory;
+  member: Companion;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
+  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+}) {
+  const [selectedEquipmentSlot, setSelectedEquipmentSlot] =
+    useState<EquipmentSlot>("mainHand");
+  const allowedEquipmentTypes = getAllowedEquipmentTypeLabels(member.classId);
+  const usableEquipmentSlots = inventory.slots.filter((slot) =>
+    canShowInventoryItemForSlot(
+      member,
+      getItemDefinition(slot.itemId),
+      selectedEquipmentSlot,
+    )
+  );
+  const statModifiers = getCompanionEquipmentStatModifiers(member);
+  const selectedItemId = member.equipment[selectedEquipmentSlot];
+  const selectedItemDefinition = selectedItemId
+    ? getItemDefinition(selectedItemId)
+    : null;
+
+  return (
+    <section className="management-section-card" aria-label="Equipment">
+      <h3>Equipment</h3>
+      <span className="equipment-section-label">Equipped Slots</span>
+      <div className="equipment-slot-picker">
+        {EQUIPMENT_SLOTS.map((slot) => {
+          const itemId = member.equipment[slot];
+          const itemDefinition = itemId ? getItemDefinition(itemId) : null;
+
+          return (
+            <button
+              key={slot}
+              className={selectedEquipmentSlot === slot ? "active" : ""}
+              onClick={() => setSelectedEquipmentSlot(slot)}
+              type="button"
+            >
+              <span>{EQUIPMENT_SLOT_LABELS[slot]}</span>
+              <strong>{itemDefinition?.displayName ?? "None"}</strong>
+            </button>
+          );
+        })}
+      </div>
+      <span className="equipment-section-label">Class Allowed Types</span>
+      <div className="equipment-allowed-types">
+        <span>
+          Allowed Main Hand: {formatEquipmentTypes(allowedEquipmentTypes.mainHand)}
+        </span>
+        <span>
+          Allowed Offhand: {formatEquipmentTypes(allowedEquipmentTypes.offhand)}
+        </span>
+      </div>
+      <span className="equipment-section-label">
+        Available for {EQUIPMENT_SLOT_LABELS[selectedEquipmentSlot]}
+      </span>
+      <div className="equipment-inventory-list">
+        {usableEquipmentSlots.length > 0 ? (
+          usableEquipmentSlots.map((slot, index) => {
+            const itemDefinition = getItemDefinition(slot.itemId);
+
+            return (
+              <EquipmentInventoryRow
+                key={`${slot.itemId}-${index}`}
+                itemDefinition={itemDefinition}
+                itemId={slot.itemId}
+                member={member}
+                onEquipEquipment={onEquipEquipment}
+                targetSlot={selectedEquipmentSlot}
+              />
+            );
+          })
+        ) : (
+          <span className="party-menu-empty">
+            No usable inventory items for this slot
+          </span>
+        )}
+      </div>
+      <StatModifierSummary statModifiers={statModifiers} />
+      <span className="equipment-section-label">Unequip</span>
+      <div className="equipment-equipped-actions">
+        {selectedItemDefinition ? (
+          <button
+            onClick={() => onUnequipEquipment(member.id, selectedEquipmentSlot)}
+            type="button"
+          >
+            Unequip {selectedItemDefinition.displayName}
+          </button>
+        ) : (
+          <span className="party-menu-empty">
+            {EQUIPMENT_SLOT_LABELS[selectedEquipmentSlot]} is empty
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EquipmentInventoryRow({
+  itemDefinition,
+  itemId,
+  member,
+  onEquipEquipment,
+  targetSlot,
+}: {
+  itemDefinition: ItemDefinition;
+  itemId: ItemId;
+  member: Companion;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
+  targetSlot: EquipmentSlot;
+}) {
+  const validation = validateEquipmentItemForCompanion(
+    member,
+    itemDefinition,
+    targetSlot,
+  );
+
+  return (
+    <div className="equipment-inventory-row">
+      <span>
+        {itemDefinition.displayName} |{" "}
+        {itemDefinition.equipmentType
+          ? EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]
+          : "Equipment"}
+      </span>
+      <span>{getEquipmentValidityText(member, itemDefinition, targetSlot)}</span>
+      <div>
+        <button
+          disabled={!validation.ok}
+          onClick={() => onEquipEquipment(member.id, itemId, targetSlot)}
+          type="button"
+        >
+          Equip to {EQUIPMENT_SLOT_LABELS[targetSlot]}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatModifierSummary({
+  statModifiers,
+}: {
+  statModifiers: EquipmentStatModifiers;
+}) {
+  const entries = Object.entries(statModifiers).filter(([, value]) =>
+    Boolean(value)
+  );
+
+  return (
+    <div className="equipment-stat-summary">
+      {entries.length > 0
+        ? entries.map(([stat, value]) => (
+            <span key={stat}>
+              {formatStatName(stat)} +{value}
+            </span>
+          ))
+        : "No equipment stat modifiers"}
+    </div>
+  );
+}
+
+function getTargetSlotsForItem(itemDefinition: ItemDefinition): EquipmentSlot[] {
+  if (itemDefinition.equipmentKind === "accessory") {
+    return ["accessory1", "accessory2"];
+  }
+
+  return itemDefinition.equipmentSlot ? [itemDefinition.equipmentSlot] : [];
+}
+
+function canShowInventoryItemForSlot(
+  member: Companion,
+  itemDefinition: ItemDefinition,
+  targetSlot: EquipmentSlot,
+): boolean {
+  return validateEquipmentItemForCompanion(
+    member,
+    itemDefinition,
+    targetSlot,
+  ).ok;
+}
+
+function getEquipmentValidityText(
+  member: Companion,
+  itemDefinition: ItemDefinition,
+  forcedTargetSlot?: EquipmentSlot,
+): string {
+  const targetSlot = forcedTargetSlot ?? getTargetSlotsForItem(itemDefinition)[0];
+
+  if (!targetSlot) {
+    return "Invalid: no target slot";
+  }
+
+  const result = validateEquipmentItemForCompanion(
+    member,
+    itemDefinition,
+    targetSlot,
+  );
+
+  return result.ok ? "Valid" : `Invalid: ${formatReason(result.reason)}`;
+}
+
+function formatEquipmentTypes(equipmentTypes: EquipmentType[]): string {
+  return equipmentTypes.length > 0
+    ? equipmentTypes.map((type) => EQUIPMENT_TYPE_LABELS[type]).join(", ")
+    : "None";
+}
+
+function formatReason(reason: string): string {
+  return reason.split("_").join(" ");
+}
+
+function formatStatName(stat: string): string {
+  return stat.replace(/[A-Z]/g, (letter) => ` ${letter}`).toLowerCase();
 }
 
 function RoleSelectSection({

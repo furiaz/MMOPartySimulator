@@ -10,6 +10,7 @@ export type {
   CompanionRole,
   CombatFeedbackEvent,
   CombatFeedbackType,
+  CompanionEquipment,
   DebugMovementResult,
   DebugMapId,
   DebugTeleportPoint,
@@ -34,10 +35,18 @@ export type {
   InventoryMutationStatus,
   InventoryRemoveResult,
   InventorySlot,
+  AccessoryType,
+  ArmorType,
+  EquipmentItemId,
+  EquipmentKind,
+  EquipmentSlot,
+  EquipmentStatModifiers,
+  EquipmentType,
   ItemCategory,
   ItemDefinition,
   ItemId,
   ItemRarity,
+  OffhandType,
   PartyMemberRole,
   PartyInventory,
   Position,
@@ -54,6 +63,7 @@ export type {
   SkillTag,
   SkillVisualEvent,
   SkillVisualType,
+  WeaponType,
 } from "./types";
 export type {
   PointOfInterest,
@@ -116,6 +126,34 @@ export {
   getItemDefinition,
   getItemDefinitionForResourceType,
 } from "./items";
+export {
+  CLASS_EQUIPMENT_PROFILES,
+  EQUIPMENT_SLOT_LABELS,
+  EQUIPMENT_SLOTS,
+  EQUIPMENT_TYPE_LABELS,
+  addEquipmentStatModifiers,
+  createEmptyCompanionEquipment,
+  type ClassEquipmentProfile,
+} from "./equipmentTypes";
+export {
+  getAllowedEquipmentTypeLabels,
+  getCompanionEquipmentStatModifiers,
+  getItemsReturnedByEquip,
+  isClassAllowedForEquipment,
+  isEquipmentSlotCompatible,
+  isMainHandOccupyingBothHands,
+  validateEquipItem,
+  validateEquipmentItemForCompanion,
+  validateUnequipItem,
+  type EquipmentFailureReason,
+  type EquipmentValidationResult,
+} from "./equipmentRules";
+export {
+  equipItemToCompanion,
+  unequipItemFromCompanion,
+  type EquipmentMutationResult,
+  type EquipmentMutationStatus,
+} from "./equipmentSystem";
 export {
   STARTING_INVENTORY_CAPACITY,
   addItemToInventoryState,
@@ -233,6 +271,7 @@ export {
 export {
   debugAddCompanion,
   debugAddCompanionToParty,
+  debugAddPrototypeEquipmentToInventory,
   debugAddTestWoodToInventory,
   debugRefreshResources,
   debugRandomizeLocations,

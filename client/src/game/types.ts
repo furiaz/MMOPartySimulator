@@ -58,7 +58,85 @@ export type ItemCategory =
   | "quest"
   | "event";
 
-export type ItemId = ResourceType;
+export type EquipmentSlot =
+  | "head"
+  | "chest"
+  | "legs"
+  | "gloves"
+  | "boots"
+  | "mainHand"
+  | "offhand"
+  | "accessory1"
+  | "accessory2";
+
+export type EquipmentKind = "weapon" | "offhand" | "armor" | "accessory";
+
+export type WeaponType =
+  | "training_sword"
+  | "one_handed_sword"
+  | "one_handed_mace"
+  | "claw_gauntlets"
+  | "thorn_whip"
+  | "bow"
+  | "orb"
+  | "rune_lantern"
+  | "holy_mace";
+
+export type OffhandType =
+  | "shield"
+  | "talisman"
+  | "holy_lantern"
+  | "sacrificial_dagger";
+
+export type ArmorType =
+  | "head_armor"
+  | "chest_armor"
+  | "legs_armor"
+  | "gloves_armor"
+  | "boots_armor";
+
+export type AccessoryType = "accessory";
+
+export type EquipmentType =
+  | WeaponType
+  | OffhandType
+  | ArmorType
+  | AccessoryType;
+
+export type EquipmentStatModifiers = {
+  attack?: number;
+  defense?: number;
+  maxHealth?: number;
+  block?: number;
+  evasion?: number;
+  magicPower?: number;
+  healingPower?: number;
+};
+
+export type CompanionEquipment = Record<EquipmentSlot, ItemId | null>;
+
+export type EquipmentItemId =
+  | "training_sword"
+  | "iron_sword"
+  | "training_mace"
+  | "claw_gauntlets"
+  | "thorn_whip"
+  | "short_bow"
+  | "apprentice_orb"
+  | "rune_lantern"
+  | "holy_mace"
+  | "wooden_shield"
+  | "simple_talisman"
+  | "holy_lantern"
+  | "sacrificial_dagger"
+  | "cloth_cap"
+  | "padded_chest"
+  | "padded_legs"
+  | "cloth_gloves"
+  | "travel_boots"
+  | "plain_charm";
+
+export type ItemId = ResourceType | EquipmentItemId;
 
 export type ItemRarity =
   | "common"
@@ -77,6 +155,13 @@ export type ItemDefinition = {
   maxStack: number;
   value?: number;
   effectId?: string;
+  equipmentSlot?: EquipmentSlot;
+  equipmentKind?: EquipmentKind;
+  equipmentType?: EquipmentType;
+  allowedClassIds?: ClassId[];
+  statModifiers?: EquipmentStatModifiers;
+  levelRequirement?: number;
+  occupiesBothHands?: boolean;
 };
 
 export type InventorySlot = {
@@ -92,6 +177,7 @@ export type PartyInventory = {
 export type InventoryMutationSource =
   | "gathering"
   | "debug"
+  | "equipment"
   | "combat_loot"
   | "unknown";
 
@@ -310,6 +396,15 @@ export type DebugTelemetryEventType =
   | "inventory_stack_created"
   | "inventory_stack_updated"
   | "inventory_capacity_checked"
+  | "equipment_equip_attempt"
+  | "equipment_equipped"
+  | "equipment_equip_failed"
+  | "equipment_unequip_attempt"
+  | "equipment_unequipped"
+  | "equipment_unequip_failed"
+  | "equipment_inventory_return_failed"
+  | "equipment_invalid_class"
+  | "equipment_invalid_slot"
   | "teleport_started"
   | "teleport_completed"
   | "teleport_skipped"
@@ -383,8 +478,10 @@ export type DebugTelemetryEvent = {
   nextXp?: number;
   previousClassId?: ClassId;
   nextClassId?: ClassId;
+  companionClassId?: ClassId;
   previousRole?: PartyMemberRole;
   nextRole?: PartyMemberRole;
+  result?: string;
   reason?: string;
   formationPhase?: FormationPhase;
   approachPoint?: Position | null;
@@ -395,7 +492,11 @@ export type DebugTelemetryEvent = {
   attackSlot?: Position | null;
   navigation?: DebugNavigationTelemetry;
   itemId?: ItemId;
+  itemDisplayName?: string;
   itemCategory?: ItemCategory;
+  targetSlot?: EquipmentSlot;
+  equipmentType?: EquipmentType;
+  previousItemId?: ItemId | null;
   requestedQuantity?: number;
   addedQuantity?: number;
   removedQuantity?: number;
@@ -568,6 +669,7 @@ export type Companion = LivingEntity & {
   lastGatherAt: number;
   gatherSpeed: number;
   commandPriority: CommandPriority;
+  equipment: CompanionEquipment;
 };
 
 export type ResourceEntity = BaseEntity & {

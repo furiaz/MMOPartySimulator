@@ -14,6 +14,7 @@ import type {
   ResourceType,
 } from "./types";
 import { MOVEMENT_STEP_TICK_SCALE } from "./simulationTiming";
+import { createEmptyCompanionEquipment } from "./equipmentTypes";
 
 export const MOVEMENT_STEP_DISTANCE = 0.455 * MOVEMENT_STEP_TICK_SCALE;
 export const ENEMY_MOVEMENT_STEP_DISTANCE = 0.58 * MOVEMENT_STEP_TICK_SCALE;
@@ -92,6 +93,7 @@ export function createCompanion(
     lastGatherAt: 0,
     gatherSpeed: STARTING_GATHER_SPEED,
     commandPriority: "autonomous",
+    equipment: createEmptyCompanionEquipment(),
   };
 }
 

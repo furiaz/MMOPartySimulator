@@ -12,6 +12,8 @@ import type {
   GameState,
   PartyInventory,
   PartyMemberRole,
+  EquipmentSlot,
+  ItemId,
   QuestId,
 } from "./game";
 
@@ -26,12 +28,15 @@ export function GameMenu({
   selectedCompanionId,
   selectedQuestId,
   onChangeRole,
+  onEquipEquipment,
+  onOpenEquipmentManagement,
   onSelectCompanion,
   onSelectManagementSection,
   onSelectQuest,
   onShortcut,
   onSelectTab,
   onToggle,
+  onUnequipEquipment,
 }: {
   activeTab: GameMenuTab | null;
   activeManagementSection: PartyManagementSection;
@@ -43,12 +48,19 @@ export function GameMenu({
   selectedCompanionId: string | null;
   selectedQuestId: QuestId | null;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
+  onOpenEquipmentManagement: () => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectManagementSection: (section: PartyManagementSection) => void;
   onSelectQuest: (questId: QuestId) => void;
   onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
   onSelectTab: (tab: GameMenuTab | null) => void;
   onToggle: () => void;
+  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
   return (
     <>
@@ -101,13 +113,19 @@ export function GameMenu({
                   activeSection={activeManagementSection}
                   leaderId={leaderId}
                   members={members}
+                  inventory={inventory}
                   selectedCompanionId={selectedCompanionId}
                   onChangeRole={onChangeRole}
+                  onEquipEquipment={onEquipEquipment}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectManagementSection}
+                  onUnequipEquipment={onUnequipEquipment}
                 />
               ) : activeTab === "inventory" ? (
-                <InventoryPanel inventory={inventory} />
+                <InventoryPanel
+                  inventory={inventory}
+                  onOpenEquipmentManagement={onOpenEquipmentManagement}
+                />
               ) : (
                 <QuestsPanel
                   quests={quests}

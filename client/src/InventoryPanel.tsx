@@ -1,9 +1,12 @@
 import { useState } from "react";
 import {
+  EQUIPMENT_SLOT_LABELS,
+  EQUIPMENT_TYPE_LABELS,
   getItemDefinition,
   getUsedInventorySlots,
   ITEM_DEFINITIONS,
   type ItemCategory,
+  type ItemDefinition,
   type ItemId,
   type PartyInventory,
 } from "./game";
@@ -15,6 +18,8 @@ function getInventorySlotTitle(slot: PartyInventory["slots"][number]): string {
     itemDefinition.displayName,
     `Category ${itemDefinition.category}`,
     `Quantity ${slot.quantity}/${itemDefinition.maxStack}`,
+    getEquipmentDetailText(itemDefinition),
+    getStatModifierText(itemDefinition),
   ].join("\n");
 }
 
@@ -26,10 +31,17 @@ function formatCategoryLabel(category: ItemCategory): string {
   return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
-export function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
+export function InventoryPanel({
+  inventory,
+  onOpenEquipmentManagement,
+}: {
+  inventory: PartyInventory;
+  onOpenEquipmentManagement: () => void;
+}) {
   const [activeCategory, setActiveCategory] = useState<ItemCategory | "all">(
     "all",
   );
+  const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null);
   const availableCategories = Array.from(
     new Set(
       Object.values(ITEM_DEFINITIONS).map((itemDefinition) =>
@@ -51,6 +63,13 @@ export function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
         ? inventory.slots[index] ?? null
         : visibleSlots[index] ?? null,
   }));
+  const selectedSlot = slots.find(
+    ({ index, slot }) =>
+      slot && selectedItemKey === `${index}-${slot.itemId}`,
+  )?.slot ?? null;
+  const selectedItemDefinition = selectedSlot
+    ? getItemDefinition(selectedSlot.itemId)
+    : null;
 
   return (
     <section className="inventory-panel" aria-label="Inventory">
@@ -72,13 +91,30 @@ export function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
           <button
             key={category}
             className={activeCategory === category ? "active" : ""}
-            onClick={() => setActiveCategory(category)}
+            onClick={() => {
+              setActiveCategory(category);
+              setSelectedItemKey(null);
+            }}
             type="button"
           >
             {formatCategoryLabel(category)}
           </button>
         ))}
       </div>
+      {selectedSlot && selectedItemDefinition ? (
+        <div className="inventory-item-action-panel">
+          <div>
+            <strong>{selectedItemDefinition.displayName}</strong>
+            <span>{getEquipmentDetailText(selectedItemDefinition)}</span>
+            <span>{getStatModifierText(selectedItemDefinition)}</span>
+          </div>
+          {selectedItemDefinition.category === "equipment" ? (
+            <button onClick={onOpenEquipmentManagement} type="button">
+              Equip
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="inventory-slot-grid">
         {slots.map(({ index, slot }) => {
           if (!slot) {
@@ -94,11 +130,17 @@ export function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
           }
 
           const itemDefinition = getItemDefinition(slot.itemId);
+          const itemKey = `${index}-${slot.itemId}`;
+          const isEquipment = itemDefinition.category === "equipment";
+          const isSelected = selectedItemKey === itemKey;
 
           return (
             <div
               key={index}
-              className="inventory-slot filled"
+              className={`inventory-slot filled${isSelected ? " selected" : ""}`}
+              onClick={() =>
+                setSelectedItemKey(isEquipment && !isSelected ? itemKey : null)
+              }
               title={getInventorySlotTitle(slot)}
             >
               <span className="inventory-slot-index">{index + 1}</span>
@@ -116,4 +158,43 @@ export function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
       </div>
     </section>
   );
+}
+
+function getEquipmentDetailText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.category !== "equipment") {
+    return "";
+  }
+
+  return [
+    itemDefinition.equipmentSlot
+      ? `Slot ${EQUIPMENT_SLOT_LABELS[itemDefinition.equipmentSlot]}`
+      : null,
+    itemDefinition.equipmentType
+      ? `Type ${EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]}`
+      : null,
+    itemDefinition.occupiesBothHands ? "Occupies both hands" : null,
+    itemDefinition.levelRequirement
+      ? `Level ${itemDefinition.levelRequirement}+`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function getStatModifierText(itemDefinition: ItemDefinition): string {
+  const statModifiers = itemDefinition.statModifiers;
+
+  if (!statModifiers) {
+    return itemDefinition.category === "equipment" ? "Stats none" : "";
+  }
+
+  const stats = Object.entries(statModifiers)
+    .filter(([, value]) => Boolean(value))
+    .map(([stat, value]) => `${formatStatName(stat)} +${value}`);
+
+  return stats.length > 0 ? stats.join(", ") : "Stats none";
+}
+
+function formatStatName(stat: string): string {
+  return stat.replace(/[A-Z]/g, (letter) => ` ${letter}`).toLowerCase();
 }

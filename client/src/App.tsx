@@ -35,6 +35,7 @@ import {
   DEBUG_MAP_ROWS,
   clearDebugTelemetry,
   debugAddCompanionToParty,
+  debugAddPrototypeEquipmentToInventory,
   debugAddTestWoodToInventory,
   debugRefreshResources,
   debugRandomizeLocations,
@@ -42,12 +43,14 @@ import {
   debugResurrectEnemy,
   debugRestorePartyHealth,
   enemyIds,
+  equipItemToCompanion,
   exportDebugTelemetryReport,
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
+  addItemToInventoryState,
   getEnemyDetectionRange,
   hasQuestGiverWork,
   issueCompanionCommands,
@@ -60,13 +63,16 @@ import {
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
   triggerMapTeleport,
+  unequipItemFromCompanion,
   updateEntity,
   type Companion,
   type CombatEntity,
   type DebugTeleportPoint,
   type Enemy,
+  type EquipmentSlot,
   type GameEntity,
   type GameState,
+  type ItemId,
   type NpcEntity,
   type PartyMemberRole,
   type Position,
@@ -181,7 +187,7 @@ function createInitialState(): GameState {
     createNpc(npc.id, npc.position, npc.displayName, npc.npcRole),
   );
 
-  return [leader, secondCompanion, ...npcs].reduce(addEntity, {
+  const initialState = [leader, secondCompanion, ...npcs].reduce(addEntity, {
     entities: {},
     inventory: createEmptyPartyInventory(),
     map: debugMap,
@@ -207,6 +213,13 @@ function createInitialState(): GameState {
     skillCooldownsByCompanionId: {},
     skillVisualEvents: [],
   });
+
+  return addItemToInventoryState(
+    initialState,
+    "training_sword",
+    1,
+    "debug",
+  ).state;
 }
 
 function EntityDebugLabel({
@@ -579,6 +592,29 @@ function App() {
     setGameState(debugAddTestWoodToInventory);
   }
 
+  function addPrototypeEquipmentToInventory() {
+    setGameState(debugAddPrototypeEquipmentToInventory);
+  }
+
+  function equipEquipment(
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) {
+    setGameState((state) =>
+      equipItemToCompanion(state, companionId, itemId, targetSlot).state,
+    );
+  }
+
+  function unequipEquipment(
+    companionId: string,
+    targetSlot: EquipmentSlot,
+  ) {
+    setGameState((state) =>
+      unequipItemFromCompanion(state, companionId, targetSlot).state,
+    );
+  }
+
   function toggleEntityInfo() {
     setShowEntityInfo((isVisible) => !isVisible);
   }
@@ -598,6 +634,12 @@ function App() {
     setSelectedCompanionId(companionId);
     setActiveGameMenuTab("partyManagement");
     setActivePartyManagementSection(target);
+  }
+
+  function openEquipmentManagementFromInventory() {
+    setSelectedCompanionId(selectedMenuCompanionId);
+    setActiveGameMenuTab("partyManagement");
+    setActivePartyManagementSection("equipment");
   }
 
   function toggleGameMenu() {
@@ -1266,12 +1308,15 @@ function App() {
           selectedCompanionId={selectedMenuCompanionId}
           selectedQuestId={selectedMenuQuestId}
           onChangeRole={changePartyMemberRole}
+          onEquipEquipment={equipEquipment}
+          onOpenEquipmentManagement={openEquipmentManagementFromInventory}
           onSelectCompanion={setSelectedCompanionId}
           onSelectManagementSection={setActivePartyManagementSection}
           onSelectQuest={setSelectedQuestId}
           onSelectTab={selectGameMenuTab}
           onShortcut={navigatePartyShortcut}
           onToggle={toggleGameMenu}
+          onUnequipEquipment={unequipEquipment}
         />
         <CompanionVitalsPanel members={partyMembers} />
         <QuestTrackerPanel quest={displayQuest} />
@@ -1323,6 +1368,9 @@ function App() {
                   Refresh Gather Points
                 </button>
                 <button onClick={addTestWoodToInventory}>Add Test Wood</button>
+                <button onClick={addPrototypeEquipmentToInventory}>
+                  Add Prototype Gear
+                </button>
                 <button onClick={toggleEntityInfo}>
                   {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
                 </button>

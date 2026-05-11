@@ -14,6 +14,27 @@ const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
 const DEBUG_RESOURCE_QUANTITY = 3;
 const DEBUG_TEST_ITEM_QUANTITY = 1;
+const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
+  "training_sword",
+  "iron_sword",
+  "training_mace",
+  "claw_gauntlets",
+  "thorn_whip",
+  "short_bow",
+  "apprentice_orb",
+  "rune_lantern",
+  "holy_mace",
+  "wooden_shield",
+  "simple_talisman",
+  "holy_lantern",
+  "sacrificial_dagger",
+  "cloth_cap",
+  "padded_chest",
+  "padded_legs",
+  "cloth_gloves",
+  "travel_boots",
+  "plain_charm",
+] as const;
 
 export function debugAddCompanion(
   state: GameState,
@@ -176,6 +197,19 @@ export function debugAddTestWoodToInventory(state: GameState): GameState {
     DEBUG_TEST_ITEM_QUANTITY,
     "debug",
   ).state;
+}
+
+export function debugAddPrototypeEquipmentToInventory(state: GameState): GameState {
+  return DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS.reduce(
+    (nextState, itemId) =>
+      addItemToInventoryState(
+        nextState,
+        itemId,
+        DEBUG_TEST_ITEM_QUANTITY,
+        "debug",
+      ).state,
+    state,
+  );
 }
 
 export function debugRefreshResources(state: GameState): GameState {
