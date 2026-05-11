@@ -103,6 +103,7 @@ function assignPartyTravelTargets(
     type: plan.target ? "attack" : (state.leaderIntent?.type ?? "move"),
     targetId: plan.target?.id ?? state.leaderIntent?.targetId ?? null,
     targetPosition: plan.targetPosition,
+    source: state.leaderIntent?.source,
   });
 
   const currentLeader = getEntityById(nextState, leader.id);
@@ -141,6 +142,7 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
     type: "attack",
     targetId,
     targetPosition: getEntityById(state, targetId)?.position ?? null,
+    source: state.leaderIntent?.source,
   });
 
   for (const member of getPartyMembers(nextState)) {

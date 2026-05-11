@@ -20,6 +20,7 @@ import type {
   PartyMemberRole,
   Position,
 } from "./types";
+import type { QuestId, QuestState } from "./questTypes";
 
 const DEFAULT_MAX_DEBUG_TICKS = 1000;
 
@@ -87,6 +88,10 @@ export function exportDebugTelemetryReport(
     activeTeleportSourceMapId: state.activeTeleport?.sourceMapId,
     activeTeleportTargetMapId: state.activeTeleport?.targetMapId,
     teleportTriggerSource: state.activeTeleport?.triggeredBy,
+    globalPoiIntent: state.globalPoiIntent,
+    localPoiTarget: state.localPoiTarget,
+    lastPoiDecision: state.lastPoiDecision,
+    activeQuestSummary: getActiveQuestSummary(state),
     telemetry: debugTelemetry,
   };
 }
@@ -148,6 +153,10 @@ export function recordDebugTelemetryTick(
     activeTeleportSourceMapId: nextState.activeTeleport?.sourceMapId,
     activeTeleportTargetMapId: nextState.activeTeleport?.targetMapId,
     teleportTriggerSource: nextState.activeTeleport?.triggeredBy,
+    globalPoiIntent: nextState.globalPoiIntent,
+    localPoiTarget: nextState.localPoiTarget,
+    lastPoiDecision: nextState.lastPoiDecision,
+    activeQuestSummary: getActiveQuestSummary(nextState),
     entities: Object.values(nextState.entities).map((entity) =>
       getEntitySnapshot(previousState, nextState, entity, tick),
     ),
@@ -216,8 +225,24 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.activeTeleportSourceMapId ?? "",
     event.activeTeleportTargetMapId ?? "",
     event.teleportTriggerSource ?? "",
+    event.localPoiId ?? "",
+    event.poiCategory ?? "",
+    event.questId ?? "",
+    event.objectiveId ?? "",
     event.reason ?? "",
   ].join("|");
+}
+
+function getActiveQuestSummary(
+  state: GameState,
+): Partial<Record<QuestId, QuestState>> | undefined {
+  const activeQuestEntries = Object.entries(state.quests).filter(([, quest]) =>
+    quest.status === "active" || quest.status === "ready_to_turn_in"
+  ) as [QuestId, QuestState][];
+
+  return activeQuestEntries.length > 0
+    ? Object.fromEntries(activeQuestEntries) as Partial<Record<QuestId, QuestState>>
+    : undefined;
 }
 
 function getEntitySnapshot(

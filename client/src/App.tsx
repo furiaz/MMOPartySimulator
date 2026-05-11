@@ -16,6 +16,7 @@ import {
   createCompanion,
   createDebugMap,
   createEmptyPartyInventory,
+  createInitialQuestStates,
   createNpc,
   DEBUG_MAP_COLUMNS,
   DEBUG_MAP_ROWS,
@@ -35,6 +36,9 @@ import {
   hubNpcStartData,
   HUB_MAP_ID,
   ITEM_DEFINITIONS,
+  QUEST_DEFINITIONS,
+  QUEST_GIVER_POI_ID,
+  QUEST_ORDER,
   issueCompanionCommands,
   isCombatEntity,
   resourceIds,
@@ -59,6 +63,9 @@ import {
   type PartyMemberRole,
   type PartyInventory,
   type Position,
+  type QuestId,
+  type QuestObjectiveDefinition,
+  type QuestState,
   type ResourceEntity,
 } from "./game";
 import {
@@ -78,7 +85,7 @@ const partyMemberRoleOptions: PartyMemberRole[] = [
 ];
 const debugMap = createDebugMap();
 const cellSize = 36;
-const visualMovementGraceMs = 560;
+const visualMovementGraceMs = 180;
 const visualMovementReachedDistance = 1;
 
 type EntityVisualMovement = {
@@ -86,7 +93,7 @@ type EntityVisualMovement = {
   expiresAt: number;
 };
 
-type GameMenuTab = "party" | "partyManagement" | "inventory";
+type GameMenuTab = "party" | "partyManagement" | "inventory" | "quests";
 
 type PartyManagementSection =
   | "role"
@@ -276,6 +283,253 @@ function InventoryPanel({ inventory }: { inventory: PartyInventory }) {
 
 function formatCategoryLabel(category: ItemCategory): string {
   return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+function formatQuestStatus(status: QuestState["status"]): string {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function getDisplayQuest(quests: GameState["quests"]): QuestState | null {
+  for (const questId of QUEST_ORDER) {
+    const quest = quests[questId];
+
+    if (
+      quest.status === "active" ||
+      quest.status === "ready_to_turn_in" ||
+      quest.status === "available"
+    ) {
+      return quest;
+    }
+  }
+
+  return null;
+}
+
+function getQuestLogQuests(quests: GameState["quests"]): QuestState[] {
+  return QUEST_ORDER
+    .map((questId) => quests[questId])
+    .filter(
+      (quest): quest is QuestState =>
+        quest.status === "available" ||
+        quest.status === "active" ||
+        quest.status === "ready_to_turn_in",
+    );
+}
+
+function getQuestProgressTotals(quest: QuestState): {
+  currentCount: number;
+  requiredCount: number;
+} {
+  const definition = QUEST_DEFINITIONS[quest.questId];
+
+  return definition.objectives.reduce(
+    (totals, objective) => {
+      const progress = quest.objectiveProgress[objective.id];
+      const requiredCount = objective.requiredCount ?? 1;
+
+      return {
+        currentCount: totals.currentCount + (progress?.currentCount ?? 0),
+        requiredCount: totals.requiredCount + requiredCount,
+      };
+    },
+    { currentCount: 0, requiredCount: 0 },
+  );
+}
+
+function getQuestObjectiveText(quest: QuestState | null): string {
+  if (!quest) {
+    return "none";
+  }
+
+  const definition = QUEST_DEFINITIONS[quest.questId];
+
+  return definition.objectives
+    .map((objective) => getObjectiveProgressText(quest, objective))
+    .join(" | ");
+}
+
+function getObjectiveProgressText(
+  quest: QuestState,
+  objective: QuestObjectiveDefinition,
+): string {
+  const progress = quest.objectiveProgress[objective.id];
+  const requiredCount = objective.requiredCount ?? 1;
+
+  return `${getObjectiveLabel(objective, requiredCount)} ${progress.currentCount}/${requiredCount}`;
+}
+
+function getObjectiveLabel(
+  objective: QuestObjectiveDefinition,
+  requiredCount = objective.requiredCount ?? 1,
+): string {
+  if (objective.type === "defeat_enemy_count") {
+    return `Kill ${requiredCount} Enemies`;
+  }
+
+  if (objective.type === "gather_item_count") {
+    return `Gather ${requiredCount} ${formatQuestResourceName(
+      objective.resourceType,
+    )}`;
+  }
+
+  if (objective.type === "reach_poi") {
+    return `Explore ${formatQuestMapName(objective.targetMapId)}`;
+  }
+
+  if (objective.type === "return_to_poi") {
+    return "Return to Quest Giver";
+  }
+
+  if (objective.type === "talk_to_poi") {
+    return "Talk to Quest Giver";
+  }
+
+  return objective.type;
+}
+
+function formatQuestResourceName(
+  resourceType: ResourceEntity["resourceType"] | undefined,
+): string {
+  return resourceType ? formatResourceName(resourceType) : "Resource";
+}
+
+function formatQuestMapName(mapId: QuestObjectiveDefinition["targetMapId"]): string {
+  if (mapId === "hub") {
+    return "Harbor Union Bastion";
+  }
+
+  if (mapId === "map-1") {
+    return "First Wild Map";
+  }
+
+  if (mapId === "map-2") {
+    return "Second Wild Map";
+  }
+
+  return "Region";
+}
+
+function QuestTrackerPanel({ quest }: { quest: QuestState | null }) {
+  if (!quest || quest.status === "completed" || quest.status === "locked") {
+    return null;
+  }
+
+  const definition = QUEST_DEFINITIONS[quest.questId];
+
+  return (
+    <section className="quest-tracker-panel" aria-label="Current quests">
+      <div className="quest-tracker-header">
+        <span>Current Quest</span>
+        <span>{formatQuestStatus(quest.status)}</span>
+      </div>
+      <strong>{definition.displayName}</strong>
+      <div className="quest-tracker-objectives">
+        {definition.objectives.map((objective) => {
+          const progress = quest.objectiveProgress[objective.id];
+          const requiredCount = objective.requiredCount ?? 1;
+
+          return (
+            <div key={objective.id} className="quest-tracker-objective">
+              <span>{getObjectiveLabel(objective, requiredCount)}</span>
+              <span>
+                {progress?.currentCount ?? 0}/{requiredCount}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function QuestsPanel({
+  quests,
+  selectedQuestId,
+  onSelectQuest,
+}: {
+  quests: GameState["quests"];
+  selectedQuestId: QuestId | null;
+  onSelectQuest: (questId: QuestId) => void;
+}) {
+  const visibleQuests = getQuestLogQuests(quests);
+  const selectedQuest =
+    visibleQuests.find((quest) => quest.questId === selectedQuestId) ??
+    visibleQuests[0] ??
+    null;
+
+  return (
+    <section className="quests-panel" aria-label="Quests">
+      <h2>Quests</h2>
+      {visibleQuests.length > 0 ? (
+        <div className="menu-split-layout">
+          <div className="quest-list">
+            {visibleQuests.map((quest) => {
+              const definition = QUEST_DEFINITIONS[quest.questId];
+              const progressTotals = getQuestProgressTotals(quest);
+
+              return (
+                <button
+                  key={quest.questId}
+                  className={`quest-list-item${
+                    selectedQuest?.questId === quest.questId ? " selected" : ""
+                  }`}
+                  onClick={() => onSelectQuest(quest.questId)}
+                  type="button"
+                >
+                  <span>{definition.displayName}</span>
+                  <span>
+                    {progressTotals.currentCount}/{progressTotals.requiredCount}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedQuest ? <QuestDetailPanel quest={selectedQuest} /> : null}
+        </div>
+      ) : (
+        <div className="placeholder-box">No current quests.</div>
+      )}
+    </section>
+  );
+}
+
+function QuestDetailPanel({ quest }: { quest: QuestState }) {
+  const definition = QUEST_DEFINITIONS[quest.questId];
+
+  return (
+    <div className="quest-detail-panel">
+      <div className="menu-section-heading">
+        <span>{definition.displayName}</span>
+        <span>{formatQuestStatus(quest.status)}</span>
+      </div>
+      <div className="quest-objective-list">
+        {definition.objectives.map((objective) => {
+          const progress = quest.objectiveProgress[objective.id];
+          const requiredCount = objective.requiredCount ?? 1;
+
+          return (
+            <div
+              key={objective.id}
+              className={`quest-objective-row${
+                progress?.completed ? " completed" : ""
+              }`}
+            >
+              <span>{getObjectiveLabel(objective, requiredCount)}</span>
+              <strong>
+                {progress?.currentCount ?? 0}/{requiredCount}
+              </strong>
+            </div>
+          );
+        })}
+      </div>
+      <div className="placeholder-box">
+        Quest details and rewards are placeholder UI for now.
+      </div>
+    </div>
+  );
 }
 
 function getCompanionLabel(member: Companion): string {
@@ -661,10 +915,13 @@ function GameMenu({
   isOpen,
   leaderId,
   members,
+  quests,
   selectedCompanionId,
+  selectedQuestId,
   onChangeRole,
   onSelectCompanion,
   onSelectManagementSection,
+  onSelectQuest,
   onShortcut,
   onSelectTab,
   onToggle,
@@ -675,10 +932,13 @@ function GameMenu({
   isOpen: boolean;
   leaderId: string;
   members: Companion[];
+  quests: GameState["quests"];
   selectedCompanionId: string | null;
+  selectedQuestId: QuestId | null;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectManagementSection: (section: PartyManagementSection) => void;
+  onSelectQuest: (questId: QuestId) => void;
   onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
   onSelectTab: (tab: GameMenuTab | null) => void;
   onToggle: () => void;
@@ -712,6 +972,13 @@ function GameMenu({
             >
               Inventory
             </button>
+            <button
+              className={activeTab === "quests" ? "active" : ""}
+              onClick={() => onSelectTab("quests")}
+              type="button"
+            >
+              Quests
+            </button>
           </nav>
           {activeTab ? (
             <div className="game-menu-content">
@@ -732,8 +999,14 @@ function GameMenu({
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectManagementSection}
                 />
-              ) : (
+              ) : activeTab === "inventory" ? (
                 <InventoryPanel inventory={inventory} />
+              ) : (
+                <QuestsPanel
+                  quests={quests}
+                  selectedQuestId={selectedQuestId}
+                  onSelectQuest={onSelectQuest}
+                />
               )}
             </div>
           ) : null}
@@ -861,6 +1134,10 @@ function createInitialState(): GameState {
     simulationTick: 0,
     partyLeaderId: leader.id,
     leaderIntent: null,
+    quests: createInitialQuestStates(),
+    globalPoiIntent: null,
+    localPoiTarget: null,
+    lastPoiDecision: undefined,
     exploredTiles: {
       [`${leader.position.x},${leader.position.y}`]: true,
     },
@@ -965,6 +1242,7 @@ function App() {
   const [selectedCompanionId, setSelectedCompanionId] = useState<string | null>(
     null,
   );
+  const [selectedQuestId, setSelectedQuestId] = useState<QuestId | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [
     visualMovementByEntityId,
@@ -996,6 +1274,18 @@ function App() {
   const npcs = Object.values(gameState.entities).filter(
     (entity): entity is NpcEntity => entity.kind === "npc",
   );
+  const displayQuest = getDisplayQuest(gameState.quests);
+  const activeQuestIds = getQuestLogQuests(gameState.quests).map(
+    (quest) => quest.questId,
+  );
+  const selectedMenuQuestId =
+    selectedQuestId && activeQuestIds.includes(selectedQuestId)
+      ? selectedQuestId
+      : activeQuestIds[0] ?? null;
+  const questGiverHasWork = QUEST_ORDER.some((questId) => {
+    const status = gameState.quests[questId]?.status;
+    return status === "available" || status === "ready_to_turn_in";
+  });
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find((resource) => !resource.isDepleted);
   const poiTarget = gameState.leaderIntent?.targetId
@@ -1164,6 +1454,7 @@ function App() {
         type: "attack",
         targetId: targetEnemyId,
         targetPosition: target?.position ?? null,
+        source: "player",
       });
 
       return leader?.kind === "companion"
@@ -1274,6 +1565,7 @@ function App() {
         type: "move",
         targetId: null,
         targetPosition: { ...targetPosition },
+        source: "player",
       });
 
       return leader?.kind === "companion"
@@ -1868,6 +2160,11 @@ function App() {
                     {npc.npcRole === "dog" ? "D" : "N"}
                   </span>
                 )}
+                {npc.id === QUEST_GIVER_POI_ID && questGiverHasWork ? (
+                  <span className="quest-available-indicator" title="Quest available or ready">
+                    !
+                  </span>
+                ) : null}
                 <EntityDebugLabel
                   name={npc.displayName}
                   entity={npc}
@@ -1886,15 +2183,19 @@ function App() {
           isOpen={isGameMenuOpen}
           leaderId={gameState.partyLeaderId}
           members={partyMembers}
+          quests={gameState.quests}
           selectedCompanionId={selectedMenuCompanionId}
+          selectedQuestId={selectedMenuQuestId}
           onChangeRole={changePartyMemberRole}
           onSelectCompanion={setSelectedCompanionId}
           onSelectManagementSection={setActivePartyManagementSection}
+          onSelectQuest={setSelectedQuestId}
           onSelectTab={selectGameMenuTab}
           onShortcut={navigatePartyShortcut}
           onToggle={toggleGameMenu}
         />
         <CompanionVitalsPanel members={partyMembers} />
+        <QuestTrackerPanel quest={displayQuest} />
 
         <div
           className={`test-controls${
@@ -1963,6 +2264,25 @@ function App() {
                   {gameState.debugTelemetry?.ticks.length ?? 0}/
                   {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
                   {gameState.debugTelemetry?.events.length ?? 0}
+                </span>
+                <span>
+                  Quest{" "}
+                  {displayQuest
+                    ? `${QUEST_DEFINITIONS[displayQuest.questId].displayName} (${formatQuestStatus(displayQuest.status)})`
+                    : "none"}
+                </span>
+                <span>Objective {getQuestObjectiveText(displayQuest)}</span>
+                <span>
+                  Global POI {gameState.globalPoiIntent?.reason ?? "none"}
+                </span>
+                <span>
+                  Local POI{" "}
+                  {gameState.localPoiTarget
+                    ? `${gameState.localPoiTarget.poiId} (${gameState.localPoiTarget.category})`
+                    : "none"}
+                </span>
+                <span>
+                  POI Reason {gameState.lastPoiDecision?.selectedReason ?? "none"}
                 </span>
               </>
             ) : null}

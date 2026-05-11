@@ -1,5 +1,6 @@
 import { createEnemy, createNpc, createResource, moveEntityTo } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { recordMapReachedForQuests } from "./questSystem";
 import {
   companionIds,
   createDebugMap,
@@ -114,6 +115,10 @@ export function isMapTeleportPoiActive(state: GameState): boolean {
 
 function getAutoTeleport(state: GameState): DebugTeleportPoint | null {
   if (!state.autoModeEnabled || state.activeTeleport || getTeleportPoi(state)) {
+    return null;
+  }
+
+  if (state.globalPoiIntent && state.globalPoiIntent.type !== "idle") {
     return null;
   }
 
@@ -245,6 +250,8 @@ function completeTeleport(state: GameState): GameState {
     map: targetMap,
     activeTeleport: null,
     leaderIntent: null,
+    localPoiTarget: null,
+    lastPoiDecision: undefined,
     exploredTiles: {},
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
@@ -298,6 +305,7 @@ function completeTeleport(state: GameState): GameState {
       ? { [`${Math.round(leader.position.x)},${Math.round(leader.position.y)}`]: true }
       : {},
   };
+  nextState = recordMapReachedForQuests(nextState, teleport.targetMapId);
 
   nextState = appendDebugTelemetryEvent(nextState, {
     type: "teleport_completed",

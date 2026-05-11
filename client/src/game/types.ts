@@ -1,3 +1,12 @@
+import type { PoiCategory } from "./poiTypes";
+import type {
+  GlobalPoiIntent,
+  LocalPoiTarget,
+  PoiDecisionState,
+  QuestId,
+  QuestState,
+} from "./questTypes";
+
 export type EntityState =
   | "idle"
   | "follow"
@@ -121,6 +130,7 @@ export type LeaderIntent = {
   type: LeaderIntentType;
   targetId: string | null;
   targetPosition: Position | null;
+  source?: "player" | "ai";
 };
 
 export type CombatFeedbackType = "attack" | "damage" | "death" | "gather";
@@ -303,7 +313,18 @@ export type DebugTelemetryEventType =
   | "teleport_started"
   | "teleport_completed"
   | "teleport_skipped"
-  | "map_transition";
+  | "map_transition"
+  | "poi_selected"
+  | "poi_skipped"
+  | "poi_interrupted"
+  | "quest_accepted"
+  | "quest_objective_progress"
+  | "quest_objective_completed"
+  | "quest_ready_to_turn_in"
+  | "quest_turned_in"
+  | "quest_completed"
+  | "quest_unlocked"
+  | "quest_intent_teleport";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -385,6 +406,17 @@ export type DebugTelemetryEvent = {
   inventoryUsedSlots?: number;
   inventoryCapacity?: number;
   source?: InventoryMutationSource;
+  globalPoiIntentType?: GlobalPoiIntent["type"];
+  localPoiId?: string;
+  poiCategory?: PoiCategory;
+  poiMapId?: DebugMapId;
+  poiPosition?: Position;
+  poiPriorityReason?: string;
+  poiSkipReason?: string;
+  questId?: QuestId;
+  objectiveId?: string;
+  objectiveProgress?: number;
+  objectiveRequiredCount?: number;
 };
 
 export type DebugTelemetryTick = {
@@ -397,6 +429,10 @@ export type DebugTelemetryTick = {
   activeTeleportSourceMapId?: DebugMapId;
   activeTeleportTargetMapId?: DebugMapId;
   teleportTriggerSource?: "ai" | "player";
+  globalPoiIntent?: GlobalPoiIntent | null;
+  localPoiTarget?: LocalPoiTarget | null;
+  lastPoiDecision?: PoiDecisionState;
+  activeQuestSummary?: Partial<Record<QuestId, QuestState>>;
   entities: DebugTelemetryEntitySnapshot[];
   events: DebugTelemetryEvent[];
 };
@@ -422,6 +458,10 @@ export type DebugTelemetryReport = {
   activeTeleportSourceMapId?: DebugMapId;
   activeTeleportTargetMapId?: DebugMapId;
   teleportTriggerSource?: "ai" | "player";
+  globalPoiIntent?: GlobalPoiIntent | null;
+  localPoiTarget?: LocalPoiTarget | null;
+  lastPoiDecision?: PoiDecisionState;
+  activeQuestSummary?: Partial<Record<QuestId, QuestState>>;
   telemetry: DebugTelemetryState;
 };
 

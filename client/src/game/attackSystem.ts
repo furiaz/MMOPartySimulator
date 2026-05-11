@@ -9,6 +9,7 @@ import {
 import { chooseAttackSlot } from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import { grantCharacterXpToParty } from "./leveling";
+import { recordEnemyDefeatedForQuests } from "./questSystem";
 import {
   addCombatFeedback,
   getEntityById,
@@ -154,6 +155,11 @@ export function updateAttackSystem(
           nextState,
           updatedTarget,
           attackReadyAttacker.id,
+        );
+        nextState = recordEnemyDefeatedForQuests(
+          nextState,
+          updatedTarget,
+          nextState.currentMapId,
         );
       }
 

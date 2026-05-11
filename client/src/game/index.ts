@@ -55,6 +55,24 @@ export type {
   SkillVisualEvent,
   SkillVisualType,
 } from "./types";
+export type {
+  PointOfInterest,
+  PoiAvailability,
+  PoiCategory,
+  PoiMapType,
+} from "./poiTypes";
+export type {
+  GlobalPoiIntent,
+  LocalPoiTarget,
+  PoiDecisionState,
+  QuestDefinition,
+  QuestId,
+  QuestObjectiveDefinition,
+  QuestObjectiveProgress,
+  QuestObjectiveType,
+  QuestState,
+  QuestStatus,
+} from "./questTypes";
 export type { GameState } from "./state";
 
 export {
@@ -154,6 +172,24 @@ export {
   triggerMapTeleport,
   updateTeleportSystem,
 } from "./teleportSystem";
+export { updatePoiSystem } from "./poiSystem";
+export {
+  QUEST_DEFINITIONS,
+  QUEST_GIVER_POI_ID,
+  QUEST_ORDER,
+  createInitialQuestStates,
+  getActiveQuest,
+  getAvailableQuest,
+  getCurrentQuest,
+  getFirstIncompleteObjective,
+  getQuestDefinition,
+  getQuestTargetMapId,
+  hasQuestGiverWork,
+  recordEnemyDefeatedForQuests,
+  recordMapReachedForQuests,
+  recordResourceGatheredForQuests,
+  updateQuestGiverInteraction,
+} from "./questSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
 export {
   companionIds,

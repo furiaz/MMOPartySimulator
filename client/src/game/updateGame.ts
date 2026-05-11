@@ -8,6 +8,7 @@ import {
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
+import { updatePoiSystem } from "./poiSystem";
 import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
 import {
@@ -50,6 +51,8 @@ export function updateGame(state: GameState): GameState {
       clearExpiredCombatFeedback(nextState),
     );
   }
+
+  nextState = updatePoiSystem(nextState);
 
   const shouldMovePartyTowardPoi =
     Boolean(nextState.leaderIntent) ||

@@ -37,6 +37,13 @@ import type {
   SkillShieldBlockState,
   SkillVisualEvent,
 } from "./types";
+import type {
+  GlobalPoiIntent,
+  LocalPoiTarget,
+  PoiDecisionState,
+  QuestId,
+  QuestState,
+} from "./questTypes";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const COMBAT_FEEDBACK_DURATION_MS = 900;
@@ -87,6 +94,10 @@ export type GameState = {
   partyLeaderId: string;
   leaderHandoffTicks?: number;
   leaderIntent: LeaderIntent | null;
+  quests: Record<QuestId, QuestState>;
+  globalPoiIntent: GlobalPoiIntent | null;
+  localPoiTarget: LocalPoiTarget | null;
+  lastPoiDecision?: PoiDecisionState;
   exploredTiles: Record<string, true>;
   followTrailsByEntityId: Record<string, Position[]>;
   lastPositionsByEntityId?: Record<string, Position>;

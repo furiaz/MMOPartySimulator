@@ -15,6 +15,7 @@ import {
 } from "./state";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
+import { recordResourceGatheredForQuests } from "./questSystem";
 import { isResourceTargetInRange } from "./targetSelection";
 import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
@@ -122,6 +123,12 @@ export function updateGatherSystem(
         "gathering",
       );
       nextState = itemAdd.state;
+      nextState = recordResourceGatheredForQuests(
+        nextState,
+        gatheredResource.resourceType,
+        nextState.currentMapId,
+        itemAdd.result.addedQuantity,
+      );
       nextState = addCombatFeedback(nextState, {
         type: "gather",
         entityId: gatheredResource.id,

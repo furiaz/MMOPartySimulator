@@ -198,7 +198,7 @@
   line-height: 1.2;
   text-align: center;
   pointer-events: none;
-  transition: transform 480ms linear;
+  transition: transform 120ms linear;
 }
 
 .poi-ring {
@@ -213,7 +213,7 @@
   border-radius: 999px;
   background: transparent;
   pointer-events: none;
-  transition: transform 480ms linear;
+  transition: transform 120ms linear;
 }
 
 .poi-ring.enemy-poi {
@@ -237,7 +237,7 @@
   margin: 7px;
   border-radius: 999px;
   box-shadow: 0 0 0 2px #ffffff, 0 1px 4px rgba(15, 23, 42, 0.32);
-  transition: transform 480ms linear;
+  transition: transform 120ms linear;
 }
 
 .entity-marker.skill-red-flash {
@@ -356,6 +356,69 @@
   background: #facc15;
 }
 
+.quest-tracker-panel {
+  position: fixed;
+  top: 132px;
+  left: 12px;
+  z-index: 11;
+  display: grid;
+  width: 220px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(51, 65, 85, 0.62);
+  background: rgba(255, 255, 255, 0.82);
+  color: #1f2937;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+}
+
+.quest-tracker-header,
+.quest-tracker-objective,
+.quest-list-item,
+.quest-objective-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.quest-tracker-header {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.quest-tracker-panel strong {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quest-tracker-objectives {
+  display: grid;
+  gap: 5px;
+}
+
+.quest-tracker-objective {
+  padding: 6px;
+  border: 1px solid rgba(100, 116, 139, 0.42);
+  background: rgba(241, 245, 249, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quest-tracker-objective span:first-child,
+.quest-list-item span:first-child,
+.quest-objective-row span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .wall-tile {
   width: 36px;
   height: 36px;
@@ -370,7 +433,7 @@
 .combat-feedback,
 .dead-label,
 .depleted-label {
-  transition: transform 480ms linear;
+  transition: transform 120ms linear;
 }
 
 .entity-label {
@@ -485,6 +548,25 @@
   pointer-events: none;
   transform: translateX(-50%);
   user-select: none;
+}
+
+.quest-available-indicator {
+  position: absolute;
+  right: -7px;
+  top: -13px;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #92400e;
+  border-radius: 999px;
+  background: #facc15;
+  color: #451a03;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.28);
 }
 
 .enemy {
@@ -623,7 +705,7 @@
 
 .game-menu-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid #3a5a60;
@@ -691,13 +773,15 @@
 }
 
 .party-menu-panel,
-.party-management-panel {
+.party-management-panel,
+.quests-panel {
   display: grid;
   gap: 12px;
 }
 
 .party-menu-panel h2,
-.party-management-panel h2 {
+.party-management-panel h2,
+.quests-panel h2 {
   margin: 0;
   font-size: 15px;
 }
@@ -710,6 +794,11 @@
 }
 
 .party-companion-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quest-list {
   display: grid;
   gap: 8px;
 }
@@ -732,6 +821,18 @@
 }
 
 .party-companion-card.selected {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.46);
+}
+
+.quest-list-item {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  text-align: left;
+}
+
+.quest-list-item.selected {
   border-color: #7aa6ad;
   background: rgba(58, 90, 96, 0.46);
 }
@@ -784,6 +885,15 @@
   display: grid;
   gap: 10px;
   padding: 12px;
+}
+
+.quest-detail-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.3);
 }
 
 .menu-section-heading {
@@ -845,6 +955,25 @@
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.quest-objective-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quest-objective-row {
+  padding: 10px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.24);
+  color: #e6f0f2;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quest-objective-row.completed {
+  border-color: rgba(126, 181, 138, 0.84);
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .party-shortcut-actions,
