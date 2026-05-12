@@ -8,6 +8,7 @@ import {
 } from "./explorationSystem";
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
+import { updateHealingFountainSystem } from "./healingFountainSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { updatePoiSystem } from "./poiSystem";
 import { getPartyMembers } from "./partySystem";
@@ -54,6 +55,7 @@ export function updateGame(state: GameState): GameState {
   }
 
   nextState = updatePoiSystem(nextState);
+  nextState = updateHealingFountainSystem(nextState);
 
   const shouldMovePartyTowardPoi =
     Boolean(nextState.leaderIntent) ||

@@ -2,6 +2,7 @@ import type {
   DebugMapId,
   DebugTeleportPoint,
   GameMap,
+  HealingFountain,
   Position,
   ResourceType,
 } from "./types";
@@ -86,6 +87,14 @@ export const teleporterPosition: Position = { x: 46, y: 22 };
 export const hubTeleporterPosition: Position = { x: 22, y: 20 };
 export const mapOneHubTeleporterPosition: Position = { x: 3, y: 22 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 3, y: 22 };
+export const HUB_HEALING_FOUNTAIN_RANGE = 5;
+export const hubHealingFountains: HealingFountain[] = [
+  {
+    id: "hub-healing-fountain",
+    position: { x: 22, y: 16 },
+    range: HUB_HEALING_FOUNTAIN_RANGE,
+  },
+];
 
 const hubArrivalPositions: Position[] = [
   { x: 22, y: 21 },
@@ -295,6 +304,7 @@ export const debugMapDefinitions: Record<
     debugName: string;
     walls: Position[];
     teleports: DebugTeleportPoint[];
+    healingFountains: HealingFountain[];
   }
 > = {
   [HUB_MAP_ID]: {
@@ -302,6 +312,7 @@ export const debugMapDefinitions: Record<
     displayName: "Harbor Union Bastion",
     debugName: "hub",
     walls: HUB_WALLS,
+    healingFountains: hubHealingFountains,
     teleports: [
       {
         id: "hub-to-map-1",
@@ -318,6 +329,7 @@ export const debugMapDefinitions: Record<
     displayName: "First Wild Map",
     debugName: "map-1",
     walls: MAP_ONE_WALLS,
+    healingFountains: [],
     teleports: [
       {
         id: "map-1-to-hub",
@@ -343,6 +355,7 @@ export const debugMapDefinitions: Record<
     displayName: "Second Wild Map",
     debugName: "map-2",
     walls: MAP_TWO_WALLS,
+    healingFountains: [],
     teleports: [
       {
         id: "map-2-to-map-1",
@@ -367,6 +380,7 @@ export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
     rows: DEBUG_MAP_ROWS,
     walls: definition.walls,
     teleports: definition.teleports,
+    healingFountains: definition.healingFountains,
   };
 
   return {

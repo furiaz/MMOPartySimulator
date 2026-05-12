@@ -624,6 +624,12 @@ export type DebugTeleportPoint = {
   autoSelectAfterEnemiesCleared?: boolean;
 };
 
+export type HealingFountain = {
+  id: string;
+  position: Position;
+  range: number;
+};
+
 export type GameMap = {
   id?: DebugMapId;
   displayName: string;
@@ -632,6 +638,7 @@ export type GameMap = {
   rows: number;
   walls: Position[];
   teleports: DebugTeleportPoint[];
+  healingFountains: HealingFountain[];
   navigationGrid?: NavigationGrid;
 };
 

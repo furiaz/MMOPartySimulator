@@ -994,6 +994,18 @@ function App() {
               />
             </div>
           ))}
+          {currentMap.healingFountains.map((fountain) => (
+            <div
+              key={fountain.id}
+              className="healing-fountain"
+              style={{
+                transform: `translate(${fountain.position.x * cellSize}px, ${
+                  fountain.position.y * cellSize
+                }px)`,
+              }}
+              title="Healing fountain"
+            />
+          ))}
           {Object.values(gameState.skillShieldBlocksById ?? {}).map((shield) => (
             <div
               key={shield.id}
