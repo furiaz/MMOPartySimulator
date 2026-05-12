@@ -120,6 +120,29 @@ Debugging / Fixing:
 
 
 ---
+## Documentation Companion Ticket Rule
+
+Whenever a GitHub Issue ticket is created for implementation work, also create one companion documentation ticket for the same topic.
+
+Do not create a companion documentation ticket for documentation-only tickets.
+
+The documentation ticket should cover:
+
+- Updating relevant project documentation after or alongside the implementation
+- Any changes needed in GDD.md, GTD.md, README files, comments, or other supporting docs
+- Confirming whether no documentation change is needed
+
+The documentation ticket must:
+
+- Reference the implementation ticket
+- Use the next available ticket number
+- Use the standard ticket title format
+- Be added to the GitHub Project board
+- Be moved to Design Stage unless the user says otherwise
+- Use an appropriate documentation label
+
+Do not edit GDD.md, GTD.md, or AGENTS.md automatically. If those documents need changes, ask the user to make or approve those updates.
+
 
 ---
 
@@ -168,9 +191,12 @@ When the user asks for an execution plan:
 - After the plan is created, automatically create a GitHub Issue ticket from that plan.
 - Use the next available ticket number in this title format:
   - [Ticket 0001]: Short descriptive title
-- Add the issue to the GitHub Project board.
-- Move the issue to Design Stage.
-- Apply an appropriate label based on scope, such as feature, bug, documentation, enhancement, or New System.
+- Also create the required companion documentation ticket.
+- Link the documentation ticket to the implementation ticket.
+- Add both issues to the GitHub Project board.
+- Move both issues to Design Stage unless the user says otherwise.
+- Apply an appropriate non-documentation label to the implementation ticket based on scope, such as feature, bug, enhancement, or New System.
+- Apply an appropriate documentation label to the companion documentation ticket.
 
 When the user later asks to execute an approved ticket or plan:
 
