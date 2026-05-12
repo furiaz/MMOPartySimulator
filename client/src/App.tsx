@@ -37,8 +37,6 @@ import {
   createEmptyPartyWallet,
   createInitialQuestStates,
   createNpc,
-  DEBUG_MAP_COLUMNS,
-  DEBUG_MAP_ROWS,
   clearDebugTelemetry,
   debugAddCompanionToParty,
   debugAddPrototypeEquipmentToInventory,
@@ -110,6 +108,10 @@ const cellSize = 36;
 const enemyAggroRange = getEnemyDetectionRange();
 const visualMovementGraceMs = 180;
 const visualMovementReachedDistance = 1;
+const cameraSettleFactor = 0.08;
+const cameraSnapDistance = 0.35;
+const cameraDeadZoneWidthRatio = 0.34;
+const cameraDeadZoneHeightRatio = 0.3;
 const wildernessMapIds = new Set(["map-1", "map-2"]);
 
 type EntityVisualMovement = {
@@ -118,6 +120,11 @@ type EntityVisualMovement = {
 };
 
 type MerchantPanel = "buy" | "sell";
+
+type ViewportSize = {
+  width: number;
+  height: number;
+};
 
 function isWildernessVisualMap(mapId: string | undefined): boolean {
   return Boolean(mapId && wildernessMapIds.has(mapId));
@@ -236,6 +243,166 @@ function getMovementDirection(
 
 function getPositionDistance(first: Position, second: Position): number {
   return Math.hypot(first.x - second.x, first.y - second.y);
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function getMaximumCameraOffset({
+  viewportSize,
+  mapPixelWidth,
+  mapPixelHeight,
+}: {
+  viewportSize: ViewportSize;
+  mapPixelWidth: number;
+  mapPixelHeight: number;
+}): Position {
+  return {
+    x: Math.max(0, mapPixelWidth - viewportSize.width),
+    y: Math.max(0, mapPixelHeight - viewportSize.height),
+  };
+}
+
+function getDeadZoneCameraOffset({
+  focusPosition,
+  currentOffset,
+  viewportSize,
+  mapPixelWidth,
+  mapPixelHeight,
+}: {
+  focusPosition: Position;
+  currentOffset: Position;
+  viewportSize: ViewportSize;
+  mapPixelWidth: number;
+  mapPixelHeight: number;
+}): Position {
+  const maximumOffset = getMaximumCameraOffset({
+    viewportSize,
+    mapPixelWidth,
+    mapPixelHeight,
+  });
+  const deadZoneWidth = viewportSize.width * cameraDeadZoneWidthRatio;
+  const deadZoneHeight = viewportSize.height * cameraDeadZoneHeightRatio;
+  const deadZone = {
+    left: currentOffset.x + (viewportSize.width - deadZoneWidth) / 2,
+    right: currentOffset.x + (viewportSize.width + deadZoneWidth) / 2,
+    top: currentOffset.y + (viewportSize.height - deadZoneHeight) / 2,
+    bottom: currentOffset.y + (viewportSize.height + deadZoneHeight) / 2,
+  };
+  let targetOffset = { ...currentOffset };
+
+  if (focusPosition.x < deadZone.left) {
+    targetOffset = {
+      ...targetOffset,
+      x: currentOffset.x - (deadZone.left - focusPosition.x),
+    };
+  } else if (focusPosition.x > deadZone.right) {
+    targetOffset = {
+      ...targetOffset,
+      x: currentOffset.x + (focusPosition.x - deadZone.right),
+    };
+  }
+
+  if (focusPosition.y < deadZone.top) {
+    targetOffset = {
+      ...targetOffset,
+      y: currentOffset.y - (deadZone.top - focusPosition.y),
+    };
+  } else if (focusPosition.y > deadZone.bottom) {
+    targetOffset = {
+      ...targetOffset,
+      y: currentOffset.y + (focusPosition.y - deadZone.bottom),
+    };
+  }
+
+  return {
+    x: clamp(targetOffset.x, 0, maximumOffset.x),
+    y: clamp(targetOffset.y, 0, maximumOffset.y),
+  };
+}
+
+function getCameraAxisStep({
+  current,
+  target,
+  focusDelta,
+}: {
+  current: number;
+  target: number;
+  focusDelta: number;
+}): number {
+  const targetDistance = target - current;
+
+  if (Math.abs(targetDistance) <= cameraSnapDistance) {
+    return target;
+  }
+
+  if (
+    Math.abs(focusDelta) > cameraSnapDistance &&
+    Math.sign(focusDelta) === Math.sign(targetDistance)
+  ) {
+    const matchedDistance =
+      Math.sign(targetDistance) *
+      Math.min(Math.abs(targetDistance), Math.abs(focusDelta));
+
+    return current + matchedDistance;
+  }
+
+  return current + targetDistance * cameraSettleFactor;
+}
+
+function getVelocityMatchedCameraOffset({
+  currentOffset,
+  targetOffset,
+  focusDelta,
+  maximumOffset,
+}: {
+  currentOffset: Position;
+  targetOffset: Position;
+  focusDelta: Position;
+  maximumOffset: Position;
+}): Position {
+  return {
+    x: clamp(
+      getCameraAxisStep({
+        current: currentOffset.x,
+        target: targetOffset.x,
+        focusDelta: focusDelta.x,
+      }),
+      0,
+      maximumOffset.x,
+    ),
+    y: clamp(
+      getCameraAxisStep({
+        current: currentOffset.y,
+        target: targetOffset.y,
+        focusDelta: focusDelta.y,
+      }),
+      0,
+      maximumOffset.y,
+    ),
+  };
+}
+
+function getSettledCameraOffset({
+  currentOffset,
+  targetOffset,
+}: {
+  currentOffset: Position;
+  targetOffset: Position;
+}): Position {
+  return {
+    x: getCameraAxisStep({
+      current: currentOffset.x,
+      target: targetOffset.x,
+      focusDelta: 0,
+    }),
+    y: getCameraAxisStep({
+      current: currentOffset.y,
+      target: targetOffset.y,
+      focusDelta: 0,
+    }),
+  };
 }
 
 function createInitialState(): GameState {
@@ -401,6 +568,14 @@ function App() {
   const [merchantResultMessage, setMerchantResultMessage] =
     useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [viewportSize, setViewportSize] = useState<ViewportSize>(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  const [visualCameraOffset, setVisualCameraOffset] = useState<Position>({
+    x: 0,
+    y: 0,
+  });
   const [
     visualMovementByEntityId,
     setVisualMovementByEntityId,
@@ -408,6 +583,9 @@ function App() {
   const stopLoopRef = useRef<(() => void) | null>(null);
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
+  const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
+  const cameraMapIdRef = useRef<string | undefined>(undefined);
+  const previousCameraFocusRef = useRef<Position | null>(null);
   const currentMap = gameState.map ?? debugMap;
 
   const partyMembers = companionIds
@@ -541,6 +719,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    function updateViewportSize() {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+
+    window.addEventListener("resize", updateViewportSize);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportSize);
+    };
+  }, []);
+
+  useEffect(() => {
     latestAnimatedEntityPositionsRef.current = [...partyMembers, ...enemies]
       .filter((entity) => entity.state !== "dead")
       .reduce<Record<string, Position>>((positionsById, entity) => {
@@ -666,7 +859,7 @@ function App() {
 
   function randomizeLocations() {
     setGameState((state) =>
-      debugRandomizeLocations(state, DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
+      debugRandomizeLocations(state, currentMap.columns, currentMap.rows),
     );
   }
 
@@ -847,14 +1040,14 @@ function App() {
   }
 
   function commandPartyToMoveFromFloorClick(event: MouseEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget) {
-      return;
-    }
-
     const bounds = event.currentTarget.getBoundingClientRect();
     const targetPosition = {
-      x: Math.floor((event.clientX - bounds.left) / cellSize),
-      y: Math.floor((event.clientY - bounds.top) / cellSize),
+      x: Math.floor(
+        (event.clientX - bounds.left + visualCameraOffset.x) / cellSize,
+      ),
+      y: Math.floor(
+        (event.clientY - bounds.top + visualCameraOffset.y) / cellSize,
+      ),
     };
 
     if (!isValidFloorPosition(targetPosition)) {
@@ -1012,6 +1205,105 @@ function App() {
   const floorTiles = useImageFloorTiles
     ? createFloorTilePositions(currentMap.columns, currentMap.rows)
     : [];
+  const mapPixelWidth = currentMap.columns * cellSize;
+  const mapPixelHeight = currentMap.rows * cellSize;
+  const leaderCameraPosition = leader?.position ?? { x: 0, y: 0 };
+  const leaderCameraFocusPosition = {
+    x: leaderCameraPosition.x * cellSize + cellSize / 2,
+    y: leaderCameraPosition.y * cellSize + cellSize / 2,
+  };
+  const currentMapKey = currentMap.id ?? currentMap.debugName;
+
+  useEffect(() => {
+    const maximumOffset = getMaximumCameraOffset({
+      viewportSize,
+      mapPixelWidth,
+      mapPixelHeight,
+    });
+    const targetOffset = getDeadZoneCameraOffset({
+      focusPosition: leaderCameraFocusPosition,
+      currentOffset: visualCameraOffsetRef.current,
+      viewportSize,
+      mapPixelWidth,
+      mapPixelHeight,
+    });
+
+    if (cameraMapIdRef.current !== currentMapKey) {
+      cameraMapIdRef.current = currentMapKey;
+      previousCameraFocusRef.current = leaderCameraFocusPosition;
+      visualCameraOffsetRef.current = targetOffset;
+      setVisualCameraOffset(targetOffset);
+      return;
+    }
+
+    const previousFocus =
+      previousCameraFocusRef.current ?? leaderCameraFocusPosition;
+    const focusDelta = {
+      x: leaderCameraFocusPosition.x - previousFocus.x,
+      y: leaderCameraFocusPosition.y - previousFocus.y,
+    };
+    const velocityMatchedOffset = getVelocityMatchedCameraOffset({
+      currentOffset: visualCameraOffsetRef.current,
+      targetOffset,
+      focusDelta,
+      maximumOffset,
+    });
+    previousCameraFocusRef.current = leaderCameraFocusPosition;
+    visualCameraOffsetRef.current = velocityMatchedOffset;
+    setVisualCameraOffset(velocityMatchedOffset);
+
+    let animationFrameId = 0;
+    let isActive = true;
+
+    function stepCamera() {
+      const currentOffset = visualCameraOffsetRef.current;
+      const nextTargetOffset = getDeadZoneCameraOffset({
+        focusPosition: leaderCameraFocusPosition,
+        currentOffset,
+        viewportSize,
+        mapPixelWidth,
+        mapPixelHeight,
+      });
+      const xDistance = nextTargetOffset.x - currentOffset.x;
+      const yDistance = nextTargetOffset.y - currentOffset.y;
+
+      if (
+        Math.abs(xDistance) <= cameraSnapDistance &&
+        Math.abs(yDistance) <= cameraSnapDistance
+      ) {
+        visualCameraOffsetRef.current = nextTargetOffset;
+        setVisualCameraOffset(nextTargetOffset);
+        return;
+      }
+
+      const nextOffset = getSettledCameraOffset({
+        currentOffset,
+        targetOffset: nextTargetOffset,
+      });
+
+      visualCameraOffsetRef.current = nextOffset;
+      setVisualCameraOffset(nextOffset);
+
+      if (isActive) {
+        animationFrameId = window.requestAnimationFrame(stepCamera);
+      }
+    }
+
+    animationFrameId = window.requestAnimationFrame(stepCamera);
+
+    return () => {
+      isActive = false;
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [
+    currentMapKey,
+    leaderCameraFocusPosition.x,
+    leaderCameraFocusPosition.y,
+    mapPixelHeight,
+    mapPixelWidth,
+    viewportSize.height,
+    viewportSize.width,
+  ]);
 
   return (
     <main className="game-page">
@@ -1027,24 +1319,6 @@ function App() {
           aria-label="Follow system top-down test area"
           onClick={commandPartyToMoveFromFloorClick}
         >
-          {floorTiles.map((tile) => (
-            <img
-              key={`floor-${tile.x}-${tile.y}`}
-              alt=""
-              aria-hidden="true"
-              className="floor-tile"
-              src={
-                useHubVisuals
-                  ? getHubFloorTileSrc(tile)
-                  : getWildernessFloorTileSrc(tile)
-              }
-              style={{
-                transform: `translate(${tile.x * cellSize}px, ${
-                  tile.y * cellSize
-                }px)`,
-              }}
-            />
-          ))}
           <div className="map-label-overlay">
             <div className="map-title-row">
               <span className="map-version">v{gameVersion}</span>
@@ -1052,540 +1326,567 @@ function App() {
             </div>
             <span>debug: {currentMap.debugName}</span>
           </div>
-          {currentMap.walls.map((wall) => (
-            <div
-              key={`${wall.x}-${wall.y}`}
-              className={`wall-tile ${
-                useWildernessVisuals
-                  ? "wall-wilderness"
-                  : mapTileVisualAssets.wall.className
-              }`}
-              style={{
-                transform: `translate(${wall.x * cellSize}px, ${
-                  wall.y * cellSize
-                }px)`,
-              }}
-            >
-              {useWildernessVisuals ? (
-                <img
-                  alt=""
-                  aria-hidden="true"
-                  className={`wall-wilderness-image ${getWildernessWallTileKind(
-                    wall,
-                  )}`}
-                  src={getWildernessWallTileSrc(wall)}
-                />
-              ) : null}
-            </div>
-          ))}
-          {activeTeleport ? (
-            <div
-              className="teleport-range"
-              style={{
-                width: activeTeleport.range * cellSize * 2,
-                height: activeTeleport.range * cellSize * 2,
-                transform: `translate(${
-                  (activeTeleport.position.x - activeTeleport.range) * cellSize
-                }px, ${
-                  (activeTeleport.position.y - activeTeleport.range) * cellSize
-                }px)`,
-              }}
-              title="Teleport rally range"
-            />
-          ) : null}
-          {teleports.map((teleport) => (
-            <div key={teleport.id}>
-              {isTeleportPoi(teleport) && !activeTeleport ? (
-                <div
-                  className="poi-ring teleport-poi"
+          <div
+            className="map-world"
+            style={{
+              width: mapPixelWidth,
+              height: mapPixelHeight,
+              transform: `translate(${-visualCameraOffset.x}px, ${-visualCameraOffset.y}px)`,
+            }}
+          >
+            {floorTiles.map((tile) => (
+              <img
+                key={`floor-${tile.x}-${tile.y}`}
+                alt=""
+                aria-hidden="true"
+                className="floor-tile"
+                src={
+                  useHubVisuals
+                    ? getHubFloorTileSrc(tile)
+                    : getWildernessFloorTileSrc(tile)
+                }
+                style={{
+                  transform: `translate(${tile.x * cellSize}px, ${
+                    tile.y * cellSize
+                  }px)`,
+                }}
+              />
+            ))}
+            {currentMap.walls.map((wall) => (
+              <div
+                key={`${wall.x}-${wall.y}`}
+                className={`wall-tile ${
+                  useWildernessVisuals
+                    ? "wall-wilderness"
+                    : mapTileVisualAssets.wall.className
+                }`}
+                style={{
+                  transform: `translate(${wall.x * cellSize}px, ${
+                    wall.y * cellSize
+                  }px)`,
+                }}
+              >
+                {useWildernessVisuals ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className={`wall-wilderness-image ${getWildernessWallTileKind(
+                      wall,
+                    )}`}
+                    src={getWildernessWallTileSrc(wall)}
+                  />
+                ) : null}
+              </div>
+            ))}
+            {activeTeleport ? (
+              <div
+                className="teleport-range"
+                style={{
+                  width: activeTeleport.range * cellSize * 2,
+                  height: activeTeleport.range * cellSize * 2,
+                  transform: `translate(${
+                    (activeTeleport.position.x - activeTeleport.range) * cellSize
+                  }px, ${
+                    (activeTeleport.position.y - activeTeleport.range) * cellSize
+                  }px)`,
+                }}
+                title="Teleport rally range"
+              />
+            ) : null}
+            {teleports.map((teleport) => (
+              <div key={teleport.id}>
+                {isTeleportPoi(teleport) && !activeTeleport ? (
+                  <div
+                    className="poi-ring teleport-poi"
+                    style={{
+                      transform: `translate(${teleport.position.x * cellSize}px, ${
+                        teleport.position.y * cellSize
+                      }px)`,
+                    }}
+                    title={`${teleport.id} point of interest`}
+                  />
+                ) : null}
+                <button
+                  className="teleporter"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    triggerTeleport(teleport.id);
+                  }}
                   style={{
                     transform: `translate(${teleport.position.x * cellSize}px, ${
                       teleport.position.y * cellSize
                     }px)`,
                   }}
-                  title={`${teleport.id} point of interest`}
-                />
-              ) : null}
-              <button
-                className="teleporter"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  triggerTeleport(teleport.id);
-                }}
-                style={{
-                  transform: `translate(${teleport.position.x * cellSize}px, ${
-                    teleport.position.y * cellSize
-                  }px)`,
-                }}
-                title={`${teleport.id}: ${teleport.sourceMapId} to ${teleport.targetMapId}`}
-                type="button"
-              />
-            </div>
-          ))}
-          {currentMap.healingFountains.map((fountain) => (
-            <div
-              key={fountain.id}
-              className="healing-fountain"
-              style={{
-                transform: `translate(${fountain.position.x * cellSize}px, ${
-                  fountain.position.y * cellSize
-                }px)`,
-              }}
-              title="Healing fountain"
-            />
-          ))}
-          {Object.values(gameState.skillShieldBlocksById ?? {}).map((shield) => (
-            <div
-              key={shield.id}
-              className="skill-shield-block"
-              style={{
-                transform: `translate(${shield.position.x * cellSize}px, ${
-                  shield.position.y * cellSize
-                }px) rotate(${shield.rotationRadians}rad)`,
-              }}
-              title="Guard Wall"
-            />
-          ))}
-          {projectileVisuals.map((event) => {
-            const source = gameState.entities[event.sourceId];
-            const target = event.targetId
-              ? gameState.entities[event.targetId]
-              : undefined;
-
-            if (!source || !target) {
-              return null;
-            }
-
-            const xDistance = target.position.x - source.position.x;
-            const yDistance = target.position.y - source.position.y;
-            const length = Math.hypot(xDistance, yDistance) * cellSize;
-            const angle = Math.atan2(yDistance, xDistance);
-
-            return (
-              <div
-                key={event.id}
-                className={`skill-link ${event.type}`}
-                style={{
-                  width: length,
-                  transform: `translate(${
-                    source.position.x * cellSize + cellSize / 2
-                  }px, ${
-                    source.position.y * cellSize + cellSize / 2
-                  }px) rotate(${angle}rad)`,
-                }}
-              />
-            );
-          })}
-          {slashVisuals.map((event) => {
-            const source = gameState.entities[event.sourceId];
-
-            if (!source) {
-              return null;
-            }
-
-            return (
-              <div
-                key={event.id}
-                className="skill-slash"
-                style={{
-                  transform: `translate(${source.position.x * cellSize}px, ${
-                    source.position.y * cellSize
-                  }px)`,
-                }}
-              />
-            );
-          })}
-          {activeDropVisualEvents.map((event) => {
-            const itemDefinition = getItemDefinition(event.itemId);
-            const iconSrc = INVENTORY_ITEM_ICON_SRC[event.itemId];
-            const duration = event.expiresAt - event.createdAt;
-            const progress = duration > 0
-              ? Math.min(1, Math.max(0, (currentTime - event.createdAt) / duration))
-              : 1;
-            const visualY = event.position.y - progress * 2;
-
-            return (
-              <div
-                key={event.id}
-                className={`drop-visual ${itemDefinition.category}`}
-                style={{
-                  opacity: 1 - progress,
-                  transform: `translate(${event.position.x * cellSize}px, ${
-                    visualY * cellSize
-                  }px)`,
-                }}
-                title={itemDefinition.displayName}
-              >
-                {iconSrc ? (
-                  <img
-                    alt=""
-                    aria-hidden="true"
-                    className="drop-visual-icon"
-                    src={iconSrc}
-                  />
-                ) : (
-                  <span aria-hidden="true">
-                    {itemDefinition.displayName.charAt(0)}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          {gameState.combatFeedbackEvents.map((event) => {
-            const entity = gameState.entities[event.entityId];
-
-            if (!entity) {
-              return null;
-            }
-
-            return (
-              <div
-                key={event.id}
-                className={`combat-feedback ${event.type}`}
-                style={{
-                  transform: `translate(${entity.position.x * cellSize}px, ${
-                    entity.position.y * cellSize
-                  }px)`,
-                }}
-              >
-                {event.text}
-              </div>
-            );
-          })}
-          {partyMembers.map((member, index) =>
-            member.state === "idle" ? (
-              <div
-                key={`idle-${member.id}`}
-                className="idle-feedback"
-                style={{
-                  transform: `translate(${member.position.x * cellSize}px, ${
-                    member.position.y * cellSize
-                  }px)`,
-                }}
-                title={`Party member ${index + 1} is idle`}
-              >
-                AFK
-              </div>
-            ) : null,
-          )}
-          {enemyPoiPosition ? (
-            <div
-              className="poi-ring enemy-poi"
-              style={{
-                transform: `translate(${enemyPoiPosition.x * cellSize}px, ${
-                  enemyPoiPosition.y * cellSize
-                }px)`,
-              }}
-              title="Enemy point of interest"
-            />
-          ) : null}
-          {movePoiPosition ? (
-            <div
-              className="poi-ring move-poi"
-              style={{
-                transform: `translate(${movePoiPosition.x * cellSize}px, ${
-                  movePoiPosition.y * cellSize
-                }px)`,
-              }}
-              title="Move point of interest"
-            />
-          ) : null}
-          {enemies.map((enemy) =>
-            enemy.state !== "dead" && enemy.aggressionMode === "aggressive" ? (
-              <div
-                key={`aggro-${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
-                className="enemy-aggro-range"
-                style={{
-                  width: enemyAggroRange * cellSize * 2,
-                  height: enemyAggroRange * cellSize * 2,
-                  transform: `translate(${
-                    enemy.position.x * cellSize +
-                    cellSize / 2 -
-                    enemyAggroRange * cellSize
-                  }px, ${
-                    enemy.position.y * cellSize +
-                    cellSize / 2 -
-                    enemyAggroRange * cellSize
-                  }px)`,
-                }}
-                title="Enemy detection range"
-              />
-            ) : null,
-          )}
-          {partyMembers.map((member, index) => {
-            const visualAsset = getEntityVisualAsset(member, gameState.currentMapId);
-            const visualMovement =
-              visualMovementByEntityId[member.id];
-            const isVisuallyMoving =
-              Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
-            const shouldRunAnimation =
-              isVisuallyMoving || isCompanionTryingToMove(member);
-            const animation =
-              visualAsset.kind === "sprite"
-                ? getSpriteAnimation(
-                    visualAsset,
-                    shouldRunAnimation,
-                    getCompanionAnimationDirection(member, visualMovement),
-                  )
-                : null;
-
-            return (
-              <div
-                key={member.id}
-                className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
-                  redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
-                }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  commandPartyToMoveToPosition(member.position);
-                }}
-                style={{
-                  transform: `translate(${member.position.x * cellSize}px, ${
-                    member.position.y * cellSize
-                  }px)`,
-                }}
-                title="Move party POI to this party member"
-              >
-                {animation ? (
-                  <SpriteAnimation
-                    alt={`Party member ${index + 1}`}
-                    animation={animation}
-                    className="entity-sprite"
-                    currentTime={currentTime}
-                  />
-                ) : null}
-                <span className="map-marker-id">{index + 1}</span>
-                <EntityDebugLabel
-                  name={`C${index + 1}`}
-                  entity={member}
-                  detail={`HP ${member.health} GS ${member.gatherSpeed} Role ${member.role}`}
-                  isVisible={showEntityInfo}
-                />
-                <HealthBar entity={member} />
-                <AttackCooldownIndicator
-                  entity={member}
-                  currentTime={currentTime}
+                  title={`${teleport.id}: ${teleport.sourceMapId} to ${teleport.targetMapId}`}
+                  type="button"
                 />
               </div>
-            );
-          })}
-          {enemies.map((enemy, index) => {
-            if (enemy.state === "dead") {
+            ))}
+            {currentMap.healingFountains.map((fountain) => (
+              <div
+                key={fountain.id}
+                className="healing-fountain"
+                style={{
+                  transform: `translate(${fountain.position.x * cellSize}px, ${
+                    fountain.position.y * cellSize
+                  }px)`,
+                }}
+                title="Healing fountain"
+              />
+            ))}
+            {Object.values(gameState.skillShieldBlocksById ?? {}).map((shield) => (
+              <div
+                key={shield.id}
+                className="skill-shield-block"
+                style={{
+                  transform: `translate(${shield.position.x * cellSize}px, ${
+                    shield.position.y * cellSize
+                  }px) rotate(${shield.rotationRadians}rad)`,
+                }}
+                title="Guard Wall"
+              />
+            ))}
+            {projectileVisuals.map((event) => {
+              const source = gameState.entities[event.sourceId];
+              const target = event.targetId
+                ? gameState.entities[event.targetId]
+                : undefined;
+
+              if (!source || !target) {
+                return null;
+              }
+
+              const xDistance = target.position.x - source.position.x;
+              const yDistance = target.position.y - source.position.y;
+              const length = Math.hypot(xDistance, yDistance) * cellSize;
+              const angle = Math.atan2(yDistance, xDistance);
+
               return (
-              <div
-                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
-                className="dead-label"
-                style={{
-                  transform: `translate(${enemy.position.x * cellSize}px, ${
-                    enemy.position.y * cellSize
-                  }px)`,
-                }}
-                title={getEnemyTooltip(enemy)}
-              >
-                {showEntityInfo ? (
-                  <>
-                    E{index + 1}
-                    <br />
-                    State {enemy.state}
-                    <br />
-                    Target {enemy.currentTargetId ?? "none"}
-                  </>
-                ) : null}
-                <HealthBar entity={enemy} />
-              </div>
+                <div
+                  key={event.id}
+                  className={`skill-link ${event.type}`}
+                  style={{
+                    width: length,
+                    transform: `translate(${
+                      source.position.x * cellSize + cellSize / 2
+                    }px, ${
+                      source.position.y * cellSize + cellSize / 2
+                    }px) rotate(${angle}rad)`,
+                  }}
+                />
               );
-            }
+            })}
+            {slashVisuals.map((event) => {
+              const source = gameState.entities[event.sourceId];
 
-            const visualAsset = getEntityVisualAsset(enemy, gameState.currentMapId);
-            const visualMovement = visualMovementByEntityId[enemy.id];
-            const isVisuallyMoving =
-              Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
-            const shouldRunAnimation =
-              isVisuallyMoving || isEnemyTryingToMove(enemy);
-            const animation =
-              visualAsset.kind === "sprite"
-                ? getSpriteAnimation(
-                    visualAsset,
-                    shouldRunAnimation,
-                    getEnemyAnimationDirection(enemy, visualMovement),
-                  )
-                : null;
+              if (!source) {
+                return null;
+              }
 
-            return (
+              return (
+                <div
+                  key={event.id}
+                  className="skill-slash"
+                  style={{
+                    transform: `translate(${source.position.x * cellSize}px, ${
+                      source.position.y * cellSize
+                    }px)`,
+                  }}
+                />
+              );
+            })}
+            {activeDropVisualEvents.map((event) => {
+              const itemDefinition = getItemDefinition(event.itemId);
+              const iconSrc = INVENTORY_ITEM_ICON_SRC[event.itemId];
+              const duration = event.expiresAt - event.createdAt;
+              const progress = duration > 0
+                ? Math.min(1, Math.max(0, (currentTime - event.createdAt) / duration))
+                : 1;
+              const visualY = event.position.y - progress * 2;
+
+              return (
+                <div
+                  key={event.id}
+                  className={`drop-visual ${itemDefinition.category}`}
+                  style={{
+                    opacity: 1 - progress,
+                    transform: `translate(${event.position.x * cellSize}px, ${
+                      visualY * cellSize
+                    }px)`,
+                  }}
+                  title={itemDefinition.displayName}
+                >
+                  {iconSrc ? (
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className="drop-visual-icon"
+                      src={iconSrc}
+                    />
+                  ) : (
+                    <span aria-hidden="true">
+                      {itemDefinition.displayName.charAt(0)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            {gameState.combatFeedbackEvents.map((event) => {
+              const entity = gameState.entities[event.entityId];
+
+              if (!entity) {
+                return null;
+              }
+
+              return (
+                <div
+                  key={event.id}
+                  className={`combat-feedback ${event.type}`}
+                  style={{
+                    transform: `translate(${entity.position.x * cellSize}px, ${
+                      entity.position.y * cellSize
+                    }px)`,
+                  }}
+                >
+                  {event.text}
+                </div>
+              );
+            })}
+            {partyMembers.map((member, index) =>
+              member.state === "idle" ? (
+                <div
+                  key={`idle-${member.id}`}
+                  className="idle-feedback"
+                  style={{
+                    transform: `translate(${member.position.x * cellSize}px, ${
+                      member.position.y * cellSize
+                    }px)`,
+                  }}
+                  title={`Party member ${index + 1} is idle`}
+                >
+                  AFK
+                </div>
+              ) : null,
+            )}
+            {enemyPoiPosition ? (
               <div
-                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
-                className={`entity-marker ${
-                  visualAsset.kind === "sprite"
-                    ? "enemy sprite-entity"
-                    : getEntityVisualClassName(enemy, gameState.currentMapId)
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  commandPartyToTargetEnemy(enemy.id);
-                }}
+                className="poi-ring enemy-poi"
                 style={{
-                  transform: `translate(${enemy.position.x * cellSize}px, ${
-                    enemy.position.y * cellSize
+                  transform: `translate(${enemyPoiPosition.x * cellSize}px, ${
+                    enemyPoiPosition.y * cellSize
                   }px)`,
                 }}
-                title={getEnemyTooltip(enemy)}
-              >
-                {animation ? (
-                  <SpriteAnimation
-                    alt={`Enemy ${index + 1}`}
-                    animation={animation}
-                    className="entity-sprite"
-                    currentTime={currentTime}
-                  />
-                ) : null}
-                <span className="map-marker-id">{index + 1}</span>
-                <EntityDebugLabel
-                  name={`E${index + 1}`}
-                  entity={enemy}
-                  detail={`HP ${enemy.health} ${enemy.archetypeId ?? enemy.aggressionMode}`}
-                  isVisible={showEntityInfo}
+                title="Enemy point of interest"
+              />
+            ) : null}
+            {movePoiPosition ? (
+              <div
+                className="poi-ring move-poi"
+                style={{
+                  transform: `translate(${movePoiPosition.x * cellSize}px, ${
+                    movePoiPosition.y * cellSize
+                  }px)`,
+                }}
+                title="Move point of interest"
+              />
+            ) : null}
+            {enemies.map((enemy) =>
+              enemy.state !== "dead" && enemy.aggressionMode === "aggressive" ? (
+                <div
+                  key={`aggro-${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
+                  className="enemy-aggro-range"
+                  style={{
+                    width: enemyAggroRange * cellSize * 2,
+                    height: enemyAggroRange * cellSize * 2,
+                    transform: `translate(${
+                      enemy.position.x * cellSize +
+                      cellSize / 2 -
+                      enemyAggroRange * cellSize
+                    }px, ${
+                      enemy.position.y * cellSize +
+                      cellSize / 2 -
+                      enemyAggroRange * cellSize
+                    }px)`,
+                  }}
+                  title="Enemy detection range"
                 />
-                {hasHealthBar(enemy) ? <HealthBar entity={enemy} /> : null}
-                {gameState.skillMarksByEnemyId?.[enemy.id] ? (
-                  <span className="skill-mark-target" title="Marked target" />
-                ) : null}
-                {gameState.skillBindsByEnemyId?.[enemy.id] ? (
-                  <span className="skill-bind-target" title="Binding Rune" />
-                ) : null}
-                {isCombatEntity(enemy) ? (
+              ) : null,
+            )}
+            {partyMembers.map((member, index) => {
+              const visualAsset = getEntityVisualAsset(member, gameState.currentMapId);
+              const visualMovement =
+                visualMovementByEntityId[member.id];
+              const isVisuallyMoving =
+                Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
+              const shouldRunAnimation =
+                isVisuallyMoving || isCompanionTryingToMove(member);
+              const animation =
+                visualAsset.kind === "sprite"
+                  ? getSpriteAnimation(
+                      visualAsset,
+                      shouldRunAnimation,
+                      getCompanionAnimationDirection(member, visualMovement),
+                    )
+                  : null;
+
+              return (
+                <div
+                  key={member.id}
+                  className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
+                    redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
+                  }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    commandPartyToMoveToPosition(member.position);
+                  }}
+                  style={{
+                    transform: `translate(${member.position.x * cellSize}px, ${
+                      member.position.y * cellSize
+                    }px)`,
+                  }}
+                  title="Move party POI to this party member"
+                >
+                  {animation ? (
+                    <SpriteAnimation
+                      alt={`Party member ${index + 1}`}
+                      animation={animation}
+                      className="entity-sprite"
+                      currentTime={currentTime}
+                    />
+                  ) : null}
+                  <span className="map-marker-id">{index + 1}</span>
+                  <EntityDebugLabel
+                    name={`C${index + 1}`}
+                    entity={member}
+                    detail={`HP ${member.health} GS ${member.gatherSpeed} Role ${member.role}`}
+                    isVisible={showEntityInfo}
+                  />
+                  <HealthBar entity={member} />
                   <AttackCooldownIndicator
-                    entity={enemy}
+                    entity={member}
                     currentTime={currentTime}
                   />
-                ) : null}
-              </div>
-            );
-          })}
-          {resources.map((resource) => {
-            const visualAsset = getEntityVisualAsset(
-              resource,
-              gameState.currentMapId,
-            );
-            const isImageResource = visualAsset.kind === "image";
+                </div>
+              );
+            })}
+            {enemies.map((enemy, index) => {
+              if (enemy.state === "dead") {
+                return (
+                <div
+                  key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
+                  className="dead-label"
+                  style={{
+                    transform: `translate(${enemy.position.x * cellSize}px, ${
+                      enemy.position.y * cellSize
+                    }px)`,
+                  }}
+                  title={getEnemyTooltip(enemy)}
+                >
+                  {showEntityInfo ? (
+                    <>
+                      E{index + 1}
+                      <br />
+                      State {enemy.state}
+                      <br />
+                      Target {enemy.currentTargetId ?? "none"}
+                    </>
+                  ) : null}
+                  <HealthBar entity={enemy} />
+                </div>
+                );
+              }
 
-            return resource.isDepleted ? (
-              <div
-                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
-                className="depleted-label"
-                style={{
-                  transform: `translate(${resource.position.x * cellSize}px, ${
-                    resource.position.y * cellSize
-                  }px)`,
-                }}
-                title={getResourceTooltip(resource)}
-              >
-                {showEntityInfo ? (
-                  <>
-                    {resource.resourceType}
-                    <br />
-                    Depleted
-                    <br />
-                    Quantity {resource.quantity}
-                  </>
-                ) : null}
-              </div>
-            ) : (
-              <div
-                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
-                className={`entity-marker ${
-                  isImageResource
-                    ? "resource-image-entity"
-                    : getEntityVisualClassName(resource, gameState.currentMapId)
-                }${
-                  gathererTargetResourceIds.has(resource.id)
-                    ? " gatherer-target"
-                    : ""
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  commandCompanionsToGatherResource(resource.id);
-                }}
-                style={{
-                  transform: `translate(${resource.position.x * cellSize}px, ${
-                    resource.position.y * cellSize
-                  }px)`,
-                }}
-                title={getResourceTooltip(resource)}
-              >
-                {isImageResource ? (
-                  <img
-                    alt=""
-                    aria-hidden="true"
-                    className="resource-image"
-                    src={visualAsset.src}
+              const visualAsset = getEntityVisualAsset(enemy, gameState.currentMapId);
+              const visualMovement = visualMovementByEntityId[enemy.id];
+              const isVisuallyMoving =
+                Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
+              const shouldRunAnimation =
+                isVisuallyMoving || isEnemyTryingToMove(enemy);
+              const animation =
+                visualAsset.kind === "sprite"
+                  ? getSpriteAnimation(
+                      visualAsset,
+                      shouldRunAnimation,
+                      getEnemyAnimationDirection(enemy, visualMovement),
+                    )
+                  : null;
+
+              return (
+                <div
+                  key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
+                  className={`entity-marker ${
+                    visualAsset.kind === "sprite"
+                      ? "enemy sprite-entity"
+                      : getEntityVisualClassName(enemy, gameState.currentMapId)
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    commandPartyToTargetEnemy(enemy.id);
+                  }}
+                  style={{
+                    transform: `translate(${enemy.position.x * cellSize}px, ${
+                      enemy.position.y * cellSize
+                    }px)`,
+                  }}
+                  title={getEnemyTooltip(enemy)}
+                >
+                  {animation ? (
+                    <SpriteAnimation
+                      alt={`Enemy ${index + 1}`}
+                      animation={animation}
+                      className="entity-sprite"
+                      currentTime={currentTime}
+                    />
+                  ) : null}
+                  <span className="map-marker-id">{index + 1}</span>
+                  <EntityDebugLabel
+                    name={`E${index + 1}`}
+                    entity={enemy}
+                    detail={`HP ${enemy.health} ${enemy.archetypeId ?? enemy.aggressionMode}`}
+                    isVisible={showEntityInfo}
                   />
-                ) : null}
-                <EntityDebugLabel
-                  name={resource.resourceType}
-                  entity={resource}
-                  detail={`${resource.durability}/${resource.maxDurability} Qty ${resource.quantity}`}
-                  isVisible={showEntityInfo}
-                />
-              </div>
-            );
-          })}
-          {npcs.map((npc) => {
-            const visualAsset = getEntityVisualAsset(npc, gameState.currentMapId);
-            const isImageNpc = visualAsset.kind === "image";
+                  {hasHealthBar(enemy) ? <HealthBar entity={enemy} /> : null}
+                  {gameState.skillMarksByEnemyId?.[enemy.id] ? (
+                    <span className="skill-mark-target" title="Marked target" />
+                  ) : null}
+                  {gameState.skillBindsByEnemyId?.[enemy.id] ? (
+                    <span className="skill-bind-target" title="Binding Rune" />
+                  ) : null}
+                  {isCombatEntity(enemy) ? (
+                    <AttackCooldownIndicator
+                      entity={enemy}
+                      currentTime={currentTime}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+            {resources.map((resource) => {
+              const visualAsset = getEntityVisualAsset(
+                resource,
+                gameState.currentMapId,
+              );
+              const isImageResource = visualAsset.kind === "image";
 
-            return (
-              <div
-                key={`${gameState.currentMapId ?? HUB_MAP_ID}-${npc.id}`}
-                className={`entity-marker ${
-                  isImageNpc
-                    ? "npc-image-entity"
-                    : getEntityVisualClassName(npc, gameState.currentMapId)
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (npc.npcRole === "merchant") {
-                    openMerchantInteraction(npc);
-                    return;
+              return resource.isDepleted ? (
+                <div
+                  key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
+                  className="depleted-label"
+                  style={{
+                    transform: `translate(${resource.position.x * cellSize}px, ${
+                      resource.position.y * cellSize
+                    }px)`,
+                  }}
+                  title={getResourceTooltip(resource)}
+                >
+                  {showEntityInfo ? (
+                    <>
+                      {resource.resourceType}
+                      <br />
+                      Depleted
+                      <br />
+                      Quantity {resource.quantity}
+                    </>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
+                  className={`entity-marker ${
+                    isImageResource
+                      ? "resource-image-entity"
+                      : getEntityVisualClassName(resource, gameState.currentMapId)
+                  }${
+                    gathererTargetResourceIds.has(resource.id)
+                      ? " gatherer-target"
+                      : ""
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    commandCompanionsToGatherResource(resource.id);
+                  }}
+                  style={{
+                    transform: `translate(${resource.position.x * cellSize}px, ${
+                      resource.position.y * cellSize
+                    }px)`,
+                  }}
+                  title={getResourceTooltip(resource)}
+                >
+                  {isImageResource ? (
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className="resource-image"
+                      src={visualAsset.src}
+                    />
+                  ) : null}
+                  <EntityDebugLabel
+                    name={resource.resourceType}
+                    entity={resource}
+                    detail={`${resource.durability}/${resource.maxDurability} Qty ${resource.quantity}`}
+                    isVisible={showEntityInfo}
+                  />
+                </div>
+              );
+            })}
+            {npcs.map((npc) => {
+              const visualAsset = getEntityVisualAsset(npc, gameState.currentMapId);
+              const isImageNpc = visualAsset.kind === "image";
+
+              return (
+                <div
+                  key={`${gameState.currentMapId ?? HUB_MAP_ID}-${npc.id}`}
+                  className={`entity-marker ${
+                    isImageNpc
+                      ? "npc-image-entity"
+                      : getEntityVisualClassName(npc, gameState.currentMapId)
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (npc.npcRole === "merchant") {
+                      openMerchantInteraction(npc);
+                      return;
+                    }
+
+                    commandPartyToMoveToPosition(npc.position);
+                  }}
+                  style={{
+                    transform: `translate(${npc.position.x * cellSize}px, ${
+                      npc.position.y * cellSize
+                    }px)`,
+                  }}
+                  title={
+                    npc.npcRole === "merchant"
+                      ? `Open ${npc.displayName}`
+                      : `Move party POI to ${npc.displayName}`
                   }
-
-                  commandPartyToMoveToPosition(npc.position);
-                }}
-                style={{
-                  transform: `translate(${npc.position.x * cellSize}px, ${
-                    npc.position.y * cellSize
-                  }px)`,
-                }}
-                title={
-                  npc.npcRole === "merchant"
-                    ? `Open ${npc.displayName}`
-                    : `Move party POI to ${npc.displayName}`
-                }
-              >
-                {isImageNpc ? (
-                  <img
-                    alt={npc.displayName}
-                    className="npc-test-image"
-                    src={visualAsset.src}
+                >
+                  {isImageNpc ? (
+                    <img
+                      alt={npc.displayName}
+                      className="npc-test-image"
+                      src={visualAsset.src}
+                    />
+                  ) : (
+                    <span className="map-marker-id">
+                      {npc.npcRole === "dog" ? "D" : "N"}
+                    </span>
+                  )}
+                  {npc.id === QUEST_GIVER_POI_ID && questGiverHasWork ? (
+                    <span className="quest-available-indicator" title="Quest available or ready">
+                      !
+                    </span>
+                  ) : null}
+                  <EntityDebugLabel
+                    name={npc.displayName}
+                    entity={npc}
+                    detail="Placeholder"
+                    isVisible={showEntityInfo}
                   />
-                ) : (
-                  <span className="map-marker-id">
-                    {npc.npcRole === "dog" ? "D" : "N"}
-                  </span>
-                )}
-                {npc.id === QUEST_GIVER_POI_ID && questGiverHasWork ? (
-                  <span className="quest-available-indicator" title="Quest available or ready">
-                    !
-                  </span>
-                ) : null}
-                <EntityDebugLabel
-                  name={npc.displayName}
-                  entity={npc}
-                  detail="Placeholder"
-                  isVisible={showEntityInfo}
-                />
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {activeMerchant ? (

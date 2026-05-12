@@ -10,6 +10,8 @@ import { bakeNavigationGrid } from "./navigation";
 
 export const DEBUG_MAP_COLUMNS = 50;
 export const DEBUG_MAP_ROWS = 26;
+export const WILDERNESS_MAP_COLUMNS = 80;
+export const WILDERNESS_MAP_ROWS = 48;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const TELEPORTER_RANGE = 10;
 export const HUB_MAP_ID: DebugMapId = "hub";
@@ -77,16 +79,16 @@ export const hubCompanionStartPositions: Position[] = [
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
-  { x: 3, y: 22 },
-  { x: 4, y: 22 },
-  { x: 3, y: 21 },
-  { x: 4, y: 21 },
+  { x: 5, y: 41 },
+  { x: 6, y: 41 },
+  { x: 5, y: 40 },
+  { x: 6, y: 40 },
 ];
 
-export const teleporterPosition: Position = { x: 46, y: 22 };
+export const teleporterPosition: Position = { x: 75, y: 41 };
 export const hubTeleporterPosition: Position = { x: 22, y: 20 };
-export const mapOneHubTeleporterPosition: Position = { x: 3, y: 22 };
-export const mapTwoReturnTeleporterPosition: Position = { x: 3, y: 22 };
+export const mapOneHubTeleporterPosition: Position = { x: 5, y: 41 };
+export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 41 };
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
   {
@@ -104,17 +106,17 @@ const hubArrivalPositions: Position[] = [
 ];
 
 const mapOneHubArrivalPositions: Position[] = [
-  { x: 3, y: 21 },
-  { x: 4, y: 21 },
-  { x: 3, y: 22 },
-  { x: 4, y: 22 },
+  { x: 5, y: 40 },
+  { x: 6, y: 40 },
+  { x: 5, y: 41 },
+  { x: 6, y: 41 },
 ];
 
 const mapOneMapTwoArrivalPositions: Position[] = [
-  { x: 46, y: 21 },
-  { x: 47, y: 21 },
-  { x: 45, y: 21 },
-  { x: 47, y: 22 },
+  { x: 75, y: 40 },
+  { x: 74, y: 40 },
+  { x: 75, y: 41 },
+  { x: 74, y: 41 },
 ];
 
 export const hubNpcStartData = [
@@ -157,63 +159,63 @@ export const hubNpcStartData = [
 ] as const;
 
 export const mapOneEnemyStartPositions: Position[] = [
-  { x: 5, y: 4 },
-  { x: 10, y: 6 },
-  { x: 22, y: 5 },
-  { x: 28, y: 7 },
-  { x: 39, y: 5 },
-  { x: 45, y: 6 },
-  { x: 6, y: 15 },
-  { x: 20, y: 14 },
-  { x: 27, y: 15 },
-  { x: 38, y: 14 },
-  { x: 45, y: 15 },
-  { x: 5, y: 22 },
-  { x: 18, y: 23 },
-  { x: 29, y: 23 },
+  { x: 9, y: 8 },
+  { x: 15, y: 13 },
+  { x: 29, y: 9 },
+  { x: 34, y: 19 },
+  { x: 50, y: 8 },
+  { x: 70, y: 12 },
+  { x: 11, y: 25 },
+  { x: 27, y: 31 },
+  { x: 45, y: 27 },
+  { x: 57, y: 37 },
+  { x: 68, y: 28 },
+  { x: 14, y: 38 },
+  { x: 37, y: 42 },
+  { x: 64, y: 42 },
 ];
 
 export const mapTwoEnemyStartPositions: Position[] = [
-  { x: 5, y: 5 },
-  { x: 16, y: 4 },
-  { x: 31, y: 5 },
-  { x: 45, y: 5 },
-  { x: 5, y: 13 },
-  { x: 18, y: 13 },
-  { x: 32, y: 13 },
-  { x: 45, y: 13 },
-  { x: 6, y: 20 },
-  { x: 17, y: 20 },
-  { x: 28, y: 20 },
-  { x: 43, y: 20 },
-  { x: 46, y: 23 },
-  { x: 33, y: 11 },
+  { x: 10, y: 9 },
+  { x: 24, y: 7 },
+  { x: 45, y: 9 },
+  { x: 72, y: 8 },
+  { x: 13, y: 20 },
+  { x: 31, y: 23 },
+  { x: 55, y: 20 },
+  { x: 70, y: 24 },
+  { x: 9, y: 35 },
+  { x: 25, y: 39 },
+  { x: 43, y: 34 },
+  { x: 61, y: 39 },
+  { x: 72, y: 37 },
+  { x: 55, y: 29 },
 ];
 
 export const mapOneResourceStartData: ResourceStartData[] = [
-  { id: resourceIds[0], position: { x: 4, y: 6 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 11, y: 4 }, resourceType: "ore" },
-  { id: resourceIds[2], position: { x: 23, y: 7 }, resourceType: "herb" },
-  { id: resourceIds[3], position: { x: 40, y: 7 }, resourceType: "wood" },
-  { id: resourceIds[4], position: { x: 46, y: 4 }, resourceType: "ore" },
-  { id: resourceIds[5], position: { x: 5, y: 17 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 21, y: 16 }, resourceType: "wood" },
-  { id: resourceIds[7], position: { x: 29, y: 14 }, resourceType: "ore" },
-  { id: resourceIds[8], position: { x: 38, y: 16 }, resourceType: "herb" },
-  { id: resourceIds[9], position: { x: 44, y: 22 }, resourceType: "wood" },
+  { id: resourceIds[0], position: { x: 7, y: 12 }, resourceType: "wood" },
+  { id: resourceIds[1], position: { x: 18, y: 8 }, resourceType: "ore" },
+  { id: resourceIds[2], position: { x: 30, y: 16 }, resourceType: "herb" },
+  { id: resourceIds[3], position: { x: 47, y: 11 }, resourceType: "wood" },
+  { id: resourceIds[4], position: { x: 70, y: 16 }, resourceType: "ore" },
+  { id: resourceIds[5], position: { x: 16, y: 27 }, resourceType: "herb" },
+  { id: resourceIds[6], position: { x: 36, y: 31 }, resourceType: "wood" },
+  { id: resourceIds[7], position: { x: 53, y: 25 }, resourceType: "ore" },
+  { id: resourceIds[8], position: { x: 72, y: 32 }, resourceType: "herb" },
+  { id: resourceIds[9], position: { x: 51, y: 41 }, resourceType: "wood" },
 ];
 
 export const mapTwoResourceStartData: ResourceStartData[] = [
-  { id: resourceIds[0], position: { x: 4, y: 4 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 15, y: 6 }, resourceType: "ore" },
-  { id: resourceIds[2], position: { x: 30, y: 6 }, resourceType: "herb" },
-  { id: resourceIds[3], position: { x: 45, y: 4 }, resourceType: "wood" },
-  { id: resourceIds[4], position: { x: 4, y: 15 }, resourceType: "ore" },
-  { id: resourceIds[5], position: { x: 18, y: 15 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 32, y: 15 }, resourceType: "wood" },
-  { id: resourceIds[7], position: { x: 45, y: 15 }, resourceType: "ore" },
-  { id: resourceIds[8], position: { x: 5, y: 20 }, resourceType: "herb" },
-  { id: resourceIds[9], position: { x: 34, y: 20 }, resourceType: "wood" },
+  { id: resourceIds[0], position: { x: 7, y: 14 }, resourceType: "wood" },
+  { id: resourceIds[1], position: { x: 22, y: 12 }, resourceType: "ore" },
+  { id: resourceIds[2], position: { x: 39, y: 15 }, resourceType: "herb" },
+  { id: resourceIds[3], position: { x: 63, y: 13 }, resourceType: "wood" },
+  { id: resourceIds[4], position: { x: 16, y: 26 }, resourceType: "ore" },
+  { id: resourceIds[5], position: { x: 38, y: 29 }, resourceType: "herb" },
+  { id: resourceIds[6], position: { x: 57, y: 24 }, resourceType: "wood" },
+  { id: resourceIds[7], position: { x: 72, y: 30 }, resourceType: "ore" },
+  { id: resourceIds[8], position: { x: 13, y: 42 }, resourceType: "herb" },
+  { id: resourceIds[9], position: { x: 50, y: 41 }, resourceType: "wood" },
 ];
 
 export type ResourceStartData = {
@@ -245,54 +247,68 @@ const HUB_WALLS = dedupeWalls([
 ]);
 
 const MAP_ONE_WALLS = dedupeWalls([
-  ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
-  ...createVerticalWall(14, 4, DEBUG_MAP_ROWS - 5, [
-    [7, 9],
-    [15, 17],
-  ]),
-  ...createVerticalWall(32, 4, DEBUG_MAP_ROWS - 5, [
-    [6, 8],
-    [14, 16],
-  ]),
-  ...createHorizontalWall(11, 5, DEBUG_MAP_COLUMNS - 5, [
-    [8, 12],
+  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
+  ...createVerticalWall(20, 5, WILDERNESS_MAP_ROWS - 6, [
+    [10, 14],
     [25, 29],
-    [40, 44],
+    [38, 42],
   ]),
-  ...createHorizontalWall(19, 5, DEBUG_MAP_COLUMNS - 5, [
-    [6, 10],
-    [22, 26],
-    [37, 41],
+  ...createVerticalWall(40, 5, WILDERNESS_MAP_ROWS - 6, [
+    [8, 12],
+    [26, 30],
+    [39, 43],
+  ]),
+  ...createVerticalWall(60, 6, WILDERNESS_MAP_ROWS - 7, [
+    [11, 15],
+    [27, 31],
+    [38, 42],
+  ]),
+  ...createHorizontalWall(18, 5, WILDERNESS_MAP_COLUMNS - 6, [
+    [12, 17],
+    [31, 36],
+    [50, 55],
+    [68, 73],
+  ]),
+  ...createHorizontalWall(34, 6, WILDERNESS_MAP_COLUMNS - 7, [
+    [9, 14],
+    [28, 33],
+    [47, 52],
+    [65, 70],
   ]),
 ]);
 
 const MAP_TWO_WALLS = dedupeWalls([
-  ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
-  ...createVerticalWall(10, 4, DEBUG_MAP_ROWS - 4, [
-    [7, 9],
-    [17, 19],
-  ]),
-  ...createVerticalWall(25, 3, DEBUG_MAP_ROWS - 4, [
-    [5, 7],
-    [14, 16],
-  ]),
-  ...createVerticalWall(39, 4, DEBUG_MAP_ROWS - 4, [
-    [10, 12],
-    [18, 20],
-  ]),
-  ...createHorizontalWall(8, 4, DEBUG_MAP_COLUMNS - 4, [
-    [6, 11],
-    [22, 27],
-    [37, 42],
-  ]),
-  ...createHorizontalWall(17, 4, DEBUG_MAP_COLUMNS - 4, [
-    [7, 11],
-    [23, 27],
+  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
+  ...createVerticalWall(16, 5, WILDERNESS_MAP_ROWS - 6, [
+    [11, 15],
+    [24, 28],
     [38, 42],
   ]),
-  ...createHorizontalWall(22, 5, DEBUG_MAP_COLUMNS - 6, [
-    [14, 18],
-    [30, 34],
+  ...createVerticalWall(34, 4, WILDERNESS_MAP_ROWS - 7, [
+    [8, 12],
+    [22, 26],
+    [35, 39],
+  ]),
+  ...createVerticalWall(52, 5, WILDERNESS_MAP_ROWS - 6, [
+    [10, 14],
+    [23, 27],
+    [37, 41],
+  ]),
+  ...createVerticalWall(68, 6, WILDERNESS_MAP_ROWS - 8, [
+    [12, 16],
+    [26, 30],
+  ]),
+  ...createHorizontalWall(17, 5, WILDERNESS_MAP_COLUMNS - 6, [
+    [8, 13],
+    [25, 30],
+    [43, 48],
+    [61, 66],
+  ]),
+  ...createHorizontalWall(32, 6, WILDERNESS_MAP_COLUMNS - 7, [
+    [10, 15],
+    [28, 33],
+    [46, 51],
+    [62, 67],
   ]),
 ]);
 
@@ -302,6 +318,8 @@ export const debugMapDefinitions: Record<
     id: DebugMapId;
     displayName: string;
     debugName: string;
+    columns: number;
+    rows: number;
     walls: Position[];
     teleports: DebugTeleportPoint[];
     healingFountains: HealingFountain[];
@@ -311,6 +329,8 @@ export const debugMapDefinitions: Record<
     id: HUB_MAP_ID,
     displayName: "Harbor Union Bastion",
     debugName: "hub",
+    columns: DEBUG_MAP_COLUMNS,
+    rows: DEBUG_MAP_ROWS,
     walls: HUB_WALLS,
     healingFountains: hubHealingFountains,
     teleports: [
@@ -328,6 +348,8 @@ export const debugMapDefinitions: Record<
     id: MAP_ONE_ID,
     displayName: "First Wild Map",
     debugName: "map-1",
+    columns: WILDERNESS_MAP_COLUMNS,
+    rows: WILDERNESS_MAP_ROWS,
     walls: MAP_ONE_WALLS,
     healingFountains: [],
     teleports: [
@@ -354,6 +376,8 @@ export const debugMapDefinitions: Record<
     id: MAP_TWO_ID,
     displayName: "Second Wild Map",
     debugName: "map-2",
+    columns: WILDERNESS_MAP_COLUMNS,
+    rows: WILDERNESS_MAP_ROWS,
     walls: MAP_TWO_WALLS,
     healingFountains: [],
     teleports: [
@@ -376,8 +400,8 @@ export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
     id: definition.id,
     displayName: definition.displayName,
     debugName: definition.debugName,
-    columns: DEBUG_MAP_COLUMNS,
-    rows: DEBUG_MAP_ROWS,
+    columns: definition.columns,
+    rows: definition.rows,
     walls: definition.walls,
     teleports: definition.teleports,
     healingFountains: definition.healingFountains,

@@ -53,6 +53,14 @@
   background: #7b9a47;
 }
 
+.map-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  transition: transform 120ms linear;
+}
+
 .entity-marker,
 .teleporter,
 .healing-fountain,
