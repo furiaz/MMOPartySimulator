@@ -180,8 +180,8 @@ When the user later asks to execute an approved ticket or plan:
 - Run the verification plan from the ticket.
 - After implementation and verification are complete, move the GitHub Project item to Manual Review.
 - Do not move the ticket to Done unless the user explicitly approves completion after review.
-
-
+- Before implementation, verify the active issue title already starts with [Ticket 000N]:.
+- If it does not, stop and promote/rename the issue before editing code.
 
 ## Rollback / Traceability Rules
 

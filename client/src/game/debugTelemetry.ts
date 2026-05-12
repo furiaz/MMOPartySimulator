@@ -240,6 +240,10 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.currencyAmount ?? "",
     event.previousCurrencyBalance ?? "",
     event.nextCurrencyBalance ?? "",
+    event.quantitySold ?? "",
+    event.valueEach ?? "",
+    event.totalItemValue ?? "",
+    event.totalExchangeValue ?? "",
   ].join("|");
 }
 

@@ -174,6 +174,9 @@ export type ItemDefinition = {
   stackable: boolean;
   maxStack: number;
   value?: number;
+  sellValue?: number;
+  exchangeCategory?: "parts";
+  canQuickExchange?: boolean;
   effectId?: string;
   equipmentSlot?: EquipmentSlot;
   equipmentKind?: EquipmentKind;
@@ -212,6 +215,7 @@ export type InventoryMutationSource =
   | "debug"
   | "equipment"
   | "combat_loot"
+  | "merchant"
   | "unknown";
 
 export type CurrencyMutationSource =
@@ -505,7 +509,17 @@ export type DebugTelemetryEventType =
   | "currency_remove_attempt"
   | "currency_removed"
   | "currency_remove_failed"
-  | "wallet_balance_changed";
+  | "wallet_balance_changed"
+  | "merchant_interaction_opened"
+  | "merchant_interaction_closed"
+  | "merchant_menu_selected"
+  | "quick_exchange_attempt"
+  | "quick_exchange_item_selected"
+  | "quick_exchange_item_removed"
+  | "quick_exchange_currency_added"
+  | "quick_exchange_completed"
+  | "quick_exchange_failed"
+  | "quick_exchange_no_items";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -591,6 +605,10 @@ export type DebugTelemetryEvent = {
   addedQuantity?: number;
   removedQuantity?: number;
   overflowQuantity?: number;
+  quantitySold?: number;
+  valueEach?: number;
+  totalItemValue?: number;
+  totalExchangeValue?: number;
   slotIndex?: number;
   stackQuantityBefore?: number;
   stackQuantityAfter?: number;

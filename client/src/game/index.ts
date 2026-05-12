@@ -187,6 +187,19 @@ export {
   setCurrencyBalanceForDebug,
 } from "./wallet";
 export {
+  getQuickExchangeItemDefinitions,
+  getQuickExchangeItems,
+  isMerchantNpc,
+  isQuickExchangeItemDefinition,
+  quickExchangeParts,
+  recordMerchantInteractionClosed,
+  recordMerchantInteractionOpened,
+  recordMerchantMenuSelected,
+  type MerchantMenuSelection,
+  type QuickExchangeItem,
+  type QuickExchangeResult,
+} from "./merchant";
+export {
   arePositionsEqual,
   getEuclideanDistance,
   getGridDistance,

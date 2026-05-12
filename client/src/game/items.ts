@@ -36,6 +36,9 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     rarity: "common",
     stackable: true,
     maxStack: 250,
+    sellValue: 3,
+    exchangeCategory: "parts",
+    canQuickExchange: true,
   },
   wolf_fang: {
     id: "wolf_fang",
@@ -45,6 +48,9 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     rarity: "common",
     stackable: true,
     maxStack: 250,
+    sellValue: 2,
+    exchangeCategory: "parts",
+    canQuickExchange: true,
   },
   wolf_claw: {
     id: "wolf_claw",
@@ -54,6 +60,9 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     rarity: "common",
     stackable: true,
     maxStack: 250,
+    sellValue: 1,
+    exchangeCategory: "parts",
+    canQuickExchange: true,
   },
   orc_tusk: {
     id: "orc_tusk",
@@ -63,6 +72,9 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     rarity: "common",
     stackable: true,
     maxStack: 250,
+    sellValue: 4,
+    exchangeCategory: "parts",
+    canQuickExchange: true,
   },
   orc_hide: {
     id: "orc_hide",
@@ -72,6 +84,9 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     rarity: "common",
     stackable: true,
     maxStack: 250,
+    sellValue: 5,
+    exchangeCategory: "parts",
+    canQuickExchange: true,
   },
   orc_scrap: {
     id: "orc_scrap",
@@ -81,6 +96,9 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     rarity: "common",
     stackable: true,
     maxStack: 250,
+    sellValue: 3,
+    exchangeCategory: "parts",
+    canQuickExchange: true,
   },
   training_sword: {
     id: "training_sword",

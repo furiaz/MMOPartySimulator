@@ -54,6 +54,7 @@ import {
   enemyIds,
   equipItemToCompanion,
   exportDebugTelemetryReport,
+  formatCurrencyDisplay,
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
@@ -66,6 +67,11 @@ import {
   hasQuestGiverWork,
   issueCompanionCommands,
   isCombatEntity,
+  isMerchantNpc,
+  quickExchangeParts,
+  recordMerchantInteractionClosed,
+  recordMerchantInteractionOpened,
+  recordMerchantMenuSelected,
   resourceIds,
   setAutoModeEnabled,
   setLeaderIntent,
@@ -110,6 +116,8 @@ type EntityVisualMovement = {
   direction: SpriteDirection;
   expiresAt: number;
 };
+
+type MerchantPanel = "buy" | "sell";
 
 function isWildernessVisualMap(mapId: string | undefined): boolean {
   return Boolean(mapId && wildernessMapIds.has(mapId));
@@ -380,6 +388,13 @@ function App() {
     null,
   );
   const [selectedQuestId, setSelectedQuestId] = useState<QuestId | null>(null);
+  const [activeMerchantNpcId, setActiveMerchantNpcId] = useState<string | null>(
+    null,
+  );
+  const [activeMerchantPanel, setActiveMerchantPanel] =
+    useState<MerchantPanel | null>(null);
+  const [merchantResultMessage, setMerchantResultMessage] =
+    useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [
     visualMovementByEntityId,
@@ -470,6 +485,12 @@ function App() {
   const activeDropVisualEvents = (gameState.dropVisualEvents ?? []).filter(
     (event) => event.expiresAt > currentTime,
   );
+  const activeMerchant =
+    activeMerchantNpcId && isMerchantNpc(gameState.entities[activeMerchantNpcId])
+      ? gameState.entities[activeMerchantNpcId]
+      : null;
+  const shouldShowWalletToast =
+    !activeMerchant && (gameState.wallet.visibleUntil ?? 0) > currentTime;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -722,6 +743,69 @@ function App() {
     setSelectedCompanionId(selectedMenuCompanionId);
     setActiveGameMenuTab("partyManagement");
     setActivePartyManagementSection("equipment");
+  }
+
+  function openMerchantInteraction(npc: NpcEntity) {
+    setActiveMerchantNpcId(npc.id);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+    setGameState((state) => recordMerchantInteractionOpened(state, npc.id));
+  }
+
+  function selectMerchantPanel(panel: MerchantPanel) {
+    if (!activeMerchantNpcId) {
+      return;
+    }
+
+    setActiveMerchantPanel(panel);
+    setMerchantResultMessage(null);
+    setGameState((state) =>
+      recordMerchantMenuSelected(state, activeMerchantNpcId, panel),
+    );
+  }
+
+  function exchangeMerchantParts() {
+    if (!activeMerchantNpcId) {
+      return;
+    }
+
+    setActiveMerchantPanel(null);
+    const selectedState = recordMerchantMenuSelected(
+      gameState,
+      activeMerchantNpcId,
+      "quick_exchange_parts",
+    );
+    const exchange = quickExchangeParts(selectedState, activeMerchantNpcId);
+
+    if (exchange.result.status === "success") {
+      setMerchantResultMessage(
+        `Exchanged parts for ${exchange.result.totalExchangeValue} Crowns`,
+      );
+    } else if (exchange.result.status === "no_items") {
+      setMerchantResultMessage("No parts to exchange");
+    } else {
+      setMerchantResultMessage("Quick exchange failed");
+    }
+
+    setGameState(exchange.state);
+  }
+
+  function closeMerchantInteraction() {
+    const merchantNpcId = activeMerchantNpcId;
+
+    setActiveMerchantNpcId(null);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+
+    if (!merchantNpcId) {
+      return;
+    }
+
+    setGameState((state) => {
+      const selectedState = recordMerchantMenuSelected(state, merchantNpcId, "leave");
+
+      return recordMerchantInteractionClosed(selectedState, merchantNpcId);
+    });
   }
 
   function toggleGameMenu() {
@@ -1454,6 +1538,11 @@ function App() {
                 }`}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (npc.npcRole === "merchant") {
+                    openMerchantInteraction(npc);
+                    return;
+                  }
+
                   commandPartyToMoveToPosition(npc.position);
                 }}
                 style={{
@@ -1461,7 +1550,11 @@ function App() {
                     npc.position.y * cellSize
                   }px)`,
                 }}
-                title={`Move party POI to ${npc.displayName}`}
+                title={
+                  npc.npcRole === "merchant"
+                    ? `Open ${npc.displayName}`
+                    : `Move party POI to ${npc.displayName}`
+                }
               >
                 {isImageNpc ? (
                   <img
@@ -1489,6 +1582,52 @@ function App() {
             );
           })}
         </div>
+
+        {activeMerchant ? (
+          <section className="merchant-interaction" aria-label="Merchant menu">
+            <div className="merchant-menu">
+              <div className="merchant-menu-header">
+                <h2>{activeMerchant.displayName}</h2>
+                <span>{formatCurrencyDisplay(gameState.wallet, "crowns")}</span>
+              </div>
+              <button
+                className={activeMerchantPanel === "buy" ? "active" : ""}
+                onClick={() => selectMerchantPanel("buy")}
+                type="button"
+              >
+                Buy
+              </button>
+              <button
+                className={activeMerchantPanel === "sell" ? "active" : ""}
+                onClick={() => selectMerchantPanel("sell")}
+                type="button"
+              >
+                Sell
+              </button>
+              <button onClick={exchangeMerchantParts} type="button">
+                Quick Exchange Parts
+              </button>
+              <button onClick={closeMerchantInteraction} type="button">
+                Leave
+              </button>
+              {merchantResultMessage ? (
+                <p className="merchant-result-message">{merchantResultMessage}</p>
+              ) : null}
+            </div>
+            {activeMerchantPanel ? (
+              <aside className="merchant-detail-panel">
+                <h2>{activeMerchantPanel === "buy" ? "Buy" : "Sell"}</h2>
+                <p>Placeholder</p>
+              </aside>
+            ) : null}
+          </section>
+        ) : null}
+
+        {shouldShowWalletToast ? (
+          <div className="wallet-visibility-toast" aria-label="Wallet balance">
+            {formatCurrencyDisplay(gameState.wallet, "crowns")}
+          </div>
+        ) : null}
 
         <GameMenu
           activeTab={activeGameMenuTab}
