@@ -1,8 +1,10 @@
 import {
+  getItemDefinition,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
   type GameState,
   type QuestObjectiveDefinition,
+  type QuestReward,
   type QuestState,
   type ResourceEntity,
 } from "./game";
@@ -73,6 +75,33 @@ export function getQuestObjectiveText(quest: QuestState | null): string {
     .join(" | ");
 }
 
+export function getQuestRewardText(reward: QuestReward | undefined): string {
+  if (!reward) {
+    return "No listed rewards";
+  }
+
+  const rewardParts = [
+    reward.crowns ? `${reward.crowns} Crowns` : null,
+    reward.characterXp ? `${reward.characterXp} XP` : null,
+    ...(reward.items ?? []).map(formatRewardItem),
+    ...(reward.equipment ?? []).map(formatRewardItem),
+  ].filter((part): part is string => Boolean(part));
+
+  return rewardParts.length > 0 ? rewardParts.join(" | ") : "No listed rewards";
+}
+
+export function getQuestTurnInErrorText(quest: QuestState): string | null {
+  if (quest.lastTurnInError === "inventory_full") {
+    return "Inventory too full";
+  }
+
+  if (quest.lastTurnInError === "invalid_reward") {
+    return "Quest reward unavailable";
+  }
+
+  return null;
+}
+
 function getObjectiveProgressText(
   quest: QuestState,
   objective: QuestObjectiveDefinition,
@@ -81,6 +110,15 @@ function getObjectiveProgressText(
   const requiredCount = objective.requiredCount ?? 1;
 
   return `${getObjectiveLabel(objective, requiredCount)} ${progress.currentCount}/${requiredCount}`;
+}
+
+function formatRewardItem(rewardItem: NonNullable<QuestReward["items"]>[number]): string {
+  const itemDefinition = getItemDefinition(rewardItem.itemId);
+  const quantity = Math.floor(rewardItem.quantity);
+
+  return quantity > 1
+    ? `${itemDefinition.displayName} x${quantity}`
+    : itemDefinition.displayName;
 }
 
 export function getObjectiveLabel(

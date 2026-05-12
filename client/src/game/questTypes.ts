@@ -1,4 +1,4 @@
-import type { DebugMapId, Position, ResourceType } from "./types";
+import type { DebugMapId, ItemId, Position, ResourceType } from "./types";
 import type { PoiCategory } from "./poiTypes";
 
 export type QuestId =
@@ -31,11 +31,28 @@ export type QuestObjectiveDefinition = {
   requiredCount?: number;
 };
 
+export type QuestSourceType = "npc" | "mapTrigger" | "objectTrigger";
+
+export type QuestRewardItem = {
+  itemId: ItemId;
+  quantity: number;
+};
+
+export type QuestReward = {
+  crowns?: number;
+  characterXp?: number;
+  items?: QuestRewardItem[];
+  equipment?: QuestRewardItem[];
+};
+
 export type QuestDefinition = {
   id: QuestId;
   displayName: string;
+  sourceType?: QuestSourceType;
   questGiverPoiId: string;
   objectives: QuestObjectiveDefinition[];
+  rewards?: QuestReward;
+  repeatable?: boolean;
   unlocksQuestIds?: QuestId[];
   requiresCompletedQuestIds?: QuestId[];
 };
@@ -50,6 +67,9 @@ export type QuestState = {
   questId: QuestId;
   status: QuestStatus;
   objectiveProgress: Record<string, QuestObjectiveProgress>;
+  completedCycle: number;
+  rewardClaimedCycle: number | null;
+  lastTurnInError?: "inventory_full" | "invalid_reward";
 };
 
 export type GlobalPoiIntent = {

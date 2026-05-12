@@ -89,6 +89,9 @@ export type {
   QuestObjectiveDefinition,
   QuestObjectiveProgress,
   QuestObjectiveType,
+  QuestReward,
+  QuestRewardItem,
+  QuestSourceType,
   QuestState,
   QuestStatus,
 } from "./questTypes";

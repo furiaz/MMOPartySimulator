@@ -509,48 +509,42 @@ Leader intent may be cleared when a point of interest is reached, combat ends, o
 
 Prototype quest definitions live in `questSystem.ts` and quest types live in `questTypes.ts`.
 
-Quest state is stored on `GameState` as:
+Quest state is stored on `GameState` as `quests: Record<QuestId, QuestState>`.
 
-```ts
-quests: Record<QuestId, QuestState>;
-```
+Current quest ids are `clear_the_shore`, `gather_expedition_supplies`, `scout_the_northern_road`, and `threat_beyond_the_pass`.
 
-Current quest ids:
+Current quest statuses are `locked`, `available`, `active`, `ready_to_turn_in`, and `completed`.
 
-```ts
-type QuestId =
-  | "clear_the_shore"
-  | "gather_expedition_supplies"
-  | "scout_the_northern_road"
-  | "threat_beyond_the_pass";
-```
+Current quest reward source types are `npc`, `mapTrigger`, and `objectTrigger`.
 
-Current quest statuses:
+Only NPC quest turn-in is implemented. Map trigger and object trigger sources are future-facing type support only.
 
-```ts
-type QuestStatus =
-  | "locked"
-  | "available"
-  | "active"
-  | "ready_to_turn_in"
-  | "completed";
-```
+Current quest rewards may include:
+
+- Crowns
+- character XP
+- inventory item rewards
+- equipment item rewards
+
+Current quest state also tracks reward claim safety through:
+
+- `completedCycle`
+- `rewardClaimedCycle`
+- `lastTurnInError`
+
+Quest reward claim behavior:
+
+- Quest Giver turn-in validates the full reward package before mutating state.
+- If validation fails, no Crowns, XP, items, equipment, or completion state are applied.
+- If validation succeeds, all rewards are granted and the quest is marked completed.
+- Equipment rewards are added to shared party inventory.
+- Quest XP is awarded to living current party members only and does not use enemy level-gap reduction.
+- Non-repeatable quests cannot grant rewards more than once.
+- Inventory-full failures leave the quest `ready_to_turn_in`.
 
 POI selection types live in `poiTypes.ts`.
 
-Current POI categories:
-
-```ts
-type PoiCategory =
-  | "npc"
-  | "quest"
-  | "combat"
-  | "resource"
-  | "teleport"
-  | "exploration"
-  | "idle"
-  | "event";
-```
+Current POI categories are `npc`, `quest`, `combat`, `resource`, `teleport`, `exploration`, `idle`, and `event`.
 
 `poiSystem.ts` selects global quest intent and local map targets for auto-mode behavior. It may set leader intent toward quest givers, combat targets, resources, exploration points, idle hub points, or prototype teleports.
 
@@ -1141,7 +1135,8 @@ Simulation logic must not depend on sprite assets.
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, and merchant quick exchange results.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, and merchant quick exchange results.
+
 
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
@@ -1205,7 +1200,8 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, party members, enemies, resources, NPCs, healing fountains, sprite animation, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, merchant quick exchange UI, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view, party members, enemies, resources, NPCs, healing fountains, sprite animation, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, XP and level progress, party size limit, debug controls, and debug telemetry export.
+
 
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.

@@ -9,6 +9,8 @@ import {
   getObjectiveLabel,
   getQuestLogQuests,
   getQuestProgressTotals,
+  getQuestRewardText,
+  getQuestTurnInErrorText,
 } from "./questUiHelpers";
 
 export function QuestTrackerPanel({ quest }: { quest: QuestState | null }) {
@@ -97,6 +99,7 @@ export function QuestsPanel({
 
 function QuestDetailPanel({ quest }: { quest: QuestState }) {
   const definition = QUEST_DEFINITIONS[quest.questId];
+  const turnInErrorText = getQuestTurnInErrorText(quest);
 
   return (
     <div className="quest-detail-panel">
@@ -125,8 +128,11 @@ function QuestDetailPanel({ quest }: { quest: QuestState }) {
         })}
       </div>
       <div className="placeholder-box">
-        Quest details and rewards are placeholder UI for now.
+        Rewards: {getQuestRewardText(definition.rewards)}
       </div>
+      {turnInErrorText ? (
+        <div className="placeholder-box">{turnInErrorText}</div>
+      ) : null}
     </div>
   );
 }

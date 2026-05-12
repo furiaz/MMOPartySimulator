@@ -645,7 +645,8 @@ It may show:
 - available, active, ready-to-turn-in, and completed prototype quests
 - current objective progress
 - simple quest status labels
-- placeholder quest detail and reward text
+- simple prototype reward text
+- inventory-full turn-in feedback when quest rewards cannot fit
 
 The Quests menu must not implement a full quest journal, branching dialogue, quest reward economy, reputation, cutscenes, or production quest content unless explicitly requested.
 
@@ -677,6 +678,18 @@ Current prototype quests:
 - Threat Beyond the Pass
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches the interaction range.
+Current prototype quest reward behavior:
+
+- ready quests can grant rewards through Quest Giver turn-in
+- rewards may include Crowns, character XP, inventory items, and equipment items
+- quest rewards are all-or-nothing
+- if every reward can fit, all rewards are granted and the quest completes
+- if any item or equipment reward cannot fit, no rewards are granted
+- inventory-full reward failure keeps the quest ready to turn in so the player can clear space and retry
+- equipment rewards go into shared party inventory, not directly into companion equipment slots
+- quest XP goes to living current party members only
+- quest XP does not use enemy level-gap reduction
+- non-repeatable quests grant rewards once total
 
 Prototype POI direction may choose local targets for auto-mode behavior.
 
@@ -1217,7 +1230,7 @@ Do not implement these unless explicitly requested:
 - networking/server authority
 - production asset pipeline
 - final world content pipeline
-- full quest journal, branching dialogue, and production quest content
+- full quest journal, branching dialogue, production quest content, or full quest reward economy beyond prototype quest rewards
 - full shop, selling, buying, and merchant economy beyond prototype quick exchange
 - persistent ground loot beyond prototype drop-to-inventory behavior
 - production POI framework beyond current debug-map guidance
