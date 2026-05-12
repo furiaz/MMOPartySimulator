@@ -1,6 +1,11 @@
 import type { GameState } from "./state";
 import { getCharacterXpProgress } from "./leveling";
 import {
+  getEnemyAttackRange,
+  getEnemyCombatStyle,
+  getEnemyTargetPreference,
+} from "./enemyArchetypes";
+import {
   getNavigationDistance,
   getNavigationGrid,
   getNavigationPositionKey,
@@ -207,6 +212,11 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.entityId,
     event.targetId ?? "",
     event.previousTargetId ?? "",
+    event.archetypeId ?? "",
+    event.enemyCombatStyle ?? "",
+    event.enemyTargetPreference ?? "",
+    event.attackRange ?? "",
+    event.targetDecisionReason ?? "",
     event.previousClassId ?? "",
     event.nextClassId ?? "",
     event.xpAmount ?? "",
@@ -284,6 +294,11 @@ function getEntitySnapshot(
     state: entity.state,
     position: { ...entity.position },
     currentTargetId: getCurrentTargetId(entity),
+    archetypeId: getArchetypeId(entity),
+    enemyCombatStyle: getEnemyCombatStyleSnapshot(entity),
+    enemyTargetPreference: getEnemyTargetPreferenceSnapshot(entity),
+    attackRange: getAttackRangeSnapshot(entity),
+    targetDecisionReason: getTargetDecisionReason(entity),
     commandPriority: getCommandPriority(entity),
     characterLevel: getCharacterLevel(entity),
     characterXp: getCharacterXp(entity),
@@ -492,6 +507,11 @@ function addTargetEvents(
     entityId: entity.id,
     targetId,
     previousTargetId,
+    archetypeId: getArchetypeId(entity),
+    enemyCombatStyle: getEnemyCombatStyleSnapshot(entity),
+    enemyTargetPreference: getEnemyTargetPreferenceSnapshot(entity),
+    attackRange: getAttackRangeSnapshot(entity),
+    targetDecisionReason: getTargetDecisionReason(entity),
   });
 }
 
@@ -705,6 +725,26 @@ function didPositionChange(a: Position, b: Position): boolean {
 
 function getCurrentTargetId(entity: GameEntity): string | null | undefined {
   return "currentTargetId" in entity ? entity.currentTargetId : undefined;
+}
+
+function getArchetypeId(entity: GameEntity) {
+  return entity.kind === "enemy" ? entity.archetypeId : undefined;
+}
+
+function getEnemyCombatStyleSnapshot(entity: GameEntity) {
+  return entity.kind === "enemy" ? getEnemyCombatStyle(entity) : undefined;
+}
+
+function getEnemyTargetPreferenceSnapshot(entity: GameEntity) {
+  return entity.kind === "enemy" ? getEnemyTargetPreference(entity) : undefined;
+}
+
+function getAttackRangeSnapshot(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? getEnemyAttackRange(entity) : undefined;
+}
+
+function getTargetDecisionReason(entity: GameEntity) {
+  return entity.kind === "enemy" ? entity.targetDecisionReason : undefined;
 }
 
 function getCommandPriority(entity: GameEntity): CommandPriority | undefined {

@@ -5,6 +5,7 @@ import type {
   Companion,
   Enemy,
   EnemyAggressionMode,
+  EnemyArchetypeId,
   EnemyType,
   EntityState,
   GameEntity,
@@ -16,6 +17,7 @@ import type {
 } from "./types";
 import { MOVEMENT_STEP_TICK_SCALE } from "./simulationTiming";
 import { createEmptyCompanionEquipment } from "./equipmentTypes";
+import { getEnemyArchetype } from "./enemyArchetypes";
 
 export const MOVEMENT_STEP_DISTANCE = 0.455 * MOVEMENT_STEP_TICK_SCALE;
 export const ENEMY_MOVEMENT_STEP_DISTANCE = 0.58 * MOVEMENT_STEP_TICK_SCALE;
@@ -40,20 +42,23 @@ type CreateResourceOptions = {
 };
 
 type CreateEnemyOptions = {
+  archetypeId?: EnemyArchetypeId;
   level?: number;
   xpReward?: number;
   maxHealth?: number;
   attackCooldownMs?: number;
+  attackRange?: number;
   enemyType?: EnemyType;
 };
 
 export function createEnemy(
   id: string,
   position: Position,
-  aggressionMode: EnemyAggressionMode = "passive",
+  aggressionMode?: EnemyAggressionMode,
   options: CreateEnemyOptions = {},
 ): Enemy {
-  const maxHealth = options.maxHealth ?? STARTING_ENEMY_HEALTH;
+  const archetype = getEnemyArchetype(options.archetypeId);
+  const maxHealth = options.maxHealth ?? archetype?.maxHealth ?? STARTING_ENEMY_HEALTH;
 
   return {
     id,
@@ -64,12 +69,14 @@ export function createEnemy(
     maxHealth,
     lastAttackAt: 0,
     currentTargetId: null,
-    aggressionMode,
+    aggressionMode: aggressionMode ?? archetype?.temperament ?? "passive",
+    archetypeId: options.archetypeId,
     enemyType: options.enemyType,
     homePosition: position,
-    level: options.level ?? STARTING_ENEMY_LEVEL,
-    xpReward: options.xpReward,
-    attackCooldownMs: options.attackCooldownMs,
+    level: options.level ?? archetype?.level ?? STARTING_ENEMY_LEVEL,
+    xpReward: options.xpReward ?? archetype?.xpReward,
+    attackCooldownMs: options.attackCooldownMs ?? archetype?.attackCooldownMs,
+    attackRange: options.attackRange ?? archetype?.attackRange,
   };
 }
 

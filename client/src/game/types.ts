@@ -17,7 +17,50 @@ export type EntityState =
 
 export type EntityKind = "companion" | "enemy" | "resource" | "npc";
 
-export type EnemyAggressionMode = "passive" | "aggressive";
+export type EnemyTemperament = "passive" | "aggressive";
+
+export type EnemyAggressionMode = EnemyTemperament;
+
+export type EnemyCombatStyle = "melee" | "ranged" | "support";
+
+export type EnemyTargetPreference = "closest" | "leader" | "lowestHealth";
+
+export type EnemyArchetypeId =
+  | "slime"
+  | "cave_bat"
+  | "forest_spider"
+  | "goblin_scout"
+  | "goblin_thrower"
+  | "bog_imp"
+  | "stone_crawler"
+  | "thorn_shaman"
+  | "ash_wisp"
+  | "mossling"
+  | "wolf"
+  | "orc";
+
+export type EnemyArchetypeDefinition = {
+  id: EnemyArchetypeId;
+  displayName: string;
+  temperament: EnemyTemperament;
+  combatStyle: EnemyCombatStyle;
+  targetPreference: EnemyTargetPreference;
+  level: number;
+  maxHealth: number;
+  attackCooldownMs: number;
+  xpReward?: number;
+  detectionRange: number;
+  attackRange: number;
+};
+
+export type EnemyTargetDecisionReason =
+  | "closest"
+  | "leader"
+  | "lowest_health"
+  | "passive_no_auto_target"
+  | "outside_detection"
+  | "outside_leash"
+  | "no_valid_target";
 
 export type EnemyType = "wolf" | "orc";
 
@@ -544,6 +587,11 @@ export type DebugTelemetryEntitySnapshot = {
   state: EntityState;
   position: Position;
   currentTargetId?: string | null;
+  archetypeId?: EnemyArchetypeId;
+  enemyCombatStyle?: EnemyCombatStyle;
+  enemyTargetPreference?: EnemyTargetPreference;
+  attackRange?: number;
+  targetDecisionReason?: EnemyTargetDecisionReason;
   commandPriority?: CommandPriority;
   characterLevel?: number;
   characterXp?: number;
@@ -581,6 +629,11 @@ export type DebugTelemetryEvent = {
   positionsAfterTransition?: Record<string, Position>;
   targetId?: string | null;
   previousTargetId?: string | null;
+  archetypeId?: EnemyArchetypeId;
+  enemyCombatStyle?: EnemyCombatStyle;
+  enemyTargetPreference?: EnemyTargetPreference;
+  attackRange?: number;
+  targetDecisionReason?: EnemyTargetDecisionReason;
   amount?: number;
   xpAmount?: number;
   baseXpAmount?: number;
@@ -781,6 +834,7 @@ export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  archetypeId?: EnemyArchetypeId;
   enemyType?: EnemyType;
   homePosition: Position;
   roamTargetPosition?: Position | null;
@@ -789,6 +843,8 @@ export type Enemy = LivingEntity & {
   level: number;
   xpReward?: number;
   attackCooldownMs?: number;
+  attackRange?: number;
+  targetDecisionReason?: EnemyTargetDecisionReason;
 };
 
 export type Companion = LivingEntity & {

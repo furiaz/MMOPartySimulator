@@ -24,14 +24,29 @@ import {
 import type {
   ActiveTeleport,
   Companion,
+  EnemyArchetypeId,
   DebugMapId,
   DebugTeleportPoint,
   GameEntity,
   Position,
 } from "./types";
 
-const MAP_TWO_ENEMY_HEALTH = 6;
-const MAP_TWO_ENEMY_ATTACK_COOLDOWN_MS = 1330;
+const MAP_ONE_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
+  "slime",
+  "cave_bat",
+  "forest_spider",
+  "goblin_scout",
+  "bog_imp",
+  "wolf",
+];
+const MAP_TWO_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
+  "goblin_thrower",
+  "stone_crawler",
+  "thorn_shaman",
+  "ash_wisp",
+  "mossling",
+  "orc",
+];
 
 export function triggerMapTeleport(
   state: GameState,
@@ -367,19 +382,22 @@ function getMapEntities(
     mapId === MAP_TWO_ID ? mapTwoResourceStartData : mapOneResourceStartData;
 
   for (const enemyId of enemyIds) {
+    const enemyIndex = enemyIds.indexOf(enemyId);
     const position =
-      enemyStartPositions[enemyIds.indexOf(enemyId)] ?? enemyStartPositions[0];
+      enemyStartPositions[enemyIndex] ?? enemyStartPositions[0];
     entities[enemyId] = createEnemy(
       enemyId,
       position,
-      "aggressive",
+      undefined,
       mapId === MAP_TWO_ID
         ? {
-            maxHealth: MAP_TWO_ENEMY_HEALTH,
-            attackCooldownMs: MAP_TWO_ENEMY_ATTACK_COOLDOWN_MS,
+            archetypeId: getMapEnemyArchetype(MAP_TWO_ENEMY_ARCHETYPES, enemyIndex),
             enemyType: "orc",
           }
-        : { enemyType: "wolf" },
+        : {
+            archetypeId: getMapEnemyArchetype(MAP_ONE_ENEMY_ARCHETYPES, enemyIndex),
+            enemyType: "wolf",
+          },
     );
   }
 
@@ -393,6 +411,13 @@ function getMapEntities(
   }
 
   return entities;
+}
+
+function getMapEnemyArchetype(
+  archetypeIds: EnemyArchetypeId[],
+  enemyIndex: number,
+): EnemyArchetypeId {
+  return archetypeIds[enemyIndex % archetypeIds.length] ?? archetypeIds[0];
 }
 
 function getPreservedCompanions(state: GameState): Record<string, GameEntity> {

@@ -9,7 +9,19 @@ import {
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity } from "./entityGuards";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
-import type { AutonomousEntity, Enemy, GameEntity, Position } from "./types";
+import { getPartyLeader } from "./partySystem";
+import {
+  getEnemyDetectionRange as getArchetypeDetectionRange,
+  getEnemyTargetPreference,
+  getEnemyTemperament,
+} from "./enemyArchetypes";
+import type {
+  AutonomousEntity,
+  Enemy,
+  EnemyTargetDecisionReason,
+  GameEntity,
+  Position,
+} from "./types";
 
 const ENEMY_DETECTION_RANGE = 5;
 const ENEMY_ROAM_LEASH_DISTANCE = 4;
@@ -21,6 +33,11 @@ const ENEMY_ROAM_IDLE_MAX_MS = 3000;
 const ENEMY_COMBAT_RETAIN_RANGE = 1;
 const ROAM_TARGET_REACHED_DISTANCE = 0.1;
 const ENEMY_WANDER_ATTEMPTS = 5;
+
+type TargetSearchResult = {
+  target?: AutonomousEntity;
+  reason: EnemyTargetDecisionReason;
+};
 
 export function updateEnemyAISystem(state: GameState): GameState {
   let nextState = state;
@@ -69,15 +86,19 @@ export function updateEnemyAISystem(state: GameState): GameState {
       continue;
     }
 
-    if (entity.aggressionMode === "passive") {
-      nextState = updateEnemyWander(nextState, entity);
+    if (getEnemyTemperament(entity) === "passive") {
+      const reasonedEnemy = withTargetDecisionReason(entity, "passive_no_auto_target");
+      nextState = updateEntity(nextState, reasonedEnemy);
+      nextState = updateEnemyWander(nextState, reasonedEnemy);
       continue;
     }
 
-    const target = findClosestTarget(entity, Object.values(nextState.entities));
+    const { target, reason } = findPreferredTarget(nextState, entity);
 
     if (!target) {
-      nextState = updateEnemyWander(nextState, entity);
+      const reasonedEnemy = withTargetDecisionReason(entity, reason);
+      nextState = updateEntity(nextState, reasonedEnemy);
+      nextState = updateEnemyWander(nextState, reasonedEnemy);
       continue;
     }
 
@@ -85,6 +106,7 @@ export function updateEnemyAISystem(state: GameState): GameState {
       ...entity,
       state: "attack",
       currentTargetId: target.id,
+      targetDecisionReason: reason,
     };
 
     nextState = updateEntity(nextState, updatedEnemy);
@@ -119,31 +141,100 @@ function clearEnemyTarget(enemy: Enemy, now = Date.now()): Enemy {
   };
 }
 
-function findClosestTarget(
+function findPreferredTarget(
+  state: GameState,
   enemy: Enemy,
-  entities: GameEntity[],
-): GameEntity | undefined {
-  let closestTarget: GameEntity | undefined;
-  let closestDistance = Infinity;
+): TargetSearchResult {
+  const candidates = getValidTargetCandidates(enemy, Object.values(state.entities));
 
-  for (const entity of entities) {
-    if (!isValidEnemyTarget(entity)) {
-      continue;
-    }
-
-    const distance = getDistanceSquared(enemy, entity);
-
-    if (
-      distance <= ENEMY_DETECTION_RANGE * ENEMY_DETECTION_RANGE &&
-      isInsideAttackLeash(enemy, entity.position) &&
-      distance < closestDistance
-    ) {
-      closestTarget = entity;
-      closestDistance = distance;
-    }
+  if (candidates.length === 0) {
+    return getNoTargetReason(enemy, Object.values(state.entities));
   }
 
-  return closestTarget;
+  const preference = getEnemyTargetPreference(enemy);
+
+  if (preference === "leader") {
+    const leader = getPartyLeader(state);
+
+    if (leader && candidates.some((candidate) => candidate.id === leader.id)) {
+      return { target: leader, reason: "leader" };
+    }
+
+    return {
+      target: findClosestCandidate(enemy, candidates),
+      reason: "closest",
+    };
+  }
+
+  if (preference === "lowestHealth") {
+    return {
+      target: findLowestHealthCandidate(enemy, candidates),
+      reason: "lowest_health",
+    };
+  }
+
+  return {
+    target: findClosestCandidate(enemy, candidates),
+    reason: "closest",
+  };
+}
+
+function getValidTargetCandidates(
+  enemy: Enemy,
+  entities: GameEntity[],
+): AutonomousEntity[] {
+  const detectionRange = getArchetypeDetectionRange(enemy, ENEMY_DETECTION_RANGE);
+
+  return entities.filter(
+    (entity): entity is AutonomousEntity =>
+      isValidEnemyTarget(entity) &&
+      getDistanceSquared(enemy, entity) <= detectionRange * detectionRange &&
+      isInsideAttackLeash(enemy, entity.position),
+  );
+}
+
+function getNoTargetReason(
+  enemy: Enemy,
+  entities: GameEntity[],
+): TargetSearchResult {
+  const detectionRange = getArchetypeDetectionRange(enemy, ENEMY_DETECTION_RANGE);
+  const validTargets = entities.filter(isValidEnemyTarget);
+
+  if (
+    validTargets.some(
+      (entity) =>
+        getDistanceSquared(enemy, entity) <= detectionRange * detectionRange &&
+        !isInsideAttackLeash(enemy, entity.position),
+    )
+  ) {
+    return { reason: "outside_leash" };
+  }
+
+  if (validTargets.length > 0) {
+    return { reason: "outside_detection" };
+  }
+
+  return { reason: "no_valid_target" };
+}
+
+function findClosestCandidate(
+  enemy: Enemy,
+  candidates: AutonomousEntity[],
+): AutonomousEntity | undefined {
+  return candidates.sort(
+    (a, b) => getDistanceSquared(enemy, a) - getDistanceSquared(enemy, b),
+  )[0];
+}
+
+function findLowestHealthCandidate(
+  enemy: Enemy,
+  candidates: AutonomousEntity[],
+): AutonomousEntity | undefined {
+  return candidates.sort(
+    (a, b) =>
+      a.health / a.maxHealth - b.health / b.maxHealth ||
+      getDistanceSquared(enemy, a) - getDistanceSquared(enemy, b),
+  )[0];
 }
 
 function isValidEnemyTarget(entity: GameEntity): entity is AutonomousEntity {
@@ -306,6 +397,18 @@ function canKeepCurrentTarget(enemy: Enemy, target: AutonomousEntity): boolean {
     isInsideAttackLeash(enemy, target.position) ||
     getDistance(enemy.position, target.position) <= ENEMY_COMBAT_RETAIN_RANGE
   );
+}
+
+function withTargetDecisionReason(
+  enemy: Enemy,
+  reason: EnemyTargetDecisionReason,
+): Enemy {
+  return enemy.targetDecisionReason === reason
+    ? enemy
+    : {
+        ...enemy,
+        targetDecisionReason: reason,
+      };
 }
 
 function getDistance(from: Position, to: Position): number {

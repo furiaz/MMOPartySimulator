@@ -23,6 +23,7 @@ export type {
   DebugTelemetryTick,
   Enemy,
   EnemyAggressionMode,
+  EnemyArchetypeId,
   EnemyType,
   EntityKind,
   EntityState,

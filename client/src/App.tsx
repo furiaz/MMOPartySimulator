@@ -180,14 +180,19 @@ function getResourceTooltip(resource: ResourceEntity): string {
 
 function getEnemyTooltip(enemy: Enemy): string {
   return [
-    enemy.enemyType ? `Enemy ${enemy.enemyType}` : "Enemy",
+    enemy.archetypeId
+      ? `Archetype ${enemy.archetypeId}`
+      : enemy.enemyType
+        ? `Enemy ${enemy.enemyType}`
+        : "Enemy",
     `Level ${enemy.level}`,
     `XP ${enemy.xpReward ?? "auto"}`,
     `HP ${enemy.health}/${enemy.maxHealth}`,
     `State ${enemy.state}`,
     `Target ${formatTargetId(enemy)}`,
     `Aggression ${enemy.aggressionMode}`,
-  ].join("\n");
+    enemy.targetDecisionReason ? `Decision ${enemy.targetDecisionReason}` : null,
+  ].filter(Boolean).join("\n");
 }
 
 function getPartyMarkerClass(member: Companion, leaderId: string): string {
@@ -417,9 +422,9 @@ function App() {
   const leader = partyMembers.find(
     (member) => member.id === gameState.partyLeaderId,
   ) ?? partyMembers[0];
-  const enemies = enemyIds
-    .map((id) => gameState.entities[id] as Enemy | undefined)
-    .filter((enemy): enemy is Enemy => Boolean(enemy));
+  const enemies = Object.values(gameState.entities).filter(
+    (entity): entity is Enemy => entity.kind === "enemy",
+  );
   const resources = resourceIds
     .map((id) => gameState.entities[id] as ResourceEntity | undefined)
     .filter((resource): resource is ResourceEntity => Boolean(resource));
@@ -1437,7 +1442,7 @@ function App() {
                 <EntityDebugLabel
                   name={`E${index + 1}`}
                   entity={enemy}
-                  detail={`HP ${enemy.health} Aggro ${enemy.aggressionMode}`}
+                  detail={`HP ${enemy.health} ${enemy.archetypeId ?? enemy.aggressionMode}`}
                   isVisible={showEntityInfo}
                 />
                 {hasHealthBar(enemy) ? <HealthBar entity={enemy} /> : null}

@@ -34,6 +34,7 @@ import {
   getGridDistance,
 } from "./positionUtils";
 import { isEnemyEntity } from "./entityGuards";
+import { getEnemyAttackRange } from "./enemyArchetypes";
 import type {
   CombatEntity,
   Enemy,
@@ -202,7 +203,7 @@ export function updateAttackSystem(
       nextState,
       currentAttacker,
       target.position,
-      ATTACK_RANGE,
+      getAttackRange(currentAttacker),
       {
         allowPartyPassThrough: true,
         maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
@@ -353,7 +354,7 @@ function isLiveCombatTarget(
 }
 
 function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
-  return getDistance(attacker.position, target.position) <= ATTACK_RANGE;
+  return getDistance(attacker.position, target.position) <= getAttackRange(attacker);
 }
 
 function canAttack(entity: CombatEntity, now: number): boolean {
@@ -434,7 +435,8 @@ function getFinalStepAttackPosition(
   }
 
   const euclideanDistance = getEuclideanDistance(attacker.position, target.position);
-  const gap = euclideanDistance - ATTACK_RANGE;
+  const attackRange = getAttackRange(attacker);
+  const gap = euclideanDistance - attackRange;
 
   if (gap <= 0 || gap > FINAL_STEP_ATTACK_DISTANCE) {
     return null;
@@ -451,8 +453,8 @@ function getFinalStepAttackPosition(
   }
 
   const finalPosition = {
-    x: target.position.x + (direction.x / directionLength) * ATTACK_RANGE,
-    y: target.position.y + (direction.y / directionLength) * ATTACK_RANGE,
+    x: target.position.x + (direction.x / directionLength) * attackRange,
+    y: target.position.y + (direction.y / directionLength) * attackRange,
   };
 
   if (
@@ -464,6 +466,10 @@ function getFinalStepAttackPosition(
   }
 
   return finalPosition;
+}
+
+function getAttackRange(attacker: GameEntity): number {
+  return isEnemy(attacker) ? getEnemyAttackRange(attacker) : ATTACK_RANGE;
 }
 
 function setCombatSlot(

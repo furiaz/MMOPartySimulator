@@ -39,6 +39,44 @@ describe("enemy attack leash movement", () => {
     expect(nextEnemy.state).toBe("idle");
     expect(nextEnemy.currentTargetId).toBeNull();
   });
+
+  it("lets passive slime archetypes fight back after being attacked", () => {
+    const companion = {
+      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      archetypeId: "slime",
+    });
+
+    const nextState = updateAttackSystem(createState([companion, enemy]));
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBe(enemy.health - 1);
+    expect(nextEnemy.state).toBe("attack");
+    expect(nextEnemy.currentTargetId).toBe(companion.id);
+  });
+
+  it("lets ranged enemy archetypes attack from numeric range without closing to melee", () => {
+    const companion = createIdleCompanion("leader", { x: 4, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+        archetypeId: "goblin_thrower",
+      }),
+      state: "attack" as const,
+      currentTargetId: companion.id,
+    };
+
+    const nextState = updateAttackSystem(createState([companion, enemy]));
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+    const nextCompanion = nextState.entities[companion.id];
+
+    expect(nextEnemy.position).toEqual(enemy.position);
+    expect(nextCompanion).toMatchObject({
+      health: companion.health - 1,
+    });
+  });
 });
 
 function createState(entities: GameEntity[]) {

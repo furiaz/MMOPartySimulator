@@ -1,4 +1,4 @@
-import type { DebugMapId, GameEntity } from "./game";
+import type { DebugMapId, EnemyArchetypeId, GameEntity } from "./game";
 import { NPC_ICON_SRC, RESOURCE_ICON_SRC } from "./assetIcons";
 
 export type SpriteAnimationAsset = {
@@ -47,6 +47,7 @@ export type MapTileVisualAsset = {
 const testCharacterBasePath = "/Asserts/Characters/Test-Character";
 const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
 const testEnemyTwoBasePath = "/Asserts/Characters/Test-Enemy2";
+const prototypeEnemyBasePath = "/Asserts/Characters/Prototype-Enemies";
 const testNpcBasePath = "/Asserts/Characters/Test-NPC";
 const defaultFrameDurationMs = 100;
 
@@ -84,6 +85,37 @@ function createEnemyTwoDirectionalFrames() {
 }
 
 const enemyTwoDirectionalFrames = createEnemyTwoDirectionalFrames();
+
+function createStaticEnemySprite(src: string): SpriteVisualAsset {
+  const frame = createSingleFrame(src);
+
+  return {
+    kind: "sprite",
+    animations: {
+      idle: {
+        southEast: frame,
+        south: frame,
+      },
+      run: {
+        southEast: frame,
+        south: frame,
+      },
+    },
+  };
+}
+
+const prototypeEnemyVisualAssets: Partial<Record<EnemyArchetypeId, SpriteVisualAsset>> = {
+  slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
+  cave_bat: createStaticEnemySprite(`${prototypeEnemyBasePath}/cave-bat-se.png`),
+  forest_spider: createStaticEnemySprite(`${prototypeEnemyBasePath}/forest-spider-se.png`),
+  goblin_scout: createStaticEnemySprite(`${prototypeEnemyBasePath}/goblin-scout-se.png`),
+  goblin_thrower: createStaticEnemySprite(`${prototypeEnemyBasePath}/goblin-thrower-se.png`),
+  bog_imp: createStaticEnemySprite(`${prototypeEnemyBasePath}/bog-imp-se.png`),
+  stone_crawler: createStaticEnemySprite(`${prototypeEnemyBasePath}/stone-crawler-se.png`),
+  thorn_shaman: createStaticEnemySprite(`${prototypeEnemyBasePath}/thorn-shaman-se.png`),
+  ash_wisp: createStaticEnemySprite(`${prototypeEnemyBasePath}/ash-wisp-se.png`),
+  mossling: createStaticEnemySprite(`${prototypeEnemyBasePath}/mossling-se.png`),
+};
 
 export const entityVisualAssets = {
   testCharacter: {
@@ -232,6 +264,22 @@ export function getEntityVisualAsset(
     return entity.npcRole === "dog"
       ? entityVisualAssets.dog
       : entityVisualAssets.npc;
+  }
+
+  const prototypeEnemyVisual = entity.archetypeId
+    ? prototypeEnemyVisualAssets[entity.archetypeId]
+    : undefined;
+
+  if (prototypeEnemyVisual) {
+    return prototypeEnemyVisual;
+  }
+
+  if (entity.archetypeId === "wolf") {
+    return entityVisualAssets.enemy;
+  }
+
+  if (entity.archetypeId === "orc") {
+    return entityVisualAssets.enemy2;
   }
 
   return currentMapId === "map-2"

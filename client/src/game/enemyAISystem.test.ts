@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
@@ -41,6 +42,109 @@ describe("enemy AI aggro and roaming", () => {
   it("keeps passive enemies from acquiring nearby targets", () => {
     const leader = createIdleCompanion("leader", { x: 1, y: 0 });
     const enemy = createEnemy("enemy", { x: 0, y: 0 });
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+  });
+
+  it("keeps passive slime archetypes from acquiring nearby targets", () => {
+    const leader = createIdleCompanion("leader", { x: 1, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      archetypeId: "slime",
+    });
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+      targetDecisionReason: "passive_no_auto_target",
+    });
+  });
+
+  it("uses wolf lowest-health targeting inside detection range and attack leash", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 0 });
+    const injured = {
+      ...createIdleCompanion("injured", { x: 4, y: 0 }),
+      health: 2,
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      archetypeId: "wolf",
+    });
+
+    const nextState = updateEnemyAISystem(createState([leader, injured, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: injured.id,
+      targetDecisionReason: "lowest_health",
+    });
+  });
+
+  it("uses leader targeting when an archetype prefers the party leader", () => {
+    const previousPreference = ENEMY_ARCHETYPES.wolf.targetPreference;
+    ENEMY_ARCHETYPES.wolf.targetPreference = "leader";
+
+    try {
+      const leader = createIdleCompanion("leader", { x: 4, y: 0 });
+      const closerCompanion = createIdleCompanion("closer", { x: 2, y: 0 });
+      const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+        archetypeId: "wolf",
+      });
+
+      const nextState = updateEnemyAISystem(
+        createState([leader, closerCompanion, enemy]),
+      );
+
+      expect(nextState.entities[enemy.id]).toMatchObject({
+        state: "attack",
+        currentTargetId: leader.id,
+        targetDecisionReason: "leader",
+      });
+    } finally {
+      ENEMY_ARCHETYPES.wolf.targetPreference = previousPreference;
+    }
+  });
+
+  it("falls back from leader targeting when the leader is not valid", () => {
+    const previousPreference = ENEMY_ARCHETYPES.wolf.targetPreference;
+    ENEMY_ARCHETYPES.wolf.targetPreference = "leader";
+
+    try {
+      const distantLeader = createIdleCompanion("leader", { x: 9, y: 0 });
+      const closerCompanion = createIdleCompanion("closer", { x: 2, y: 0 });
+      const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+        archetypeId: "wolf",
+      });
+
+      const nextState = updateEnemyAISystem(
+        createState([distantLeader, closerCompanion, enemy]),
+      );
+
+      expect(nextState.entities[enemy.id]).toMatchObject({
+        state: "attack",
+        currentTargetId: closerCompanion.id,
+        targetDecisionReason: "closest",
+      });
+    } finally {
+      ENEMY_ARCHETYPES.wolf.targetPreference = previousPreference;
+    }
+  });
+
+  it("clears ranged archetype targets outside attack leash", () => {
+    const leader = createIdleCompanion("leader", { x: 10, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 7, y: 0 }, undefined, {
+        archetypeId: "goblin_thrower",
+      }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+      homePosition: { x: 0, y: 0 },
+    };
 
     const nextState = updateEnemyAISystem(createState([leader, enemy]));
 
