@@ -160,6 +160,28 @@ Ticket titles must use the format:
 Future idea cards may use normal descriptive titles while they are in Dragons Vault or Todo.
 When a future idea is promoted into Design Stage or Implementation scope, rename it to the next ticket number before implementation work begins.
 
+## Execution Plan Workflow
+
+When the user asks for an execution plan:
+
+- Create a clear implementation plan first.
+- After the plan is created, automatically create a GitHub Issue ticket from that plan.
+- Use the next available ticket number in this title format:
+  - [Ticket 0001]: Short descriptive title
+- Add the issue to the GitHub Project board.
+- Move the issue to Design Stage.
+- Apply an appropriate label based on scope, such as feature, bug, documentation, enhancement, or New System.
+
+When the user later asks to execute an approved ticket or plan:
+
+- Move the GitHub Project item to In Progress before implementation begins.
+- Keep implementation scoped to the ticket.
+- Reference the ticket number in the work summary.
+- Run the verification plan from the ticket.
+- After implementation and verification are complete, move the GitHub Project item to Manual Review.
+- Do not move the ticket to Done unless the user explicitly approves completion after review.
+
+
 
 ## Rollback / Traceability Rules
 
