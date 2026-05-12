@@ -32,8 +32,6 @@ React must not contain core simulation rules.
 
 ## Folder Structure
 
-Current game logic is organized as flat TypeScript modules under `client/src/game/`.
-
 Current files include:
 
 - `attackSlots.ts`
@@ -44,31 +42,52 @@ Current files include:
 - `debugTelemetry.ts`
 - `debugTools.ts`
 - `defendSystem.ts`
+- `defenderCombat.ts`
+- `dropSystem.ts`
+- `dropTables.ts`
 - `enemyAISystem.ts`
 - `entities.ts`
+- `entityGuards.ts`
+- `equipmentRules.ts`
+- `equipmentSystem.ts`
+- `equipmentTypes.ts`
 - `explorationSystem.ts`
 - `followSystem.ts`
 - `gameLoop.ts`
 - `gatherSystem.ts`
+- `healingFountainSystem.ts`
 - `index.ts`
+- `inventory.ts`
+- `items.ts`
 - `leveling.ts`
+- `merchant.ts`
 - `movementCadence.ts`
+- `movementState.ts`
 - `navigation.ts`
 - `partyFormationSystem.ts`
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
+- `poiSystem.ts`
+- `poiTypes.ts`
+- `positionUtils.ts`
+- `questSystem.ts`
+- `questTypes.ts`
 - `roleProfiles.ts`
 - `roleSystem.ts`
+- `simulationTiming.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
-- `skills.ts`
 - `skillSystem.ts`
+- `skillTargeting.ts`
+- `skills.ts`
 - `state.ts`
 - `targetSelection.ts`
 - `teleportSystem.ts`
 - `types.ts`
 - `updateGame.ts`
+- `wallet.ts`
+
 
 Do not restructure the project unless explicitly requested.
 
@@ -86,7 +105,8 @@ Current entity kinds:
 type EntityKind = "companion" | "enemy" | "resource" | "npc";
 ```
 
-NPC entities are prototype placeholders for safe hub map visuals. They do not implement dialogue, shops, quests, crafting, recruitment, or interaction behavior.
+NPC entities are prototype placeholders for safe hub map visuals. Current prototype NPC behavior is limited to Quest Giver quest interaction and Merchant quick exchange. NPCs do not implement dialogue, full shops, crafting, recruitment, smithing, or relationship behavior.
+
 
 
 The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
@@ -227,7 +247,8 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick, party leader id, leader handoff ticks, leader intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick, party leader id, leader handoff ticks, leader intent, prototype quest state, global/local POI intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, and debug telemetry.
+
 
 Current movement planning fields include:
 
@@ -484,6 +505,58 @@ Leader intent is used by party movement, role behavior, combat targeting, explor
 
 Leader intent may be cleared when a point of interest is reached, combat ends, or a map transition completes.
 
+## Prototype Quests and POIs
+
+Prototype quest definitions live in `questSystem.ts` and quest types live in `questTypes.ts`.
+
+Quest state is stored on `GameState` as:
+
+```ts
+quests: Record<QuestId, QuestState>;
+```
+
+Current quest ids:
+
+```ts
+type QuestId =
+  | "clear_the_shore"
+  | "gather_expedition_supplies"
+  | "scout_the_northern_road"
+  | "threat_beyond_the_pass";
+```
+
+Current quest statuses:
+
+```ts
+type QuestStatus =
+  | "locked"
+  | "available"
+  | "active"
+  | "ready_to_turn_in"
+  | "completed";
+```
+
+POI selection types live in `poiTypes.ts`.
+
+Current POI categories:
+
+```ts
+type PoiCategory =
+  | "npc"
+  | "quest"
+  | "combat"
+  | "resource"
+  | "teleport"
+  | "exploration"
+  | "idle"
+  | "event";
+```
+
+`poiSystem.ts` selects global quest intent and local map targets for auto-mode behavior. It may set leader intent toward quest givers, combat targets, resources, exploration points, idle hub points, or prototype teleports.
+
+The POI system must remain a prototype debug-map guidance layer and must not become the final world-routing, dialogue, or quest content pipeline unless explicitly requested.
+
+
 ---
 
 ## Systems
@@ -493,6 +566,8 @@ Systems operate on `GameState`.
 Current systems include:
 
 - Teleport System
+- POI System
+- Healing Fountain System
 - Role System
 - Skill System
 - Party Formation System
@@ -501,9 +576,11 @@ Current systems include:
 - Follow System
 - Enemy AI System
 - Attack System
+- Drop System
 - Gathering System
 - Party Protection System
 - Debug Telemetry
+
 
 Each system reads `GameState`, updates entities through state helpers, runs during simulation ticks, and keeps behavior focused and simple.
 
@@ -519,24 +596,26 @@ The game loop runs continuously while enabled, executes systems in order, update
 
 Current high-level order:
 
-1. Clear expired skill runtime state
-2. Clear expired combat feedback
-3. Clear tick movement planning
-4. Advance simulation tick
-5. Update teleport system
-6. If teleport is active or map transition happened, record telemetry and stop the tick early
-7. If auto mode is enabled, update role behavior
-8. If auto mode is enabled, update prototype skills
-9. If auto mode is enabled or teleport POI movement is active, update party formation movement
-10. If auto mode is enabled, reserve exploration movement
-11. Update defender behavior
-12. If auto mode is enabled, update exploration
-13. Update follow behavior
-14. Update enemy AI
-15. Update attacks
+1. Advance simulation tick and clear expired combat feedback, skill runtime state, and tick movement planning
+2. Update teleport system
+3. If teleport is active or map transition happened, record telemetry and stop the tick early
+4. Update POI system
+5. Update healing fountain system
+6. If auto mode is enabled, update role behavior
+7. If auto mode is enabled, update prototype skills
+8. If leader intent, auto mode, or teleport POI movement is active, update party formation movement
+9. If auto mode is enabled, reserve exploration movement
+10. Update defender behavior
+11. If auto mode is enabled, update exploration
+12. Update follow behavior
+13. Update enemy AI
+14. Update attacks
+15. Update drop system
 16. Update gathering
 17. Update skill shield block positions
-18. Record debug telemetry
+18. Idle autonomous party members when no POI or leader intent is active
+19. Record debug telemetry
+
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, and reserved positions.
 
@@ -832,11 +911,11 @@ Gathering reduces durability.
 
 When durability reaches zero, quantity decreases, resource yield is routed through prototype inventory helpers, durability resets if quantity remains, and the resource becomes depleted when quantity reaches zero.
 
-## Prototype Inventory
+## Prototype Inventory, Wallet, Drops, and Merchant Exchange
 
 Prototype inventory game logic lives under `client/src/game/`.
 
-Current intended modules may include:
+Current inventory modules include:
 
 - `items.ts`
 - `inventory.ts`
@@ -845,48 +924,34 @@ Inventory state is stored on `GameState` as shared party state.
 
 Inventory is slot-based with a temporary starting capacity of 10 slots.
 
-Item definitions include:
+The shared prototype wallet is stored on `GameState` as `wallet`.
 
-- item id
-- display name
-- category
-- stack behavior
-- max stack size when stackable
+Wallet logic lives in `wallet.ts`.
 
-Current item categories are:
+Current currency id:
 
-- material
-- consumable
-- equipment
-- quest
-- event
-
-Inventory slots store item stacks.
-
-Inventory helper responsibilities include:
-
-- checking stack compatibility
-- adding items
-- removing items
-- counting items
-- checking available capacity
-- returning partial/full add results without silently deleting overflow
-
-Stacking rules:
-
-- materials stack to 250
-- consumables stack to 99
-- equipment does not stack
-- quest items can stack only if the item definition allows it
-- event items can stack only if the item definition allows it
+- `crowns`
 
 Currency does not use inventory slots.
 
-React UI may display inventory state and issue debug commands, but inventory rules must remain in game logic.
+Enemy drop logic lives in:
 
-This prototype inventory includes non-stacking equipment items that can move between shared inventory and companion equipment slots.
+- `dropTables.ts`
+- `dropSystem.ts`
 
-This prototype inventory does not include bank storage, ground loot, consumable item effects, selling, shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
+Drops roll by enemy type, create short-lived drop visual events, and route completed drops into shared inventory. Drops do not create persistent ground loot.
+
+Merchant quick exchange logic lives in `merchant.ts`.
+
+Current merchant behavior:
+
+- identifies Merchant NPCs by `npcRole: "merchant"`
+- finds eligible parts marked for quick exchange
+- removes eligible parts from shared inventory
+- adds Crowns to the shared wallet
+- records merchant and wallet telemetry
+
+This prototype inventory/wallet/drop/merchant layer does not include bank storage, persistent ground loot, consumable item effects, full selling, buying, shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
 
 
 ## Prototype Equipment
@@ -914,9 +979,18 @@ type EquipmentSlot =
   | "offhand"
   | "accessory1"
   | "accessory2";
+```
 
+Current equipment kinds are:
 
----
+```ts
+type EquipmentKind = "weapon" | "offhand" | "armor" | "accessory";
+```
+
+Equipment rules validate slot, class permission, both-hands occupancy, inventory removal, inventory return on unequip, and telemetry results.
+
+Equipment remains gameplay-facing data only. It must not require sprite swaps, weapon anchoring, paper-doll rendering, or visible attachment systems.
+
 
 ## Map Data
 
@@ -933,9 +1007,11 @@ type GameMap = {
   rows: number;
   walls: Position[];
   teleports: DebugTeleportPoint[];
+  healingFountains: HealingFountain[];
   navigationGrid?: NavigationGrid;
 };
 ```
+
 
 Current debug map ids:
 
@@ -949,7 +1025,8 @@ Current readable map names:
 - `map-1`: First Wild Map
 - `map-2`: Second Wild Map
 
-Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, display/debug names, and prototype teleport points.
+Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, display/debug names, and prototype teleport points.
+
 
 Map data is still development/prototype data and should not define final world content.
 
@@ -1064,7 +1141,7 @@ Simulation logic must not depend on sprite assets.
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, and map transitions.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, and merchant quick exchange results.
 
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
@@ -1128,14 +1205,15 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, party members, enemies, resources, sprite animation, combat feedback, skill visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view, party members, enemies, resources, NPCs, healing fountains, sprite animation, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, merchant quick exchange UI, XP and level progress, party size limit, debug controls, and debug telemetry export.
+
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
 
 ## Menu UI Technical Structure
 
-The React UI may include a main menu and submenu system for party overview, party management, and prototype inventory display.
+The React UI may include a main menu and submenu system for party overview, party management, prototype inventory display, and prototype quest display.
 
 Menu UI must remain in React components under `client/src/`.
 
@@ -1147,6 +1225,7 @@ React may:
 - track selected menu state
 - track selected companion UI state
 - track selected management section UI state
+- track selected quest UI state
 - call existing game command/helper functions for supported actions
 - display placeholder sections for future systems
 
@@ -1155,15 +1234,15 @@ React must not:
 - define core simulation behavior
 - duplicate role logic
 - invent new role values
-- define equipment rules, skills, formation, behavior settings, or advanced inventory rules inside React components
+- define equipment rules, skills, formation, behavior settings, quest rules, merchant rules, wallet rules, or advanced inventory rules inside React components
 - implement equipment UI beyond displaying game state and issuing commands to existing game logic unless explicitly requested
-
 
 Current intended main menu views:
 
 - Party
 - Party Management
 - Inventory
+- Quests
 
 Current intended Party Management sections:
 
@@ -1184,10 +1263,14 @@ type PartyMemberRole =
   | "support"
   | "gatherer"
   | "none";
+```
 
+The Quests view may display prototype quest state and objective progress from game state.
 
+The Inventory view may display wallet balance, but wallet and inventory rules must remain in game logic.
 
----
+Merchant UI may call existing merchant helper functions, but must not define exchange rules inside React.
+
 
 ## World Structure Future Work
 
@@ -1228,3 +1311,7 @@ Do not implement unless requested:
 - advanced support mechanics
 - production asset pipeline
 - final world content pipeline
+- full quest journal, dialogue system, quest reward economy, or production quest content beyond the prototype quest chain
+- full shop, selling, buying, and merchant economy beyond prototype quick exchange
+- persistent ground loot beyond prototype drop visual events and drop-to-inventory behavior
+- final POI/world-routing framework beyond debug-map POI guidance

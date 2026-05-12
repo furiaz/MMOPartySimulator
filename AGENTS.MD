@@ -179,6 +179,8 @@ When the user later asks to execute an approved ticket or plan:
 - Reference the ticket number in the work summary.
 - Run the verification plan from the ticket.
 - After implementation and verification are complete, move the GitHub Project item to Manual Review.
+- After implementation and verification are complete, apply the `Completed` label to the GitHub Issue.
+- Completion notes should list the main files changed, verification performed, and confirm the `Completed` label was applied to the GitHub Issue.
 - Do not move the ticket to Done unless the user explicitly approves completion after review.
 - Before implementation, verify the active issue title already starts with [Ticket 000N]:.
 - If it does not, stop and promote/rename the issue before editing code.

@@ -385,16 +385,15 @@ Current resource categories:
 
 Resources currently grant prototype item stacks into the shared party inventory.
 
-## Prototype Inventory
+## Prototype Inventory, Wallet, Drops, and Exchange
 
-The party has a shared prototype inventory.
+The party has a shared prototype inventory and wallet.
 
 Inventory is slot-based and belongs to the party, not individual companions.
 
 Current prototype inventory rules:
 
 - starting capacity is 10 slots
-- currency does not use inventory slots
 - item gains go directly into shared inventory for now
 - materials stack to 250
 - consumables stack to 99
@@ -411,15 +410,40 @@ Current item categories:
 - quest
 - event
 
-This is not the full inventory, equipment economy, wallet, shop, crafting, trading, bank, loot, or persistence system.
+The prototype wallet is shared by the party.
+
+Current wallet rules:
+
+- currency does not use inventory slots
+- current currency is Crowns
+- wallet balance may be shown in inventory, merchant UI, and temporary feedback
+- wallet changes are game-state data, not individual companion data
+
+Enemy drops currently use lightweight prototype drop tables.
+
+Current enemy drop behavior:
+
+- defeated enemies may roll material or equipment drops by enemy type
+- drop results use short-lived visual feedback before being routed into shared inventory
+- drops do not create persistent ground loot
+- inventory overflow may partially or fully reject dropped items
+
+Current quick exchange behavior:
+
+- the hub Merchant can exchange eligible enemy parts for Crowns
+- quick exchange removes eligible parts from shared inventory
+- quick exchange adds Crowns to the shared wallet
+- this is a prototype exchange action, not a full selling or shop economy
+
+This is not the full inventory, wallet, equipment economy, shop, crafting, trading, bank, loot, or persistence system.
 
 Do not implement these unless explicitly requested:
 
 - bank storage
-- ground loot
+- persistent ground loot
 - consumable item effects
-- selling
-- shops
+- full selling or buying flows
+- full shops
 - crafting
 - trading
 - save/load
@@ -469,7 +493,8 @@ Current prototype class equipment permissions:
 
 Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
 
-Do not implement generalized dual wield, arbitrary two-handed combinations, subclass equipment expansion, equipment visuals, full stat scaling, drops, merchant systems, gear recycling, or a full equipment economy unless explicitly requested.
+Do not implement generalized dual wield, arbitrary two-handed combinations, subclass equipment expansion, equipment visuals, full stat scaling, gear recycling, or a full equipment economy unless explicitly requested.
+
 
 
 
@@ -531,6 +556,8 @@ Current intended main menu entries:
 - Party
 - Party Management
 - Inventory
+- Quests
+
 
 The player is the party manager, not a physical character. Menus should support party oversight, planning, and decision-making without implying the player is a world entity.
 
@@ -606,8 +633,67 @@ It may show:
 - equipment item details such as slot, type, and simple stat modifiers
 - a shortcut from an equipment item to Party Management Equipment
 
-The Inventory menu must not implement the full inventory, equipment economy, wallet, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
+The Inventory menu may display the shared wallet balance, but must not implement the full inventory, equipment economy, full wallet UI, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
 
+
+### Quests Menu
+
+The Quests menu displays the current prototype quest log.
+
+It may show:
+
+- available, active, ready-to-turn-in, and completed prototype quests
+- current objective progress
+- simple quest status labels
+- placeholder quest detail and reward text
+
+The Quests menu must not implement a full quest journal, branching dialogue, quest reward economy, reputation, cutscenes, or production quest content unless explicitly requested.
+
+## Prototype Quests and POI Direction
+
+A lightweight prototype quest chain exists to guide idle/AFK progression through current debug maps.
+
+Current prototype quest statuses:
+
+- Locked
+- Available
+- Active
+- Ready to Turn In
+- Completed
+
+Current prototype quest objective types:
+
+- talk to POI
+- reach POI
+- defeat enemy count
+- gather item count
+- return to POI
+
+Current prototype quests:
+
+- Clear the Shore
+- Gather Expedition Supplies
+- Scout the Northern Road
+- Threat Beyond the Pass
+
+The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches the interaction range.
+
+Prototype POI direction may choose local targets for auto-mode behavior.
+
+Current POI categories:
+
+- NPC
+- Quest
+- Combat
+- Resource
+- Teleport
+- Exploration
+- Idle
+- Event
+
+POI direction may route the leader toward quest givers, combat targets, resources, exploration points, idle hub positions, or prototype teleports.
+
+This is a prototype guidance layer for current debug maps. It is not a full quest system, dialogue system, final POI framework, final zone-routing system, or production content pipeline.
 
 ---
 
@@ -965,10 +1051,14 @@ Current prototype hub:
 
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
-- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, and a clear exit to the first wild map.
-- Current placeholders may include Quest Giver, Merchant, Smith, and Dog.
+- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, and a clear exit to the first wild map.
+- Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and Test Hunter.
+- The Quest Giver supports the lightweight prototype quest chain only.
+- The Merchant supports prototype quick exchange of eligible enemy parts for Crowns only.
+- The healing fountain restores party member health when party members are in range.
 - The prototype hub should not spawn hostile enemies for now.
-- The prototype hub must not implement full town systems, interiors, quests, shops, crafting, dialogue, or NPC interaction unless explicitly requested.
+- The prototype hub must not implement full town systems, interiors, branching dialogue, shops, crafting, recruitment, smithing, or NPC relationship systems unless explicitly requested.
+
 
 
 The expedition expands outward into regions such as:
@@ -1099,6 +1189,10 @@ Temporary debug tools may include:
 - inspect movement/pathing issues
 - debug map transitions
 - export debug telemetry
+- inspect quest state and POI decisions
+- inspect wallet, drops, and merchant exchange telemetry
+- inspect healing fountain behavior
+
 
 Debug tools are not part of final gameplay.
 
@@ -1123,6 +1217,11 @@ Do not implement these unless explicitly requested:
 - networking/server authority
 - production asset pipeline
 - final world content pipeline
+- full quest journal, branching dialogue, and production quest content
+- full shop, selling, buying, and merchant economy beyond prototype quick exchange
+- persistent ground loot beyond prototype drop-to-inventory behavior
+- production POI framework beyond current debug-map guidance
+
 
 ---
 
