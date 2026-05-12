@@ -5,6 +5,7 @@ import type {
   Companion,
   Enemy,
   EnemyAggressionMode,
+  EnemyType,
   EntityState,
   GameEntity,
   NpcEntity,
@@ -43,6 +44,7 @@ type CreateEnemyOptions = {
   xpReward?: number;
   maxHealth?: number;
   attackCooldownMs?: number;
+  enemyType?: EnemyType;
 };
 
 export function createEnemy(
@@ -63,6 +65,7 @@ export function createEnemy(
     lastAttackAt: 0,
     currentTargetId: null,
     aggressionMode,
+    enemyType: options.enemyType,
     homePosition: position,
     level: options.level ?? STARTING_ENEMY_LEVEL,
     xpReward: options.xpReward,

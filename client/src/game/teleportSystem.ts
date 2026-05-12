@@ -268,6 +268,7 @@ function completeTeleport(state: GameState): GameState {
     defenderWaitTicksByLeaderId: {},
     defenderBlockedTicksByEntityId: {},
     skillVisualEvents: [],
+    dropVisualEvents: [],
     partyFormation: {
       phase: "idle",
       targetId: null,
@@ -376,8 +377,9 @@ function getMapEntities(
         ? {
             maxHealth: MAP_TWO_ENEMY_HEALTH,
             attackCooldownMs: MAP_TWO_ENEMY_ATTACK_COOLDOWN_MS,
+            enemyType: "orc",
           }
-        : {},
+        : { enemyType: "wolf" },
     );
   }
 

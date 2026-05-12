@@ -37,6 +37,7 @@ import type {
   PartyFormationState,
   PartyMemberRole,
   Position,
+  DropVisualEvent,
   SkillBindState,
   SkillCooldownState,
   SkillMarkState,
@@ -126,6 +127,7 @@ export type GameState = {
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
+  dropVisualEvents?: DropVisualEvent[];
   debugTelemetry?: DebugTelemetryState;
 };
 

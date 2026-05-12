@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
 import {
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
@@ -133,6 +134,7 @@ export function InventoryPanel({
           const itemKey = `${index}-${slot.itemId}`;
           const isEquipment = itemDefinition.category === "equipment";
           const isSelected = selectedItemKey === itemKey;
+          const iconSrc = INVENTORY_ITEM_ICON_SRC[slot.itemId];
 
           return (
             <div
@@ -144,10 +146,19 @@ export function InventoryPanel({
               title={getInventorySlotTitle(slot)}
             >
               <span className="inventory-slot-index">{index + 1}</span>
-              <span
-                className={getInventoryResourceShapeClass(slot.itemId)}
-                aria-hidden="true"
-              />
+              {iconSrc ? (
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="inventory-item-icon"
+                  src={iconSrc}
+                />
+              ) : (
+                <span
+                  className={getInventoryResourceShapeClass(slot.itemId)}
+                  aria-hidden="true"
+                />
+              )}
               <span className="inventory-slot-name">
                 {itemDefinition.displayName}
               </span>

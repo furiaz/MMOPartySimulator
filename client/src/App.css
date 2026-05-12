@@ -45,14 +45,20 @@
     #eef2f7;
 }
 
+.test-area.floor-wilderness {
+  background: #6c982e;
+}
+
 .entity-marker,
 .teleporter,
 .teleport-range,
 .enemy-aggro-range,
 .map-label-overlay,
+.floor-tile,
 .skill-link,
 .skill-shield-block,
 .skill-slash,
+.drop-visual,
 .combat-feedback,
 .dead-label,
 .depleted-label,
@@ -139,6 +145,39 @@
   border-radius: 999px;
   transform-origin: center;
   pointer-events: none;
+}
+
+.drop-visual {
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: 1px 0 0 5px;
+  border: 2px solid #334155;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #111827;
+  font-size: 13px;
+  font-weight: 900;
+  pointer-events: none;
+  transition: opacity 80ms linear, transform 80ms linear;
+}
+
+.drop-visual.material {
+  border-color: #047857;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.22);
+}
+
+.drop-visual.equipment {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.drop-visual-icon {
+  width: 22px;
+  height: 22px;
+  image-rendering: pixelated;
 }
 
 .teleporter {
@@ -454,6 +493,42 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
+.floor-tile {
+  z-index: 0;
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+.wall-tile.wall-wilderness {
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.wall-wilderness-image {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+  transform: translateX(-50%);
+  user-select: none;
+}
+
+.wall-wilderness-image.bush {
+  width: 42px;
+  height: 42px;
+}
+
+.wall-wilderness-image.tree {
+  width: 72px;
+  height: 72px;
+}
+
 .combat-feedback,
 .dead-label,
 .depleted-label {
@@ -632,7 +707,29 @@
   background: #15803d;
 }
 
-.resource.gatherer-target::before {
+.resource-image-entity {
+  width: 38px;
+  height: 38px;
+  margin: -1px;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.resource-image {
+  position: absolute;
+  inset: 0;
+  width: 38px;
+  height: 38px;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+.resource.gatherer-target::before,
+.resource-image-entity.gatherer-target::before {
   content: "";
   position: absolute;
   inset: -12px;
@@ -1032,7 +1129,8 @@
 
 .equipment-slot-picker button {
   display: grid;
-  gap: 4px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 3px 8px;
   min-width: 0;
   padding: 8px;
   text-align: left;
@@ -1063,6 +1161,13 @@
   font-size: 12px;
 }
 
+.equipment-slot-icon {
+  grid-row: span 2;
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
 .equipment-section-label {
   color: rgba(230, 240, 242, 0.72);
   font-size: 10px;
@@ -1089,6 +1194,20 @@
 .equipment-inventory-row {
   display: grid;
   gap: 8px;
+}
+
+.equipment-inventory-item-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.equipment-inventory-item-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  image-rendering: pixelated;
 }
 
 .equipment-inventory-row div {
@@ -1231,6 +1350,13 @@
   border-radius: 999px 999px 999px 0;
   background: #15803d;
   transform: rotate(-45deg);
+}
+
+.inventory-item-icon {
+  width: 32px;
+  height: 32px;
+  margin-top: 0;
+  image-rendering: pixelated;
 }
 
 .inventory-slot-name,

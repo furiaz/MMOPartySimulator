@@ -1,4 +1,5 @@
 import type { DebugMapId, GameEntity } from "./game";
+import { NPC_ICON_SRC, RESOURCE_ICON_SRC } from "./assetIcons";
 
 export type SpriteAnimationAsset = {
   frames: string[];
@@ -148,16 +149,16 @@ export const entityVisualAssets = {
   },
   resource: {
     wood: {
-      kind: "placeholder",
-      className: "resource wood",
+      kind: "image",
+      src: RESOURCE_ICON_SRC.wood,
     },
     ore: {
-      kind: "placeholder",
-      className: "resource ore",
+      kind: "image",
+      src: RESOURCE_ICON_SRC.ore,
     },
     herb: {
-      kind: "placeholder",
-      className: "resource herb",
+      kind: "image",
+      src: RESOURCE_ICON_SRC.herb,
     },
   },
   npc: {
@@ -180,7 +181,7 @@ export const entityVisualAssets = {
   testCharacter: SpriteVisualAsset;
   enemy: SpriteVisualAsset;
   enemy2: SpriteVisualAsset;
-  resource: Record<string, PlaceholderVisualAsset>;
+  resource: Record<string, ImageVisualAsset>;
   npc: PlaceholderVisualAsset;
   dog: PlaceholderVisualAsset;
   testBlade: ImageVisualAsset;
@@ -211,6 +212,15 @@ export function getEntityVisualAsset(
   }
 
   if (entity.kind === "npc") {
+    const npcIconSrc = NPC_ICON_SRC[entity.npcRole];
+
+    if (npcIconSrc) {
+      return {
+        kind: "image",
+        src: npcIconSrc,
+      };
+    }
+
     if (entity.npcRole === "test_blade") {
       return entityVisualAssets.testBlade;
     }

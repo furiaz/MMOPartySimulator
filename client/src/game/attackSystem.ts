@@ -27,6 +27,7 @@ import {
   isEnemyBound,
 } from "./skillRuntime";
 import { getEnemyAttackLeashDistance } from "./enemyAISystem";
+import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
   arePositionsEqual,
   getEuclideanDistance,
@@ -166,6 +167,12 @@ export function updateAttackSystem(
           nextState,
           updatedTarget,
           nextState.currentMapId,
+        );
+        nextState = handleEnemyDefeatedDrops(
+          nextState,
+          updatedTarget,
+          attackReadyAttacker.id,
+          now,
         );
       }
 

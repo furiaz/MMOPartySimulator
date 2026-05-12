@@ -1,6 +1,7 @@
 import { updateAttackSystem } from "./attackSystem";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { updateDropSystem } from "./dropSystem";
 import {
   reserveExploringPartyMemberNextTile,
   updateExplorationSystem,
@@ -79,6 +80,7 @@ export function updateGame(state: GameState): GameState {
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState);
   nextState = updateAttackSystem(nextState, movedEntityIds);
+  nextState = updateDropSystem(nextState);
   nextState = updateGatherSystem(nextState, movedEntityIds);
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);

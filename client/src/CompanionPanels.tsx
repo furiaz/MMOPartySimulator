@@ -1,5 +1,9 @@
 import { useState, type ReactNode } from "react";
 import {
+  EMPTY_EQUIPMENT_SLOT_ICON_SRC,
+  INVENTORY_ITEM_ICON_SRC,
+} from "./assetIcons";
+import {
   CLASS_DEFINITIONS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
@@ -451,6 +455,9 @@ function EquipmentManagementSection({
         {EQUIPMENT_SLOTS.map((slot) => {
           const itemId = member.equipment[slot];
           const itemDefinition = itemId ? getItemDefinition(itemId) : null;
+          const iconSrc = itemId
+            ? INVENTORY_ITEM_ICON_SRC[itemId]
+            : EMPTY_EQUIPMENT_SLOT_ICON_SRC[slot];
 
           return (
             <button
@@ -459,6 +466,14 @@ function EquipmentManagementSection({
               onClick={() => setSelectedEquipmentSlot(slot)}
               type="button"
             >
+              {iconSrc ? (
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="equipment-slot-icon"
+                  src={iconSrc}
+                />
+              ) : null}
               <span>{EQUIPMENT_SLOT_LABELS[slot]}</span>
               <strong>{itemDefinition?.displayName ?? "None"}</strong>
             </button>
@@ -541,14 +556,25 @@ function EquipmentInventoryRow({
     itemDefinition,
     targetSlot,
   );
+  const iconSrc = INVENTORY_ITEM_ICON_SRC[itemId];
 
   return (
     <div className="equipment-inventory-row">
-      <span>
-        {itemDefinition.displayName} |{" "}
-        {itemDefinition.equipmentType
-          ? EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]
-          : "Equipment"}
+      <span className="equipment-inventory-item-name">
+        {iconSrc ? (
+          <img
+            alt=""
+            aria-hidden="true"
+            className="equipment-inventory-item-icon"
+            src={iconSrc}
+          />
+        ) : null}
+        <span>
+          {itemDefinition.displayName} |{" "}
+          {itemDefinition.equipmentType
+            ? EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]
+            : "Equipment"}
+        </span>
       </span>
       <span>{getEquipmentValidityText(member, itemDefinition, targetSlot)}</span>
       <div>

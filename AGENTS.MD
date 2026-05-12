@@ -152,6 +152,14 @@ When implementation begins:
 - Keep changes scoped to the ticket.
 - Do not expand into future systems unless the ticket explicitly includes them.
 - Update or close the ticket when the work is complete.
+Ticket titles must use the format:
+
+- [Ticket 0001]: Short descriptive title
+- [Ticket 0002]: Short descriptive title
+
+Future idea cards may use normal descriptive titles while they are in Dragons Vault or Todo.
+When a future idea is promoted into Design Stage or Implementation scope, rename it to the next ticket number before implementation work begins.
+
 
 ## Rollback / Traceability Rules
 

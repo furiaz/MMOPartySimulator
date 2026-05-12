@@ -22,6 +22,7 @@ export type {
   DebugTelemetryTick,
   Enemy,
   EnemyAggressionMode,
+  EnemyType,
   EntityKind,
   EntityState,
   GameEntity,
@@ -63,6 +64,7 @@ export type {
   SkillTag,
   SkillVisualEvent,
   SkillVisualType,
+  DropVisualEvent,
   WeaponType,
 } from "./types";
 export type {
@@ -216,6 +218,21 @@ export {
   getAttackCooldownMs,
   updateAttackSystem,
 } from "./attackSystem";
+export {
+  ENEMY_DROP_TABLES,
+  getEnemyDropTable,
+  rollEnemyDropTable,
+  type DropGroup,
+  type DropRollResult,
+  type DropTableEntry,
+  type DropTableId,
+  type EnemyDropTable,
+} from "./dropTables";
+export {
+  DROP_VISUAL_DURATION_MS,
+  handleEnemyDefeatedDrops,
+  updateDropSystem,
+} from "./dropSystem";
 export { updateDefendSystem } from "./defendSystem";
 export {
   getEnemyAttackLeashDistance,

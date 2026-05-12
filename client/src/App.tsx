@@ -5,6 +5,10 @@ import {
   type MouseEvent,
 } from "react";
 import "./App.css";
+import {
+  INVENTORY_ITEM_ICON_SRC,
+  WILDERNESS_MAP_TILE_SRC,
+} from "./assetIcons";
 import SpriteAnimation from "./SpriteAnimation";
 import { GameMenu } from "./GameMenu";
 import {
@@ -53,6 +57,7 @@ import {
   addItemToInventoryState,
   getAttackCooldownMs,
   getEnemyDetectionRange,
+  getItemDefinition,
   hasQuestGiverWork,
   issueCompanionCommands,
   isCombatEntity,
@@ -94,11 +99,41 @@ const cellSize = 36;
 const enemyAggroRange = getEnemyDetectionRange();
 const visualMovementGraceMs = 180;
 const visualMovementReachedDistance = 1;
+const wildernessMapIds = new Set(["map-1", "map-2"]);
 
 type EntityVisualMovement = {
   direction: SpriteDirection;
   expiresAt: number;
 };
+
+function isWildernessVisualMap(mapId: string | undefined): boolean {
+  return Boolean(mapId && wildernessMapIds.has(mapId));
+}
+
+function createFloorTilePositions(columns: number, rows: number): Position[] {
+  return Array.from({ length: columns * rows }, (_, index) => ({
+    x: index % columns,
+    y: Math.floor(index / columns),
+  }));
+}
+
+function getCoordinateHash(position: Position): number {
+  return Math.abs(position.x * 31 + position.y * 17 + position.x * position.y * 7);
+}
+
+function getWildernessFloorTileSrc(position: Position): string {
+  return getCoordinateHash(position) % 4 === 0
+    ? WILDERNESS_MAP_TILE_SRC.grassB
+    : WILDERNESS_MAP_TILE_SRC.grassA;
+}
+
+function getWildernessWallTileKind(position: Position): "tree" | "bush" {
+  return getCoordinateHash(position) % 10 === 0 ? "tree" : "bush";
+}
+
+function getWildernessWallTileSrc(position: Position): string {
+  return WILDERNESS_MAP_TILE_SRC[getWildernessWallTileKind(position)];
+}
 
 function formatResourceName(resourceType: ResourceEntity["resourceType"]): string {
   return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
@@ -118,7 +153,7 @@ function getResourceTooltip(resource: ResourceEntity): string {
 
 function getEnemyTooltip(enemy: Enemy): string {
   return [
-    "Enemy",
+    enemy.enemyType ? `Enemy ${enemy.enemyType}` : "Enemy",
     `Level ${enemy.level}`,
     `XP ${enemy.xpReward ?? "auto"}`,
     `HP ${enemy.health}/${enemy.maxHealth}`,
@@ -223,6 +258,7 @@ function createInitialState(): GameState {
     skillShieldBlocksById: {},
     skillCooldownsByCompanionId: {},
     skillVisualEvents: [],
+    dropVisualEvents: [],
   });
 
   return addItemToInventoryState(
@@ -410,6 +446,9 @@ function App() {
   );
   const slashVisuals = activeSkillVisualEvents.filter(
     (event) => event.type === "slash",
+  );
+  const activeDropVisualEvents = (gameState.dropVisualEvents ?? []).filter(
+    (event) => event.expiresAt > currentTime,
   );
 
   useEffect(() => {
@@ -846,6 +885,11 @@ function App() {
       : undefined;
   }
 
+  const useWildernessVisuals = isWildernessVisualMap(currentMap.id);
+  const floorTiles = useWildernessVisuals
+    ? createFloorTilePositions(currentMap.columns, currentMap.rows)
+    : [];
+
   return (
     <main className="game-page">
       <section className="game-panel">
@@ -853,10 +897,26 @@ function App() {
 
         <div
           key={gameState.currentMapId ?? HUB_MAP_ID}
-          className={`test-area ${mapTileVisualAssets.floor.className}`}
+          className={`test-area ${mapTileVisualAssets.floor.className}${
+            useWildernessVisuals ? " floor-wilderness" : ""
+          }`}
           aria-label="Follow system top-down test area"
           onClick={commandPartyToMoveFromFloorClick}
         >
+          {floorTiles.map((tile) => (
+            <img
+              key={`floor-${tile.x}-${tile.y}`}
+              alt=""
+              aria-hidden="true"
+              className="floor-tile"
+              src={getWildernessFloorTileSrc(tile)}
+              style={{
+                transform: `translate(${tile.x * cellSize}px, ${
+                  tile.y * cellSize
+                }px)`,
+              }}
+            />
+          ))}
           <div className="map-label-overlay">
             <div className="map-title-row">
               <span className="map-version">v{gameVersion}</span>
@@ -867,13 +927,28 @@ function App() {
           {currentMap.walls.map((wall) => (
             <div
               key={`${wall.x}-${wall.y}`}
-              className={`wall-tile ${mapTileVisualAssets.wall.className}`}
+              className={`wall-tile ${
+                useWildernessVisuals
+                  ? "wall-wilderness"
+                  : mapTileVisualAssets.wall.className
+              }`}
               style={{
                 transform: `translate(${wall.x * cellSize}px, ${
                   wall.y * cellSize
                 }px)`,
               }}
-            />
+            >
+              {useWildernessVisuals ? (
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className={`wall-wilderness-image ${getWildernessWallTileKind(
+                    wall,
+                  )}`}
+                  src={getWildernessWallTileSrc(wall)}
+                />
+              ) : null}
+            </div>
           ))}
           {activeTeleport ? (
             <div
@@ -978,6 +1053,42 @@ function App() {
                   }px)`,
                 }}
               />
+            );
+          })}
+          {activeDropVisualEvents.map((event) => {
+            const itemDefinition = getItemDefinition(event.itemId);
+            const iconSrc = INVENTORY_ITEM_ICON_SRC[event.itemId];
+            const duration = event.expiresAt - event.createdAt;
+            const progress = duration > 0
+              ? Math.min(1, Math.max(0, (currentTime - event.createdAt) / duration))
+              : 1;
+            const visualY = event.position.y - progress * 2;
+
+            return (
+              <div
+                key={event.id}
+                className={`drop-visual ${itemDefinition.category}`}
+                style={{
+                  opacity: 1 - progress,
+                  transform: `translate(${event.position.x * cellSize}px, ${
+                    visualY * cellSize
+                  }px)`,
+                }}
+                title={itemDefinition.displayName}
+              >
+                {iconSrc ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="drop-visual-icon"
+                    src={iconSrc}
+                  />
+                ) : (
+                  <span aria-hidden="true">
+                    {itemDefinition.displayName.charAt(0)}
+                  </span>
+                )}
+              </div>
             );
           })}
           {gameState.combatFeedbackEvents.map((event) => {
@@ -1210,8 +1321,14 @@ function App() {
               </div>
             );
           })}
-          {resources.map((resource) =>
-            resource.isDepleted ? (
+          {resources.map((resource) => {
+            const visualAsset = getEntityVisualAsset(
+              resource,
+              gameState.currentMapId,
+            );
+            const isImageResource = visualAsset.kind === "image";
+
+            return resource.isDepleted ? (
               <div
                 key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
                 className="depleted-label"
@@ -1235,10 +1352,11 @@ function App() {
             ) : (
               <div
                 key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
-                className={`entity-marker ${getEntityVisualClassName(
-                  resource,
-                  gameState.currentMapId,
-                )}${
+                className={`entity-marker ${
+                  isImageResource
+                    ? "resource-image-entity"
+                    : getEntityVisualClassName(resource, gameState.currentMapId)
+                }${
                   gathererTargetResourceIds.has(resource.id)
                     ? " gatherer-target"
                     : ""
@@ -1254,6 +1372,14 @@ function App() {
                 }}
                 title={getResourceTooltip(resource)}
               >
+                {isImageResource ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="resource-image"
+                    src={visualAsset.src}
+                  />
+                ) : null}
                 <EntityDebugLabel
                   name={resource.resourceType}
                   entity={resource}
@@ -1261,8 +1387,8 @@ function App() {
                   isVisible={showEntityInfo}
                 />
               </div>
-            ),
-          )}
+            );
+          })}
           {npcs.map((npc) => {
             const visualAsset = getEntityVisualAsset(npc, gameState.currentMapId);
             const isImageNpc = visualAsset.kind === "image";

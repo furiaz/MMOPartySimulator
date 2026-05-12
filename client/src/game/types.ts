@@ -19,6 +19,8 @@ export type EntityKind = "companion" | "enemy" | "resource" | "npc";
 
 export type EnemyAggressionMode = "passive" | "aggressive";
 
+export type EnemyType = "wolf" | "orc";
+
 export type CommandPriority = "autonomous" | "direct";
 
 export type ClassPath = "honor" | "primal" | "arcane" | "holy";
@@ -115,6 +117,14 @@ export type EquipmentStatModifiers = {
 
 export type CompanionEquipment = Record<EquipmentSlot, ItemId | null>;
 
+export type LootMaterialItemId =
+  | "wolf_pelt"
+  | "wolf_fang"
+  | "wolf_claw"
+  | "orc_tusk"
+  | "orc_hide"
+  | "orc_scrap";
+
 export type EquipmentItemId =
   | "training_sword"
   | "iron_sword"
@@ -134,9 +144,19 @@ export type EquipmentItemId =
   | "padded_legs"
   | "cloth_gloves"
   | "travel_boots"
-  | "plain_charm";
+  | "plain_charm"
+  | "worn_cap"
+  | "worn_tunic"
+  | "worn_pants"
+  | "worn_gloves"
+  | "worn_boots"
+  | "reinforced_helm"
+  | "reinforced_armor"
+  | "reinforced_legguards"
+  | "reinforced_gloves"
+  | "reinforced_boots";
 
-export type ItemId = ResourceType | EquipmentItemId;
+export type ItemId = ResourceType | LootMaterialItemId | EquipmentItemId;
 
 export type ItemRarity =
   | "common"
@@ -341,6 +361,20 @@ export type SkillVisualEvent = {
   expiresAt: number;
 };
 
+export type DropVisualEvent = {
+  id: string;
+  enemyId: string;
+  enemyType?: EnemyType;
+  itemId: ItemId;
+  quantity: number;
+  position: Position;
+  createdAt: number;
+  expiresAt: number;
+  currentMapId?: DebugMapId;
+  tableId: string;
+  dropChance: number;
+};
+
 export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 
 export type DebugNavigationReason =
@@ -419,7 +453,17 @@ export type DebugTelemetryEventType =
   | "quest_turned_in"
   | "quest_completed"
   | "quest_unlocked"
-  | "quest_intent_teleport";
+  | "quest_intent_teleport"
+  | "enemy_drop_roll_started"
+  | "enemy_drop_rolled"
+  | "enemy_drop_none"
+  | "enemy_drop_visual_started"
+  | "enemy_drop_visual_completed"
+  | "enemy_drop_inventory_add_attempt"
+  | "enemy_drop_inventory_added"
+  | "enemy_drop_inventory_failed"
+  | "enemy_drop_inventory_partial"
+  | "enemy_drop_overflow";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -496,6 +540,10 @@ export type DebugTelemetryEvent = {
   itemCategory?: ItemCategory;
   targetSlot?: EquipmentSlot;
   equipmentType?: EquipmentType;
+  enemyType?: EnemyType;
+  enemyPosition?: Position;
+  tableId?: string;
+  dropChance?: number;
   previousItemId?: ItemId | null;
   requestedQuantity?: number;
   addedQuantity?: number;
@@ -647,6 +695,7 @@ export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  enemyType?: EnemyType;
   homePosition: Position;
   roamTargetPosition?: Position | null;
   nextRoamAt?: number;
