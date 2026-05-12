@@ -183,6 +183,29 @@ Ticket titles must use the format:
 Future idea cards may use normal descriptive titles while they are in Dragons Vault or Todo.
 When a future idea is promoted into Design Stage or Implementation scope, rename it to the next ticket number before implementation work begins.
 
+## Ticket Number Validation Rule
+
+Before any implementation work begins, verify that the active GitHub Issue title starts with the standard ticket format:
+
+- [Ticket 0001]: Short descriptive title
+
+If the active issue does not already have a ticket number:
+
+1. Search all GitHub Issues in this repository for titles matching `[Ticket 000N]:`.
+2. Extract all existing ticket numbers.
+3. Find the highest existing ticket number.
+4. Assign the active issue the next available number:
+   - highest existing number + 1
+5. Rename the active issue to:
+   - `[Ticket 000N]: Short descriptive title`
+6. Before renaming, search again and confirm no other issue already uses that ticket number.
+7. If a duplicate ticket number is found, do not proceed until the duplicate is resolved.
+
+Ticket numbers must be unique across all GitHub Issues, regardless of whether the issue is open or closed.
+
+Do not guess the next ticket number from GitHub issue numbers. GitHub issue numbers and ticket numbers are separate.
+
+
 ## Execution Plan Workflow
 
 When the user asks for an execution plan:
@@ -209,7 +232,8 @@ When the user later asks to execute an approved ticket or plan:
 - Completion notes should list the main files changed, verification performed, and confirm the `Completed` label was applied to the GitHub Issue.
 - Do not move the ticket to Done unless the user explicitly approves completion after review.
 - Before implementation, verify the active issue title already starts with [Ticket 000N]:.
-- If it does not, stop and promote/rename the issue before editing code.
+- If it does not, automatically promote/rename the issue using the Ticket Number Validation Rule before editing code.
+
 
 ## Rollback / Traceability Rules
 
