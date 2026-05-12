@@ -49,6 +49,10 @@
   background: #6c982e;
 }
 
+.test-area.floor-hub {
+  background: #7b9a47;
+}
+
 .entity-marker,
 .teleporter,
 .healing-fountain,

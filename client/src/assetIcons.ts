@@ -2,6 +2,7 @@ import type { EquipmentSlot, ItemId, NpcEntity, ResourceType } from "./game";
 
 const nowAssetPackPath = "/Asserts/Generated/now-pack";
 const wildernessMapAssetPath = "/Asserts/Generated/map-wilderness";
+const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
 
 export const INVENTORY_ITEM_ICON_SRC: Partial<Record<ItemId, string>> = {
   wood: `${nowAssetPackPath}/wood-node.png`,
@@ -39,4 +40,8 @@ export const WILDERNESS_MAP_TILE_SRC = {
   grassB: `${wildernessMapAssetPath}/grass-b.png`,
   tree: `${wildernessMapAssetPath}/tree.png`,
   bush: `${wildernessMapAssetPath}/bush.png`,
+} as const;
+
+export const HUB_MAP_TILE_SRC = {
+  stone: `${hubFloorAssetPath}/hub-city-stone-seamless.png`,
 } as const;

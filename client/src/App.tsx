@@ -6,6 +6,7 @@ import {
 } from "react";
 import "./App.css";
 import {
+  HUB_MAP_TILE_SRC,
   INVENTORY_ITEM_ICON_SRC,
   WILDERNESS_MAP_TILE_SRC,
 } from "./assetIcons";
@@ -110,6 +111,10 @@ function isWildernessVisualMap(mapId: string | undefined): boolean {
   return Boolean(mapId && wildernessMapIds.has(mapId));
 }
 
+function isHubVisualMap(mapId: string | undefined): boolean {
+  return mapId === HUB_MAP_ID;
+}
+
 function createFloorTilePositions(columns: number, rows: number): Position[] {
   return Array.from({ length: columns * rows }, (_, index) => ({
     x: index % columns,
@@ -125,6 +130,16 @@ function getWildernessFloorTileSrc(position: Position): string {
   return getCoordinateHash(position) % 4 === 0
     ? WILDERNESS_MAP_TILE_SRC.grassB
     : WILDERNESS_MAP_TILE_SRC.grassA;
+}
+
+function getHubFloorTileSrc(position: Position): string {
+  const isCityInterior =
+    position.x >= 13 &&
+    position.x <= 34 &&
+    position.y >= 7 &&
+    position.y <= 18;
+
+  return isCityInterior ? HUB_MAP_TILE_SRC.stone : getWildernessFloorTileSrc(position);
 }
 
 function getWildernessWallTileKind(position: Position): "tree" | "bush" {
@@ -886,7 +901,9 @@ function App() {
   }
 
   const useWildernessVisuals = isWildernessVisualMap(currentMap.id);
-  const floorTiles = useWildernessVisuals
+  const useHubVisuals = isHubVisualMap(currentMap.id);
+  const useImageFloorTiles = useWildernessVisuals || useHubVisuals;
+  const floorTiles = useImageFloorTiles
     ? createFloorTilePositions(currentMap.columns, currentMap.rows)
     : [];
 
@@ -899,6 +916,7 @@ function App() {
           key={gameState.currentMapId ?? HUB_MAP_ID}
           className={`test-area ${mapTileVisualAssets.floor.className}${
             useWildernessVisuals ? " floor-wilderness" : ""
+          }${useHubVisuals ? " floor-hub" : ""
           }`}
           aria-label="Follow system top-down test area"
           onClick={commandPartyToMoveFromFloorClick}
@@ -909,7 +927,11 @@ function App() {
               alt=""
               aria-hidden="true"
               className="floor-tile"
-              src={getWildernessFloorTileSrc(tile)}
+              src={
+                useHubVisuals
+                  ? getHubFloorTileSrc(tile)
+                  : getWildernessFloorTileSrc(tile)
+              }
               style={{
                 transform: `translate(${tile.x * cellSize}px, ${
                   tile.y * cellSize
