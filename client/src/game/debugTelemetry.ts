@@ -235,6 +235,11 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.questId ?? "",
     event.objectiveId ?? "",
     event.reason ?? "",
+    event.currencyId ?? "",
+    event.currencyDisplayName ?? "",
+    event.currencyAmount ?? "",
+    event.previousCurrencyBalance ?? "",
+    event.nextCurrencyBalance ?? "",
   ].join("|");
 }
 

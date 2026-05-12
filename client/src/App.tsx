@@ -34,6 +34,7 @@ import {
   createCompanion,
   createDebugMap,
   createEmptyPartyInventory,
+  createEmptyPartyWallet,
   createInitialQuestStates,
   createNpc,
   DEBUG_MAP_COLUMNS,
@@ -41,10 +42,13 @@ import {
   clearDebugTelemetry,
   debugAddCompanionToParty,
   debugAddPrototypeEquipmentToInventory,
+  debugAddTestCrowns,
   debugAddTestWoodToInventory,
   debugRefreshResources,
   debugRandomizeLocations,
   debugRemoveCompanionFromParty,
+  debugRemoveTestCrowns,
+  debugResetCrowns,
   debugResurrectEnemy,
   debugRestorePartyHealth,
   enemyIds,
@@ -251,6 +255,7 @@ function createInitialState(): GameState {
   const initialState = [leader, secondCompanion, ...npcs].reduce(addEntity, {
     entities: {},
     inventory: createEmptyPartyInventory(),
+    wallet: createEmptyPartyWallet(),
     map: debugMap,
     currentMapId: HUB_MAP_ID,
     activeTeleport: null,
@@ -659,6 +664,18 @@ function App() {
 
   function addPrototypeEquipmentToInventory() {
     setGameState(debugAddPrototypeEquipmentToInventory);
+  }
+
+  function addTestCrowns() {
+    setGameState(debugAddTestCrowns);
+  }
+
+  function removeTestCrowns() {
+    setGameState(debugRemoveTestCrowns);
+  }
+
+  function resetCrowns() {
+    setGameState(debugResetCrowns);
   }
 
   function equipEquipment(
@@ -1477,6 +1494,7 @@ function App() {
           activeTab={activeGameMenuTab}
           activeManagementSection={activePartyManagementSection}
           inventory={inventory}
+          wallet={gameState.wallet}
           isOpen={isGameMenuOpen}
           leaderId={gameState.partyLeaderId}
           members={partyMembers}
@@ -1547,6 +1565,9 @@ function App() {
                 <button onClick={addPrototypeEquipmentToInventory}>
                   Add Prototype Gear
                 </button>
+                <button onClick={addTestCrowns}>Add Test Crowns</button>
+                <button onClick={removeTestCrowns}>Remove Test Crowns</button>
+                <button onClick={resetCrowns}>Reset Crowns</button>
                 <button onClick={toggleEntityInfo}>
                   {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
                 </button>

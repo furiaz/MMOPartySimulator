@@ -34,6 +34,7 @@ import type {
   Enemy,
   LeaderIntent,
   PartyInventory,
+  PartyWallet,
   PartyFormationState,
   PartyMemberRole,
   Position,
@@ -96,6 +97,7 @@ export { clearTickMovementPlanning } from "./movementState";
 export type GameState = {
   entities: Record<string, GameEntity>;
   inventory: PartyInventory;
+  wallet: PartyWallet;
   currentMapId?: DebugMapId;
   map?: GameMap;
   activeTeleport?: ActiveTeleport | null;

@@ -892,6 +892,27 @@
   font-size: 15px;
 }
 
+.inventory-wallet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border-bottom: 1px solid #3a5a60;
+  background: rgba(16, 28, 32, 0.34);
+  font-size: 13px;
+}
+
+.inventory-wallet-label {
+  color: #aec6ca;
+  font-weight: 700;
+}
+
+.inventory-wallet-balance {
+  color: #f3df93;
+  font-weight: 800;
+}
+
 .inventory-category-tabs {
   display: flex;
   gap: 8px;

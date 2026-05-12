@@ -11,6 +11,7 @@ import type {
   Companion,
   GameState,
   PartyInventory,
+  PartyWallet,
   PartyMemberRole,
   EquipmentSlot,
   ItemId,
@@ -21,6 +22,7 @@ export function GameMenu({
   activeTab,
   activeManagementSection,
   inventory,
+  wallet,
   isOpen,
   leaderId,
   members,
@@ -41,6 +43,7 @@ export function GameMenu({
   activeTab: GameMenuTab | null;
   activeManagementSection: PartyManagementSection;
   inventory: PartyInventory;
+  wallet: PartyWallet;
   isOpen: boolean;
   leaderId: string;
   members: Companion[];
@@ -124,6 +127,7 @@ export function GameMenu({
               ) : activeTab === "inventory" ? (
                 <InventoryPanel
                   inventory={inventory}
+                  wallet={wallet}
                   onOpenEquipmentManagement={onOpenEquipmentManagement}
                 />
               ) : (

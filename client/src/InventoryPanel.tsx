@@ -4,12 +4,14 @@ import {
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   getItemDefinition,
+  formatCurrencyDisplay,
   getUsedInventorySlots,
   ITEM_DEFINITIONS,
   type ItemCategory,
   type ItemDefinition,
   type ItemId,
   type PartyInventory,
+  type PartyWallet,
 } from "./game";
 
 function getInventorySlotTitle(slot: PartyInventory["slots"][number]): string {
@@ -34,9 +36,11 @@ function formatCategoryLabel(category: ItemCategory): string {
 
 export function InventoryPanel({
   inventory,
+  wallet,
   onOpenEquipmentManagement,
 }: {
   inventory: PartyInventory;
+  wallet: PartyWallet;
   onOpenEquipmentManagement: () => void;
 }) {
   const [activeCategory, setActiveCategory] = useState<ItemCategory | "all">(
@@ -78,6 +82,12 @@ export function InventoryPanel({
         <h2>Inventory</h2>
         <span>
           {getUsedInventorySlots(inventory)}/{inventory.capacity}
+        </span>
+      </div>
+      <div className="inventory-wallet-row" title="Shared party wallet">
+        <span className="inventory-wallet-label">Wallet</span>
+        <span className="inventory-wallet-balance">
+          {formatCurrencyDisplay(wallet, "crowns")}
         </span>
       </div>
       <div className="inventory-category-tabs" aria-label="Inventory categories">

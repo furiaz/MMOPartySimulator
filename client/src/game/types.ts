@@ -194,12 +194,48 @@ export type PartyInventory = {
   slots: InventorySlot[];
 };
 
+export type CurrencyId = "crowns";
+
+export type CurrencyDefinition = {
+  id: CurrencyId;
+  displayName: string;
+  symbol: string;
+};
+
+export type PartyWallet = {
+  balancesByCurrencyId: Record<CurrencyId, number>;
+  visibleUntil?: number;
+};
+
 export type InventoryMutationSource =
   | "gathering"
   | "debug"
   | "equipment"
   | "combat_loot"
   | "unknown";
+
+export type CurrencyMutationSource =
+  | "debug"
+  | "quest_reward"
+  | "merchant"
+  | "chest"
+  | "unknown";
+
+export type CurrencyMutationStatus =
+  | "success"
+  | "failed_invalid"
+  | "failed_insufficient";
+
+export type CurrencyMutationResult = {
+  status: CurrencyMutationStatus;
+  currencyId: CurrencyId;
+  requestedAmount: number;
+  changedAmount: number;
+  previousBalance: number;
+  newBalance: number;
+  source: CurrencyMutationSource;
+  reason?: string;
+};
 
 export type InventoryMutationStatus =
   | "success"
@@ -463,7 +499,13 @@ export type DebugTelemetryEventType =
   | "enemy_drop_inventory_added"
   | "enemy_drop_inventory_failed"
   | "enemy_drop_inventory_partial"
-  | "enemy_drop_overflow";
+  | "enemy_drop_overflow"
+  | "currency_add_attempt"
+  | "currency_added"
+  | "currency_remove_attempt"
+  | "currency_removed"
+  | "currency_remove_failed"
+  | "wallet_balance_changed";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -554,7 +596,12 @@ export type DebugTelemetryEvent = {
   stackQuantityAfter?: number;
   inventoryUsedSlots?: number;
   inventoryCapacity?: number;
-  source?: InventoryMutationSource;
+  source?: InventoryMutationSource | CurrencyMutationSource;
+  currencyId?: CurrencyId;
+  currencyDisplayName?: string;
+  currencyAmount?: number;
+  previousCurrencyBalance?: number;
+  nextCurrencyBalance?: number;
   globalPoiIntentType?: GlobalPoiIntent["type"];
   localPoiId?: string;
   poiCategory?: PoiCategory;

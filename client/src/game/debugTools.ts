@@ -1,6 +1,11 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import {
+  addCurrencyToWalletState,
+  removeCurrencyFromWalletState,
+  setCurrencyBalanceForDebug,
+} from "./wallet";
+import {
   addEntity,
   findClosestAvailablePosition,
   getEntityById,
@@ -14,6 +19,7 @@ const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
 const DEBUG_RESOURCE_QUANTITY = 3;
 const DEBUG_TEST_ITEM_QUANTITY = 1;
+const DEBUG_TEST_CROWNS_AMOUNT = 100;
 const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "training_sword",
   "iron_sword",
@@ -197,6 +203,28 @@ export function debugAddTestWoodToInventory(state: GameState): GameState {
     DEBUG_TEST_ITEM_QUANTITY,
     "debug",
   ).state;
+}
+
+export function debugAddTestCrowns(state: GameState): GameState {
+  return addCurrencyToWalletState(
+    state,
+    "crowns",
+    DEBUG_TEST_CROWNS_AMOUNT,
+    "debug",
+  ).state;
+}
+
+export function debugRemoveTestCrowns(state: GameState): GameState {
+  return removeCurrencyFromWalletState(
+    state,
+    "crowns",
+    DEBUG_TEST_CROWNS_AMOUNT,
+    "debug",
+  ).state;
+}
+
+export function debugResetCrowns(state: GameState): GameState {
+  return setCurrencyBalanceForDebug(state, "crowns", 0).state;
 }
 
 export function debugAddPrototypeEquipmentToInventory(state: GameState): GameState {

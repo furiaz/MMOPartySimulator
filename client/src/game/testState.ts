@@ -1,6 +1,7 @@
 import { createEmptyPartyInventory } from "./inventory";
 import { createInitialQuestStates } from "./questSystem";
 import type { GameState } from "./state";
+import { createEmptyPartyWallet } from "./wallet";
 
 export function createTestGameState(
   overrides: Partial<GameState> = {},
@@ -8,6 +9,7 @@ export function createTestGameState(
   return {
     entities: {},
     inventory: createEmptyPartyInventory(),
+    wallet: createEmptyPartyWallet(),
     autoModeEnabled: false,
     simulationTick: 0,
     partyLeaderId: "",
