@@ -11,7 +11,7 @@ import type {
   PartyInventory,
 } from "./types";
 
-export const STARTING_INVENTORY_CAPACITY = 10;
+export const STARTING_INVENTORY_CAPACITY = 50;
 const INVENTORY_TELEMETRY_ENTITY_ID = "__inventory__";
 
 export function createEmptyPartyInventory(

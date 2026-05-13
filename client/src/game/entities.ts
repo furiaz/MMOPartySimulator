@@ -9,6 +9,7 @@ import type {
   EnemyType,
   EntityState,
   GameEntity,
+  LootTier,
   NpcEntity,
   PartyMemberRole,
   Position,
@@ -45,6 +46,7 @@ type CreateResourceOptions = {
   quantity?: number;
   maxGatherers?: number;
   resourceType?: ResourceType;
+  tier?: LootTier;
 };
 
 type CreateEnemyOptions = {
@@ -129,12 +131,14 @@ export function createResource(
     quantity = STARTING_RESOURCE_QUANTITY,
     maxGatherers = STARTING_RESOURCE_MAX_GATHERERS,
     resourceType = DEFAULT_RESOURCE_TYPE,
+    tier = 1,
   } = options;
 
   return {
     id,
     kind: "resource",
     resourceType,
+    tier,
     position,
     state: "idle",
     durability,

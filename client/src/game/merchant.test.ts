@@ -32,9 +32,9 @@ describe("merchant quick exchange", () => {
     expect(nextState.wallet).toEqual(state.wallet);
   });
 
-  it("exchanges mixed wolf and orc parts for exact Crown value", () => {
+  it("exchanges mixed junk for exact Crown value", () => {
     let state = createMerchantState();
-    state = addItemToInventoryState(state, "wolf_claw", 2, "debug").state;
+    state = addItemToInventoryState(state, "slime_gel_t1", 2, "debug").state;
     state = addItemToInventoryState(state, "wolf_pelt", 1, "debug").state;
     state = addItemToInventoryState(state, "orc_hide", 3, "debug").state;
     state = setCurrencyBalanceForDebug(state, "crowns", 10).state;
@@ -43,33 +43,33 @@ describe("merchant quick exchange", () => {
 
     expect(result).toMatchObject({
       status: "success",
-      totalExchangeValue: 20,
+      totalExchangeValue: 30,
       previousCrowns: 10,
-      newCrowns: 30,
+      newCrowns: 40,
     });
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(30);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(40);
     expect(getQuickExchangeItems(nextState)).toEqual([]);
   });
 
-  it("does not exchange normal resources or equipment", () => {
+  it("does not exchange materials or equipment", () => {
     let state = createMerchantState();
-    state = addItemToInventoryState(state, "wood", 5, "debug").state;
+    state = addItemToInventoryState(state, "softwood", 5, "debug").state;
     state = addItemToInventoryState(state, "training_sword", 1, "debug").state;
     state = addItemToInventoryState(state, "wolf_fang", 2, "debug").state;
 
     const { state: nextState, result } = quickExchangeParts(state, MERCHANT_ID);
 
     expect(result.status).toBe("success");
-    expect(result.totalExchangeValue).toBe(4);
+    expect(result.totalExchangeValue).toBe(28);
     expect(nextState.inventory.slots).toEqual([
-      { itemId: "wood", quantity: 5 },
+      { itemId: "softwood", quantity: 5 },
       { itemId: "training_sword", quantity: 1 },
     ]);
   });
 
   it("fails safely if inventory removal fails", () => {
     let state = createMerchantState();
-    state = addItemToInventoryState(state, "orc_scrap", 2, "debug").state;
+    state = addItemToInventoryState(state, "goblin_tooth_t1", 2, "debug").state;
 
     const { state: nextState, result } = quickExchangeParts(state, MERCHANT_ID, {
       removeItemFromInventory: (currentState, itemId, quantity) => ({
@@ -87,7 +87,7 @@ describe("merchant quick exchange", () => {
     expect(result).toMatchObject({
       status: "failed",
       reason: "remove_partial",
-      totalExchangeValue: 6,
+      totalExchangeValue: 20,
     });
     expect(nextState.inventory).toEqual(state.inventory);
     expect(nextState.wallet).toEqual(state.wallet);
@@ -95,7 +95,7 @@ describe("merchant quick exchange", () => {
 
   it("records development telemetry while debug recording is active", () => {
     let state = startDebugTelemetryRecording(createMerchantState());
-    state = addItemToInventoryState(state, "wolf_claw", 1, "debug").state;
+    state = addItemToInventoryState(state, "slime_gel_t1", 1, "debug").state;
 
     const { state: nextState } = quickExchangeParts(state, MERCHANT_ID);
 
@@ -107,7 +107,7 @@ describe("merchant quick exchange", () => {
         expect.objectContaining({
           type: "quick_exchange_item_selected",
           entityId: MERCHANT_ID,
-          itemId: "wolf_claw",
+          itemId: "slime_gel_t1",
           quantitySold: 1,
           valueEach: 1,
           totalItemValue: 1,

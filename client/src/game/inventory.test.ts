@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  STARTING_INVENTORY_CAPACITY,
   addItemToInventoryState,
   countInventoryItem,
   createEmptyPartyInventory,
@@ -7,6 +8,11 @@ import {
 import { createTestGameState } from "./testState";
 
 describe("prototype inventory", () => {
+  it("starts with the prototype vertical-slice capacity", () => {
+    expect(createEmptyPartyInventory().capacity).toBe(STARTING_INVENTORY_CAPACITY);
+    expect(STARTING_INVENTORY_CAPACITY).toBe(50);
+  });
+
   it("stacks items up to slot capacity and reports overflow", () => {
     const state = createTestGameState({
       inventory: createEmptyPartyInventory(1),

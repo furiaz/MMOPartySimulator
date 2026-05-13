@@ -3,6 +3,7 @@ import type {
   DebugTeleportPoint,
   GameMap,
   HealingFountain,
+  LootTier,
   Position,
   ResourceType,
 } from "./types";
@@ -206,22 +207,23 @@ export const mapOneResourceStartData: ResourceStartData[] = [
 ];
 
 export const mapTwoResourceStartData: ResourceStartData[] = [
-  { id: resourceIds[0], position: { x: 7, y: 14 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 22, y: 12 }, resourceType: "ore" },
-  { id: resourceIds[2], position: { x: 39, y: 15 }, resourceType: "herb" },
-  { id: resourceIds[3], position: { x: 63, y: 13 }, resourceType: "wood" },
-  { id: resourceIds[4], position: { x: 16, y: 26 }, resourceType: "ore" },
-  { id: resourceIds[5], position: { x: 38, y: 29 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 57, y: 24 }, resourceType: "wood" },
-  { id: resourceIds[7], position: { x: 72, y: 30 }, resourceType: "ore" },
-  { id: resourceIds[8], position: { x: 13, y: 42 }, resourceType: "herb" },
-  { id: resourceIds[9], position: { x: 50, y: 41 }, resourceType: "wood" },
+  { id: resourceIds[0], position: { x: 7, y: 14 }, resourceType: "wood", tier: 2 },
+  { id: resourceIds[1], position: { x: 22, y: 12 }, resourceType: "ore", tier: 2 },
+  { id: resourceIds[2], position: { x: 39, y: 15 }, resourceType: "herb", tier: 2 },
+  { id: resourceIds[3], position: { x: 63, y: 13 }, resourceType: "wood", tier: 2 },
+  { id: resourceIds[4], position: { x: 16, y: 26 }, resourceType: "ore", tier: 2 },
+  { id: resourceIds[5], position: { x: 38, y: 29 }, resourceType: "herb", tier: 2 },
+  { id: resourceIds[6], position: { x: 57, y: 24 }, resourceType: "wood", tier: 2 },
+  { id: resourceIds[7], position: { x: 72, y: 30 }, resourceType: "ore", tier: 2 },
+  { id: resourceIds[8], position: { x: 13, y: 42 }, resourceType: "herb", tier: 2 },
+  { id: resourceIds[9], position: { x: 50, y: 41 }, resourceType: "wood", tier: 2 },
 ];
 
 export type ResourceStartData = {
   id: string;
   position: Position;
   resourceType: ResourceType;
+  tier?: LootTier;
 };
 
 const HUB_WALLS = dedupeWalls([

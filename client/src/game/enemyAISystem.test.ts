@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
-import { addEntity } from "./state";
+import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
 
@@ -189,13 +189,38 @@ describe("enemy AI aggro and roaming", () => {
       getDistance(nextEnemy.homePosition, nextEnemy.roamTargetPosition!),
     ).toBeLessThanOrEqual(4);
   });
+
+  it("continues roaming across small real-time movement frames", () => {
+    const enemy = {
+      ...createEnemy("enemy", { x: 0, y: 0 }),
+      roamTargetPosition: { x: 1, y: 0 },
+      roamMoveUntil: 10_000,
+    };
+    let state = createState([enemy], { simulationDeltaMs: 16 });
+
+    for (let frame = 0; frame < 10; frame += 1) {
+      state = updateEnemyAISystem(state, {
+        nowMs: 1_000 + frame * 16,
+        deltaMs: 16,
+        deltaSeconds: 0.016,
+        frameNumber: frame + 1,
+      });
+    }
+
+    const nextEnemy = state.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.position.x).toBeGreaterThan(0.1);
+    expect(nextEnemy.roamTargetPosition).toEqual(enemy.roamTargetPosition);
+    expect(getDistance(nextEnemy.homePosition, nextEnemy.position)).toBeLessThanOrEqual(4);
+  });
 });
 
-function createState(entities: GameEntity[]) {
+function createState(entities: GameEntity[], overrides: Partial<GameState> = {}) {
   return entities.reduce(
     addEntity,
     createTestGameState({
       partyLeaderId: "leader",
+      ...overrides,
     }),
   );
 }

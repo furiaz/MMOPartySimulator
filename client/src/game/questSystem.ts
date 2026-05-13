@@ -88,7 +88,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     rewards: {
       crowns: 20,
       characterXp: 6,
-      items: [{ itemId: "herb", quantity: 3 }],
+      items: [{ itemId: "field_herb", quantity: 3 }],
     },
   },
   scout_the_northern_road: {

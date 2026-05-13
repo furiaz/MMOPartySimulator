@@ -1161,6 +1161,37 @@
   font-weight: 800;
 }
 
+.party-management-heading-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leadership-status,
+.leadership-action-button {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.leadership-status {
+  padding: 6px 8px;
+  border: 1px solid rgba(122, 166, 173, 0.76);
+  background: rgba(9, 18, 21, 0.2);
+  color: #e6f0f2;
+}
+
+.leadership-current {
+  border-color: rgba(126, 181, 138, 0.84);
+  color: #b8f0c6;
+}
+
+.leadership-unavailable {
+  border-color: rgba(148, 163, 184, 0.58);
+  color: rgba(230, 240, 242, 0.62);
+}
+
 .compact-stat-grid,
 .full-stat-grid,
 .equipment-slot-list {

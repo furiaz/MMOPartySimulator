@@ -77,7 +77,7 @@ describe("prototype quest system", () => {
     let state = createStateWithParty({
       inventory: {
         capacity: 1,
-        slots: [{ itemId: "herb", quantity: 1 }],
+        slots: [{ itemId: "field_herb", quantity: 1 }],
       },
       quests: createQuestStates({
         clear_the_shore: "completed",
@@ -88,7 +88,7 @@ describe("prototype quest system", () => {
     state = updateQuestGiverInteraction(state);
 
     expect(state.quests.gather_expedition_supplies.status).toBe("completed");
-    expect(state.inventory.slots).toEqual([{ itemId: "herb", quantity: 4 }]);
+    expect(state.inventory.slots).toEqual([{ itemId: "field_herb", quantity: 4 }]);
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(20);
   });
 

@@ -75,6 +75,7 @@ import {
   resourceIds,
   setAutoModeEnabled,
   setLeaderIntent,
+  setPartyLeader,
   setPartyMemberRole,
   startGameLoop,
   startDebugTelemetryRecording,
@@ -857,6 +858,16 @@ function App() {
     setGameState((state) => setPartyMemberRole(state, entityId, role));
   }
 
+  function changePartyLeader(companionId: string) {
+    setGameState((state) => {
+      const companion = state.entities[companionId];
+
+      return companion?.kind === "companion" && companion.state !== "dead"
+        ? setPartyLeader(state, companion.id)
+        : state;
+    });
+  }
+
   function commandCompanionsToFollow() {
     if (!leader || activePartyMemberIds.length === 0) {
       return;
@@ -1052,7 +1063,7 @@ function App() {
     );
   }
 
-  function exchangeMerchantParts() {
+  function exchangeMerchantJunk() {
     if (!activeMerchantNpcId) {
       return;
     }
@@ -1067,10 +1078,10 @@ function App() {
 
     if (exchange.result.status === "success") {
       setMerchantResultMessage(
-        `Exchanged parts for ${exchange.result.totalExchangeValue} Crowns`,
+        `Exchanged junk for ${exchange.result.totalExchangeValue} Crowns`,
       );
     } else if (exchange.result.status === "no_items") {
-      setMerchantResultMessage("No parts to exchange");
+      setMerchantResultMessage("No junk to exchange");
     } else {
       setMerchantResultMessage("Quick exchange failed");
     }
@@ -1981,8 +1992,8 @@ function App() {
               >
                 Sell
               </button>
-              <button onClick={exchangeMerchantParts} type="button">
-                Quick Exchange Parts
+              <button onClick={exchangeMerchantJunk} type="button">
+                Quick Exchange Junk
               </button>
               <button onClick={closeMerchantInteraction} type="button">
                 Leave
@@ -2017,6 +2028,7 @@ function App() {
           quests={gameState.quests}
           selectedCompanionId={selectedMenuCompanionId}
           selectedQuestId={selectedMenuQuestId}
+          onChangeLeader={changePartyLeader}
           onChangeRole={changePartyMemberRole}
           onEquipEquipment={equipEquipment}
           onOpenEquipmentManagement={openEquipmentManagementFromInventory}

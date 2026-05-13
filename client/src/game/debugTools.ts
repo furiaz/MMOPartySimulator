@@ -199,7 +199,7 @@ export function debugRestorePartyHealth(state: GameState): GameState {
 export function debugAddTestWoodToInventory(state: GameState): GameState {
   return addItemToInventoryState(
     state,
-    "wood",
+    "softwood",
     DEBUG_TEST_ITEM_QUANTITY,
     "debug",
   ).state;

@@ -82,8 +82,7 @@ export function isQuickExchangeItemDefinition(
   itemDefinition: ItemDefinition,
 ): boolean {
   return Boolean(
-    itemDefinition.canQuickExchange &&
-      itemDefinition.exchangeCategory === "parts" &&
+    itemDefinition.category === "junk" &&
       itemDefinition.sellValue &&
       itemDefinition.sellValue > 0,
   );

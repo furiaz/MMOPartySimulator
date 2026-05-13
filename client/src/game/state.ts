@@ -611,6 +611,7 @@ function createPositionTarget(position: Position): GameEntity {
     position,
     state: "idle",
     resourceType: "wood",
+    tier: 1,
     durability: 1,
     maxDurability: 1,
     quantity: 1,

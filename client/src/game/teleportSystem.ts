@@ -38,13 +38,13 @@ const MAP_ONE_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
   "goblin_scout",
   "bog_imp",
   "wolf",
-];
-const MAP_TWO_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
   "goblin_thrower",
   "stone_crawler",
-  "thorn_shaman",
-  "ash_wisp",
   "mossling",
+];
+const MAP_TWO_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
+  "goblin_shaman",
+  "ash_wisp",
   "orc",
 ];
 
@@ -394,11 +394,9 @@ function getMapEntities(
       mapId === MAP_TWO_ID
         ? {
             archetypeId: getMapEnemyArchetype(MAP_TWO_ENEMY_ARCHETYPES, enemyIndex),
-            enemyType: "orc",
           }
         : {
             archetypeId: getMapEnemyArchetype(MAP_ONE_ENEMY_ARCHETYPES, enemyIndex),
-            enemyType: "wolf",
           },
     );
   }
@@ -409,6 +407,7 @@ function getMapEntities(
       resourceStartData[0];
     entities[resourceId] = createResource(resourceId, resource.position, {
       resourceType: resource.resourceType,
+      tier: resource.tier,
     });
   }
 

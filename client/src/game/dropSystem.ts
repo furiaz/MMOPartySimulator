@@ -1,5 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { rollEnemyDropTable } from "./dropTables";
+import { getLootTierForLevel, rollEnemyDropTable } from "./dropTables";
+import { getEnemyFamilyId } from "./enemyArchetypes";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
 import {
@@ -23,22 +24,30 @@ export function handleEnemyDefeatedDrops(
   now = Date.now(),
   random = Math.random,
 ): GameState {
-  if (!enemy.enemyType) {
+  const familyId = getEnemyFamilyId(enemy);
+
+  if (!familyId) {
     return appendDropTelemetry(state, enemy, {
       type: "enemy_drop_none",
       entityId: enemy.id,
-      reason: "missing_enemy_type",
+      reason: "missing_enemy_family",
       targetId: defeatedByEntityId,
     });
   }
 
+  const lootTier = getLootTierForLevel(enemy.level);
   let nextState = appendDropTelemetry(state, enemy, {
     type: "enemy_drop_roll_started",
     entityId: enemy.id,
     targetId: defeatedByEntityId,
-    enemyType: enemy.enemyType,
+    enemyType: familyId,
   });
-  const rolls = rollEnemyDropTable(enemy.enemyType, random);
+  const rolls = rollEnemyDropTable(
+    familyId,
+    lootTier,
+    random,
+    enemy.archetypeId,
+  );
   const droppedRolls = rolls.filter((roll) => roll.didDrop && roll.entry);
 
   for (const roll of rolls) {
@@ -46,7 +55,7 @@ export function handleEnemyDefeatedDrops(
       type: roll.didDrop ? "enemy_drop_rolled" : "enemy_drop_none",
       entityId: enemy.id,
       targetId: defeatedByEntityId,
-      enemyType: enemy.enemyType,
+      enemyType: familyId,
       itemId: roll.entry?.itemId,
       tableId: roll.tableId,
       dropChance: roll.chance,
@@ -63,7 +72,7 @@ export function handleEnemyDefeatedDrops(
     const event = createDropVisualEvent(
       nextState,
       enemy,
-      enemy.enemyType,
+      familyId,
       roll.entry.itemId,
       roll.entry.quantity,
       roll.tableId,
@@ -77,7 +86,7 @@ export function handleEnemyDefeatedDrops(
     nextState = appendDropTelemetry(nextState, enemy, {
       type: "enemy_drop_visual_started",
       entityId: enemy.id,
-      enemyType: enemy.enemyType,
+      enemyType: familyId,
       itemId: event.itemId,
       tableId: event.tableId,
       dropChance: event.dropChance,

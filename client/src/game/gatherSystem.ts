@@ -115,6 +115,7 @@ export function updateGatherSystem(
     if (didYieldResource) {
       const itemDefinition = getItemDefinitionForResourceType(
         gatheredResource.resourceType,
+        gatheredResource.tier,
       );
       const itemAdd = addItemToInventoryState(
         nextState,

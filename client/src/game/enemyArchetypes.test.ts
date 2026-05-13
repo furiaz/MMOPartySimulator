@@ -7,6 +7,7 @@ describe("prototype enemy archetypes", () => {
     expect(Object.keys(ENEMY_ARCHETYPES)).toHaveLength(12);
     expect(ENEMY_ARCHETYPES).toHaveProperty("wolf");
     expect(ENEMY_ARCHETYPES).toHaveProperty("orc");
+    expect(ENEMY_ARCHETYPES).toHaveProperty("goblin_shaman");
   });
 
   it("keeps archetype ranges numeric and prototype-safe", () => {
@@ -30,7 +31,7 @@ describe("prototype enemy archetypes", () => {
     });
 
     expect(enemy.aggressionMode).toBe("aggressive");
-    expect(enemy.level).toBe(2);
+    expect(enemy.level).toBe(7);
     expect(enemy.health).toBe(3);
     expect(enemy.maxHealth).toBe(3);
     expect(enemy.attackCooldownMs).toBe(1300);

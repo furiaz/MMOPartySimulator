@@ -328,12 +328,17 @@ function moveEnemyTowardRoamTarget(
     return movedState;
   }
 
-  if (getDistance(movedEnemy.position, enemy.position) <= ROAM_TARGET_REACHED_DISTANCE) {
-    return updateEntity(movedState, finishEnemyRoam(movedEnemy, now));
-  }
-
   if (getDistance(movedEnemy.position, movedEnemy.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
-    return updateEntity(movedState, finishEnemyRoam(movedEnemy, now));
+    return updateEntity(
+      movedState,
+      finishEnemyRoam(
+        {
+          ...movedEnemy,
+          position: enemy.position,
+        },
+        now,
+      ),
+    );
   }
 
   return movedState;

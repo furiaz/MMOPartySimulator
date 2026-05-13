@@ -3,6 +3,7 @@ import type {
   EnemyArchetypeDefinition,
   EnemyArchetypeId,
   EnemyCombatStyle,
+  EnemyFamilyId,
   EnemyTargetPreference,
   EnemyTemperament,
 } from "./types";
@@ -28,7 +29,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "closest",
-    level: 1,
+    level: 2,
     maxHealth: 2,
     attackCooldownMs: 900,
     detectionRange: 5,
@@ -40,7 +41,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "passive",
     combatStyle: "melee",
     targetPreference: "closest",
-    level: 1,
+    level: 3,
     maxHealth: 3,
     attackCooldownMs: 1200,
     detectionRange: 4,
@@ -52,7 +53,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "leader",
-    level: 2,
+    level: 4,
     maxHealth: 3,
     attackCooldownMs: 1000,
     detectionRange: 6,
@@ -64,7 +65,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "ranged",
     targetPreference: "lowestHealth",
-    level: 2,
+    level: 7,
     maxHealth: 3,
     attackCooldownMs: 1300,
     detectionRange: 5,
@@ -76,7 +77,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "ranged",
     targetPreference: "closest",
-    level: 2,
+    level: 5,
     maxHealth: 3,
     attackCooldownMs: 1300,
     detectionRange: 5,
@@ -88,19 +89,19 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "passive",
     combatStyle: "melee",
     targetPreference: "leader",
-    level: 3,
+    level: 8,
     maxHealth: 5,
     attackCooldownMs: 1500,
     detectionRange: 4,
     attackRange: 1,
   },
-  thorn_shaman: {
-    id: "thorn_shaman",
-    displayName: "Thorn Shaman",
+  goblin_shaman: {
+    id: "goblin_shaman",
+    displayName: "Goblin Shaman",
     temperament: "aggressive",
     combatStyle: "support",
     targetPreference: "lowestHealth",
-    level: 3,
+    level: 10,
     maxHealth: 3,
     attackCooldownMs: 1500,
     detectionRange: 5,
@@ -112,7 +113,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "ranged",
     targetPreference: "leader",
-    level: 3,
+    level: 11,
     maxHealth: 3,
     attackCooldownMs: 1200,
     detectionRange: 6,
@@ -124,7 +125,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "passive",
     combatStyle: "support",
     targetPreference: "closest",
-    level: 1,
+    level: 9,
     maxHealth: 2,
     attackCooldownMs: 1400,
     detectionRange: 4,
@@ -136,7 +137,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "lowestHealth",
-    level: 1,
+    level: 6,
     maxHealth: 3,
     attackCooldownMs: 1000,
     detectionRange: 5,
@@ -148,7 +149,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "leader",
-    level: 3,
+    level: 12,
     maxHealth: 6,
     attackCooldownMs: 1330,
     detectionRange: 5,
@@ -160,6 +161,39 @@ export function getEnemyArchetype(
   archetypeId: EnemyArchetypeId | undefined,
 ): EnemyArchetypeDefinition | undefined {
   return archetypeId ? ENEMY_ARCHETYPES[archetypeId] : undefined;
+}
+
+export function getEnemyFamilyId(enemy: Enemy): EnemyFamilyId | undefined {
+  if (enemy.enemyType) {
+    return enemy.enemyType;
+  }
+
+  switch (enemy.archetypeId) {
+    case "slime":
+      return "slime";
+    case "cave_bat":
+      return "bat";
+    case "forest_spider":
+      return "spider";
+    case "goblin_scout":
+    case "goblin_thrower":
+    case "goblin_shaman":
+      return "goblin";
+    case "bog_imp":
+      return "imp";
+    case "wolf":
+      return "wolf";
+    case "stone_crawler":
+      return "crawler";
+    case "mossling":
+      return "mossling";
+    case "ash_wisp":
+      return "wisp";
+    case "orc":
+      return "orc";
+    default:
+      return undefined;
+  }
 }
 
 export function getEnemyTemperament(enemy: Enemy): EnemyTemperament {

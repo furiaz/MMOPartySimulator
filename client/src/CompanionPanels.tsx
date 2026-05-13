@@ -262,6 +262,7 @@ export function PartyManagementPanel({
   leaderId,
   members,
   selectedCompanionId,
+  onChangeLeader,
   onChangeRole,
   onEquipEquipment,
   onSelectCompanion,
@@ -273,6 +274,7 @@ export function PartyManagementPanel({
   leaderId: string;
   members: Companion[];
   selectedCompanionId: string | null;
+  onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onEquipEquipment: (
     companionId: string,
@@ -300,11 +302,15 @@ export function PartyManagementPanel({
           {selectedMember ? (
             <>
               <div className="menu-section-heading">
-                <span>
+                <span className="party-management-heading-title">
                   {getCompanionLabel(selectedMember)} |{" "}
                   {partyMemberRoleLabels[selectedMember.role]}
                 </span>
-                <span>{selectedMember.id}</span>
+                <LeadershipHeaderAction
+                  leaderId={leaderId}
+                  member={selectedMember}
+                  onChangeLeader={onChangeLeader}
+                />
               </div>
               <nav
                 className="party-management-sections"
@@ -337,6 +343,42 @@ export function PartyManagementPanel({
         </div>
       </div>
     </section>
+  );
+}
+
+function LeadershipHeaderAction({
+  leaderId,
+  member,
+  onChangeLeader,
+}: {
+  leaderId: string;
+  member: Companion;
+  onChangeLeader: (companionId: string) => void;
+}) {
+  if (member.id === leaderId) {
+    return (
+      <span className="leadership-status leadership-current">
+        Current Leader
+      </span>
+    );
+  }
+
+  if (member.state === "dead") {
+    return (
+      <span className="leadership-status leadership-unavailable">
+        Leader Unavailable
+      </span>
+    );
+  }
+
+  return (
+    <button
+      className="leadership-action-button"
+      onClick={() => onChangeLeader(member.id)}
+      type="button"
+    >
+      Make Leader
+    </button>
   );
 }
 

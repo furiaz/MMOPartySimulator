@@ -33,7 +33,7 @@ export type EnemyArchetypeId =
   | "goblin_thrower"
   | "bog_imp"
   | "stone_crawler"
-  | "thorn_shaman"
+  | "goblin_shaman"
   | "ash_wisp"
   | "mossling"
   | "wolf"
@@ -61,7 +61,21 @@ export type EnemyTargetDecisionReason =
   | "outside_leash"
   | "no_valid_target";
 
-export type EnemyType = "wolf" | "orc";
+export type LootTier = 1 | 2;
+
+export type EnemyFamilyId =
+  | "slime"
+  | "bat"
+  | "spider"
+  | "goblin"
+  | "imp"
+  | "wolf"
+  | "crawler"
+  | "mossling"
+  | "wisp"
+  | "orc";
+
+export type EnemyType = EnemyFamilyId;
 
 export type CommandPriority = "autonomous" | "direct";
 
@@ -95,12 +109,22 @@ export type CompanionRole = PartyMemberRole;
 
 export type ResourceType = "wood" | "ore" | "herb";
 
+export type ResourceItemId =
+  | ResourceType
+  | "softwood"
+  | "copper_ore"
+  | "field_herb"
+  | "hardwood"
+  | "iron_ore"
+  | "redleaf_herb";
+
 export type ItemCategory =
   | "material"
   | "consumable"
   | "equipment"
   | "quest"
-  | "event";
+  | "event"
+  | "junk";
 
 export type EquipmentSlot =
   | "head"
@@ -159,13 +183,29 @@ export type EquipmentStatModifiers = {
 
 export type CompanionEquipment = Record<EquipmentSlot, ItemId | null>;
 
-export type LootMaterialItemId =
+export type JunkItemId =
+  | "slime_gel_t1"
+  | "slime_core_t1"
+  | "bat_wing_t1"
+  | "bat_ear_t1"
+  | "spider_silk_t1"
+  | "spider_fang_t1"
+  | "goblin_ear_t1"
+  | "goblin_tooth_t1"
+  | "imp_horn_chip_t1"
+  | "imp_tail_t1"
   | "wolf_pelt"
   | "wolf_fang"
-  | "wolf_claw"
+  | "crawler_pebble_t1"
+  | "crawler_plate_t1"
+  | "moss_tuft_t1"
+  | "mossling_cap_t1"
+  | "goblin_ear_t2"
+  | "goblin_tooth_t2"
+  | "wisp_ash_t2"
+  | "wisp_ember_t2"
   | "orc_tusk"
-  | "orc_hide"
-  | "orc_scrap";
+  | "orc_hide";
 
 export type EquipmentItemId =
   | "training_sword"
@@ -198,7 +238,7 @@ export type EquipmentItemId =
   | "reinforced_gloves"
   | "reinforced_boots";
 
-export type ItemId = ResourceType | LootMaterialItemId | EquipmentItemId;
+export type ItemId = ResourceItemId | JunkItemId | EquipmentItemId;
 
 export type ItemRarity =
   | "common"
@@ -213,6 +253,7 @@ export type ItemDefinition = {
   category: ItemCategory;
   description?: string;
   rarity?: ItemRarity;
+  tier?: LootTier;
   stackable: boolean;
   maxStack: number;
   value?: number;
@@ -871,6 +912,7 @@ export type Companion = LivingEntity & {
 export type ResourceEntity = BaseEntity & {
   kind: "resource";
   resourceType: ResourceType;
+  tier: LootTier;
   durability: number;
   maxDurability: number;
   quantity: number;

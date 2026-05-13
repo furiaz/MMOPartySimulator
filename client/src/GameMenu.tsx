@@ -29,6 +29,7 @@ export function GameMenu({
   quests,
   selectedCompanionId,
   selectedQuestId,
+  onChangeLeader,
   onChangeRole,
   onEquipEquipment,
   onOpenEquipmentManagement,
@@ -50,6 +51,7 @@ export function GameMenu({
   quests: GameState["quests"];
   selectedCompanionId: string | null;
   selectedQuestId: QuestId | null;
+  onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onEquipEquipment: (
     companionId: string,
@@ -118,6 +120,7 @@ export function GameMenu({
                   members={members}
                   inventory={inventory}
                   selectedCompanionId={selectedCompanionId}
+                  onChangeLeader={onChangeLeader}
                   onChangeRole={onChangeRole}
                   onEquipEquipment={onEquipEquipment}
                   onSelectCompanion={onSelectCompanion}
