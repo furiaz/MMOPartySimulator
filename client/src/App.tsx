@@ -1,5 +1,7 @@
 import {
+  memo,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent,
@@ -86,6 +88,7 @@ import {
   type Enemy,
   type EquipmentSlot,
   type GameEntity,
+  type GameMap,
   type GameState,
   type ItemId,
   type NpcEntity,
@@ -168,6 +171,69 @@ function getWildernessWallTileKind(position: Position): "tree" | "bush" {
 function getWildernessWallTileSrc(position: Position): string {
   return WILDERNESS_MAP_TILE_SRC[getWildernessWallTileKind(position)];
 }
+
+const TerrainLayer = memo(function TerrainLayer({
+  floorTiles,
+  map,
+  useHubVisuals,
+  useImageFloorTiles,
+  useWildernessVisuals,
+}: {
+  floorTiles: Position[];
+  map: GameMap;
+  useHubVisuals: boolean;
+  useImageFloorTiles: boolean;
+  useWildernessVisuals: boolean;
+}) {
+  return (
+    <div className="map-terrain" aria-hidden="true">
+      {useImageFloorTiles
+        ? floorTiles.map((tile) => (
+            <img
+              key={`floor-${tile.x}-${tile.y}`}
+              alt=""
+              className="floor-tile"
+              src={
+                useHubVisuals
+                  ? getHubFloorTileSrc(tile)
+                  : getWildernessFloorTileSrc(tile)
+              }
+              style={{
+                transform: `translate(${tile.x * cellSize}px, ${
+                  tile.y * cellSize
+                }px)`,
+              }}
+            />
+          ))
+        : null}
+      {map.walls.map((wall) => (
+        <div
+          key={`${wall.x}-${wall.y}`}
+          className={`wall-tile ${
+            useWildernessVisuals
+              ? "wall-wilderness"
+              : mapTileVisualAssets.wall.className
+          }`}
+          style={{
+            transform: `translate(${wall.x * cellSize}px, ${
+              wall.y * cellSize
+            }px)`,
+          }}
+        >
+          {useWildernessVisuals ? (
+            <img
+              alt=""
+              className={`wall-wilderness-image ${getWildernessWallTileKind(
+                wall,
+              )}`}
+              src={getWildernessWallTileSrc(wall)}
+            />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+});
 
 function formatResourceName(resourceType: ResourceEntity["resourceType"]): string {
   return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
@@ -326,10 +392,12 @@ function getCameraAxisStep({
   current,
   target,
   focusDelta,
+  deltaMs = 1000 / 60,
 }: {
   current: number;
   target: number;
   focusDelta: number;
+  deltaMs?: number;
 }): number {
   const targetDistance = target - current;
 
@@ -348,7 +416,10 @@ function getCameraAxisStep({
     return current + matchedDistance;
   }
 
-  return current + targetDistance * cameraSettleFactor;
+  const frameAdjustedSettleFactor =
+    1 - Math.pow(1 - cameraSettleFactor, deltaMs / (1000 / 60));
+
+  return current + targetDistance * frameAdjustedSettleFactor;
 }
 
 function getVelocityMatchedCameraOffset({
@@ -356,11 +427,13 @@ function getVelocityMatchedCameraOffset({
   targetOffset,
   focusDelta,
   maximumOffset,
+  deltaMs,
 }: {
   currentOffset: Position;
   targetOffset: Position;
   focusDelta: Position;
   maximumOffset: Position;
+  deltaMs?: number;
 }): Position {
   return {
     x: clamp(
@@ -368,6 +441,7 @@ function getVelocityMatchedCameraOffset({
         current: currentOffset.x,
         target: targetOffset.x,
         focusDelta: focusDelta.x,
+        deltaMs,
       }),
       0,
       maximumOffset.x,
@@ -377,6 +451,7 @@ function getVelocityMatchedCameraOffset({
         current: currentOffset.y,
         target: targetOffset.y,
         focusDelta: focusDelta.y,
+        deltaMs,
       }),
       0,
       maximumOffset.y,
@@ -387,20 +462,24 @@ function getVelocityMatchedCameraOffset({
 function getSettledCameraOffset({
   currentOffset,
   targetOffset,
+  deltaMs,
 }: {
   currentOffset: Position;
   targetOffset: Position;
+  deltaMs?: number;
 }): Position {
   return {
     x: getCameraAxisStep({
       current: currentOffset.x,
       target: targetOffset.x,
       focusDelta: 0,
+      deltaMs,
     }),
     y: getCameraAxisStep({
       current: currentOffset.y,
       target: targetOffset.y,
       focusDelta: 0,
+      deltaMs,
     }),
   };
 }
@@ -441,6 +520,9 @@ function createInitialState(): GameState {
     activeTeleport: null,
     autoModeEnabled: false,
     simulationTick: 0,
+    simulationFrame: 0,
+    simulationTimeMs: 0,
+    simulationDeltaMs: 100,
     partyLeaderId: leader.id,
     leaderIntent: null,
     quests: createInitialQuestStates(),
@@ -572,10 +654,6 @@ function App() {
     width: window.innerWidth,
     height: window.innerHeight,
   }));
-  const [visualCameraOffset, setVisualCameraOffset] = useState<Position>({
-    x: 0,
-    y: 0,
-  });
   const [
     visualMovementByEntityId,
     setVisualMovementByEntityId,
@@ -583,6 +661,7 @@ function App() {
   const stopLoopRef = useRef<(() => void) | null>(null);
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
+  const mapWorldRef = useRef<HTMLDivElement | null>(null);
   const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
   const cameraMapIdRef = useRef<string | undefined>(undefined);
   const previousCameraFocusRef = useRef<Position | null>(null);
@@ -676,7 +755,14 @@ function App() {
     !activeMerchant && (gameState.wallet.visibleUntil ?? 0) > currentTime;
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
+    let animationFrameId = 0;
+    let isActive = true;
+
+    function stepVisualClock() {
+      if (!isActive) {
+        return;
+      }
+
       const now = Date.now();
       const latestPositions = latestAnimatedEntityPositionsRef.current;
       const previousPositions = previousAnimatedEntityPositionsRef.current;
@@ -710,10 +796,14 @@ function App() {
       }
 
       previousAnimatedEntityPositionsRef.current = { ...latestPositions };
-    }, 100);
+      animationFrameId = window.requestAnimationFrame(stepVisualClock);
+    }
+
+    animationFrameId = window.requestAnimationFrame(stepVisualClock);
 
     return () => {
-      window.clearInterval(intervalId);
+      isActive = false;
+      window.cancelAnimationFrame(animationFrameId);
       stopLoopRef.current?.();
     };
   }, []);
@@ -1041,6 +1131,7 @@ function App() {
 
   function commandPartyToMoveFromFloorClick(event: MouseEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
+    const visualCameraOffset = visualCameraOffsetRef.current;
     const targetPosition = {
       x: Math.floor(
         (event.clientX - bounds.left + visualCameraOffset.x) / cellSize,
@@ -1202,9 +1293,13 @@ function App() {
   const useWildernessVisuals = isWildernessVisualMap(currentMap.id);
   const useHubVisuals = isHubVisualMap(currentMap.id);
   const useImageFloorTiles = useWildernessVisuals || useHubVisuals;
-  const floorTiles = useImageFloorTiles
-    ? createFloorTilePositions(currentMap.columns, currentMap.rows)
-    : [];
+  const floorTiles = useMemo(
+    () =>
+      useImageFloorTiles
+        ? createFloorTilePositions(currentMap.columns, currentMap.rows)
+        : [],
+    [currentMap.columns, currentMap.rows, useImageFloorTiles],
+  );
   const mapPixelWidth = currentMap.columns * cellSize;
   const mapPixelHeight = currentMap.rows * cellSize;
   const leaderCameraPosition = leader?.position ?? { x: 0, y: 0 };
@@ -1213,6 +1308,14 @@ function App() {
     y: leaderCameraPosition.y * cellSize + cellSize / 2,
   };
   const currentMapKey = currentMap.id ?? currentMap.debugName;
+
+  function applyMapWorldTransform(offset: Position) {
+    if (!mapWorldRef.current) {
+      return;
+    }
+
+    mapWorldRef.current.style.transform = `translate(${-offset.x}px, ${-offset.y}px)`;
+  }
 
   useEffect(() => {
     const maximumOffset = getMaximumCameraOffset({
@@ -1232,7 +1335,7 @@ function App() {
       cameraMapIdRef.current = currentMapKey;
       previousCameraFocusRef.current = leaderCameraFocusPosition;
       visualCameraOffsetRef.current = targetOffset;
-      setVisualCameraOffset(targetOffset);
+      applyMapWorldTransform(targetOffset);
       return;
     }
 
@@ -1250,12 +1353,16 @@ function App() {
     });
     previousCameraFocusRef.current = leaderCameraFocusPosition;
     visualCameraOffsetRef.current = velocityMatchedOffset;
-    setVisualCameraOffset(velocityMatchedOffset);
+    applyMapWorldTransform(velocityMatchedOffset);
 
     let animationFrameId = 0;
     let isActive = true;
+    let previousCameraStepAt = Date.now();
 
     function stepCamera() {
+      const now = Date.now();
+      const deltaMs = now - previousCameraStepAt;
+      previousCameraStepAt = now;
       const currentOffset = visualCameraOffsetRef.current;
       const nextTargetOffset = getDeadZoneCameraOffset({
         focusPosition: leaderCameraFocusPosition,
@@ -1272,17 +1379,18 @@ function App() {
         Math.abs(yDistance) <= cameraSnapDistance
       ) {
         visualCameraOffsetRef.current = nextTargetOffset;
-        setVisualCameraOffset(nextTargetOffset);
+        applyMapWorldTransform(nextTargetOffset);
         return;
       }
 
       const nextOffset = getSettledCameraOffset({
         currentOffset,
         targetOffset: nextTargetOffset,
+        deltaMs,
       });
 
       visualCameraOffsetRef.current = nextOffset;
-      setVisualCameraOffset(nextOffset);
+      applyMapWorldTransform(nextOffset);
 
       if (isActive) {
         animationFrameId = window.requestAnimationFrame(stepCamera);
@@ -1327,57 +1435,20 @@ function App() {
             <span>debug: {currentMap.debugName}</span>
           </div>
           <div
+            ref={mapWorldRef}
             className="map-world"
             style={{
               width: mapPixelWidth,
               height: mapPixelHeight,
-              transform: `translate(${-visualCameraOffset.x}px, ${-visualCameraOffset.y}px)`,
             }}
           >
-            {floorTiles.map((tile) => (
-              <img
-                key={`floor-${tile.x}-${tile.y}`}
-                alt=""
-                aria-hidden="true"
-                className="floor-tile"
-                src={
-                  useHubVisuals
-                    ? getHubFloorTileSrc(tile)
-                    : getWildernessFloorTileSrc(tile)
-                }
-                style={{
-                  transform: `translate(${tile.x * cellSize}px, ${
-                    tile.y * cellSize
-                  }px)`,
-                }}
-              />
-            ))}
-            {currentMap.walls.map((wall) => (
-              <div
-                key={`${wall.x}-${wall.y}`}
-                className={`wall-tile ${
-                  useWildernessVisuals
-                    ? "wall-wilderness"
-                    : mapTileVisualAssets.wall.className
-                }`}
-                style={{
-                  transform: `translate(${wall.x * cellSize}px, ${
-                    wall.y * cellSize
-                  }px)`,
-                }}
-              >
-                {useWildernessVisuals ? (
-                  <img
-                    alt=""
-                    aria-hidden="true"
-                    className={`wall-wilderness-image ${getWildernessWallTileKind(
-                      wall,
-                    )}`}
-                    src={getWildernessWallTileSrc(wall)}
-                  />
-                ) : null}
-              </div>
-            ))}
+            <TerrainLayer
+              floorTiles={floorTiles}
+              map={currentMap}
+              useHubVisuals={useHubVisuals}
+              useImageFloorTiles={useImageFloorTiles}
+              useWildernessVisuals={useWildernessVisuals}
+            />
             {activeTeleport ? (
               <div
                 className="teleport-range"
@@ -2029,7 +2100,7 @@ function App() {
                 </button>
                 <span>
                   Debug Recording{" "}
-                  {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Ticks{" "}
+                  {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Samples{" "}
                   {gameState.debugTelemetry?.ticks.length ?? 0}/
                   {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
                   {gameState.debugTelemetry?.events.length ?? 0}

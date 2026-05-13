@@ -27,9 +27,9 @@ const GATHER_APPROACH_BUFFER = 0.15;
 export function updateGatherSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
+  now = Date.now(),
 ): GameState {
   let nextState = state;
-  const now = Date.now();
   const allowedGathererIdsByResource = getAllowedGathererIdsByResource(state);
 
   for (const entity of Object.values(state.entities)) {

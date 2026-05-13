@@ -24,8 +24,11 @@ import type {
 } from "./types";
 
 export const PARTY_COHESION_DISTANCE = 4;
+export const PARTY_WAIT_DISTANCE = 7;
 export const FOLLOW_DISTANCE = 1.5;
 export const FOLLOW_CATCHUP_DISTANCE = 5;
+const LEADER_COHESION_SLOW_SPEED_MULTIPLIER = 0.45;
+const FOLLOWER_CATCH_UP_SPEED_MULTIPLIER = 1.8;
 export const COMBAT_BREAK_DISTANCE = 3;
 export const POI_REACHED_DISTANCE = 1;
 export const GATHERER_REJOIN_DISTANCE = 6;
@@ -34,6 +37,11 @@ type PartyPlan = {
   phase: FormationPhase;
   target: Enemy | null;
   targetPosition: Position | null;
+};
+
+type PartyTravelCohesion = {
+  canMoveLeader: boolean;
+  leaderSpeedMultiplier: number;
 };
 
 export function updatePartyFormationSystem(
@@ -61,8 +69,17 @@ export function updatePartyFormationSystem(
 
   nextState = assignPartyTravelTargets(nextState, leader, plan);
 
-  if (isPartyCohesive(nextState, leader) || isLeaderHandoffActive(nextState, leader)) {
-    nextState = moveLeaderTowardPoi(nextState, leader.id, plan, movedEntityIds);
+  const handoffActive = isLeaderHandoffActive(nextState, leader);
+  const travelCohesion = getPartyTravelCohesion(nextState, leader);
+
+  if (travelCohesion.canMoveLeader || handoffActive) {
+    nextState = moveLeaderTowardPoi(
+      nextState,
+      leader.id,
+      plan,
+      movedEntityIds,
+      handoffActive ? 1 : travelCohesion.leaderSpeedMultiplier,
+    );
   }
 
   nextState = moveFollowersTowardLeader(nextState, leader.id, movedEntityIds);
@@ -205,6 +222,7 @@ function moveLeaderTowardPoi(
   leaderId: string,
   plan: PartyPlan,
   movedEntityIds: Set<string>,
+  speedMultiplier = 1,
 ): GameState {
   if (!plan.targetPosition || movedEntityIds.has(leaderId)) {
     return state;
@@ -224,7 +242,7 @@ function moveLeaderTowardPoi(
     state,
     leader,
     plan.targetPosition,
-    { allowPartyPassThrough: true },
+    { allowPartyPassThrough: true, speedMultiplier },
   );
 
   if (didEntityMove(nextState, leader)) {
@@ -284,7 +302,10 @@ function moveFollowersTowardLeader(
       nextState,
       currentMember,
       followPosition,
-      { allowPartyPassThrough: true },
+      {
+        allowPartyPassThrough: true,
+        speedMultiplier: shouldCatchUp ? FOLLOWER_CATCH_UP_SPEED_MULTIPLIER : 1,
+      },
     );
 
     if (didEntityMove(nextMemberState, currentMember)) {
@@ -357,37 +378,84 @@ function clearFinishedCombat(state: GameState): GameState {
   return setLeaderIntent(nextState, null);
 }
 
-function isPartyCohesive(state: GameState, leader: PartyMember): boolean {
-  return getPartyMembers(state)
-    .filter((member) => member.commandPriority !== "direct")
-    .filter(
-      (member) =>
-        member.role !== "gatherer" ||
-        (!isGathererBusy(state, member) &&
-          getDistance(member.position, leader.position) <= GATHERER_REJOIN_DISTANCE),
-    )
-    .every(
-      (member) =>
-        member.id === leader.id ||
-        getDistance(member.position, leader.position) <= PARTY_COHESION_DISTANCE,
-    );
+function getPartyTravelCohesion(
+  state: GameState,
+  leader: PartyMember,
+): PartyTravelCohesion {
+  let shouldSlowLeader = false;
+
+  for (const member of getPartyMembers(state)) {
+    if (member.id === leader.id || !isRequiredForTravelCohesion(state, member, leader)) {
+      continue;
+    }
+
+    const distance = getDistance(member.position, leader.position);
+
+    if (distance > PARTY_WAIT_DISTANCE) {
+      return {
+        canMoveLeader: false,
+        leaderSpeedMultiplier: 0,
+      };
+    }
+
+    if (distance > PARTY_COHESION_DISTANCE) {
+      shouldSlowLeader = true;
+    }
+  }
+
+  return {
+    canMoveLeader: true,
+    leaderSpeedMultiplier: shouldSlowLeader
+      ? LEADER_COHESION_SLOW_SPEED_MULTIPLIER
+      : 1,
+  };
+}
+
+function isRequiredForTravelCohesion(
+  state: GameState,
+  member: PartyMember,
+  leader: PartyMember,
+): boolean {
+  if (member.commandPriority === "direct") {
+    return false;
+  }
+
+  if (member.role !== "gatherer") {
+    return true;
+  }
+
+  return (
+    !isGathererBusy(state, member) &&
+    getDistance(member.position, leader.position) <= GATHERER_REJOIN_DISTANCE
+  );
 }
 
 function isLeaderHandoffActive(state: GameState, leader: PartyMember): boolean {
-  return state.partyLeaderId === leader.id && (state.leaderHandoffTicks ?? 0) > 0;
+  return (
+    state.partyLeaderId === leader.id &&
+    (state.leaderHandoffRemainingMs ?? 0) > 0
+  );
 }
 
 function consumeLeaderHandoffTick(
   state: GameState,
   leaderId: string,
 ): GameState {
-  if (state.partyLeaderId !== leaderId || !state.leaderHandoffTicks) {
+  if (
+    state.partyLeaderId !== leaderId ||
+    !state.leaderHandoffRemainingMs
+  ) {
     return state;
   }
 
+  const nextRemainingMs = Math.max(
+    0,
+    (state.leaderHandoffRemainingMs ?? 0) - (state.simulationDeltaMs ?? 100),
+  );
+
   return {
     ...state,
-    leaderHandoffTicks: Math.max(0, state.leaderHandoffTicks - 1),
+    leaderHandoffRemainingMs: nextRemainingMs,
   };
 }
 

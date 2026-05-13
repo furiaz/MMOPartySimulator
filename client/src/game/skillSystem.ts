@@ -34,9 +34,8 @@ type SkillUse = {
   score: number;
 };
 
-export function updateSkillSystem(state: GameState): GameState {
+export function updateSkillSystem(state: GameState, now = Date.now()): GameState {
   let nextState = state;
-  const now = Date.now();
 
   for (const entity of Object.values(state.entities)) {
     const caster = nextState.entities[entity.id];

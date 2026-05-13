@@ -53,6 +53,10 @@ import type {
   QuestId,
   QuestState,
 } from "./questTypes";
+import {
+  GAME_LOOP_TICK_MS,
+  type SimulationTiming,
+} from "./simulationTiming";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const COMBAT_FEEDBACK_DURATION_MS = 900;
@@ -60,7 +64,7 @@ const POSITION_EPSILON = 0.001;
 export const ENTITY_COLLISION_DISTANCE = 0.7;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
-const PARTY_LEADER_HANDOFF_TICKS = 8;
+const PARTY_LEADER_HANDOFF_MS = 800;
 
 type FindAvailablePositionOptions = {
   blockedPositions?: Position[];
@@ -71,7 +75,9 @@ type WalkablePositionOptions = {
   allowPartyPassThrough?: boolean;
 };
 
-type MovementOptions = WalkablePositionOptions;
+type MovementOptions = WalkablePositionOptions & {
+  speedMultiplier?: number;
+};
 
 type MovementPath = {
   targetKey: string;
@@ -92,7 +98,7 @@ export type MovementFailureDetail = {
   blockerKind?: GameEntity["kind"] | "wall" | "bounds" | "reserved" | "unknown";
 };
 
-export { clearTickMovementPlanning } from "./movementState";
+export { clearFrameMovementPlanning, clearTickMovementPlanning } from "./movementState";
 
 export type GameState = {
   entities: Record<string, GameEntity>;
@@ -103,8 +109,12 @@ export type GameState = {
   activeTeleport?: ActiveTeleport | null;
   autoModeEnabled: boolean;
   simulationTick: number;
+  simulationFrame?: number;
+  simulationTimeMs?: number;
+  simulationDeltaMs?: number;
   partyLeaderId: string;
   leaderHandoffTicks?: number;
+  leaderHandoffRemainingMs?: number;
   leaderIntent: LeaderIntent | null;
   quests: Record<QuestId, QuestState>;
   globalPoiIntent: GlobalPoiIntent | null;
@@ -114,6 +124,7 @@ export type GameState = {
   followTrailsByEntityId: Record<string, Position[]>;
   lastPositionsByEntityId?: Record<string, Position>;
   failedMoveByEntityId?: Record<string, true>;
+  movementFailureMsByEntityId?: Record<string, number>;
   movementFailuresByEntityId?: Record<string, MovementFailureDetail>;
   moveIntentsByEntityId?: Record<string, Position>;
   reservedPositionsByEntityId?: Record<string, Position>;
@@ -121,6 +132,8 @@ export type GameState = {
   movementDecisionsByEntityId?: Record<string, DebugNavigationReason>;
   defenderWaitTicksByLeaderId?: Record<string, number>;
   defenderBlockedTicksByEntityId?: Record<string, number>;
+  defenderWaitMsByLeaderId?: Record<string, number>;
+  defenderBlockedMsByEntityId?: Record<string, number>;
   partyFormation?: PartyFormationState;
   combatFeedbackEvents: CombatFeedbackEvent[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
@@ -352,10 +365,10 @@ export function setPartyLeader(
   return {
     ...state,
     partyLeaderId: entity.id,
-    leaderHandoffTicks:
+    leaderHandoffRemainingMs:
       state.partyLeaderId === entity.id
-        ? state.leaderHandoffTicks
-        : PARTY_LEADER_HANDOFF_TICKS,
+        ? state.leaderHandoffRemainingMs
+        : PARTY_LEADER_HANDOFF_MS,
   };
 }
 
@@ -363,6 +376,21 @@ export function advanceSimulationTick(state: GameState): GameState {
   return {
     ...state,
     simulationTick: state.simulationTick + 1,
+  };
+}
+
+export function advanceSimulationTime(
+  state: GameState,
+  timing: SimulationTiming,
+): GameState {
+  const nextFrame = (state.simulationFrame ?? state.simulationTick ?? 0) + 1;
+
+  return {
+    ...state,
+    simulationTick: nextFrame,
+    simulationFrame: nextFrame,
+    simulationTimeMs: (state.simulationTimeMs ?? 0) + timing.deltaMs,
+    simulationDeltaMs: timing.deltaMs,
   };
 }
 
@@ -493,7 +521,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
       entity.id,
       moveResolution.reason,
     );
-    const reservedState = reserveSwapPositionsForTick(
+    const reservedState = reserveSwapPositionsForFrame(
       decisionState,
       entity.id,
       moveResolution.swapWithEntityId,
@@ -536,7 +564,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     entity.id,
     moveResolution.reason,
   );
-  const reservedState = reservePositionForTick(
+  const reservedState = reservePositionForFrame(
     decisionState,
     entity.id,
     moveResolution.position,
@@ -591,7 +619,7 @@ function createPositionTarget(position: Position): GameEntity {
   };
 }
 
-export function reservePositionForTick(
+export function reservePositionForFrame(
   state: GameState,
   entityId: string,
   position: Position,
@@ -721,7 +749,11 @@ function getNextMoveResolution(
     return pathMoveResolution;
   }
 
-  const movedEntity = moveEntityToward(entity, target);
+  const movedEntity = moveEntityToward(
+    entity,
+    target,
+    getMovementDeltaMs(state, options),
+  );
 
   if (isSamePosition(movedEntity.position, entity.position)) {
     return null;
@@ -815,7 +847,11 @@ function getPathMoveResolution(
     return null;
   }
 
-  const movedEntity = moveEntityToward(entity, createPositionTarget(waypoint));
+  const movedEntity = moveEntityToward(
+    entity,
+    createPositionTarget(waypoint),
+    getMovementDeltaMs(state, options),
+  );
 
   if (
     isSamePosition(movedEntity.position, entity.position) ||
@@ -899,6 +935,8 @@ function setMovementPath(
   };
 }
 
+export const reservePositionForTick = reservePositionForFrame;
+
 function clearMovementPath(state: GameState, entityId: string): GameState {
   if (!state.movementPathsByEntityId?.[entityId]) {
     return state;
@@ -966,8 +1004,10 @@ function findAlternativeMovePosition(
   }
 
   const candidates = getAlternativeMoveCandidates(
+    state,
     entity,
     target.position,
+    options,
   );
   const previousPosition = state.lastPositionsByEntityId?.[entity.id];
   const validCandidates = candidates
@@ -993,14 +1033,19 @@ function findAlternativeMovePosition(
 }
 
 function getAlternativeMoveCandidates(
+  state: GameState,
   entity: GameEntity,
   target: Position,
+  options: MovementOptions = {},
 ): Position[] {
   const current = entity.position;
   const xStep = Math.sign(target.x - current.x);
   const yStep = Math.sign(target.y - current.y);
   const candidates: Position[] = [];
-  const stepDistance = getMovementStepDistance(entity);
+  const stepDistance = getMovementStepDistance(
+    entity,
+    getMovementDeltaMs(state, options),
+  );
 
   addAlternativeStepCandidates(
     candidates,
@@ -1013,6 +1058,14 @@ function getAlternativeMoveCandidates(
   return dedupePositions(candidates).filter(
     (position) => !isSamePosition(position, current),
   );
+}
+
+function getMovementDeltaMs(
+  state: GameState,
+  options: MovementOptions = {},
+): number {
+  return (state.simulationDeltaMs ?? GAME_LOOP_TICK_MS) *
+    (options.speedMultiplier ?? 1);
 }
 
 function addAlternativeStepCandidates(
@@ -1260,7 +1313,7 @@ function getSwapCandidate(
     : undefined;
 }
 
-function reserveSwapPositionsForTick(
+function reserveSwapPositionsForFrame(
   state: GameState,
   firstEntityId: string,
   secondEntityId: string,

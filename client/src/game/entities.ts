@@ -15,13 +15,19 @@ import type {
   ResourceEntity,
   ResourceType,
 } from "./types";
-import { MOVEMENT_STEP_TICK_SCALE } from "./simulationTiming";
+import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { createEmptyCompanionEquipment } from "./equipmentTypes";
 import { getEnemyArchetype } from "./enemyArchetypes";
 
-export const MOVEMENT_STEP_DISTANCE = 0.455 * MOVEMENT_STEP_TICK_SCALE;
-export const ENEMY_MOVEMENT_STEP_DISTANCE = 0.58 * MOVEMENT_STEP_TICK_SCALE;
-export const COMPANION_MOVEMENT_STEP_DISTANCE = MOVEMENT_STEP_DISTANCE * 2.197;
+export const MOVEMENT_SPEED_PER_SECOND = 0.91;
+export const ENEMY_MOVEMENT_SPEED_PER_SECOND = 1.16;
+export const COMPANION_MOVEMENT_SPEED_PER_SECOND = 2;
+export const MOVEMENT_STEP_DISTANCE =
+  MOVEMENT_SPEED_PER_SECOND * (GAME_LOOP_TICK_MS / 1000);
+export const ENEMY_MOVEMENT_STEP_DISTANCE =
+  ENEMY_MOVEMENT_SPEED_PER_SECOND * (GAME_LOOP_TICK_MS / 1000);
+export const COMPANION_MOVEMENT_STEP_DISTANCE =
+  COMPANION_MOVEMENT_SPEED_PER_SECOND * (GAME_LOOP_TICK_MS / 1000);
 const STARTING_HEALTH = 10;
 const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
@@ -162,10 +168,11 @@ export function moveEntityTo<T extends GameEntity>(
 export function moveEntityToward<T extends GameEntity>(
   entity: T,
   target: GameEntity,
+  deltaMs = GAME_LOOP_TICK_MS,
 ): T {
   return moveEntityTo(
     entity,
-    stepToward(entity.position, target.position, getMovementStepDistance(entity)),
+    stepToward(entity.position, target.position, getMovementStepDistance(entity, deltaMs)),
   );
 }
 
@@ -281,16 +288,21 @@ export function isResourceEntity(
   return entity?.kind === "resource";
 }
 
-export function getMovementStepDistance(entity: GameEntity): number {
+export function getMovementStepDistance(
+  entity: GameEntity,
+  deltaMs = GAME_LOOP_TICK_MS,
+): number {
+  const deltaSeconds = deltaMs / 1000;
+
   if (entity.kind === "companion") {
-    return COMPANION_MOVEMENT_STEP_DISTANCE;
+    return COMPANION_MOVEMENT_SPEED_PER_SECOND * deltaSeconds;
   }
 
   if (entity.kind === "enemy") {
-    return ENEMY_MOVEMENT_STEP_DISTANCE;
+    return ENEMY_MOVEMENT_SPEED_PER_SECOND * deltaSeconds;
   }
 
-  return MOVEMENT_STEP_DISTANCE;
+  return MOVEMENT_SPEED_PER_SECOND * deltaSeconds;
 }
 
 function stepToward(

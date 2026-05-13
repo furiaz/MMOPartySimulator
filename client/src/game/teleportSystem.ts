@@ -282,6 +282,8 @@ function completeTeleport(state: GameState): GameState {
     lastPositionsByEntityId: {},
     defenderWaitTicksByLeaderId: {},
     defenderBlockedTicksByEntityId: {},
+    defenderWaitMsByLeaderId: {},
+    defenderBlockedMsByEntityId: {},
     skillVisualEvents: [],
     dropVisualEvents: [],
     partyFormation: {

@@ -15,7 +15,7 @@ import {
   getEntityById,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
-  reservePositionForTick,
+  reservePositionForFrame,
   updateEntity,
   type GameState,
 } from "./state";
@@ -53,9 +53,9 @@ const FINAL_STEP_ATTACK_DISTANCE = MOVEMENT_STEP_DISTANCE * 0.5;
 export function updateAttackSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
+  now = Date.now(),
 ): GameState {
   let nextState = state;
-  const now = Date.now();
 
   for (const entity of getCombatMovementOrder(state)) {
     const attacker = getEntityById(nextState, entity.id);
@@ -107,7 +107,7 @@ export function updateAttackSystem(
       : currentAttacker;
 
     if (finalStepPosition) {
-      nextState = reservePositionForTick(nextState, currentAttacker.id, finalStepPosition);
+      nextState = reservePositionForFrame(nextState, currentAttacker.id, finalStepPosition);
       nextState = updateEntity(nextState, attackReadyAttacker);
       movedEntityIds.add(currentAttacker.id);
     }
@@ -216,7 +216,7 @@ export function updateAttackSystem(
 
     if (attackSlot) {
       nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
-      nextState = reservePositionForTick(nextState, currentAttacker.id, attackSlot, {
+      nextState = reservePositionForFrame(nextState, currentAttacker.id, attackSlot, {
         allowPartyPassThrough: true,
       });
     }

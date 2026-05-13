@@ -8,7 +8,7 @@ import {
 } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity } from "./entityGuards";
-import { GAME_LOOP_TICK_MS } from "./simulationTiming";
+import { GAME_LOOP_TICK_MS, type SimulationTiming } from "./simulationTiming";
 import { getPartyLeader } from "./partySystem";
 import {
   getEnemyDetectionRange as getArchetypeDetectionRange,
@@ -39,7 +39,15 @@ type TargetSearchResult = {
   reason: EnemyTargetDecisionReason;
 };
 
-export function updateEnemyAISystem(state: GameState): GameState {
+export function updateEnemyAISystem(
+  state: GameState,
+  timing: SimulationTiming = {
+    nowMs: Date.now(),
+    deltaMs: GAME_LOOP_TICK_MS,
+    deltaSeconds: GAME_LOOP_TICK_MS / 1000,
+    frameNumber: state.simulationFrame ?? state.simulationTick ?? 0,
+  },
+): GameState {
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
@@ -77,19 +85,19 @@ export function updateEnemyAISystem(state: GameState): GameState {
     }
 
     if (entity.currentTargetId) {
-      nextState = updateEntity(nextState, clearEnemyTarget(entity, Date.now()));
+      nextState = updateEntity(nextState, clearEnemyTarget(entity, timing.nowMs));
       continue;
     }
 
     if (getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
-      nextState = moveEnemyTowardHome(nextState, entity);
+      nextState = moveEnemyTowardHome(nextState, entity, timing.nowMs);
       continue;
     }
 
     if (getEnemyTemperament(entity) === "passive") {
       const reasonedEnemy = withTargetDecisionReason(entity, "passive_no_auto_target");
       nextState = updateEntity(nextState, reasonedEnemy);
-      nextState = updateEnemyWander(nextState, reasonedEnemy);
+      nextState = updateEnemyWander(nextState, reasonedEnemy, timing);
       continue;
     }
 
@@ -98,7 +106,7 @@ export function updateEnemyAISystem(state: GameState): GameState {
     if (!target) {
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
       nextState = updateEntity(nextState, reasonedEnemy);
-      nextState = updateEnemyWander(nextState, reasonedEnemy);
+      nextState = updateEnemyWander(nextState, reasonedEnemy, timing);
       continue;
     }
 
@@ -248,8 +256,12 @@ function getDistanceSquared(a: GameEntity, b: GameEntity): number {
   return xDistance * xDistance + yDistance * yDistance;
 }
 
-function updateEnemyWander(state: GameState, enemy: Enemy): GameState {
-  const now = Date.now();
+function updateEnemyWander(
+  state: GameState,
+  enemy: Enemy,
+  timing: SimulationTiming,
+): GameState {
+  const now = timing.nowMs;
 
   if (enemy.roamTargetPosition && enemy.roamMoveUntil && now <= enemy.roamMoveUntil) {
     return moveEnemyTowardRoamTarget(state, enemy, now);
@@ -284,8 +296,8 @@ function updateEnemyWander(state: GameState, enemy: Enemy): GameState {
   });
 }
 
-function moveEnemyTowardHome(state: GameState, enemy: Enemy): GameState {
-  const clearedEnemy = clearEnemyTarget(enemy);
+function moveEnemyTowardHome(state: GameState, enemy: Enemy, now: number): GameState {
+  const clearedEnemy = clearEnemyTarget(enemy, now);
   const nextState =
     enemy.state === "idle" && !enemy.currentTargetId
       ? state
@@ -355,7 +367,7 @@ function getRandomWanderTarget(enemy: Enemy, roamMoveDuration: number): Position
 }
 
 function getRoamDistanceForDuration(enemy: Enemy, roamMoveDuration: number): number {
-  return getMovementStepDistance(enemy) * Math.max(1, roamMoveDuration / GAME_LOOP_TICK_MS);
+  return getMovementStepDistance(enemy, roamMoveDuration);
 }
 
 function clampToRoamLeash(homePosition: Position, position: Position): Position {

@@ -11,6 +11,7 @@ import type { AutonomousEntity, GameEntity } from "./types";
 
 export const FOLLOW_LEASH_RADIUS = 1.5;
 const FOLLOW_CATCHUP_DISTANCE = 5;
+const FOLLOW_CATCH_UP_SPEED_MULTIPLIER = 1.8;
 
 export function updateFollowSystem(
   state: GameState,
@@ -43,37 +44,22 @@ export function updateFollowSystem(
     }
 
     const previousPosition = follower.position;
-    const stepCount =
+    const speedMultiplier =
       getGridDistance(follower.position, leader.position) >= FOLLOW_CATCHUP_DISTANCE
-        ? 2
+        ? FOLLOW_CATCH_UP_SPEED_MULTIPLIER
         : 1;
 
-    for (let step = 0; step < stepCount; step += 1) {
-      const currentFollower = getEntityById(nextState, follower.id);
-      const currentLeader = getPartyLeader(nextState);
-
-      if (
-        !currentFollower ||
-        !currentLeader ||
-        !isFollowingAutonomousEntity(currentFollower) ||
-        (isWithinFollowLeash(nextState, currentFollower, currentLeader) &&
-          !isStackedWithPartyMember(nextState, currentFollower))
-      ) {
-        break;
-      }
-
-      nextState = moveEntityTowardPositionIfUnoccupied(
+    nextState = moveEntityTowardPositionIfUnoccupied(
+      nextState,
+      follower,
+      getSoftFollowPosition(
         nextState,
-        currentFollower,
-        getSoftFollowPosition(
-          nextState,
-          currentFollower,
-          currentLeader,
-          nextState.leaderIntent?.targetPosition,
-        ),
-        { allowPartyPassThrough: true },
-      );
-    }
+        follower,
+        leader,
+        nextState.leaderIntent?.targetPosition,
+      ),
+      { allowPartyPassThrough: true, speedMultiplier },
+    );
 
     const movedFollower = getEntityById(nextState, follower.id);
 

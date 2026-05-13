@@ -23,19 +23,29 @@ import {
 } from "./teleportSystem";
 import { recordDebugTelemetryTick } from "./debugTelemetry";
 import {
-  advanceSimulationTick,
+  advanceSimulationTime,
   clearExpiredCombatFeedback,
   clearExpiredSkillRuntimeState,
-  clearTickMovementPlanning,
+  clearFrameMovementPlanning,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  createSimulationTiming,
+  type SimulationTiming,
+} from "./simulationTiming";
 
-export function updateGame(state: GameState): GameState {
+export function updateGame(
+  state: GameState,
+  timingInput?: Partial<SimulationTiming>,
+): GameState {
+  const timing = getUpdateTiming(state, timingInput);
   let nextState = clearExpiredSkillRuntimeState(
     clearExpiredCombatFeedback(
-      clearTickMovementPlanning(advanceSimulationTick(state)),
+      clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
+      timing.nowMs,
     ),
+    timing.nowMs,
   );
   const movedEntityIds = new Set<string>();
   const mapIdBeforeTeleport = nextState.currentMapId;
@@ -50,7 +60,8 @@ export function updateGame(state: GameState): GameState {
   ) {
     return recordDebugTelemetryTick(
       state,
-      clearExpiredCombatFeedback(nextState),
+      clearExpiredCombatFeedback(nextState, timing.nowMs),
+      timing,
     );
   }
 
@@ -64,7 +75,7 @@ export function updateGame(state: GameState): GameState {
 
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState);
-    nextState = updateSkillSystem(nextState);
+    nextState = updateSkillSystem(nextState, timing.nowMs);
   }
 
   if (shouldMovePartyTowardPoi) {
@@ -75,22 +86,39 @@ export function updateGame(state: GameState): GameState {
     nextState = reserveExploringPartyMemberNextTile(nextState);
   }
 
-  nextState = updateDefendSystem(nextState, movedEntityIds);
+  nextState = updateDefendSystem(nextState, movedEntityIds, timing);
   if (nextState.autoModeEnabled) {
     nextState = updateExplorationSystem(nextState, movedEntityIds);
   }
   nextState = updateFollowSystem(nextState, movedEntityIds);
-  nextState = updateEnemyAISystem(nextState);
-  nextState = updateAttackSystem(nextState, movedEntityIds);
-  nextState = updateDropSystem(nextState);
-  nextState = updateGatherSystem(nextState, movedEntityIds);
+  nextState = updateEnemyAISystem(nextState, timing);
+  nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = updateDropSystem(nextState, timing.nowMs);
+  nextState = updateGatherSystem(nextState, movedEntityIds, timing.nowMs);
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);
 
   return recordDebugTelemetryTick(
     state,
-    clearExpiredCombatFeedback(nextState),
+    clearExpiredCombatFeedback(nextState, timing.nowMs),
+    timing,
   );
+}
+
+function getUpdateTiming(
+  state: GameState,
+  timingInput: Partial<SimulationTiming> = {},
+): SimulationTiming {
+  const nowMs = timingInput.nowMs ?? Date.now();
+  const deltaMs =
+    timingInput.deltaMs ??
+    (state.simulationDeltaMs && state.simulationDeltaMs > 0
+      ? state.simulationDeltaMs
+      : undefined);
+  const frameNumber =
+    timingInput.frameNumber ?? (state.simulationFrame ?? state.simulationTick ?? 0) + 1;
+
+  return createSimulationTiming(nowMs, deltaMs, frameNumber);
 }
 
 function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {

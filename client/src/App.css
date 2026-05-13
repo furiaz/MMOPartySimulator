@@ -58,7 +58,15 @@
   top: 0;
   left: 0;
   transform-origin: 0 0;
-  transition: transform 120ms linear;
+  contain: layout paint;
+  will-change: transform;
+}
+
+.map-terrain {
+  position: absolute;
+  inset: 0;
+  contain: layout paint;
+  pointer-events: none;
 }
 
 .entity-marker,
@@ -280,7 +288,6 @@
   line-height: 1.2;
   text-align: center;
   pointer-events: none;
-  transition: transform 120ms linear;
 }
 
 .poi-ring {
@@ -295,7 +302,6 @@
   border-radius: 999px;
   background: transparent;
   pointer-events: none;
-  transition: transform 120ms linear;
 }
 
 .poi-ring.enemy-poi {
@@ -318,7 +324,6 @@
   border-radius: 999px;
   background: rgba(239, 68, 68, 0.2);
   pointer-events: none;
-  transition: transform 120ms linear;
 }
 
 .entity-marker {
@@ -327,7 +332,6 @@
   margin: 7px;
   border-radius: 999px;
   box-shadow: 0 0 0 2px #ffffff, 0 1px 4px rgba(15, 23, 42, 0.32);
-  transition: transform 120ms linear;
 }
 
 .entity-marker.skill-red-flash {
@@ -556,12 +560,6 @@
 .wall-wilderness-image.tree {
   width: 72px;
   height: 72px;
-}
-
-.combat-feedback,
-.dead-label,
-.depleted-label {
-  transition: transform 120ms linear;
 }
 
 .entity-label {

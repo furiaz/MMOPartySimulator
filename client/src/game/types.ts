@@ -702,6 +702,10 @@ export type DebugTelemetryEvent = {
 
 export type DebugTelemetryTick = {
   tick: number;
+  frame: number;
+  sample: number;
+  simulationTimeMs?: number;
+  deltaMs?: number;
   recordedAt: number;
   currentMapId?: DebugMapId;
   currentMapDisplayName?: string;
@@ -721,6 +725,7 @@ export type DebugTelemetryTick = {
 export type DebugTelemetryState = {
   isRecording: boolean;
   tickNumber: number;
+  frameNumber?: number;
   maxTicks: number;
   ticks: DebugTelemetryTick[];
   events: DebugTelemetryEvent[];

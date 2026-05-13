@@ -7,7 +7,7 @@ import {
   isActiveResourcePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
-  reservePositionForTick,
+  reservePositionForFrame,
   setLeaderIntent,
   type GameState,
 } from "./state";
@@ -98,7 +98,7 @@ export function reserveExploringPartyMemberNextTile(state: GameState): GameState
   const nextTile = previewMoveTowardPosition(state, explorer, targetPosition);
 
   return nextTile
-    ? reservePositionForTick(state, explorer.id, nextTile)
+    ? reservePositionForFrame(state, explorer.id, nextTile)
     : state;
 }
 

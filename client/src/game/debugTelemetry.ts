@@ -26,8 +26,10 @@ import type {
   Position,
 } from "./types";
 import type { QuestId, QuestState } from "./questTypes";
+import type { SimulationTiming } from "./simulationTiming";
 
 const DEFAULT_MAX_DEBUG_TICKS = 1000;
+const DEBUG_TELEMETRY_SAMPLE_INTERVAL_MS = 100;
 
 export function createDebugTelemetryState(
   maxTicks = DEFAULT_MAX_DEBUG_TICKS,
@@ -35,6 +37,7 @@ export function createDebugTelemetryState(
   return {
     isRecording: false,
     tickNumber: 0,
+    frameNumber: 0,
     maxTicks,
     ticks: [],
     events: [],
@@ -133,6 +136,7 @@ export function appendDebugTelemetryEvent(
 export function recordDebugTelemetryTick(
   previousState: GameState,
   nextState: GameState,
+  timing?: SimulationTiming,
 ): GameState {
   const debugTelemetry = previousState.debugTelemetry;
 
@@ -142,15 +146,33 @@ export function recordDebugTelemetryTick(
       : { ...nextState, debugTelemetry };
   }
 
-  const tick = debugTelemetry.tickNumber + 1;
+  const tick = timing?.frameNumber ?? debugTelemetry.tickNumber + 1;
+  const recordedAt = timing?.nowMs ?? Date.now();
   const appendedEvents = getAppendedTelemetryEvents(debugTelemetry, nextState, tick);
+
+  if (!shouldRecordTelemetrySample(debugTelemetry, nextState, recordedAt)) {
+    return {
+      ...nextState,
+      debugTelemetry: {
+        ...debugTelemetry,
+        tickNumber: tick,
+        frameNumber: tick,
+        events: [...debugTelemetry.events, ...appendedEvents],
+      },
+    };
+  }
+
   const events = [
     ...appendedEvents,
     ...getTelemetryEvents(previousState, nextState, tick),
   ];
   const telemetryTick = {
     tick,
-    recordedAt: Date.now(),
+    frame: tick,
+    sample: tick,
+    simulationTimeMs: nextState.simulationTimeMs ?? 0,
+    deltaMs: timing?.deltaMs ?? nextState.simulationDeltaMs,
+    recordedAt,
     currentMapId: nextState.currentMapId,
     currentMapDisplayName: nextState.map?.displayName,
     currentMapDebugName: nextState.map?.debugName,
@@ -177,12 +199,27 @@ export function recordDebugTelemetryTick(
     debugTelemetry: {
       ...debugTelemetry,
       tickNumber: tick,
+      frameNumber: tick,
       ticks,
       events: [...debugTelemetry.events, ...events].filter(
         (event) => event.tick >= firstTick,
       ),
     },
   };
+}
+
+function shouldRecordTelemetrySample(
+  debugTelemetry: DebugTelemetryState,
+  nextState: GameState,
+  recordedAt: number,
+): boolean {
+  const previousSample = debugTelemetry.ticks[debugTelemetry.ticks.length - 1];
+
+  return (
+    !previousSample ||
+    previousSample.currentMapId !== nextState.currentMapId ||
+    recordedAt - previousSample.recordedAt >= DEBUG_TELEMETRY_SAMPLE_INTERVAL_MS
+  );
 }
 
 function getAppendedTelemetryEvents(
@@ -667,7 +704,7 @@ function getReason(
     return "dead";
   }
 
-  if (state.defenderWaitTicksByLeaderId?.[entity.id]) {
+  if (state.defenderWaitMsByLeaderId?.[entity.id]) {
     return "waiting for formation";
   }
 

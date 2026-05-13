@@ -3,10 +3,11 @@ import {
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
-  reservePositionForTick,
+  reservePositionForFrame,
   updateEntity,
   type GameState,
 } from "./state";
+import type { SimulationTiming } from "./simulationTiming";
 import { chooseAttackSlot } from "./attackSlots";
 import { getPartyLeader } from "./partySystem";
 import { attackDefenderTarget } from "./defenderCombat";
@@ -19,13 +20,13 @@ import {
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
-const DEFENDER_CATCH_UP_MOVE_STEPS = 2;
+const DEFENDER_CATCH_UP_SPEED_MULTIPLIER = 2;
 const DEFENDER_ATTACK_RANGE = 1;
 const DEFENDER_GUARD_RADIUS = 3;
 const DEFENDER_MAX_LEADER_DISTANCE = 4;
 const DEFENDER_INTERCEPT_READY_DISTANCE = 1;
-const DEFENDER_LEADER_WAIT_TICKS = 3;
-const DEFENDER_BLOCKED_FALLBACK_TICKS = 3;
+const DEFENDER_LEADER_WAIT_MS = 300;
+const DEFENDER_BLOCKED_FALLBACK_MS = 300;
 const DEFENDER_MAX_PREFERRED_LEADER_DISTANCE = 2;
 const DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE = 4;
 const DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE = 2;
@@ -36,9 +37,15 @@ const DEFENDER_ANCHOR_MAX_PATH_DISTANCE = 6;
 export function updateDefendSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
+  timing: SimulationTiming = {
+    nowMs: Date.now(),
+    deltaMs: 100,
+    deltaSeconds: 0.1,
+    frameNumber: state.simulationFrame ?? state.simulationTick ?? 0,
+  },
 ): GameState {
   let nextState = state;
-  const now = Date.now();
+  const now = timing.nowMs;
   const waitingLeaderIds = new Set<string>();
   const resetLeaderWaitIds = new Set<string>();
 
@@ -107,7 +114,7 @@ export function updateDefendSystem(
       isInAttackRange(syncedDefender, target)
     ) {
       nextState = attackDefenderTarget(nextState, syncedDefender, target, now);
-      nextState = updateDefenderBlockedTicks(nextState, syncedDefender.id, false);
+      nextState = updateDefenderBlockedMs(nextState, syncedDefender.id, false);
       continue;
     }
 
@@ -119,7 +126,10 @@ export function updateDefendSystem(
         target,
         leader,
         defendPosition ?? leader?.position ?? defender.position,
-        Boolean(shouldWaitForIntercept),
+        Boolean(
+          shouldWaitForIntercept ||
+            (leader && (nextState.defenderWaitMsByLeaderId?.[leader.id] ?? 0) > 0),
+        ),
       );
       if (
         didEntityMove(nextState, defender) ||
@@ -157,7 +167,7 @@ export function updateDefendSystem(
       }
     }
 
-    nextState = updateDefenderBlockedTicks(nextState, defender.id, false);
+    nextState = updateDefenderBlockedMs(nextState, defender.id, false);
   }
 
   for (const leaderId of waitingLeaderIds) {
@@ -363,8 +373,8 @@ function shouldLeaderWaitForDefender(
     return false;
   }
 
-  return (state.defenderWaitTicksByLeaderId?.[leader.id] ?? 0) <
-    DEFENDER_LEADER_WAIT_TICKS;
+  return (state.defenderWaitMsByLeaderId?.[leader.id] ?? 0) <
+    DEFENDER_LEADER_WAIT_MS;
 }
 
 function updateLeaderWait(
@@ -372,26 +382,26 @@ function updateLeaderWait(
   leaderId: string,
   shouldWait: boolean,
 ): GameState {
-  const waitTicks = { ...(state.defenderWaitTicksByLeaderId ?? {}) };
+  const waitMs = { ...(state.defenderWaitMsByLeaderId ?? {}) };
 
   if (!shouldWait) {
-    if (!waitTicks[leaderId]) {
+    if (!waitMs[leaderId]) {
       return state;
     }
 
-    delete waitTicks[leaderId];
+    delete waitMs[leaderId];
 
     return {
       ...state,
-      defenderWaitTicksByLeaderId: waitTicks,
+      defenderWaitMsByLeaderId: waitMs,
     };
   }
 
-  waitTicks[leaderId] = (waitTicks[leaderId] ?? 0) + 1;
+  waitMs[leaderId] = (waitMs[leaderId] ?? 0) + (state.simulationDeltaMs ?? 100);
 
   return {
     ...state,
-    defenderWaitTicksByLeaderId: waitTicks,
+    defenderWaitMsByLeaderId: waitMs,
   };
 }
 
@@ -403,106 +413,93 @@ function moveDefenderTowardCommittedTarget(
   fallbackPosition: Position,
   useInterceptBoost: boolean,
 ): GameState {
-  const blockedTicks = state.defenderBlockedTicksByEntityId?.[defender.id] ?? 0;
+  const blockedMs = state.defenderBlockedMsByEntityId?.[defender.id] ?? 0;
 
-  if (blockedTicks >= DEFENDER_BLOCKED_FALLBACK_TICKS) {
+  if (blockedMs >= DEFENDER_BLOCKED_FALLBACK_MS) {
     return moveDefenderTowardPosition(
-      updateDefenderBlockedTicks(state, defender.id, false),
+      updateDefenderBlockedMs(state, defender.id, false),
       defender,
       fallbackPosition,
       false,
     );
   }
 
-  let nextState = state;
-  const stepCount = getCommittedTargetStepCount(
-    state,
-    defender,
-    target,
-    leader,
-    useInterceptBoost,
-  );
-
-  for (let step = 0; step < stepCount; step += 1) {
-    const currentDefender = nextState.entities[defender.id];
-
-    if (!isDefendingCompanion(currentDefender)) {
-      break;
-    }
-
-    if (isInAttackRange(currentDefender, target)) {
-      break;
-    }
-
-    if (shouldHoldDefenderLine(nextState, currentDefender, leader, target)) {
-      break;
-    }
-
-    const attackPosition = chooseAttackSlot(
-      nextState,
-      currentDefender,
-      target.position,
-      DEFENDER_ATTACK_RANGE,
-      {
-        maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
-        leader,
-        leaderSafeDistance: DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE,
-        leaderMaxPathDistance: DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE,
-      },
-    );
-
-    if (!attackPosition) {
-      return moveDefenderTowardPosition(
-        updateDefenderBlockedTicks(nextState, defender.id, false),
-        currentDefender,
-        fallbackPosition,
-        false,
-      );
-    }
-
-    const movementTarget = attackPosition;
-    const nextPosition = previewMoveTowardPosition(
-      reservePositionForTick(nextState, currentDefender.id, attackPosition),
-      currentDefender,
-      movementTarget,
-    );
-
-    if (
-      nextPosition &&
-      wouldExceedDefenderLineAtPosition(
-        nextState,
-        nextPosition,
-        currentDefender,
-        leader,
-        target,
-      )
-    ) {
-      break;
-    }
-
-    const previousPosition = currentDefender.position;
-
-    nextState = moveEntityTowardPositionIfUnoccupied(
-      reservePositionForTick(nextState, currentDefender.id, attackPosition),
-      currentDefender,
-      attackPosition,
-    );
-
-    const movedDefender = nextState.entities[defender.id];
-
-    if (
-      !isDefendingCompanion(movedDefender) ||
-      (movedDefender.position.x === previousPosition.x &&
-        movedDefender.position.y === previousPosition.y)
-    ) {
-      return updateDefenderBlockedTicks(nextState, defender.id, true);
-    }
+  if (isInAttackRange(defender, target)) {
+    return updateDefenderBlockedMs(state, defender.id, false);
   }
 
-  return updateDefenderBlockedTicks(nextState, defender.id, false);
+  if (shouldHoldDefenderLine(state, defender, leader, target)) {
+    return updateDefenderBlockedMs(state, defender.id, false);
+  }
+
+  const attackPosition = chooseAttackSlot(
+    state,
+    defender,
+    target.position,
+    DEFENDER_ATTACK_RANGE,
+    {
+      maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+      leader,
+      leaderSafeDistance: DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE,
+      leaderMaxPathDistance: DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+    },
+  );
+
+  if (!attackPosition) {
+    return moveDefenderTowardPosition(
+      updateDefenderBlockedMs(state, defender.id, false),
+      defender,
+      fallbackPosition,
+      false,
+    );
+  }
+
+  const movementOptions = {
+    speedMultiplier: getCommittedTargetSpeedMultiplier(
+      state,
+      defender,
+      target,
+      leader,
+      useInterceptBoost,
+    ),
+  };
+  const nextPosition = previewMoveTowardPosition(
+    reservePositionForFrame(state, defender.id, attackPosition),
+    defender,
+    attackPosition,
+    movementOptions,
+  );
+
+  if (
+    nextPosition &&
+    wouldExceedDefenderLineAtPosition(
+      state,
+      nextPosition,
+      defender,
+      leader,
+      target,
+    )
+  ) {
+    return updateDefenderBlockedMs(state, defender.id, false);
+  }
+
+  const nextState = moveEntityTowardPositionIfUnoccupied(
+    reservePositionForFrame(state, defender.id, attackPosition),
+    defender,
+    attackPosition,
+    movementOptions,
+  );
+
+  const movedDefender = nextState.entities[defender.id];
+
+  if (!isDefendingCompanion(movedDefender) || !didEntityMove(nextState, defender)) {
+    return updateDefenderBlockedMs(nextState, defender.id, true);
+  }
+
+  return updateDefenderBlockedMs(nextState, defender.id, false);
 }
 
-function getCommittedTargetStepCount(
+function getCommittedTargetSpeedMultiplier(
   state: GameState,
   defender: Companion,
   target: Enemy,
@@ -517,10 +514,7 @@ function getCommittedTargetStepCount(
     return 1;
   }
 
-  return Math.min(
-    DEFENDER_CATCH_UP_MOVE_STEPS,
-    getGridDistance(defender.position, target.position),
-  );
+  return DEFENDER_CATCH_UP_SPEED_MULTIPLIER;
 }
 
 function shouldBoostCommittedTargetStep(
@@ -636,31 +630,31 @@ function isSamePosition(a: Position, b: Position): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
-function updateDefenderBlockedTicks(
+function updateDefenderBlockedMs(
   state: GameState,
   defenderId: string,
   isBlocked: boolean,
 ): GameState {
-  const blockedTicks = { ...(state.defenderBlockedTicksByEntityId ?? {}) };
+  const blockedMs = { ...(state.defenderBlockedMsByEntityId ?? {}) };
 
   if (!isBlocked) {
-    if (!blockedTicks[defenderId]) {
+    if (!blockedMs[defenderId]) {
       return state;
     }
 
-    delete blockedTicks[defenderId];
+    delete blockedMs[defenderId];
 
     return {
       ...state,
-      defenderBlockedTicksByEntityId: blockedTicks,
+      defenderBlockedMsByEntityId: blockedMs,
     };
   }
 
-  blockedTicks[defenderId] = (blockedTicks[defenderId] ?? 0) + 1;
+  blockedMs[defenderId] = (blockedMs[defenderId] ?? 0) + (state.simulationDeltaMs ?? 100);
 
   return {
     ...state,
-    defenderBlockedTicksByEntityId: blockedTicks,
+    defenderBlockedMsByEntityId: blockedMs,
   };
 }
 
@@ -670,51 +664,29 @@ function moveDefenderTowardPosition(
   targetPosition: Position,
   useInterceptBoost = false,
 ): GameState {
-  let nextState = state;
-  const stepCount = getDefenderStepCount(
+  const speedMultiplier = getDefenderSpeedMultiplier(
     state,
     defender,
     targetPosition,
     useInterceptBoost,
   );
 
-  for (let step = 0; step < stepCount; step += 1) {
-    const currentDefender = nextState.entities[defender.id];
-
-    if (!isDefendingCompanion(currentDefender)) {
-      break;
-    }
-
-    if (
-      currentDefender.position.x === targetPosition.x &&
-      currentDefender.position.y === targetPosition.y
-    ) {
-      break;
-    }
-
-    const previousPosition = currentDefender.position;
-
-    nextState = moveEntityTowardPositionIfUnoccupied(
-      nextState,
-      currentDefender,
-      targetPosition,
-    );
-
-    const movedDefender = nextState.entities[defender.id];
-
-    if (
-      !isDefendingCompanion(movedDefender) ||
-      (movedDefender.position.x === previousPosition.x &&
-        movedDefender.position.y === previousPosition.y)
-    ) {
-      break;
-    }
+  if (
+    defender.position.x === targetPosition.x &&
+    defender.position.y === targetPosition.y
+  ) {
+    return state;
   }
 
-  return nextState;
+  return moveEntityTowardPositionIfUnoccupied(
+    state,
+    defender,
+    targetPosition,
+    { speedMultiplier },
+  );
 }
 
-function getDefenderStepCount(
+function getDefenderSpeedMultiplier(
   state: GameState,
   defender: Companion,
   targetPosition: Position,
@@ -736,7 +708,7 @@ function getDefenderStepCount(
     return 1;
   }
 
-  return Math.min(DEFENDER_CATCH_UP_MOVE_STEPS, distanceToIntent);
+  return DEFENDER_CATCH_UP_SPEED_MULTIPLIER;
 }
 
 function isBehindLeader(

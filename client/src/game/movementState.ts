@@ -2,10 +2,19 @@ import { getGridDistance } from "./positionUtils";
 import type { GameState, MovementFailureDetail } from "./state";
 import type { DebugNavigationReason, GameEntity, Position } from "./types";
 
-export function clearTickMovementPlanning(state: GameState): GameState {
+export function clearFrameMovementPlanning(state: GameState): GameState {
+  const movementFailureMsByEntityId = { ...(state.movementFailureMsByEntityId ?? {}) };
+
+  for (const entityId of Object.keys(movementFailureMsByEntityId)) {
+    if (!state.failedMoveByEntityId?.[entityId]) {
+      delete movementFailureMsByEntityId[entityId];
+    }
+  }
+
   return {
     ...state,
     failedMoveByEntityId: {},
+    movementFailureMsByEntityId,
     movementFailuresByEntityId: {},
     movementDecisionsByEntityId: {},
     moveIntentsByEntityId: {},
@@ -13,14 +22,18 @@ export function clearTickMovementPlanning(state: GameState): GameState {
   };
 }
 
+export const clearTickMovementPlanning = clearFrameMovementPlanning;
+
 export function markMoveSucceeded(
   state: GameState,
   entityId: string,
   previousPosition: Position,
 ): GameState {
   const failedMoveByEntityId = { ...(state.failedMoveByEntityId ?? {}) };
+  const movementFailureMsByEntityId = { ...(state.movementFailureMsByEntityId ?? {}) };
   const movementFailuresByEntityId = { ...(state.movementFailuresByEntityId ?? {}) };
   delete failedMoveByEntityId[entityId];
+  delete movementFailureMsByEntityId[entityId];
   delete movementFailuresByEntityId[entityId];
 
   return {
@@ -30,6 +43,7 @@ export function markMoveSucceeded(
       [entityId]: previousPosition,
     },
     failedMoveByEntityId,
+    movementFailureMsByEntityId,
     movementFailuresByEntityId,
   };
 }
@@ -54,11 +68,17 @@ export function markMoveFailed(
   detail: MovementFailureDetail = {},
   reason: DebugNavigationReason = "blocked",
 ): GameState {
+  const deltaMs = state.simulationDeltaMs ?? 100;
+
   return {
     ...state,
     failedMoveByEntityId: {
       ...(state.failedMoveByEntityId ?? {}),
       [entityId]: true,
+    },
+    movementFailureMsByEntityId: {
+      ...(state.movementFailureMsByEntityId ?? {}),
+      [entityId]: (state.movementFailureMsByEntityId?.[entityId] ?? 0) + deltaMs,
     },
     movementFailuresByEntityId: {
       ...(state.movementFailuresByEntityId ?? {}),
