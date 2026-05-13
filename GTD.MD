@@ -1167,6 +1167,11 @@ Maps currently support dimensions, wall positions, baked navigation grid, compan
 
 Map data is still development/prototype data and should not define final world content.
 
+Current prototype map dimensions:
+
+- `hub`: 50 columns by 26 rows
+- `map-1`: 80 columns by 48 rows
+- `map-2`: 80 columns by 48 rows
 
 ---
 
