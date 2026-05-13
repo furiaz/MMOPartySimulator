@@ -20,7 +20,7 @@ The game is divided into:
 
 - Game Logic: `client/src/game/`
 - UI Layer: React components in `client/src/`
-- Visual asset registry and sprite helpers: `client/src/visualAssets.ts` and `client/src/SpriteAnimation.tsx`
+- Visual asset registry, image icon mappings, and sprite helpers: `client/src/visualAssets.ts`, `client/src/assetIcons.ts`, and `client/src/SpriteAnimation.tsx`
 
 Game logic must not depend on React.
 
@@ -46,6 +46,7 @@ Current files include:
 - `dropSystem.ts`
 - `dropTables.ts`
 - `enemyAISystem.ts`
+- `enemyArchetypes.ts`
 - `entities.ts`
 - `entityGuards.ts`
 - `equipmentRules.ts`
@@ -83,6 +84,7 @@ Current files include:
 - `skills.ts`
 - `state.ts`
 - `targetSelection.ts`
+- `testState.ts`
 - `teleportSystem.ts`
 - `types.ts`
 - `updateGame.ts`
@@ -192,7 +194,7 @@ Systems must not assume any separate player entity exists.
 
 If the configured leader is missing or dead, party helper logic falls back to the first living party member.
 
-Leader handoff uses a short tick buffer so systems can settle after leader changes.
+Leader handoff uses a short millisecond-based timing buffer so systems can settle after leader changes.
 
 ---
 
@@ -247,18 +249,20 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick, party leader id, leader handoff ticks, leader intent, prototype quest state, global/local POI intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, and debug telemetry.
 
 
 Current movement planning fields include:
 
 - `failedMoveByEntityId`
+- `movementFailureMsByEntityId`
 - `movementFailuresByEntityId`
 - `moveIntentsByEntityId`
 - `reservedPositionsByEntityId`
 - `movementPathsByEntityId`
 - `movementDecisionsByEntityId`
 - `lastPositionsByEntityId`
+
 
 Current prototype skill runtime fields include:
 
@@ -498,7 +502,9 @@ type LeaderIntent = {
   type: "attack" | "move" | "gather" | "explore";
   targetId: string | null;
   targetPosition: Position | null;
+  source?: "player" | "ai";
 };
+
 ```
 
 Leader intent is used by party movement, role behavior, combat targeting, exploration, defender positioning, and teleport point movement.
@@ -590,7 +596,7 @@ The game loop runs continuously while enabled, executes systems in order, update
 
 Current high-level order:
 
-1. Advance simulation tick and clear expired combat feedback, skill runtime state, and tick movement planning
+1. Advance simulation timing and clear expired combat feedback, skill runtime state, and frame movement planning
 2. Update teleport system
 3. If teleport is active or map transition happened, record telemetry and stop the tick early
 4. Update POI system
@@ -779,6 +785,10 @@ Current attack behavior:
 - attackers move toward targets if out of range
 - attackers can select attack slots around a target
 - attackers attack when in range and cooldown is ready
+- companion basic attacks use the prototype attack range
+- enemies may use archetype or entity-specific attack ranges
+- enemies may use entity-specific attack cooldowns
+- attackers can take a small final positioning step when just outside range
 - damage is applied directly
 - prototype skill damage modifiers can increase damage
 - shield blocks can block incoming enemy attacks
@@ -787,6 +797,9 @@ Current attack behavior:
 - party members may assist nearby party combat targets
 - party protection is triggered when enemies damage party members
 - party members gain XP when enemies are defeated by party attacks
+- enemy defeats can progress prototype quests
+- enemy defeats can trigger prototype drop rolls
+
 
 Current basic attack constants:
 
@@ -799,19 +812,60 @@ Combat movement order uses role priority for party members.
 
 ---
 
+## Enemy Archetypes
+
+`enemyArchetypes.ts` owns lightweight prototype enemy tuning data.
+
+Current enemy archetype ids:
+
+- `slime`
+- `cave_bat`
+- `forest_spider`
+- `goblin_scout`
+- `goblin_thrower`
+- `bog_imp`
+- `stone_crawler`
+- `thorn_shaman`
+- `ash_wisp`
+- `mossling`
+- `wolf`
+- `orc`
+
+Current enemy archetype data may define:
+
+- display name
+- temperament
+- combat style
+- target preference
+- level
+- max health
+- attack cooldown
+- XP reward override
+- detection range
+- attack range
+
+Enemy archetypes are prototype tuning records. They are not final bestiary content, faction design, encounter design, or production AI behavior trees.
+
+
+
+
 ## Enemy AI System
 
 `enemyAISystem.ts` owns enemy autonomous targeting.
 
 Current enemy behavior:
 
-- passive enemies do not seek targets on their own
+- passive enemies do not seek combat targets on their own
+- passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
+- enemy archetypes can define detection range and target preference
+- target preferences currently support closest, leader, and lowest-health party member
 - enemies with valid targets enter or remain in attack state
 - enemies clear invalid targets
 - enemies attacking party members trigger party protection
 - bound enemies cannot chase targets while out of attack range
-- enemies respect a home leash distance
+- enemies respect home roam leash and attack leash distances
+- enemies record lightweight target decision reasons for debug telemetry
 
 Current enemy detection range:
 
@@ -981,9 +1035,98 @@ Current equipment kinds are:
 type EquipmentKind = "weapon" | "offhand" | "armor" | "accessory";
 ```
 
+Current weapon types are:
+
+```ts
+type WeaponType =
+  | "training_sword"
+  | "one_handed_sword"
+  | "one_handed_mace"
+  | "claw_gauntlets"
+  | "thorn_whip"
+  | "bow"
+  | "orb"
+  | "rune_lantern"
+  | "holy_mace";
+```
+
+Current offhand types are:
+
+```ts
+type OffhandType =
+  | "shield"
+  | "talisman"
+  | "holy_lantern"
+  | "sacrificial_dagger";
+```
+
+Current armor types are:
+
+```ts
+type ArmorType =
+  | "head_armor"
+  | "chest_armor"
+  | "legs_armor"
+  | "gloves_armor"
+  | "boots_armor";
+```
+
+Current accessory type is:
+
+```ts
+type AccessoryType = "accessory";
+```
+
 Equipment rules validate slot, class permission, both-hands occupancy, inventory removal, inventory return on unequip, and telemetry results.
 
 Equipment remains gameplay-facing data only. It must not require sprite swaps, weapon anchoring, paper-doll rendering, or visible attachment systems.
+
+Current prototype class-restricted equipment items include:
+
+- Beginner: Training Sword
+- Blade: Iron Sword
+- Aegis: Training Mace, Wooden Shield
+- Hunter: Short Bow
+- Beast: Claw Gauntlets
+- Elementalist: Apprentice Orb
+- Runecaster: Rune Lantern, Simple Talisman
+- Lightbearer: Holy Mace, Holy Lantern
+- Penitent: Thorn Whip, Sacrificial Dagger
+
+Current shared prototype armor and accessory items include:
+
+- Cloth Cap
+- Padded Chest
+- Padded Legs
+- Cloth Gloves
+- Travel Boots
+- Plain Charm
+
+Current enemy-drop prototype armor items include:
+
+- Worn Cap
+- Worn Tunic
+- Worn Pants
+- Worn Gloves
+- Worn Boots
+- Reinforced Helm
+- Reinforced Armor
+- Reinforced Legguards
+- Reinforced Gloves
+- Reinforced Boots
+
+Current prototype equipment stat modifiers may include:
+
+- attack
+- defense
+- maxHealth
+- block
+- evasion
+- magicPower
+- healingPower
+
+Short Bow and Claw Gauntlets currently occupy both hands as prototype exceptions.
+
 
 
 ## Map Data
@@ -1097,16 +1240,26 @@ Visual assets are currently UI-facing and are not part of core simulation rules.
 Current visual asset files:
 
 - `client/src/visualAssets.ts`
+- `client/src/assetIcons.ts`
 - `client/src/SpriteAnimation.tsx`
 
 Current public asset path root:
 
 - `client/public/Asserts/`
 
-Current sprite asset groups:
+Current generated asset groups include:
+
+- `Asserts/Generated/now-pack`
+- `Asserts/Generated/map-wilderness`
+- `Asserts/Generated/hub-floors`
+
+Current sprite asset groups include:
 
 - `Asserts/Characters/Test-Character`
 - `Asserts/Characters/Test-Enemy`
+- `Asserts/Characters/Test-Enemy2`
+- `Asserts/Characters/Test-NPC`
+- `Asserts/Characters/Prototype-Enemies`
 
 Current companion visuals:
 
@@ -1116,18 +1269,29 @@ Current companion visuals:
 
 Current enemy visuals:
 
-- enemies use the test enemy sprite
-- idle uses south-facing run-style frames as temporary idle animation
-- run uses directional frame sequences for north, south, west, and east
+- Wolf-style enemies may use the test enemy sprite
+- Orc-style enemies may use the Test-Enemy2 directional static sprites
+- prototype enemy archetypes may use static generated archetype sprites
+- fallback enemy visuals depend on current map/debug context
 
-Current resource visuals use placeholder class names by resource type.
-Current hub NPC and dog visuals use placeholder class names.
+Current resource visuals use generated image icons by resource type.
 
-Current map tile visuals use placeholder class names.
+Current NPC visuals:
 
-Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, and placeholder class names.
+- Quest Giver, Merchant, Smith, and Dog may use generated image icons
+- Test Blade and Test Hunter may use Test-NPC image assets
+- unsupported NPC visuals fall back to placeholder classes
+
+Current map tile visuals:
+
+- wilderness maps may use generated grass, tree, and bush image tiles
+- the hub may use generated stone floor imagery for the city interior
+- fallback floor and wall visuals use placeholder class names
+
+Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, image icon mappings, and placeholder class names.
 
 Simulation logic must not depend on sprite assets.
+
 
 ---
 
@@ -1200,7 +1364,8 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, party members, enemies, resources, NPCs, healing fountains, sprite animation, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view, generated terrain tiles, party members, enemies, resources, NPCs, healing fountains, sprite animation, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, XP and level progress, party size limit, debug controls, and debug telemetry export.
+
 
 
 

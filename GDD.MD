@@ -328,11 +328,16 @@ Combat flow:
 9. Defeated enemies grant XP to eligible living party members
 10. Party regroups or continues exploration
 
-Current attack range is mostly melee, but combat positioning should support future ranged classes.
+Current basic party attacks are mostly melee.
 
-Early-game enemies are passive by default and only fight back after being attacked.
+Prototype combat also supports numeric skill ranges and enemy attack ranges. Some prototype enemy archetypes may attack from range.
 
-Aggressive enemies may be introduced by enemy type, zone, event, or explicit debug scenario.
+Combat positioning should continue to support future ranged classes without treating the current prototype ranged enemy behavior as the final ranged combat system.
+
+Early-game enemies may be passive by default and only fight back after being attacked.
+
+Aggressive enemies may be introduced by enemy archetype, enemy type, zone, event, or explicit debug scenario.
+
 
 If any party member is attacked, the party may switch target priority to that attacker.
 
@@ -345,17 +350,49 @@ Enemies can be passive or aggressive.
 Passive enemies:
 
 - do not seek targets on their own
+- may wander near their home position
 - fight back after being attacked
 
 Aggressive enemies:
 
 - may detect nearby party members
 - may attack without being attacked first
+- may choose targets by enemy archetype preference
 - should respect their intended encounter area or leash behavior
 
-Enemies may have levels.
+Current prototype enemy combat styles:
+
+- Melee
+- Ranged
+- Support
+
+Current prototype enemy target preferences:
+
+- closest party member
+- current leader
+- lowest-health party member
+
+Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, and lightweight roaming behavior.
 
 Enemy level affects XP reward and may later affect stats, difficulty, loot, and encounter tuning.
+
+Current prototype enemy archetypes:
+
+- Slime
+- Cave Bat
+- Forest Spider
+- Goblin Scout
+- Goblin Thrower
+- Bog Imp
+- Stone Crawler
+- Thorn Shaman
+- Ash Wisp
+- Mossling
+- Wolf
+- Orc
+
+Prototype enemy archetypes are lightweight tuning data. They are not final bestiary content, final encounter design, faction design, AI behavior trees, or production combat roles.
+
 
 ---
 
@@ -424,16 +461,52 @@ Enemy drops currently use lightweight prototype drop tables.
 Current enemy drop behavior:
 
 - defeated enemies may roll material or equipment drops by enemy type
+- current enemy drop tables exist for Wolf and Orc enemy types only
 - drop results use short-lived visual feedback before being routed into shared inventory
 - drops do not create persistent ground loot
 - inventory overflow may partially or fully reject dropped items
 
+Current prototype loot materials:
+
+- Wolf Pelt
+- Wolf Fang
+- Wolf Claw
+- Orc Tusk
+- Orc Hide
+- Orc Scrap
+
+Current prototype enemy equipment drops may include:
+
+- Worn Cap
+- Worn Tunic
+- Worn Pants
+- Worn Gloves
+- Worn Boots
+- Reinforced Helm
+- Reinforced Armor
+- Reinforced Legguards
+- Reinforced Gloves
+- Reinforced Boots
+
 Current quick exchange behavior:
 
 - the hub Merchant can exchange eligible enemy parts for Crowns
+- eligible quick-exchange parts are prototype material items marked for exchange
 - quick exchange removes eligible parts from shared inventory
 - quick exchange adds Crowns to the shared wallet
 - this is a prototype exchange action, not a full selling or shop economy
+
+Current merchant UI may show Buy and Sell placeholder panels.
+
+Buy and Sell placeholder panels:
+
+- may be visible in the merchant interaction UI
+- do not currently implement buying or selling rules
+- must not be treated as full shop behavior
+- must not define economy rules in React UI
+
+
+
 
 This is not the full inventory, wallet, equipment economy, shop, crafting, trading, bank, loot, or persistence system.
 
@@ -462,10 +535,14 @@ Equipment is gameplay-facing, not sprite-facing.
 
 Equipped items:
 
-- affect data and future stat hooks only
+- affect prototype equipment data
+- may expose simple prototype stat modifiers such as attack, defense, max health, block, evasion, magic power, or healing power
+- may be displayed in UI summaries
+- do not imply a complete stat scaling system
 - do not visually change character sprites
 - do not add visible weapon swaps
 - do not add paper-doll rendering, weapon anchoring, or sprite attachments
+
 
 Current companion equipment slots:
 
@@ -490,6 +567,32 @@ Current prototype class equipment permissions:
 - Runecaster: Rune Lantern, Talisman
 - Lightbearer: Holy Mace, Holy Lantern
 - Penitent: Thorn Whip, Sacrificial Dagger
+
+Armor and accessories are currently shared prototype equipment categories and are not class-restricted unless explicitly defined later.
+
+
+Current shared prototype armor and accessory examples include:
+
+- Cloth Cap
+- Padded Chest
+- Padded Legs
+- Cloth Gloves
+- Travel Boots
+- Plain Charm
+
+Current enemy-drop prototype armor examples include:
+
+- Worn Cap
+- Worn Tunic
+- Worn Pants
+- Worn Gloves
+- Worn Boots
+- Reinforced Helm
+- Reinforced Armor
+- Reinforced Legguards
+- Reinforced Gloves
+- Reinforced Boots
+
 
 Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
 
@@ -523,6 +626,11 @@ Initial prototype party:
 
 - 1 current leader
 - 2 starting party members
+- current starting leader is a Fighter
+- current second starting member is a Defender
+- the party currently starts in Harbor Union Bastion
+- the shared inventory currently starts with one Training Sword as prototype/debug setup
+
 
 Party size may increase through total party level progression.
 
@@ -683,13 +791,19 @@ Current prototype quest reward behavior:
 - ready quests can grant rewards through Quest Giver turn-in
 - rewards may include Crowns, character XP, inventory items, and equipment items
 - quest rewards are all-or-nothing
+- reward values are validated before state changes are applied
 - if every reward can fit, all rewards are granted and the quest completes
 - if any item or equipment reward cannot fit, no rewards are granted
 - inventory-full reward failure keeps the quest ready to turn in so the player can clear space and retry
+- invalid reward data prevents reward claiming
 - equipment rewards go into shared party inventory, not directly into companion equipment slots
 - quest XP goes to living current party members only
 - quest XP does not use enemy level-gap reduction
+- max-level party members do not gain quest XP
 - non-repeatable quests grant rewards once total
+- completed quests may unlock later quests
+- later quests may require specific earlier quests to be completed
+
 
 Prototype POI direction may choose local targets for auto-mode behavior.
 
@@ -1205,6 +1319,7 @@ Temporary debug tools may include:
 - inspect quest state and POI decisions
 - inspect wallet, drops, and merchant exchange telemetry
 - inspect healing fountain behavior
+- inspect enemy archetype, combat style, target preference, attack range, and target decision behavior
 
 
 Debug tools are not part of final gameplay.
@@ -1225,7 +1340,7 @@ Do not implement these unless explicitly requested:
 - mana or complex resource costs
 - advanced support mechanics
 - advanced aggro/threat mechanics
-- advanced ranged combat
+- full ranged combat beyond current prototype skill and enemy attack ranges
 - backend persistence
 - networking/server authority
 - production asset pipeline
