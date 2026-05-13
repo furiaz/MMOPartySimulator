@@ -140,6 +140,15 @@ The documentation ticket must:
 - Be added to the GitHub Project board
 - Be moved to Design Stage unless the user says otherwise
 - Use an appropriate documentation label
+The documentation ticket should also inherit all non-completion labels from the implementation ticket.
+
+When copying labels from the implementation ticket to the documentation ticket:
+
+- Copy scope/category labels such as `enhancement`, `feature`, `bug`, `New System`, or similar.
+- Also apply the appropriate documentation label.
+- Do NOT copy workflow/status labels such as `Completed`.
+- If the implementation ticket has no scope/category label, apply only the appropriate documentation label.
+
 
 Do not edit GDD.md, GTD.md, or AGENTS.md automatically. If those documents need changes, ask the user to make or approve those updates.
 
