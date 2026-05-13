@@ -11,6 +11,9 @@ export function createTestGameState(
     inventory: createEmptyPartyInventory(),
     wallet: createEmptyPartyWallet(),
     autoModeEnabled: false,
+    poiPreferences: {
+      stayInMap: false,
+    },
     simulationTick: 0,
     simulationFrame: 0,
     simulationTimeMs: 0,

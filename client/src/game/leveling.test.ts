@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion } from "./entities";
+import { createCompanion, createEnemy } from "./entities";
 import {
   getLevelGapXpModifier,
   getPartySizeLimit,
   grantCharacterXpToCompanion,
+  grantCharacterXpToParty,
   MAX_CHARACTER_LEVEL,
 } from "./leveling";
 import { createTestGameState } from "./testState";
@@ -66,5 +67,33 @@ describe("character leveling", () => {
         }),
       ),
     ).toBe(3);
+  });
+
+  it("applies the debug super XP multiplier to enemy XP grants", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive", {
+      level: 1,
+      xpReward: 2,
+    });
+
+    const nextState = grantCharacterXpToParty(
+      createTestGameState({
+        entities: {
+          [companion.id]: companion,
+          [enemy.id]: enemy,
+        },
+        debugOptions: {
+          superSpeedEnabled: false,
+          superExpEnabled: true,
+        },
+      }),
+      enemy,
+    );
+
+    expect(nextState.entities[companion.id]).toMatchObject({
+      characterLevel: 2,
+      characterXp: 4,
+      lastCharacterXpGained: 10,
+    });
   });
 });

@@ -79,6 +79,15 @@ type MovementOptions = WalkablePositionOptions & {
   speedMultiplier?: number;
 };
 
+export type DebugOptions = {
+  superSpeedEnabled: boolean;
+  superExpEnabled: boolean;
+};
+
+export type PoiPreferences = {
+  stayInMap: boolean;
+};
+
 type MovementPath = {
   targetKey: string;
   waypoints: Position[];
@@ -108,6 +117,7 @@ export type GameState = {
   map?: GameMap;
   activeTeleport?: ActiveTeleport | null;
   autoModeEnabled: boolean;
+  poiPreferences: PoiPreferences;
   simulationTick: number;
   simulationFrame?: number;
   simulationTimeMs?: number;
@@ -144,6 +154,7 @@ export type GameState = {
   skillVisualEvents?: SkillVisualEvent[];
   dropVisualEvents?: DropVisualEvent[];
   debugTelemetry?: DebugTelemetryState;
+  debugOptions?: DebugOptions;
 };
 
 export function addEntity(state: GameState, entity: GameEntity): GameState {
@@ -331,6 +342,19 @@ export function setAutoModeEnabled(
   return {
     ...state,
     autoModeEnabled,
+  };
+}
+
+export function setStayInMapEnabled(
+  state: GameState,
+  stayInMap: boolean,
+): GameState {
+  return {
+    ...state,
+    poiPreferences: {
+      ...state.poiPreferences,
+      stayInMap,
+    },
   };
 }
 
@@ -753,7 +777,7 @@ function getNextMoveResolution(
   const movedEntity = moveEntityToward(
     entity,
     target,
-    getMovementDeltaMs(state, options),
+    getMovementDeltaMs(state, entity, options),
   );
 
   if (isSamePosition(movedEntity.position, entity.position)) {
@@ -851,7 +875,7 @@ function getPathMoveResolution(
   const movedEntity = moveEntityToward(
     entity,
     createPositionTarget(waypoint),
-    getMovementDeltaMs(state, options),
+    getMovementDeltaMs(state, entity, options),
   );
 
   if (
@@ -1045,7 +1069,7 @@ function getAlternativeMoveCandidates(
   const candidates: Position[] = [];
   const stepDistance = getMovementStepDistance(
     entity,
-    getMovementDeltaMs(state, options),
+    getMovementDeltaMs(state, entity, options),
   );
 
   addAlternativeStepCandidates(
@@ -1063,10 +1087,15 @@ function getAlternativeMoveCandidates(
 
 function getMovementDeltaMs(
   state: GameState,
+  entity: GameEntity,
   options: MovementOptions = {},
 ): number {
+  const debugSpeedMultiplier =
+    entity.kind === "companion" && state.debugOptions?.superSpeedEnabled ? 5 : 1;
+
   return (state.simulationDeltaMs ?? GAME_LOOP_TICK_MS) *
-    (options.speedMultiplier ?? 1);
+    (options.speedMultiplier ?? 1) *
+    debugSpeedMultiplier;
 }
 
 function addAlternativeStepCandidates(

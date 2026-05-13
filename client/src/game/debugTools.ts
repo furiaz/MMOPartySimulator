@@ -20,6 +20,10 @@ const DEBUG_RESOURCE_DURABILITY = 5;
 const DEBUG_RESOURCE_QUANTITY = 3;
 const DEBUG_TEST_ITEM_QUANTITY = 1;
 const DEBUG_TEST_CROWNS_AMOUNT = 100;
+const DEFAULT_DEBUG_OPTIONS = {
+  superSpeedEnabled: false,
+  superExpEnabled: false,
+};
 const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "training_sword",
   "iron_sword",
@@ -137,6 +141,30 @@ export function debugRemoveCompanionFromParty(
   }
 
   return debugRemoveCompanion(state, companionId);
+}
+
+export function debugToggleSuperSpeed(state: GameState): GameState {
+  const debugOptions = state.debugOptions ?? DEFAULT_DEBUG_OPTIONS;
+
+  return {
+    ...state,
+    debugOptions: {
+      ...debugOptions,
+      superSpeedEnabled: !debugOptions.superSpeedEnabled,
+    },
+  };
+}
+
+export function debugToggleSuperExp(state: GameState): GameState {
+  const debugOptions = state.debugOptions ?? DEFAULT_DEBUG_OPTIONS;
+
+  return {
+    ...state,
+    debugOptions: {
+      ...debugOptions,
+      superExpEnabled: !debugOptions.superExpEnabled,
+    },
+  };
 }
 
 export function debugRandomizeLocations(

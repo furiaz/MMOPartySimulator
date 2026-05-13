@@ -125,6 +125,23 @@ describe("prototype quest system", () => {
     expect(getCompanion(state, deadCompanion.id).characterXp).toBe(0);
   });
 
+  it("applies the debug super XP multiplier to quest rewards", () => {
+    let state = createStateWithParty({
+      debugOptions: {
+        superSpeedEnabled: false,
+        superExpEnabled: true,
+      },
+      quests: createQuestStates({
+        clear_the_shore: "ready_to_turn_in",
+      }),
+    });
+
+    state = updateQuestGiverInteraction(state);
+
+    expect(getCompanion(state, "companion-1").lastCharacterXpGained).toBe(40);
+    expect(getCompanion(state, "companion-2").lastCharacterXpGained).toBe(40);
+  });
+
   it("does not grant non-repeatable quest rewards more than once", () => {
     let state = createStateWithParty({
       quests: createQuestStates({

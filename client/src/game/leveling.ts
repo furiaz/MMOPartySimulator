@@ -4,6 +4,7 @@ import type { Companion, Enemy } from "./types";
 
 export const MAX_CHARACTER_LEVEL = 200;
 export const BEGINNER_CLASS_UNLOCK_LEVEL = 10;
+export const DEBUG_SUPER_EXP_MULTIPLIER = 5;
 
 const XP_TO_NEXT_LEVEL_ANCHORS: Record<number, number> = {
   1: 6,
@@ -137,6 +138,7 @@ export function grantCharacterXpToParty(
   sourceId?: string,
 ): GameState {
   const baseXpAmount = getEnemyXpReward(enemy);
+  const debugXpMultiplier = getDebugXpMultiplier(state);
   let nextState = state;
 
   for (const entity of Object.values(nextState.entities)) {
@@ -166,17 +168,18 @@ export function grantCharacterXpToParty(
       continue;
     }
 
-    const xpModifier = getLevelGapXpModifier(entity.characterLevel, enemy.level);
+    const levelGapXpModifier = getLevelGapXpModifier(entity.characterLevel, enemy.level);
+    const xpModifier = levelGapXpModifier * debugXpMultiplier;
     const modifiedXpAmount = Math.floor(baseXpAmount * xpModifier);
 
-    if (xpModifier < 1 && xpModifier > 0) {
+    if (levelGapXpModifier < 1 && levelGapXpModifier > 0) {
       nextState = appendDebugTelemetryEvent(nextState, {
         type: "character_xp_reduced",
         entityId: entity.id,
         targetId: enemy.id,
         baseXpAmount,
         modifiedXpAmount,
-        xpModifier,
+        xpModifier: levelGapXpModifier,
         reason: "level_gap",
       });
     }
@@ -229,6 +232,10 @@ export function grantCharacterXpToParty(
   }
 
   return nextState;
+}
+
+export function getDebugXpMultiplier(state: GameState): number {
+  return state.debugOptions?.superExpEnabled ? DEBUG_SUPER_EXP_MULTIPLIER : 1;
 }
 
 export function grantCharacterXpToCompanion(

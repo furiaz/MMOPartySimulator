@@ -2,7 +2,11 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { HUB_MAP_ID, MAP_ONE_ID, MAP_TWO_ID, npcIds } from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
-import { MAX_CHARACTER_LEVEL, grantCharacterXpToCompanion } from "./leveling";
+import {
+  MAX_CHARACTER_LEVEL,
+  getDebugXpMultiplier,
+  grantCharacterXpToCompanion,
+} from "./leveling";
 import { getPartyMembers } from "./partySystem";
 import { updateEntity, type GameState } from "./state";
 import { addCurrencyToWalletState } from "./wallet";
@@ -662,7 +666,9 @@ function grantQuestXpToCurrentParty(
   amount: number,
 ): GameState {
   let nextState = state;
-  const xpAmount = Math.floor(amount);
+  const baseXpAmount = Math.floor(amount);
+  const xpModifier = getDebugXpMultiplier(state);
+  const xpAmount = Math.floor(baseXpAmount * xpModifier);
 
   for (const companion of getPartyMembers(nextState)) {
     if (companion.characterLevel >= MAX_CHARACTER_LEVEL) {
@@ -671,9 +677,9 @@ function grantQuestXpToCurrentParty(
         entityId: companion.id,
         questId,
         xpAmount: 0,
-        baseXpAmount: xpAmount,
+        baseXpAmount,
         modifiedXpAmount: 0,
-        xpModifier: 1,
+        xpModifier,
         previousLevel: companion.characterLevel,
         nextLevel: companion.characterLevel,
         previousXp: companion.characterXp,
@@ -690,9 +696,9 @@ function grantQuestXpToCurrentParty(
       entityId: companion.id,
       questId,
       xpAmount,
-      baseXpAmount: xpAmount,
+      baseXpAmount,
       modifiedXpAmount: xpAmount,
-      xpModifier: 1,
+      xpModifier,
       previousLevel: companion.characterLevel,
       nextLevel: updatedCompanion.characterLevel,
       previousXp: companion.characterXp,

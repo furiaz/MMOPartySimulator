@@ -111,6 +111,24 @@
   gap: 8px;
 }
 
+.stay-in-map-toggle {
+  padding: 3px 7px;
+  border: 1px solid rgba(51, 65, 85, 0.62);
+  background: rgba(255, 255, 255, 0.78);
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.stay-in-map-toggle.active {
+  border-color: #0284c7;
+  background: #e0f2fe;
+  color: #075985;
+}
+
 .map-version {
   font-size: 11px;
   font-weight: 800;
@@ -127,6 +145,117 @@
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.map-debug-toggle-controls {
+  position: absolute;
+  z-index: 12;
+  top: 8px;
+  left: calc(50% + 126px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-debug-toggle-controls button {
+  min-width: 112px;
+  color: #1f2937;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.leader-poi-panel {
+  position: fixed;
+  top: 52%;
+  right: 16px;
+  z-index: 11;
+  display: grid;
+  width: 210px;
+  max-height: 34vh;
+  gap: 6px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(51, 65, 85, 0.72);
+  background: rgba(191, 219, 254, 0.7);
+  color: #1f2937;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+  pointer-events: none;
+}
+
+.leader-poi-panel h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.leader-poi-list {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leader-poi-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  padding: 5px 6px;
+  border: 1px solid rgba(100, 116, 139, 0.42);
+  background: rgba(241, 245, 249, 0.72);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.leader-poi-row.selected {
+  border-color: #0284c7;
+  background: rgba(224, 242, 254, 0.9);
+}
+
+.leader-poi-main {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.leader-poi-main strong,
+.leader-poi-main span,
+.leader-poi-reason {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leader-poi-main strong {
+  color: #1f2937;
+  font-size: 11px;
+}
+
+.leader-poi-main span,
+.leader-poi-reason {
+  color: #475569;
+}
+
+.leader-poi-reason {
+  grid-column: 1 / -1;
+}
+
+.leader-poi-distance {
+  align-self: start;
+  color: #075985;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.leader-poi-empty {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .skill-shield-block {
@@ -1599,6 +1728,18 @@ button {
   border: 1px solid #334155;
   background: #ffffff;
   color: #1f2937;
+}
+
+.map-debug-toggle-controls button {
+  padding: 7px 10px;
+  border-color: rgba(51, 65, 85, 0.72);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.map-debug-toggle-controls button.active {
+  border-color: #15803d;
+  background: #dcfce7;
+  color: #14532d;
 }
 
 .game-menu-panel button {

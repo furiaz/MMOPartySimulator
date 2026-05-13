@@ -90,11 +90,27 @@ export type LocalPoiTarget = {
   reason: string;
 };
 
+export type PoiConsideration = {
+  poiId: string;
+  category: PoiCategory;
+  mapId: DebugMapId;
+  position: Position;
+  reason: string;
+  priority: number;
+  pathDistance: number;
+  score?: number;
+  targetEntityId?: string;
+  questId?: QuestId;
+  objectiveId?: string;
+  isSelected?: boolean;
+};
+
 export type PoiDecisionState = {
   selectedPoiId?: string;
   selectedCategory?: PoiCategory;
   selectedMapId?: DebugMapId;
   selectedPosition?: Position;
   selectedReason?: string;
+  consideredTargets?: PoiConsideration[];
   skippedReasons: Record<string, string>;
 };

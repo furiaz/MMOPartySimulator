@@ -88,6 +88,7 @@ export type {
 export type {
   GlobalPoiIntent,
   LocalPoiTarget,
+  PoiConsideration,
   PoiDecisionState,
   QuestDefinition,
   QuestId,
@@ -136,6 +137,7 @@ export {
   setPartyMemberClass,
   setPartyMemberRole,
   setPartyOrder,
+  setStayInMapEnabled,
   updateEntity,
 } from "./state";
 export {
@@ -351,6 +353,8 @@ export {
   debugRemoveTestCrowns,
   debugResetCrowns,
   debugRestorePartyHealth,
+  debugToggleSuperExp,
+  debugToggleSuperSpeed,
 } from "./debugTools";
 export {
   appendDebugTelemetryEvent,
@@ -364,9 +368,11 @@ export {
 export type { CharacterXpProgress } from "./leveling";
 export {
   BEGINNER_CLASS_UNLOCK_LEVEL,
+  DEBUG_SUPER_EXP_MULTIPLIER,
   MAX_CHARACTER_LEVEL,
   getCharacterXpProgress,
   getCharacterXpToNextLevel,
+  getDebugXpMultiplier,
   getEnemyXpReward,
   getLevelGapXpModifier,
   getPartySizeLimit,

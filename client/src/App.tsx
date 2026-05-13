@@ -41,16 +41,12 @@ import {
   createNpc,
   clearDebugTelemetry,
   debugAddCompanionToParty,
-  debugAddPrototypeEquipmentToInventory,
-  debugAddTestCrowns,
-  debugAddTestWoodToInventory,
   debugRefreshResources,
-  debugRandomizeLocations,
   debugRemoveCompanionFromParty,
-  debugRemoveTestCrowns,
-  debugResetCrowns,
   debugResurrectEnemy,
   debugRestorePartyHealth,
+  debugToggleSuperExp,
+  debugToggleSuperSpeed,
   enemyIds,
   equipItemToCompanion,
   exportDebugTelemetryReport,
@@ -78,6 +74,7 @@ import {
   setLeaderIntent,
   setPartyLeader,
   setPartyMemberRole,
+  setStayInMapEnabled,
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
@@ -95,6 +92,7 @@ import {
   type ItemId,
   type NpcEntity,
   type PartyMemberRole,
+  type PoiConsideration,
   type Position,
   type QuestId,
   type ResourceEntity,
@@ -247,6 +245,53 @@ function formatIdentifierName(identifier: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function LeaderPoiPanel({
+  autoModeEnabled,
+  consideredTargets,
+  hasLeader,
+}: {
+  autoModeEnabled: boolean;
+  consideredTargets: PoiConsideration[] | undefined;
+  hasLeader: boolean;
+}) {
+  let emptyMessage: string | null = null;
+
+  if (!autoModeEnabled) {
+    emptyMessage = "Auto mode off";
+  } else if (!hasLeader) {
+    emptyMessage = "No leader";
+  } else if (!consideredTargets || consideredTargets.length === 0) {
+    emptyMessage = "No reachable POIs";
+  }
+
+  return (
+    <aside className="leader-poi-panel" aria-label="Leader POIs">
+      <h2>Leader POIs</h2>
+      {emptyMessage ? (
+        <p className="leader-poi-empty">{emptyMessage}</p>
+      ) : (
+        <ol className="leader-poi-list">
+          {consideredTargets?.map((target) => (
+            <li
+              key={`${target.mapId}-${target.poiId}`}
+              className={`leader-poi-row${target.isSelected ? " selected" : ""}`}
+            >
+              <span className="leader-poi-main">
+                <strong>{formatIdentifierName(target.category)}</strong>
+                <span>{target.poiId}</span>
+              </span>
+              <span className="leader-poi-reason">{target.reason}</span>
+              <span className="leader-poi-distance">
+                {Math.round(target.pathDistance)} steps
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </aside>
+  );
 }
 
 function getEnemyDisplayName(enemy: Enemy): string {
@@ -537,6 +582,9 @@ function createInitialState(): GameState {
     currentMapId: HUB_MAP_ID,
     activeTeleport: null,
     autoModeEnabled: false,
+    poiPreferences: {
+      stayInMap: false,
+    },
     simulationTick: 0,
     simulationFrame: 0,
     simulationTimeMs: 0,
@@ -701,6 +749,7 @@ function App() {
   const leader = partyMembers.find(
     (member) => member.id === gameState.partyLeaderId,
   ) ?? partyMembers[0];
+  const hasPartyLeader = Boolean(leader);
   const enemies = Object.values(gameState.entities).filter(
     (entity): entity is Enemy => entity.kind === "enemy",
   );
@@ -872,6 +921,12 @@ function App() {
     );
   }
 
+  function toggleStayInMap() {
+    setGameState((state) =>
+      setStayInMapEnabled(state, !state.poiPreferences.stayInMap),
+    );
+  }
+
   function changePartyMemberRole(
     entityId: string,
     role: PartyMemberRole,
@@ -979,12 +1034,6 @@ function App() {
     setGameState((state) => debugRemoveCompanionFromParty(state, companionIds));
   }
 
-  function randomizeLocations() {
-    setGameState((state) =>
-      debugRandomizeLocations(state, currentMap.columns, currentMap.rows),
-    );
-  }
-
   function resurrectEnemy() {
     setGameState((state) =>
       enemyIds.reduce(debugResurrectEnemy, state),
@@ -997,26 +1046,6 @@ function App() {
 
   function restorePartyHealth() {
     setGameState(debugRestorePartyHealth);
-  }
-
-  function addTestWoodToInventory() {
-    setGameState(debugAddTestWoodToInventory);
-  }
-
-  function addPrototypeEquipmentToInventory() {
-    setGameState(debugAddPrototypeEquipmentToInventory);
-  }
-
-  function addTestCrowns() {
-    setGameState(debugAddTestCrowns);
-  }
-
-  function removeTestCrowns() {
-    setGameState(debugRemoveTestCrowns);
-  }
-
-  function resetCrowns() {
-    setGameState(debugResetCrowns);
   }
 
   function equipEquipment(
@@ -1044,6 +1073,14 @@ function App() {
 
   function toggleDebugTools() {
     setShowDebugTools((isVisible) => !isVisible);
+  }
+
+  function toggleSuperSpeed() {
+    setGameState(debugToggleSuperSpeed);
+  }
+
+  function toggleSuperExp() {
+    setGameState(debugToggleSuperExp);
   }
 
   function selectGameMenuTab(tab: GameMenuTab | null) {
@@ -1463,9 +1500,48 @@ function App() {
             <div className="map-title-row">
               <span className="map-version">v{gameVersion}</span>
               <strong>{currentMap.displayName}</strong>
+              <button
+                className={`stay-in-map-toggle${
+                  gameState.poiPreferences.stayInMap ? " active" : ""
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleStayInMap();
+                }}
+                type="button"
+              >
+                Stay in Map {gameState.poiPreferences.stayInMap ? "On" : "Off"}
+              </button>
             </div>
             <span>debug: {currentMap.debugName}</span>
           </div>
+          <div className="map-debug-toggle-controls" aria-label="Debug multipliers">
+            <button
+              className={gameState.debugOptions?.superSpeedEnabled ? "active" : ""}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleSuperSpeed();
+              }}
+              type="button"
+            >
+              Super Speed {gameState.debugOptions?.superSpeedEnabled ? "On" : "Off"}
+            </button>
+            <button
+              className={gameState.debugOptions?.superExpEnabled ? "active" : ""}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleSuperExp();
+              }}
+              type="button"
+            >
+              Super Exp {gameState.debugOptions?.superExpEnabled ? "On" : "Off"}
+            </button>
+          </div>
+          <LeaderPoiPanel
+            autoModeEnabled={gameState.autoModeEnabled}
+            consideredTargets={gameState.lastPoiDecision?.consideredTargets}
+            hasLeader={hasPartyLeader}
+          />
           <div
             ref={mapWorldRef}
             className="map-world"
@@ -2104,21 +2180,11 @@ function App() {
                 <button onClick={removeCompanionFromParty}>
                   Remove Companion from Party
                 </button>
-                <button onClick={randomizeLocations}>
-                  Randomize Locations
-                </button>
                 <button onClick={resurrectEnemy}>Resurrect Enemy</button>
                 <button onClick={restorePartyHealth}>Restore Party HP</button>
                 <button onClick={refreshGatherPoints}>
                   Refresh Gather Points
                 </button>
-                <button onClick={addTestWoodToInventory}>Add Test Wood</button>
-                <button onClick={addPrototypeEquipmentToInventory}>
-                  Add Prototype Gear
-                </button>
-                <button onClick={addTestCrowns}>Add Test Crowns</button>
-                <button onClick={removeTestCrowns}>Remove Test Crowns</button>
-                <button onClick={resetCrowns}>Reset Crowns</button>
                 <button onClick={toggleEntityInfo}>
                   {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
                 </button>
