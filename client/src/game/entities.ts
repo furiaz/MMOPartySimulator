@@ -80,7 +80,7 @@ export function createEnemy(
     enemyType: options.enemyType,
     homePosition: position,
     level: options.level ?? archetype?.level ?? STARTING_ENEMY_LEVEL,
-    xpReward: options.xpReward ?? archetype?.xpReward,
+    xpReward: options.xpReward,
     attackCooldownMs: options.attackCooldownMs ?? archetype?.attackCooldownMs,
     attackRange: options.attackRange ?? archetype?.attackRange,
   };

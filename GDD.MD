@@ -374,7 +374,9 @@ Current prototype enemy target preferences:
 
 Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, and lightweight roaming behavior.
 
-Enemy level affects XP reward and may later affect stats, difficulty, loot, and encounter tuning.
+Enemy XP rewards currently come from the enemy level XP table by default. Monster-specific XP adjustments, Superior monster reward modifiers, and special named Elite monster rewards are future-facing and should not be treated as part of the current archetype setup data.
+
+Enemy level may later affect stats, difficulty, loot, and encounter tuning.
 
 Current prototype enemy archetypes:
 
@@ -391,7 +393,7 @@ Current prototype enemy archetypes:
 - Wolf
 - Orc
 
-Prototype enemy archetypes are lightweight tuning data. They are not final bestiary content, final encounter design, faction design, AI behavior trees, or production combat roles.
+Prototype enemy archetypes are lightweight tuning data for current supported setup values such as level, health, attack cooldown, detection range, attack range, temperament, combat style, and target preference. They are not final bestiary content, final encounter design, faction design, AI behavior trees, production combat roles, or XP reward tables.
 
 
 ---
@@ -848,7 +850,8 @@ Current XP intent:
 
 - early levels should be fast enough to show progression quickly
 - later levels should take significantly longer
-- XP rewards should scale with enemy level
+- XP rewards should scale from the enemy level table by default
+- monster-specific XP deltas and Superior monster XP modifiers are future-facing tuning work
 - lower-level enemies should become less valuable as party members outlevel them
 
 Leveling should remain simple and readable during the prototype phase.

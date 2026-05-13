@@ -48,7 +48,6 @@ export type EnemyArchetypeDefinition = {
   level: number;
   maxHealth: number;
   attackCooldownMs: number;
-  xpReward?: number;
   detectionRange: number;
   attackRange: number;
 };

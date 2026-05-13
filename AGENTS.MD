@@ -143,6 +143,22 @@ The documentation ticket must:
 
 Do not edit GDD.md, GTD.md, or AGENTS.md automatically. If those documents need changes, ask the user to make or approve those updates.
 
+## Protected Documentation Edit Approval Rule
+
+Codex must not edit AGENTS.md, GDD.md, or GTD.md unless the user explicitly says one of:
+
+- "Approve editing AGENTS.md"
+- "Approve editing GDD.md"
+- "Approve editing GTD.md"
+- "You may edit [exact protected document name]"
+
+General requests such as "fix the documentation", "update the docs", "do issue X", or "execute the documentation ticket" are not enough approval to edit protected documents.
+
+If protected documentation appears to need updates, Codex must:
+1. Identify the needed documentation change.
+2. Ask for explicit approval naming the exact protected document.
+3. Wait for approval before editing.
+4. If approval is not given, provide proposed text for the user to apply manually.
 
 ---
 

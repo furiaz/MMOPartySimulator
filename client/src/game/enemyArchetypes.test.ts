@@ -44,7 +44,6 @@ describe("prototype enemy archetypes", () => {
       maxHealth: 9,
       attackCooldownMs: 500,
       attackRange: 2,
-      xpReward: 12,
     });
 
     expect(enemy.level).toBe(5);
@@ -52,6 +51,5 @@ describe("prototype enemy archetypes", () => {
     expect(enemy.maxHealth).toBe(9);
     expect(enemy.attackCooldownMs).toBe(500);
     expect(enemy.attackRange).toBe(2);
-    expect(enemy.xpReward).toBe(12);
   });
 });

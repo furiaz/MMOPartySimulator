@@ -358,6 +358,8 @@ level: number;
 xpReward?: number;
 ```
 
+`xpReward` is stored on individual enemy entities only as an explicit spawn-level override. It is not part of `EnemyArchetypeDefinition`.
+
 Current leveling constants:
 
 - `MAX_CHARACTER_LEVEL = 200`
@@ -369,7 +371,7 @@ Current leveling behavior:
 - XP is granted to living companions
 - dead companions do not receive XP
 - max-level companions do not receive XP
-- XP reward defaults from enemy level if `xpReward` is not set
+- XP reward defaults from the same-level enemy XP table if an individual enemy `xpReward` override is not set
 - XP to next level uses anchored progression values with interpolation
 - same-level enemy XP uses anchored progression values with interpolation
 - companion XP rolls over through multiple level-ups if enough XP is gained
@@ -858,7 +860,8 @@ Current enemy behavior:
 - passive enemies do not seek combat targets on their own
 - passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
-- enemy archetypes can define detection range and target preference
+- enemy archetypes can define setup data such as level, max health, attack cooldown, detection range, attack range, temperament, combat style, and target preference
+- enemy archetypes do not define XP rewards; enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`
 - target preferences currently support closest, leader, and lowest-health party member
 - enemies with valid targets enter or remain in attack state
 - enemies clear invalid targets
