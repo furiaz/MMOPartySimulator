@@ -279,6 +279,7 @@ export {
   updateDropSystem,
 } from "./dropSystem";
 export { updateDefendSystem } from "./defendSystem";
+export { getEnemyArchetype } from "./enemyArchetypes";
 export {
   getEnemyAttackLeashDistance,
   getEnemyDetectionRange,

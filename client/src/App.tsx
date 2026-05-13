@@ -62,6 +62,7 @@ import {
   QUEST_GIVER_POI_ID,
   addItemToInventoryState,
   getAttackCooldownMs,
+  getEnemyArchetype,
   getEnemyDetectionRange,
   getItemDefinition,
   hasQuestGiverWork,
@@ -240,6 +241,25 @@ function formatResourceName(resourceType: ResourceEntity["resourceType"]): strin
   return resourceType.charAt(0).toUpperCase() + resourceType.slice(1);
 }
 
+function formatIdentifierName(identifier: string): string {
+  return identifier
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getEnemyDisplayName(enemy: Enemy): string {
+  if (enemy.archetypeId) {
+    return (
+      getEnemyArchetype(enemy.archetypeId)?.displayName ??
+      formatIdentifierName(enemy.archetypeId)
+    );
+  }
+
+  return enemy.enemyType ? formatIdentifierName(enemy.enemyType) : "Enemy";
+}
+
 function formatTargetId(entity: CombatEntity): string {
   return entity.currentTargetId ?? "none";
 }
@@ -254,11 +274,8 @@ function getResourceTooltip(resource: ResourceEntity): string {
 
 function getEnemyTooltip(enemy: Enemy): string {
   return [
-    enemy.archetypeId
-      ? `Archetype ${enemy.archetypeId}`
-      : enemy.enemyType
-        ? `Enemy ${enemy.enemyType}`
-        : "Enemy",
+    getEnemyDisplayName(enemy),
+    enemy.archetypeId ? `Archetype ${enemy.archetypeId}` : null,
     `Level ${enemy.level}`,
     `XP ${enemy.xpReward ?? "auto"}`,
     `HP ${enemy.health}/${enemy.maxHealth}`,
@@ -604,6 +621,10 @@ function HealthBar({ entity }: { entity: HealthBarEntity }) {
       <span style={{ width: `${healthPercent}%` }} />
     </span>
   );
+}
+
+function EntityNameLabel({ name }: { name: string }) {
+  return <span className="entity-name-label">{name}</span>;
 }
 
 function AttackCooldownIndicator({
@@ -1812,6 +1833,7 @@ function App() {
                   }}
                   title={getEnemyTooltip(enemy)}
                 >
+                  <EntityNameLabel name={getEnemyDisplayName(enemy)} />
                   {animation ? (
                     <SpriteAnimation
                       alt={`Enemy ${index + 1}`}
@@ -1943,6 +1965,7 @@ function App() {
                       : `Move party POI to ${npc.displayName}`
                   }
                 >
+                  <EntityNameLabel name={npc.displayName} />
                   {isImageNpc ? (
                     <img
                       alt={npc.displayName}
