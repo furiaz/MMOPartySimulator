@@ -387,7 +387,7 @@ Current prototype enemy archetypes:
 - Goblin Thrower
 - Bog Imp
 - Stone Crawler
-- Thorn Shaman
+- Goblin Shaman
 - Ash Wisp
 - Mossling
 - Wolf
@@ -432,7 +432,7 @@ Inventory is slot-based and belongs to the party, not individual companions.
 
 Current prototype inventory rules:
 
-- starting capacity is 10 slots
+- starting capacity is 50 slots
 - item gains go directly into shared inventory for now
 - materials stack to 250
 - consumables stack to 99
@@ -448,6 +448,7 @@ Current item categories:
 - equipment
 - quest
 - event
+- junk
 
 The prototype wallet is shared by the party.
 
@@ -462,41 +463,65 @@ Enemy drops currently use lightweight prototype drop tables.
 
 Current enemy drop behavior:
 
-- defeated enemies may roll material or equipment drops by enemy type
-- current enemy drop tables exist for Wolf and Orc enemy types only
+- defeated enemies may roll junk drops by enemy family and loot tier
+- loot tier is currently derived from enemy level
+- Tier 1 currently covers enemies below level 10
+- Tier 2 currently covers enemies level 10 and above
+- current family drop tables may exist for Slime, Bat, Spider, Goblin, Imp, Wolf, Crawler, Mossling, Wisp, and Orc families
+- family/tier drops route prototype junk items into shared inventory
+- Goblin Shaman may also roll a low-chance archetype-specific Holy Lantern equipment drop
 - drop results use short-lived visual feedback before being routed into shared inventory
 - drops do not create persistent ground loot
 - inventory overflow may partially or fully reject dropped items
 
-Current prototype loot materials:
+Current prototype gathered materials:
 
-- Wolf Pelt
-- Wolf Fang
-- Wolf Claw
-- Orc Tusk
-- Orc Hide
-- Orc Scrap
+- Softwood
+- Copper Ore
+- Field Herb
+- Hardwood
+- Iron Ore
+- Redleaf Herb
+
+Legacy gathered material ids for Wood, Ore, and Herb may still exist for compatibility, but current resource yields should use tiered gathered material items.
+
+Current prototype junk drops may include:
+
+- Tier 1 Slime Gel
+- Tier 1 Slime Core
+- Tier 1 Bat Wing
+- Tier 1 Bat Ear
+- Tier 1 Spider Silk
+- Tier 1 Spider Fang
+- Tier 1 Goblin Ear
+- Tier 1 Goblin Tooth
+- Tier 1 Imp Horn Chip
+- Tier 1 Imp Tail
+- Tier 1 Wolf Pelt
+- Tier 1 Wolf Fang
+- Tier 1 Crawler Pebble
+- Tier 1 Crawler Plate
+- Tier 1 Moss Tuft
+- Tier 1 Mossling Cap
+- Tier 2 Goblin Ear
+- Tier 2 Goblin Tooth
+- Tier 2 Wisp Ash
+- Tier 2 Wisp Ember
+- Tier 2 Orc Hide
+- Tier 2 Orc Tusk
 
 Current prototype enemy equipment drops may include:
 
-- Worn Cap
-- Worn Tunic
-- Worn Pants
-- Worn Gloves
-- Worn Boots
-- Reinforced Helm
-- Reinforced Armor
-- Reinforced Legguards
-- Reinforced Gloves
-- Reinforced Boots
+- Holy Lantern from Goblin Shaman
 
 Current quick exchange behavior:
 
-- the hub Merchant can exchange eligible enemy parts for Crowns
-- eligible quick-exchange parts are prototype material items marked for exchange
-- quick exchange removes eligible parts from shared inventory
+- the hub Merchant can exchange eligible junk items for Crowns
+- eligible quick-exchange junk items are prototype junk items with sell value
+- quick exchange removes eligible junk items from shared inventory
 - quick exchange adds Crowns to the shared wallet
 - this is a prototype exchange action, not a full selling or shop economy
+
 
 Current merchant UI may show Buy and Sell placeholder panels.
 
@@ -582,18 +607,12 @@ Current shared prototype armor and accessory examples include:
 - Travel Boots
 - Plain Charm
 
-Current enemy-drop prototype armor examples include:
+Current archetype-specific prototype equipment drops may include:
 
-- Worn Cap
-- Worn Tunic
-- Worn Pants
-- Worn Gloves
-- Worn Boots
-- Reinforced Helm
-- Reinforced Armor
-- Reinforced Legguards
-- Reinforced Gloves
-- Reinforced Boots
+- Holy Lantern from Goblin Shaman
+
+Older prototype armor items may still exist as item definitions, but they should not be treated as current enemy drop behavior unless a drop table explicitly uses them again.
+
 
 
 Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
@@ -707,11 +726,16 @@ It may show:
 
 - companion list
 - selected companion management options
+- current leader status
+- leadership switch action for living eligible companions
 - Role Select
 - Equipment
 - Full Stats
 
+Leadership switching changes the current leader identity only. It does not change role, class, party order, equipment, or party behavior rules.
+
 Role Select must use the existing party role values:
+
 
 - Defender
 - Fighter
@@ -1184,7 +1208,7 @@ Current prototype hub:
 - It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, and a clear exit to the first wild map.
 - Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and Test Hunter.
 - The Quest Giver supports the lightweight prototype quest chain only.
-- The Merchant supports prototype quick exchange of eligible enemy parts for Crowns only.
+- The Merchant supports prototype quick exchange of eligible junk items for Crowns only.
 - The healing fountain restores party member health when party members are in range.
 - The prototype hub should not spawn hostile enemies for now.
 - The prototype hub must not implement full town systems, interiors, branching dialogue, shops, crafting, recruitment, smithing, or NPC relationship systems unless explicitly requested.
@@ -1270,9 +1294,13 @@ Visual priorities:
 
 - party members should be easy to identify
 - enemies should be easy to distinguish from party members
+- NPCs should be easy to identify in prototype hub spaces
 - resources should be visible and readable
 - movement direction should be understandable
 - feedback should make combat, gathering, and skills readable
+
+Enemy and NPC name labels may be used as UI-facing readability aids. Name labels must not define simulation behavior, targeting rules, NPC behavior, dialogue, or final content pipeline rules.
+
 
 Prototype art assets are allowed while systems are being built.
 

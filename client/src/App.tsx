@@ -653,8 +653,8 @@ function AttackCooldownIndicator({
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
-  const [showEntityInfo, setShowEntityInfo] = useState(true);
-  const [showDebugTools, setShowDebugTools] = useState(true);
+  const [showEntityInfo, setShowEntityInfo] = useState(false);
+  const [showDebugTools, setShowDebugTools] = useState(false);
   const [isGameMenuOpen, setIsGameMenuOpen] = useState(false);
   const [activeGameMenuTab, setActiveGameMenuTab] =
     useState<GameMenuTab | null>(null);

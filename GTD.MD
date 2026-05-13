@@ -827,7 +827,7 @@ Current enemy archetype ids:
 - `goblin_thrower`
 - `bog_imp`
 - `stone_crawler`
-- `thorn_shaman`
+- `goblin_shaman`
 - `ash_wisp`
 - `mossling`
 - `wolf`
@@ -842,9 +842,9 @@ Current enemy archetype data may define:
 - level
 - max health
 - attack cooldown
-- XP reward override
 - detection range
 - attack range
+
 
 Enemy archetypes are prototype tuning records. They are not final bestiary content, faction design, encounter design, or production AI behavior trees.
 
@@ -946,6 +946,7 @@ Resources are entities.
 Current resource fields:
 
 - `resourceType`
+- `tier`
 - `durability`
 - `maxDurability`
 - `quantity`
@@ -958,9 +959,32 @@ Current resource types:
 type ResourceType = "wood" | "ore" | "herb";
 ```
 
+Current loot tiers:
+
+```ts
+type LootTier = 1 | 2;
+```
+
 Gathering reduces durability.
 
 When durability reaches zero, quantity decreases, resource yield is routed through prototype inventory helpers, durability resets if quantity remains, and the resource becomes depleted when quantity reaches zero.
+
+Resource yields currently resolve by resource type and tier.
+
+Current tiered resource item ids:
+
+```ts
+type ResourceItemId =
+  | ResourceType
+  | "softwood"
+  | "copper_ore"
+  | "field_herb"
+  | "hardwood"
+  | "iron_ore"
+  | "redleaf_herb";
+```
+
+The base `wood`, `ore`, and `herb` item ids are legacy compatibility material ids. Current resource yields should use tiered material ids.
 
 ## Prototype Inventory, Wallet, Drops, and Merchant Exchange
 
@@ -973,7 +997,19 @@ Current inventory modules include:
 
 Inventory state is stored on `GameState` as shared party state.
 
-Inventory is slot-based with a temporary starting capacity of 10 slots.
+Inventory is slot-based with a temporary starting capacity of 50 slots.
+
+Current item categories:
+
+```ts
+type ItemCategory =
+  | "material"
+  | "consumable"
+  | "equipment"
+  | "quest"
+  | "event"
+  | "junk";
+```
 
 The shared prototype wallet is stored on `GameState` as `wallet`.
 
@@ -990,19 +1026,87 @@ Enemy drop logic lives in:
 - `dropTables.ts`
 - `dropSystem.ts`
 
-Drops roll by enemy type, create short-lived drop visual events, and route completed drops into shared inventory. Drops do not create persistent ground loot.
+Drops roll by enemy family and loot tier, create short-lived drop visual events, and route completed drops into shared inventory. Drops do not create persistent ground loot.
+
+Current enemy family ids:
+
+```ts
+type EnemyFamilyId =
+  | "slime"
+  | "bat"
+  | "spider"
+  | "goblin"
+  | "imp"
+  | "wolf"
+  | "crawler"
+  | "mossling"
+  | "wisp"
+  | "orc";
+```
+
+Current enemy type aliases enemy family id:
+
+```ts
+type EnemyType = EnemyFamilyId;
+```
+
+Current drop tables are keyed by enemy family and loot tier. Loot tier is currently derived from enemy level.
+
+Current loot tier behavior:
+
+- level below 10 maps to tier 1
+- level 10 or higher maps to tier 2
+- supported loot tiers are currently 1 and 2
+
+Current drop table behavior:
+
+- family drop tables may roll common and rare junk drops
+- archetype-specific drop tables may add special exceptions
+- `goblin_shaman` currently has a low-chance tier 2 Holy Lantern equipment drop
+- missing family or tier tables simply produce no drops from that table
+
+Current prototype junk item ids:
+
+```ts
+type JunkItemId =
+  | "slime_gel_t1"
+  | "slime_core_t1"
+  | "bat_wing_t1"
+  | "bat_ear_t1"
+  | "spider_silk_t1"
+  | "spider_fang_t1"
+  | "goblin_ear_t1"
+  | "goblin_tooth_t1"
+  | "imp_horn_chip_t1"
+  | "imp_tail_t1"
+  | "wolf_pelt"
+  | "wolf_fang"
+  | "crawler_pebble_t1"
+  | "crawler_plate_t1"
+  | "moss_tuft_t1"
+  | "mossling_cap_t1"
+  | "goblin_ear_t2"
+  | "goblin_tooth_t2"
+  | "wisp_ash_t2"
+  | "wisp_ember_t2"
+  | "orc_tusk"
+  | "orc_hide";
+```
 
 Merchant quick exchange logic lives in `merchant.ts`.
 
 Current merchant behavior:
 
 - identifies Merchant NPCs by `npcRole: "merchant"`
-- finds eligible parts marked for quick exchange
-- removes eligible parts from shared inventory
+- finds eligible junk items with positive sell value
+- removes eligible junk items from shared inventory
 - adds Crowns to the shared wallet
 - records merchant and wallet telemetry
 
+The Merchant Buy and Sell panels are currently UI placeholders only. There is no merchant stock list, purchase transaction, sell transaction, shop inventory, or buy/sell economy.
+
 This prototype inventory/wallet/drop/merchant layer does not include bank storage, persistent ground loot, consumable item effects, full selling, buying, shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
+
 
 
 ## Prototype Equipment
@@ -1105,18 +1209,12 @@ Current shared prototype armor and accessory items include:
 - Travel Boots
 - Plain Charm
 
-Current enemy-drop prototype armor items include:
+Current archetype-specific prototype equipment drops may include:
 
-- Worn Cap
-- Worn Tunic
-- Worn Pants
-- Worn Gloves
-- Worn Boots
-- Reinforced Helm
-- Reinforced Armor
-- Reinforced Legguards
-- Reinforced Gloves
-- Reinforced Boots
+- Holy Lantern from Goblin Shaman
+
+Older prototype armor items may still exist as equipment item definitions, but they should not be treated as current enemy drop behavior unless a drop table explicitly uses them again.
+
 
 Current prototype equipment stat modifiers may include:
 
@@ -1372,9 +1470,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, generated terrain tiles, party members, enemies, resources, NPCs, healing fountains, sprite animation, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, XP and level progress, party size limit, debug controls, and debug telemetry export.
-
-
+The React UI currently may display and control map/debug map view, generated terrain tiles, party members, enemies, resources, NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, XP and level progress, party size limit, debug controls, and debug telemetry export.
 
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
@@ -1395,8 +1491,11 @@ React may:
 - track selected companion UI state
 - track selected management section UI state
 - track selected quest UI state
+- render UI-facing enemy and NPC name labels
 - call existing game command/helper functions for supported actions
+- call existing party leader helper functions for leadership switching
 - display placeholder sections for future systems
+
 
 React must not:
 
@@ -1413,8 +1512,10 @@ Current intended main menu views:
 - Inventory
 - Quests
 
-Current intended Party Management sections:
+Current intended Party Management sections and controls:
 
+- current leader status
+- leadership switch action for living eligible companions
 - Role Select
 - Equipment
 - Full Stats
@@ -1422,6 +1523,7 @@ Current intended Party Management sections:
 - Formation placeholder
 - Skill Preferences placeholder
 - Behavior Settings placeholder
+
 
 Role Select must use the existing `PartyMemberRole` values:
 
@@ -1438,8 +1540,7 @@ The Quests view may display prototype quest state and objective progress from ga
 
 The Inventory view may display wallet balance, but wallet and inventory rules must remain in game logic.
 
-Merchant UI may call existing merchant helper functions, but must not define exchange rules inside React.
-
+Merchant UI may call existing merchant helper functions, but must not define exchange rules inside React. Buy and Sell panels may exist as placeholders only until a real shop system is explicitly requested.
 
 ## World Structure Future Work
 
