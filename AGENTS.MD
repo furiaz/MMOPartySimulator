@@ -261,3 +261,22 @@ For each implementation ticket:
 - If multiple tickets are implemented together, explain why in the ticket and commit message.
 - Completion notes should list the main files changed and any verification performed.
 - If rollback is needed, prefer reverting the commit associated with the ticket instead of manually undoing unrelated code.
+
+## Explicit Quick Fix Exception
+
+Codex may skip GitHub Issue ticket creation only when the user explicitly labels the request as a quick fix and explicitly says to ignore or skip issue creation.
+
+Acceptable user wording includes phrases like:
+
+- "Quick fix: rename typo from X to Y, ignore issue creation"
+- "Small fix, skip ticket"
+- "No issue needed, just fix this typo"
+- "Quick fix only, do not create a ticket"
+
+If the user says something broad such as "let's do this", "go ahead", "implement this", or "fix this" without explicitly saying to skip issue/ticket creation, Codex must follow the normal ticket workflow before making changes.
+
+Quick fixes must remain narrowly scoped and low-risk. They may include typos, obvious naming mistakes, formatting, comments, lint-only fixes, or minor UI text corrections.
+
+Quick fixes must not include gameplay behavior changes, design decisions, balance changes, architecture changes, map/content changes, protected documentation edits, persistence/backend changes, or anything requiring GDD/GTD alignment.
+
+If a requested quick fix appears to involve design or behavior, Codex must stop and ask whether to create a normal implementation ticket instead.
