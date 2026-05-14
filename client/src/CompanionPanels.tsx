@@ -225,12 +225,20 @@ function CompanionSkillSummary({
   member: Companion;
   skills: SkillDefinition[];
 }) {
+  const orderedSkills = skills
+    .map((skill, index) => ({
+      index,
+      score: getSkillRoleScore(member.role, skill.tags),
+      skill,
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
   return (
     <div className="companion-skill-summary" aria-label="Companion skills">
       <span className="equipment-section-label">Skills</span>
       {skills.length > 0 ? (
         <div className="companion-skill-list">
-          {skills.map((skill) => (
+          {orderedSkills.map(({ score, skill }) => (
             <div key={skill.id} className="companion-skill-row">
               <div>
                 <strong>{skill.displayName}</strong>
@@ -243,7 +251,7 @@ function CompanionSkillSummary({
                 </div>
                 <div>
                   <dt>Role Score</dt>
-                  <dd>{getSkillRoleScore(member.role, skill.tags)}</dd>
+                  <dd>{score}</dd>
                 </div>
               </dl>
               <span className="companion-skill-tags">
