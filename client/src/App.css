@@ -299,7 +299,7 @@
 }
 
 .skill-visual-sprite {
-  z-index: 3;
+  z-index: 4;
   width: 50px;
   height: 50px;
   image-rendering: pixelated;
@@ -377,7 +377,7 @@
 }
 
 .combat-feedback {
-  z-index: 3;
+  z-index: 5;
   min-width: 48px;
   margin: -18px 0 0 -10px;
   padding: 2px 4px;
@@ -391,24 +391,49 @@
 }
 
 .combat-feedback.attack {
-  border-color: #1d4ed8;
+  min-width: 84px;
+  margin: -34px 0 0 -24px;
+  border-color: transparent;
+  background: transparent;
   color: #1d4ed8;
+  text-shadow:
+    0 1px 0 #ffffff,
+    1px 0 0 #ffffff,
+    0 -1px 0 #ffffff,
+    -1px 0 0 #ffffff;
 }
 
 .combat-feedback.damage {
-  border-color: #b91c1c;
+  border-color: transparent;
+  background: transparent;
   color: #b91c1c;
+  text-shadow:
+    0 1px 0 #ffffff,
+    1px 0 0 #ffffff,
+    0 -1px 0 #ffffff,
+    -1px 0 0 #ffffff;
 }
 
 .combat-feedback.death {
-  border-color: #111827;
-  background: #fee2e2;
+  border-color: transparent;
+  background: transparent;
   color: #111827;
+  text-shadow:
+    0 1px 0 #ffffff,
+    1px 0 0 #ffffff,
+    0 -1px 0 #ffffff,
+    -1px 0 0 #ffffff;
 }
 
 .combat-feedback.gather {
-  border-color: #047857;
+  border-color: transparent;
+  background: transparent;
   color: #047857;
+  text-shadow:
+    0 1px 0 #ffffff,
+    1px 0 0 #ffffff,
+    0 -1px 0 #ffffff,
+    -1px 0 0 #ffffff;
 }
 
 .idle-feedback {
@@ -728,9 +753,9 @@
   max-width: 108px;
   padding: 1px 5px;
   transform: translateX(-50%);
-  border: 1px solid rgba(15, 23, 42, 0.72);
+  border: 1px solid transparent;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.92);
+  background: transparent;
   color: #111827;
   font-size: 11px;
   font-weight: 700;
@@ -738,8 +763,16 @@
   overflow-wrap: anywhere;
   pointer-events: none;
   text-align: center;
-  text-shadow: none;
+  text-shadow:
+    0 1px 0 #ffffff,
+    1px 0 0 #ffffff,
+    0 -1px 0 #ffffff,
+    -1px 0 0 #ffffff;
   white-space: nowrap;
+}
+
+.entity-name-label-aggressive {
+  color: #dc2626;
 }
 
 .companion {

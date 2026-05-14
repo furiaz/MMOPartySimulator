@@ -41,6 +41,12 @@ export const enemyIds = [
   "test-enemy-12",
   "test-enemy-13",
   "test-enemy-14",
+  "test-enemy-15",
+  "test-enemy-16",
+  "test-enemy-17",
+  "test-enemy-18",
+  "test-enemy-19",
+  "test-enemy-20",
 ];
 
 export const resourceIds = [
@@ -160,47 +166,59 @@ export const hubNpcStartData = [
 ] as const;
 
 export const mapOneEnemyStartPositions: Position[] = [
-  { x: 9, y: 8 },
-  { x: 15, y: 13 },
-  { x: 29, y: 9 },
-  { x: 34, y: 19 },
-  { x: 50, y: 8 },
-  { x: 70, y: 12 },
-  { x: 11, y: 25 },
-  { x: 27, y: 31 },
-  { x: 45, y: 27 },
-  { x: 57, y: 37 },
-  { x: 68, y: 28 },
-  { x: 14, y: 38 },
-  { x: 37, y: 42 },
-  { x: 64, y: 42 },
+  { x: 10, y: 8 },
+  { x: 16, y: 12 },
+  { x: 28, y: 7 },
+  { x: 34, y: 13 },
+  { x: 49, y: 9 },
+  { x: 66, y: 11 },
+  { x: 73, y: 15 },
+  { x: 12, y: 24 },
+  { x: 25, y: 22 },
+  { x: 35, y: 28 },
+  { x: 48, y: 24 },
+  { x: 62, y: 27 },
+  { x: 71, y: 30 },
+  { x: 13, y: 39 },
+  { x: 27, y: 42 },
+  { x: 39, y: 38 },
+  { x: 50, y: 42 },
+  { x: 61, y: 37 },
+  { x: 70, y: 42 },
+  { x: 73, y: 36 },
 ];
 
 export const mapTwoEnemyStartPositions: Position[] = [
-  { x: 10, y: 9 },
-  { x: 24, y: 7 },
-  { x: 45, y: 9 },
-  { x: 72, y: 8 },
-  { x: 13, y: 20 },
-  { x: 31, y: 23 },
-  { x: 55, y: 20 },
-  { x: 70, y: 24 },
-  { x: 9, y: 35 },
-  { x: 25, y: 39 },
-  { x: 43, y: 34 },
-  { x: 61, y: 39 },
-  { x: 72, y: 37 },
-  { x: 55, y: 29 },
+  { x: 9, y: 8 },
+  { x: 18, y: 10 },
+  { x: 28, y: 7 },
+  { x: 44, y: 11 },
+  { x: 59, y: 8 },
+  { x: 72, y: 12 },
+  { x: 12, y: 21 },
+  { x: 25, y: 25 },
+  { x: 40, y: 22 },
+  { x: 55, y: 19 },
+  { x: 69, y: 24 },
+  { x: 10, y: 35 },
+  { x: 21, y: 40 },
+  { x: 33, y: 36 },
+  { x: 45, y: 41 },
+  { x: 57, y: 34 },
+  { x: 65, y: 39 },
+  { x: 72, y: 34 },
+  { x: 51, y: 28 },
+  { x: 30, y: 29 },
 ];
 
 export const mapOneResourceStartData: ResourceStartData[] = [
   { id: resourceIds[0], position: { x: 7, y: 12 }, resourceType: "wood" },
-  { id: resourceIds[1], position: { x: 18, y: 8 }, resourceType: "ore" },
+  { id: resourceIds[1], position: { x: 23, y: 8 }, resourceType: "ore" },
   { id: resourceIds[2], position: { x: 30, y: 16 }, resourceType: "herb" },
   { id: resourceIds[3], position: { x: 47, y: 11 }, resourceType: "wood" },
   { id: resourceIds[4], position: { x: 70, y: 16 }, resourceType: "ore" },
   { id: resourceIds[5], position: { x: 16, y: 27 }, resourceType: "herb" },
-  { id: resourceIds[6], position: { x: 36, y: 31 }, resourceType: "wood" },
+  { id: resourceIds[6], position: { x: 41, y: 31 }, resourceType: "wood" },
   { id: resourceIds[7], position: { x: 53, y: 25 }, resourceType: "ore" },
   { id: resourceIds[8], position: { x: 72, y: 32 }, resourceType: "herb" },
   { id: resourceIds[9], position: { x: 51, y: 41 }, resourceType: "wood" },
@@ -209,12 +227,12 @@ export const mapOneResourceStartData: ResourceStartData[] = [
 export const mapTwoResourceStartData: ResourceStartData[] = [
   { id: resourceIds[0], position: { x: 7, y: 14 }, resourceType: "wood", tier: 2 },
   { id: resourceIds[1], position: { x: 22, y: 12 }, resourceType: "ore", tier: 2 },
-  { id: resourceIds[2], position: { x: 39, y: 15 }, resourceType: "herb", tier: 2 },
+  { id: resourceIds[2], position: { x: 40, y: 13 }, resourceType: "herb", tier: 2 },
   { id: resourceIds[3], position: { x: 63, y: 13 }, resourceType: "wood", tier: 2 },
   { id: resourceIds[4], position: { x: 16, y: 26 }, resourceType: "ore", tier: 2 },
   { id: resourceIds[5], position: { x: 38, y: 29 }, resourceType: "herb", tier: 2 },
   { id: resourceIds[6], position: { x: 57, y: 24 }, resourceType: "wood", tier: 2 },
-  { id: resourceIds[7], position: { x: 72, y: 30 }, resourceType: "ore", tier: 2 },
+  { id: resourceIds[7], position: { x: 73, y: 28 }, resourceType: "ore", tier: 2 },
   { id: resourceIds[8], position: { x: 13, y: 42 }, resourceType: "herb", tier: 2 },
   { id: resourceIds[9], position: { x: 50, y: 41 }, resourceType: "wood", tier: 2 },
 ];
@@ -250,67 +268,80 @@ const HUB_WALLS = dedupeWalls([
 
 const MAP_ONE_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(20, 5, WILDERNESS_MAP_ROWS - 6, [
-    [10, 14],
-    [25, 29],
-    [38, 42],
-  ]),
-  ...createVerticalWall(40, 5, WILDERNESS_MAP_ROWS - 6, [
-    [8, 12],
-    [26, 30],
-    [39, 43],
-  ]),
-  ...createVerticalWall(60, 6, WILDERNESS_MAP_ROWS - 7, [
-    [11, 15],
-    [27, 31],
-    [38, 42],
-  ]),
-  ...createHorizontalWall(18, 5, WILDERNESS_MAP_COLUMNS - 6, [
-    [12, 17],
-    [31, 36],
-    [50, 55],
-    [68, 73],
-  ]),
-  ...createHorizontalWall(34, 6, WILDERNESS_MAP_COLUMNS - 7, [
+  ...createVerticalWall(18, 5, WILDERNESS_MAP_ROWS - 6, [
     [9, 14],
-    [28, 33],
-    [47, 52],
-    [65, 70],
+    [23, 28],
+    [38, 43],
+  ]),
+  ...createVerticalWall(36, 4, WILDERNESS_MAP_ROWS - 7, [
+    [7, 13],
+    [24, 30],
+    [37, 42],
+  ]),
+  ...createVerticalWall(55, 6, WILDERNESS_MAP_ROWS - 7, [
+    [8, 13],
+    [23, 29],
+    [36, 41],
+  ]),
+  ...createHorizontalWall(17, 6, WILDERNESS_MAP_COLUMNS - 7, [
+    [10, 16],
+    [27, 34],
+    [47, 53],
+    [65, 74],
+  ]),
+  ...createHorizontalWall(33, 7, WILDERNESS_MAP_COLUMNS - 8, [
+    [10, 16],
+    [25, 32],
+    [45, 52],
+    [63, 72],
+  ]),
+  ...createVerticalWall(67, 18, 32, [
+    [22, 26],
+  ]),
+  ...createHorizontalWall(25, 19, 35, [
+    [25, 31],
   ]),
 ]);
 
 const MAP_TWO_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(16, 5, WILDERNESS_MAP_ROWS - 6, [
-    [11, 15],
-    [24, 28],
-    [38, 42],
-  ]),
-  ...createVerticalWall(34, 4, WILDERNESS_MAP_ROWS - 7, [
-    [8, 12],
-    [22, 26],
-    [35, 39],
-  ]),
-  ...createVerticalWall(52, 5, WILDERNESS_MAP_ROWS - 6, [
-    [10, 14],
-    [23, 27],
-    [37, 41],
-  ]),
-  ...createVerticalWall(68, 6, WILDERNESS_MAP_ROWS - 8, [
-    [12, 16],
-    [26, 30],
-  ]),
-  ...createHorizontalWall(17, 5, WILDERNESS_MAP_COLUMNS - 6, [
+  ...createVerticalWall(15, 5, WILDERNESS_MAP_ROWS - 6, [
     [8, 13],
-    [25, 30],
-    [43, 48],
-    [61, 66],
+    [22, 27],
+    [38, 43],
   ]),
-  ...createHorizontalWall(32, 6, WILDERNESS_MAP_COLUMNS - 7, [
+  ...createVerticalWall(32, 5, WILDERNESS_MAP_ROWS - 7, [
+    [7, 12],
+    [23, 29],
+    [36, 41],
+  ]),
+  ...createVerticalWall(50, 4, WILDERNESS_MAP_ROWS - 7, [
+    [9, 14],
+    [22, 28],
+    [37, 42],
+  ]),
+  ...createVerticalWall(66, 6, WILDERNESS_MAP_ROWS - 8, [
     [10, 15],
-    [28, 33],
-    [46, 51],
-    [62, 67],
+    [24, 30],
+    [36, 40],
+  ]),
+  ...createHorizontalWall(16, 6, WILDERNESS_MAP_COLUMNS - 7, [
+    [8, 13],
+    [24, 30],
+    [42, 48],
+    [60, 72],
+  ]),
+  ...createHorizontalWall(31, 7, WILDERNESS_MAP_COLUMNS - 8, [
+    [9, 14],
+    [24, 31],
+    [43, 49],
+    [61, 71],
+  ]),
+  ...createHorizontalWall(24, 51, 65, [
+    [55, 61],
+  ]),
+  ...createVerticalWall(41, 17, 30, [
+    [20, 25],
   ]),
 ]);
 

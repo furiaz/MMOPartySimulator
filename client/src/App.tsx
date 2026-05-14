@@ -11,6 +11,7 @@ import {
   HUB_MAP_TILE_SRC,
   INVENTORY_ITEM_ICON_SRC,
   MAP_OBJECT_ICON_SRC,
+  SHARED_SKILL_VISUAL_ICON_SRC,
   SKILL_VISUAL_ICON_SRC,
   WILDERNESS_MAP_TILE_SRC,
 } from "./assetIcons";
@@ -135,7 +136,27 @@ type ViewportSize = {
 };
 
 function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
-  return event.skillId ? SKILL_VISUAL_ICON_SRC[event.skillId] : undefined;
+  if (event.skillId && SKILL_VISUAL_ICON_SRC[event.skillId]) {
+    return SKILL_VISUAL_ICON_SRC[event.skillId];
+  }
+
+  if (event.type === "projectile") {
+    return SHARED_SKILL_VISUAL_ICON_SRC.projectile;
+  }
+
+  if (event.type === "slash") {
+    return SHARED_SKILL_VISUAL_ICON_SRC.slash;
+  }
+
+  if (event.type === "red_flash") {
+    return SHARED_SKILL_VISUAL_ICON_SRC.redFlash;
+  }
+
+  if (event.type === "heal") {
+    return SHARED_SKILL_VISUAL_ICON_SRC.heal;
+  }
+
+  return undefined;
 }
 
 function isWildernessVisualMap(mapId: string | undefined): boolean {
@@ -681,8 +702,22 @@ function HealthBar({ entity }: { entity: HealthBarEntity }) {
   );
 }
 
-function EntityNameLabel({ name }: { name: string }) {
-  return <span className="entity-name-label">{name}</span>;
+function EntityNameLabel({
+  name,
+  isAggressive = false,
+}: {
+  name: string;
+  isAggressive?: boolean;
+}) {
+  return (
+    <span
+      className={`entity-name-label${
+        isAggressive ? " entity-name-label-aggressive" : ""
+      }`}
+    >
+      {name}
+    </span>
+  );
 }
 
 function AttackCooldownIndicator({
@@ -1677,18 +1712,10 @@ function App() {
                 return null;
               }
 
-              const spritePosition = target
-                ? {
-                    x: (source.position.x + target.position.x) / 2,
-                    y: (source.position.y + target.position.y) / 2,
-                  }
-                : event.position ?? source.position;
-              const angle = target && event.type !== "heal"
-                ? Math.atan2(
-                    target.position.y - source.position.y,
-                    target.position.x - source.position.x,
-                  )
-                : 0;
+              const spritePosition =
+                event.type === "heal" && target
+                  ? target.position
+                  : event.position ?? source.position;
 
               return (
                 <img
@@ -1702,7 +1729,7 @@ function App() {
                       spritePosition.x * cellSize + cellSize / 2
                     }px, ${
                       spritePosition.y * cellSize + cellSize / 2
-                    }px) translate(-50%, -50%) rotate(${angle}rad)`,
+                    }px) translate(-50%, -50%)`,
                   }}
                 />
               );
@@ -1991,7 +2018,10 @@ function App() {
                   }}
                   title={getEnemyTooltip(enemy)}
                 >
-                  <EntityNameLabel name={getEnemyDisplayName(enemy)} />
+                  <EntityNameLabel
+                    name={getEnemyDisplayName(enemy)}
+                    isAggressive={enemy.aggressionMode === "aggressive"}
+                  />
                   {animation ? (
                     <SpriteAnimation
                       alt={`Enemy ${index + 1}`}

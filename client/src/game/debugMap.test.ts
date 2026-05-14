@@ -34,6 +34,9 @@ describe("debug maps", () => {
   });
 
   it("keeps wilderness enemies and resources on reachable open floor", () => {
+    expect(mapOneEnemyStartPositions).toHaveLength(20);
+    expect(mapTwoEnemyStartPositions).toHaveLength(20);
+
     assertMapPlacements(MAP_ONE_ID, [
       ...mapOneEnemyStartPositions,
       ...mapOneResourceStartData.map((resource) => resource.position),
@@ -68,6 +71,20 @@ describe("debug maps", () => {
       ...mapTwoEnemyStartPositions,
       ...mapTwoResourceStartData.map((resource) => resource.position),
     ])).toEqual([]);
+  });
+
+  it("bakes navigation grids for all debug maps", () => {
+    for (const definition of Object.values(debugMapDefinitions)) {
+      const map = createDebugMap(definition.id);
+
+      expect(map.navigationGrid).toMatchObject({
+        columns: map.columns,
+        rows: map.rows,
+      });
+      expect(Object.keys(map.navigationGrid?.cellsByKey ?? {})).toHaveLength(
+        map.columns * map.rows,
+      );
+    }
   });
 });
 
