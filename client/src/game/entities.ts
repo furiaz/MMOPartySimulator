@@ -19,6 +19,10 @@ import type {
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { createEmptyCompanionEquipment } from "./equipmentTypes";
 import { getEnemyArchetype } from "./enemyArchetypes";
+import {
+  createDefaultNaturalCompanionStats,
+  createEmptyAllocatedCompanionStats,
+} from "./stats";
 
 export const MOVEMENT_SPEED_PER_SECOND = 0.91;
 export const ENEMY_MOVEMENT_SPEED_PER_SECOND = 1.16;
@@ -103,6 +107,9 @@ export function createCompanion(
     characterLevel: STARTING_CHARACTER_LEVEL,
     characterXp: STARTING_CHARACTER_XP,
     lastCharacterXpGained: 0,
+    naturalStats: createDefaultNaturalCompanionStats(),
+    allocatedStats: createEmptyAllocatedCompanionStats(),
+    unspentStatPoints: 0,
     role,
     partyOrder,
     position,

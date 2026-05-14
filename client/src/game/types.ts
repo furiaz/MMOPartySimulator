@@ -181,6 +181,27 @@ export type EquipmentStatModifiers = {
   healingPower?: number;
 };
 
+export type PrimaryStatId =
+  | "strength"
+  | "dexterity"
+  | "constitution"
+  | "intelligence"
+  | "wisdom";
+
+export type CompanionPrimaryStats = Record<PrimaryStatId, number>;
+
+export type CompanionPrimaryStatModifiers = Partial<CompanionPrimaryStats>;
+
+export type CompanionDerivedStats = {
+  attack: number;
+  defense: number;
+  maxHealth: number;
+  evasion: number;
+  block: number;
+  magicPower: number;
+  healingPower: number;
+};
+
 export type CompanionEquipment = Record<EquipmentSlot, ItemId | null>;
 
 export type JunkItemId =
@@ -927,6 +948,9 @@ export type Companion = LivingEntity & {
   characterLevel: number;
   characterXp: number;
   lastCharacterXpGained?: number;
+  naturalStats: CompanionPrimaryStats;
+  allocatedStats: CompanionPrimaryStats;
+  unspentStatPoints: number;
   role: PartyMemberRole;
   partyOrder: number;
   followTargetId: string;
