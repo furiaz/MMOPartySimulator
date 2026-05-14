@@ -1,4 +1,5 @@
 import { damageEntity, setLastAttackAt } from "./entities";
+import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { grantCharacterXpToParty } from "./leveling";
 import { getSkillRoleScore } from "./skillRolePreferences";
 import { getPrototypeAttackDamage } from "./skillRuntime";
@@ -6,6 +7,7 @@ import { getSkillsForClass } from "./skills";
 import {
   addCombatFeedback,
   addSkillVisualEvent,
+  findClosestAvailablePosition,
   updateEntity,
   type GameState,
 } from "./state";
@@ -39,12 +41,25 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
 
   for (const entity of Object.values(state.entities)) {
     const caster = nextState.entities[entity.id];
+    const cooldownSkill =
+      isLivingCompanion(caster) && isSkillOnCooldown(nextState, caster, now)
+        ? getCooldownSkill(nextState, caster)
+        : undefined;
 
     if (!canUsePrototypeSkill(nextState, caster, now)) {
+      if (isLivingCompanion(caster) && cooldownSkill) {
+        nextState = recordSkillTelemetry(nextState, caster, {
+          type: "skill_skipped",
+          skill: cooldownSkill,
+          reason: "cooldown",
+        });
+      }
       continue;
     }
 
-    const skillUse = chooseSkillUse(nextState, caster);
+    const result = chooseSkillUse(nextState, caster);
+    nextState = result.state;
+    const skillUse = result.skillUse;
 
     if (!skillUse) {
       continue;
@@ -101,18 +116,83 @@ function isSkillOnCooldown(
   return Boolean(cooldown && cooldown.expiresAt > now);
 }
 
-function chooseSkillUse(state: GameState, caster: Companion): SkillUse | null {
+function getCooldownSkill(
+  state: GameState,
+  entity: Companion,
+): SkillDefinition | undefined {
+  const cooldown = state.skillCooldownsByCompanionId?.[entity.id];
+
+  return cooldown
+    ? getSkillsForClass(entity.classId).find((skill) => skill.id === cooldown.skillId)
+    : undefined;
+}
+
+function getSkillTargetSkipReason(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+): string {
+  if (
+    (skill.effect.type === "selfBuff" || skill.effect.type === "allyBuff") &&
+    state.skillSelfBuffsByCompanionId?.[caster.id]
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
+    skill.effect.type === "gatherBuff" &&
+    state.skillGatherBuffsByCompanionId?.[caster.id]
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
+    skill.effect.type === "shieldBlock" &&
+    Object.values(state.skillShieldBlocksById ?? {}).some(
+      (shield) => shield.ownerId === caster.id,
+    )
+  ) {
+    return "active_duplicate_shield";
+  }
+
+  if (
+    (skill.effect.type === "selfBuff" || skill.effect.type === "selfCostHeal") &&
+    "hpCost" in skill.effect &&
+    caster.health <= skill.effect.hpCost + LOW_HEALTH_BUFFER
+  ) {
+    return "unsafe_hp_cost";
+  }
+
+  return "no_target";
+}
+
+function chooseSkillUse(
+  state: GameState,
+  caster: Companion,
+): { state: GameState; skillUse: SkillUse | null } {
+  let nextState = state;
   const skillUses = getSkillsForClass(caster.classId)
     .map((skill): SkillUse | null => {
       const target = getSkillTarget(state, caster, skill);
 
-      if (!target && skill.effect.type !== "selfBuff" && skill.effect.type !== "shieldBlock") {
+      if (!target) {
+        nextState = recordSkillTelemetry(nextState, caster, {
+          type: "skill_skipped",
+          skill,
+          reason: getSkillTargetSkipReason(state, caster, skill),
+        });
         return null;
       }
 
       const score = getSkillRoleScore(caster.role, skill.tags);
 
-      if (score < 0) {
+      if (score <= 0) {
+        nextState = recordSkillTelemetry(nextState, caster, {
+          type: "skill_skipped",
+          skill,
+          score,
+          reason: "non_positive_role_score",
+        });
         return null;
       }
 
@@ -120,7 +200,19 @@ function chooseSkillUse(state: GameState, caster: Companion): SkillUse | null {
     })
     .filter((skillUse): skillUse is SkillUse => Boolean(skillUse));
 
-  return skillUses.sort((a, b) => b.score - a.score)[0] ?? null;
+  const skillUse = skillUses.sort((a, b) => b.score - a.score)[0] ?? null;
+
+  return {
+    state: skillUse
+      ? recordSkillTelemetry(nextState, caster, {
+          type: "skill_selected",
+          skill: skillUse.skill,
+          score: skillUse.score,
+          targetId: skillUse.target?.id,
+        })
+      : nextState,
+    skillUse,
+  };
 }
 
 function applySkill(
@@ -130,10 +222,21 @@ function applySkill(
   now: number,
 ): GameState {
   const { skill, target } = skillUse;
+  let nextState = recordSkillTelemetry(state, caster, {
+    type: "skill_used",
+    skill,
+    score: skillUse.score,
+    targetId: target?.id,
+  });
 
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {
     return startSkillCooldown(
-      applyDamageSkill(state, caster, target, skill, skill.effect.damage, now),
+      recordSkillApplied(
+        applyDamageSkill(nextState, caster, target, skill, skill.effect.damage, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
       caster,
       skill,
       now,
@@ -142,7 +245,26 @@ function applySkill(
 
   if (skill.effect.type === "sweepingDamage" && isLivingEnemy(target)) {
     return startSkillCooldown(
-      applySweepingStrike(state, caster, target, skill, now),
+      recordSkillApplied(
+        applySweepingStrike(nextState, caster, target, skill, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
+      caster,
+      skill,
+      now,
+    );
+  }
+
+  if (skill.effect.type === "taunt" && isLivingEnemy(target)) {
+    return startSkillCooldown(
+      recordSkillApplied(
+        applyTaunt(nextState, caster, target, skill, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
       caster,
       skill,
       now,
@@ -151,7 +273,12 @@ function applySkill(
 
   if (skill.effect.type === "mark" && isLivingEnemy(target)) {
     return startSkillCooldown(
-      applyMarkTarget(state, caster, target, skill, now),
+      recordSkillApplied(
+        applyMarkTarget(nextState, caster, target, skill, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
       caster,
       skill,
       now,
@@ -160,7 +287,54 @@ function applySkill(
 
   if (skill.effect.type === "selfBuff") {
     return startSkillCooldown(
-      applySelfBuff(state, caster, skill, now),
+      recordSkillApplied(
+        applySelfBuff(nextState, caster, skill, now),
+        caster,
+        skillUse,
+        caster.id,
+      ),
+      caster,
+      skill,
+      now,
+    );
+  }
+
+  if (skill.effect.type === "allyBuff" && isLivingCompanion(target)) {
+    return startSkillCooldown(
+      recordSkillApplied(
+        applyAllyBuff(nextState, caster, target, skill, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
+      caster,
+      skill,
+      now,
+    );
+  }
+
+  if (skill.effect.type === "gatherBuff") {
+    return startSkillCooldown(
+      recordSkillApplied(
+        applyGatherBuff(nextState, caster, skill, now),
+        caster,
+        skillUse,
+        caster.id,
+      ),
+      caster,
+      skill,
+      now,
+    );
+  }
+
+  if (skill.effect.type === "quickStep") {
+    return startSkillCooldown(
+      recordSkillApplied(
+        applyQuickStep(nextState, caster, skill, now),
+        caster,
+        skillUse,
+        caster.id,
+      ),
       caster,
       skill,
       now,
@@ -169,7 +343,12 @@ function applySkill(
 
   if (skill.effect.type === "shieldBlock") {
     return startSkillCooldown(
-      applyShieldBlock(state, caster, skill, now),
+      recordSkillApplied(
+        applyShieldBlock(nextState, caster, skill, now),
+        caster,
+        skillUse,
+        caster.id,
+      ),
       caster,
       skill,
       now,
@@ -178,7 +357,12 @@ function applySkill(
 
   if (skill.effect.type === "bind" && isLivingEnemy(target)) {
     return startSkillCooldown(
-      applyBind(state, caster, target, skill, now),
+      recordSkillApplied(
+        applyBind(nextState, caster, target, skill, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
       caster,
       skill,
       now,
@@ -187,7 +371,12 @@ function applySkill(
 
   if (skill.effect.type === "heal" && isLivingCompanion(target)) {
     return startSkillCooldown(
-      applyHeal(state, caster, target, skill.effect.amount, 0, now),
+      recordSkillApplied(
+        applyHeal(nextState, caster, target, skill.effect.amount, 0, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
       caster,
       skill,
       now,
@@ -196,13 +385,18 @@ function applySkill(
 
   if (skill.effect.type === "selfCostHeal" && isLivingCompanion(target)) {
     return startSkillCooldown(
-      applyHeal(
-        state,
+      recordSkillApplied(
+        applyHeal(
+          nextState,
+          caster,
+          target,
+          skill.effect.amount,
+          skill.effect.hpCost,
+          now,
+        ),
         caster,
-        target,
-        skill.effect.amount,
-        skill.effect.hpCost,
-        now,
+        skillUse,
+        target.id,
       ),
       caster,
       skill,
@@ -210,7 +404,7 @@ function applySkill(
     );
   }
 
-  return state;
+  return nextState;
 }
 
 function startSkillCooldown(
@@ -230,6 +424,45 @@ function startSkillCooldown(
       },
     },
   };
+}
+
+function recordSkillApplied(
+  state: GameState,
+  caster: Companion,
+  skillUse: SkillUse,
+  targetId?: string,
+): GameState {
+  return recordSkillTelemetry(state, caster, {
+    type: "skill_effect_applied",
+    skill: skillUse.skill,
+    score: skillUse.score,
+    targetId,
+  });
+}
+
+function recordSkillTelemetry(
+  state: GameState,
+  caster: Companion,
+  event: {
+    type: "skill_selected" | "skill_used" | "skill_skipped" | "skill_effect_applied";
+    skill?: SkillDefinition;
+    score?: number;
+    targetId?: string;
+    reason?: string;
+  },
+): GameState {
+  return appendDebugTelemetryEvent(state, {
+    type: event.type,
+    entityId: caster.id,
+    targetId: event.targetId,
+    companionClassId: caster.classId,
+    skillId: event.skill?.id,
+    skillDisplayName: event.skill?.displayName,
+    skillTags: event.skill?.tags,
+    skillScore: event.score,
+    skillEffectType: event.skill?.effect.type,
+    reason: event.reason,
+  });
 }
 
 function applyDamageSkill(
@@ -306,6 +539,49 @@ function applySweepingStrike(
   return updateCasterLastAttackAt(nextState, caster.id, now);
 }
 
+function applyTaunt(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "taunt") {
+    return state;
+  }
+
+  let nextState = addCombatFeedback(state, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  if (skill.effect.damage > 0) {
+    nextState = damageEnemy(nextState, caster, target, skill.effect.damage, skill.displayName, now);
+  }
+
+  const currentTarget = nextState.entities[target.id];
+
+  if (isLivingEnemy(currentTarget)) {
+    nextState = updateEntity(nextState, {
+      ...currentTarget,
+      state: "attack",
+      currentTargetId: caster.id,
+    });
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "projectile",
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return updateCasterLastAttackAt(nextState, caster.id, now);
+}
+
 function applyMarkTarget(
   state: GameState,
   caster: Companion,
@@ -371,19 +647,152 @@ function applySelfBuff(
   };
 
   nextState = addSkillVisualEvent(nextState, {
-    type: "red_flash",
+    type: skill.effect.hpCost > 0 ? "red_flash" : "heal",
     sourceId: caster.id,
     now,
     durationMs: 500,
   });
   nextState = addCombatFeedback(nextState, {
-    type: "damage",
+    type: skill.effect.hpCost > 0 ? "damage" : "attack",
     entityId: caster.id,
     text: skill.displayName,
     now,
   });
 
   return updateEntity(nextState, setLastAttackAt(damagedCaster, now));
+}
+
+function applyAllyBuff(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "allyBuff" ||
+    state.skillSelfBuffsByCompanionId?.[target.id]
+  ) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillSelfBuffsByCompanionId: {
+      ...(state.skillSelfBuffsByCompanionId ?? {}),
+      [target.id]: {
+        companionId: target.id,
+        bonusDamage: skill.effect.bonusDamage,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: 600,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return updateEntity(nextState, setLastAttackAt(caster, now));
+}
+
+function applyGatherBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "gatherBuff" ||
+    state.skillGatherBuffsByCompanionId?.[caster.id]
+  ) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillGatherBuffsByCompanionId: {
+      ...(state.skillGatherBuffsByCompanionId ?? {}),
+      [caster.id]: {
+        companionId: caster.id,
+        bonusGatherSpeed: skill.effect.bonusGatherSpeed,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "gather",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return updateEntity(nextState, setLastAttackAt(caster, now));
+}
+
+function applyQuickStep(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "quickStep") {
+    return state;
+  }
+
+  const enemy = findEnemyTarget(state, caster, 6);
+  const direction = getUnitDirection(
+    enemy
+      ? {
+          x: caster.position.x - enemy.position.x,
+          y: caster.position.y - enemy.position.y,
+        }
+      : getLeaderMovementDirection(state, caster),
+    DEFAULT_SHIELD_DIRECTION,
+  );
+  const intendedPosition = {
+    x: caster.position.x + direction.x * skill.effect.distance,
+    y: caster.position.y + direction.y * skill.effect.distance,
+  };
+  const position = findClosestAvailablePosition(state, intendedPosition, {
+    ignoredEntityId: caster.id,
+  });
+  let nextState = updateEntity(state, {
+    ...caster,
+    position,
+  });
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    sourceId: caster.id,
+    position,
+    now,
+    durationMs: 400,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return updateEntity(nextState, setLastAttackAt({ ...caster, position }, now));
 }
 
 function applyShieldBlock(

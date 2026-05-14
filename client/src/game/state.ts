@@ -41,6 +41,7 @@ import type {
   DropVisualEvent,
   SkillBindState,
   SkillCooldownState,
+  SkillGatherBuffState,
   SkillMarkState,
   SkillSelfBuffState,
   SkillShieldBlockState,
@@ -148,6 +149,7 @@ export type GameState = {
   combatFeedbackEvents: CombatFeedbackEvent[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
+  skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillBindsByEnemyId?: Record<string, SkillBindState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
@@ -285,6 +287,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillSelfBuffsByCompanionId,
     now,
   );
+  const skillGatherBuffsByCompanionId = filterExpiredRecord(
+    state.skillGatherBuffsByCompanionId,
+    now,
+  );
   const skillBindsByEnemyId = filterExpiredRecord(
     state.skillBindsByEnemyId,
     now,
@@ -305,6 +311,7 @@ export function clearExpiredSkillRuntimeState(
     ...state,
     skillMarksByEnemyId,
     skillSelfBuffsByCompanionId,
+    skillGatherBuffsByCompanionId,
     skillBindsByEnemyId,
     skillShieldBlocksById,
     skillCooldownsByCompanionId,

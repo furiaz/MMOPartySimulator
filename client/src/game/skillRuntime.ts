@@ -18,6 +18,13 @@ export function getPrototypeAttackDamage(
   return baseDamage + markBonus + selfBuffBonus;
 }
 
+export function getPrototypeGatherAmountBonus(
+  state: GameState,
+  companion: Companion,
+): number {
+  return state.skillGatherBuffsByCompanionId?.[companion.id]?.bonusGatherSpeed ?? 0;
+}
+
 export function blockIncomingAttackIfShielded(
   state: GameState,
   attacker: CombatEntity,

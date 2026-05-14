@@ -1403,6 +1403,71 @@
   line-height: 1.4;
 }
 
+.companion-skill-summary {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.24);
+}
+
+.companion-skill-list {
+  display: grid;
+  gap: 8px;
+}
+
+.companion-skill-row {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(58, 90, 96, 0.62);
+  background: rgba(8, 13, 16, 0.32);
+  color: #e6f0f2;
+}
+
+.companion-skill-row > div,
+.companion-skill-row dl {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.companion-skill-row strong,
+.companion-skill-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.companion-skill-row dl {
+  margin: 0;
+}
+
+.companion-skill-row dt,
+.companion-skill-row dd {
+  display: inline;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.companion-skill-row dt {
+  color: #9bb3b8;
+}
+
+.companion-skill-row dd {
+  margin-left: 4px;
+  color: #ffffff;
+}
+
+.companion-skill-tags {
+  color: rgba(230, 240, 242, 0.78);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .quest-objective-list {
   display: grid;
   gap: 8px;

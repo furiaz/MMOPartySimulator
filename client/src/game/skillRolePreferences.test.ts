@@ -1,0 +1,60 @@
+import { describe, expect, it } from "vitest";
+import { getSkillRoleScore } from "./skillRolePreferences";
+import { SKILL_DEFINITIONS, getSkillsForClass } from "./skills";
+
+describe("skill role preferences", () => {
+  it("caps positive tag matches so tag-heavy skills do not inflate forever", () => {
+    expect(
+      getSkillRoleScore("fighter", [
+        "Offensive",
+        "Damage",
+        "Single Target",
+        "Multi Target",
+        "AoE",
+      ]),
+    ).toBe(6);
+  });
+
+  it("counts avoid tags strongly and without a positive cap", () => {
+    expect(
+      getSkillRoleScore("fighter", [
+        "Offensive",
+        "Damage",
+        "Taunt",
+        "Aggro",
+      ]),
+    ).toBe(-6);
+  });
+
+  it("makes Throw Rock less desirable than Kick for Fighters", () => {
+    expect(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.throw_rock.tags),
+    ).toBeLessThan(getSkillRoleScore("fighter", SKILL_DEFINITIONS.kick.tags));
+  });
+
+  it("makes Throw Rock desirable for Defenders", () => {
+    expect(getSkillRoleScore("defender", SKILL_DEFINITIONS.throw_rock.tags)).toBeGreaterThan(0);
+  });
+
+  it("lets Support value HP-cost healing when healing and safety tags are present", () => {
+    expect(
+      getSkillRoleScore("support", SKILL_DEFINITIONS.penitents_gift.tags),
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps Beginner skills scoped to Beginner class lookup", () => {
+    expect(getSkillsForClass("beginner").map((skill) => skill.id)).toEqual([
+      "throw_rock",
+      "kick",
+      "guard_up",
+      "first_aid",
+      "deep_breath",
+      "rally_call",
+      "field_hands",
+      "quick_step",
+    ]);
+    expect(getSkillsForClass("blade").map((skill) => skill.id)).toEqual([
+      "sweeping_strike",
+    ]);
+  });
+});

@@ -69,6 +69,7 @@ export type {
   SkillBindState,
   SkillCooldownState,
   SkillDefinition,
+  SkillGatherBuffState,
   SkillId,
   SkillMarkState,
   SkillSelfBuffState,

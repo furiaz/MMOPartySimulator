@@ -264,6 +264,10 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.nextLevel ?? "",
     event.previousXp ?? "",
     event.nextXp ?? "",
+    event.skillId ?? "",
+    event.skillDisplayName ?? "",
+    event.skillScore ?? "",
+    event.skillEffectType ?? "",
     event.itemId ?? "",
     event.itemDisplayName ?? "",
     event.tableId ?? "",
@@ -342,6 +346,7 @@ function getEntitySnapshot(
     characterXpToNextLevel: getCharacterXpToNextLevel(entity),
     characterXpProgressPercent: getCharacterXpProgressPercent(entity),
     lastCharacterXpGained: getLastCharacterXpGained(entity),
+    activeCooldownSkillId: getActiveCooldownSkillId(nextState, entity),
     movementResult,
     reason: getReason(nextState, entity, movementResult),
     formationPhase: nextState.partyFormation?.phase,
@@ -818,6 +823,15 @@ function getCharacterXpProgressPercent(entity: GameEntity): number | undefined {
 
 function getLastCharacterXpGained(entity: GameEntity): number | undefined {
   return entity.kind === "companion" ? entity.lastCharacterXpGained : undefined;
+}
+
+function getActiveCooldownSkillId(
+  state: GameState,
+  entity: GameEntity,
+) {
+  return entity.kind === "companion"
+    ? state.skillCooldownsByCompanionId?.[entity.id]?.skillId
+    : undefined;
 }
 
 function getHealth(entity: GameEntity): number | null {

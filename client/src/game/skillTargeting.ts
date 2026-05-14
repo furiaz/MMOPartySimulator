@@ -1,6 +1,6 @@
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import { getLeaderEnemyTarget } from "./roleSystem";
-import { isLivingEnemy } from "./entityGuards";
+import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getGridDistance } from "./positionUtils";
 import { getEntityById, type GameState } from "./state";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
@@ -29,6 +29,25 @@ export function getSkillTarget(
     return hasValidEnemyContext(state, caster) &&
       canPayHpCost(caster, skill.effect.hpCost) &&
       !state.skillSelfBuffsByCompanionId?.[caster.id]
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "allyBuff") {
+    return hasValidEnemyContext(state, caster)
+      ? findAllyBuffTarget(state, caster, skill.range)
+      : undefined;
+  }
+
+  if (skill.effect.type === "gatherBuff") {
+    return hasResourceContext(state, caster) &&
+      !state.skillGatherBuffsByCompanionId?.[caster.id]
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "quickStep") {
+    return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster)
       ? caster
       : undefined;
   }
@@ -102,8 +121,45 @@ function findHealingTarget(
     )[0];
 }
 
+function findAllyBuffTarget(
+  state: GameState,
+  caster: Companion,
+  range: number,
+): Companion | undefined {
+  return getPartyMembers(state)
+    .filter(
+      (member) =>
+        isLivingCompanion(member) &&
+        !state.skillSelfBuffsByCompanionId?.[member.id] &&
+        getGridDistance(caster.position, member.position) <= range,
+    )
+    .sort(
+      (a, b) =>
+        (a.id === caster.id ? 1 : 0) - (b.id === caster.id ? 1 : 0) ||
+        getGridDistance(caster.position, a.position) -
+          getGridDistance(caster.position, b.position),
+    )[0];
+}
+
 function hasValidEnemyContext(state: GameState, caster: Companion): boolean {
   return Boolean(findEnemyTarget(state, caster, DEFAULT_ENEMY_CONTEXT_RANGE));
+}
+
+function hasResourceContext(state: GameState, caster: Companion): boolean {
+  const currentTarget = caster.currentTargetId
+    ? getEntityById(state, caster.currentTargetId)
+    : undefined;
+
+  if (currentTarget?.kind === "resource" && !currentTarget.isDepleted) {
+    return true;
+  }
+
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.kind === "resource" &&
+      !entity.isDepleted &&
+      getGridDistance(caster.position, entity.position) <= DEFAULT_ENEMY_CONTEXT_RANGE,
+  );
 }
 
 function hasPartyDanger(state: GameState, caster: Companion): boolean {

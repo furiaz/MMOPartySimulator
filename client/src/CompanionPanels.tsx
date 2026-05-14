@@ -13,6 +13,8 @@ import {
   getAllowedEquipmentTypeLabels,
   getCompanionEquipmentStatModifiers,
   getItemDefinition,
+  getSkillRoleScore,
+  getSkillsForClass,
   validateEquipmentItemForCompanion,
   type Companion,
   type EquipmentSlot,
@@ -22,6 +24,7 @@ import {
   type ItemId,
   type PartyInventory,
   type PartyMemberRole,
+  type SkillDefinition,
 } from "./game";
 
 export type GameMenuTab = "party" | "partyManagement" | "inventory" | "quests";
@@ -113,9 +116,13 @@ export function PartyMenuPanel({
   onSelectCompanion: (companionId: string) => void;
   onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
 }) {
+  const [isSkillPanelOpen, setIsSkillPanelOpen] = useState(false);
   const orderedMembers = getOrderedMenuMembers(members);
   const selectedMember =
     orderedMembers.find((member) => member.id === selectedCompanionId) ?? null;
+  const selectedMemberSkills = selectedMember
+    ? getSkillsForClass(selectedMember.classId)
+    : [];
 
   return (
     <section className="party-menu-panel" aria-label="Party">
@@ -182,7 +189,20 @@ export function PartyMenuPanel({
                 >
                   Manage Equipment
                 </button>
+                <button
+                  className={isSkillPanelOpen ? "active" : ""}
+                  onClick={() => setIsSkillPanelOpen((isOpen) => !isOpen)}
+                  type="button"
+                >
+                  Skills
+                </button>
               </div>
+              {isSkillPanelOpen ? (
+                <CompanionSkillSummary
+                  member={selectedMember}
+                  skills={selectedMemberSkills}
+                />
+              ) : null}
             </>
           ) : (
             <span className="party-menu-empty">Select a companion</span>
@@ -191,6 +211,99 @@ export function PartyMenuPanel({
       </div>
     </section>
   );
+}
+
+function CompanionSkillSummary({
+  member,
+  skills,
+}: {
+  member: Companion;
+  skills: SkillDefinition[];
+}) {
+  return (
+    <div className="companion-skill-summary" aria-label="Companion skills">
+      <span className="equipment-section-label">Skills</span>
+      {skills.length > 0 ? (
+        <div className="companion-skill-list">
+          {skills.map((skill) => (
+            <div key={skill.id} className="companion-skill-row">
+              <div>
+                <strong>{skill.displayName}</strong>
+                <span>{getSkillEffectSummary(skill)}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Range</dt>
+                  <dd>{skill.range}</dd>
+                </div>
+                <div>
+                  <dt>Role Score</dt>
+                  <dd>{getSkillRoleScore(member.role, skill.tags)}</dd>
+                </div>
+              </dl>
+              <span className="companion-skill-tags">
+                {skill.tags.join(", ")}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <span className="party-menu-empty">No skills for this class</span>
+      )}
+    </div>
+  );
+}
+
+function getSkillEffectSummary(skill: SkillDefinition): string {
+  const { effect } = skill;
+
+  if (effect.type === "damage") {
+    return `Deals ${effect.damage} damage.`;
+  }
+
+  if (effect.type === "sweepingDamage") {
+    return `Deals ${effect.mainDamage} damage and ${effect.splashDamage} splash damage.`;
+  }
+
+  if (effect.type === "taunt") {
+    return effect.damage > 0
+      ? `Pulls attention and deals ${effect.damage} damage.`
+      : "Pulls enemy attention.";
+  }
+
+  if (effect.type === "mark") {
+    return `Marks a target for +${effect.bonusDamage} damage.`;
+  }
+
+  if (effect.type === "selfBuff") {
+    return `Self +${effect.bonusDamage} damage.`;
+  }
+
+  if (effect.type === "allyBuff") {
+    return `Ally +${effect.bonusDamage} damage.`;
+  }
+
+  if (effect.type === "gatherBuff") {
+    return `Self +${effect.bonusGatherSpeed} gather speed.`;
+  }
+
+  if (effect.type === "quickStep") {
+    return `Moves ${effect.distance} space.`;
+  }
+
+  if (effect.type === "shieldBlock") {
+    return `Blocks ${effect.blocks} hit.`;
+  }
+
+  if (effect.type === "bind") {
+    return "Binds an enemy briefly.";
+  }
+
+  if (effect.type === "heal") {
+    return `Heals ${effect.amount} HP.`;
+  }
+
+  return `Heals ${effect.amount} HP at ${effect.hpCost} HP cost.`;
 }
 
 function CompanionMenuList({

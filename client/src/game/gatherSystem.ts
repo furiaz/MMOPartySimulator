@@ -16,6 +16,7 @@ import {
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
 import { recordResourceGatheredForQuests } from "./questSystem";
+import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
 import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
 
@@ -97,7 +98,7 @@ export function updateGatherSystem(
       continue;
     }
 
-    const gatherAmount = getGatherAmount(gatherer);
+    const gatherAmount = getGatherAmount(nextState, gatherer);
     const didYieldResource =
       resource.quantity > 0 &&
       resource.durability > 0 &&
@@ -231,8 +232,13 @@ function canGather(entity: AutonomousEntity, now: number): boolean {
   return now - entity.lastGatherAt >= GATHER_COOLDOWN_MS;
 }
 
-function getGatherAmount(gatherer: AutonomousEntity): number {
-  return Math.max(0, gatherer.gatherSpeed);
+function getGatherAmount(state: GameState, gatherer: AutonomousEntity): number {
+  const skillBonus =
+    gatherer.kind === "companion"
+      ? getPrototypeGatherAmountBonus(state, gatherer)
+      : 0;
+
+  return Math.max(0, gatherer.gatherSpeed + skillBonus);
 }
 
 function getReachableSearchLimit(state: GameState): number {

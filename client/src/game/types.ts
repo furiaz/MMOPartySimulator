@@ -375,6 +375,14 @@ export type CombatFeedbackEvent = {
 };
 
 export type SkillId =
+  | "throw_rock"
+  | "kick"
+  | "guard_up"
+  | "first_aid"
+  | "deep_breath"
+  | "rally_call"
+  | "field_hands"
+  | "quick_step"
   | "sweeping_strike"
   | "guard_wall"
   | "mark_target"
@@ -427,8 +435,12 @@ export type SkillDefinition = {
   effect:
     | { type: "damage"; damage: number }
     | { type: "sweepingDamage"; mainDamage: number; splashDamage: number; splashRange: number }
+    | { type: "taunt"; damage: number }
     | { type: "mark"; bonusDamage: number; durationMs: number }
     | { type: "selfBuff"; bonusDamage: number; durationMs: number; hpCost: number }
+    | { type: "allyBuff"; bonusDamage: number; durationMs: number }
+    | { type: "gatherBuff"; bonusGatherSpeed: number; durationMs: number }
+    | { type: "quickStep"; distance: number }
     | { type: "shieldBlock"; durationMs: number; blocks: number }
     | { type: "bind"; durationMs: number }
     | { type: "heal"; amount: number }
@@ -445,6 +457,12 @@ export type SkillMarkState = {
 export type SkillSelfBuffState = {
   companionId: string;
   bonusDamage: number;
+  expiresAt: number;
+};
+
+export type SkillGatherBuffState = {
+  companionId: string;
+  bonusGatherSpeed: number;
   expiresAt: number;
 };
 
@@ -616,7 +634,11 @@ export type DebugTelemetryEventType =
   | "quick_exchange_currency_added"
   | "quick_exchange_completed"
   | "quick_exchange_failed"
-  | "quick_exchange_no_items";
+  | "quick_exchange_no_items"
+  | "skill_selected"
+  | "skill_used"
+  | "skill_skipped"
+  | "skill_effect_applied";
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -638,6 +660,7 @@ export type DebugTelemetryEntitySnapshot = {
   characterXpToNextLevel?: number | null;
   characterXpProgressPercent?: number;
   lastCharacterXpGained?: number;
+  activeCooldownSkillId?: SkillId;
   movementResult: DebugMovementResult;
   reason?: string;
   formationPhase?: FormationPhase;
@@ -686,6 +709,11 @@ export type DebugTelemetryEvent = {
   previousClassId?: ClassId;
   nextClassId?: ClassId;
   companionClassId?: ClassId;
+  skillId?: SkillId;
+  skillDisplayName?: string;
+  skillTags?: SkillTag[];
+  skillScore?: number;
+  skillEffectType?: SkillDefinition["effect"]["type"];
   previousRole?: PartyMemberRole;
   nextRole?: PartyMemberRole;
   result?: string;
