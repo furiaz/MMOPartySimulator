@@ -415,10 +415,13 @@ Skill selection and execution live in:
 
 Current skill runtime is prototype-only. It is not a full ability framework.
 
-Current skill ids:
+Current skill ids should include Beginner prototype skills and base class prototype skills:
 
 ```ts
 type SkillId =
+  | "training_strike"
+  | "patch_up"
+  | "brace"
   | "sweeping_strike"
   | "guard_wall"
   | "mark_target"
@@ -429,7 +432,13 @@ type SkillId =
   | "penitents_gift";
 ```
 
-Current prototype skills:
+Current Beginner prototype skills:
+
+- Beginner: Training Strike
+- Beginner: Patch Up
+- Beginner: Brace
+
+Current base class prototype skills:
 
 - Blade: Sweeping Strike
 - Aegis: Guard Wall
@@ -440,13 +449,14 @@ Current prototype skills:
 - Lightbearer: Light Mend
 - Penitent: Penitent's Gift
 
-Current skill effects include direct damage, sweeping/splash damage, enemy mark bonus damage, self damage buff with HP cost, shield block, bind, heal, and self-cost heal.
+Current skill effects may include direct damage, sweeping/splash damage, enemy mark bonus damage, self damage buff with HP cost, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, and beginner defensive survival.
 
 Current skill rules:
 
 - skills are tied to classes
 - roles determine preferred skill usage
 - skill tags affect role scoring
+- skill selection must validate target, range, cooldown, companion state, and current context
 - direct-commanded companions do not use autonomous prototype skills
 - dead companions do not use skills
 - skills have a shared prototype cooldown
@@ -455,6 +465,7 @@ Current skill rules:
 - runtime skill effects expire through game-state cleanup
 - skill visuals are represented through temporary visual events
 - skill feedback may use combat feedback events
+- React UI must not define skill behavior or skill scoring
 
 Current skill visual event types:
 
@@ -470,7 +481,8 @@ Current skill runtime state includes marks, self buffs, binds, shield blocks, co
 
 Do not expand this into a full ability framework unless explicitly requested.
 
-Do not add mana, casting, advanced targeting, equipment requirements, or complex cooldown systems unless explicitly requested.
+Do not add mana, casting, advanced targeting, equipment requirements, complex cooldown systems, skill trees, hotbars, or player-triggered active skill input unless explicitly requested.
+
 
 ---
 
@@ -554,9 +566,29 @@ POI selection types live in `poiTypes.ts`.
 
 Current POI categories are `npc`, `quest`, `combat`, `resource`, `teleport`, `exploration`, `idle`, and `event`.
 
-`poiSystem.ts` selects global quest intent and local map targets for auto-mode behavior. It may set leader intent toward quest givers, combat targets, resources, exploration points, idle hub points, or prototype teleports.
+`poiSystem.ts` selects global quest intent and local map targets for auto-mode behavior.
+
+POI selection should evaluate progression targets before generic map activity.
+
+Current intended POI priority order:
+
+1. ready quest turn-in target
+2. active quest objective target on the current map
+3. available quest acceptance target on the current map
+4. quest-required prototype teleport when the active objective is on a connected map
+5. nearby combat target when combat is relevant
+6. nearby resource target when gathering is relevant
+7. reachable unexplored exploration point
+8. safe idle hub point
+
+POI selection should skip targets that are invalid, unreachable, depleted, dead, completed, locked, already satisfied, or not relevant to the current map.
+
+POI selection should record debug telemetry for selected POIs and skipped POIs where useful.
+
+The POI system may set leader intent toward quest givers, combat targets, resources, exploration points, idle hub points, or prototype teleports.
 
 The POI system must remain a prototype debug-map guidance layer and must not become the final world-routing, dialogue, or quest content pipeline unless explicitly requested.
+
 
 
 ---
@@ -1292,9 +1324,10 @@ Current prototype/debug routes:
 Current teleport behavior:
 
 - uses a small debug map teleport table
-- can be triggered by player/debug action or AI conditions
+- can be triggered by player/debug action, World Travel menu selection, or AI conditions
 - can set a teleport point as party movement intent
-- auto mode may select eligible teleport points after living enemies are cleared
+- auto mode may select eligible teleport points after living enemies are cleared or when quest progression requires a connected map
+- World Travel may select an eligible known destination and guide the party toward the matching teleport point
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
@@ -1313,6 +1346,8 @@ type ActiveTeleport = {
   triggeredBy: "ai" | "player";
 };
 ```
+
+World Travel should use current route and map data. It must not require final zone ids, persistent zone state, final world streaming, map discovery, travel costs, or a production teleport network.
 
 Do not expand this into full zones, persistent world streaming, or a final teleport network unless explicitly requested.
 
@@ -1470,15 +1505,13 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, generated terrain tiles, party members, enemies, resources, NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, XP and level progress, party size limit, debug controls, and debug telemetry export.
-
+The React UI currently may display and control map/debug map view, generated terrain tiles, party members, enemies, resources, NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
-
 ## Menu UI Technical Structure
 
-The React UI may include a main menu and submenu system for party overview, party management, prototype inventory display, and prototype quest display.
+The React UI may include a main menu and submenu system for party overview, party management, prototype inventory display, prototype quest display, and prototype world travel.
 
 Menu UI must remain in React components under `client/src/`.
 
@@ -1491,19 +1524,21 @@ React may:
 - track selected companion UI state
 - track selected management section UI state
 - track selected quest UI state
+- track selected World Travel destination UI state
 - render UI-facing enemy and NPC name labels
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
+- call existing teleport or travel-intent helpers for supported prototype World Travel actions
 - display placeholder sections for future systems
-
 
 React must not:
 
 - define core simulation behavior
 - duplicate role logic
 - invent new role values
-- define equipment rules, skills, formation, behavior settings, quest rules, merchant rules, wallet rules, or advanced inventory rules inside React components
+- define equipment rules, skills, formation, behavior settings, quest rules, POI selection rules, teleport rules, merchant rules, wallet rules, or advanced inventory rules inside React components
 - implement equipment UI beyond displaying game state and issuing commands to existing game logic unless explicitly requested
+- implement final zone routing, map discovery, travel costs, or production world-map behavior inside React components
 
 Current intended main menu views:
 
@@ -1511,6 +1546,7 @@ Current intended main menu views:
 - Party Management
 - Inventory
 - Quests
+- World Travel
 
 Current intended Party Management sections and controls:
 
@@ -1523,7 +1559,6 @@ Current intended Party Management sections and controls:
 - Formation placeholder
 - Skill Preferences placeholder
 - Behavior Settings placeholder
-
 
 Role Select must use the existing `PartyMemberRole` values:
 
@@ -1540,7 +1575,10 @@ The Quests view may display prototype quest state and objective progress from ga
 
 The Inventory view may display wallet balance, but wallet and inventory rules must remain in game logic.
 
+The World Travel view may display current map and available prototype connected destinations. Selecting a destination may issue supported travel intent toward an existing prototype teleport point.
+
 Merchant UI may call existing merchant helper functions, but must not define exchange rules inside React. Buy and Sell panels may exist as placeholders only until a real shop system is explicitly requested.
+
 
 ## World Structure Future Work
 

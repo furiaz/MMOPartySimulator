@@ -678,7 +678,7 @@ Party members act independently based on:
 
 ## Main Menu and Party UI
 
-The main gameplay UI may include a simple menu system for inspecting and managing the party.
+The main gameplay UI may include a simple menu system for inspecting and managing the party and prototype world navigation.
 
 Current intended main menu entries:
 
@@ -686,9 +686,9 @@ Current intended main menu entries:
 - Party Management
 - Inventory
 - Quests
+- World Travel
 
-
-The player is the party manager, not a physical character. Menus should support party oversight, planning, and decision-making without implying the player is a world entity.
+The player is the party manager, not a physical character. Menus should support party oversight, planning, travel decisions, and decision-making without implying the player is a world entity.
 
 ### Party Menu
 
@@ -736,7 +736,6 @@ Leadership switching changes the current leader identity only. It does not chang
 
 Role Select must use the existing party role values:
 
-
 - Defender
 - Fighter
 - Support
@@ -769,7 +768,6 @@ It may show:
 
 The Inventory menu may display the shared wallet balance, but must not implement the full inventory, equipment economy, full wallet UI, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
 
-
 ### Quests Menu
 
 The Quests menu displays the current prototype quest log.
@@ -783,6 +781,25 @@ It may show:
 - inventory-full turn-in feedback when quest rewards cannot fit
 
 The Quests menu must not implement a full quest journal, branching dialogue, quest reward economy, reputation, cutscenes, or production quest content unless explicitly requested.
+
+### World Travel Menu
+
+The World Travel menu is a prototype navigation menu for choosing available known prototype map destinations.
+
+It may show:
+
+- current prototype map
+- available connected prototype destinations
+- destination display names
+- whether a destination can currently be selected
+- simple unavailable-state messaging when travel is blocked
+
+World Travel selection may request travel to an available prototype teleport destination by setting party travel intent toward the relevant teleport point.
+
+World Travel must use existing prototype teleport route data and current map state. It must not create final zone routing, persistent zone state, fast travel rules, map discovery rules, production travel costs, or a full world map unless explicitly requested.
+
+World Travel does not replace physical teleport points. It is a menu-driven way to guide the party toward currently valid prototype map transitions.
+
 
 ## Prototype Quests and POI Direction
 
@@ -812,6 +829,7 @@ Current prototype quests:
 - Threat Beyond the Pass
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches the interaction range.
+
 Current prototype quest reward behavior:
 
 - ready quests can grant rewards through Quest Giver turn-in
@@ -830,7 +848,6 @@ Current prototype quest reward behavior:
 - completed quests may unlock later quests
 - later quests may require specific earlier quests to be completed
 
-
 Prototype POI direction may choose local targets for auto-mode behavior.
 
 Current POI categories:
@@ -844,9 +861,27 @@ Current POI categories:
 - Idle
 - Event
 
+POI selection should prefer progression-relevant targets before generic local activity.
+
+Current intended POI priority order:
+
+1. ready quest turn-in target
+2. active quest objective target on the current map
+3. available quest acceptance target on the current map
+4. quest-required prototype teleport when the active objective is on a connected map
+5. nearby combat target when combat is relevant
+6. nearby resource target when gathering is relevant
+7. reachable unexplored exploration point
+8. safe idle hub point
+
+POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, or already satisfied targets.
+
+POI selection should not repeatedly choose the same failed target when a better valid target exists.
+
 POI direction may route the leader toward quest givers, combat targets, resources, exploration points, idle hub positions, or prototype teleports.
 
 This is a prototype guidance layer for current debug maps. It is not a full quest system, dialogue system, final POI framework, final zone-routing system, or production content pipeline.
+
 
 ---
 
@@ -1054,12 +1089,16 @@ Skills:
 - may use a shared prototype cooldown
 - do not yet use mana or advanced resource systems
 - are used as simple extensions of existing behavior
+- should be selected through role priorities and context instead of hardcoded class behavior
 
 Skill usage is determined by:
 
 - role priorities
 - skill tags
 - current context such as combat, danger, gathering, and safety
+- target validity
+- range
+- cooldown availability
 
 Current prototype skills may include:
 
@@ -1071,8 +1110,35 @@ Current prototype skills may include:
 - binds
 - healing
 - self-cost healing
+- beginner fallback combat or survival tools
 
 Current prototype skills are not the full final ability system.
+
+Skill logic should remain in game logic, not React UI.
+
+---
+
+## Prototype Beginner Skills
+
+Beginner may have simple prototype skills before choosing a base class.
+
+Beginner skills should feel basic, flexible, and transitional.
+
+Current intended Beginner prototype skill identities:
+
+- Training Strike
+- Patch Up
+- Brace
+
+Training Strike is a simple offensive fallback skill.
+
+Patch Up is a small emergency recovery skill.
+
+Brace is a simple defensive survival skill.
+
+Beginner skills should not compete with base class identity. They exist to make early party members feel functional before level 10.
+
+Beginner skills may be replaced, renamed, retuned, or removed later.
 
 ---
 
@@ -1152,11 +1218,13 @@ Prototype / Utility:
 
 - Self Buff
 - Light Damage
+- Beginner
 
 Important rules:
 
 - Roles determine preferred skill usage, not classes
 - Classes define available skills, not behavior
+- Beginner skills are temporary prototype tools, not a final class kit
 - Skills must remain simple during this phase
 - This is a prototype system, not a full ability system
 
@@ -1174,6 +1242,7 @@ Examples:
 - Long range: 6+
 
 Do not use vague terms like "short" or "medium" in implementation.
+
 
 ---
 
@@ -1256,7 +1325,11 @@ Current prototype/debug map routes are:
 
 Prototype teleport behavior should not define the final world structure.
 
-Do not build the final zone system, persistent zone state, or full production teleport network unless explicitly requested.
+The World Travel menu may expose currently available prototype/debug map destinations and guide the party toward the matching teleport point.
+
+World Travel is menu-driven travel intent for existing prototype routes. It is not instant fast travel unless explicitly implemented that way later.
+
+Do not build the final zone system, persistent zone state, full production teleport network, travel costs, map discovery, or a full world map unless explicitly requested.
 
 
 ---
