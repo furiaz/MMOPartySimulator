@@ -1,5 +1,6 @@
 import { InventoryPanel } from "./InventoryPanel";
 import { QuestsPanel } from "./QuestPanels";
+import { WorldPanel } from "./WorldPanel";
 import {
   PartyManagementPanel,
   PartyMenuPanel,
@@ -16,6 +17,7 @@ import type {
   EquipmentSlot,
   ItemId,
   QuestId,
+  DebugMapId,
 } from "./game";
 
 export function GameMenu({
@@ -27,6 +29,8 @@ export function GameMenu({
   leaderId,
   members,
   quests,
+  currentMapId,
+  worldTravelTargetMapId,
   selectedCompanionId,
   selectedQuestId,
   onChangeLeader,
@@ -38,6 +42,8 @@ export function GameMenu({
   onSelectQuest,
   onShortcut,
   onSelectTab,
+  onSetWorldTravelRoute,
+  onClearWorldTravelRoute,
   onToggle,
   onUnequipEquipment,
 }: {
@@ -49,6 +55,8 @@ export function GameMenu({
   leaderId: string;
   members: Companion[];
   quests: GameState["quests"];
+  currentMapId?: DebugMapId;
+  worldTravelTargetMapId: DebugMapId | null;
   selectedCompanionId: string | null;
   selectedQuestId: QuestId | null;
   onChangeLeader: (companionId: string) => void;
@@ -64,6 +72,8 @@ export function GameMenu({
   onSelectQuest: (questId: QuestId) => void;
   onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
   onSelectTab: (tab: GameMenuTab | null) => void;
+  onSetWorldTravelRoute: (targetMapId: DebugMapId) => void;
+  onClearWorldTravelRoute: () => void;
   onToggle: () => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
@@ -103,6 +113,13 @@ export function GameMenu({
             >
               Quests
             </button>
+            <button
+              className={activeTab === "world" ? "active" : ""}
+              onClick={() => onSelectTab("world")}
+              type="button"
+            >
+              World
+            </button>
           </nav>
           {activeTab ? (
             <div className="game-menu-content">
@@ -133,11 +150,18 @@ export function GameMenu({
                   wallet={wallet}
                   onOpenEquipmentManagement={onOpenEquipmentManagement}
                 />
-              ) : (
+              ) : activeTab === "quests" ? (
                 <QuestsPanel
                   quests={quests}
                   selectedQuestId={selectedQuestId}
                   onSelectQuest={onSelectQuest}
+                />
+              ) : (
+                <WorldPanel
+                  currentMapId={currentMapId}
+                  worldTravelTargetMapId={worldTravelTargetMapId}
+                  onClearRoute={onClearWorldTravelRoute}
+                  onSetRoute={onSetWorldTravelRoute}
                 />
               )}
             </div>

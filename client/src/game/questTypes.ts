@@ -73,9 +73,10 @@ export type QuestState = {
 };
 
 export type GlobalPoiIntent = {
-  type: "complete_current_quest" | "get_new_quest" | "idle";
+  type: "complete_current_quest" | "get_new_quest" | "travel_to_map" | "idle";
   questId?: QuestId;
   objectiveId?: string;
+  targetMapId?: DebugMapId;
   reason: string;
 };
 

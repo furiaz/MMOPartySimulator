@@ -27,7 +27,12 @@ import {
   type SkillDefinition,
 } from "./game";
 
-export type GameMenuTab = "party" | "partyManagement" | "inventory" | "quests";
+export type GameMenuTab =
+  | "party"
+  | "partyManagement"
+  | "inventory"
+  | "quests"
+  | "world";
 
 export type PartyManagementSection =
   | "role"

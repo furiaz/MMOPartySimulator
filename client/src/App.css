@@ -1005,7 +1005,7 @@
 
 .game-menu-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid #3a5a60;
@@ -1181,16 +1181,59 @@
 
 .party-menu-panel,
 .party-management-panel,
-.quests-panel {
+.quests-panel,
+.world-panel {
   display: grid;
   gap: 12px;
 }
 
 .party-menu-panel h2,
 .party-management-panel h2,
-.quests-panel h2 {
+.quests-panel h2,
+.world-panel h2 {
   margin: 0;
   font-size: 15px;
+}
+
+.world-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.world-region,
+.world-map-list {
+  display: grid;
+  gap: 8px;
+}
+
+.world-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #3a5a60;
+  background: rgba(16, 28, 32, 0.34);
+}
+
+.world-map-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.world-map-row strong,
+.world-map-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.world-map-row span {
+  color: #aec6ca;
+  font-size: 12px;
 }
 
 .menu-split-layout {

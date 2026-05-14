@@ -118,6 +118,7 @@ export type GameState = {
   map?: GameMap;
   activeTeleport?: ActiveTeleport | null;
   autoModeEnabled: boolean;
+  worldTravelTargetMapId: DebugMapId | null;
   poiPreferences: PoiPreferences;
   simulationTick: number;
   simulationFrame?: number;
@@ -349,6 +350,16 @@ export function setAutoModeEnabled(
   return {
     ...state,
     autoModeEnabled,
+  };
+}
+
+export function setWorldTravelTargetMapId(
+  state: GameState,
+  worldTravelTargetMapId: DebugMapId | null,
+): GameState {
+  return {
+    ...state,
+    worldTravelTargetMapId,
   };
 }
 

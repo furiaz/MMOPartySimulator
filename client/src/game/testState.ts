@@ -11,6 +11,7 @@ export function createTestGameState(
     inventory: createEmptyPartyInventory(),
     wallet: createEmptyPartyWallet(),
     autoModeEnabled: false,
+    worldTravelTargetMapId: null,
     poiPreferences: {
       stayInMap: false,
     },

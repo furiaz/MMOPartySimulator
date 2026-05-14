@@ -75,6 +75,7 @@ import {
   setPartyLeader,
   setPartyMemberRole,
   setStayInMapEnabled,
+  setWorldTravelTargetMapId,
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
@@ -83,6 +84,7 @@ import {
   updateEntity,
   type Companion,
   type CombatEntity,
+  type DebugMapId,
   type DebugTeleportPoint,
   type Enemy,
   type EquipmentSlot,
@@ -582,6 +584,7 @@ function createInitialState(): GameState {
     currentMapId: HUB_MAP_ID,
     activeTeleport: null,
     autoModeEnabled: false,
+    worldTravelTargetMapId: null,
     poiPreferences: {
       stayInMap: false,
     },
@@ -1085,6 +1088,16 @@ function App() {
 
   function selectGameMenuTab(tab: GameMenuTab | null) {
     setActiveGameMenuTab(tab);
+  }
+
+  function setWorldTravelRoute(targetMapId: DebugMapId) {
+    setGameState((state) =>
+      setAutoModeEnabled(setWorldTravelTargetMapId(state, targetMapId), true),
+    );
+  }
+
+  function clearWorldTravelRoute() {
+    setGameState((state) => setWorldTravelTargetMapId(state, null));
   }
 
   function navigatePartyShortcut(
@@ -2125,6 +2138,8 @@ function App() {
           leaderId={gameState.partyLeaderId}
           members={partyMembers}
           quests={gameState.quests}
+          currentMapId={gameState.currentMapId}
+          worldTravelTargetMapId={gameState.worldTravelTargetMapId}
           selectedCompanionId={selectedMenuCompanionId}
           selectedQuestId={selectedMenuQuestId}
           onChangeLeader={changePartyLeader}
@@ -2136,6 +2151,8 @@ function App() {
           onSelectQuest={setSelectedQuestId}
           onSelectTab={selectGameMenuTab}
           onShortcut={navigatePartyShortcut}
+          onSetWorldTravelRoute={setWorldTravelRoute}
+          onClearWorldTravelRoute={clearWorldTravelRoute}
           onToggle={toggleGameMenu}
           onUnequipEquipment={unequipEquipment}
         />

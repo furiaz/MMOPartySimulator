@@ -92,7 +92,9 @@ export function updatePoiSystem(state: GameState): GameState {
     return clearPoiSelection(state);
   }
 
-  const interactionState = updateReachedPoiInteractions(state);
+  const interactionState = clearReachedWorldTravelTarget(
+    updateReachedPoiInteractions(state),
+  );
   const globalPoiIntent = getGlobalPoiIntent(interactionState);
   const selection = selectLocalPoiTarget(interactionState, globalPoiIntent);
   let nextState: GameState = {
@@ -122,6 +124,20 @@ export function updatePoiSystem(state: GameState): GameState {
 
 export function getMapType(mapId: DebugMapId | undefined): PoiMapType {
   return mapId === HUB_MAP_ID ? "hub" : "wild";
+}
+
+function clearReachedWorldTravelTarget(state: GameState): GameState {
+  if (
+    !state.worldTravelTargetMapId ||
+    state.worldTravelTargetMapId !== state.currentMapId
+  ) {
+    return state;
+  }
+
+  return {
+    ...state,
+    worldTravelTargetMapId: null,
+  };
 }
 
 function updateReachedPoiInteractions(state: GameState): GameState {
@@ -160,6 +176,17 @@ function updateReachedPoiInteractions(state: GameState): GameState {
 }
 
 function getGlobalPoiIntent(state: GameState): GlobalPoiIntent {
+  if (
+    state.worldTravelTargetMapId &&
+    state.worldTravelTargetMapId !== state.currentMapId
+  ) {
+    return {
+      type: "travel_to_map",
+      targetMapId: state.worldTravelTargetMapId,
+      reason: `world route toward ${state.worldTravelTargetMapId}`,
+    };
+  }
+
   const activeQuest = getActiveQuest(state);
 
   if (activeQuest) {
@@ -222,6 +249,21 @@ function getPoiTargetOptions(
 ): PoiTargetOption[] {
   const mapType = getMapType(state.currentMapId);
   const stayInMap = Boolean(state.poiPreferences?.stayInMap);
+
+  if (globalPoiIntent.type === "travel_to_map" && globalPoiIntent.targetMapId) {
+    const teleportPoi = getTeleportPoiTowardMap(state, globalPoiIntent.targetMapId);
+
+    return teleportPoi
+      ? [
+          {
+            poi: teleportPoi,
+            priority: 5,
+            reason: `world route toward ${globalPoiIntent.targetMapId}`,
+          },
+        ]
+      : [];
+  }
+
   const questOptions = getQuestTargetOptions(
     state,
     globalPoiIntent,

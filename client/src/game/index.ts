@@ -139,6 +139,7 @@ export {
   setPartyMemberRole,
   setPartyOrder,
   setStayInMapEnabled,
+  setWorldTravelTargetMapId,
   updateEntity,
 } from "./state";
 export {
