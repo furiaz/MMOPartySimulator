@@ -35,6 +35,10 @@ import {
 } from "./positionUtils";
 import { isEnemyEntity } from "./entityGuards";
 import { getEnemyAttackRange } from "./enemyArchetypes";
+import {
+  DEFAULT_COMPANION_ATTACK_RANGE,
+  getCompanionAttackRange,
+} from "./companionCombat";
 import type {
   CombatEntity,
   Enemy,
@@ -43,7 +47,6 @@ import type {
   Position,
 } from "./types";
 
-const ATTACK_RANGE = 1;
 const ATTACK_DAMAGE = 1;
 export const ATTACK_COOLDOWN_MS = 1000;
 const TARGET_SWITCH_DISTANCE = 6;
@@ -469,7 +472,13 @@ function getFinalStepAttackPosition(
 }
 
 function getAttackRange(attacker: GameEntity): number {
-  return isEnemy(attacker) ? getEnemyAttackRange(attacker) : ATTACK_RANGE;
+  if (isEnemy(attacker)) {
+    return getEnemyAttackRange(attacker);
+  }
+
+  return attacker.kind === "companion"
+    ? getCompanionAttackRange(attacker)
+    : DEFAULT_COMPANION_ATTACK_RANGE;
 }
 
 function setCombatSlot(

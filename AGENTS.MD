@@ -208,6 +208,16 @@ Ticket titles must use the format:
 Future idea cards may use normal descriptive titles while they are in Dragons Vault or Todo.
 When a future idea is promoted into Design Stage or Implementation scope, rename it to the next ticket number before implementation work begins.
 
+For companion documentation tickets, `Completed` means the documentation review task is complete, not necessarily that protected documents were edited.
+
+Before applying `Completed` to a documentation companion ticket, Codex must leave a comment stating one of:
+- Documentation was updated, listing the files changed.
+- No documentation change is needed.
+- Protected documentation appears to need changes, but Codex cannot edit it without explicit approval; include proposed text or request approval.
+
+If protected documentation changes are still awaiting user approval, move the ticket to Manual Review but do not move it to Done.
+
+
 ## Ticket Number Validation Rule
 
 Before any implementation work begins, verify that the active GitHub Issue title starts with the standard ticket format:

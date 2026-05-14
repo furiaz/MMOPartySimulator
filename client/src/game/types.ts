@@ -496,6 +496,7 @@ export type SkillVisualType =
 export type SkillVisualEvent = {
   id: string;
   type: SkillVisualType;
+  skillId?: SkillId;
   sourceId: string;
   targetId?: string;
   position?: Position;

@@ -264,6 +264,10 @@ export {
   updateAttackSystem,
 } from "./attackSystem";
 export {
+  DEFAULT_COMPANION_ATTACK_RANGE,
+  getCompanionAttackRange,
+} from "./companionCombat";
+export {
   ENEMY_DROP_TABLES,
   ENEMY_ARCHETYPE_DROP_TABLES,
   SUPPORTED_LOOT_TIERS,

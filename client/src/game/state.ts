@@ -266,6 +266,7 @@ export function addSkillVisualEvent(
       {
         id: `${event.now}-${event.type}-${event.sourceId}-${state.skillVisualEvents?.length ?? 0}`,
         type: event.type,
+        skillId: event.skillId,
         sourceId: event.sourceId,
         targetId: event.targetId,
         position: event.position,

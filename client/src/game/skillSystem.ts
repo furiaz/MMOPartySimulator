@@ -372,7 +372,7 @@ function applySkill(
   if (skill.effect.type === "heal" && isLivingCompanion(target)) {
     return startSkillCooldown(
       recordSkillApplied(
-        applyHeal(nextState, caster, target, skill.effect.amount, 0, now),
+        applyHeal(nextState, caster, target, skill.effect.amount, 0, skill.id, now),
         caster,
         skillUse,
         target.id,
@@ -392,6 +392,7 @@ function applySkill(
           target,
           skill.effect.amount,
           skill.effect.hpCost,
+          skill.id,
           now,
         ),
         caster,
@@ -478,6 +479,7 @@ function applyDamageSkill(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "projectile",
+    skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
     now,
@@ -530,6 +532,7 @@ function applySweepingStrike(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "slash",
+    skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
     now,
@@ -573,6 +576,7 @@ function applyTaunt(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "projectile",
+    skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
     now,
@@ -648,6 +652,7 @@ function applySelfBuff(
 
   nextState = addSkillVisualEvent(nextState, {
     type: skill.effect.hpCost > 0 ? "red_flash" : "heal",
+    skillId: skill.id,
     sourceId: caster.id,
     now,
     durationMs: 500,
@@ -690,6 +695,7 @@ function applyAllyBuff(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
+    skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
     now,
@@ -732,6 +738,7 @@ function applyGatherBuff(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
+    skillId: skill.id,
     sourceId: caster.id,
     now,
     durationMs: 600,
@@ -780,6 +787,7 @@ function applyQuickStep(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
+    skillId: skill.id,
     sourceId: caster.id,
     position,
     now,
@@ -829,6 +837,15 @@ function applyShieldBlock(
     now,
   });
 
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    position: shieldPlacement.position,
+    now,
+    durationMs: 600,
+  });
+
   return updateEntity(nextState, setLastAttackAt(caster, now));
 }
 
@@ -871,6 +888,7 @@ function applyHeal(
   target: Companion,
   amount: number,
   hpCost: number,
+  skillId: SkillDefinition["id"],
   now: number,
 ): GameState {
   if (hpCost > 0 && caster.health <= hpCost + LOW_HEALTH_BUFFER) {
@@ -895,6 +913,7 @@ function applyHeal(
       nextState = updateEntity(nextState, damagedCaster);
       nextState = addSkillVisualEvent(nextState, {
         type: "red_flash",
+        skillId,
         sourceId: caster.id,
         now,
         durationMs: 500,
@@ -904,6 +923,7 @@ function applyHeal(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
+    skillId,
     sourceId: caster.id,
     targetId: target.id,
     now,

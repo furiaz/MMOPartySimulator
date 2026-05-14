@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
+import { DEFAULT_COMPANION_ATTACK_RANGE, getCompanionAttackRange } from "./companionCombat";
 import { updateAttackSystem } from "./attackSystem";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
 
 describe("enemy attack leash movement", () => {
+  it("keeps default companion basic attack range melee", () => {
+    const companion = createIdleCompanion("leader", { x: 0, y: 0 });
+
+    expect(getCompanionAttackRange(companion)).toBe(DEFAULT_COMPANION_ATTACK_RANGE);
+    expect(getCompanionAttackRange(companion)).toBe(1);
+  });
+
   it("lets enemies pursue beyond roam leash while inside attack leash", () => {
     const companion = createIdleCompanion("leader", { x: 6, y: 0 });
     const enemy = {

@@ -77,6 +77,7 @@
 .map-label-overlay,
 .floor-tile,
 .skill-link,
+.skill-visual-sprite,
 .skill-shield-block,
 .skill-slash,
 .drop-visual,
@@ -297,6 +298,14 @@
   pointer-events: none;
 }
 
+.skill-visual-sprite {
+  z-index: 3;
+  width: 50px;
+  height: 50px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
 .drop-visual {
   z-index: 4;
   display: grid;
@@ -332,14 +341,14 @@
 
 .teleporter {
   z-index: 2;
-  width: 36px;
-  height: 36px;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
   margin: 0;
   padding: 0;
-  border: 2px solid #581c87;
-  border-radius: 999px;
-  background: #a855f7;
-  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.18);
+  border: 0;
+  background: transparent;
   cursor: pointer;
 }
 
@@ -353,15 +362,17 @@
 
 .healing-fountain {
   z-index: 2;
-  width: 34px;
-  height: 34px;
-  margin: 1px;
-  border: 2px solid #0369a1;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 50% 44%, #e0f2fe 0 20%, transparent 22%),
-    radial-gradient(circle at 50% 55%, #38bdf8 0 43%, #0284c7 45% 62%, #075985 64%);
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.16);
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  pointer-events: none;
+}
+
+.map-object-icon {
+  width: 50px;
+  height: 50px;
+  image-rendering: pixelated;
   pointer-events: none;
 }
 

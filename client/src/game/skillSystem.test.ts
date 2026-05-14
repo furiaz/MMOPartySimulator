@@ -17,6 +17,10 @@ describe("beginner skill system", () => {
       state: "attack",
       currentTargetId: defender.id,
     });
+    expect(nextState.skillVisualEvents?.at(-1)).toMatchObject({
+      skillId: "throw_rock",
+      type: "projectile",
+    });
   });
 
   it("uses Field Hands to improve gathering temporarily", () => {
@@ -35,6 +39,9 @@ describe("beginner skill system", () => {
     const gatheredState = updateGatherSystem(buffedState, new Set(), 2000);
 
     expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.bonusGatherSpeed).toBe(1);
+    expect(buffedState.skillVisualEvents?.at(-1)).toMatchObject({
+      skillId: "field_hands",
+    });
     expect(gatheredState.entities.wood).toMatchObject({
       isDepleted: true,
       durability: 0,
@@ -92,6 +99,112 @@ describe("beginner skill system", () => {
           event.reason === "no_target",
       ),
     ).toBe(true);
+  });
+
+  it("records Beginner skill ids on emitted visual events", () => {
+    const cases: Array<{
+      skillId: string;
+      entities: GameEntity[];
+      overrides?: Partial<GameState>;
+    }> = [
+      {
+        skillId: "kick",
+        entities: [
+          createBeginner("fighter", "fighter", { x: 0, y: 0 }),
+          createEnemy("enemy", { x: 1, y: 0 }),
+        ],
+      },
+      {
+        skillId: "guard_up",
+        entities: [
+          createBeginner("defender", "defender", { x: 0, y: 0 }),
+          {
+            ...createEnemy("enemy", { x: 2, y: 0 }),
+            state: "attack",
+            currentTargetId: "defender",
+          },
+        ],
+      },
+      {
+        skillId: "first_aid",
+        entities: [
+          createBeginner("support", "support", { x: 0, y: 0 }),
+          {
+            ...createBeginner("ally", "fighter", { x: 1, y: 0 }),
+            health: 2,
+            maxHealth: 3,
+          },
+        ],
+      },
+      {
+        skillId: "deep_breath",
+        entities: [
+          createBeginner("fighter", "fighter", { x: 0, y: 0 }),
+          createEnemy("enemy", { x: 3, y: 0 }),
+        ],
+      },
+      {
+        skillId: "rally_call",
+        entities: [
+          createBeginner("support", "support", { x: 0, y: 0 }),
+          createBeginner("ally", "fighter", { x: 1, y: 0 }),
+          createEnemy("enemy", { x: 3, y: 0 }),
+        ],
+        overrides: {
+          skillSelfBuffsByCompanionId: {
+            support: {
+              companionId: "support",
+              bonusDamage: 1,
+              expiresAt: 5000,
+            },
+          },
+        },
+      },
+      {
+        skillId: "quick_step",
+        entities: [
+          createBeginner("gatherer", "gatherer", { x: 0, y: 0 }),
+          {
+            ...createEnemy("enemy", { x: 1, y: 0 }),
+            state: "attack",
+            currentTargetId: "gatherer",
+          },
+        ],
+        overrides: {
+          skillSelfBuffsByCompanionId: {
+            gatherer: {
+              companionId: "gatherer",
+              bonusDamage: 1,
+              expiresAt: 5000,
+            },
+          },
+          skillShieldBlocksById: {
+            "gatherer-guard_up": {
+              id: "gatherer-guard_up",
+              ownerId: "gatherer",
+              position: { x: 0, y: -1 },
+              rotationRadians: 0,
+              expiresAt: 5000,
+              remainingBlocks: 1,
+            },
+          },
+        },
+      },
+    ];
+
+    for (const testCase of cases) {
+      const nextState = updateSkillSystem(
+        createSkillState(testCase.entities, testCase.overrides),
+        1000,
+      );
+
+      expect(
+        nextState.skillVisualEvents?.some(
+          (event) => event.skillId === testCase.skillId,
+        ),
+        testCase.skillId,
+      ).toBe(true);
+    }
   });
 });
 

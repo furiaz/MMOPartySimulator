@@ -10,6 +10,8 @@ import "./App.css";
 import {
   HUB_MAP_TILE_SRC,
   INVENTORY_ITEM_ICON_SRC,
+  MAP_OBJECT_ICON_SRC,
+  SKILL_VISUAL_ICON_SRC,
   WILDERNESS_MAP_TILE_SRC,
 } from "./assetIcons";
 import SpriteAnimation from "./SpriteAnimation";
@@ -98,6 +100,7 @@ import {
   type Position,
   type QuestId,
   type ResourceEntity,
+  type SkillVisualEvent,
 } from "./game";
 import {
   getEntityVisualAsset,
@@ -130,6 +133,10 @@ type ViewportSize = {
   width: number;
   height: number;
 };
+
+function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
+  return event.skillId ? SKILL_VISUAL_ICON_SRC[event.skillId] : undefined;
+}
 
 function isWildernessVisualMap(mapId: string | undefined): boolean {
   return Boolean(mapId && wildernessMapIds.has(mapId));
@@ -802,6 +809,9 @@ function App() {
   const activeSkillVisualEvents = (gameState.skillVisualEvents ?? []).filter(
     (event) => event.expiresAt > currentTime,
   );
+  const skillSpriteVisuals = activeSkillVisualEvents.filter((event) =>
+    Boolean(getSkillVisualIconSrc(event)),
+  );
   const redFlashEntityIds = new Set(
     activeSkillVisualEvents
       .filter((event) => event.type === "red_flash")
@@ -813,10 +823,12 @@ function App() {
       .map((event) => event.targetId),
   );
   const projectileVisuals = activeSkillVisualEvents.filter(
-    (event) => event.type === "projectile" || event.type === "heal",
+    (event) =>
+      !getSkillVisualIconSrc(event) &&
+      (event.type === "projectile" || event.type === "heal"),
   );
   const slashVisuals = activeSkillVisualEvents.filter(
-    (event) => event.type === "slash",
+    (event) => !getSkillVisualIconSrc(event) && event.type === "slash",
   );
   const activeDropVisualEvents = (gameState.dropVisualEvents ?? []).filter(
     (event) => event.expiresAt > currentTime,
@@ -1611,7 +1623,14 @@ function App() {
                   }}
                   title={`${teleport.id}: ${teleport.sourceMapId} to ${teleport.targetMapId}`}
                   type="button"
-                />
+                >
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="map-object-icon"
+                    src={MAP_OBJECT_ICON_SRC.teleportPoint}
+                  />
+                </button>
               </div>
             ))}
             {currentMap.healingFountains.map((fountain) => (
@@ -1624,20 +1643,70 @@ function App() {
                   }px)`,
                 }}
                 title="Healing fountain"
-              />
+              >
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="map-object-icon"
+                  src={MAP_OBJECT_ICON_SRC.healingFountain}
+                />
+              </div>
             ))}
-            {Object.values(gameState.skillShieldBlocksById ?? {}).map((shield) => (
-              <div
-                key={shield.id}
-                className="skill-shield-block"
-                style={{
-                  transform: `translate(${shield.position.x * cellSize}px, ${
-                    shield.position.y * cellSize
-                  }px) rotate(${shield.rotationRadians}rad)`,
-                }}
-                title="Guard Wall"
-              />
-            ))}
+            {Object.values(gameState.skillShieldBlocksById ?? {})
+              .filter((shield) => !shield.id.endsWith("-guard_up"))
+              .map((shield) => (
+                <div
+                  key={shield.id}
+                  className="skill-shield-block"
+                  style={{
+                    transform: `translate(${shield.position.x * cellSize}px, ${
+                      shield.position.y * cellSize
+                    }px) rotate(${shield.rotationRadians}rad)`,
+                  }}
+                  title="Guard Wall"
+                />
+              ))}
+            {skillSpriteVisuals.map((event) => {
+              const source = gameState.entities[event.sourceId];
+              const target = event.targetId
+                ? gameState.entities[event.targetId]
+                : undefined;
+              const iconSrc = getSkillVisualIconSrc(event);
+
+              if (!source || !iconSrc) {
+                return null;
+              }
+
+              const spritePosition = target
+                ? {
+                    x: (source.position.x + target.position.x) / 2,
+                    y: (source.position.y + target.position.y) / 2,
+                  }
+                : event.position ?? source.position;
+              const angle = target && event.type !== "heal"
+                ? Math.atan2(
+                    target.position.y - source.position.y,
+                    target.position.x - source.position.x,
+                  )
+                : 0;
+
+              return (
+                <img
+                  key={event.id}
+                  alt=""
+                  aria-hidden="true"
+                  className={`skill-visual-sprite ${event.type}`}
+                  src={iconSrc}
+                  style={{
+                    transform: `translate(${
+                      spritePosition.x * cellSize + cellSize / 2
+                    }px, ${
+                      spritePosition.y * cellSize + cellSize / 2
+                    }px) translate(-50%, -50%) rotate(${angle}rad)`,
+                  }}
+                />
+              );
+            })}
             {projectileVisuals.map((event) => {
               const source = gameState.entities[event.sourceId];
               const target = event.targetId
