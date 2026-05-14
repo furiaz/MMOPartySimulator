@@ -1126,15 +1126,31 @@ Beginner skills should feel basic, flexible, and transitional.
 
 Current intended Beginner prototype skill identities:
 
-- Training Strike
-- Patch Up
-- Brace
+- Throw Rock
+- Kick
+- Guard Up
+- First Aid
+- Deep Breath
+- Rally Call
+- Field Hands
+- Quick Step
 
-Training Strike is a simple offensive fallback skill.
+Throw Rock is a simple ranged taunt tool.
 
-Patch Up is a small emergency recovery skill.
+Kick is a simple melee fallback attack.
 
-Brace is a simple defensive survival skill.
+Guard Up is a simple defensive survival skill.
+
+First Aid is a small emergency recovery skill.
+
+Deep Breath is a simple self-buff.
+
+Rally Call is a simple ally buff.
+
+Field Hands is a simple gathering support skill.
+
+Quick Step is a simple mobility and escape skill.
+
 
 Beginner skills should not compete with base class identity. They exist to make early party members feel functional before level 10.
 
@@ -1218,7 +1234,6 @@ Prototype / Utility:
 
 - Self Buff
 - Light Damage
-- Beginner
 
 Important rules:
 

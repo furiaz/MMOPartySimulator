@@ -38,6 +38,7 @@ Current files include:
 - `attackSystem.ts`
 - `classes.ts`
 - `commands.ts`
+- `companionCombat.ts`
 - `debugMap.ts`
 - `debugTelemetry.ts`
 - `debugTools.ts`
@@ -268,10 +269,12 @@ Current prototype skill runtime fields include:
 
 - `skillMarksByEnemyId`
 - `skillSelfBuffsByCompanionId`
+- `skillGatherBuffsByCompanionId`
 - `skillBindsByEnemyId`
 - `skillShieldBlocksById`
 - `skillCooldownsByCompanionId`
 - `skillVisualEvents`
+
 
 State helpers should remain low-level and safe. Systems should own behavior decisions.
 
@@ -419,9 +422,14 @@ Current skill ids should include Beginner prototype skills and base class protot
 
 ```ts
 type SkillId =
-  | "training_strike"
-  | "patch_up"
-  | "brace"
+  | "throw_rock"
+  | "kick"
+  | "guard_up"
+  | "first_aid"
+  | "deep_breath"
+  | "rally_call"
+  | "field_hands"
+  | "quick_step"
   | "sweeping_strike"
   | "guard_wall"
   | "mark_target"
@@ -434,9 +442,14 @@ type SkillId =
 
 Current Beginner prototype skills:
 
-- Beginner: Training Strike
-- Beginner: Patch Up
-- Beginner: Brace
+- Beginner: Throw Rock
+- Beginner: Kick
+- Beginner: Guard Up
+- Beginner: First Aid
+- Beginner: Deep Breath
+- Beginner: Rally Call
+- Beginner: Field Hands
+- Beginner: Quick Step
 
 Current base class prototype skills:
 
@@ -449,7 +462,7 @@ Current base class prototype skills:
 - Lightbearer: Light Mend
 - Penitent: Penitent's Gift
 
-Current skill effects may include direct damage, sweeping/splash damage, enemy mark bonus damage, self damage buff with HP cost, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, and beginner defensive survival.
+Current skill effects may include direct damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, gathering speed buff, quick-step movement, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
 
 Current skill rules:
 
