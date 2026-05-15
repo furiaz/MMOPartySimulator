@@ -76,6 +76,12 @@ export type CharacterXpProgress = {
   isMaxLevel: boolean;
 };
 
+const PARTY_SIZE_UNLOCK_REQUIREMENTS: Record<number, number> = {
+  3: 10,
+  4: 30,
+  5: 60,
+};
+
 export function getCharacterXpToNextLevel(level: number): number | null {
   const clampedLevel = clampLevel(level);
 
@@ -320,6 +326,10 @@ export function getPartySizeLimit(state: GameState): number {
   }
 
   return 2;
+}
+
+export function getPartySizeUnlockRequirement(slotNumber: number): number | null {
+  return PARTY_SIZE_UNLOCK_REQUIREMENTS[slotNumber] ?? null;
 }
 
 export function isBeginnerClassEligible(companion: Companion): boolean {

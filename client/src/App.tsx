@@ -64,6 +64,7 @@ import {
   getEnemyArchetype,
   getEnemyDetectionRange,
   getItemDefinition,
+  getTotalPartyCharacterLevel,
   hasQuestGiverWork,
   issueCompanionCommands,
   isCombatEntity,
@@ -794,6 +795,7 @@ function App() {
     ? selectedCompanionId
     : partyMembers[0]?.id ?? null;
   const activePartyMemberIds = partyMembers.map((companion) => companion.id);
+  const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
   const leader = partyMembers.find(
     (member) => member.id === gameState.partyLeaderId,
   ) ?? partyMembers[0];
@@ -2275,6 +2277,7 @@ function App() {
           worldTravelTargetMapId={gameState.worldTravelTargetMapId}
           selectedCompanionId={selectedMenuCompanionId}
           selectedQuestId={selectedMenuQuestId}
+          totalPartyLevel={totalPartyLevel}
           onChangeLeader={changePartyLeader}
           onChangeRole={changePartyMemberRole}
           onEquipEquipment={equipEquipment}

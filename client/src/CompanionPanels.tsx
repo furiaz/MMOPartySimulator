@@ -14,6 +14,7 @@ import {
   getCompanionActualStats,
   getCompanionDerivedStats,
   getItemDefinition,
+  getPartySizeUnlockRequirement,
   getSkillRoleScore,
   getSkillsForClass,
   validateEquipmentItemForCompanion,
@@ -93,6 +94,8 @@ const partyManagementSections: PartyManagementSection[] = [
   "behaviorSettings",
 ];
 
+const partyCompanionSlotCount = 5;
+
 const primaryStatLabels: Record<PrimaryStatId, string> = {
   strength: "Strength",
   dexterity: "Dexterity",
@@ -140,6 +143,7 @@ export function PartyMenuPanel({
   inventory,
   members,
   selectedCompanionId,
+  totalPartyLevel,
   onEquipEquipment,
   onSelectCompanion,
   onSelectSection,
@@ -149,6 +153,7 @@ export function PartyMenuPanel({
   inventory: PartyInventory;
   members: Companion[];
   selectedCompanionId: string | null;
+  totalPartyLevel: number;
   onEquipEquipment: (
     companionId: string,
     itemId: ItemId,
@@ -169,6 +174,8 @@ export function PartyMenuPanel({
         layout="horizontal"
         members={orderedMembers}
         selectedCompanionId={selectedCompanionId}
+        showEmptySlots={true}
+        totalPartyLevel={totalPartyLevel}
         onSelectCompanion={onSelectCompanion}
       />
       <nav className="party-submenu-tabs" aria-label="Party sections">
@@ -349,17 +356,62 @@ function CompanionMenuList({
   layout = "vertical",
   members,
   selectedCompanionId,
+  showEmptySlots = false,
+  totalPartyLevel = 0,
   onSelectCompanion,
 }: {
   layout?: "vertical" | "horizontal";
   members: Companion[];
   selectedCompanionId: string | null;
+  showEmptySlots?: boolean;
+  totalPartyLevel?: number;
   onSelectCompanion: (companionId: string) => void;
 }) {
+  const slots = showEmptySlots
+    ? Array.from({ length: partyCompanionSlotCount }, (_, index) => ({
+        member: members[index] ?? null,
+        slotNumber: index + 1,
+      }))
+    : members.map((member, index) => ({
+        member,
+        slotNumber: index + 1,
+      }));
+
   return (
     <div className={`party-companion-list party-companion-list-${layout}`}>
-      {members.length > 0 ? (
-        members.map((member) => {
+      {slots.length > 0 ? (
+        slots.map(({ member, slotNumber }) => {
+          if (!member) {
+            const unlockRequirement = getPartySizeUnlockRequirement(slotNumber);
+            const isLocked =
+              unlockRequirement !== null && totalPartyLevel < unlockRequirement;
+
+            return (
+              <div
+                key={`empty-slot-${slotNumber}`}
+                className="party-companion-list-item"
+              >
+                <button
+                  className={`party-companion-card party-companion-card-empty${
+                    isLocked ? " locked" : ""
+                  }`}
+                  disabled
+                  type="button"
+                >
+                  <span className="party-companion-card-header">
+                    <strong>Slot {slotNumber}</strong>
+                  </span>
+                  <span className="party-companion-card-detail">Empty Slot</span>
+                  <span className="party-companion-xp-text">
+                    {isLocked
+                      ? `Unlocks at Total Party Level ${unlockRequirement}`
+                      : "No companion assigned"}
+                  </span>
+                </button>
+              </div>
+            );
+          }
+
           const characterXpProgress = getCharacterXpProgress(member);
           const isSelected = member.id === selectedCompanionId;
           const xpToNextLevelText =
@@ -415,6 +467,7 @@ export function PartyManagementPanel({
   leaderId,
   members,
   selectedCompanionId,
+  totalPartyLevel,
   onChangeLeader,
   onChangeRole,
   onSelectCompanion,
@@ -425,6 +478,7 @@ export function PartyManagementPanel({
   leaderId: string;
   members: Companion[];
   selectedCompanionId: string | null;
+  totalPartyLevel: number;
   onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onSelectCompanion: (companionId: string) => void;
@@ -458,6 +512,8 @@ export function PartyManagementPanel({
           layout="horizontal"
           members={orderedMembers}
           selectedCompanionId={selectedCompanionId}
+          showEmptySlots={true}
+          totalPartyLevel={totalPartyLevel}
           onSelectCompanion={onSelectCompanion}
         />
         {selectedMember ? (

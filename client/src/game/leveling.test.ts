@@ -3,6 +3,7 @@ import { createCompanion, createEnemy } from "./entities";
 import {
   getLevelGapXpModifier,
   getPartySizeLimit,
+  getPartySizeUnlockRequirement,
   grantCharacterXpToCompanion,
   grantCharacterXpToParty,
   MAX_CHARACTER_LEVEL,
@@ -67,6 +68,15 @@ describe("character leveling", () => {
         }),
       ),
     ).toBe(3);
+  });
+
+  it("returns party size unlock requirements by slot", () => {
+    expect(getPartySizeUnlockRequirement(1)).toBeNull();
+    expect(getPartySizeUnlockRequirement(2)).toBeNull();
+    expect(getPartySizeUnlockRequirement(3)).toBe(10);
+    expect(getPartySizeUnlockRequirement(4)).toBe(30);
+    expect(getPartySizeUnlockRequirement(5)).toBe(60);
+    expect(getPartySizeUnlockRequirement(6)).toBeNull();
   });
 
   it("applies the debug super XP multiplier to enemy XP grants", () => {

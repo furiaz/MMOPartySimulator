@@ -1342,6 +1342,16 @@
   background: rgba(58, 90, 96, 0.46);
 }
 
+.party-companion-card-empty {
+  border-style: dashed;
+  opacity: 0.76;
+  cursor: not-allowed;
+}
+
+.party-companion-card-empty.locked {
+  background: rgba(9, 18, 21, 0.32);
+}
+
 .quest-list-item {
   width: 100%;
   min-width: 0;

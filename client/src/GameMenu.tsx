@@ -34,6 +34,7 @@ export function GameMenu({
   worldTravelTargetMapId,
   selectedCompanionId,
   selectedQuestId,
+  totalPartyLevel,
   onChangeLeader,
   onChangeRole,
   onEquipEquipment,
@@ -62,6 +63,7 @@ export function GameMenu({
   worldTravelTargetMapId: DebugMapId | null;
   selectedCompanionId: string | null;
   selectedQuestId: QuestId | null;
+  totalPartyLevel: number;
   onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onEquipEquipment: (
@@ -133,6 +135,7 @@ export function GameMenu({
                   inventory={inventory}
                   members={members}
                   selectedCompanionId={selectedCompanionId}
+                  totalPartyLevel={totalPartyLevel}
                   onEquipEquipment={onEquipEquipment}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectPartySection}
@@ -144,6 +147,7 @@ export function GameMenu({
                   leaderId={leaderId}
                   members={members}
                   selectedCompanionId={selectedCompanionId}
+                  totalPartyLevel={totalPartyLevel}
                   onChangeLeader={onChangeLeader}
                   onChangeRole={onChangeRole}
                   onSelectCompanion={onSelectCompanion}

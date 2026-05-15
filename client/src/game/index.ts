@@ -401,6 +401,7 @@ export {
   getEnemyXpReward,
   getLevelGapXpModifier,
   getPartySizeLimit,
+  getPartySizeUnlockRequirement,
   getSameLevelEnemyXp,
   getTotalCharacterXpForLevel,
   getTotalPartyCharacterLevel,
