@@ -6,7 +6,7 @@ import {
   PartyMenuPanel,
   type GameMenuTab,
   type PartyManagementSection,
-  type PartyShortcutTarget,
+  type PartyMenuSection,
 } from "./CompanionPanels";
 import type {
   Companion,
@@ -23,6 +23,7 @@ import type {
 export function GameMenu({
   activeTab,
   activeManagementSection,
+  activePartySection,
   inventory,
   wallet,
   isOpen,
@@ -39,16 +40,18 @@ export function GameMenu({
   onOpenEquipmentManagement,
   onSelectCompanion,
   onSelectManagementSection,
+  onSelectPartySection,
   onSelectQuest,
-  onShortcut,
   onSelectTab,
   onSetWorldTravelRoute,
   onClearWorldTravelRoute,
   onToggle,
   onUnequipEquipment,
+  onMovePartyOrder,
 }: {
   activeTab: GameMenuTab | null;
   activeManagementSection: PartyManagementSection;
+  activePartySection: PartyMenuSection;
   inventory: PartyInventory;
   wallet: PartyWallet;
   isOpen: boolean;
@@ -69,13 +72,14 @@ export function GameMenu({
   onOpenEquipmentManagement: () => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectManagementSection: (section: PartyManagementSection) => void;
+  onSelectPartySection: (section: PartyMenuSection) => void;
   onSelectQuest: (questId: QuestId) => void;
-  onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
   onSelectTab: (tab: GameMenuTab | null) => void;
   onSetWorldTravelRoute: (targetMapId: DebugMapId) => void;
   onClearWorldTravelRoute: () => void;
   onToggle: () => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
   return (
     <>
@@ -118,31 +122,33 @@ export function GameMenu({
               onClick={() => onSelectTab("world")}
               type="button"
             >
-              World
+              World Travel
             </button>
           </nav>
           {activeTab ? (
             <div className="game-menu-content">
               {activeTab === "party" ? (
                 <PartyMenuPanel
+                  activeSection={activePartySection}
+                  inventory={inventory}
                   members={members}
                   selectedCompanionId={selectedCompanionId}
+                  onEquipEquipment={onEquipEquipment}
                   onSelectCompanion={onSelectCompanion}
-                  onShortcut={onShortcut}
+                  onSelectSection={onSelectPartySection}
+                  onUnequipEquipment={onUnequipEquipment}
                 />
               ) : activeTab === "partyManagement" ? (
                 <PartyManagementPanel
                   activeSection={activeManagementSection}
                   leaderId={leaderId}
                   members={members}
-                  inventory={inventory}
                   selectedCompanionId={selectedCompanionId}
                   onChangeLeader={onChangeLeader}
                   onChangeRole={onChangeRole}
-                  onEquipEquipment={onEquipEquipment}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectManagementSection}
-                  onUnequipEquipment={onUnequipEquipment}
+                  onMovePartyOrder={onMovePartyOrder}
                 />
               ) : activeTab === "inventory" ? (
                 <InventoryPanel

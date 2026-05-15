@@ -21,7 +21,7 @@ import {
   CompanionVitalsPanel,
   type GameMenuTab,
   type PartyManagementSection,
-  type PartyShortcutTarget,
+  type PartyMenuSection,
 } from "./CompanionPanels";
 import {
   formatQuestStatus,
@@ -77,6 +77,7 @@ import {
   setLeaderIntent,
   setPartyLeader,
   setPartyMemberRole,
+  setPartyOrder,
   setStayInMapEnabled,
   setWorldTravelTargetMapId,
   startGameLoop,
@@ -753,6 +754,8 @@ function App() {
     useState<GameMenuTab | null>(null);
   const [activePartyManagementSection, setActivePartyManagementSection] =
     useState<PartyManagementSection>("role");
+  const [activePartyMenuSection, setActivePartyMenuSection] =
+    useState<PartyMenuSection>("stats");
   const [selectedCompanionId, setSelectedCompanionId] = useState<string | null>(
     null,
   );
@@ -1147,19 +1150,49 @@ function App() {
     setGameState((state) => setWorldTravelTargetMapId(state, null));
   }
 
-  function navigatePartyShortcut(
-    companionId: string,
-    target: PartyShortcutTarget,
-  ) {
-    setSelectedCompanionId(companionId);
-    setActiveGameMenuTab("partyManagement");
-    setActivePartyManagementSection(target);
-  }
-
   function openEquipmentManagementFromInventory() {
     setSelectedCompanionId(selectedMenuCompanionId);
-    setActiveGameMenuTab("partyManagement");
-    setActivePartyManagementSection("equipment");
+    setActiveGameMenuTab("party");
+    setActivePartyMenuSection("equipment");
+  }
+
+  function movePartyMemberOrder(
+    companionId: string,
+    direction: "up" | "down",
+  ) {
+    setGameState((state) => {
+      const orderedMembers = companionIds
+        .map((id) => state.entities[id] as Companion | undefined)
+        .filter((companion): companion is Companion => Boolean(companion))
+        .sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id));
+      const currentIndex = orderedMembers.findIndex(
+        (member) => member.id === companionId,
+      );
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+      if (
+        currentIndex < 0 ||
+        targetIndex < 0 ||
+        targetIndex >= orderedMembers.length
+      ) {
+        return state;
+      }
+
+      const currentMember = orderedMembers[currentIndex];
+      const targetMember = orderedMembers[targetIndex];
+      const swappedCurrent = setPartyOrder(
+        state,
+        currentMember.id,
+        targetMember.partyOrder,
+      );
+
+      return setPartyOrder(
+        swappedCurrent,
+        targetMember.id,
+        currentMember.partyOrder,
+      );
+    });
   }
 
   function openMerchantInteraction(npc: NpcEntity) {
@@ -2231,6 +2264,7 @@ function App() {
         <GameMenu
           activeTab={activeGameMenuTab}
           activeManagementSection={activePartyManagementSection}
+          activePartySection={activePartyMenuSection}
           inventory={inventory}
           wallet={gameState.wallet}
           isOpen={isGameMenuOpen}
@@ -2247,13 +2281,14 @@ function App() {
           onOpenEquipmentManagement={openEquipmentManagementFromInventory}
           onSelectCompanion={setSelectedCompanionId}
           onSelectManagementSection={setActivePartyManagementSection}
+          onSelectPartySection={setActivePartyMenuSection}
           onSelectQuest={setSelectedQuestId}
           onSelectTab={selectGameMenuTab}
-          onShortcut={navigatePartyShortcut}
           onSetWorldTravelRoute={setWorldTravelRoute}
           onClearWorldTravelRoute={clearWorldTravelRoute}
           onToggle={toggleGameMenu}
           onUnequipEquipment={unequipEquipment}
+          onMovePartyOrder={movePartyMemberOrder}
         />
         <CompanionVitalsPanel members={partyMembers} />
         <QuestTrackerPanel quest={displayQuest} />

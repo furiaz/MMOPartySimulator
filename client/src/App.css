@@ -1037,7 +1037,8 @@
   right: 16px;
   z-index: 13;
   display: grid;
-  width: min(620px, calc(100vw - 32px));
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(700px, calc(100vw - 32px));
   max-height: calc(100vh - 88px);
   overflow: hidden;
   border: 1px solid #3a5a60;
@@ -1055,6 +1056,12 @@
   border-bottom: 1px solid #3a5a60;
 }
 
+.game-menu-tabs button {
+  min-width: 0;
+  padding: 9px 8px;
+  overflow-wrap: anywhere;
+}
+
 .game-menu-tabs button.active {
   border-color: #7aa6ad;
   background: rgba(58, 90, 96, 0.54);
@@ -1062,7 +1069,10 @@
 }
 
 .game-menu-content {
-  overflow: auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
 }
 
@@ -1210,7 +1220,9 @@
 }
 
 .inventory-category-tabs button.active,
-.party-management-sections button.active {
+.party-management-sections button.active,
+.party-submenu-tabs button.active,
+.class-skill-tabs button.active {
   border-color: #7aa6ad;
   background: rgba(58, 90, 96, 0.62);
   color: #ffffff;
@@ -1229,6 +1241,7 @@
 .world-panel {
   display: grid;
   gap: 12px;
+  min-height: 0;
 }
 
 .party-menu-panel h2,
@@ -1292,6 +1305,12 @@
   gap: 8px;
 }
 
+.party-companion-list-horizontal {
+  grid-template-columns: repeat(5, minmax(96px, 1fr));
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
 .quest-list {
   display: grid;
   gap: 8px;
@@ -1312,6 +1331,10 @@
   background: rgba(26, 42, 47, 0.3);
   color: #e6f0f2;
   text-align: left;
+}
+
+.party-companion-list-horizontal .party-companion-card {
+  min-height: 108px;
 }
 
 .party-companion-card.selected {
@@ -1376,8 +1399,10 @@
 
 .party-selected-summary,
 .party-management-detail {
+  position: relative;
   display: grid;
   gap: 10px;
+  min-height: 0;
   padding: 12px;
 }
 
@@ -1433,7 +1458,8 @@
 
 .compact-stat-grid,
 .full-stat-grid,
-.equipment-slot-list {
+.equipment-slot-list,
+.base-stat-grid {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -1451,9 +1477,14 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.base-stat-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .compact-stat-grid div,
 .full-stat-grid div,
-.equipment-slot-list div {
+.equipment-slot-list div,
+.base-stat-grid div {
   min-width: 0;
   padding: 8px;
   border: 1px solid rgba(58, 90, 96, 0.78);
@@ -1462,7 +1493,8 @@
 
 .compact-stat-grid dt,
 .full-stat-grid dt,
-.equipment-slot-list dt {
+.equipment-slot-list dt,
+.base-stat-grid dt {
   color: rgba(230, 240, 242, 0.68);
   font-size: 10px;
   font-weight: 800;
@@ -1471,13 +1503,51 @@
 
 .compact-stat-grid dd,
 .full-stat-grid dd,
-.equipment-slot-list dd {
+.equipment-slot-list dd,
+.base-stat-grid dd {
   margin: 3px 0 0;
   overflow: hidden;
   font-size: 12px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.base-stat-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(122, 166, 173, 0.76);
+  background: rgba(9, 18, 21, 0.22);
+}
+
+.base-stat-grid div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.base-stat-grid dt {
+  grid-column: 1 / -1;
+}
+
+.base-stat-grid button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.available-stat-points {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(122, 166, 173, 0.76);
+  background: rgba(9, 18, 21, 0.22);
+  color: #f3df93;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .placeholder-box {
@@ -1578,12 +1648,19 @@
 }
 
 .party-shortcut-actions,
+.party-submenu-tabs,
+.class-skill-tabs,
 .party-management-sections,
 .role-select-grid,
 .equipment-equipped-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.party-submenu-tabs,
+.class-skill-tabs {
+  padding-bottom: 2px;
 }
 
 .equipment-allowed-types,
@@ -1597,6 +1674,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.party-equipment-section {
+  position: relative;
 }
 
 .equipment-slot-picker button {
@@ -1686,6 +1767,78 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.equipment-popover-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: 32px 16px 16px;
+  overflow-y: auto;
+  background: rgba(8, 13, 16, 0.36);
+}
+
+.equipment-popover {
+  display: grid;
+  width: min(430px, 100%);
+  max-height: min(440px, 62vh);
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #7aa6ad;
+  background: rgba(26, 42, 47, 0.96);
+  box-shadow: 0 18px 38px rgba(8, 13, 16, 0.36);
+}
+
+.equipment-popover-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.equipment-popover-header div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.equipment-popover-header strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.party-order-list {
+  display: grid;
+  gap: 8px;
+}
+
+.party-order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.24);
+  text-align: left;
+}
+
+.party-order-row.selected {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+  color: #ffffff;
+}
+
+.party-order-list span,
+.party-order-list strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .party-management-sections {
@@ -1913,11 +2066,17 @@ button {
   .menu-split-layout,
   .compact-stat-grid,
   .full-stat-grid,
+  .base-stat-grid,
   .equipment-slot-list,
   .equipment-slot-picker,
   .equipment-stat-summary,
+  .party-order-row,
   .inventory-item-action-panel {
     grid-template-columns: 1fr;
+  }
+
+  .party-companion-list-horizontal {
+    grid-template-columns: repeat(5, minmax(112px, 1fr));
   }
 }
 

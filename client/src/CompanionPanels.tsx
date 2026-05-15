@@ -10,20 +10,21 @@ import {
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
   getCharacterXpProgress,
-  getAllowedEquipmentTypeLabels,
   getCompanionEquipmentStatModifiers,
+  getCompanionActualStats,
+  getCompanionDerivedStats,
   getItemDefinition,
   getSkillRoleScore,
   getSkillsForClass,
   validateEquipmentItemForCompanion,
   type Companion,
   type EquipmentSlot,
-  type EquipmentType,
   type EquipmentStatModifiers,
   type ItemDefinition,
   type ItemId,
   type PartyInventory,
   type PartyMemberRole,
+  type PrimaryStatId,
   type SkillDefinition,
 } from "./game";
 
@@ -34,19 +35,19 @@ export type GameMenuTab =
   | "quests"
   | "world";
 
+export type PartyMenuSection =
+  | "stats"
+  | "equipment"
+  | "skills"
+  | "skillPreferences";
+
 export type PartyManagementSection =
   | "role"
-  | "equipment"
-  | "stats"
   | "partyOrder"
   | "formation"
-  | "skillPreferences"
   | "behaviorSettings";
 
-export type PartyShortcutTarget = Extract<
-  PartyManagementSection,
-  "stats" | "role" | "equipment"
->;
+export type PartyShortcutTarget = PartyMenuSection;
 
 const partyMemberRoleOptions: PartyMemberRole[] = [
   "none",
@@ -64,24 +65,48 @@ const partyMemberRoleLabels: Record<PartyMemberRole, string> = {
   none: "None / Unassigned",
 };
 
+const partyMenuSectionLabels: Record<PartyMenuSection, string> = {
+  stats: "Stats",
+  equipment: "Equipment",
+  skills: "Skills",
+  skillPreferences: "Skill Preferences",
+};
+
+const partyMenuSections: PartyMenuSection[] = [
+  "stats",
+  "equipment",
+  "skills",
+  "skillPreferences",
+];
+
 const partyManagementSectionLabels: Record<PartyManagementSection, string> = {
   role: "Role Select",
-  equipment: "Equipment",
-  stats: "Full Stats",
   partyOrder: "Party Order",
   formation: "Formation",
-  skillPreferences: "Skill Preferences",
   behaviorSettings: "Behavior Settings",
 };
 
 const partyManagementSections: PartyManagementSection[] = [
   "role",
-  "equipment",
-  "stats",
   "partyOrder",
   "formation",
-  "skillPreferences",
   "behaviorSettings",
+];
+
+const primaryStatLabels: Record<PrimaryStatId, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+};
+
+const primaryStatIds: PrimaryStatId[] = [
+  "strength",
+  "dexterity",
+  "constitution",
+  "intelligence",
+  "wisdom",
 ];
 
 function getCharacterXpText(member: Companion): string {
@@ -111,110 +136,111 @@ function getRoleAccentClass(role: PartyMemberRole): string {
 }
 
 export function PartyMenuPanel({
+  activeSection,
+  inventory,
   members,
   selectedCompanionId,
+  onEquipEquipment,
   onSelectCompanion,
-  onShortcut,
+  onSelectSection,
+  onUnequipEquipment,
 }: {
+  activeSection: PartyMenuSection;
+  inventory: PartyInventory;
   members: Companion[];
   selectedCompanionId: string | null;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
   onSelectCompanion: (companionId: string) => void;
-  onShortcut: (companionId: string, target: PartyShortcutTarget) => void;
+  onSelectSection: (section: PartyMenuSection) => void;
+  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
-  const [isSkillPanelOpen, setIsSkillPanelOpen] = useState(false);
   const orderedMembers = getOrderedMenuMembers(members);
   const selectedMember =
     orderedMembers.find((member) => member.id === selectedCompanionId) ?? null;
-  const selectedMemberSkills = selectedMember
-    ? getSkillsForClass(selectedMember.classId)
-    : [];
 
   return (
     <section className="party-menu-panel" aria-label="Party">
       <h2>Party</h2>
-      <div className="menu-split-layout">
-        <CompanionMenuList
-          members={orderedMembers}
-          selectedCompanionId={selectedCompanionId}
-          onSelectCompanion={onSelectCompanion}
-        />
-        <div className="party-selected-summary">
-          {selectedMember ? (
-            <>
-              <div className="menu-section-heading">
-                <span>{getCompanionLabel(selectedMember)} Overview</span>
-                <span
-                  className={`role-pill ${getRoleAccentClass(
-                    selectedMember.role,
-                  )}`}
-                >
-                  {partyMemberRoleLabels[selectedMember.role]}
-                </span>
-              </div>
-              <dl className="compact-stat-grid">
-                <div>
-                  <dt>HP</dt>
-                  <dd>
-                    {selectedMember.health}/{selectedMember.maxHealth}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Level</dt>
-                  <dd>{selectedMember.characterLevel}</dd>
-                </div>
-                <div>
-                  <dt>Class</dt>
-                  <dd>{CLASS_DEFINITIONS[selectedMember.classId].displayName}</dd>
-                </div>
-                <div>
-                  <dt>State</dt>
-                  <dd>{selectedMember.state}</dd>
-                </div>
-              </dl>
-              <div className="placeholder-box">
-                <span className="equipment-section-label">Equipped</span>
-                <EquipmentSlotList member={selectedMember} isCompact />
-              </div>
-              <div className="party-shortcut-actions">
-                <button
-                  onClick={() => onShortcut(selectedMember.id, "stats")}
-                  type="button"
-                >
-                  View Full Stats
-                </button>
-                <button
-                  onClick={() => onShortcut(selectedMember.id, "role")}
-                  type="button"
-                >
-                  Change Role
-                </button>
-                <button
-                  onClick={() => onShortcut(selectedMember.id, "equipment")}
-                  type="button"
-                >
-                  Manage Equipment
-                </button>
-                <button
-                  className={isSkillPanelOpen ? "active" : ""}
-                  onClick={() => setIsSkillPanelOpen((isOpen) => !isOpen)}
-                  type="button"
-                >
-                  Skills
-                </button>
-              </div>
-              {isSkillPanelOpen ? (
-                <CompanionSkillSummary
-                  member={selectedMember}
-                  skills={selectedMemberSkills}
-                />
-              ) : null}
-            </>
-          ) : (
-            <span className="party-menu-empty">Select a companion</span>
-          )}
-        </div>
+      <CompanionMenuList
+        layout="horizontal"
+        members={orderedMembers}
+        selectedCompanionId={selectedCompanionId}
+        onSelectCompanion={onSelectCompanion}
+      />
+      <nav className="party-submenu-tabs" aria-label="Party sections">
+        {partyMenuSections.map((section) => (
+          <button
+            key={section}
+            className={activeSection === section ? "active" : ""}
+            onClick={() => onSelectSection(section)}
+            type="button"
+          >
+            {partyMenuSectionLabels[section]}
+          </button>
+        ))}
+      </nav>
+      <div className="party-selected-summary">
+        {selectedMember ? (
+          <PartyMenuSectionPanel
+            activeSection={activeSection}
+            inventory={inventory}
+            member={selectedMember}
+            onEquipEquipment={onEquipEquipment}
+            onUnequipEquipment={onUnequipEquipment}
+          />
+        ) : (
+          <span className="party-menu-empty">Select a companion</span>
+        )}
       </div>
     </section>
+  );
+}
+
+function PartyMenuSectionPanel({
+  activeSection,
+  inventory,
+  member,
+  onEquipEquipment,
+  onUnequipEquipment,
+}: {
+  activeSection: PartyMenuSection;
+  inventory: PartyInventory;
+  member: Companion;
+  onEquipEquipment: (
+    companionId: string,
+    itemId: ItemId,
+    targetSlot: EquipmentSlot,
+  ) => void;
+  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+}) {
+  if (activeSection === "stats") {
+    return <StatsSection member={member} />;
+  }
+
+  if (activeSection === "equipment") {
+    return (
+      <PartyEquipmentSection
+        inventory={inventory}
+        member={member}
+        onEquipEquipment={onEquipEquipment}
+        onUnequipEquipment={onUnequipEquipment}
+      />
+    );
+  }
+
+  if (activeSection === "skills") {
+    return <PartySkillsSection member={member} />;
+  }
+
+  return (
+    <PlaceholderSection title="Skill Preferences">
+      Skill Preferences is a future-facing placeholder and does not change skill
+      behavior yet.
+    </PlaceholderSection>
   );
 }
 
@@ -320,16 +346,18 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 }
 
 function CompanionMenuList({
+  layout = "vertical",
   members,
   selectedCompanionId,
   onSelectCompanion,
 }: {
+  layout?: "vertical" | "horizontal";
   members: Companion[];
   selectedCompanionId: string | null;
   onSelectCompanion: (companionId: string) => void;
 }) {
   return (
-    <div className="party-companion-list">
+    <div className={`party-companion-list party-companion-list-${layout}`}>
       {members.length > 0 ? (
         members.map((member) => {
           const characterXpProgress = getCharacterXpProgress(member);
@@ -384,32 +412,24 @@ function CompanionMenuList({
 
 export function PartyManagementPanel({
   activeSection,
-  inventory,
   leaderId,
   members,
   selectedCompanionId,
   onChangeLeader,
   onChangeRole,
-  onEquipEquipment,
   onSelectCompanion,
   onSelectSection,
-  onUnequipEquipment,
+  onMovePartyOrder,
 }: {
   activeSection: PartyManagementSection;
-  inventory: PartyInventory;
   leaderId: string;
   members: Companion[];
   selectedCompanionId: string | null;
   onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
-  onEquipEquipment: (
-    companionId: string,
-    itemId: ItemId,
-    targetSlot: EquipmentSlot,
-  ) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectSection: (section: PartyManagementSection) => void;
-  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
   const orderedMembers = getOrderedMenuMembers(members);
   const selectedMember =
@@ -418,55 +438,41 @@ export function PartyManagementPanel({
   return (
     <section className="party-management-panel" aria-label="Party Management">
       <h2>Party Management</h2>
-      <div className="menu-split-layout">
+      <div className="party-management-detail">
+        <nav
+          className="party-management-sections"
+          aria-label="Party management sections"
+        >
+          {partyManagementSections.map((section) => (
+            <button
+              key={section}
+              className={activeSection === section ? "active" : ""}
+              onClick={() => onSelectSection(section)}
+              type="button"
+            >
+              {partyManagementSectionLabels[section]}
+            </button>
+          ))}
+        </nav>
         <CompanionMenuList
+          layout="horizontal"
           members={orderedMembers}
           selectedCompanionId={selectedCompanionId}
           onSelectCompanion={onSelectCompanion}
         />
-        <div className="party-management-detail">
-          {selectedMember ? (
-            <>
-              <div className="menu-section-heading">
-                <span className="party-management-heading-title">
-                  {getCompanionLabel(selectedMember)} |{" "}
-                  {partyMemberRoleLabels[selectedMember.role]}
-                </span>
-                <LeadershipHeaderAction
-                  leaderId={leaderId}
-                  member={selectedMember}
-                  onChangeLeader={onChangeLeader}
-                />
-              </div>
-              <nav
-                className="party-management-sections"
-                aria-label="Party management sections"
-              >
-                {partyManagementSections.map((section) => (
-                  <button
-                    key={section}
-                    className={activeSection === section ? "active" : ""}
-                    onClick={() => onSelectSection(section)}
-                    type="button"
-                  >
-                    {partyManagementSectionLabels[section]}
-                  </button>
-                ))}
-              </nav>
-              <PartyManagementSectionPanel
-                activeSection={activeSection}
-                inventory={inventory}
-                leaderId={leaderId}
-                member={selectedMember}
-                onChangeRole={onChangeRole}
-                onEquipEquipment={onEquipEquipment}
-                onUnequipEquipment={onUnequipEquipment}
-              />
-            </>
-          ) : (
-            <span className="party-menu-empty">No companion selected</span>
-          )}
-        </div>
+        {selectedMember ? (
+          <PartyManagementSectionPanel
+            activeSection={activeSection}
+            leaderId={leaderId}
+            member={selectedMember}
+            members={orderedMembers}
+            onChangeLeader={onChangeLeader}
+            onChangeRole={onChangeRole}
+            onMovePartyOrder={onMovePartyOrder}
+          />
+        ) : (
+          <span className="party-menu-empty">No companion selected</span>
+        )}
       </div>
     </section>
   );
@@ -510,42 +516,35 @@ function LeadershipHeaderAction({
 
 function PartyManagementSectionPanel({
   activeSection,
-  inventory,
   leaderId,
   member,
+  members,
+  onChangeLeader,
   onChangeRole,
-  onEquipEquipment,
-  onUnequipEquipment,
+  onMovePartyOrder,
 }: {
   activeSection: PartyManagementSection;
-  inventory: PartyInventory;
   leaderId: string;
   member: Companion;
+  members: Companion[];
+  onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
-  onEquipEquipment: (
-    companionId: string,
-    itemId: ItemId,
-    targetSlot: EquipmentSlot,
-  ) => void;
-  onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
   if (activeSection === "role") {
     return <RoleSelectSection member={member} onChangeRole={onChangeRole} />;
   }
 
-  if (activeSection === "equipment") {
+  if (activeSection === "partyOrder") {
     return (
-      <EquipmentManagementSection
-        inventory={inventory}
+      <PartyOrderSection
+        leaderId={leaderId}
         member={member}
-        onEquipEquipment={onEquipEquipment}
-        onUnequipEquipment={onUnequipEquipment}
+        members={members}
+        onChangeLeader={onChangeLeader}
+        onMovePartyOrder={onMovePartyOrder}
       />
     );
-  }
-
-  if (activeSection === "stats") {
-    return <FullStatsSection leaderId={leaderId} member={member} />;
   }
 
   return (
@@ -556,35 +555,7 @@ function PartyManagementSectionPanel({
   );
 }
 
-function EquipmentSlotList({
-  isCompact = false,
-  member,
-}: {
-  isCompact?: boolean;
-  member: Companion;
-}) {
-  const visibleSlots = isCompact
-    ? (["mainHand", "offhand", "head", "chest"] as EquipmentSlot[])
-    : EQUIPMENT_SLOTS;
-
-  return (
-    <dl className="equipment-slot-list">
-      {visibleSlots.map((slot) => {
-        const itemId = member.equipment[slot];
-        const itemDefinition = itemId ? getItemDefinition(itemId) : null;
-
-        return (
-          <div key={slot}>
-            <dt>{EQUIPMENT_SLOT_LABELS[slot]}</dt>
-            <dd>{itemDefinition?.displayName ?? "None"}</dd>
-          </div>
-        );
-      })}
-    </dl>
-  );
-}
-
-function EquipmentManagementSection({
+function PartyEquipmentSection({
   inventory,
   member,
   onEquipEquipment,
@@ -600,23 +571,23 @@ function EquipmentManagementSection({
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
   const [selectedEquipmentSlot, setSelectedEquipmentSlot] =
-    useState<EquipmentSlot>("mainHand");
-  const allowedEquipmentTypes = getAllowedEquipmentTypeLabels(member.classId);
+    useState<EquipmentSlot | null>(null);
+  const selectedSlot = selectedEquipmentSlot ?? "mainHand";
   const usableEquipmentSlots = inventory.slots.filter((slot) =>
     canShowInventoryItemForSlot(
       member,
       getItemDefinition(slot.itemId),
-      selectedEquipmentSlot,
+      selectedSlot,
     )
   );
   const statModifiers = getCompanionEquipmentStatModifiers(member);
-  const selectedItemId = member.equipment[selectedEquipmentSlot];
+  const selectedItemId = member.equipment[selectedSlot];
   const selectedItemDefinition = selectedItemId
     ? getItemDefinition(selectedItemId)
     : null;
 
   return (
-    <section className="management-section-card" aria-label="Equipment">
+    <section className="management-section-card party-equipment-section" aria-label="Equipment">
       <h3>Equipment</h3>
       <span className="equipment-section-label">Equipped Slots</span>
       <div className="equipment-slot-picker">
@@ -648,56 +619,68 @@ function EquipmentManagementSection({
           );
         })}
       </div>
-      <span className="equipment-section-label">Class Allowed Types</span>
-      <div className="equipment-allowed-types">
-        <span>
-          Allowed Main Hand: {formatEquipmentTypes(allowedEquipmentTypes.mainHand)}
-        </span>
-        <span>
-          Allowed Offhand: {formatEquipmentTypes(allowedEquipmentTypes.offhand)}
-        </span>
-      </div>
-      <span className="equipment-section-label">
-        Available for {EQUIPMENT_SLOT_LABELS[selectedEquipmentSlot]}
-      </span>
-      <div className="equipment-inventory-list">
-        {usableEquipmentSlots.length > 0 ? (
-          usableEquipmentSlots.map((slot, index) => {
-            const itemDefinition = getItemDefinition(slot.itemId);
-
-            return (
-              <EquipmentInventoryRow
-                key={`${slot.itemId}-${index}`}
-                itemDefinition={itemDefinition}
-                itemId={slot.itemId}
-                member={member}
-                onEquipEquipment={onEquipEquipment}
-                targetSlot={selectedEquipmentSlot}
-              />
-            );
-          })
-        ) : (
-          <span className="party-menu-empty">
-            No usable inventory items for this slot
-          </span>
-        )}
-      </div>
       <StatModifierSummary statModifiers={statModifiers} />
-      <span className="equipment-section-label">Unequip</span>
-      <div className="equipment-equipped-actions">
-        {selectedItemDefinition ? (
-          <button
-            onClick={() => onUnequipEquipment(member.id, selectedEquipmentSlot)}
-            type="button"
-          >
-            Unequip {selectedItemDefinition.displayName}
-          </button>
-        ) : (
-          <span className="party-menu-empty">
-            {EQUIPMENT_SLOT_LABELS[selectedEquipmentSlot]} is empty
-          </span>
-        )}
-      </div>
+      {selectedEquipmentSlot ? (
+        <div className="equipment-popover-backdrop" role="presentation">
+          <aside className="equipment-popover" aria-label="Equipment slot options">
+            <div className="equipment-popover-header">
+              <div>
+                <span className="equipment-section-label">
+                  Equip {EQUIPMENT_SLOT_LABELS[selectedEquipmentSlot]}
+                </span>
+                <strong>
+                  {selectedItemDefinition?.displayName ?? "Empty Slot"}
+                </strong>
+              </div>
+              <button onClick={() => setSelectedEquipmentSlot(null)} type="button">
+                Close
+              </button>
+            </div>
+            <div className="equipment-inventory-list">
+              {usableEquipmentSlots.length > 0 ? (
+                usableEquipmentSlots.map((slot, index) => {
+                  const itemDefinition = getItemDefinition(slot.itemId);
+
+                  return (
+                    <EquipmentInventoryRow
+                      key={`${slot.itemId}-${index}`}
+                      itemDefinition={itemDefinition}
+                      itemId={slot.itemId}
+                      member={member}
+                      onEquipEquipment={(companionId, itemId, targetSlot) => {
+                        onEquipEquipment(companionId, itemId, targetSlot);
+                        setSelectedEquipmentSlot(null);
+                      }}
+                      targetSlot={selectedEquipmentSlot}
+                    />
+                  );
+                })
+              ) : (
+                <span className="party-menu-empty">
+                  No usable inventory items for this slot
+                </span>
+              )}
+            </div>
+            <div className="equipment-equipped-actions">
+              {selectedItemDefinition ? (
+                <button
+                  onClick={() => {
+                    onUnequipEquipment(member.id, selectedEquipmentSlot);
+                    setSelectedEquipmentSlot(null);
+                  }}
+                  type="button"
+                >
+                  Unequip {selectedItemDefinition.displayName}
+                </button>
+              ) : (
+                <span className="party-menu-empty">
+                  {EQUIPMENT_SLOT_LABELS[selectedEquipmentSlot]} is empty
+                </span>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -820,12 +803,6 @@ function getEquipmentValidityText(
   return result.ok ? "Valid" : `Invalid: ${formatReason(result.reason)}`;
 }
 
-function formatEquipmentTypes(equipmentTypes: EquipmentType[]): string {
-  return equipmentTypes.length > 0
-    ? equipmentTypes.map((type) => EQUIPMENT_TYPE_LABELS[type]).join(", ")
-    : "None";
-}
-
 function formatReason(reason: string): string {
   return reason.split("_").join(" ");
 }
@@ -863,23 +840,93 @@ function RoleSelectSection({
   );
 }
 
-function FullStatsSection({
+function PartyOrderSection({
   leaderId,
   member,
+  members,
+  onChangeLeader,
+  onMovePartyOrder,
 }: {
   leaderId: string;
   member: Companion;
+  members: Companion[];
+  onChangeLeader: (companionId: string) => void;
+  onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
+  const selectedIndex = members.findIndex((candidate) => candidate.id === member.id);
+
   return (
-    <section className="management-section-card" aria-label="Full Stats">
-      <h3>Full Stats</h3>
+    <section className="management-section-card" aria-label="Party Order">
+      <h3>Party Order</h3>
+      <div className="party-order-list">
+        {members.map((candidate, index) => (
+          <div
+            key={candidate.id}
+            className={`party-order-row${
+              candidate.id === member.id ? " selected" : ""
+            }`}
+          >
+            <span>
+              {index + 1}. {getCompanionLabel(candidate)}
+            </span>
+            <span>{partyMemberRoleLabels[candidate.role]}</span>
+            {candidate.id === leaderId ? <strong>Leader</strong> : null}
+          </div>
+        ))}
+      </div>
+      <div className="equipment-equipped-actions">
+        <button
+          disabled={selectedIndex <= 0}
+          onClick={() => onMovePartyOrder(member.id, "up")}
+          type="button"
+        >
+          Move Up
+        </button>
+        <button
+          disabled={selectedIndex < 0 || selectedIndex >= members.length - 1}
+          onClick={() => onMovePartyOrder(member.id, "down")}
+          type="button"
+        >
+          Move Down
+        </button>
+        <LeadershipHeaderAction
+          leaderId={leaderId}
+          member={member}
+          onChangeLeader={onChangeLeader}
+        />
+      </div>
+    </section>
+  );
+}
+
+function StatsSection({ member }: { member: Companion }) {
+  const actualStats = getCompanionActualStats(member);
+  const derivedStats = getCompanionDerivedStats(member);
+
+  return (
+    <section className="management-section-card" aria-label="Stats">
+      <div className="menu-section-heading">
+        <h3>Stats</h3>
+        <span className="available-stat-points">
+          Available Stat Points: {member.unspentStatPoints}
+        </span>
+      </div>
+      <div className="base-stat-panel">
+        <span className="equipment-section-label">Base Stats</span>
+        <dl className="base-stat-grid">
+          {primaryStatIds.map((statId) => (
+            <div key={statId}>
+              <dt>{primaryStatLabels[statId]}</dt>
+              <dd>{actualStats[statId]}</dd>
+              <button disabled title="Stat allocation is not implemented yet" type="button">
+                +
+              </button>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <span className="equipment-section-label">Progression</span>
       <dl className="full-stat-grid">
-        <div>
-          <dt>HP</dt>
-          <dd>
-            {member.health}/{member.maxHealth}
-          </dd>
-        </div>
         <div>
           <dt>Level</dt>
           <dd>{member.characterLevel}</dd>
@@ -901,22 +948,64 @@ function FullStatsSection({
           <dd>{member.state}</dd>
         </div>
         <div>
-          <dt>Command</dt>
-          <dd>{member.commandPriority}</dd>
+          <dt>Party Order</dt>
+          <dd>{member.partyOrder}</dd>
+        </div>
+      </dl>
+      <span className="equipment-section-label">Derived Stats</span>
+      <dl className="full-stat-grid">
+        <div>
+          <dt>Health</dt>
+          <dd>
+            {member.health}/{derivedStats.maxHealth}
+          </dd>
+        </div>
+        <div>
+          <dt>Attack</dt>
+          <dd>{derivedStats.attack}</dd>
+        </div>
+        <div>
+          <dt>Defense</dt>
+          <dd>{derivedStats.defense}</dd>
+        </div>
+        <div>
+          <dt>Block</dt>
+          <dd>{derivedStats.block}</dd>
+        </div>
+        <div>
+          <dt>Evasion</dt>
+          <dd>{derivedStats.evasion}</dd>
+        </div>
+        <div>
+          <dt>Magic Power</dt>
+          <dd>{derivedStats.magicPower}</dd>
+        </div>
+        <div>
+          <dt>Healing Power</dt>
+          <dd>{derivedStats.healingPower}</dd>
         </div>
         <div>
           <dt>Gather Speed</dt>
           <dd>{member.gatherSpeed}</dd>
         </div>
-        <div>
-          <dt>Party Order</dt>
-          <dd>{member.partyOrder}</dd>
-        </div>
-        <div>
-          <dt>Leader</dt>
-          <dd>{leaderId === member.id ? "yes" : "no"}</dd>
-        </div>
       </dl>
+    </section>
+  );
+}
+
+function PartySkillsSection({ member }: { member: Companion }) {
+  const classDefinition = CLASS_DEFINITIONS[member.classId];
+  const skills = getSkillsForClass(member.classId);
+
+  return (
+    <section className="management-section-card" aria-label="Skills">
+      <h3>Skills</h3>
+      <nav className="class-skill-tabs" aria-label="Class skills">
+        <button className="active" type="button">
+          {classDefinition.displayName}
+        </button>
+      </nav>
+      <CompanionSkillSummary member={member} skills={skills} />
     </section>
   );
 }
