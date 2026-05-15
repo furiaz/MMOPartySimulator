@@ -332,7 +332,12 @@ Current basic party attacks are mostly melee.
 
 Prototype combat also supports numeric skill ranges and enemy attack ranges. Some prototype enemy archetypes may attack from range.
 
+Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, and passive health regeneration.
+
+Derived stat combat integration should remain simple and readable. It should not become a final balance model, advanced threat model, or production combat formula system unless explicitly requested.
+
 Combat positioning should continue to support future ranged classes without treating the current prototype ranged enemy behavior as the final ranged combat system.
+
 
 Early-game enemies may be passive by default and only fight back after being attacked.
 
@@ -692,45 +697,59 @@ The player is the party manager, not a physical character. Menus should support 
 
 ### Party Menu
 
-The Party menu is for quick inspection and overview.
+The Party menu is for companion-focused inspection and companion-specific management.
 
 It may show:
 
 - current companions in the party
-- selected companion summary
-- basic stats preview
-- current role preview
-- equipment preview, if equipment data exists
+- a selected companion summary
+- companion Stats
+- companion Equipment
+- companion Skills
+- companion Skill Preferences
 
-The Party menu is not the primary place for role decisions, equipment decisions, class decisions, party order changes, or advanced management.
+The Party menu may use a persistent companion selector so the player can switch companions while staying inside companion-focused sections.
 
-To reduce unnecessary backtracking, the Party menu may provide contextual shortcuts for the selected companion:
+Current Party sections:
 
-- View Full Stats
-- Change Role
-- Manage Equipment
+- Stats
+- Equipment
+- Skills
+- Skill Preferences
 
-Shortcut intent:
+Stats may show:
 
-- View Full Stats opens the full stats view for the selected companion
-- Change Role opens Party Management for the selected companion with Role Select visible
-- Manage Equipment opens Party Management for the selected companion with Equipment visible
+- available stat points
+- Strength
+- Dexterity
+- Constitution
+- Intelligence
+- Wisdom
+- level and XP progression
+- derived combat stats from current prototype stat helpers
 
-If the target system does not exist yet, the shortcut may open a placeholder section only.
+Stat allocation controls may appear in the Party Stats UI only when backed by game-logic commands. If allocation is not supported for the current state, controls must be disabled or read-only.
+
+Equipment may show companion equipment slots and valid equipment choices from the shared party inventory. Equipment rules must remain in game logic.
+
+Skills may show the selected companion's current class skills. Current class tabs may show only the companion's current class until class-history or multi-class progression data exists.
+
+Skill Preferences may appear as a placeholder only until a supported skill-preference system exists.
+
+The Party menu is not the primary place for whole-party decisions such as role assignment, party order, formation, or behavior settings.
 
 ### Party Management Menu
 
-The Party Management menu is for companion decisions and management.
+The Party Management menu is for party-wide decisions and management.
 
 It may show:
 
-- companion list
-- selected companion management options
 - current leader status
 - leadership switch action for living eligible companions
 - Role Select
-- Equipment
-- Full Stats
+- Party Order
+- Formation
+- Behavior Settings
 
 Leadership switching changes the current leader identity only. It does not change role, class, party order, equipment, or party behavior rules.
 
@@ -744,14 +763,12 @@ Role Select must use the existing party role values:
 
 Role changes affect role priority behavior. Leader identity remains separate from role.
 
-Future-facing sections may appear as placeholders only:
+Party Order may support ordering companions for party behavior and display.
 
-- Party Order
-- Formation
-- Skill Preferences
-- Behavior Settings
+Formation and Behavior Settings may appear as placeholders only until those systems are explicitly implemented.
 
-Placeholder sections must not implement future systems unless explicitly requested.
+Party Management should not own companion-specific Stats, Equipment, Skills, or Skill Preferences unless explicitly redesigned later.
+
 
 ### Inventory Menu
 
@@ -764,7 +781,6 @@ It may show:
 - item categories already supported by the current prototype inventory
 - basic item details on hover or selection
 - equipment item details such as slot, type, and simple stat modifiers
-- a shortcut from an equipment item to Party Management Equipment
 
 The Inventory menu may display the shared wallet balance, but must not implement the full inventory, equipment economy, full wallet UI, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
 
@@ -900,6 +916,10 @@ Current leveling rules:
 - max-level party members do not gain XP
 - XP can be reduced when the enemy is much lower level than the party member
 - level-ups may occur immediately when enough XP is gained
+- level-ups may increase natural primary stats through prototype class growth
+- level-ups may grant unspent stat points after base class progression begins
+- player-assigned stat points are stored as companion stat data, not UI-only state
+
 
 Current max level:
 
@@ -914,6 +934,60 @@ Current XP intent:
 - lower-level enemies should become less valuable as party members outlevel them
 
 Leveling should remain simple and readable during the prototype phase.
+
+### Prototype Companion Stats
+
+Current primary stats:
+
+- Strength
+- Dexterity
+- Constitution
+- Intelligence
+- Wisdom
+
+Primary stats are prototype progression data for companions.
+
+Current prototype stat sources may include:
+
+- natural stats from starting values and level-up growth
+- allocated stats from player-assigned stat points
+- temporary stat modifiers from prototype effects
+- equipment stat modifiers from equipped items
+
+Current derived combat stats may include:
+
+- Attack
+- Defense
+- Max HP
+- Evasion
+- Block
+- Magic Power
+- Healing Power
+- Magic Defense
+- Accuracy
+- Critical Chance
+- Critical Damage
+- Health Regen
+
+Derived combat stats are calculated from primary stats and equipment modifiers. They are the current prototype path for making class growth, allocation, and equipment matter in combat.
+
+Beginner growth is broad and simple.
+
+Base class growth should express class identity using small automatic stat increases:
+
+- Blade emphasizes Strength and Dexterity
+- Aegis emphasizes Constitution and frontline durability
+- Hunter emphasizes Dexterity
+- Beast emphasizes Strength and Constitution
+- Elementalist emphasizes Intelligence
+- Runecaster emphasizes Intelligence and Wisdom
+- Lightbearer emphasizes Wisdom
+- Penitent emphasizes Constitution and Wisdom
+
+Current stat allocation is prototype-only and should stay simple.
+
+Do not implement final balance curves, respec systems, advanced formulas, secondary class stat history, or permanent build-locking rules unless explicitly requested.
+
 
 ---
 

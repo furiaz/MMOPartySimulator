@@ -225,6 +225,30 @@ export function debugRestorePartyHealth(state: GameState): GameState {
   return nextState;
 }
 
+export function debugKillOneCompanion(state: GameState): GameState {
+  const companion = Object.values(state.entities)
+    .filter(
+      (entity): entity is Companion =>
+        entity.kind === "companion" &&
+        entity.state !== "dead" &&
+        entity.health > 0,
+    )
+    .sort((first, second) => first.partyOrder - second.partyOrder)[0];
+
+  if (!companion) {
+    return state;
+  }
+
+  return updateEntity(state, {
+    ...companion,
+    state: "dead",
+    health: 0,
+    currentTargetId: null,
+    defendPosition: null,
+    commandPriority: "autonomous",
+  });
+}
+
 export function debugAddTestWoodToInventory(state: GameState): GameState {
   return addItemToInventoryState(
     state,

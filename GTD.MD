@@ -38,6 +38,7 @@ Current files include:
 - `attackSystem.ts`
 - `classes.ts`
 - `commands.ts`
+- `combatResolver.ts`
 - `companionCombat.ts`
 - `debugMap.ts`
 - `debugTelemetry.ts`
@@ -58,6 +59,7 @@ Current files include:
 - `gameLoop.ts`
 - `gatherSystem.ts`
 - `healingFountainSystem.ts`
+- `healthSystem.ts`
 - `index.ts`
 - `inventory.ts`
 - `items.ts`
@@ -84,6 +86,7 @@ Current files include:
 - `skillTargeting.ts`
 - `skills.ts`
 - `state.ts`
+- `stats.ts`
 - `targetSelection.ts`
 - `testState.ts`
 - `teleportSystem.ts`
@@ -163,6 +166,9 @@ Party members currently support:
 - `characterLevel`
 - `characterXp`
 - `lastCharacterXpGained`
+- `naturalStats`
+- `allocatedStats`
+- `unspentStatPoints`
 - `role`
 - `partyOrder`
 - `followTargetId`
@@ -496,6 +502,111 @@ Do not expand this into a full ability framework unless explicitly requested.
 
 Do not add mana, casting, advanced targeting, equipment requirements, complex cooldown systems, skill trees, hotbars, or player-triggered active skill input unless explicitly requested.
 
+## Prototype Companion Stats
+
+Prototype companion stats are implemented in `stats.ts`.
+
+Current primary stat ids are:
+
+```ts
+type PrimaryStatId =
+  | "strength"
+  | "dexterity"
+  | "constitution"
+  | "intelligence"
+  | "wisdom";
+```
+
+Companions store:
+
+```ts
+naturalStats: CompanionPrimaryStats;
+allocatedStats: CompanionPrimaryStats;
+unspentStatPoints: number;
+```
+
+Current derived stat shape is:
+
+```ts
+type CompanionDerivedStats = {
+  attack: number;
+  defense: number;
+  maxHealth: number;
+  evasion: number;
+  block: number;
+  magicPower: number;
+  healingPower: number;
+  magicDefense: number;
+  accuracy: number;
+  criticalChance: number;
+  criticalDamage: number;
+  healthRegen: number;
+};
+```
+
+Current stat constants include:
+
+- `MINIMUM_ACTUAL_PRIMARY_STAT = 1`
+- `STARTING_PRIMARY_STAT_VALUE = 1`
+- `BEGINNER_STAT_GROWTH_PER_LEVEL`
+- `BASE_CLASS_AUTOMATIC_STAT_POINTS_PER_LEVEL = 5`
+- `PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK = 2`
+- `MAX_ALLOCATED_PRIMARY_STAT_POINTS_PER_STAT = 99`
+
+Current stat helpers include:
+
+- `createDefaultNaturalCompanionStats`
+- `createEmptyAllocatedCompanionStats`
+- `getCompanionActualStats`
+- `getCompanionDerivedStats`
+- `applyCompanionLevelUpStatGrowth`
+- `allocateCompanionStatPoint`
+- `syncCompanionDerivedMaxHealth`
+
+Natural stats represent starting and automatic level-up growth.
+
+Allocated stats represent player-assigned stat points.
+
+Unspent stat points represent available allocation points.
+
+Equipment stat modifiers are reused by derived stat calculation and remain flat prototype modifiers.
+
+Derived max health is synchronized onto companions when relevant state changes occur.
+
+Stat allocation is game logic, not React-only state. React may call supported allocation helpers and display allocation results, but must not define stat formulas.
+
+Do not add final balance formulas, respec systems, advanced scaling, secondary class history, or backend persistence unless explicitly requested.
+
+
+
+## Combat Resolution
+
+Prototype combat resolution uses shared game-logic helpers.
+
+Combat-facing companion values should route through `getCompanionDerivedStats` where supported.
+
+Current derived stat combat behavior may include:
+
+- physical damage using Attack
+- magic damage using Magic Power
+- healing using Healing Power
+- damage mitigation using Defense or Magic Defense
+- hit checks using Accuracy and Evasion
+- active shield block support
+- passive block support
+- critical hit chance and critical damage
+- derived max health
+- passive health regeneration
+
+`combatResolver.ts` owns shared combat resolution helpers for attacks, mitigation, evasion, block, critical hits, minimum damage, healing calculations, and combat telemetry.
+
+`healthSystem.ts` owns derived max-health synchronization and passive companion health regeneration.
+
+Auto attacks, defender attacks, prototype damage skills, splash damage, magic damage, healing skills, fountain healing, debug health restore, and UI health displays should use derived stat data where that behavior is implemented.
+
+Combat formulas are prototype rules. They should stay simple and centralized in game logic.
+
+React must not define combat formulas, stat formulas, hit rules, block rules, crit rules, healing rules, or regeneration rules.
 
 ---
 
@@ -1535,23 +1646,28 @@ React may:
 - read current game state
 - track selected menu state
 - track selected companion UI state
-- track selected management section UI state
+- track selected Party section UI state
+- track selected Party Management section UI state
 - track selected quest UI state
 - track selected World Travel destination UI state
 - render UI-facing enemy and NPC name labels
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
+- call existing stat allocation helpers for supported stat allocation actions
+- call existing equipment helpers for supported equipment actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
 - display placeholder sections for future systems
+
 
 React must not:
 
 - define core simulation behavior
 - duplicate role logic
 - invent new role values
-- define equipment rules, skills, formation, behavior settings, quest rules, POI selection rules, teleport rules, merchant rules, wallet rules, or advanced inventory rules inside React components
+- define stat formulas, derived combat formulas, equipment rules, skills, formation, behavior settings, quest rules, POI selection rules, teleport rules, merchant rules, wallet rules, or advanced inventory rules inside React components
 - implement equipment UI beyond displaying game state and issuing commands to existing game logic unless explicitly requested
 - implement final zone routing, map discovery, travel costs, or production world-map behavior inside React components
+
 
 Current intended main menu views:
 
@@ -1561,17 +1677,23 @@ Current intended main menu views:
 - Quests
 - World Travel
 
+Current intended Party sections and controls:
+
+- companion selector
+- Stats
+- Equipment
+- Skills
+- Skill Preferences placeholder
+
 Current intended Party Management sections and controls:
 
 - current leader status
 - leadership switch action for living eligible companions
 - Role Select
-- Equipment
-- Full Stats
-- Party Order placeholder
+- Party Order
 - Formation placeholder
-- Skill Preferences placeholder
 - Behavior Settings placeholder
+
 
 Role Select must use the existing `PartyMemberRole` values:
 

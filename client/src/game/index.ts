@@ -82,6 +82,8 @@ export type {
   SkillVisualEvent,
   SkillVisualType,
   DropVisualEvent,
+  WorldWipeRecoveryChoice,
+  WorldWipeRecoveryState,
   WeaponType,
 } from "./types";
 export type {
@@ -222,6 +224,15 @@ export {
   removeCurrencyFromWalletState,
   setCurrencyBalanceForDebug,
 } from "./wallet";
+export {
+  DEFAULT_RESCUE_HUBS,
+  WORLD_WIPE_RESCUE_OVERLAY_DURATION_MS,
+  getWorldWipeRecoveryChoices,
+  resolveWorldWipeRecoveryChoice,
+  updateWorldWipeRecovery,
+  type RescueHubDefinition,
+  type WorldWipeRecoveryOptions,
+} from "./worldWipeRecovery";
 export {
   getQuickExchangeItemDefinitions,
   getQuickExchangeItems,
@@ -375,6 +386,7 @@ export {
   debugAddPrototypeEquipmentToInventory,
   debugAddTestCrowns,
   debugAddTestWoodToInventory,
+  debugKillOneCompanion,
   debugRefreshResources,
   debugRandomizeLocations,
   debugRemoveCompanion,

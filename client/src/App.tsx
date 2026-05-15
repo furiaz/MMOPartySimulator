@@ -45,6 +45,7 @@ import {
   createNpc,
   clearDebugTelemetry,
   debugAddCompanionToParty,
+  debugKillOneCompanion,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
   debugResurrectEnemy,
@@ -75,6 +76,7 @@ import {
   recordMerchantInteractionOpened,
   recordMerchantMenuSelected,
   resourceIds,
+  resolveWorldWipeRecoveryChoice,
   setAutoModeEnabled,
   setLeaderIntent,
   setPartyLeader,
@@ -106,6 +108,7 @@ import {
   type QuestId,
   type ResourceEntity,
   type SkillVisualEvent,
+  type WorldWipeRecoveryChoice,
 } from "./game";
 import {
   getEntityVisualAsset,
@@ -747,6 +750,25 @@ function AttackCooldownIndicator({
   );
 }
 
+function RescueChoiceButton({
+  choice,
+  onChoose,
+}: {
+  choice: WorldWipeRecoveryChoice;
+  onChoose: (hubId: string) => void;
+}) {
+  return (
+    <button onClick={() => onChoose(choice.hubId)} type="button">
+      <span>{choice.hubDisplayName}</span>
+      <strong>{formatCurrencyAmount(choice.fee)} Crowns</strong>
+    </button>
+  );
+}
+
+function formatCurrencyAmount(amount: number): string {
+  return Math.max(0, Math.floor(amount)).toLocaleString();
+}
+
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
@@ -881,6 +903,15 @@ function App() {
       : null;
   const shouldShowWalletToast =
     !activeMerchant && (gameState.wallet.visibleUntil ?? 0) > currentTime;
+  const pendingWorldWipeRecovery =
+    gameState.worldWipeRecovery?.status === "pending_choice"
+      ? gameState.worldWipeRecovery
+      : null;
+  const activeWorldWipeRescue =
+    gameState.worldWipeRecovery?.status === "rescued" &&
+    gameState.worldWipeRecovery.expiresAt > currentTime
+      ? gameState.worldWipeRecovery
+      : null;
 
   useEffect(() => {
     let animationFrameId = 0;
@@ -1105,6 +1136,10 @@ function App() {
     setGameState(debugRestorePartyHealth);
   }
 
+  function killOneCompanion() {
+    setGameState(debugKillOneCompanion);
+  }
+
   function equipEquipment(
     companionId: string,
     itemId: ItemId,
@@ -1276,6 +1311,12 @@ function App() {
 
       return recordMerchantInteractionClosed(selectedState, merchantNpcId);
     });
+  }
+
+  function chooseWorldWipeRecoveryHub(hubId: string) {
+    setGameState((state) =>
+      resolveWorldWipeRecoveryChoice(state, hubId, Date.now()),
+    );
   }
 
   function toggleGameMenu() {
@@ -2281,6 +2322,38 @@ function App() {
           </div>
         ) : null}
 
+        {pendingWorldWipeRecovery ? (
+          <section className="rescue-overlay" aria-label="Choose rescue hub">
+            <div className="rescue-panel">
+              <p className="rescue-kicker">Rescue needed</p>
+              <h2>Choose a rescue hub</h2>
+              <div className="rescue-choice-list">
+                {pendingWorldWipeRecovery.choices.map((choice) => (
+                  <RescueChoiceButton
+                    key={choice.hubId}
+                    choice={choice}
+                    onChoose={chooseWorldWipeRecoveryHub}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeWorldWipeRescue ? (
+          <section className="rescue-overlay" aria-label="Party rescued">
+            <div className="rescue-panel rescue-panel-compact">
+              <p className="rescue-kicker">
+                {activeWorldWipeRescue.selectedChoice.rescueActorName}
+              </p>
+              <h2>{activeWorldWipeRescue.selectedChoice.rescueLine}</h2>
+              <p>
+                Rescue fee: {formatCurrencyAmount(activeWorldWipeRescue.chargedFee)} Crowns
+              </p>
+            </div>
+          </section>
+        ) : null}
+
         <GameMenu
           activeTab={activeGameMenuTab}
           activeManagementSection={activePartyManagementSection}
@@ -2355,6 +2428,7 @@ function App() {
                 </button>
                 <button onClick={resurrectEnemy}>Resurrect Enemy</button>
                 <button onClick={restorePartyHealth}>Restore Party HP</button>
+                <button onClick={killOneCompanion}>Kill One Companion</button>
                 <button onClick={refreshGatherPoints}>
                   Refresh Gather Points
                 </button>

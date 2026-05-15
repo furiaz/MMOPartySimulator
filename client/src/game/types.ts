@@ -338,6 +338,7 @@ export type CurrencyMutationSource =
   | "quest_reward"
   | "merchant"
   | "chest"
+  | "world_wipe_recovery"
   | "unknown";
 
 export type CurrencyMutationStatus =
@@ -567,6 +568,36 @@ export type DropVisualEvent = {
   tableId: string;
   dropChance: number;
 };
+
+export type WorldWipeRecoveryChoice = {
+  hubId: string;
+  hubDisplayName: string;
+  mapId: DebugMapId;
+  rescueActorId: string;
+  rescueActorName: string;
+  rescueLine: string;
+  hopDistance: number;
+  fee: number;
+  arrivalPositions: Position[];
+};
+
+export type WorldWipeRecoveryState =
+  | {
+      status: "pending_choice";
+      wipeId: string;
+      sourceMapId: DebugMapId;
+      choices: WorldWipeRecoveryChoice[];
+    }
+  | {
+      status: "rescued";
+      wipeId: string;
+      sourceMapId: DebugMapId;
+      selectedChoice: WorldWipeRecoveryChoice;
+      chargedFee: number;
+      previousCrowns: number;
+      createdAt: number;
+      expiresAt: number;
+    };
 
 export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 

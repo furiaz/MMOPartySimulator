@@ -26,6 +26,7 @@ import {
   updateTeleportSystem,
 } from "./teleportSystem";
 import { recordDebugTelemetryTick } from "./debugTelemetry";
+import { updateWorldWipeRecovery } from "./worldWipeRecovery";
 import {
   advanceSimulationTime,
   clearExpiredCombatFeedback,
@@ -56,6 +57,20 @@ export function updateGame(
   const wasTeleportActive = Boolean(nextState.activeTeleport);
 
   nextState = syncPartyDerivedMaxHealth(nextState);
+
+  const mapIdBeforeWipeRecovery = nextState.currentMapId;
+  nextState = updateWorldWipeRecovery(nextState, timing.nowMs);
+
+  if (
+    nextState.worldWipeRecovery?.status === "pending_choice" ||
+    mapIdBeforeWipeRecovery !== nextState.currentMapId
+  ) {
+    return recordDebugTelemetryTick(
+      state,
+      clearExpiredCombatFeedback(nextState, timing.nowMs),
+      timing,
+    );
+  }
 
   nextState = updateTeleportSystem(nextState, movedEntityIds);
 

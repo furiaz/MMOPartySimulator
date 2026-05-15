@@ -1163,6 +1163,60 @@
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
 }
 
+.rescue-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 12, 16, 0.42);
+}
+
+.rescue-panel {
+  display: grid;
+  gap: 12px;
+  width: min(360px, 100%);
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid #7aa6ad;
+  background: rgba(26, 42, 47, 0.94);
+  color: #e6f0f2;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+}
+
+.rescue-panel-compact {
+  text-align: center;
+}
+
+.rescue-panel h2,
+.rescue-panel p {
+  margin: 0;
+}
+
+.rescue-panel h2 {
+  font-size: 20px;
+}
+
+.rescue-kicker {
+  color: #f3df93;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rescue-choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.rescue-choice-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .inventory-panel,
 .party-selected-summary,
 .party-management-detail,

@@ -46,6 +46,7 @@ import type {
   SkillSelfBuffState,
   SkillShieldBlockState,
   SkillVisualEvent,
+  WorldWipeRecoveryState,
 } from "./types";
 import type {
   GlobalPoiIntent,
@@ -156,6 +157,7 @@ export type GameState = {
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
   dropVisualEvents?: DropVisualEvent[];
+  worldWipeRecovery?: WorldWipeRecoveryState;
   lastHealthRegenAtByCompanionId?: Record<string, number>;
   debugTelemetry?: DebugTelemetryState;
   debugOptions?: DebugOptions;
