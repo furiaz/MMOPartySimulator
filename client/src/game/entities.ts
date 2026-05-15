@@ -22,6 +22,7 @@ import { getEnemyArchetype } from "./enemyArchetypes";
 import {
   createDefaultNaturalCompanionStats,
   createEmptyAllocatedCompanionStats,
+  syncCompanionDerivedMaxHealth,
 } from "./stats";
 
 export const MOVEMENT_SPEED_PER_SECOND = 0.91;
@@ -100,7 +101,7 @@ export function createCompanion(
   partyOrder = 1,
   classId: ClassId = "beginner",
 ): Companion {
-  return {
+  return syncCompanionDerivedMaxHealth({
     id,
     kind: "companion",
     classId,
@@ -124,7 +125,7 @@ export function createCompanion(
     gatherSpeed: STARTING_GATHER_SPEED,
     commandPriority: "autonomous",
     equipment: createEmptyCompanionEquipment(),
-  };
+  });
 }
 
 export function createResource(

@@ -1,5 +1,11 @@
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
-import type { CombatEntity, Companion, Enemy, SkillShieldBlockState } from "./types";
+import type {
+  CombatDamageType,
+  CombatEntity,
+  Companion,
+  Enemy,
+  SkillShieldBlockState,
+} from "./types";
 
 export function getPrototypeAttackDamage(
   state: GameState,
@@ -30,8 +36,9 @@ export function blockIncomingAttackIfShielded(
   attacker: CombatEntity,
   target: Companion,
   now: number,
+  damageType: CombatDamageType = "physical",
 ): { state: GameState; blocked: boolean } {
-  const shield = getBlockingShield(state, target);
+  const shield = getBlockingShield(state, target, damageType);
 
   if (!shield) {
     return { state, blocked: false };
@@ -74,11 +81,13 @@ export function blockIncomingAttackIfShielded(
 function getBlockingShield(
   state: GameState,
   target: Companion,
+  damageType: CombatDamageType,
 ): SkillShieldBlockState | undefined {
   return Object.values(state.skillShieldBlocksById ?? {}).find(
     (shield) =>
-      getDistance(shield.position, target.position) <= 1.5 ||
-      shield.ownerId === target.id,
+      (shield.blockedDamageTypes ?? ["physical"]).includes(damageType) &&
+      (getDistance(shield.position, target.position) <= 1.5 ||
+        shield.ownerId === target.id),
   );
 }
 

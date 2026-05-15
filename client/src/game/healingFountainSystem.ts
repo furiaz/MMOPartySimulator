@@ -22,7 +22,7 @@ export function updateHealingFountainSystem(state: GameState): GameState {
   let nextState = state;
 
   for (const member of partyMembers) {
-    if (member.health >= member.maxHealth) {
+    if (member.state === "dead" || member.health <= 0 || member.health >= member.maxHealth) {
       continue;
     }
 

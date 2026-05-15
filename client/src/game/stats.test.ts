@@ -4,6 +4,9 @@ import {
   BASE_CLASS_AUTOMATIC_STAT_POINTS_PER_LEVEL,
   BASE_CLASS_STAT_GROWTHS,
   BEGINNER_STAT_GROWTH_PER_LEVEL,
+  MAX_ALLOCATED_PRIMARY_STAT_POINTS_PER_STAT,
+  allocateCompanionStatPoint,
+  applyCompanionLevelUpStatGrowth,
   createCompanionPrimaryStats,
   getCompanionActualStats,
   getCompanionDerivedStats,
@@ -60,7 +63,11 @@ describe("prototype companion stats", () => {
 
     expect(getCompanionDerivedStats(companion)).toMatchObject({
       attack: 3,
-      maxHealth: 13,
+      maxHealth: 15,
+      accuracy: 1,
+      criticalChance: 0.05,
+      criticalDamage: 1.2,
+      healthRegen: 1,
     });
   });
 
@@ -72,8 +79,11 @@ describe("prototype companion stats", () => {
 
     expect(getCompanionDerivedStats(companion)).toMatchObject({
       defense: 5,
+      magicDefense: 5,
+      accuracy: 3,
       magicPower: 9,
       healingPower: 8,
+      block: 3,
     });
   });
 
@@ -99,6 +109,66 @@ describe("prototype companion stats", () => {
 
       expect(totalGrowth).toBe(BASE_CLASS_AUTOMATIC_STAT_POINTS_PER_LEVEL);
     }
+  });
+
+  it("applies automatic level-up growth for Beginners without unspent points", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+
+    const updatedCompanion = applyCompanionLevelUpStatGrowth(companion, 2);
+
+    expect(updatedCompanion.naturalStats).toEqual(createCompanionPrimaryStats(3));
+    expect(updatedCompanion.unspentStatPoints).toBe(0);
+    expect(updatedCompanion.maxHealth).toBe(
+      getCompanionDerivedStats(updatedCompanion).maxHealth,
+    );
+  });
+
+  it("applies base-class growth and grants allocation points", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      classId: "blade" as const,
+      characterLevel: 10,
+    };
+
+    const updatedCompanion = applyCompanionLevelUpStatGrowth(companion, 2);
+
+    expect(updatedCompanion.naturalStats).toEqual(createPrimaryStats(5, 5, 3, 1, 1));
+    expect(updatedCompanion.unspentStatPoints).toBe(4);
+  });
+
+  it("allocates stat points through game logic and syncs derived health", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      unspentStatPoints: 1,
+    };
+
+    const result = allocateCompanionStatPoint(companion, "constitution");
+
+    expect(result.status).toBe("success");
+    expect(result.companion.allocatedStats.constitution).toBe(1);
+    expect(result.companion.unspentStatPoints).toBe(0);
+    expect(result.companion.maxHealth).toBe(
+      getCompanionDerivedStats(result.companion).maxHealth,
+    );
+  });
+
+  it("fails allocation safely without points or above the prototype cap", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const cappedCompanion = {
+      ...companion,
+      unspentStatPoints: 1,
+      allocatedStats: {
+        ...companion.allocatedStats,
+        strength: MAX_ALLOCATED_PRIMARY_STAT_POINTS_PER_STAT,
+      },
+    };
+
+    expect(allocateCompanionStatPoint(companion, "strength").status).toBe(
+      "failed_no_points",
+    );
+    expect(allocateCompanionStatPoint(cappedCompanion, "strength").status).toBe(
+      "failed_stat_cap",
+    );
   });
 });
 

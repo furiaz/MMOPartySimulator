@@ -425,7 +425,8 @@
     -1px 0 0 #ffffff;
 }
 
-.combat-feedback.gather {
+.combat-feedback.gather,
+.combat-feedback.heal {
   border-color: transparent;
   background: transparent;
   color: #047857;

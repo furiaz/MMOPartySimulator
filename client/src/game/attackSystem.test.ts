@@ -56,12 +56,13 @@ describe("enemy attack leash movement", () => {
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
       archetypeId: "slime",
+      maxHealth: 3,
     });
 
     const nextState = updateAttackSystem(createState([companion, enemy]));
     const nextEnemy = nextState.entities[enemy.id] as Enemy;
 
-    expect(nextEnemy.health).toBe(enemy.health - 1);
+    expect(nextEnemy.health).toBe(enemy.health - 2);
     expect(nextEnemy.state).toBe("attack");
     expect(nextEnemy.currentTargetId).toBe(companion.id);
   });

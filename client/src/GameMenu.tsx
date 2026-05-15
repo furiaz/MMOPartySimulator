@@ -18,6 +18,7 @@ import type {
   ItemId,
   QuestId,
   DebugMapId,
+  PrimaryStatId,
 } from "./game";
 
 export function GameMenu({
@@ -35,6 +36,7 @@ export function GameMenu({
   selectedCompanionId,
   selectedQuestId,
   totalPartyLevel,
+  onAllocateStatPoint,
   onChangeLeader,
   onChangeRole,
   onEquipEquipment,
@@ -64,6 +66,7 @@ export function GameMenu({
   selectedCompanionId: string | null;
   selectedQuestId: QuestId | null;
   totalPartyLevel: number;
+  onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onEquipEquipment: (
@@ -136,6 +139,7 @@ export function GameMenu({
                   members={members}
                   selectedCompanionId={selectedCompanionId}
                   totalPartyLevel={totalPartyLevel}
+                  onAllocateStatPoint={onAllocateStatPoint}
                   onEquipEquipment={onEquipEquipment}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectPartySection}

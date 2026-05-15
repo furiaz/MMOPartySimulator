@@ -1,14 +1,9 @@
-import { damageEntity, setLastAttackAt } from "./entities";
+import { setLastAttackAt } from "./entities";
+import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { grantCharacterXpToParty } from "./leveling";
-import { getPrototypeAttackDamage } from "./skillRuntime";
-import {
-  addCombatFeedback,
-  updateEntity,
-  type GameState,
-} from "./state";
+import { updateEntity, type GameState } from "./state";
 import type { Companion, Enemy } from "./types";
 
-const DEFENDER_ATTACK_DAMAGE = 1;
 const DEFENDER_ATTACK_COOLDOWN_MS = 1000;
 
 export function attackDefenderTarget(
@@ -24,38 +19,23 @@ export function attackDefenderTarget(
     });
   }
 
-  const attackDamage = getPrototypeAttackDamage(
+  const combatResult = resolveAndApplyCombatDamage(
     state,
     defender,
     target,
-    DEFENDER_ATTACK_DAMAGE,
-  );
-  const damagedTarget = damageEntity(target, attackDamage);
-  let nextState = addCombatFeedback(state, {
-    type: "attack",
-    entityId: defender.id,
-    text: "Attack",
-    now,
-  });
-  nextState = addCombatFeedback(nextState, {
-    type: "damage",
-    entityId: damagedTarget.id,
-    text: `-${attackDamage} HP`,
-    now,
-  });
-
-  if (damagedTarget.state === "dead") {
-    nextState = addCombatFeedback(nextState, {
-      type: "death",
-      entityId: damagedTarget.id,
-      text: "Defeated",
+    {
+      damageType: "physical",
+      powerMultiplier: 1,
+      allowEvasion: true,
+      allowPassiveBlock: true,
       now,
-    });
-  }
+      label: "Attack",
+    },
+  );
+  let nextState = combatResult.state;
+  const damagedTarget = combatResult.target;
 
-  nextState = updateEntity(nextState, damagedTarget);
-
-  if (damagedTarget.state === "dead") {
+  if (damagedTarget.kind === "enemy" && damagedTarget.state === "dead") {
     nextState = grantCharacterXpToParty(
       nextState,
       damagedTarget,
@@ -63,7 +43,7 @@ export function attackDefenderTarget(
     );
   }
 
-  if (damagedTarget.state !== "dead") {
+  if (damagedTarget.kind === "enemy" && damagedTarget.state !== "dead") {
     nextState = updateEntity(nextState, {
       ...damagedTarget,
       state: "attack",

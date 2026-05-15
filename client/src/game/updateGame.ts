@@ -9,6 +9,10 @@ import {
 import { updateFollowSystem } from "./followSystem";
 import { updateGatherSystem } from "./gatherSystem";
 import { updateHealingFountainSystem } from "./healingFountainSystem";
+import {
+  syncPartyDerivedMaxHealth,
+  updatePassiveHealthRegen,
+} from "./healthSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { updatePoiSystem } from "./poiSystem";
 import { getPartyMembers } from "./partySystem";
@@ -50,6 +54,8 @@ export function updateGame(
   const movedEntityIds = new Set<string>();
   const mapIdBeforeTeleport = nextState.currentMapId;
   const wasTeleportActive = Boolean(nextState.activeTeleport);
+
+  nextState = syncPartyDerivedMaxHealth(nextState);
 
   nextState = updateTeleportSystem(nextState, movedEntityIds);
 
@@ -93,6 +99,7 @@ export function updateGame(
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState, timing);
   nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(nextState, movedEntityIds, timing.nowMs);
   nextState = updateSkillShieldBlockPositions(nextState);

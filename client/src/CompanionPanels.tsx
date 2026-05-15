@@ -144,6 +144,7 @@ export function PartyMenuPanel({
   members,
   selectedCompanionId,
   totalPartyLevel,
+  onAllocateStatPoint,
   onEquipEquipment,
   onSelectCompanion,
   onSelectSection,
@@ -154,6 +155,7 @@ export function PartyMenuPanel({
   members: Companion[];
   selectedCompanionId: string | null;
   totalPartyLevel: number;
+  onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onEquipEquipment: (
     companionId: string,
     itemId: ItemId,
@@ -196,6 +198,7 @@ export function PartyMenuPanel({
             activeSection={activeSection}
             inventory={inventory}
             member={selectedMember}
+            onAllocateStatPoint={onAllocateStatPoint}
             onEquipEquipment={onEquipEquipment}
             onUnequipEquipment={onUnequipEquipment}
           />
@@ -212,6 +215,7 @@ function PartyMenuSectionPanel({
   inventory,
   member,
   onEquipEquipment,
+  onAllocateStatPoint,
   onUnequipEquipment,
 }: {
   activeSection: PartyMenuSection;
@@ -222,10 +226,16 @@ function PartyMenuSectionPanel({
     itemId: ItemId,
     targetSlot: EquipmentSlot,
   ) => void;
+  onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
 }) {
   if (activeSection === "stats") {
-    return <StatsSection member={member} />;
+    return (
+      <StatsSection
+        member={member}
+        onAllocateStatPoint={onAllocateStatPoint}
+      />
+    );
   }
 
   if (activeSection === "equipment") {
@@ -304,16 +314,16 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   const { effect } = skill;
 
   if (effect.type === "damage") {
-    return `Deals ${effect.damage} damage.`;
+    return `Deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
   }
 
   if (effect.type === "sweepingDamage") {
-    return `Deals ${effect.mainDamage} damage and ${effect.splashDamage} splash damage.`;
+    return `Deals ${Math.round(effect.mainPowerMultiplier * 100)}% ${effect.damageType} damage and ${Math.round(effect.splashPowerMultiplier * 100)}% splash damage.`;
   }
 
   if (effect.type === "taunt") {
-    return effect.damage > 0
-      ? `Pulls attention and deals ${effect.damage} damage.`
+    return effect.powerMultiplier && effect.powerMultiplier > 0
+      ? `Pulls attention and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType ?? "physical"} damage.`
       : "Pulls enemy attention.";
   }
 
@@ -346,10 +356,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   if (effect.type === "heal") {
-    return `Heals ${effect.amount} HP.`;
+    return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power.`;
   }
 
-  return `Heals ${effect.amount} HP at ${effect.hpCost} HP cost.`;
+  return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power at ${effect.hpCost} HP cost.`;
 }
 
 function CompanionMenuList({
@@ -955,7 +965,13 @@ function PartyOrderSection({
   );
 }
 
-function StatsSection({ member }: { member: Companion }) {
+function StatsSection({
+  member,
+  onAllocateStatPoint,
+}: {
+  member: Companion;
+  onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
+}) {
   const actualStats = getCompanionActualStats(member);
   const derivedStats = getCompanionDerivedStats(member);
 
@@ -974,7 +990,16 @@ function StatsSection({ member }: { member: Companion }) {
             <div key={statId}>
               <dt>{primaryStatLabels[statId]}</dt>
               <dd>{actualStats[statId]}</dd>
-              <button disabled title="Stat allocation is not implemented yet" type="button">
+              <button
+                disabled={member.unspentStatPoints <= 0}
+                onClick={() => onAllocateStatPoint(member.id, statId)}
+                title={
+                  member.unspentStatPoints > 0
+                    ? `Allocate 1 point to ${primaryStatLabels[statId]}`
+                    : "No stat points available"
+                }
+                type="button"
+              >
                 +
               </button>
             </div>
@@ -1025,6 +1050,14 @@ function StatsSection({ member }: { member: Companion }) {
           <dd>{derivedStats.defense}</dd>
         </div>
         <div>
+          <dt>Magic Defense</dt>
+          <dd>{derivedStats.magicDefense}</dd>
+        </div>
+        <div>
+          <dt>Accuracy</dt>
+          <dd>{derivedStats.accuracy}</dd>
+        </div>
+        <div>
           <dt>Block</dt>
           <dd>{derivedStats.block}</dd>
         </div>
@@ -1039,6 +1072,18 @@ function StatsSection({ member }: { member: Companion }) {
         <div>
           <dt>Healing Power</dt>
           <dd>{derivedStats.healingPower}</dd>
+        </div>
+        <div>
+          <dt>Critical Chance</dt>
+          <dd>{Math.round(derivedStats.criticalChance * 100)}%</dd>
+        </div>
+        <div>
+          <dt>Critical Damage</dt>
+          <dd>{Math.round(derivedStats.criticalDamage * 100)}%</dd>
+        </div>
+        <div>
+          <dt>Health Regen</dt>
+          <dd>{derivedStats.healthRegen}</dd>
         </div>
         <div>
           <dt>Gather Speed</dt>
@@ -1093,9 +1138,10 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
   return (
     <section className="companion-vitals-panel" aria-label="Companion vitals">
       {orderedMembers.map((member) => {
+        const derivedStats = getCompanionDerivedStats(member);
         const healthPercent =
-          member.maxHealth > 0
-            ? Math.max(0, Math.min(100, (member.health / member.maxHealth) * 100))
+          derivedStats.maxHealth > 0
+            ? Math.max(0, Math.min(100, (member.health / derivedStats.maxHealth) * 100))
             : 0;
         const characterXpProgress = getCharacterXpProgress(member);
         const companionNumber = companionIds.indexOf(member.id) + 1;
@@ -1105,12 +1151,12 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
             <div className="companion-vitals-header">
               <span>Lv {member.characterLevel} C{companionNumber}</span>
               <span>
-                {member.health}/{member.maxHealth} HP
+                {member.health}/{derivedStats.maxHealth} HP
               </span>
             </div>
             <span
               className="companion-vitals-bar companion-vitals-hp"
-              title={`HP ${member.health}/${member.maxHealth}`}
+              title={`HP ${member.health}/${derivedStats.maxHealth}`}
             >
               <span style={{ width: `${healthPercent}%` }} />
             </span>

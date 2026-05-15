@@ -33,6 +33,7 @@ import { QuestTrackerPanel } from "./QuestPanels";
 
 import {
   addEntity,
+  allocateCompanionStatPoint,
   CLASS_DEFINITIONS,
   companionIds,
   companionStartPositions,
@@ -99,6 +100,7 @@ import {
   type ItemId,
   type NpcEntity,
   type PartyMemberRole,
+  type PrimaryStatId,
   type PoiConsideration,
   type Position,
   type QuestId,
@@ -1120,6 +1122,22 @@ function App() {
     setGameState((state) =>
       unequipItemFromCompanion(state, companionId, targetSlot).state,
     );
+  }
+
+  function allocateStatPoint(companionId: string, statId: PrimaryStatId) {
+    setGameState((state) => {
+      const companion = state.entities[companionId];
+
+      if (companion?.kind !== "companion") {
+        return state;
+      }
+
+      const result = allocateCompanionStatPoint(companion, statId);
+
+      return result.status === "success"
+        ? updateEntity(state, result.companion)
+        : state;
+    });
   }
 
   function toggleEntityInfo() {
@@ -2278,6 +2296,7 @@ function App() {
           selectedCompanionId={selectedMenuCompanionId}
           selectedQuestId={selectedMenuQuestId}
           totalPartyLevel={totalPartyLevel}
+          onAllocateStatPoint={allocateStatPoint}
           onChangeLeader={changePartyLeader}
           onChangeRole={changePartyMemberRole}
           onEquipEquipment={equipEquipment}

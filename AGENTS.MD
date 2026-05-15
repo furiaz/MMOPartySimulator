@@ -208,14 +208,27 @@ Ticket titles must use the format:
 Future idea cards may use normal descriptive titles while they are in Dragons Vault or Todo.
 When a future idea is promoted into Design Stage or Implementation scope, rename it to the next ticket number before implementation work begins.
 
-For companion documentation tickets, `Completed` means the documentation review task is complete, not necessarily that protected documents were edited.
+For companion documentation tickets, Codex must not apply the `Completed` label unless the user explicitly says the documentation ticket is complete.
 
-Before applying `Completed` to a documentation companion ticket, Codex must leave a comment stating one of:
-- Documentation was updated, listing the files changed.
-- No documentation change is needed.
-- Protected documentation appears to need changes, but Codex cannot edit it without explicit approval; include proposed text or request approval.
+When the linked implementation ticket moves to In Progress, the companion documentation ticket should be moved to Design Stage.
 
-If protected documentation changes are still awaiting user approval, move the ticket to Manual Review but do not move it to Done.
+Codex may review documentation impact and leave comments on the documentation ticket, including:
+- Documentation files that may need updates
+- Protected documentation changes that require explicit approval
+- Proposed text for the user to apply manually
+- Confirmation that no documentation change appears necessary
+
+However, documentation review comments do not complete the documentation ticket.
+
+The documentation companion ticket should only receive the `Completed` label after the user explicitly confirms that documentation was updated manually or that no documentation update is needed.
+
+Acceptable user wording includes:
+- "Documentation ticket is complete"
+- "Mark the documentation ticket completed"
+- "Docs are updated, complete the documentation ticket"
+- "No docs needed, complete the documentation ticket"
+
+If the user has not explicitly approved completion, leave the documentation ticket in Design Stage or the user-requested project status, and do not apply `Completed`.
 
 
 ## Ticket Number Validation Rule
@@ -264,6 +277,8 @@ When the user later asks to execute an approved ticket or plan:
 - Run the verification plan from the ticket.
 - After implementation and verification are complete, move the GitHub Project item to Manual Review.
 - After implementation and verification are complete, apply the `Completed` label to the GitHub Issue.
+- This Manual Review step applies to the implementation ticket only. It does not apply to the companion documentation ticket unless the user explicitly requests that move.
+- After implementation and verification are complete, Codex may comment on the companion documentation ticket with documentation impact notes, but must not move the documentation ticket to Manual Review or apply `Completed` unless the user explicitly requests it.
 - Completion notes should list the main files changed, verification performed, and confirm the `Completed` label was applied to the GitHub Issue.
 - Do not move the ticket to Done unless the user explicitly approves completion after review.
 - Before implementation, verify the active issue title already starts with [Ticket 000N]:.

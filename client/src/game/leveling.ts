@@ -1,6 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { updateEntity, type GameState } from "./state";
 import type { Companion, Enemy } from "./types";
+import { applyCompanionLevelUpStatGrowth } from "./stats";
 
 export const MAX_CHARACTER_LEVEL = 200;
 export const BEGINNER_CLASS_UNLOCK_LEVEL = 10;
@@ -269,21 +270,29 @@ export function grantCharacterXpToCompanion(
     xpToNextLevel = getCharacterXpToNextLevel(characterLevel);
   }
 
+  const levelsGained = characterLevel - companion.characterLevel;
+
   if (characterLevel >= MAX_CHARACTER_LEVEL) {
-    return {
-      ...companion,
-      characterLevel: MAX_CHARACTER_LEVEL,
-      characterXp: 0,
-      lastCharacterXpGained: Math.floor(amount),
-    };
+    return applyCompanionLevelUpStatGrowth(
+      {
+        ...companion,
+        characterLevel: MAX_CHARACTER_LEVEL,
+        characterXp: 0,
+        lastCharacterXpGained: Math.floor(amount),
+      },
+      levelsGained,
+    );
   }
 
-  return {
-    ...companion,
-    characterLevel,
-    characterXp,
-    lastCharacterXpGained: Math.floor(amount),
-  };
+  return applyCompanionLevelUpStatGrowth(
+    {
+      ...companion,
+      characterLevel,
+      characterXp,
+      lastCharacterXpGained: Math.floor(amount),
+    },
+    levelsGained,
+  );
 }
 
 export function getCharacterXpProgress(

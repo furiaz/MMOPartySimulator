@@ -17,6 +17,7 @@ import {
   validateEquipItem,
   validateUnequipItem,
 } from "./equipmentRules";
+import { syncCompanionDerivedMaxHealth } from "./stats";
 
 export type EquipmentMutationStatus = "success" | "failed";
 
@@ -119,7 +120,7 @@ export function equipItemToCompanion(
     targetSlot,
     validation.itemDefinition.occupiesBothHands === true,
   );
-  nextState = updateEntity(inventoryState, equippedCompanion);
+  nextState = updateEntity(inventoryState, syncCompanionDerivedMaxHealth(equippedCompanion));
   nextState = appendEquipmentTelemetry(nextState, {
     type: "equipment_equipped",
     companionId,
@@ -217,7 +218,7 @@ export function unequipItemFromCompanion(
       [targetSlot]: null,
     },
   };
-  nextState = updateEntity(addResult.state, companion);
+  nextState = updateEntity(addResult.state, syncCompanionDerivedMaxHealth(companion));
   nextState = appendEquipmentTelemetry(nextState, {
     type: "equipment_unequipped",
     companionId,

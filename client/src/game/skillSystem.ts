@@ -1,8 +1,12 @@
-import { damageEntity, setLastAttackAt } from "./entities";
+import { setLastAttackAt } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { grantCharacterXpToParty } from "./leveling";
 import { getSkillRoleScore } from "./skillRolePreferences";
-import { getPrototypeAttackDamage } from "./skillRuntime";
+import {
+  getHealingAmount,
+  resolveAndApplyCombatDamage,
+} from "./combatResolver";
+import { getCompanionDerivedStats } from "./stats";
 import { getSkillsForClass } from "./skills";
 import {
   addCombatFeedback,
@@ -232,7 +236,7 @@ function applySkill(
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {
     return startSkillCooldown(
       recordSkillApplied(
-        applyDamageSkill(nextState, caster, target, skill, skill.effect.damage, now),
+        applyDamageSkill(nextState, caster, target, skill, now),
         caster,
         skillUse,
         target.id,
@@ -372,7 +376,15 @@ function applySkill(
   if (skill.effect.type === "heal" && isLivingCompanion(target)) {
     return startSkillCooldown(
       recordSkillApplied(
-        applyHeal(nextState, caster, target, skill.effect.amount, 0, skill.id, now),
+        applyHeal(
+          nextState,
+          caster,
+          target,
+          skill.effect.powerMultiplier,
+          0,
+          skill.id,
+          now,
+        ),
         caster,
         skillUse,
         target.id,
@@ -390,7 +402,7 @@ function applySkill(
           nextState,
           caster,
           target,
-          skill.effect.amount,
+          skill.effect.powerMultiplier,
           skill.effect.hpCost,
           skill.id,
           now,
@@ -471,11 +483,22 @@ function applyDamageSkill(
   caster: Companion,
   target: Enemy,
   skill: SkillDefinition,
-  baseDamage: number,
   now: number,
 ): GameState {
-  const damage = getPrototypeAttackDamage(state, caster, target, baseDamage);
-  let nextState = damageEnemy(state, caster, target, damage, skill.displayName, now);
+  if (skill.effect.type !== "damage") {
+    return state;
+  }
+
+  let nextState = damageEnemy(
+    state,
+    caster,
+    target,
+    skill.displayName,
+    now,
+    skill.effect.damageType,
+    skill.effect.powerMultiplier,
+    skill.effect.damageType === "physical",
+  );
 
   nextState = addSkillVisualEvent(nextState, {
     type: "projectile",
@@ -500,13 +523,16 @@ function applySweepingStrike(
     return state;
   }
 
-  const mainDamage = getPrototypeAttackDamage(
+  let nextState = damageEnemy(
     state,
     caster,
     target,
-    skill.effect.mainDamage,
+    skill.displayName,
+    now,
+    skill.effect.damageType,
+    skill.effect.mainPowerMultiplier,
+    true,
   );
-  let nextState = damageEnemy(state, caster, target, mainDamage, skill.displayName, now);
   const currentTarget = nextState.entities[target.id];
 
   for (const enemy of Object.values(nextState.entities)) {
@@ -524,9 +550,11 @@ function applySweepingStrike(
       nextState,
       caster,
       enemy,
-      skill.effect.splashDamage,
       "Sweep",
       now,
+      skill.effect.damageType,
+      skill.effect.splashPowerMultiplier,
+      true,
     );
   }
 
@@ -560,8 +588,17 @@ function applyTaunt(
     now,
   });
 
-  if (skill.effect.damage > 0) {
-    nextState = damageEnemy(nextState, caster, target, skill.effect.damage, skill.displayName, now);
+  if (skill.effect.powerMultiplier && skill.effect.powerMultiplier > 0) {
+    nextState = damageEnemy(
+      nextState,
+      caster,
+      target,
+      skill.displayName,
+      now,
+      skill.effect.damageType ?? "physical",
+      skill.effect.powerMultiplier,
+      skill.effect.damageType !== "magic",
+    );
   }
 
   const currentTarget = nextState.entities[target.id];
@@ -826,6 +863,7 @@ function applyShieldBlock(
         rotationRadians: shieldPlacement.rotationRadians,
         expiresAt: now + skill.effect.durationMs,
         remainingBlocks: skill.effect.blocks,
+        blockedDamageTypes: skill.effect.blockedDamageTypes ?? ["physical"],
       },
     },
   };
@@ -886,7 +924,7 @@ function applyHeal(
   state: GameState,
   caster: Companion,
   target: Companion,
-  amount: number,
+  powerMultiplier: number,
   hpCost: number,
   skillId: SkillDefinition["id"],
   now: number,
@@ -895,6 +933,7 @@ function applyHeal(
     return state;
   }
 
+  const amount = getHealingAmount(caster, powerMultiplier);
   const healedTarget = {
     ...target,
     health: Math.min(target.maxHealth, target.health + amount),
@@ -930,10 +969,21 @@ function applyHeal(
     durationMs: 1000,
   });
   nextState = addCombatFeedback(nextState, {
-    type: "gather",
+    type: "heal",
     entityId: target.id,
     text: `+${amount} HP`,
     now,
+  });
+  nextState = appendDebugTelemetryEvent(nextState, {
+    type: "healing_resolved",
+    entityId: caster.id,
+    targetId: target.id,
+    healingPowerRating: getCompanionDerivedStats(caster).healingPower,
+    healingMultiplier: powerMultiplier,
+    healingAmount: amount,
+    previousHealth: target.health,
+    nextHealth: healedTarget.health,
+    skillId,
   });
 
   const currentCaster = nextState.entities[caster.id];
@@ -947,41 +997,28 @@ function damageEnemy(
   state: GameState,
   caster: Companion,
   target: Enemy,
-  damage: number,
   label: string,
   now: number,
+  damageType: "physical" | "magic",
+  powerMultiplier: number,
+  allowPassiveBlock: boolean,
 ): GameState {
-  const damagedTarget = damageEntity(target, damage);
-  let nextState = addCombatFeedback(state, {
-    type: "attack",
-    entityId: caster.id,
-    text: label,
+  const combatResult = resolveAndApplyCombatDamage(state, caster, target, {
+    damageType,
+    powerMultiplier,
+    allowEvasion: true,
+    allowPassiveBlock,
     now,
+    label,
   });
+  let nextState = combatResult.state;
+  const damagedTarget = combatResult.target;
 
-  nextState = addCombatFeedback(nextState, {
-    type: "damage",
-    entityId: target.id,
-    text: `-${damage} HP`,
-    now,
-  });
-
-  if (damagedTarget.state === "dead") {
-    nextState = addCombatFeedback(nextState, {
-      type: "death",
-      entityId: damagedTarget.id,
-      text: "Defeated",
-      now,
-    });
-  }
-
-  nextState = updateEntity(nextState, damagedTarget);
-
-  if (damagedTarget.state === "dead") {
+  if (damagedTarget.kind === "enemy" && damagedTarget.state === "dead") {
     nextState = grantCharacterXpToParty(nextState, damagedTarget, caster.id);
   }
 
-  if (damagedTarget.state !== "dead") {
+  if (damagedTarget.kind === "enemy" && damagedTarget.state !== "dead") {
     nextState = updateEntity(nextState, {
       ...damagedTarget,
       state: "attack",

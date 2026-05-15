@@ -525,6 +525,15 @@ function getCombatFeedbackEvents(
         };
       }
 
+      if (event.type === "heal") {
+        return {
+          tick,
+          type: "healing_resolved",
+          entityId: event.entityId,
+          reason: event.text,
+        };
+      }
+
       return null;
     })
     .filter((event): event is DebugTelemetryEvent => Boolean(event));

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import {
+  getCharacterXpToNextLevel,
   getLevelGapXpModifier,
   getPartySizeLimit,
   getPartySizeUnlockRequirement,
@@ -8,6 +9,7 @@ import {
   grantCharacterXpToParty,
   MAX_CHARACTER_LEVEL,
 } from "./leveling";
+import { createCompanionPrimaryStats } from "./stats";
 import { createTestGameState } from "./testState";
 
 describe("character leveling", () => {
@@ -19,6 +21,29 @@ describe("character leveling", () => {
     expect(updatedCompanion.characterLevel).toBe(2);
     expect(updatedCompanion.characterXp).toBe(2);
     expect(updatedCompanion.lastCharacterXpGained).toBe(8);
+    expect(updatedCompanion.naturalStats).toEqual(createCompanionPrimaryStats(2));
+  });
+
+  it("applies base-class stat growth and allocation points when XP grants levels", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      classId: "aegis" as const,
+      characterLevel: 10,
+      characterXp: 0,
+    };
+    const xpToNextLevel = getCharacterXpToNextLevel(companion.characterLevel) ?? 0;
+
+    const updatedCompanion = grantCharacterXpToCompanion(companion, xpToNextLevel);
+
+    expect(updatedCompanion.characterLevel).toBe(11);
+    expect(updatedCompanion.naturalStats).toEqual({
+      strength: 2,
+      dexterity: 1,
+      constitution: 4,
+      intelligence: 1,
+      wisdom: 2,
+    });
+    expect(updatedCompanion.unspentStatPoints).toBe(2);
   });
 
   it("keeps max-level companions at max with zero current XP", () => {

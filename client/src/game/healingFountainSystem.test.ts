@@ -27,8 +27,8 @@ describe("healing fountain system", () => {
       createHubState([leader, follower], { partyLeaderId: leader.id }),
     );
 
-    expect(nextState.entities[leader.id]).toMatchObject({ health: 10 });
-    expect(nextState.entities[follower.id]).toMatchObject({ health: 10 });
+    expect(nextState.entities[leader.id]).toMatchObject({ health: leader.maxHealth });
+    expect(nextState.entities[follower.id]).toMatchObject({ health: follower.maxHealth });
   });
 
   it("does not heal when all living party members are outside range", () => {

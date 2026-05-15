@@ -1,4 +1,5 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
+import { syncCompanionDerivedMaxHealth } from "./stats";
 import { addItemToInventoryState } from "./inventory";
 import {
   addCurrencyToWalletState,
@@ -324,11 +325,13 @@ function resetResource(resource: ResourceEntity): ResourceEntity {
   };
 }
 
-function restorePartyMember<T extends Companion>(entity: T): T {
+function restorePartyMember(entity: Companion): Companion {
+  const syncedEntity = syncCompanionDerivedMaxHealth(entity);
+
   return {
-    ...entity,
-    health: entity.maxHealth,
-    state: entity.state === "dead" ? "idle" : entity.state,
+    ...syncedEntity,
+    health: syncedEntity.maxHealth,
+    state: syncedEntity.state === "dead" ? "idle" : syncedEntity.state,
   };
 }
 

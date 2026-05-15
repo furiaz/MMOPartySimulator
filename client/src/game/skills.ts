@@ -8,7 +8,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Single Target", "Taunt"],
     type: "active",
     range: 4,
-    effect: { type: "taunt", damage: 0 },
+    effect: { type: "taunt" },
   },
   kick: {
     id: "kick",
@@ -17,7 +17,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Damage", "Single Target"],
     type: "active",
     range: 1,
-    effect: { type: "damage", damage: 1 },
+    effect: { type: "damage", damageType: "physical", powerMultiplier: 1 },
   },
   guard_up: {
     id: "guard_up",
@@ -26,7 +26,12 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Defensive", "Shield", "Safety"],
     type: "active",
     range: 0,
-    effect: { type: "shieldBlock", durationMs: 3000, blocks: 1 },
+    effect: {
+      type: "shieldBlock",
+      durationMs: 3000,
+      blocks: 1,
+      blockedDamageTypes: ["physical"],
+    },
   },
   first_aid: {
     id: "first_aid",
@@ -35,7 +40,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Heal", "Safety"],
     type: "active",
     range: 3,
-    effect: { type: "heal", amount: 1 },
+    effect: { type: "heal", powerMultiplier: 1 },
   },
   deep_breath: {
     id: "deep_breath",
@@ -82,8 +87,9 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     range: 1,
     effect: {
       type: "sweepingDamage",
-      mainDamage: 1,
-      splashDamage: 1,
+      damageType: "physical",
+      mainPowerMultiplier: 1.5,
+      splashPowerMultiplier: 1,
       splashRange: 1.5,
     },
   },
@@ -94,7 +100,12 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Defensive", "Shield", "Safety"],
     type: "active",
     range: 0,
-    effect: { type: "shieldBlock", durationMs: 5000, blocks: 1 },
+    effect: {
+      type: "shieldBlock",
+      durationMs: 5000,
+      blocks: 1,
+      blockedDamageTypes: ["physical"],
+    },
   },
   mark_target: {
     id: "mark_target",
@@ -121,7 +132,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Damage", "Single Target"],
     type: "active",
     range: 5,
-    effect: { type: "damage", damage: 1 },
+    effect: { type: "damage", damageType: "magic", powerMultiplier: 1.5 },
   },
   binding_rune: {
     id: "binding_rune",
@@ -139,7 +150,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Heal", "Safety"],
     type: "active",
     range: 4,
-    effect: { type: "heal", amount: 1 },
+    effect: { type: "heal", powerMultiplier: 1.5 },
   },
   penitents_gift: {
     id: "penitents_gift",
@@ -148,7 +159,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Heal", "Self Cost - HP", "Safety"],
     type: "active",
     range: 4,
-    effect: { type: "selfCostHeal", amount: 2, hpCost: 1 },
+    effect: { type: "selfCostHeal", powerMultiplier: 2, hpCost: 1 },
   },
 };
 

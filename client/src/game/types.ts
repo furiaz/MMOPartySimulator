@@ -179,6 +179,11 @@ export type EquipmentStatModifiers = {
   evasion?: number;
   magicPower?: number;
   healingPower?: number;
+  magicDefense?: number;
+  accuracy?: number;
+  criticalChance?: number;
+  criticalDamage?: number;
+  healthRegen?: number;
 };
 
 export type PrimaryStatId =
@@ -200,6 +205,11 @@ export type CompanionDerivedStats = {
   block: number;
   magicPower: number;
   healingPower: number;
+  magicDefense: number;
+  accuracy: number;
+  criticalChance: number;
+  criticalDamage: number;
+  healthRegen: number;
 };
 
 export type CompanionEquipment = Record<EquipmentSlot, ItemId | null>;
@@ -384,7 +394,12 @@ export type LeaderIntent = {
   source?: "player" | "ai";
 };
 
-export type CombatFeedbackType = "attack" | "damage" | "death" | "gather";
+export type CombatFeedbackType =
+  | "attack"
+  | "damage"
+  | "death"
+  | "gather"
+  | "heal";
 
 export type CombatFeedbackEvent = {
   id: string;
@@ -446,6 +461,8 @@ export type SkillTag =
   | "Self Buff"
   | "Light Damage";
 
+export type CombatDamageType = "physical" | "magic";
+
 export type SkillDefinition = {
   id: SkillId;
   classId: ClassId;
@@ -454,18 +471,29 @@ export type SkillDefinition = {
   type: "active";
   range: number;
   effect:
-    | { type: "damage"; damage: number }
-    | { type: "sweepingDamage"; mainDamage: number; splashDamage: number; splashRange: number }
-    | { type: "taunt"; damage: number }
+    | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
+    | {
+        type: "sweepingDamage";
+        damageType: CombatDamageType;
+        mainPowerMultiplier: number;
+        splashPowerMultiplier: number;
+        splashRange: number;
+      }
+    | { type: "taunt"; damageType?: CombatDamageType; powerMultiplier?: number }
     | { type: "mark"; bonusDamage: number; durationMs: number }
     | { type: "selfBuff"; bonusDamage: number; durationMs: number; hpCost: number }
     | { type: "allyBuff"; bonusDamage: number; durationMs: number }
     | { type: "gatherBuff"; bonusGatherSpeed: number; durationMs: number }
     | { type: "quickStep"; distance: number }
-    | { type: "shieldBlock"; durationMs: number; blocks: number }
+    | {
+        type: "shieldBlock";
+        durationMs: number;
+        blocks: number;
+        blockedDamageTypes?: CombatDamageType[];
+      }
     | { type: "bind"; durationMs: number }
-    | { type: "heal"; amount: number }
-    | { type: "selfCostHeal"; amount: number; hpCost: number };
+    | { type: "heal"; powerMultiplier: number }
+    | { type: "selfCostHeal"; powerMultiplier: number; hpCost: number };
 };
 
 export type SkillMarkState = {
@@ -500,6 +528,7 @@ export type SkillShieldBlockState = {
   rotationRadians: number;
   expiresAt: number;
   remainingBlocks: number;
+  blockedDamageTypes?: CombatDamageType[];
 };
 
 export type SkillCooldownState = {
@@ -577,6 +606,10 @@ export type DebugTelemetryEventType =
   | "movement_failed"
   | "attack_started"
   | "damage_dealt"
+  | "combat_resolved"
+  | "healing_resolved"
+  | "health_regen"
+  | "max_health_synced"
   | "entity_died"
   | "gather_started"
   | "resource_depleted"
@@ -720,6 +753,36 @@ export type DebugTelemetryEvent = {
   attackRange?: number;
   targetDecisionReason?: EnemyTargetDecisionReason;
   amount?: number;
+  damageType?: CombatDamageType;
+  powerMultiplier?: number;
+  rawDamage?: number;
+  finalDamage?: number;
+  attackRating?: number;
+  magicPowerRating?: number;
+  defenseRating?: number;
+  magicDefenseRating?: number;
+  defenseReduction?: number;
+  evasionRating?: number;
+  accuracyRating?: number;
+  evasionChance?: number;
+  evasionRoll?: number;
+  evaded?: boolean;
+  blockRating?: number;
+  blockChance?: number;
+  blockRoll?: number;
+  blocked?: boolean;
+  criticalChance?: number;
+  criticalRoll?: number;
+  critical?: boolean;
+  criticalDamage?: number;
+  healingPowerRating?: number;
+  healingMultiplier?: number;
+  healingAmount?: number;
+  healthRegenAmount?: number;
+  previousMaxHealth?: number;
+  nextMaxHealth?: number;
+  previousHealth?: number;
+  nextHealth?: number;
   xpAmount?: number;
   baseXpAmount?: number;
   modifiedXpAmount?: number;

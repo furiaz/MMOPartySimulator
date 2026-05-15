@@ -125,5 +125,14 @@ export function addEquipmentStatModifiers(
     magicPower: (first.magicPower ?? 0) + (second.magicPower ?? 0) || undefined,
     healingPower:
       (first.healingPower ?? 0) + (second.healingPower ?? 0) || undefined,
+    magicDefense:
+      (first.magicDefense ?? 0) + (second.magicDefense ?? 0) || undefined,
+    accuracy: (first.accuracy ?? 0) + (second.accuracy ?? 0) || undefined,
+    criticalChance:
+      (first.criticalChance ?? 0) + (second.criticalChance ?? 0) || undefined,
+    criticalDamage:
+      (first.criticalDamage ?? 0) + (second.criticalDamage ?? 0) || undefined,
+    healthRegen:
+      (first.healthRegen ?? 0) + (second.healthRegen ?? 0) || undefined,
   };
 }

@@ -1,5 +1,4 @@
 import {
-  damageEntity,
   isAutonomousEntity,
   isCombatEntity,
   moveEntityTo,
@@ -11,7 +10,6 @@ import { getPartyMembers, isPartyMember } from "./partySystem";
 import { grantCharacterXpToParty } from "./leveling";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
 import {
-  addCombatFeedback,
   getEntityById,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
@@ -21,11 +19,8 @@ import {
 } from "./state";
 import { protectPartyMember } from "./partyProtectionSystem";
 import { getRolePriority } from "./roleProfiles";
-import {
-  blockIncomingAttackIfShielded,
-  getPrototypeAttackDamage,
-  isEnemyBound,
-} from "./skillRuntime";
+import { isEnemyBound } from "./skillRuntime";
+import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { getEnemyAttackLeashDistance } from "./enemyAISystem";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
@@ -47,7 +42,6 @@ import type {
   Position,
 } from "./types";
 
-const ATTACK_DAMAGE = 1;
 export const ATTACK_COOLDOWN_MS = 1000;
 const TARGET_SWITCH_DISTANCE = 6;
 const MAX_ATTACK_SLOT_PATH_DISTANCE = 6;
@@ -120,41 +114,26 @@ export function updateAttackSystem(
         continue;
       }
 
-      const attackDamage = getPrototypeAttackDamage(
+      const combatResult = resolveAndApplyCombatDamage(
         nextState,
         attackReadyAttacker,
         target,
-        ATTACK_DAMAGE,
+        {
+          damageType: "physical",
+          powerMultiplier: 1,
+          allowEvasion: true,
+          allowPassiveBlock: true,
+          now,
+          label: "Attack",
+        },
       );
-      const shieldResult =
-        isEnemy(attackReadyAttacker) && isPartyCombatEntity(target)
-          ? blockIncomingAttackIfShielded(nextState, attackReadyAttacker, target, now)
-          : { state: nextState, blocked: false };
-
-      nextState = shieldResult.state;
-
-      if (shieldResult.blocked) {
-        nextState = updateEntity(
-          nextState,
-          setLastAttackAt(attackReadyAttacker, now),
-        );
-        continue;
-      }
-
+      nextState = combatResult.state;
       const updatedTarget = updateTargetAfterDamage(
-        target,
+        combatResult.target,
         attackReadyAttacker,
-        attackDamage,
       );
       const updatedAttacker = setLastAttackAt(attackReadyAttacker, now);
 
-      nextState = addAttackFeedback(
-        nextState,
-        attackReadyAttacker,
-        updatedTarget,
-        attackDamage,
-        now,
-      );
       nextState = updateEntity(nextState, updatedTarget);
 
       if (
@@ -313,39 +292,6 @@ function getCombatOrderPriority(entity: GameEntity): number {
   return 5;
 }
 
-function addAttackFeedback(
-  state: GameState,
-  attacker: CombatEntity,
-  target: CombatEntity,
-  damage: number,
-  now: number,
-): GameState {
-  let nextState = addCombatFeedback(state, {
-    type: "attack",
-    entityId: attacker.id,
-    text: "Attack",
-    now,
-  });
-
-  nextState = addCombatFeedback(nextState, {
-    type: "damage",
-    entityId: target.id,
-    text: `-${damage} HP`,
-    now,
-  });
-
-  if (target.state === "dead") {
-    nextState = addCombatFeedback(nextState, {
-      type: "death",
-      entityId: target.id,
-      text: "Defeated",
-      now,
-    });
-  }
-
-  return nextState;
-}
-
 function isAttackingCombatEntity(entity: GameEntity): entity is CombatEntity {
   return isCombatEntity(entity) && entity.state === "attack";
 }
@@ -373,20 +319,17 @@ export function getAttackCooldownMs(entity: CombatEntity): number {
 function updateTargetAfterDamage(
   target: CombatEntity,
   attacker: CombatEntity,
-  damage: number,
 ): CombatEntity {
-  const damagedTarget = damageEntity(target, damage);
-
   if (
-    !isEnemy(damagedTarget) ||
-    damagedTarget.state === "dead" ||
+    !isEnemy(target) ||
+    target.state === "dead" ||
     !isAutonomousEntity(attacker)
   ) {
-    return damagedTarget;
+    return target;
   }
 
   return {
-    ...damagedTarget,
+    ...target,
     state: "attack",
     currentTargetId: attacker.id,
   };

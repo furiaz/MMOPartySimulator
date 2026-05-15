@@ -156,6 +156,7 @@ export type GameState = {
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
   dropVisualEvents?: DropVisualEvent[];
+  lastHealthRegenAtByCompanionId?: Record<string, number>;
   debugTelemetry?: DebugTelemetryState;
   debugOptions?: DebugOptions;
 };
