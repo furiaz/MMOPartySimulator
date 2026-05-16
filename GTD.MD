@@ -49,6 +49,8 @@ Current files include:
 - `dropTables.ts`
 - `enemyAISystem.ts`
 - `enemyArchetypes.ts`
+- `enemyRespawnSystem.ts`
+- `enemyScaling.ts`
 - `entities.ts`
 - `entityGuards.ts`
 - `equipmentRules.ts`
@@ -72,11 +74,13 @@ Current files include:
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
+- `poiResumeSystem.ts`
 - `poiSystem.ts`
 - `poiTypes.ts`
 - `positionUtils.ts`
 - `questSystem.ts`
 - `questTypes.ts`
+- `resurrectionSystem.ts`
 - `roleProfiles.ts`
 - `roleSystem.ts`
 - `simulationTiming.ts`
@@ -93,6 +97,7 @@ Current files include:
 - `types.ts`
 - `updateGame.ts`
 - `wallet.ts`
+- `worldWipeRecovery.ts`
 
 
 Do not restructure the project unless explicitly requested.
@@ -256,7 +261,8 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, and debug telemetry.
+
 
 
 Current movement planning fields include:
@@ -270,6 +276,14 @@ Current movement planning fields include:
 - `movementDecisionsByEntityId`
 - `lastPositionsByEntityId`
 
+Current POI and travel fields include:
+
+- `worldTravelTargetMapId`
+- `globalPoiIntent`
+- `localPoiTarget`
+- `lastPoiDecision`
+- `interruptedPoiTarget`
+- `poiPreferences`
 
 Current prototype skill runtime fields include:
 
@@ -280,6 +294,12 @@ Current prototype skill runtime fields include:
 - `skillShieldBlocksById`
 - `skillCooldownsByCompanionId`
 - `skillVisualEvents`
+
+Current resurrection and recovery fields include:
+
+- `resurrectionProgressByCompanionId`
+- `resurrectionChannelsByHelperId`
+- `worldWipeRecovery`
 
 
 State helpers should remain low-level and safe. Systems should own behavior decisions.
@@ -696,14 +716,17 @@ POI selection should evaluate progression targets before generic map activity.
 
 Current intended POI priority order:
 
-1. ready quest turn-in target
-2. active quest objective target on the current map
-3. available quest acceptance target on the current map
-4. quest-required prototype teleport when the active objective is on a connected map
-5. nearby combat target when combat is relevant
-6. nearby resource target when gathering is relevant
-7. reachable unexplored exploration point
-8. safe idle hub point
+1. active World Travel route target
+2. hub Merchant quick exchange when eligible junk is available
+3. ready quest turn-in target
+4. active quest objective target on the current map
+5. available quest acceptance target on the current map
+6. quest-required prototype teleport when the active objective is on a connected map
+7. nearby combat target when combat is relevant
+8. nearby resource target when gathering is relevant
+9. reachable unexplored exploration point
+10. safe idle hub point
+
 
 POI selection should skip targets that are invalid, unreachable, depleted, dead, completed, locked, already satisfied, or not relevant to the current map.
 
@@ -711,9 +734,9 @@ POI selection should record debug telemetry for selected POIs and skipped POIs w
 
 The POI system may set leader intent toward quest givers, combat targets, resources, exploration points, idle hub points, or prototype teleports.
 
+`poiResumeSystem.ts` can capture an interrupted POI target when combat interrupts travel, gathering, or world-route intent. It may restore that target after combat ends if the map still matches, the target is still valid, no live party aggro remains, and no blocking direct party command exists.
+
 The POI system must remain a prototype debug-map guidance layer and must not become the final world-routing, dialogue, or quest content pipeline unless explicitly requested.
-
-
 
 ---
 
@@ -725,7 +748,9 @@ Current systems include:
 
 - Teleport System
 - POI System
+- POI Resume System
 - Healing Fountain System
+- Resurrection System
 - Role System
 - Skill System
 - Party Formation System
@@ -735,8 +760,10 @@ Current systems include:
 - Enemy AI System
 - Attack System
 - Drop System
+- Enemy Respawn System
 - Gathering System
 - Party Protection System
+- World Wipe Recovery
 - Debug Telemetry
 
 
@@ -755,24 +782,32 @@ The game loop runs continuously while enabled, executes systems in order, update
 Current high-level order:
 
 1. Advance simulation timing and clear expired combat feedback, skill runtime state, and frame movement planning
-2. Update teleport system
-3. If teleport is active or map transition happened, record telemetry and stop the tick early
-4. Update POI system
-5. Update healing fountain system
-6. If auto mode is enabled, update role behavior
-7. If auto mode is enabled, update prototype skills
-8. If leader intent, auto mode, or teleport POI movement is active, update party formation movement
-9. If auto mode is enabled, reserve exploration movement
-10. Update defender behavior
-11. If auto mode is enabled, update exploration
-12. Update follow behavior
-13. Update enemy AI
-14. Update attacks
-15. Update drop system
-16. Update gathering
-17. Update skill shield block positions
-18. Idle autonomous party members when no POI or leader intent is active
-19. Record debug telemetry
+2. Synchronize derived max health
+3. Update world-wipe recovery
+4. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
+5. Update teleport system
+6. If teleport is active or map transition happened, record telemetry and stop the tick early
+7. Update POI system
+8. Update healing fountain system
+9. Update resurrection system
+10. If auto mode is enabled, update role behavior
+11. If auto mode is enabled, update prototype skills
+12. If leader intent, auto mode, or teleport POI movement is active, update party formation movement
+13. If auto mode is enabled, reserve exploration movement
+14. Update defender behavior
+15. If auto mode is enabled, update exploration
+16. Update follow behavior
+17. Update enemy AI
+18. Update attacks
+19. Restore interrupted POI target when valid
+20. Update passive health regeneration
+21. Update drop system
+22. Update enemy respawn system
+23. Update gathering
+24. Update skill shield block positions
+25. Idle autonomous party members when no POI or leader intent is active
+26. Record debug telemetry
+
 
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, and reserved positions.
@@ -1031,6 +1066,41 @@ Current enemy detection range:
 - `ENEMY_DETECTION_RANGE = 5`
 
 ---
+
+## Enemy Scaling and Respawn
+
+`enemyScaling.ts` owns lightweight prototype enemy combat stat scaling.
+
+Current enemy scaling behavior:
+
+- clamps effective scaling level to the current prototype range
+- supports `starter` and `early` scaling bands
+- derives max health, attack, defense, magic defense, evasion, and threat
+- may use archetype id for future threat modifiers
+- remains prototype tuning, not final encounter balance
+
+Current enemy scaling constants:
+
+- `MIN_ENEMY_SCALING_LEVEL = 1`
+- `MAX_ENEMY_SCALING_LEVEL = 20`
+
+`enemyRespawnSystem.ts` owns current prototype enemy respawn behavior.
+
+Current enemy respawn behavior:
+
+- does not run without a current map id
+- does not run in the hub
+- records a defeated timestamp for dead enemies
+- respawns dead wild-map enemies after the respawn delay
+- restores respawned enemies to home position, idle state, full health, and no target
+- clears temporary mark and bind runtime state for the respawned enemy
+
+Current enemy respawn constant:
+
+- `ENEMY_RESPAWN_DELAY_MS = 5000`
+
+Enemy respawn is prototype wild-map behavior. It should not become production spawn scheduling, encounter reset design, persistent world spawning, or final difficulty pacing unless explicitly requested.
+
 
 ## Party Protection
 
@@ -1402,15 +1472,16 @@ type GameMap = {
   walls: Position[];
   teleports: DebugTeleportPoint[];
   healingFountains: HealingFountain[];
+  subzones?: ZoneSubzone[];
+  subzoneNameLabels?: ZoneSubzoneNameLabel[];
   navigationGrid?: NavigationGrid;
 };
 ```
 
-
 Current debug map ids:
 
 ```ts
-type DebugMapId = "hub" | "map-1" | "map-2";
+type DebugMapId = "hub" | "map-1" | "map-2" | "map-3" | "map-4";
 ```
 
 Current readable map names:
@@ -1418,17 +1489,20 @@ Current readable map names:
 - `hub`: Harbor Union Bastion
 - `map-1`: First Wild Map
 - `map-2`: Second Wild Map
+- `map-3`: Third Wild Map
+- `map-4`: Fourth Wild Map
 
-Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, display/debug names, and prototype teleport points.
-
+Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, display/debug names, prototype teleport points, optional subzones, optional subzone labels, encounter areas, encounter leashes, and resource locations.
 
 Map data is still development/prototype data and should not define final world content.
 
 Current prototype map dimensions:
 
 - `hub`: 50 columns by 26 rows
-- `map-1`: 80 columns by 48 rows
-- `map-2`: 80 columns by 48 rows
+- `map-1`: 160 columns by 26 rows
+- `map-2`: 160 columns by 26 rows
+- `map-3`: 160 columns by 26 rows
+- `map-4`: 160 columns by 26 rows
 
 ---
 
@@ -1444,6 +1518,11 @@ Current prototype/debug routes:
 - `map-1` -> `hub`
 - `map-1` -> `map-2`
 - `map-2` -> `map-1`
+- `map-2` -> `map-3`
+- `map-3` -> `map-2`
+- `map-3` -> `map-4`
+- `map-4` -> `map-3`
+
 
 Current teleport behavior:
 
@@ -1455,7 +1534,7 @@ Current teleport behavior:
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
-- map-local enemies, resources, hub placeholders, explored tiles, movement planning, formation state, combat feedback, skill visuals, and follow trails are reset or rebuilt for the new map
+- map-local enemies, resources, hub placeholders, explored tiles, movement planning, formation state, combat feedback, skill visuals, drop visuals, and follow trails are reset or rebuilt for the new map
 - companion progression, class, role, level, XP, health, party identity, and party order are preserved
 
 Current active teleport state:
@@ -1475,6 +1554,46 @@ World Travel should use current route and map data. It must not require final zo
 
 Do not expand this into full zones, persistent world streaming, or a final teleport network unless explicitly requested.
 
+## Resurrection and World-Wipe Recovery
+
+`resurrectionSystem.ts` owns current prototype companion resurrection behavior.
+
+Current resurrection behavior:
+
+- runs during simulation updates after POI and healing fountain updates
+- only assigns resurrection helpers when the party is not in combat
+- living autonomous companions may move toward dead companions
+- resurrection requires close range
+- resurrection progresses over time while the helper remains valid and in range
+- direct-commanded helpers do not continue resurrection channeling
+- completed resurrection returns the target companion to follow behavior with minimal health
+- resurrection channels and progress emit debug telemetry
+
+Current resurrection constants:
+
+- `RESURRECTION_REQUIRED_MS = 10000`
+- `RESURRECTION_RANGE = 1`
+
+`worldWipeRecovery.ts` owns current prototype party defeat recovery.
+
+Current world-wipe recovery behavior:
+
+- triggers when every companion is dead outside the hub
+- chooses available unlocked rescue hubs by route distance
+- may enter a pending choice state when multiple equally valid hubs exist
+- currently defaults to Harbor Union Bastion as the unlocked rescue hub
+- may charge Crowns using the current rescue fee calculation, capped by current wallet balance
+- restores companions to rescue hub arrival positions with full health
+- clears map-local runtime state, combat state, movement state, teleport state, POI state, skill runtime state, drop visuals, resurrection state, and formation state
+- records map reach for quest state after rescue
+
+Current world-wipe recovery constants:
+
+- `WORLD_WIPE_RESCUE_OVERLAY_DURATION_MS = 2000`
+- rescue base fee is 5 Crowns
+- rescue fee adds 10 Crowns per map hop
+
+This is a prototype safety system. It is not the final death penalty, checkpoint, revive economy, or recovery design unless explicitly requested.
 
 ---
 
@@ -1485,8 +1604,14 @@ Combat feedback events are stored in game state.
 Current feedback event types:
 
 ```ts
-type CombatFeedbackType = "attack" | "damage" | "death" | "gather";
+type CombatFeedbackType =
+  | "attack"
+  | "damage"
+  | "death"
+  | "gather"
+  | "heal";
 ```
+
 
 Feedback events expire automatically.
 
@@ -1564,8 +1689,7 @@ Simulation logic must not depend on sprite assets.
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, and merchant quick exchange results.
-
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, quick exchange results, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, and companion resurrection.
 
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
@@ -1622,6 +1746,12 @@ Debug/testing helpers may exist for development:
 - debug maps
 - explicit aggressive-enemy test setups
 - prototype teleport/map transition testing
+- prototype resurrection testing
+- prototype world-wipe recovery testing
+- enemy scaling and respawn testing
+- subzone, encounter area, and subzone label validation
+- interrupted POI restore testing
+
 
 These should remain isolated from core systems and must not define final gameplay behavior.
 
@@ -1629,7 +1759,8 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, generated terrain tiles, party members, enemies, resources, NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
+
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -1757,4 +1888,6 @@ Do not implement unless requested:
 - full quest journal, dialogue system, quest reward economy, or production quest content beyond the prototype quest chain
 - full shop, selling, buying, and merchant economy beyond prototype quick exchange
 - persistent ground loot beyond prototype drop visual events and drop-to-inventory behavior
+- final death penalty, checkpoint, resurrection economy, or recovery system beyond prototype resurrection and world-wipe recovery
+- production enemy respawn, encounter reset, or spawn scheduling beyond current prototype wild-map respawn behavior
 - final POI/world-routing framework beyond debug-map POI guidance

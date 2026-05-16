@@ -339,12 +339,42 @@ Derived stat combat integration should remain simple and readable. It should not
 Combat positioning should continue to support future ranged classes without treating the current prototype ranged enemy behavior as the final ranged combat system.
 
 
-Early-game enemies may be passive by default and only fight back after being attacked.
+Current prototype enemies may be passive or aggressive by archetype or setup.
 
 Aggressive enemies may be introduced by enemy archetype, enemy type, zone, event, or explicit debug scenario.
 
-
 If any party member is attacked, the party may switch target priority to that attacker.
+
+## Party Defeat, Resurrection, and Recovery
+
+Party members can die during combat.
+
+Dead party members:
+
+- do not act
+- do not receive enemy XP
+- may be revived by living companions when the party is out of combat
+
+Current prototype resurrection behavior:
+
+- living autonomous companions may move to dead companions after combat ends
+- resurrection requires close range
+- resurrection channels over time
+- resurrection can be canceled if the helper becomes invalid, receives a direct command, or the target is revived
+- revived companions return with minimal health and resume party behavior
+
+If all party members are defeated outside the hub, prototype world-wipe recovery may rescue the party to an unlocked rescue hub.
+
+Current prototype world-wipe recovery behavior:
+
+- does not trigger in the hub
+- restores companions to the selected rescue hub
+- restores companion health
+- clears active combat, movement, teleport, POI, skill, drop, and resurrection runtime state
+- may charge Crowns based on route distance, limited by the current wallet balance
+- may show short-lived rescue feedback
+
+This is a prototype safety system, not the final death penalty, revive economy, checkpoint system, or town recovery design.
 
 ---
 
@@ -377,11 +407,23 @@ Current prototype enemy target preferences:
 - current leader
 - lowest-health party member
 
-Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, and lightweight roaming behavior.
+Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, subzone ids, encounter area ids, lightweight roaming behavior, and defeated timestamps.
 
 Enemy XP rewards currently come from the enemy level XP table by default. Monster-specific XP adjustments, Superior monster reward modifiers, and special named Elite monster rewards are future-facing and should not be treated as part of the current archetype setup data.
 
-Enemy level may later affect stats, difficulty, loot, and encounter tuning.
+Current prototype enemy scaling:
+
+- supports starter and early scaling bands
+- clamps effective scaling levels to the current prototype range
+- derives simple combat stats such as max health, attack, defense, magic defense, evasion, and threat
+- remains lightweight prototype tuning, not final encounter balance
+
+Current prototype enemy respawn behavior:
+
+- defeated enemies may respawn on wild maps after a short delay
+- enemies respawn at their home position
+- respawn restores health and clears temporary target, roam, mark, and bind state
+- enemy respawn does not run in the hub
 
 Current prototype enemy archetypes:
 
@@ -400,7 +442,6 @@ Current prototype enemy archetypes:
 
 Prototype enemy archetypes are lightweight tuning data for current supported setup values such as level, health, attack cooldown, detection range, attack range, temperament, combat style, and target preference. They are not final bestiary content, final encounter design, faction design, AI behavior trees, production combat roles, or XP reward tables.
 
-
 ---
 
 ## Gathering
@@ -412,8 +453,11 @@ Resources:
 - have durability
 - yield items when durability is depleted
 - can have limited quantity
+- can have a resource tier
+- can limit simultaneous gatherers
 - become depleted
-- may respawn later
+- may be rebuilt by map reset, debug reset, or future respawn behavior
+
 
 Gathering is task-based, not manual.
 
@@ -829,13 +873,22 @@ Current prototype quest statuses:
 - Ready to Turn In
 - Completed
 
-Current prototype quest objective types:
+Supported prototype quest objective type definitions:
 
 - talk to POI
 - reach POI
 - defeat enemy count
 - gather item count
 - return to POI
+
+Current prototype quest content currently uses:
+
+- reach POI
+- defeat enemy count
+- gather item count
+
+Talk-to-POI and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
+
 
 Current prototype quests:
 
@@ -881,20 +934,25 @@ POI selection should prefer progression-relevant targets before generic local ac
 
 Current intended POI priority order:
 
-1. ready quest turn-in target
-2. active quest objective target on the current map
-3. available quest acceptance target on the current map
-4. quest-required prototype teleport when the active objective is on a connected map
-5. nearby combat target when combat is relevant
-6. nearby resource target when gathering is relevant
-7. reachable unexplored exploration point
-8. safe idle hub point
+1. active World Travel route target
+2. hub Merchant quick exchange when eligible junk is available
+3. ready quest turn-in target
+4. active quest objective target on the current map
+5. available quest acceptance target on the current map
+6. quest-required prototype teleport when the active objective is on a connected map
+7. nearby combat target when combat is relevant
+8. nearby resource target when gathering is relevant
+9. reachable unexplored exploration point
+10. safe idle hub point
 
 POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, or already satisfied targets.
 
 POI selection should not repeatedly choose the same failed target when a better valid target exists.
 
 POI direction may route the leader toward quest givers, combat targets, resources, exploration points, idle hub positions, or prototype teleports.
+
+If combat interrupts an active POI target, the prototype may preserve the interrupted POI and restore it after combat ends when the target is still valid and no direct party command blocks it.
+
 
 This is a prototype guidance layer for current debug maps. It is not a full quest system, dialogue system, final POI framework, final zone-routing system, or production content pipeline.
 
@@ -1411,6 +1469,21 @@ Current prototype/debug map routes are:
 
 - `hub` <-> `map-1`
 - `map-1` <-> `map-2`
+- `map-2` <-> `map-3`
+- `map-3` <-> `map-4`
+
+Current readable prototype/debug map names:
+
+- `hub`: Harbor Union Bastion
+- `map-1`: First Wild Map
+- `map-2`: Second Wild Map
+- `map-3`: Third Wild Map
+- `map-4`: Fourth Wild Map
+
+Current prototype wilderness maps may contain named subzones, encounter areas, encounter leashes, resource locations, and UI-facing subzone labels.
+
+Subzones and encounter areas are current prototype map-organization data. They must not be treated as the final zone system, final region content model, final encounter design pipeline, or persistent world-state structure.
+
 
 Prototype teleport behavior should not define the final world structure.
 
@@ -1513,6 +1586,9 @@ Temporary debug tools may include:
 - inspect wallet, drops, and merchant exchange telemetry
 - inspect healing fountain behavior
 - inspect enemy archetype, combat style, target preference, attack range, and target decision behavior
+- inspect enemy scaling, respawn, subzone, and encounter area behavior
+- inspect resurrection and world-wipe recovery behavior
+- inspect interrupted POI restore behavior
 
 
 Debug tools are not part of final gameplay.
@@ -1541,6 +1617,8 @@ Do not implement these unless explicitly requested:
 - full quest journal, branching dialogue, production quest content, or full quest reward economy beyond prototype quest rewards
 - full shop, selling, buying, and merchant economy beyond prototype quick exchange
 - persistent ground loot beyond prototype drop-to-inventory behavior
+- final death penalty, checkpoint, resurrection economy, or recovery system beyond prototype resurrection and world-wipe recovery
+- production enemy respawn, encounter reset, or spawn scheduling beyond current prototype wild-map respawn behavior
 - production POI framework beyond current debug-map guidance
 
 
