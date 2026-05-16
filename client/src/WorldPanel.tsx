@@ -1,12 +1,20 @@
 import {
   debugMapDefinitions,
   HUB_MAP_ID,
+  MAP_FOUR_ID,
   MAP_ONE_ID,
+  MAP_THREE_ID,
   MAP_TWO_ID,
   type DebugMapId,
 } from "./game";
 
-const prototypeRegionMapIds: DebugMapId[] = [HUB_MAP_ID, MAP_ONE_ID, MAP_TWO_ID];
+const prototypeRegionMapIds: DebugMapId[] = [
+  HUB_MAP_ID,
+  MAP_ONE_ID,
+  MAP_TWO_ID,
+  MAP_THREE_ID,
+  MAP_FOUR_ID,
+];
 
 export function WorldPanel({
   currentMapId,

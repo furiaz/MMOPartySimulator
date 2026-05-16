@@ -16,12 +16,16 @@ import { bakeNavigationGrid } from "./navigation";
 export const DEBUG_MAP_COLUMNS = 50;
 export const DEBUG_MAP_ROWS = 26;
 export const WILDERNESS_MAP_COLUMNS = 160;
-export const WILDERNESS_MAP_ROWS = 48;
+export const WILDERNESS_MAP_ROWS = 26;
 export const TELEPORTER_ID = "map-1-to-map-2";
+export const MAP_TWO_TO_MAP_THREE_TELEPORTER_ID = "map-2-to-map-3";
+export const MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID = "map-3-to-map-4";
 export const TELEPORTER_RANGE = 10;
 export const HUB_MAP_ID: DebugMapId = "hub";
 export const MAP_ONE_ID: DebugMapId = "map-1";
 export const MAP_TWO_ID: DebugMapId = "map-2";
+export const MAP_THREE_ID: DebugMapId = "map-3";
+export const MAP_FOUR_ID: DebugMapId = "map-4";
 
 export const companionIds = [
   "test-companion-1",
@@ -116,16 +120,20 @@ export const hubCompanionStartPositions: Position[] = [
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
-  { x: 5, y: 38 },
-  { x: 6, y: 38 },
-  { x: 5, y: 39 },
-  { x: 6, y: 39 },
+  { x: 28, y: 14 },
+  { x: 29, y: 14 },
+  { x: 28, y: 15 },
+  { x: 29, y: 15 },
 ];
 
 export const teleporterPosition: Position = { x: 154, y: 12 };
+export const mapTwoForwardTeleporterPosition: Position = { x: 154, y: 12 };
+export const mapThreeForwardTeleporterPosition: Position = { x: 154, y: 12 };
 export const hubTeleporterPosition: Position = { x: 22, y: 20 };
 export const mapOneHubTeleporterPosition: Position = { x: 5, y: 12 };
-export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 36 };
+export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 12 };
+export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 12 };
+export const mapFourReturnTeleporterPosition: Position = { x: 5, y: 12 };
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
   {
@@ -150,10 +158,45 @@ const mapOneHubArrivalPositions: Position[] = [
 ];
 
 const mapOneMapTwoArrivalPositions: Position[] = [
+  { x: 28, y: 14 },
+  { x: 29, y: 14 },
+  { x: 28, y: 15 },
+  { x: 29, y: 15 },
+];
+
+const mapTwoMapOneArrivalPositions: Position[] = [
   { x: 154, y: 14 },
   { x: 153, y: 14 },
   { x: 154, y: 15 },
   { x: 153, y: 15 },
+];
+
+const mapTwoMapThreeArrivalPositions: Position[] = [
+  { x: 7, y: 12 },
+  { x: 8, y: 12 },
+  { x: 7, y: 13 },
+  { x: 8, y: 13 },
+];
+
+const mapThreeMapTwoArrivalPositions: Position[] = [
+  { x: 154, y: 14 },
+  { x: 153, y: 14 },
+  { x: 154, y: 15 },
+  { x: 153, y: 15 },
+];
+
+const mapThreeMapFourArrivalPositions: Position[] = [
+  { x: 8, y: 12 },
+  { x: 9, y: 12 },
+  { x: 8, y: 13 },
+  { x: 9, y: 13 },
+];
+
+const mapFourMapThreeArrivalPositions: Position[] = [
+  { x: 154, y: 12 },
+  { x: 153, y: 12 },
+  { x: 154, y: 13 },
+  { x: 153, y: 13 },
 ];
 
 export const hubNpcStartData = [
@@ -195,7 +238,7 @@ export const hubNpcStartData = [
   },
 ] as const;
 
-const WILDERNESS_PASSAGES: ZoneSubzonePassage[] = [
+const MAP_ONE_PASSAGES: ZoneSubzonePassage[] = [
   {
     id: "north-west-to-north-center",
     fromSubzoneId: "north-west",
@@ -208,18 +251,9 @@ const WILDERNESS_PASSAGES: ZoneSubzonePassage[] = [
     toSubzoneId: "south-west",
     position: { x: 26, y: 24 },
   },
-  {
-    id: "north-center-to-south-center",
-    fromSubzoneId: "north-center",
-    toSubzoneId: "south-center",
-    position: { x: 80, y: 24 },
-  },
-  {
-    id: "south-west-to-south-center",
-    fromSubzoneId: "south-west",
-    toSubzoneId: "south-center",
-    position: { x: 52, y: 36 },
-  },
+];
+
+const MAP_TWO_PASSAGES: ZoneSubzonePassage[] = [
   {
     id: "south-center-to-south-east",
     fromSubzoneId: "south-center",
@@ -234,7 +268,97 @@ const WILDERNESS_PASSAGES: ZoneSubzonePassage[] = [
   },
 ];
 
-export const mapOneSubzones: ZoneSubzone[] = [
+const MAP_THREE_PASSAGES: ZoneSubzonePassage[] = [
+  {
+    id: "south-west-to-north-west",
+    fromSubzoneId: "south-west",
+    toSubzoneId: "north-west",
+    position: { x: 26, y: 24 },
+  },
+  {
+    id: "south-west-to-south-center",
+    fromSubzoneId: "south-west",
+    toSubzoneId: "south-center",
+    position: { x: 52, y: 36 },
+  },
+];
+
+const MAP_FOUR_PASSAGES: ZoneSubzonePassage[] = [
+  {
+    id: "north-center-to-north-east",
+    fromSubzoneId: "north-center",
+    toSubzoneId: "north-east",
+    position: { x: 105, y: 12 },
+  },
+  {
+    id: "south-east-to-north-east",
+    fromSubzoneId: "south-east",
+    toSubzoneId: "north-east",
+    position: { x: 132, y: 24 },
+  },
+];
+
+const MAP_ONE_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
+  {
+    id: "north-west-to-north-center",
+    fromSubzoneId: "north-west",
+    toSubzoneId: "north-center",
+    position: { x: 52, y: 12 },
+  },
+  {
+    id: "north-center-to-south-west",
+    fromSubzoneId: "north-center",
+    toSubzoneId: "south-west",
+    position: { x: 105, y: 12 },
+  },
+];
+
+const MAP_TWO_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
+  {
+    id: "south-center-to-south-east",
+    fromSubzoneId: "south-center",
+    toSubzoneId: "south-east",
+    position: { x: 52, y: 12 },
+  },
+  {
+    id: "south-east-to-north-east",
+    fromSubzoneId: "south-east",
+    toSubzoneId: "north-east",
+    position: { x: 105, y: 12 },
+  },
+];
+
+const MAP_THREE_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
+  {
+    id: "south-west-to-north-west",
+    fromSubzoneId: "south-west",
+    toSubzoneId: "north-west",
+    position: { x: 52, y: 12 },
+  },
+  {
+    id: "north-west-to-south-center",
+    fromSubzoneId: "north-west",
+    toSubzoneId: "south-center",
+    position: { x: 105, y: 12 },
+  },
+];
+
+const MAP_FOUR_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
+  {
+    id: "north-center-to-north-east",
+    fromSubzoneId: "north-center",
+    toSubzoneId: "north-east",
+    position: { x: 52, y: 12 },
+  },
+  {
+    id: "north-east-to-south-east",
+    fromSubzoneId: "north-east",
+    toSubzoneId: "south-east",
+    position: { x: 105, y: 12 },
+  },
+];
+
+const mapOneSourceSubzones: ZoneSubzone[] = [
   {
     id: "north-west",
     displayName: "Shore Fringe",
@@ -246,7 +370,7 @@ export const mapOneSubzones: ZoneSubzone[] = [
       { id: resourceIds[0], subzoneId: "north-west", position: { x: 47, y: 21 }, resourceType: "wood" },
       { id: resourceIds[10], subzoneId: "north-west", position: { x: 8, y: 20 }, resourceType: "herb" },
     ],
-    passages: getPassagesForSubzone("north-west"),
+    passages: getPassagesForSubzone("north-west", MAP_ONE_PASSAGES),
   },
   {
     id: "north-center",
@@ -260,7 +384,7 @@ export const mapOneSubzones: ZoneSubzone[] = [
       { id: resourceIds[2], subzoneId: "north-center", position: { x: 102, y: 20 }, resourceType: "herb" },
       { id: resourceIds[11], subzoneId: "north-center", position: { x: 58, y: 4 }, resourceType: "wood" },
     ],
-    passages: getPassagesForSubzone("north-center"),
+    passages: getPassagesForSubzone("north-center", MAP_ONE_PASSAGES),
   },
   {
     id: "south-west",
@@ -274,8 +398,11 @@ export const mapOneSubzones: ZoneSubzone[] = [
       { id: resourceIds[5], subzoneId: "south-west", position: { x: 48, y: 43 }, resourceType: "herb" },
       { id: resourceIds[12], subzoneId: "south-west", position: { x: 7, y: 28 }, resourceType: "wood" },
     ],
-    passages: getPassagesForSubzone("south-west"),
+    passages: getPassagesForSubzone("south-west", MAP_ONE_PASSAGES),
   },
+];
+
+const mapTwoSourceSubzones: ZoneSubzone[] = [
   {
     id: "south-center",
     displayName: "Scout Rise",
@@ -287,7 +414,7 @@ export const mapOneSubzones: ZoneSubzone[] = [
       { id: resourceIds[3], subzoneId: "south-center", position: { x: 56, y: 43 }, resourceType: "wood" },
       { id: resourceIds[13], subzoneId: "south-center", position: { x: 102, y: 28 }, resourceType: "ore" },
     ],
-    passages: getPassagesForSubzone("south-center"),
+    passages: getPassagesForSubzone("south-center", MAP_TWO_PASSAGES),
   },
   {
     id: "south-east",
@@ -301,7 +428,7 @@ export const mapOneSubzones: ZoneSubzone[] = [
       { id: resourceIds[7], subzoneId: "south-east", position: { x: 155, y: 43 }, resourceType: "ore" },
       { id: resourceIds[14], subzoneId: "south-east", position: { x: 154, y: 28 }, resourceType: "herb" },
     ],
-    passages: getPassagesForSubzone("south-east"),
+    passages: getPassagesForSubzone("south-east", MAP_TWO_PASSAGES),
   },
   {
     id: "north-east",
@@ -315,11 +442,11 @@ export const mapOneSubzones: ZoneSubzone[] = [
       { id: resourceIds[9], subzoneId: "north-east", position: { x: 156, y: 21 }, resourceType: "wood" },
       { id: resourceIds[15], subzoneId: "north-east", position: { x: 109, y: 4 }, resourceType: "ore" },
     ],
-    passages: getPassagesForSubzone("north-east"),
+    passages: getPassagesForSubzone("north-east", MAP_TWO_PASSAGES),
   },
 ];
 
-export const mapTwoSubzones: ZoneSubzone[] = [
+const mapThreeSourceSubzones: ZoneSubzone[] = [
   {
     id: "south-west",
     displayName: "Broken Thicket",
@@ -331,7 +458,7 @@ export const mapTwoSubzones: ZoneSubzone[] = [
       { id: resourceIds[0], subzoneId: "south-west", position: { x: 48, y: 43 }, resourceType: "wood", tier: 2 },
       { id: resourceIds[10], subzoneId: "south-west", position: { x: 7, y: 28 }, resourceType: "herb", tier: 2 },
     ],
-    passages: getPassagesForSubzone("south-west"),
+    passages: getPassagesForSubzone("south-west", MAP_THREE_PASSAGES),
   },
   {
     id: "north-west",
@@ -345,7 +472,7 @@ export const mapTwoSubzones: ZoneSubzone[] = [
       { id: resourceIds[2], subzoneId: "north-west", position: { x: 49, y: 20 }, resourceType: "herb", tier: 2 },
       { id: resourceIds[11], subzoneId: "north-west", position: { x: 49, y: 4 }, resourceType: "wood", tier: 2 },
     ],
-    passages: getPassagesForSubzone("north-west"),
+    passages: getPassagesForSubzone("north-west", MAP_THREE_PASSAGES),
   },
   {
     id: "south-center",
@@ -359,8 +486,11 @@ export const mapTwoSubzones: ZoneSubzone[] = [
       { id: resourceIds[5], subzoneId: "south-center", position: { x: 102, y: 43 }, resourceType: "herb", tier: 2 },
       { id: resourceIds[12], subzoneId: "south-center", position: { x: 102, y: 28 }, resourceType: "wood", tier: 2 },
     ],
-    passages: getPassagesForSubzone("south-center"),
+    passages: getPassagesForSubzone("south-center", MAP_THREE_PASSAGES),
   },
+];
+
+const mapFourSourceSubzones: ZoneSubzone[] = [
   {
     id: "north-center",
     displayName: "Shaman Watch",
@@ -372,7 +502,7 @@ export const mapTwoSubzones: ZoneSubzone[] = [
       { id: resourceIds[3], subzoneId: "north-center", position: { x: 102, y: 20 }, resourceType: "wood", tier: 2 },
       { id: resourceIds[13], subzoneId: "north-center", position: { x: 58, y: 4 }, resourceType: "ore", tier: 2 },
     ],
-    passages: getPassagesForSubzone("north-center"),
+    passages: getPassagesForSubzone("north-center", MAP_FOUR_PASSAGES),
   },
   {
     id: "north-east",
@@ -383,10 +513,10 @@ export const mapTwoSubzones: ZoneSubzone[] = [
     encounterAreas: [{ id: "ash-hollow", subzoneId: "north-east", center: { x: 133, y: 12 }, radius: 19, leashRadius: 21 }],
     resourceLocations: [
       { id: resourceIds[6], subzoneId: "north-east", position: { x: 109, y: 20 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[7], subzoneId: "north-east", position: { x: 156, y: 21 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[7], subzoneId: "north-east", position: { x: 154, y: 21 }, resourceType: "ore", tier: 2 },
       { id: resourceIds[14], subzoneId: "north-east", position: { x: 109, y: 4 }, resourceType: "herb", tier: 2 },
     ],
-    passages: getPassagesForSubzone("north-east"),
+    passages: getPassagesForSubzone("north-east", MAP_FOUR_PASSAGES),
   },
   {
     id: "south-east",
@@ -400,44 +530,110 @@ export const mapTwoSubzones: ZoneSubzone[] = [
       { id: resourceIds[9], subzoneId: "south-east", position: { x: 156, y: 43 }, resourceType: "wood", tier: 2 },
       { id: resourceIds[15], subzoneId: "south-east", position: { x: 154, y: 28 }, resourceType: "ore", tier: 2 },
     ],
-    passages: getPassagesForSubzone("south-east"),
+    passages: getPassagesForSubzone("south-east", MAP_FOUR_PASSAGES),
   },
 ];
 
-export const mapOneSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
+const MAP_ONE_COMPACT_OFFSETS: Record<string, Position> = {
+  "south-west": { x: 105, y: -24 },
+};
+
+const MAP_TWO_COMPACT_OFFSETS: Record<string, Position> = {
+  "south-center": { x: -52, y: -24 },
+  "south-east": { x: -52, y: -24 },
+};
+
+const MAP_THREE_COMPACT_OFFSETS: Record<string, Position> = {
+  "south-west": { x: 0, y: -24 },
+  "north-west": { x: 53, y: 0 },
+  "south-center": { x: 53, y: -24 },
+};
+
+const MAP_FOUR_COMPACT_OFFSETS: Record<string, Position> = {
+  "north-center": { x: -52, y: 0 },
+  "north-east": { x: -52, y: 0 },
+  "south-east": { x: 0, y: -24 },
+};
+
+export const mapOneSubzones: ZoneSubzone[] = compactSubzones(
+  mapOneSourceSubzones,
+  MAP_ONE_COMPACT_OFFSETS,
+  MAP_ONE_COMPACT_PASSAGES,
+);
+
+export const mapTwoSubzones: ZoneSubzone[] = compactSubzones(
+  mapTwoSourceSubzones,
+  MAP_TWO_COMPACT_OFFSETS,
+  MAP_TWO_COMPACT_PASSAGES,
+);
+
+export const mapThreeSubzones: ZoneSubzone[] = compactSubzones(
+  mapThreeSourceSubzones,
+  MAP_THREE_COMPACT_OFFSETS,
+  MAP_THREE_COMPACT_PASSAGES,
+);
+
+export const mapFourSubzones: ZoneSubzone[] = compactSubzones(
+  mapFourSourceSubzones,
+  MAP_FOUR_COMPACT_OFFSETS,
+  MAP_FOUR_COMPACT_PASSAGES,
+);
+
+const mapOneSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
   { id: "map-1-shore-fringe-entry-label", subzoneId: "north-west", text: "Shore Fringe", position: { x: 8, y: 14 } },
   { id: "map-1-shore-fringe-mossy-label", subzoneId: "north-west", text: "Shore Fringe", position: { x: 47, y: 12 } },
   { id: "map-1-mossy-glade-shore-label", subzoneId: "north-center", text: "Mossy Glade", position: { x: 57, y: 12 } },
   { id: "map-1-shore-fringe-lower-label", subzoneId: "north-west", text: "Shore Fringe", position: { x: 26, y: 21 } },
   { id: "map-1-lower-shore-shore-label", subzoneId: "south-west", text: "Lower Shore", position: { x: 26, y: 27 } },
-  { id: "map-1-mossy-glade-scout-label", subzoneId: "north-center", text: "Mossy Glade", position: { x: 80, y: 21 } },
-  { id: "map-1-scout-rise-mossy-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 80, y: 27 } },
-  { id: "map-1-lower-shore-scout-label", subzoneId: "south-west", text: "Lower Shore", position: { x: 47, y: 36 } },
-  { id: "map-1-scout-rise-lower-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 57, y: 36 } },
-  { id: "map-1-scout-rise-old-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 100, y: 36 } },
-  { id: "map-1-old-grove-scout-label", subzoneId: "south-east", text: "Old Grove", position: { x: 110, y: 36 } },
-  { id: "map-1-old-grove-wolf-label", subzoneId: "south-east", text: "Old Grove", position: { x: 132, y: 27 } },
-  { id: "map-1-wolf-causeway-old-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 132, y: 21 } },
-  { id: "map-1-wolf-causeway-exit-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 151, y: 12 } },
 ];
 
-export const mapTwoSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
+const mapTwoSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
+  { id: "map-2-scout-rise-entry-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 80, y: 39 } },
+  { id: "map-2-scout-rise-old-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 100, y: 36 } },
+  { id: "map-2-old-grove-scout-label", subzoneId: "south-east", text: "Old Grove", position: { x: 110, y: 36 } },
+  { id: "map-2-old-grove-wolf-label", subzoneId: "south-east", text: "Old Grove", position: { x: 132, y: 27 } },
+  { id: "map-2-wolf-causeway-old-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 132, y: 21 } },
+  { id: "map-2-wolf-causeway-exit-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 151, y: 12 } },
+];
+
+const mapThreeSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
   { id: "map-2-broken-thicket-entry-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 8, y: 36 } },
   { id: "map-2-broken-thicket-crawler-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 26, y: 27 } },
   { id: "map-2-crawler-shelf-broken-label", subzoneId: "north-west", text: "Crawler Shelf", position: { x: 26, y: 21 } },
   { id: "map-2-broken-thicket-imp-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 47, y: 36 } },
   { id: "map-2-imp-fen-broken-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 57, y: 36 } },
-  { id: "map-2-crawler-shelf-shaman-label", subzoneId: "north-west", text: "Crawler Shelf", position: { x: 47, y: 12 } },
-  { id: "map-2-shaman-watch-crawler-label", subzoneId: "north-center", text: "Shaman Watch", position: { x: 57, y: 12 } },
-  { id: "map-2-imp-fen-shaman-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 80, y: 27 } },
-  { id: "map-2-shaman-watch-imp-label", subzoneId: "north-center", text: "Shaman Watch", position: { x: 80, y: 21 } },
-  { id: "map-2-imp-fen-orc-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 100, y: 36 } },
-  { id: "map-2-orc-approach-imp-label", subzoneId: "south-east", text: "Orc Approach", position: { x: 110, y: 36 } },
-  { id: "map-2-orc-approach-ash-label", subzoneId: "south-east", text: "Orc Approach", position: { x: 132, y: 27 } },
-  { id: "map-2-ash-hollow-orc-label", subzoneId: "north-east", text: "Ash Hollow", position: { x: 132, y: 21 } },
+  { id: "map-3-imp-fen-exit-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 100, y: 36 } },
 ];
 
-export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(mapOneSubzones, [
+const mapFourSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
+  { id: "map-4-shaman-watch-entry-label", subzoneId: "north-center", text: "Shaman Watch", position: { x: 60, y: 12 } },
+  { id: "map-4-shaman-watch-ash-label", subzoneId: "north-center", text: "Shaman Watch", position: { x: 100, y: 12 } },
+  { id: "map-4-ash-hollow-shaman-label", subzoneId: "north-east", text: "Ash Hollow", position: { x: 110, y: 12 } },
+  { id: "map-4-orc-approach-ash-label", subzoneId: "south-east", text: "Orc Approach", position: { x: 132, y: 27 } },
+  { id: "map-4-ash-hollow-orc-label", subzoneId: "north-east", text: "Ash Hollow", position: { x: 132, y: 21 } },
+];
+
+export const mapOneSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
+  mapOneSourceSubzoneNameLabels,
+  MAP_ONE_COMPACT_OFFSETS,
+);
+
+export const mapTwoSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
+  mapTwoSourceSubzoneNameLabels,
+  MAP_TWO_COMPACT_OFFSETS,
+);
+
+export const mapThreeSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
+  mapThreeSourceSubzoneNameLabels,
+  MAP_THREE_COMPACT_OFFSETS,
+);
+
+export const mapFourSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
+  mapFourSourceSubzoneNameLabels,
+  MAP_FOUR_COMPACT_OFFSETS,
+);
+
+const mapOneProgressionEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[0], position: { x: 12, y: 8 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
   { id: enemyIds[1], position: { x: 25, y: 15 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
   { id: enemyIds[2], position: { x: 38, y: 9 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
@@ -478,9 +674,19 @@ export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(mapOn
   { id: enemyIds[37], position: { x: 126, y: 6 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
   { id: enemyIds[38], position: { x: 144, y: 7 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
   { id: enemyIds[39], position: { x: 154, y: 16 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-]);
+];
 
-export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(mapTwoSubzones, [
+export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  mapOneSubzones,
+  compactEnemyStartData(mapOneProgressionEnemyStartData, MAP_ONE_COMPACT_OFFSETS),
+);
+
+export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  mapTwoSubzones,
+  compactEnemyStartData(mapOneProgressionEnemyStartData, MAP_TWO_COMPACT_OFFSETS),
+);
+
+const mapTwoProgressionEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[0], position: { x: 12, y: 34 }, archetypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
   { id: enemyIds[1], position: { x: 27, y: 39 }, archetypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
   { id: enemyIds[2], position: { x: 43, y: 33 }, archetypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
@@ -521,7 +727,17 @@ export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(mapTw
   { id: enemyIds[37], position: { x: 134, y: 33 }, archetypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
   { id: enemyIds[38], position: { x: 143, y: 36 }, archetypeId: "ash_wisp", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
   { id: enemyIds[39], position: { x: 151, y: 40 }, archetypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-]);
+];
+
+export const mapThreeEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  mapThreeSubzones,
+  compactEnemyStartData(mapTwoProgressionEnemyStartData, MAP_THREE_COMPACT_OFFSETS),
+);
+
+export const mapFourEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  mapFourSubzones,
+  compactEnemyStartData(mapTwoProgressionEnemyStartData, MAP_FOUR_COMPACT_OFFSETS),
+);
 
 export const mapOneEnemyStartPositions: Position[] = mapOneEnemyStartData.map(
   (enemy) => enemy.position,
@@ -531,11 +747,25 @@ export const mapTwoEnemyStartPositions: Position[] = mapTwoEnemyStartData.map(
   (enemy) => enemy.position,
 );
 
+export const mapThreeEnemyStartPositions: Position[] = mapThreeEnemyStartData.map(
+  (enemy) => enemy.position,
+);
+
+export const mapFourEnemyStartPositions: Position[] = mapFourEnemyStartData.map(
+  (enemy) => enemy.position,
+);
+
 export const mapOneResourceStartData: ResourceStartData[] =
   createResourceStartData(mapOneSubzones);
 
 export const mapTwoResourceStartData: ResourceStartData[] =
   createResourceStartData(mapTwoSubzones);
+
+export const mapThreeResourceStartData: ResourceStartData[] =
+  createResourceStartData(mapThreeSubzones);
+
+export const mapFourResourceStartData: ResourceStartData[] =
+  createResourceStartData(mapFourSubzones);
 
 export type ResourceStartData = {
   id: string;
@@ -577,34 +807,20 @@ const HUB_WALLS = dedupeWalls([
 
 const MAP_ONE_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [
-    [10, 14],
-    [34, 38],
-  ]),
-  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [
-    [34, 38],
-  ]),
-  ...createHorizontalWall(24, 4, WILDERNESS_MAP_COLUMNS - 5, [
-    [24, 29],
-    [78, 83],
-    [130, 135],
-  ]),
+  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
+  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
 ]);
 
 const MAP_TWO_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [
-    [10, 14],
-    [34, 38],
-  ]),
-  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [
-    [34, 38],
-  ]),
-  ...createHorizontalWall(24, 4, WILDERNESS_MAP_COLUMNS - 5, [
-    [24, 29],
-    [78, 83],
-    [130, 135],
-  ]),
+  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
+  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
+]);
+
+const MAP_FOUR_WALLS = dedupeWalls([
+  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
+  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
+  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
 ]);
 
 export const debugMapDefinitions: Record<
@@ -666,7 +882,7 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_ONE_ID,
         targetMapId: MAP_TWO_ID,
-        arrivalPositions: mapTwoCompanionStartPositions,
+        arrivalPositions: mapOneMapTwoArrivalPositions,
         autoSelectAfterEnemiesCleared: true,
       },
     ],
@@ -688,7 +904,67 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_TWO_ID,
         targetMapId: MAP_ONE_ID,
-        arrivalPositions: mapOneMapTwoArrivalPositions,
+        arrivalPositions: mapTwoMapOneArrivalPositions,
+      },
+      {
+        id: MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
+        position: mapTwoForwardTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_TWO_ID,
+        targetMapId: MAP_THREE_ID,
+        arrivalPositions: mapTwoMapThreeArrivalPositions,
+        autoSelectAfterEnemiesCleared: true,
+      },
+    ],
+  },
+  [MAP_THREE_ID]: {
+    id: MAP_THREE_ID,
+    displayName: "Third Wild Map",
+    debugName: "map-3",
+    columns: WILDERNESS_MAP_COLUMNS,
+    rows: WILDERNESS_MAP_ROWS,
+    walls: MAP_TWO_WALLS,
+    healingFountains: [],
+    subzones: mapThreeSubzones,
+    subzoneNameLabels: mapThreeSubzoneNameLabels,
+    teleports: [
+      {
+        id: "map-3-to-map-2",
+        position: mapThreeReturnTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_THREE_ID,
+        targetMapId: MAP_TWO_ID,
+        arrivalPositions: mapThreeMapTwoArrivalPositions,
+      },
+      {
+        id: MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID,
+        position: mapThreeForwardTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_THREE_ID,
+        targetMapId: MAP_FOUR_ID,
+        arrivalPositions: mapThreeMapFourArrivalPositions,
+        autoSelectAfterEnemiesCleared: true,
+      },
+    ],
+  },
+  [MAP_FOUR_ID]: {
+    id: MAP_FOUR_ID,
+    displayName: "Fourth Wild Map",
+    debugName: "map-4",
+    columns: WILDERNESS_MAP_COLUMNS,
+    rows: WILDERNESS_MAP_ROWS,
+    walls: MAP_FOUR_WALLS,
+    healingFountains: [],
+    subzones: mapFourSubzones,
+    subzoneNameLabels: mapFourSubzoneNameLabels,
+    teleports: [
+      {
+        id: "map-4-to-map-3",
+        position: mapFourReturnTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_FOUR_ID,
+        targetMapId: MAP_THREE_ID,
+        arrivalPositions: mapFourMapThreeArrivalPositions,
         autoSelectAfterEnemiesCleared: true,
       },
     ],
@@ -786,8 +1062,79 @@ function dedupeWalls(walls: { x: number; y: number }[]) {
   });
 }
 
-function getPassagesForSubzone(subzoneId: string): ZoneSubzonePassage[] {
-  return WILDERNESS_PASSAGES.filter(
+function compactSubzones(
+  subzones: ZoneSubzone[],
+  offsetsBySubzoneId: Record<string, Position>,
+  passages: ZoneSubzonePassage[],
+): ZoneSubzone[] {
+  return subzones.map((subzone) => {
+    const offset = getCompactOffset(subzone.id, offsetsBySubzoneId);
+
+    return {
+      ...subzone,
+      bounds: {
+        ...subzone.bounds,
+        x: subzone.bounds.x + offset.x,
+        y: subzone.bounds.y + offset.y,
+      },
+      encounterAreas: subzone.encounterAreas.map((encounterArea) => ({
+        ...encounterArea,
+        center: offsetPosition(encounterArea.center, offset),
+      })),
+      resourceLocations: subzone.resourceLocations.map((resourceLocation) => ({
+        ...resourceLocation,
+        position: offsetPosition(resourceLocation.position, offset),
+      })),
+      passages: getPassagesForSubzone(subzone.id, passages),
+    };
+  });
+}
+
+function compactSubzoneNameLabels(
+  labels: ZoneSubzoneNameLabel[],
+  offsetsBySubzoneId: Record<string, Position>,
+): ZoneSubzoneNameLabel[] {
+  return labels.map((label) => ({
+    ...label,
+    position: offsetPosition(
+      label.position,
+      getCompactOffset(label.subzoneId, offsetsBySubzoneId),
+    ),
+  }));
+}
+
+function compactEnemyStartData(
+  enemies: EnemyStartData[],
+  offsetsBySubzoneId: Record<string, Position>,
+): EnemyStartData[] {
+  return enemies.map((enemy) => ({
+    ...enemy,
+    position: offsetPosition(
+      enemy.position,
+      getCompactOffset(enemy.subzoneId, offsetsBySubzoneId),
+    ),
+  }));
+}
+
+function getCompactOffset(
+  subzoneId: string,
+  offsetsBySubzoneId: Record<string, Position>,
+): Position {
+  return offsetsBySubzoneId[subzoneId] ?? { x: 0, y: 0 };
+}
+
+function offsetPosition(position: Position, offset: Position): Position {
+  return {
+    x: position.x + offset.x,
+    y: position.y + offset.y,
+  };
+}
+
+function getPassagesForSubzone(
+  subzoneId: string,
+  passages: ZoneSubzonePassage[],
+): ZoneSubzonePassage[] {
+  return passages.filter(
     (passage) =>
       passage.fromSubzoneId === subzoneId || passage.toSubzoneId === subzoneId,
   );

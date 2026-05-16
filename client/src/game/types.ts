@@ -432,7 +432,7 @@ export type InventoryRemoveResult = {
   remainingQuantity: number;
 };
 
-export type DebugMapId = "hub" | "map-1" | "map-2";
+export type DebugMapId = "hub" | "map-1" | "map-2" | "map-3" | "map-4";
 
 export type Position = {
   x: number;

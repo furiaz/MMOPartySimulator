@@ -3,7 +3,9 @@ import { createCompanion, createEnemy, createNpc, createResource } from "./entit
 import {
   createDebugMap,
   HUB_MAP_ID,
+  MAP_FOUR_ID,
   MAP_ONE_ID,
+  MAP_THREE_ID,
   MAP_TWO_ID,
   npcIds,
 } from "./debugMap";
@@ -929,24 +931,24 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget?.reason).toBe("hub idle city point");
   });
 
-  it("routes world travel from hub toward map 2 through map 1", () => {
+  it("routes world travel from hub toward map 4 through map 1", () => {
     const leader = createLeader({ x: 22, y: 13 });
 
     const nextState = updateGame(
       createHubState([leader, ...createHubNpcs()], {
         partyLeaderId: leader.id,
-        worldTravelTargetMapId: MAP_TWO_ID,
+        worldTravelTargetMapId: MAP_FOUR_ID,
       }),
     );
 
     expect(nextState.globalPoiIntent?.type).toBe("travel_to_map");
     expect(nextState.localPoiTarget?.poiId).toBe("hub-to-map-1");
-    expect(nextState.localPoiTarget?.reason).toBe("world route toward map-2");
+    expect(nextState.localPoiTarget?.reason).toBe("world route toward map-4");
     expect(nextState.leaderIntent?.type).toBe("move");
   });
 
   it("routes world travel from map 1 toward map 2 directly", () => {
-    const leader = createLeader({ x: 70, y: 40 });
+    const leader = createLeader({ x: 70, y: 12 });
 
     const nextState = updateGame(
       createMapOneState([leader], {
@@ -959,8 +961,64 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent?.type).toBe("move");
   });
 
+  it("routes world travel from map 1 toward map 4 through map 2", () => {
+    const leader = createLeader({ x: 70, y: 12 });
+
+    const nextState = updateGame(
+      createMapOneState([leader], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_FOUR_ID,
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).toBe("map-1-to-map-2");
+    expect(nextState.leaderIntent?.type).toBe("move");
+  });
+
+  it("routes world travel from map 2 toward map 4 through map 3", () => {
+    const leader = createLeader({ x: 130, y: 12 });
+
+    const nextState = updateGame(
+      createMapTwoState([leader], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_FOUR_ID,
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).toBe("map-2-to-map-3");
+    expect(nextState.leaderIntent?.type).toBe("move");
+  });
+
+  it("routes world travel from map 3 toward map 4 directly", () => {
+    const leader = createLeader({ x: 80, y: 12 });
+
+    const nextState = updateGame(
+      createMapThreeState([leader], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_FOUR_ID,
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).toBe("map-3-to-map-4");
+    expect(nextState.leaderIntent?.type).toBe("move");
+  });
+
+  it("routes world travel from map 4 toward hub through map 3", () => {
+    const leader = createLeader({ x: 130, y: 12 });
+
+    const nextState = updateGame(
+      createMapFourState([leader], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: HUB_MAP_ID,
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).toBe("map-4-to-map-3");
+    expect(nextState.leaderIntent?.type).toBe("move");
+  });
+
   it("routes world travel from map 2 toward hub through map 1", () => {
-    const leader = createLeader({ x: 70, y: 40 });
+    const leader = createLeader({ x: 70, y: 12 });
 
     const nextState = updateGame(
       createMapTwoState([leader], {
@@ -1010,7 +1068,7 @@ describe("game update intent priority", () => {
         poiPreferences: {
           stayInMap: true,
         },
-        worldTravelTargetMapId: MAP_TWO_ID,
+        worldTravelTargetMapId: MAP_FOUR_ID,
       }),
     );
 
@@ -1080,6 +1138,40 @@ function createMapTwoState(
       autoModeEnabled: true,
       currentMapId: MAP_TWO_ID,
       map: createDebugMap(MAP_TWO_ID),
+      activeTeleport: null,
+      exploredTiles: {},
+      ...overrides,
+    }),
+  );
+}
+
+function createMapThreeState(
+  entities: GameEntity[],
+  overrides: Partial<GameState>,
+): GameState {
+  return entities.reduce(
+    addEntity,
+    createTestGameState({
+      autoModeEnabled: true,
+      currentMapId: MAP_THREE_ID,
+      map: createDebugMap(MAP_THREE_ID),
+      activeTeleport: null,
+      exploredTiles: {},
+      ...overrides,
+    }),
+  );
+}
+
+function createMapFourState(
+  entities: GameEntity[],
+  overrides: Partial<GameState>,
+): GameState {
+  return entities.reduce(
+    addEntity,
+    createTestGameState({
+      autoModeEnabled: true,
+      currentMapId: MAP_FOUR_ID,
+      map: createDebugMap(MAP_FOUR_ID),
       activeTeleport: null,
       exploredTiles: {},
       ...overrides,

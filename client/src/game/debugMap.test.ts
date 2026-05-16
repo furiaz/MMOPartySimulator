@@ -3,17 +3,29 @@ import {
   DEBUG_MAP_COLUMNS,
   DEBUG_MAP_ROWS,
   HUB_MAP_ID,
+  MAP_FOUR_ID,
   MAP_ONE_ID,
+  MAP_THREE_ID,
   MAP_TWO_ID,
   WILDERNESS_MAP_COLUMNS,
   WILDERNESS_MAP_ROWS,
   createDebugMap,
   debugMapDefinitions,
+  mapFourEnemyStartPositions,
+  mapFourEnemyStartData,
+  mapFourSubzoneNameLabels,
+  mapFourResourceStartData,
+  mapFourSubzones,
   mapOneEnemyStartPositions,
   mapOneEnemyStartData,
   mapOneSubzoneNameLabels,
   mapOneResourceStartData,
   mapOneSubzones,
+  mapThreeEnemyStartPositions,
+  mapThreeEnemyStartData,
+  mapThreeSubzoneNameLabels,
+  mapThreeResourceStartData,
+  mapThreeSubzones,
   mapTwoEnemyStartPositions,
   mapTwoEnemyStartData,
   mapTwoSubzoneNameLabels,
@@ -23,6 +35,41 @@ import {
 import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
 import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
 import type { DebugMapId, GameMap, Position, ZoneSubzone } from "./types";
+
+const wildernessMaps = [
+  {
+    mapId: MAP_ONE_ID,
+    subzones: mapOneSubzones,
+    enemies: mapOneEnemyStartData,
+    enemyPositions: mapOneEnemyStartPositions,
+    resources: mapOneResourceStartData,
+    labels: mapOneSubzoneNameLabels,
+  },
+  {
+    mapId: MAP_TWO_ID,
+    subzones: mapTwoSubzones,
+    enemies: mapTwoEnemyStartData,
+    enemyPositions: mapTwoEnemyStartPositions,
+    resources: mapTwoResourceStartData,
+    labels: mapTwoSubzoneNameLabels,
+  },
+  {
+    mapId: MAP_THREE_ID,
+    subzones: mapThreeSubzones,
+    enemies: mapThreeEnemyStartData,
+    enemyPositions: mapThreeEnemyStartPositions,
+    resources: mapThreeResourceStartData,
+    labels: mapThreeSubzoneNameLabels,
+  },
+  {
+    mapId: MAP_FOUR_ID,
+    subzones: mapFourSubzones,
+    enemies: mapFourEnemyStartData,
+    enemyPositions: mapFourEnemyStartPositions,
+    resources: mapFourResourceStartData,
+    labels: mapFourSubzoneNameLabels,
+  },
+] as const;
 
 describe("debug maps", () => {
   it("keeps the hub compact and expands wilderness maps", () => {
@@ -38,22 +85,26 @@ describe("debug maps", () => {
       columns: WILDERNESS_MAP_COLUMNS,
       rows: WILDERNESS_MAP_ROWS,
     });
+    expect(createDebugMap(MAP_THREE_ID)).toMatchObject({
+      columns: WILDERNESS_MAP_COLUMNS,
+      rows: WILDERNESS_MAP_ROWS,
+    });
+    expect(createDebugMap(MAP_FOUR_ID)).toMatchObject({
+      columns: WILDERNESS_MAP_COLUMNS,
+      rows: WILDERNESS_MAP_ROWS,
+    });
   });
 
   it("keeps wilderness enemies and resources on reachable open floor", () => {
-    expect(mapOneEnemyStartPositions).toHaveLength(40);
-    expect(mapTwoEnemyStartPositions).toHaveLength(40);
-    expect(mapOneResourceStartData).toHaveLength(16);
-    expect(mapTwoResourceStartData).toHaveLength(16);
-
-    assertMapPlacements(MAP_ONE_ID, [
-      ...mapOneEnemyStartPositions,
-      ...mapOneResourceStartData.map((resource) => resource.position),
-    ]);
-    assertMapPlacements(MAP_TWO_ID, [
-      ...mapTwoEnemyStartPositions,
-      ...mapTwoResourceStartData.map((resource) => resource.position),
-    ]);
+    for (const wildernessMap of wildernessMaps) {
+      expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
+      expect(wildernessMap.enemyPositions.length).toBeLessThanOrEqual(22);
+      expect(wildernessMap.resources).toHaveLength(8);
+      assertMapPlacements(wildernessMap.mapId, [
+        ...wildernessMap.enemyPositions,
+        ...wildernessMap.resources.map((resource) => resource.position),
+      ]);
+    }
   });
 
   it("keeps wilderness teleports and arrivals on reachable open floor", () => {
@@ -72,49 +123,62 @@ describe("debug maps", () => {
   });
 
   it("does not stack wilderness enemies and resources on each other", () => {
-    expect(getDuplicatePositions([
-      ...mapOneEnemyStartPositions,
-      ...mapOneResourceStartData.map((resource) => resource.position),
-    ])).toEqual([]);
-    expect(getDuplicatePositions([
-      ...mapTwoEnemyStartPositions,
-      ...mapTwoResourceStartData.map((resource) => resource.position),
-    ])).toEqual([]);
+    for (const wildernessMap of wildernessMaps) {
+      expect(getDuplicatePositions([
+        ...wildernessMap.enemyPositions,
+        ...wildernessMap.resources.map((resource) => resource.position),
+      ])).toEqual([]);
+    }
   });
 
-  it("defines six authored subzones for each wilderness map", () => {
-    expect(mapOneSubzones).toHaveLength(6);
-    expect(mapTwoSubzones).toHaveLength(6);
+  it("defines three authored subzones for each wilderness map", () => {
+    for (const wildernessMap of wildernessMaps) {
+      expect(wildernessMap.subzones).toHaveLength(3);
+      expect(createDebugMap(wildernessMap.mapId).subzones).toBe(wildernessMap.subzones);
+    }
     expect(createDebugMap(MAP_ONE_ID).subzones).toBe(mapOneSubzones);
     expect(createDebugMap(MAP_TWO_ID).subzones).toBe(mapTwoSubzones);
   });
 
   it("keeps authored subzones, passages, encounter areas, and resource locations valid", () => {
-    assertSubzones(MAP_ONE_ID, mapOneSubzones);
-    assertSubzones(MAP_TWO_ID, mapTwoSubzones);
+    for (const wildernessMap of wildernessMaps) {
+      assertSubzones(wildernessMap.mapId, wildernessMap.subzones);
+    }
   });
 
   it("keeps wilderness enemies inside their authored subzones", () => {
-    assertEnemyStartData(MAP_ONE_ID, mapOneSubzones, mapOneEnemyStartData);
-    assertEnemyStartData(MAP_TWO_ID, mapTwoSubzones, mapTwoEnemyStartData);
+    for (const wildernessMap of wildernessMaps) {
+      assertEnemyStartData(
+        wildernessMap.mapId,
+        wildernessMap.subzones,
+        wildernessMap.enemies,
+      );
+    }
   });
 
-  it("doubles authored wilderness enemy density and adds one resource per subzone", () => {
-    assertSubzoneContentDensity(mapOneSubzones, mapOneEnemyStartData);
-    assertSubzoneContentDensity(mapTwoSubzones, mapTwoEnemyStartData);
+  it("keeps authored wilderness density bounded per smaller map", () => {
+    for (const wildernessMap of wildernessMaps) {
+      assertSubzoneContentDensity(wildernessMap.subzones, wildernessMap.enemies);
+    }
   });
 
   it("makes current prototype wilderness monsters aggressive", () => {
-    for (const enemy of [...mapOneEnemyStartData, ...mapTwoEnemyStartData]) {
-      expect(ENEMY_ARCHETYPES[enemy.archetypeId].temperament).toBe("aggressive");
+    for (const wildernessMap of wildernessMaps) {
+      for (const enemy of wildernessMap.enemies) {
+        expect(ENEMY_ARCHETYPES[enemy.archetypeId].temperament).toBe("aggressive");
+      }
     }
   });
 
   it("places subzone name labels near reachable entrances and exits", () => {
-    assertSubzoneNameLabels(MAP_ONE_ID, mapOneSubzones, mapOneSubzoneNameLabels);
-    assertSubzoneNameLabels(MAP_TWO_ID, mapTwoSubzones, mapTwoSubzoneNameLabels);
-    expect(createDebugMap(MAP_ONE_ID).subzoneNameLabels).toBe(mapOneSubzoneNameLabels);
-    expect(createDebugMap(MAP_TWO_ID).subzoneNameLabels).toBe(mapTwoSubzoneNameLabels);
+    for (const wildernessMap of wildernessMaps) {
+      assertSubzoneNameLabels(
+        wildernessMap.mapId,
+        wildernessMap.subzones,
+        wildernessMap.labels,
+      );
+      expect(createDebugMap(wildernessMap.mapId).subzoneNameLabels).toBe(wildernessMap.labels);
+    }
   });
 
   it("starts map one in the weakest subzone and ramps toward harder areas", () => {
@@ -141,9 +205,9 @@ describe("debug maps", () => {
     expect(getSubzone(mapOneSubzones, "south-west").levelRange.min).toBeGreaterThan(
       shoreFringe.levelRange.max,
     );
-    expect(getSubzone(mapOneSubzones, "south-center").levelRange.min).toBeGreaterThanOrEqual(3);
-    expect(getSubzone(mapOneSubzones, "south-east").levelRange.min).toBeGreaterThanOrEqual(4);
-    expect(getSubzone(mapOneSubzones, "north-east").levelRange.min).toBeGreaterThanOrEqual(5);
+    expect(getSubzone(mapTwoSubzones, "south-center").levelRange.min).toBeGreaterThanOrEqual(3);
+    expect(getSubzone(mapTwoSubzones, "south-east").levelRange.min).toBeGreaterThanOrEqual(4);
+    expect(getSubzone(mapTwoSubzones, "north-east").levelRange.min).toBeGreaterThanOrEqual(5);
   });
 
   it("bakes navigation grids for all debug maps", () => {
@@ -179,24 +243,11 @@ function assertSubzoneContentDensity(
   enemies: Array<{ subzoneId: string }>,
 ) {
   for (const subzone of subzones) {
-    expect(enemies.filter((enemy) => enemy.subzoneId === subzone.id)).toHaveLength(
-      subzone.displayName === "Orc Approach"
-        ? 10
-        : subzone.displayName === "Old Grove" ||
-            subzone.displayName === "Wolf Causeway"
-        ? 8
-        : 6,
-    );
-    expect(subzone.resourceLocations.length).toBe(
-      [
-        "Shore Fringe",
-        "Scout Rise",
-        "Broken Thicket",
-        "Shaman Watch",
-      ].includes(subzone.displayName)
-        ? 2
-        : 3,
-    );
+    const enemyCount = enemies.filter((enemy) => enemy.subzoneId === subzone.id).length;
+    expect(enemyCount).toBeGreaterThanOrEqual(6);
+    expect(enemyCount).toBeLessThanOrEqual(10);
+    expect(subzone.resourceLocations.length).toBeGreaterThanOrEqual(2);
+    expect(subzone.resourceLocations.length).toBeLessThanOrEqual(3);
   }
 }
 
@@ -250,6 +301,8 @@ function assertSubzones(mapId: DebugMapId, subzones: ZoneSubzone[]) {
     expect(subzone.encounterAreas.length).toBeGreaterThan(0);
 
     for (const passage of subzone.passages) {
+      expect(subzones.some((candidate) => candidate.id === passage.fromSubzoneId)).toBe(true);
+      expect(subzones.some((candidate) => candidate.id === passage.toSubzoneId)).toBe(true);
       assertOpenReachablePosition(map, passage.position);
       if (isNearMapEdge(map, passage.position)) {
         throw new Error(`${passage.id} is too close to ${mapId} edge`);

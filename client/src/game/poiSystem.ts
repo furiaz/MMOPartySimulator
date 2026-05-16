@@ -1,7 +1,10 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import {
+  debugMapDefinitions,
   HUB_MAP_ID,
   MAP_ONE_ID,
+  MAP_FOUR_ID,
+  MAP_THREE_ID,
   MAP_TWO_ID,
 } from "./debugMap";
 import { getQuickExchangeItems, quickExchangeParts } from "./merchant";
@@ -869,16 +872,34 @@ function getNextMapRouteStep(
     return null;
   }
 
-  if (currentMapId === HUB_MAP_ID && targetMapId !== HUB_MAP_ID) {
-    return MAP_ONE_ID;
-  }
+  const visited = new Set<DebugMapId>([currentMapId]);
+  const queue: Array<{ mapId: DebugMapId; firstStep: DebugMapId | null }> = [
+    { mapId: currentMapId, firstStep: null },
+  ];
+  let queueIndex = 0;
 
-  if (currentMapId === MAP_ONE_ID) {
-    return targetMapId === HUB_MAP_ID ? HUB_MAP_ID : MAP_TWO_ID;
-  }
+  while (queueIndex < queue.length) {
+    const current = queue[queueIndex];
+    queueIndex += 1;
 
-  if (currentMapId === MAP_TWO_ID) {
-    return MAP_ONE_ID;
+    if (!current) {
+      continue;
+    }
+
+    for (const teleport of debugMapDefinitions[current.mapId].teleports) {
+      if (visited.has(teleport.targetMapId)) {
+        continue;
+      }
+
+      const firstStep = current.firstStep ?? teleport.targetMapId;
+
+      if (teleport.targetMapId === targetMapId) {
+        return firstStep;
+      }
+
+      visited.add(teleport.targetMapId);
+      queue.push({ mapId: teleport.targetMapId, firstStep });
+    }
   }
 
   return null;
@@ -913,8 +934,16 @@ function createExplorationPoi(
 }
 
 function getMapExplorationTarget(mapId: DebugMapId): Position {
+  if (mapId === MAP_FOUR_ID) {
+    return { x: 132, y: 36 };
+  }
+
+  if (mapId === MAP_THREE_ID) {
+    return { x: 80, y: 36 };
+  }
+
   if (mapId === MAP_TWO_ID) {
-    return { x: 6, y: 21 };
+    return { x: 134, y: 13 };
   }
 
   return { x: 46, y: 22 };

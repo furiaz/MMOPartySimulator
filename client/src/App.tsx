@@ -129,7 +129,7 @@ const cameraSettleFactor = 0.08;
 const cameraSnapDistance = 0.35;
 const cameraDeadZoneWidthRatio = 0.34;
 const cameraDeadZoneHeightRatio = 0.3;
-const wildernessMapIds = new Set(["map-1", "map-2"]);
+const wildernessMapIds = new Set(["map-1", "map-2", "map-3", "map-4"]);
 
 type EntityVisualMovement = {
   direction: SpriteDirection;

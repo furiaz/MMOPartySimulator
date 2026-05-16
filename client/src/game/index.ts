@@ -405,6 +405,8 @@ export {
   mapOneEnemyStartPositions,
   mapOneResourceStartData,
   MAP_ONE_ID,
+  MAP_THREE_ID,
+  MAP_FOUR_ID,
   MAP_TWO_ID,
   resourceIds,
   teleporterPosition,

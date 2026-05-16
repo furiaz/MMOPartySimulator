@@ -171,5 +171,13 @@ function formatQuestMapName(mapId: QuestObjectiveDefinition["targetMapId"]): str
     return "Second Wild Map";
   }
 
+  if (mapId === "map-3") {
+    return "Third Wild Map";
+  }
+
+  if (mapId === "map-4") {
+    return "Fourth Wild Map";
+  }
+
   return "Region";
 }

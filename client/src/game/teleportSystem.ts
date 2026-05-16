@@ -5,15 +5,16 @@ import {
   companionIds,
   createDebugMap,
   debugMapDefinitions,
-  enemyIds,
   hubNpcStartData,
   HUB_MAP_ID,
   mapOneEnemyStartData,
   mapOneResourceStartData,
+  mapThreeEnemyStartData,
+  mapThreeResourceStartData,
+  mapFourEnemyStartData,
+  mapFourResourceStartData,
   mapTwoEnemyStartData,
   mapTwoResourceStartData,
-  MAP_TWO_ID,
-  resourceIds,
 } from "./debugMap";
 import {
   moveEntityTowardPositionIfUnoccupied,
@@ -363,26 +364,33 @@ function getMapEntities(
     return entities;
   }
 
-  const enemyStartData =
-    mapId === MAP_TWO_ID ? mapTwoEnemyStartData : mapOneEnemyStartData;
-  const resourceStartData =
-    mapId === MAP_TWO_ID ? mapTwoResourceStartData : mapOneResourceStartData;
+  const enemyStartDataByMapId: Record<DebugMapId, typeof mapOneEnemyStartData> = {
+    hub: [],
+    "map-1": mapOneEnemyStartData,
+    "map-2": mapTwoEnemyStartData,
+    "map-3": mapThreeEnemyStartData,
+    "map-4": mapFourEnemyStartData,
+  };
+  const resourceStartDataByMapId: Record<DebugMapId, typeof mapOneResourceStartData> = {
+    hub: [],
+    "map-1": mapOneResourceStartData,
+    "map-2": mapTwoResourceStartData,
+    "map-3": mapThreeResourceStartData,
+    "map-4": mapFourResourceStartData,
+  };
+  const enemyStartData = enemyStartDataByMapId[mapId];
+  const resourceStartData = resourceStartDataByMapId[mapId];
 
-  for (const enemyId of enemyIds) {
-    const enemyStart =
-      enemyStartData.find((entry) => entry.id === enemyId) ?? enemyStartData[0];
-    entities[enemyId] = createEnemy(enemyId, enemyStart.position, undefined, {
+  for (const enemyStart of enemyStartData) {
+    entities[enemyStart.id] = createEnemy(enemyStart.id, enemyStart.position, undefined, {
       archetypeId: enemyStart.archetypeId,
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
     });
   }
 
-  for (const resourceId of resourceIds) {
-    const resource =
-      resourceStartData.find((entry) => entry.id === resourceId) ??
-      resourceStartData[0];
-    entities[resourceId] = createResource(resourceId, resource.position, {
+  for (const resource of resourceStartData) {
+    entities[resource.id] = createResource(resource.id, resource.position, {
       resourceType: resource.resourceType,
       tier: resource.tier,
     });
