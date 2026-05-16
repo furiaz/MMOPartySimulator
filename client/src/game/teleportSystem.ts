@@ -268,6 +268,7 @@ function completeTeleport(state: GameState): GameState {
     map: targetMap,
     activeTeleport: null,
     leaderIntent: null,
+    interruptedPoiTarget: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,
     exploredTiles: {},

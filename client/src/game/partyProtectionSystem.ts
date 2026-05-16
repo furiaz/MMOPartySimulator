@@ -1,4 +1,5 @@
 import { isWithinFollowLeash } from "./followSystem";
+import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import { setLeaderIntent, updateEntity, type GameState } from "./state";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
@@ -12,7 +13,7 @@ export function protectPartyMember(
     return state;
   }
 
-  let nextState = setLeaderIntent(state, {
+  let nextState = setLeaderIntent(captureInterruptedPoiTarget(state, attacker), {
     type: "attack",
     targetId: attacker.id,
     targetPosition: attacker.position,
@@ -46,10 +47,6 @@ function canProtectPartyMember(
     return false;
   }
 
-  if (entity.commandPriority === "direct") {
-    return false;
-  }
-
   if (
     entity.kind === "companion" &&
     entity.id !== attackedMember.id &&
@@ -74,5 +71,5 @@ function canProtectPartyMember(
     return entity.state === "idle" || entity.state === "follow" || entity.state === "gather";
   }
 
-  return entity.state === "idle" || entity.state === "follow";
+  return entity.state === "idle" || entity.state === "follow" || entity.state === "gather";
 }

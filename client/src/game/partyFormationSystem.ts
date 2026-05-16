@@ -8,6 +8,7 @@ import {
   isPartyMember,
   type PartyMember,
 } from "./partySystem";
+import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getEntityById,
   moveEntityTowardPositionIfUnoccupied,
@@ -37,6 +38,7 @@ type PartyPlan = {
   phase: FormationPhase;
   target: Enemy | null;
   targetPosition: Position | null;
+  isAggroInterruption: boolean;
 };
 
 type PartyTravelCohesion = {
@@ -60,7 +62,11 @@ export function updatePartyFormationSystem(
     return clearFinishedCombat(clearFormation(state));
   }
 
-  let nextState = setFormationState(state, plan);
+  let nextState = plan.isAggroInterruption && plan.target
+    ? captureInterruptedPoiTarget(state, plan.target)
+    : state;
+
+  nextState = setFormationState(nextState, plan);
 
   if (plan.phase === "combat" && plan.target) {
     nextState = assignPartyCombatTarget(nextState, plan.target.id);
@@ -108,6 +114,7 @@ function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
     phase,
     target,
     targetPosition,
+    isAggroInterruption: Boolean(aggroTarget),
   };
 }
 

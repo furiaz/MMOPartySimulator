@@ -80,6 +80,60 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("interrupts gathering when companions are inside enemy aggro range", () => {
+    const resource = createResource("danger-wood", { x: 6, y: 5 }, {
+      resourceType: "wood",
+      durability: 5,
+    });
+    const leader = {
+      ...createCompanion("leader", { x: 6, y: 5 }, "leader", "fighter", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+    const ally = {
+      ...createCompanion("companion-2", { x: 6.5, y: 5 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+    const enemy = createEnemy("aggro-enemy", { x: 5, y: 5 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, ally, resource, enemy], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        leaderIntent: {
+          type: "gather",
+          targetId: resource.id,
+          targetPosition: resource.position,
+        },
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: leader.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+      commandPriority: "autonomous",
+    });
+    expect(nextState.entities[ally.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+      commandPriority: "autonomous",
+    });
+    expect(nextState.entities[resource.id]).toMatchObject({
+      durability: resource.durability,
+      quantity: resource.quantity,
+    });
+  });
+
   it("switches to attack intent when an enemy is attacking the party", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const wood = createResource("quest-wood", { x: 8, y: 4 }, {
@@ -105,6 +159,341 @@ describe("game update intent priority", () => {
 
     expect(nextState.leaderIntent?.type).toBe("attack");
     expect(nextState.leaderIntent?.targetId).toBe(attacker.id);
+  });
+
+  it("remembers the interrupted POI when enemy aggro pulls the party into combat", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const wood = createResource("quest-wood", { x: 8, y: 4 }, {
+      resourceType: "wood",
+    });
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState(
+        [leader, wood, attacker],
+        {
+          partyLeaderId: leader.id,
+          quests: createQuestStates({
+            gather_expedition_supplies: "active",
+          }),
+        },
+      ),
+    );
+
+    expect(nextState.leaderIntent?.targetId).toBe(attacker.id);
+    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: wood.id,
+    });
+    expect(nextState.interruptedPoiTarget?.localPoiTarget?.targetEntityId).toBe(wood.id);
+  });
+
+  it("remembers a direct gather command when aggro interrupts without a POI", () => {
+    const resource = createResource("direct-resource", { x: 8, y: 4 });
+    const leader = {
+      ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+    };
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, attacker], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        leaderIntent: null,
+        localPoiTarget: null,
+        globalPoiIntent: null,
+      }),
+    );
+
+    expect(nextState.leaderIntent?.targetId).toBe(attacker.id);
+    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: resource.id,
+      source: "player",
+    });
+  });
+
+  it("restores a direct gather command after the interrupting enemy dies", () => {
+    const resource = createResource("direct-resource", { x: 8, y: 4 });
+    const leader = {
+      ...createCompanion("leader", { x: 5, y: 4 }, "leader", "fighter", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+    };
+    const attacker = defeatedEnemy("attacking-enemy", { x: 5, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, attacker], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        leaderIntent: {
+          type: "attack",
+          targetId: attacker.id,
+          targetPosition: attacker.position,
+        },
+        interruptedPoiTarget: {
+          interruptedByEnemyId: attacker.id,
+          mapId: MAP_ONE_ID,
+          leaderIntent: {
+            type: "gather",
+            targetId: resource.id,
+            targetPosition: resource.position,
+            source: "player",
+          },
+          globalPoiIntent: null,
+          localPoiTarget: null,
+        },
+      }),
+    );
+
+    expect(nextState.interruptedPoiTarget).toBeNull();
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: resource.id,
+      targetPosition: resource.position,
+      source: "player",
+    });
+  });
+
+  it("restores an interrupted world travel teleport POI after combat ends", () => {
+    const leader = {
+      ...createLeader({ x: 70, y: 40 }),
+      state: "attack" as const,
+      currentTargetId: "attacker",
+    };
+    const attacker = defeatedEnemy("attacker", { x: 69, y: 40 });
+    const teleportPosition = { x: 74, y: 40 };
+
+    const nextState = updateGame(
+      createMapOneState([leader, attacker], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_TWO_ID,
+        leaderIntent: {
+          type: "attack",
+          targetId: attacker.id,
+          targetPosition: attacker.position,
+        },
+        interruptedPoiTarget: {
+          interruptedByEnemyId: attacker.id,
+          mapId: MAP_ONE_ID,
+          leaderIntent: {
+            type: "move",
+            targetId: null,
+            targetPosition: teleportPosition,
+          },
+          globalPoiIntent: {
+            type: "travel_to_map",
+            targetMapId: MAP_TWO_ID,
+            reason: "world route toward map-2",
+          },
+          localPoiTarget: {
+            poiId: "map-1-to-map-2",
+            category: "teleport",
+            mapId: MAP_ONE_ID,
+            position: teleportPosition,
+            targetEntityId: "map-1-to-map-2",
+            reason: "world route toward map-2",
+          },
+        },
+      }),
+    );
+
+    expect(nextState.interruptedPoiTarget).toBeNull();
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "move",
+      targetId: null,
+      targetPosition: teleportPosition,
+    });
+    expect(nextState.localPoiTarget?.poiId).toBe("map-1-to-map-2");
+  });
+
+  it("restores an interrupted resource POI when the resource is still valid", () => {
+    const leader = {
+      ...createLeader({ x: 2, y: 2 }),
+      state: "attack" as const,
+      currentTargetId: "attacker",
+    };
+    const resource = createResource("fallback-resource", { x: 8, y: 2 });
+    const attacker = defeatedEnemy("attacker", { x: 3, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, attacker], {
+        partyLeaderId: leader.id,
+        leaderIntent: {
+          type: "attack",
+          targetId: attacker.id,
+          targetPosition: attacker.position,
+        },
+        interruptedPoiTarget: {
+          interruptedByEnemyId: attacker.id,
+          mapId: MAP_ONE_ID,
+          leaderIntent: {
+            type: "gather",
+            targetId: resource.id,
+            targetPosition: resource.position,
+          },
+          globalPoiIntent: {
+            type: "idle",
+            reason: "no active or available quest",
+          },
+          localPoiTarget: {
+            poiId: resource.id,
+            category: "resource",
+            mapId: MAP_ONE_ID,
+            position: resource.position,
+            targetEntityId: resource.id,
+            reason: "wild resource fallback",
+          },
+        },
+      }),
+    );
+
+    expect(nextState.leaderIntent?.type).toBe("gather");
+    expect(nextState.leaderIntent?.targetId).toBe(resource.id);
+    expect(nextState.localPoiTarget?.targetEntityId).toBe(resource.id);
+  });
+
+  it("restores an interrupted combat POI when the original enemy is still valid", () => {
+    const leader = {
+      ...createLeader({ x: 2, y: 2 }),
+      state: "attack" as const,
+      currentTargetId: "attacker",
+    };
+    const originalEnemy = createEnemy("original-enemy", { x: 8, y: 2 });
+    const attacker = defeatedEnemy("attacker", { x: 3, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, originalEnemy, attacker], {
+        partyLeaderId: leader.id,
+        leaderIntent: {
+          type: "attack",
+          targetId: attacker.id,
+          targetPosition: attacker.position,
+        },
+        interruptedPoiTarget: {
+          interruptedByEnemyId: attacker.id,
+          mapId: MAP_ONE_ID,
+          leaderIntent: {
+            type: "attack",
+            targetId: originalEnemy.id,
+            targetPosition: originalEnemy.position,
+          },
+          globalPoiIntent: {
+            type: "idle",
+            reason: "no active or available quest",
+          },
+          localPoiTarget: {
+            poiId: originalEnemy.id,
+            category: "combat",
+            mapId: MAP_ONE_ID,
+            position: originalEnemy.position,
+            targetEntityId: originalEnemy.id,
+            reason: "wild enemy fallback",
+          },
+        },
+      }),
+    );
+
+    expect(nextState.leaderIntent?.type).toBe("attack");
+    expect(nextState.leaderIntent?.targetId).toBe(originalEnemy.id);
+    expect(nextState.localPoiTarget?.targetEntityId).toBe(originalEnemy.id);
+  });
+
+  it("clears an interrupted POI when the original target is no longer valid", () => {
+    const leader = {
+      ...createLeader({ x: 2, y: 2 }),
+      state: "attack" as const,
+      currentTargetId: "attacker",
+    };
+    const depletedResource = {
+      ...createResource("depleted-resource", { x: 8, y: 2 }),
+      isDepleted: true,
+      quantity: 0,
+    };
+    const attacker = defeatedEnemy("attacker", { x: 3, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, depletedResource, attacker], {
+        partyLeaderId: leader.id,
+        autoModeEnabled: false,
+        leaderIntent: {
+          type: "attack",
+          targetId: attacker.id,
+          targetPosition: attacker.position,
+        },
+        interruptedPoiTarget: {
+          interruptedByEnemyId: attacker.id,
+          mapId: MAP_ONE_ID,
+          leaderIntent: {
+            type: "gather",
+            targetId: depletedResource.id,
+            targetPosition: depletedResource.position,
+          },
+          globalPoiIntent: null,
+          localPoiTarget: {
+            poiId: depletedResource.id,
+            category: "resource",
+            mapId: MAP_ONE_ID,
+            position: depletedResource.position,
+            targetEntityId: depletedResource.id,
+            reason: "wild resource fallback",
+          },
+        },
+      }),
+    );
+
+    expect(nextState.interruptedPoiTarget).toBeNull();
+    expect(nextState.leaderIntent?.targetId).not.toBe(depletedResource.id);
+  });
+
+  it("does not restore interrupted POI over a direct player command", () => {
+    const leader = {
+      ...createLeader({ x: 2, y: 2 }),
+      commandPriority: "direct" as const,
+    };
+    const resource = createResource("fallback-resource", { x: 8, y: 2 });
+    const attacker = defeatedEnemy("attacker", { x: 3, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, attacker], {
+        partyLeaderId: leader.id,
+        autoModeEnabled: false,
+        leaderIntent: null,
+        interruptedPoiTarget: {
+          interruptedByEnemyId: attacker.id,
+          mapId: MAP_ONE_ID,
+          leaderIntent: {
+            type: "gather",
+            targetId: resource.id,
+            targetPosition: resource.position,
+          },
+          globalPoiIntent: null,
+          localPoiTarget: {
+            poiId: resource.id,
+            category: "resource",
+            mapId: MAP_ONE_ID,
+            position: resource.position,
+            targetEntityId: resource.id,
+            reason: "wild resource fallback",
+          },
+        },
+      }),
+    );
+
+    expect(nextState.interruptedPoiTarget).toBeNull();
+    expect(nextState.leaderIntent?.targetId).not.toBe(resource.id);
   });
 
   it("still explores unexplored positions without a quest or POI target", () => {
@@ -598,6 +987,15 @@ function createLeader(position: { x: number; y: number }) {
   return {
     ...createCompanion("leader", position, "leader", "fighter", 0),
     state: "idle" as const,
+    currentTargetId: null,
+  };
+}
+
+function defeatedEnemy(id: string, position: Position) {
+  return {
+    ...createEnemy(id, position),
+    state: "dead" as const,
+    health: 0,
     currentTargetId: null,
   };
 }

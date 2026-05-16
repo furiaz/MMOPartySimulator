@@ -1,9 +1,15 @@
 import {
   gatherResource,
   isAutonomousEntity,
+  isCombatEntity,
   isResourceEntity,
   setLastGatherAt,
 } from "./entities";
+import {
+  getEnemyAttackLeashDistance,
+  getEnemyDetectionRange as getDefaultEnemyDetectionRange,
+} from "./enemyAISystem";
+import { getEnemyDetectionRange, getEnemyTemperament } from "./enemyArchetypes";
 import {
   addCombatFeedback,
   ENTITY_COLLISION_DISTANCE,
@@ -15,10 +21,11 @@ import {
 } from "./state";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
+import { protectPartyMember } from "./partyProtectionSystem";
 import { recordResourceGatheredForQuests } from "./questSystem";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
-import type { AutonomousEntity, GameEntity, ResourceEntity } from "./types";
+import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
 const GATHER_COOLDOWN_MS = 1000;
@@ -82,6 +89,12 @@ export function updateGatherSystem(
       continue;
     }
 
+    const preGatherAggro = interruptGathererForEnemyAggro(nextState, gatherer);
+    if (preGatherAggro.interrupted) {
+      nextState = preGatherAggro.state;
+      continue;
+    }
+
     if (!isInGatherRange(gatherer, resource)) {
       if (movedEntityIds.has(gatherer.id)) {
         continue;
@@ -90,6 +103,14 @@ export function updateGatherSystem(
       nextState = moveEntityTowardIfUnoccupied(nextState, gatherer, resource);
       if (didEntityMove(nextState, gatherer)) {
         movedEntityIds.add(gatherer.id);
+        const movedGatherer = getEntityById(nextState, gatherer.id);
+
+        if (movedGatherer && isGatheringEntity(movedGatherer)) {
+          const postMoveAggro = interruptGathererForEnemyAggro(nextState, movedGatherer);
+          if (postMoveAggro.interrupted) {
+            nextState = postMoveAggro.state;
+          }
+        }
       }
       continue;
     }
@@ -159,6 +180,81 @@ export function updateGatherSystem(
   return nextState;
 }
 
+function interruptGathererForEnemyAggro(
+  state: GameState,
+  gatherer: AutonomousEntity,
+): { state: GameState; interrupted: boolean } {
+  if (gatherer.kind !== "companion") {
+    return { state, interrupted: false };
+  }
+
+  const threat = findGathererAggroThreat(state, gatherer);
+
+  if (!threat) {
+    return { state, interrupted: false };
+  }
+
+  const attackingEnemy: Enemy = {
+    ...threat,
+    state: "attack",
+    currentTargetId: gatherer.id,
+    targetDecisionReason: "closest",
+    roamTargetPosition: null,
+    roamMoveUntil: undefined,
+  };
+  const aggroState = updateEntity(state, attackingEnemy);
+
+  return {
+    state: protectPartyMember(aggroState, gatherer, attackingEnemy),
+    interrupted: true,
+  };
+}
+
+function findGathererAggroThreat(
+  state: GameState,
+  gatherer: AutonomousEntity,
+): Enemy | null {
+  let closestThreat: Enemy | null = null;
+  let closestDistanceSquared = Number.POSITIVE_INFINITY;
+
+  for (const entity of Object.values(state.entities)) {
+    if (!isLiveAggressiveEnemy(entity)) {
+      continue;
+    }
+
+    const detectionRange = getEnemyDetectionRange(
+      entity,
+      getDefaultEnemyDetectionRange(),
+    );
+
+    if (
+      getDistanceSquared(entity.position, gatherer.position) > detectionRange * detectionRange ||
+      getDistance(entity.homePosition, gatherer.position) > getEnemyAttackLeashDistance()
+    ) {
+      continue;
+    }
+
+    const distanceSquared = getDistanceSquared(entity.position, gatherer.position);
+
+    if (distanceSquared < closestDistanceSquared) {
+      closestThreat = entity;
+      closestDistanceSquared = distanceSquared;
+    }
+  }
+
+  return closestThreat;
+}
+
+function isLiveAggressiveEnemy(entity: GameEntity): entity is Enemy {
+  return (
+    entity.kind === "enemy" &&
+    isCombatEntity(entity) &&
+    entity.state !== "dead" &&
+    entity.health > 0 &&
+    getEnemyTemperament(entity) === "aggressive"
+  );
+}
+
 function didEntityMove(state: GameState, entity: GameEntity): boolean {
   const currentEntity = getEntityById(state, entity.id);
 
@@ -167,6 +263,20 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
       (currentEntity.position.x !== entity.position.x ||
         currentEntity.position.y !== entity.position.y),
   );
+}
+
+function getDistance(from: { x: number; y: number }, to: { x: number; y: number }): number {
+  return Math.hypot(to.x - from.x, to.y - from.y);
+}
+
+function getDistanceSquared(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): number {
+  const xDistance = to.x - from.x;
+  const yDistance = to.y - from.y;
+
+  return xDistance * xDistance + yDistance * yDistance;
 }
 
 function isGatheringEntity(entity: GameEntity): entity is AutonomousEntity {

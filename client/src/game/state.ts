@@ -109,6 +109,15 @@ export type MovementFailureDetail = {
   blockerKind?: GameEntity["kind"] | "wall" | "bounds" | "reserved" | "unknown";
 };
 
+export type InterruptedPoiTarget = {
+  interruptedByEnemyId: string;
+  mapId?: DebugMapId;
+  leaderIntent: LeaderIntent | null;
+  globalPoiIntent: GlobalPoiIntent | null;
+  localPoiTarget: LocalPoiTarget | null;
+  lastPoiDecision?: PoiDecisionState;
+};
+
 export { clearFrameMovementPlanning, clearTickMovementPlanning } from "./movementState";
 
 export type GameState = {
@@ -129,6 +138,7 @@ export type GameState = {
   leaderHandoffTicks?: number;
   leaderHandoffRemainingMs?: number;
   leaderIntent: LeaderIntent | null;
+  interruptedPoiTarget?: InterruptedPoiTarget | null;
   quests: Record<QuestId, QuestState>;
   globalPoiIntent: GlobalPoiIntent | null;
   localPoiTarget: LocalPoiTarget | null;

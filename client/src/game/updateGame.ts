@@ -14,6 +14,7 @@ import {
   updatePassiveHealthRegen,
 } from "./healthSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
+import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
 import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
@@ -114,6 +115,7 @@ export function updateGame(
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState, timing);
   nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(nextState, movedEntityIds, timing.nowMs);
