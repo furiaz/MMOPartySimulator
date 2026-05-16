@@ -19,6 +19,7 @@ import type {
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { createEmptyCompanionEquipment } from "./equipmentTypes";
 import { getEnemyArchetype } from "./enemyArchetypes";
+import { getScaledEnemyStats } from "./enemyScaling";
 import {
   createDefaultNaturalCompanionStats,
   createEmptyAllocatedCompanionStats,
@@ -35,7 +36,6 @@ export const ENEMY_MOVEMENT_STEP_DISTANCE =
 export const COMPANION_MOVEMENT_STEP_DISTANCE =
   COMPANION_MOVEMENT_SPEED_PER_SECOND * (GAME_LOOP_TICK_MS / 1000);
 const STARTING_HEALTH = 10;
-const STARTING_ENEMY_HEALTH = 3;
 const STARTING_GATHER_SPEED = 1;
 const STARTING_RESOURCE_DURABILITY = 5;
 const STARTING_RESOURCE_QUANTITY = 3;
@@ -59,6 +59,10 @@ type CreateEnemyOptions = {
   level?: number;
   xpReward?: number;
   maxHealth?: number;
+  attack?: number;
+  defense?: number;
+  magicDefense?: number;
+  evasion?: number;
   attackCooldownMs?: number;
   attackRange?: number;
   enemyType?: EnemyType;
@@ -71,7 +75,10 @@ export function createEnemy(
   options: CreateEnemyOptions = {},
 ): Enemy {
   const archetype = getEnemyArchetype(options.archetypeId);
-  const maxHealth = options.maxHealth ?? archetype?.maxHealth ?? STARTING_ENEMY_HEALTH;
+  const level = options.level ?? archetype?.level ?? STARTING_ENEMY_LEVEL;
+  const scaledStats = getScaledEnemyStats(level, options.archetypeId);
+  const maxHealth = options.maxHealth ?? scaledStats.maxHealth;
+  const scalingOverrides = getEnemyScalingOverrides(options);
 
   return {
     id,
@@ -86,8 +93,16 @@ export function createEnemy(
     archetypeId: options.archetypeId,
     enemyType: options.enemyType,
     homePosition: position,
-    level: options.level ?? archetype?.level ?? STARTING_ENEMY_LEVEL,
+    level,
     xpReward: options.xpReward,
+    attack: options.attack ?? scaledStats.attack,
+    defense: options.defense ?? scaledStats.defense,
+    magicDefense: options.magicDefense ?? scaledStats.magicDefense,
+    evasion: options.evasion ?? scaledStats.evasion,
+    effectiveScalingLevel: scaledStats.effectiveLevel,
+    scalingBand: scaledStats.scalingBand,
+    threat: scaledStats.threat,
+    scalingOverrides,
     attackCooldownMs: options.attackCooldownMs ?? archetype?.attackCooldownMs,
     attackRange: options.attackRange ?? archetype?.attackRange,
   };
@@ -334,4 +349,30 @@ function stepToward(
     x: current.x + (xDistance / distance) * stepDistance,
     y: current.y + (yDistance / distance) * stepDistance,
   };
+}
+
+function getEnemyScalingOverrides(options: CreateEnemyOptions): string[] {
+  const overrides: string[] = [];
+
+  if (options.maxHealth !== undefined) {
+    overrides.push("maxHealth");
+  }
+
+  if (options.attack !== undefined) {
+    overrides.push("attack");
+  }
+
+  if (options.defense !== undefined) {
+    overrides.push("defense");
+  }
+
+  if (options.magicDefense !== undefined) {
+    overrides.push("magicDefense");
+  }
+
+  if (options.evasion !== undefined) {
+    overrides.push("evasion");
+  }
+
+  return overrides;
 }

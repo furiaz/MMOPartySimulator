@@ -83,7 +83,7 @@ describe("enemy attack leash movement", () => {
 
     expect(nextEnemy.position).toEqual(enemy.position);
     expect(nextCompanion).toMatchObject({
-      health: companion.health - 1,
+      health: companion.health - enemy.attack,
     });
   });
 });

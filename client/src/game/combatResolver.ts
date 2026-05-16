@@ -1,9 +1,15 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { damageEntity } from "./entities";
+import { getEnemyCombatStats } from "./enemyScaling";
 import { getCompanionDerivedStats } from "./stats";
 import { blockIncomingAttackIfShielded, getPrototypeAttackDamage } from "./skillRuntime";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
-import type { CombatDamageType, CombatEntity, Companion } from "./types";
+import type {
+  CombatDamageType,
+  CombatEntity,
+  Companion,
+  CompanionDerivedStats,
+} from "./types";
 
 export type CombatRng = () => number;
 
@@ -46,7 +52,6 @@ const EVASION_FACTOR = 0.45;
 const EVASION_SOFTNESS = 20;
 const BLOCK_FACTOR = 0.45;
 const BLOCK_SOFTNESS = 35;
-const ENEMY_BASE_POWER = 1;
 const ENEMY_BASE_ACCURACY = 1;
 
 export function resolveAndApplyCombatDamage(
@@ -56,21 +61,19 @@ export function resolveAndApplyCombatDamage(
   options: CombatResolutionOptions,
 ): CombatResolution {
   const rng = options.rng ?? Math.random;
-  const attackerStats =
-    attacker.kind === "companion" ? getCompanionDerivedStats(attacker) : null;
-  const targetStats =
-    target.kind === "companion" ? getCompanionDerivedStats(target) : null;
+  const attackerStats = getCombatStats(attacker);
+  const targetStats = getCombatStats(target);
   const basePower = getBasePower(attacker, options.damageType);
   const bonusDamage =
     attacker.kind === "companion" && target.kind === "enemy"
       ? getPrototypeAttackDamage(state, attacker, target, 0)
       : 0;
   const rawDamage = basePower * options.powerMultiplier + bonusDamage;
-  const attackerAccuracy = attackerStats?.accuracy ?? ENEMY_BASE_ACCURACY;
-  const targetDefense = targetStats?.defense ?? 0;
-  const targetMagicDefense = targetStats?.magicDefense ?? 0;
-  const targetEvasion = targetStats?.evasion ?? 0;
-  const targetBlock = targetStats?.block ?? 0;
+  const attackerAccuracy = getAccuracy(attackerStats);
+  const targetDefense = targetStats.defense;
+  const targetMagicDefense = targetStats.magicDefense;
+  const targetEvasion = targetStats.evasion;
+  const targetBlock = targetStats.block;
   const evasionChance = options.allowEvasion
     ? getEvasionChance(targetEvasion, attackerAccuracy)
     : 0;
@@ -159,12 +162,25 @@ export function resolveAndApplyCombatDamage(
     type: "combat_resolved",
     entityId: attacker.id,
     targetId: target.id,
+    archetypeId: attacker.kind === "enemy" ? attacker.archetypeId : undefined,
+    enemyLevel: attacker.kind === "enemy" ? attacker.level : undefined,
+    enemyEffectiveScalingLevel:
+      attacker.kind === "enemy" ? attacker.effectiveScalingLevel : undefined,
+    enemyScalingBand: attacker.kind === "enemy" ? attacker.scalingBand : undefined,
+    enemyThreat: attacker.kind === "enemy" ? attacker.threat : undefined,
+    enemyAttack: attacker.kind === "enemy" ? attacker.attack : undefined,
+    enemyDefense: attacker.kind === "enemy" ? attacker.defense : undefined,
+    enemyMagicDefense:
+      attacker.kind === "enemy" ? attacker.magicDefense : undefined,
+    enemyEvasion: attacker.kind === "enemy" ? attacker.evasion : undefined,
+    enemyScalingOverrides:
+      attacker.kind === "enemy" ? attacker.scalingOverrides : undefined,
     damageType: options.damageType,
     powerMultiplier: options.powerMultiplier,
     rawDamage,
     finalDamage,
-    attackRating: attackerStats?.attack,
-    magicPowerRating: attackerStats?.magicPower,
+    attackRating: attackerStats.attack,
+    magicPowerRating: attackerStats.magicPower,
     defenseRating: targetDefense,
     magicDefenseRating: targetMagicDefense,
     defenseReduction,
@@ -180,7 +196,7 @@ export function resolveAndApplyCombatDamage(
     criticalChance,
     criticalRoll,
     critical,
-    criticalDamage: attackerStats?.criticalDamage,
+    criticalDamage: attackerStats.criticalDamage,
     reason: options.label,
   });
 
@@ -216,13 +232,40 @@ export function getHealingAmount(caster: Companion, powerMultiplier: number): nu
 }
 
 function getBasePower(attacker: CombatEntity, damageType: CombatDamageType): number {
-  if (attacker.kind !== "companion") {
-    return ENEMY_BASE_POWER;
+  if (attacker.kind === "enemy") {
+    return attacker.attack;
   }
 
   const stats = getCompanionDerivedStats(attacker);
 
   return damageType === "magic" ? stats.magicPower : stats.attack;
+}
+
+function getCombatStats(entity: CombatEntity): CompanionDerivedStats {
+  if (entity.kind === "companion") {
+    return getCompanionDerivedStats(entity);
+  }
+
+  const enemyStats = getEnemyCombatStats(entity);
+
+  return {
+    attack: enemyStats.attack,
+    defense: enemyStats.defense,
+    maxHealth: enemyStats.maxHealth,
+    evasion: enemyStats.evasion,
+    block: 0,
+    magicPower: enemyStats.attack,
+    healingPower: 0,
+    magicDefense: enemyStats.magicDefense,
+    accuracy: ENEMY_BASE_ACCURACY,
+    criticalChance: 0,
+    criticalDamage: 1,
+    healthRegen: 0,
+  };
+}
+
+function getAccuracy(stats: CompanionDerivedStats): number {
+  return stats.accuracy || ENEMY_BASE_ACCURACY;
 }
 
 function getDefenseReduction(defense: number): number {

@@ -52,6 +52,8 @@ export type EnemyArchetypeDefinition = {
   attackRange: number;
 };
 
+export type EnemyScalingBand = "starter" | "early";
+
 export type EnemyTargetDecisionReason =
   | "closest"
   | "leader"
@@ -760,6 +762,15 @@ export type DebugTelemetryEntitySnapshot = {
   archetypeId?: EnemyArchetypeId;
   enemyCombatStyle?: EnemyCombatStyle;
   enemyTargetPreference?: EnemyTargetPreference;
+  enemyLevel?: number;
+  enemyEffectiveScalingLevel?: number;
+  enemyScalingBand?: EnemyScalingBand;
+  enemyThreat?: number;
+  enemyAttack?: number;
+  enemyDefense?: number;
+  enemyMagicDefense?: number;
+  enemyEvasion?: number;
+  enemyScalingOverrides?: string[];
   attackRange?: number;
   targetDecisionReason?: EnemyTargetDecisionReason;
   commandPriority?: CommandPriority;
@@ -803,6 +814,15 @@ export type DebugTelemetryEvent = {
   archetypeId?: EnemyArchetypeId;
   enemyCombatStyle?: EnemyCombatStyle;
   enemyTargetPreference?: EnemyTargetPreference;
+  enemyLevel?: number;
+  enemyEffectiveScalingLevel?: number;
+  enemyScalingBand?: EnemyScalingBand;
+  enemyThreat?: number;
+  enemyAttack?: number;
+  enemyDefense?: number;
+  enemyMagicDefense?: number;
+  enemyEvasion?: number;
+  enemyScalingOverrides?: string[];
   attackRange?: number;
   targetDecisionReason?: EnemyTargetDecisionReason;
   amount?: number;
@@ -1058,6 +1078,14 @@ export type Enemy = LivingEntity & {
   roamMoveUntil?: number;
   level: number;
   xpReward?: number;
+  attack: number;
+  defense: number;
+  magicDefense: number;
+  evasion: number;
+  effectiveScalingLevel: number;
+  scalingBand: EnemyScalingBand;
+  threat: number;
+  scalingOverrides: string[];
   attackCooldownMs?: number;
   attackRange?: number;
   targetDecisionReason?: EnemyTargetDecisionReason;

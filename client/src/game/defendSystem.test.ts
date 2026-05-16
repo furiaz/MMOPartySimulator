@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion } from "./entities";
+import { createCompanion, createEnemy } from "./entities";
 import { updateDefendSystem } from "./defendSystem";
 import { createTestGameState } from "./testState";
 
@@ -14,19 +14,7 @@ describe("defender real-time movement", () => {
       state: "defend" as const,
       defendPosition: { x: 3, y: 0 },
     };
-    const target = {
-      id: "target",
-      kind: "enemy" as const,
-      position: { x: 4, y: 0 },
-      state: "idle" as const,
-      health: 3,
-      maxHealth: 3,
-      lastAttackAt: 0,
-      currentTargetId: null,
-      aggressionMode: "passive" as const,
-      homePosition: { x: 4, y: 0 },
-      level: 1,
-    };
+    const target = createEnemy("target", { x: 4, y: 0 });
     const state = createTestGameState({
       entities: {
         [leader.id]: leader,

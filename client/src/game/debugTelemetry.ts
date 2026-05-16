@@ -252,6 +252,15 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.archetypeId ?? "",
     event.enemyCombatStyle ?? "",
     event.enemyTargetPreference ?? "",
+    event.enemyLevel ?? "",
+    event.enemyEffectiveScalingLevel ?? "",
+    event.enemyScalingBand ?? "",
+    event.enemyThreat ?? "",
+    event.enemyAttack ?? "",
+    event.enemyDefense ?? "",
+    event.enemyMagicDefense ?? "",
+    event.enemyEvasion ?? "",
+    event.enemyScalingOverrides?.join(",") ?? "",
     event.attackRange ?? "",
     event.targetDecisionReason ?? "",
     event.previousClassId ?? "",
@@ -338,6 +347,15 @@ function getEntitySnapshot(
     archetypeId: getArchetypeId(entity),
     enemyCombatStyle: getEnemyCombatStyleSnapshot(entity),
     enemyTargetPreference: getEnemyTargetPreferenceSnapshot(entity),
+    enemyLevel: getEnemyLevel(entity),
+    enemyEffectiveScalingLevel: getEnemyEffectiveScalingLevel(entity),
+    enemyScalingBand: getEnemyScalingBand(entity),
+    enemyThreat: getEnemyThreat(entity),
+    enemyAttack: getEnemyAttack(entity),
+    enemyDefense: getEnemyDefense(entity),
+    enemyMagicDefense: getEnemyMagicDefense(entity),
+    enemyEvasion: getEnemyEvasion(entity),
+    enemyScalingOverrides: getEnemyScalingOverrides(entity),
     attackRange: getAttackRangeSnapshot(entity),
     targetDecisionReason: getTargetDecisionReason(entity),
     commandPriority: getCommandPriority(entity),
@@ -788,6 +806,42 @@ function getEnemyCombatStyleSnapshot(entity: GameEntity) {
 
 function getEnemyTargetPreferenceSnapshot(entity: GameEntity) {
   return entity.kind === "enemy" ? getEnemyTargetPreference(entity) : undefined;
+}
+
+function getEnemyLevel(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.level : undefined;
+}
+
+function getEnemyEffectiveScalingLevel(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.effectiveScalingLevel : undefined;
+}
+
+function getEnemyScalingBand(entity: GameEntity) {
+  return entity.kind === "enemy" ? entity.scalingBand : undefined;
+}
+
+function getEnemyThreat(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.threat : undefined;
+}
+
+function getEnemyAttack(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.attack : undefined;
+}
+
+function getEnemyDefense(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.defense : undefined;
+}
+
+function getEnemyMagicDefense(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.magicDefense : undefined;
+}
+
+function getEnemyEvasion(entity: GameEntity): number | undefined {
+  return entity.kind === "enemy" ? entity.evasion : undefined;
+}
+
+function getEnemyScalingOverrides(entity: GameEntity): string[] | undefined {
+  return entity.kind === "enemy" ? entity.scalingOverrides : undefined;
 }
 
 function getAttackRangeSnapshot(entity: GameEntity): number | undefined {

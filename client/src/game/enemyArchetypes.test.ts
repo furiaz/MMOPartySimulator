@@ -32,8 +32,13 @@ describe("prototype enemy archetypes", () => {
 
     expect(enemy.aggressionMode).toBe("aggressive");
     expect(enemy.level).toBe(7);
-    expect(enemy.health).toBe(3);
-    expect(enemy.maxHealth).toBe(3);
+    expect(enemy.health).toBe(42);
+    expect(enemy.maxHealth).toBe(42);
+    expect(enemy.attack).toBe(6);
+    expect(enemy.defense).toBe(4);
+    expect(enemy.magicDefense).toBe(4);
+    expect(enemy.evasion).toBe(2);
+    expect(enemy.scalingBand).toBe("starter");
     expect(enemy.attackCooldownMs).toBe(1300);
     expect(enemy.attackRange).toBe(4);
   });
@@ -43,6 +48,7 @@ describe("prototype enemy archetypes", () => {
       archetypeId: "slime",
       level: 5,
       maxHealth: 9,
+      attack: 4,
       attackCooldownMs: 500,
       attackRange: 2,
     });
@@ -50,6 +56,8 @@ describe("prototype enemy archetypes", () => {
     expect(enemy.level).toBe(5);
     expect(enemy.health).toBe(9);
     expect(enemy.maxHealth).toBe(9);
+    expect(enemy.attack).toBe(4);
+    expect(enemy.scalingOverrides).toEqual(["maxHealth", "attack"]);
     expect(enemy.attackCooldownMs).toBe(500);
     expect(enemy.attackRange).toBe(2);
   });

@@ -28,6 +28,7 @@ export type {
   EnemyAggressionMode,
   EnemyArchetypeId,
   EnemyFamilyId,
+  EnemyScalingBand,
   EnemyType,
   EntityKind,
   EntityState,
@@ -326,6 +327,16 @@ export {
 } from "./dropSystem";
 export { updateDefendSystem } from "./defendSystem";
 export { getEnemyArchetype } from "./enemyArchetypes";
+export {
+  MAX_ENEMY_SCALING_LEVEL,
+  MIN_ENEMY_SCALING_LEVEL,
+  getEffectiveEnemyScalingLevel,
+  getEnemyCombatStats,
+  getEnemyScalingBand,
+  getScaledEnemyStats,
+  type EnemyCombatStats,
+  type EnemyScalingResult,
+} from "./enemyScaling";
 export {
   getEnemyAttackLeashDistance,
   getEnemyDetectionRange,
