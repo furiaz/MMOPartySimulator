@@ -724,7 +724,29 @@ export type DebugTelemetryEventType =
   | "skill_selected"
   | "skill_used"
   | "skill_skipped"
-  | "skill_effect_applied";
+  | "skill_effect_applied"
+  | "resurrection_target_selected"
+  | "resurrection_channel_started"
+  | "resurrection_channel_progressed"
+  | "resurrection_channel_canceled"
+  | "companion_resurrected";
+
+export type ResurrectionCancelReason =
+  | "attacked"
+  | "direct_command"
+  | "target_revived"
+  | "target_invalid";
+
+export type ResurrectionProgressState = {
+  companionId: string;
+  progressMs: number;
+  requiredMs: number;
+};
+
+export type ResurrectionChannelState = {
+  helperId: string;
+  targetId: string;
+};
 
 export type DebugTelemetryEntitySnapshot = {
   tick: number;
@@ -834,6 +856,11 @@ export type DebugTelemetryEvent = {
   nextRole?: PartyMemberRole;
   result?: string;
   reason?: string;
+  progressBeforeMs?: number;
+  progressAfterMs?: number;
+  progressContributionMs?: number;
+  requiredProgressMs?: number;
+  cancelReason?: ResurrectionCancelReason;
   formationPhase?: FormationPhase;
   approachPoint?: Position | null;
   targetDistance?: number;

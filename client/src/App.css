@@ -533,6 +533,42 @@
   background: #ffffff;
 }
 
+.channel-feedback {
+  position: absolute;
+  left: 50%;
+  bottom: 35px;
+  z-index: 4;
+  display: grid;
+  width: 76px;
+  gap: 2px;
+  padding: 3px 4px;
+  border: 1px solid #14532d;
+  border-radius: 5px;
+  background: rgba(240, 253, 244, 0.96);
+  color: #14532d;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.channel-feedback-bar {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #bbf7d0;
+}
+
+.channel-feedback-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #16a34a;
+}
+
 .attack-cooldown span {
   display: block;
   height: 100%;
@@ -785,6 +821,10 @@
   background: transparent;
   box-shadow: none;
   cursor: pointer;
+}
+
+.companion.companion-dead {
+  cursor: default;
 }
 
 .entity-marker.sprite-entity {

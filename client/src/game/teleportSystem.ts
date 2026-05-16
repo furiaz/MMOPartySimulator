@@ -287,6 +287,8 @@ function completeTeleport(state: GameState): GameState {
     defenderBlockedMsByEntityId: {},
     skillVisualEvents: [],
     dropVisualEvents: [],
+    resurrectionProgressByCompanionId: {},
+    resurrectionChannelsByHelperId: {},
     partyFormation: {
       phase: "idle",
       targetId: null,

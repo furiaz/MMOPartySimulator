@@ -5,6 +5,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
+import { cancelResurrectionChannelForHelper } from "./resurrectionSystem";
 import type {
   AutonomousEntity,
   CommandPriority,
@@ -71,6 +72,16 @@ export function issueEntityCommand(
     return state;
   }
 
+  const commandState =
+    commandPriority === "direct"
+      ? cancelResurrectionChannelForHelper(
+          state,
+          entity.id,
+          Date.now(),
+          "direct_command",
+        )
+      : state;
+
   if (command.type === "idle") {
     const updatedEntity: AutonomousEntity = {
       ...entity,
@@ -79,7 +90,7 @@ export function issueEntityCommand(
       commandPriority,
     };
 
-    const nextState = updateEntity(state, updatedEntity);
+    const nextState = updateEntity(commandState, updatedEntity);
 
     return entity.id === state.partyLeaderId
       ? setLeaderIntent(nextState, null)
@@ -96,7 +107,7 @@ export function issueEntityCommand(
       : {}),
   };
 
-  const nextState = updateEntity(state, updatedEntity);
+  const nextState = updateEntity(commandState, updatedEntity);
 
   return entity.id === state.partyLeaderId
     ? setLeaderIntent(nextState, getLeaderIntentFromCommand(state, command))

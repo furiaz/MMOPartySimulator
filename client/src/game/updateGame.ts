@@ -16,6 +16,7 @@ import {
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
+import { updateResurrectionSystem } from "./resurrectionSystem";
 import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
 import {
@@ -89,6 +90,12 @@ export function updateGame(
 
   nextState = updatePoiSystem(nextState);
   nextState = updateHealingFountainSystem(nextState);
+  nextState = updateResurrectionSystem(
+    nextState,
+    movedEntityIds,
+    timing.nowMs,
+    timing.deltaMs,
+  );
 
   const shouldMovePartyTowardPoi =
     Boolean(nextState.leaderIntent) ||
@@ -154,6 +161,7 @@ function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
 
   for (const member of getPartyMembers(nextState)) {
     if (
+      nextState.resurrectionChannelsByHelperId?.[member.id] ||
       member.commandPriority === "direct" ||
       member.state === "idle" ||
       member.state === "dead"

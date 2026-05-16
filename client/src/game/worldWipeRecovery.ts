@@ -241,6 +241,8 @@ function resetStateToRescueHub(
     skillCooldownsByCompanionId: {},
     skillVisualEvents: [],
     dropVisualEvents: [],
+    resurrectionProgressByCompanionId: {},
+    resurrectionChannelsByHelperId: {},
     partyFormation: {
       phase: "idle",
       targetId: null,

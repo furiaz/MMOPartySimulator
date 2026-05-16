@@ -8,6 +8,7 @@ import {
 import { getPartyLeader, isPartyMember, type PartyMember } from "./partySystem";
 import { ROLE_TUNING } from "./roleProfiles";
 import { findResourceTarget } from "./targetSelection";
+import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
@@ -55,6 +56,7 @@ function canUseRoleBehavior(
 ): entity is PartyMember {
   if (
     !isPartyMember(entity) ||
+    isCompanionResurrectionChanneling(state, entity.id) ||
     entity.commandPriority === "direct" ||
     (entity.state !== "idle" &&
       entity.state !== "follow" &&

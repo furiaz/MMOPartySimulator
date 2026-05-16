@@ -9,6 +9,7 @@ import {
   type PartyMember,
 } from "./partySystem";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
+import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import {
   getEntityById,
   moveEntityTowardPositionIfUnoccupied,
@@ -52,7 +53,12 @@ export function updatePartyFormationSystem(
 ): GameState {
   const leader = getPartyLeader(state);
 
-  if (!leader || leader.state === "dead" || leader.commandPriority === "direct") {
+  if (
+    !leader ||
+    leader.state === "dead" ||
+    leader.commandPriority === "direct" ||
+    isCompanionResurrectionChanneling(state, leader.id)
+  ) {
     return clearFormation(state);
   }
 
@@ -158,6 +164,7 @@ function assignPartyTravelTargets(
     if (
       member.id === leader.id ||
       member.commandPriority === "direct" ||
+      isCompanionResurrectionChanneling(nextState, member.id) ||
       isGathererBusy(nextState, member)
     ) {
       continue;
@@ -185,7 +192,10 @@ function assignPartyGatherTarget(
   }
 
   for (const member of getPartyMembers(nextState)) {
-    if (member.commandPriority === "direct") {
+    if (
+      member.commandPriority === "direct" ||
+      isCompanionResurrectionChanneling(nextState, member.id)
+    ) {
       continue;
     }
 
@@ -209,7 +219,11 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
   });
 
   for (const member of getPartyMembers(nextState)) {
-    if (member.commandPriority === "direct" || isGathererBusy(nextState, member)) {
+    if (
+      member.commandPriority === "direct" ||
+      isCompanionResurrectionChanneling(nextState, member.id) ||
+      isGathererBusy(nextState, member)
+    ) {
       continue;
     }
 
@@ -275,6 +289,7 @@ function moveFollowersTowardLeader(
     if (
       member.id === leader.id ||
       member.commandPriority === "direct" ||
+      isCompanionResurrectionChanneling(nextState, member.id) ||
       isGathererBusy(nextState, member) ||
       movedEntityIds.has(member.id)
     ) {
@@ -423,7 +438,10 @@ function isRequiredForTravelCohesion(
   member: PartyMember,
   leader: PartyMember,
 ): boolean {
-  if (member.commandPriority === "direct") {
+  if (
+    member.commandPriority === "direct" ||
+    isCompanionResurrectionChanneling(state, member.id)
+  ) {
     return false;
   }
 

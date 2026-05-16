@@ -25,6 +25,7 @@ import { protectPartyMember } from "./partyProtectionSystem";
 import { recordResourceGatheredForQuests } from "./questSystem";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
+import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
@@ -43,7 +44,12 @@ export function updateGatherSystem(
   for (const entity of Object.values(state.entities)) {
     const gatherer = getEntityById(nextState, entity.id);
 
-    if (!gatherer || !isGatheringEntity(gatherer)) {
+    if (
+      !gatherer ||
+      (gatherer.kind === "companion" &&
+        isCompanionResurrectionChanneling(nextState, gatherer.id)) ||
+      !isGatheringEntity(gatherer)
+    ) {
       continue;
     }
 

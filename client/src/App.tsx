@@ -66,6 +66,7 @@ import {
   getEnemyArchetype,
   getEnemyDetectionRange,
   getItemDefinition,
+  getPartyLeader,
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
   issueCompanionCommands,
@@ -709,6 +710,27 @@ function HealthBar({ entity }: { entity: HealthBarEntity }) {
   );
 }
 
+function ResurrectionChannelBar({
+  progress,
+}: {
+  progress?: { progressMs: number; requiredMs: number };
+}) {
+  if (!progress || progress.progressMs <= 0) {
+    return null;
+  }
+
+  const progressRatio = Math.min(1, progress.progressMs / progress.requiredMs);
+
+  return (
+    <div className="channel-feedback" title="Resurrection channel progress">
+      <span className="channel-feedback-label">Resurrecting</span>
+      <span className="channel-feedback-bar">
+        <span style={{ width: `${progressRatio * 100}%` }} />
+      </span>
+    </div>
+  );
+}
+
 function EntityNameLabel({
   name,
   isAggressive = false,
@@ -820,9 +842,7 @@ function App() {
     : partyMembers[0]?.id ?? null;
   const activePartyMemberIds = partyMembers.map((companion) => companion.id);
   const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
-  const leader = partyMembers.find(
-    (member) => member.id === gameState.partyLeaderId,
-  ) ?? partyMembers[0];
+  const leader = getPartyLeader(gameState);
   const hasPartyLeader = Boolean(leader);
   const enemies = Object.values(gameState.entities).filter(
     (entity): entity is Enemy => entity.kind === "enemy",
@@ -1037,18 +1057,22 @@ function App() {
       return;
     }
 
-    setGameState((state) =>
-      issueCompanionCommands(
+    setGameState((state) => {
+      const livingLeader = getPartyLeader(state);
+
+      if (!livingLeader) {
+        return state;
+      }
+
+      return issueCompanionCommands(
         state,
-        activePartyMemberIds.filter(
-          (entityId) => entityId !== state.partyLeaderId,
-        ),
+        activePartyMemberIds.filter((entityId) => entityId !== livingLeader.id),
         {
           type: "follow",
-          targetId: state.partyLeaderId,
+          targetId: livingLeader.id,
         },
-      ),
-    );
+      );
+    });
   }
 
   function commandCompanionsToIdle() {
@@ -1070,7 +1094,12 @@ function App() {
 
     setGameState((state) => {
       const target = state.entities[targetEnemyId];
-      const leader = state.entities[state.partyLeaderId];
+      const leader = getPartyLeader(state);
+
+      if (!leader) {
+        return state;
+      }
+
       const leaderIntentState = setLeaderIntent(state, {
         type: "attack",
         targetId: targetEnemyId,
@@ -1078,14 +1107,12 @@ function App() {
         source: "player",
       });
 
-      return leader?.kind === "companion"
-        ? updateEntity(leaderIntentState, {
-            ...leader,
-            state: "follow",
-            currentTargetId: targetEnemyId,
-            commandPriority: "autonomous",
-          })
-        : leaderIntentState;
+      return updateEntity(leaderIntentState, {
+        ...leader,
+        state: "follow",
+        currentTargetId: targetEnemyId,
+        commandPriority: "autonomous",
+      });
     });
   }
 
@@ -1333,7 +1360,12 @@ function App() {
 
   function commandPartyToMoveToPosition(targetPosition: Position) {
     setGameState((state) => {
-      const leader = state.entities[state.partyLeaderId];
+      const leader = getPartyLeader(state);
+
+      if (!leader) {
+        return state;
+      }
+
       const leaderIntentState = setLeaderIntent(state, {
         type: "move",
         targetId: null,
@@ -1341,14 +1373,12 @@ function App() {
         source: "player",
       });
 
-      return leader?.kind === "companion"
-        ? updateEntity(leaderIntentState, {
-            ...leader,
-            state: "follow",
-            currentTargetId: null,
-            commandPriority: "autonomous",
-          })
-        : leaderIntentState;
+      return updateEntity(leaderIntentState, {
+        ...leader,
+        state: "follow",
+        currentTargetId: null,
+        commandPriority: "autonomous",
+      });
     });
   }
 
@@ -1998,10 +2028,11 @@ function App() {
               const visualAsset = getEntityVisualAsset(member, gameState.currentMapId);
               const visualMovement =
                 visualMovementByEntityId[member.id];
+              const isDead = member.state === "dead";
               const isVisuallyMoving =
                 Boolean(visualMovement) && visualMovement.expiresAt > currentTime;
               const shouldRunAnimation =
-                isVisuallyMoving || isCompanionTryingToMove(member);
+                isVisuallyMoving || (!isDead && isCompanionTryingToMove(member));
               const animation =
                 visualAsset.kind === "sprite"
                   ? getSpriteAnimation(
@@ -2016,9 +2047,14 @@ function App() {
                   key={member.id}
                   className={`${getPartyMarkerClass(member, gameState.partyLeaderId)}${
                     redFlashEntityIds.has(member.id) ? " skill-red-flash" : ""
-                  }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}`}
+                  }${healedEntityIds.has(member.id) ? " skill-heal-outline" : ""}${
+                    isDead ? " companion-dead" : ""
+                  }`}
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (isDead) {
+                      return;
+                    }
                     commandPartyToMoveToPosition(member.position);
                   }}
                   style={{
@@ -2026,7 +2062,11 @@ function App() {
                       member.position.y * cellSize
                     }px)`,
                   }}
-                  title="Move party POI to this party member"
+                  title={
+                    isDead
+                      ? "Dead companion"
+                      : "Move party POI to this party member"
+                  }
                 >
                   {animation ? (
                     <SpriteAnimation
@@ -2044,6 +2084,9 @@ function App() {
                     isVisible={showEntityInfo}
                   />
                   <HealthBar entity={member} />
+                  <ResurrectionChannelBar
+                    progress={gameState.resurrectionProgressByCompanionId?.[member.id]}
+                  />
                   <AttackCooldownIndicator
                     entity={member}
                     currentTime={currentTime}

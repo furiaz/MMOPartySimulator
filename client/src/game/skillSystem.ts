@@ -18,6 +18,7 @@ import {
 import { getLeaderMovementDirection } from "./roleSystem";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { findEnemyTarget, getSkillTarget } from "./skillTargeting";
+import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
@@ -107,6 +108,7 @@ function canUsePrototypeSkill(
       entity.state !== "dead" &&
       entity.health > 0 &&
       entity.commandPriority !== "direct" &&
+      !isCompanionResurrectionChanneling(state, entity.id) &&
       !isSkillOnCooldown(state, entity, now),
   );
 }

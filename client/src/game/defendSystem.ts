@@ -17,6 +17,7 @@ import {
   getLeaderIntentPosition,
   getLeaderMovementDirection,
 } from "./roleSystem";
+import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
@@ -54,6 +55,7 @@ export function updateDefendSystem(
 
     if (
       !isDefendingCompanion(defender) ||
+      isCompanionResurrectionChanneling(nextState, defender.id) ||
       movedEntityIds.has(defender.id)
     ) {
       continue;

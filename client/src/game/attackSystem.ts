@@ -24,6 +24,10 @@ import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { getEnemyAttackLeashDistance } from "./enemyAISystem";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
+  cancelResurrectionChannelForHelper,
+  isCompanionResurrectionChanneling,
+} from "./resurrectionSystem";
+import {
   arePositionsEqual,
   getEuclideanDistance,
   getGridDistance,
@@ -57,7 +61,12 @@ export function updateAttackSystem(
   for (const entity of getCombatMovementOrder(state)) {
     const attacker = getEntityById(nextState, entity.id);
 
-    if (!attacker || !isAttackingCombatEntity(attacker)) {
+    if (
+      !attacker ||
+      (attacker.kind === "companion" &&
+        isCompanionResurrectionChanneling(nextState, attacker.id)) ||
+      !isAttackingCombatEntity(attacker)
+    ) {
       continue;
     }
 
@@ -160,6 +169,12 @@ export function updateAttackSystem(
       }
 
       if (isEnemy(attackReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
+        nextState = cancelResurrectionChannelForHelper(
+          nextState,
+          updatedTarget.id,
+          now,
+          "attacked",
+        );
         nextState = protectPartyMember(nextState, updatedTarget, attackReadyAttacker);
       }
 

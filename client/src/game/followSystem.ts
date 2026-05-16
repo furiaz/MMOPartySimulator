@@ -6,6 +6,7 @@ import {
 } from "./state";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
+import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import { arePositionsEqual, getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, GameEntity } from "./types";
 
@@ -29,6 +30,7 @@ export function updateFollowSystem(
       !isFollowingAutonomousEntity(follower) ||
       !isPartyMember(follower) ||
       follower.id === leader.id ||
+      isCompanionResurrectionChanneling(nextState, follower.id) ||
       follower.commandPriority === "direct" ||
       isGathererBusy(nextState, follower) ||
       movedEntityIds.has(follower.id)

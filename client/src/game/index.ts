@@ -70,6 +70,9 @@ export type {
   ResourceEntity,
   ResourceItemId,
   ResourceType,
+  ResurrectionCancelReason,
+  ResurrectionChannelState,
+  ResurrectionProgressState,
   SkillBindState,
   SkillCooldownState,
   SkillDefinition,
@@ -340,6 +343,13 @@ export {
   updateTeleportSystem,
 } from "./teleportSystem";
 export { updatePoiSystem } from "./poiSystem";
+export {
+  RESURRECTION_RANGE,
+  RESURRECTION_REQUIRED_MS,
+  cancelResurrectionChannelForHelper,
+  isCompanionResurrectionChanneling,
+  updateResurrectionSystem,
+} from "./resurrectionSystem";
 export {
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,

@@ -43,6 +43,8 @@ import type {
   SkillCooldownState,
   SkillGatherBuffState,
   SkillMarkState,
+  ResurrectionChannelState,
+  ResurrectionProgressState,
   SkillSelfBuffState,
   SkillShieldBlockState,
   SkillVisualEvent,
@@ -167,6 +169,8 @@ export type GameState = {
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
   dropVisualEvents?: DropVisualEvent[];
+  resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
+  resurrectionChannelsByHelperId?: Record<string, ResurrectionChannelState>;
   worldWipeRecovery?: WorldWipeRecoveryState;
   lastHealthRegenAtByCompanionId?: Record<string, number>;
   debugTelemetry?: DebugTelemetryState;
