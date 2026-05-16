@@ -111,6 +111,57 @@ export type CompanionRole = PartyMemberRole;
 
 export type ResourceType = "wood" | "ore" | "herb";
 
+export type ZoneSubzoneBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type ZoneSubzonePassage = {
+  id: string;
+  fromSubzoneId: string;
+  toSubzoneId: string;
+  position: Position;
+};
+
+export type ZoneSubzoneNameLabel = {
+  id: string;
+  subzoneId: string;
+  text: string;
+  position: Position;
+};
+
+export type EncounterArea = {
+  id: string;
+  subzoneId: string;
+  center: Position;
+  radius: number;
+  leashRadius?: number;
+};
+
+export type ResourceLocation = {
+  id: string;
+  subzoneId: string;
+  position: Position;
+  resourceType: ResourceType;
+  tier?: LootTier;
+};
+
+export type ZoneSubzone = {
+  id: string;
+  displayName: string;
+  bounds: ZoneSubzoneBounds;
+  levelRange: {
+    min: number;
+    max: number;
+  };
+  enemyArchetypeIds: EnemyArchetypeId[];
+  encounterAreas: EncounterArea[];
+  resourceLocations: ResourceLocation[];
+  passages: ZoneSubzonePassage[];
+};
+
 export type ResourceItemId =
   | ResourceType
   | "softwood"
@@ -1007,6 +1058,8 @@ export type GameMap = {
   walls: Position[];
   teleports: DebugTeleportPoint[];
   healingFountains: HealingFountain[];
+  subzones?: ZoneSubzone[];
+  subzoneNameLabels?: ZoneSubzoneNameLabel[];
   navigationGrid?: NavigationGrid;
 };
 
@@ -1073,6 +1126,9 @@ export type Enemy = LivingEntity & {
   archetypeId?: EnemyArchetypeId;
   enemyType?: EnemyType;
   homePosition: Position;
+  subzoneId?: string;
+  encounterAreaId?: string;
+  defeatedAtMs?: number;
   roamTargetPosition?: Position | null;
   nextRoamAt?: number;
   roamMoveUntil?: number;

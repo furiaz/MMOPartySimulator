@@ -107,6 +107,7 @@ export type PoiConsideration = {
 };
 
 export type PoiDecisionState = {
+  evaluatedAtMs?: number;
   selectedPoiId?: string;
   selectedCategory?: PoiCategory;
   selectedMapId?: DebugMapId;

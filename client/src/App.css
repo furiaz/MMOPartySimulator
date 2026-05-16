@@ -75,6 +75,7 @@
 .teleport-range,
 .enemy-aggro-range,
 .map-label-overlay,
+.subzone-name-label,
 .floor-tile,
 .skill-link,
 .skill-visual-sprite,
@@ -146,6 +147,26 @@
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.subzone-name-label {
+  z-index: 6;
+  min-width: 86px;
+  max-width: 132px;
+  padding: 2px 6px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(15, 23, 42, 0.35);
+  border-radius: 3px;
+  background: rgba(248, 250, 252, 0.82);
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+  white-space: normal;
 }
 
 .map-debug-toggle-controls {

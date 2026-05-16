@@ -48,7 +48,7 @@ describe("enemy attack leash movement", () => {
     expect(nextEnemy.currentTargetId).toBeNull();
   });
 
-  it("lets passive slime archetypes fight back after being attacked", () => {
+  it("lets slime archetypes fight back after being attacked", () => {
     const companion = {
       ...createIdleCompanion("leader", { x: 1, y: 0 }),
       state: "attack" as const,

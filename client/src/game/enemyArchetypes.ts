@@ -14,7 +14,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   slime: {
     id: "slime",
     displayName: "Slime",
-    temperament: "passive",
+    temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "closest",
     level: 1,
@@ -38,7 +38,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   forest_spider: {
     id: "forest_spider",
     displayName: "Forest Spider",
-    temperament: "passive",
+    temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "closest",
     level: 3,
@@ -86,7 +86,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   stone_crawler: {
     id: "stone_crawler",
     displayName: "Stone Crawler",
-    temperament: "passive",
+    temperament: "aggressive",
     combatStyle: "melee",
     targetPreference: "leader",
     level: 8,
@@ -122,7 +122,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   mossling: {
     id: "mossling",
     displayName: "Mossling",
-    temperament: "passive",
+    temperament: "aggressive",
     combatStyle: "support",
     targetPreference: "closest",
     level: 9,

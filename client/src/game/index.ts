@@ -30,6 +30,7 @@ export type {
   EnemyFamilyId,
   EnemyScalingBand,
   EnemyType,
+  EncounterArea,
   EntityKind,
   EntityState,
   GameEntity,
@@ -69,6 +70,7 @@ export type {
   PrimaryStatId,
   NpcEntity,
   ResourceEntity,
+  ResourceLocation,
   ResourceItemId,
   ResourceType,
   ResurrectionCancelReason,
@@ -89,6 +91,9 @@ export type {
   WorldWipeRecoveryChoice,
   WorldWipeRecoveryState,
   WeaponType,
+  ZoneSubzone,
+  ZoneSubzoneBounds,
+  ZoneSubzonePassage,
 } from "./types";
 export type {
   PointOfInterest,
@@ -342,6 +347,10 @@ export {
   getEnemyDetectionRange,
   updateEnemyAISystem,
 } from "./enemyAISystem";
+export {
+  ENEMY_RESPAWN_DELAY_MS,
+  updateEnemyRespawnSystem,
+} from "./enemyRespawnSystem";
 export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";

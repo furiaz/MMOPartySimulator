@@ -1,6 +1,7 @@
 import { updateAttackSystem } from "./attackSystem";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { updateDropSystem } from "./dropSystem";
 import {
   reserveExploringPartyMemberNextTile,
@@ -125,6 +126,7 @@ export function updateGame(
   nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
+  nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(nextState, movedEntityIds, timing.nowMs);
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);

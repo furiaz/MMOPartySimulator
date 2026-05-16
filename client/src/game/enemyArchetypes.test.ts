@@ -25,6 +25,12 @@ describe("prototype enemy archetypes", () => {
     }
   });
 
+  it("keeps current prototype monster archetypes aggressive", () => {
+    for (const archetype of Object.values(ENEMY_ARCHETYPES)) {
+      expect(archetype.temperament).toBe("aggressive");
+    }
+  });
+
   it("applies supported archetype setup values when enemies are created", () => {
     const enemy = createEnemy("thrower", { x: 0, y: 0 }, undefined, {
       archetypeId: "goblin_thrower",

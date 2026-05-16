@@ -8,9 +8,9 @@ import {
   enemyIds,
   hubNpcStartData,
   HUB_MAP_ID,
-  mapOneEnemyStartPositions,
+  mapOneEnemyStartData,
   mapOneResourceStartData,
-  mapTwoEnemyStartPositions,
+  mapTwoEnemyStartData,
   mapTwoResourceStartData,
   MAP_TWO_ID,
   resourceIds,
@@ -24,29 +24,11 @@ import {
 import type {
   ActiveTeleport,
   Companion,
-  EnemyArchetypeId,
   DebugMapId,
   DebugTeleportPoint,
   GameEntity,
   Position,
 } from "./types";
-
-const MAP_ONE_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
-  "slime",
-  "cave_bat",
-  "forest_spider",
-  "goblin_scout",
-  "bog_imp",
-  "wolf",
-  "goblin_thrower",
-  "stone_crawler",
-  "mossling",
-];
-const MAP_TWO_ENEMY_ARCHETYPES: EnemyArchetypeId[] = [
-  "goblin_shaman",
-  "ash_wisp",
-  "orc",
-];
 
 export function triggerMapTeleport(
   state: GameState,
@@ -381,27 +363,19 @@ function getMapEntities(
     return entities;
   }
 
-  const enemyStartPositions =
-    mapId === MAP_TWO_ID ? mapTwoEnemyStartPositions : mapOneEnemyStartPositions;
+  const enemyStartData =
+    mapId === MAP_TWO_ID ? mapTwoEnemyStartData : mapOneEnemyStartData;
   const resourceStartData =
     mapId === MAP_TWO_ID ? mapTwoResourceStartData : mapOneResourceStartData;
 
   for (const enemyId of enemyIds) {
-    const enemyIndex = enemyIds.indexOf(enemyId);
-    const position =
-      enemyStartPositions[enemyIndex] ?? enemyStartPositions[0];
-    entities[enemyId] = createEnemy(
-      enemyId,
-      position,
-      undefined,
-      mapId === MAP_TWO_ID
-        ? {
-            archetypeId: getMapEnemyArchetype(MAP_TWO_ENEMY_ARCHETYPES, enemyIndex),
-          }
-        : {
-            archetypeId: getMapEnemyArchetype(MAP_ONE_ENEMY_ARCHETYPES, enemyIndex),
-          },
-    );
+    const enemyStart =
+      enemyStartData.find((entry) => entry.id === enemyId) ?? enemyStartData[0];
+    entities[enemyId] = createEnemy(enemyId, enemyStart.position, undefined, {
+      archetypeId: enemyStart.archetypeId,
+      subzoneId: enemyStart.subzoneId,
+      encounterAreaId: enemyStart.encounterAreaId,
+    });
   }
 
   for (const resourceId of resourceIds) {
@@ -415,13 +389,6 @@ function getMapEntities(
   }
 
   return entities;
-}
-
-function getMapEnemyArchetype(
-  archetypeIds: EnemyArchetypeId[],
-  enemyIndex: number,
-): EnemyArchetypeId {
-  return archetypeIds[enemyIndex % archetypeIds.length] ?? archetypeIds[0];
 }
 
 function getPreservedCompanions(state: GameState): Record<string, GameEntity> {

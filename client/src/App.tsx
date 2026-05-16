@@ -143,6 +143,13 @@ type ViewportSize = {
   height: number;
 };
 
+type TileBounds = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+};
+
 function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
   if (event.skillId && SKILL_VISUAL_ICON_SRC[event.skillId]) {
     return SKILL_VISUAL_ICON_SRC[event.skillId];
@@ -175,11 +182,44 @@ function isHubVisualMap(mapId: string | undefined): boolean {
   return mapId === HUB_MAP_ID;
 }
 
-function createFloorTilePositions(columns: number, rows: number): Position[] {
-  return Array.from({ length: columns * rows }, (_, index) => ({
-    x: index % columns,
-    y: Math.floor(index / columns),
-  }));
+function getVisibleTileBounds({
+  cameraOffset,
+  viewportSize,
+  map,
+  bufferTiles = 4,
+}: {
+  cameraOffset: Position;
+  viewportSize: ViewportSize;
+  map: GameMap;
+  bufferTiles?: number;
+}): TileBounds {
+  return {
+    minX: clamp(Math.floor(cameraOffset.x / cellSize) - bufferTiles, 0, map.columns - 1),
+    maxX: clamp(Math.ceil((cameraOffset.x + viewportSize.width) / cellSize) + bufferTiles, 0, map.columns - 1),
+    minY: clamp(Math.floor(cameraOffset.y / cellSize) - bufferTiles, 0, map.rows - 1),
+    maxY: clamp(Math.ceil((cameraOffset.y + viewportSize.height) / cellSize) + bufferTiles, 0, map.rows - 1),
+  };
+}
+
+function createVisibleFloorTilePositions(bounds: TileBounds): Position[] {
+  const tiles: Position[] = [];
+
+  for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
+    for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
+      tiles.push({ x, y });
+    }
+  }
+
+  return tiles;
+}
+
+function isPositionInTileBounds(position: Position, bounds: TileBounds): boolean {
+  return (
+    position.x >= bounds.minX &&
+    position.x <= bounds.maxX &&
+    position.y >= bounds.minY &&
+    position.y <= bounds.maxY
+  );
 }
 
 function getCoordinateHash(position: Position): number {
@@ -216,12 +256,14 @@ const TerrainLayer = memo(function TerrainLayer({
   useHubVisuals,
   useImageFloorTiles,
   useWildernessVisuals,
+  visibleTileBounds,
 }: {
   floorTiles: Position[];
   map: GameMap;
   useHubVisuals: boolean;
   useImageFloorTiles: boolean;
   useWildernessVisuals: boolean;
+  visibleTileBounds: TileBounds;
 }) {
   return (
     <div className="map-terrain" aria-hidden="true">
@@ -244,31 +286,33 @@ const TerrainLayer = memo(function TerrainLayer({
             />
           ))
         : null}
-      {map.walls.map((wall) => (
-        <div
-          key={`${wall.x}-${wall.y}`}
-          className={`wall-tile ${
-            useWildernessVisuals
-              ? "wall-wilderness"
-              : mapTileVisualAssets.wall.className
-          }`}
-          style={{
-            transform: `translate(${wall.x * cellSize}px, ${
-              wall.y * cellSize
-            }px)`,
-          }}
-        >
-          {useWildernessVisuals ? (
-            <img
-              alt=""
-              className={`wall-wilderness-image ${getWildernessWallTileKind(
-                wall,
-              )}`}
-              src={getWildernessWallTileSrc(wall)}
-            />
-          ) : null}
-        </div>
-      ))}
+      {map.walls
+        .filter((wall) => isPositionInTileBounds(wall, visibleTileBounds))
+        .map((wall) => (
+          <div
+            key={`${wall.x}-${wall.y}`}
+            className={`wall-tile ${
+              useWildernessVisuals
+                ? "wall-wilderness"
+                : mapTileVisualAssets.wall.className
+            }`}
+            style={{
+              transform: `translate(${wall.x * cellSize}px, ${
+                wall.y * cellSize
+              }px)`,
+            }}
+          >
+            {useWildernessVisuals ? (
+              <img
+                alt=""
+                className={`wall-wilderness-image ${getWildernessWallTileKind(
+                  wall,
+                )}`}
+                src={getWildernessWallTileSrc(wall)}
+              />
+            ) : null}
+          </div>
+        ))}
     </div>
   );
 });
@@ -1546,13 +1590,6 @@ function App() {
   const useWildernessVisuals = isWildernessVisualMap(currentMap.id);
   const useHubVisuals = isHubVisualMap(currentMap.id);
   const useImageFloorTiles = useWildernessVisuals || useHubVisuals;
-  const floorTiles = useMemo(
-    () =>
-      useImageFloorTiles
-        ? createFloorTilePositions(currentMap.columns, currentMap.rows)
-        : [],
-    [currentMap.columns, currentMap.rows, useImageFloorTiles],
-  );
   const mapPixelWidth = currentMap.columns * cellSize;
   const mapPixelHeight = currentMap.rows * cellSize;
   const leaderCameraPosition = leader?.position ?? { x: 0, y: 0 };
@@ -1561,6 +1598,31 @@ function App() {
     y: leaderCameraPosition.y * cellSize + cellSize / 2,
   };
   const currentMapKey = currentMap.id ?? currentMap.debugName;
+  const terrainCameraOffset = getDeadZoneCameraOffset({
+    focusPosition: leaderCameraFocusPosition,
+    currentOffset: visualCameraOffsetRef.current,
+    viewportSize,
+    mapPixelWidth,
+    mapPixelHeight,
+  });
+  const visibleTileBounds = getVisibleTileBounds({
+    cameraOffset: terrainCameraOffset,
+    viewportSize,
+    map: currentMap,
+  });
+  const floorTiles = useMemo(
+    () =>
+      useImageFloorTiles
+        ? createVisibleFloorTilePositions(visibleTileBounds)
+        : [],
+    [
+      useImageFloorTiles,
+      visibleTileBounds.minX,
+      visibleTileBounds.maxX,
+      visibleTileBounds.minY,
+      visibleTileBounds.maxY,
+    ],
+  );
 
   function applyMapWorldTransform(offset: Position) {
     if (!mapWorldRef.current) {
@@ -1740,6 +1802,7 @@ function App() {
               useHubVisuals={useHubVisuals}
               useImageFloorTiles={useImageFloorTiles}
               useWildernessVisuals={useWildernessVisuals}
+              visibleTileBounds={visibleTileBounds}
             />
             {activeTeleport ? (
               <div
@@ -1756,6 +1819,20 @@ function App() {
                 title="Teleport rally range"
               />
             ) : null}
+            {currentMap.subzoneNameLabels?.map((label) => (
+              <div
+                key={label.id}
+                className="subzone-name-label"
+                style={{
+                  transform: `translate(${label.position.x * cellSize}px, ${
+                    label.position.y * cellSize
+                  }px) translate(-50%, -50%)`,
+                }}
+                title={label.text}
+              >
+                {label.text}
+              </div>
+            ))}
             {teleports.map((teleport) => (
               <div key={teleport.id}>
                 {isTeleportPoi(teleport) && !activeTeleport ? (
@@ -2002,28 +2079,30 @@ function App() {
                 title="Move point of interest"
               />
             ) : null}
-            {enemies.map((enemy) =>
-              enemy.state !== "dead" && enemy.aggressionMode === "aggressive" ? (
-                <div
-                  key={`aggro-${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
-                  className="enemy-aggro-range"
-                  style={{
-                    width: enemyAggroRange * cellSize * 2,
-                    height: enemyAggroRange * cellSize * 2,
-                    transform: `translate(${
-                      enemy.position.x * cellSize +
-                      cellSize / 2 -
-                      enemyAggroRange * cellSize
-                    }px, ${
-                      enemy.position.y * cellSize +
-                      cellSize / 2 -
-                      enemyAggroRange * cellSize
-                    }px)`,
-                  }}
-                  title="Enemy detection range"
-                />
-              ) : null,
-            )}
+            {showEntityInfo
+              ? enemies.map((enemy) =>
+                  enemy.state !== "dead" && enemy.aggressionMode === "aggressive" ? (
+                    <div
+                      key={`aggro-${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
+                      className="enemy-aggro-range"
+                      style={{
+                        width: enemyAggroRange * cellSize * 2,
+                        height: enemyAggroRange * cellSize * 2,
+                        transform: `translate(${
+                          enemy.position.x * cellSize +
+                          cellSize / 2 -
+                          enemyAggroRange * cellSize
+                        }px, ${
+                          enemy.position.y * cellSize +
+                          cellSize / 2 -
+                          enemyAggroRange * cellSize
+                        }px)`,
+                      }}
+                      title="Enemy detection range"
+                    />
+                  ) : null,
+                )
+              : null}
             {partyMembers.map((member, index) => {
               const visualAsset = getEntityVisualAsset(member, gameState.currentMapId);
               const visualMovement =

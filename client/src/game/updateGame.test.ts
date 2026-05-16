@@ -632,6 +632,42 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("reuses a valid nearby wild combat POI between throttle intervals", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const currentEnemy = createEnemy("current-enemy", { x: 3, y: 2 });
+    const alternateEnemy = createEnemy("alternate-enemy", { x: 4, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, currentEnemy, alternateEnemy], {
+        partyLeaderId: leader.id,
+        simulationTimeMs: 1000,
+        simulationDeltaMs: 100,
+        localPoiTarget: {
+          poiId: currentEnemy.id,
+          category: "combat",
+          mapId: MAP_ONE_ID,
+          position: currentEnemy.position,
+          targetEntityId: currentEnemy.id,
+          reason: "wild enemy fallback",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 1000,
+          selectedPoiId: currentEnemy.id,
+          selectedCategory: "combat",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: currentEnemy.position,
+          selectedReason: "wild enemy fallback",
+          consideredTargets: [],
+          skippedReasons: {},
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.leaderIntent?.targetId).toBe(currentEnemy.id);
+    expect(nextState.lastPoiDecision?.evaluatedAtMs).toBe(1000);
+  });
+
   it("switches from a resource POI to a much better enemy fallback", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const resource = createResource("fallback-resource", { x: 12, y: 2 });

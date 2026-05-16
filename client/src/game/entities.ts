@@ -66,6 +66,8 @@ type CreateEnemyOptions = {
   attackCooldownMs?: number;
   attackRange?: number;
   enemyType?: EnemyType;
+  subzoneId?: string;
+  encounterAreaId?: string;
 };
 
 export function createEnemy(
@@ -93,6 +95,8 @@ export function createEnemy(
     archetypeId: options.archetypeId,
     enemyType: options.enemyType,
     homePosition: position,
+    subzoneId: options.subzoneId,
+    encounterAreaId: options.encounterAreaId,
     level,
     xpReward: options.xpReward,
     attack: options.attack ?? scaledStats.attack,

@@ -55,6 +55,7 @@ const FALLBACK_DISTANCE_SCORE_MULTIPLIER = 1;
 const NEARBY_RESOURCE_PATH_DISTANCE = 3;
 const NEARBY_RESOURCE_SCORE_BONUS = -12;
 const IDLE_CITY_POINT: Position = { x: 22, y: 16 };
+const WILD_POI_REEVALUATE_INTERVAL_MS = 500;
 
 type PoiTargetOption = {
   poi: PointOfInterest;
@@ -92,6 +93,10 @@ export function updatePoiSystem(state: GameState): GameState {
     return clearPoiSelection(state);
   }
 
+  if (canReuseWildPoiSelection(state, leader)) {
+    return applyLocalTargetToLeaderIntent(state, state.localPoiTarget);
+  }
+
   const interactionState = clearReachedWorldTravelTarget(
     updateReachedPoiInteractions(state),
   );
@@ -102,6 +107,7 @@ export function updatePoiSystem(state: GameState): GameState {
     globalPoiIntent,
     localPoiTarget: selection.localTarget,
     lastPoiDecision: {
+      evaluatedAtMs: interactionState.simulationTimeMs ?? 0,
       selectedPoiId: selection.localTarget?.poiId,
       selectedCategory: selection.localTarget?.category,
       selectedMapId: selection.localTarget?.mapId,
@@ -120,6 +126,70 @@ export function updatePoiSystem(state: GameState): GameState {
   }
 
   return recordSkippedPois(nextState, selection.skippedReasons);
+}
+
+function canReuseWildPoiSelection(
+  state: GameState,
+  leader: { position: Position },
+): state is GameState & { localPoiTarget: LocalPoiTarget } {
+  if (state.currentMapId === HUB_MAP_ID || !state.localPoiTarget) {
+    return false;
+  }
+
+  const evaluatedAtMs = state.lastPoiDecision?.evaluatedAtMs;
+  const nowMs = state.simulationTimeMs ?? 0;
+
+  if (
+    evaluatedAtMs === undefined ||
+    nowMs - evaluatedAtMs >= WILD_POI_REEVALUATE_INTERVAL_MS
+  ) {
+    return false;
+  }
+
+  if (!isLocalPoiTargetStillValid(state, state.localPoiTarget)) {
+    return false;
+  }
+
+  if (
+    state.localPoiTarget.category === "combat" ||
+    state.localPoiTarget.category === "resource"
+  ) {
+    return true;
+  }
+
+  return (
+    getDistance(leader.position, state.localPoiTarget.position) >
+    DEFAULT_POI_INTERACTION_RANGE
+  );
+}
+
+function isLocalPoiTargetStillValid(
+  state: GameState,
+  target: LocalPoiTarget,
+): boolean {
+  if (target.mapId !== state.currentMapId) {
+    return false;
+  }
+
+  if (!target.targetEntityId) {
+    return true;
+  }
+
+  const entity = state.entities[target.targetEntityId];
+
+  if (!entity) {
+    return false;
+  }
+
+  if (target.category === "combat") {
+    return entity.kind === "enemy" && entity.state !== "dead";
+  }
+
+  if (target.category === "resource") {
+    return entity.kind === "resource" && !entity.isDepleted;
+  }
+
+  return true;
 }
 
 export function getMapType(mapId: DebugMapId | undefined): PoiMapType {
@@ -588,15 +658,28 @@ function createPoiDistanceMap(
       .filter((option) => option.poi.mapId === state.currentMapId)
       .map((option) => getNavigationPositionKey(option.poi.position)),
   );
+  const startKey = getNavigationPositionKey(start);
   const distanceByKey: Record<string, number> = {
-    [getNavigationPositionKey(start)]: 0,
+    [startKey]: 0,
   };
+
+  if (targetKeys.size === 0) {
+    return distanceByKey;
+  }
+
+  const remainingTargetKeys = new Set(targetKeys);
+  remainingTargetKeys.delete(startKey);
+
+  if (remainingTargetKeys.size === 0) {
+    return distanceByKey;
+  }
+
   const queue: Position[] = [start];
-  const queued = new Set<string>([getNavigationPositionKey(start)]);
+  const queued = new Set<string>([startKey]);
   const visited = new Set<string>();
   let queueIndex = 0;
 
-  while (queueIndex < queue.length) {
+  while (queueIndex < queue.length && remainingTargetKeys.size > 0) {
     const current = queue[queueIndex];
     queueIndex += 1;
 
@@ -634,6 +717,7 @@ function createPoiDistanceMap(
       }
 
       distanceByKey[neighborKey] = nextDistance;
+      remainingTargetKeys.delete(neighborKey);
 
       if (!queued.has(neighborKey)) {
         queued.add(neighborKey);
