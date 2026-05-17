@@ -140,6 +140,18 @@ describe("debug maps", () => {
     expect(createDebugMap(MAP_TWO_ID).subzones).toBe(mapTwoSubzones);
   });
 
+  it("adds interior blockers to each map one subzone", () => {
+    const mapOne = createDebugMap(MAP_ONE_ID);
+
+    for (const subzone of mapOneSubzones) {
+      const interiorWallCount = mapOne.walls.filter((wall) =>
+        isInsideSubzone(subzone, wall),
+      ).length;
+
+      expect(interiorWallCount).toBeGreaterThan(0);
+    }
+  });
+
   it("keeps authored subzones, passages, encounter areas, and resource locations valid", () => {
     for (const wildernessMap of wildernessMaps) {
       assertSubzones(wildernessMap.mapId, wildernessMap.subzones);
