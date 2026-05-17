@@ -1523,7 +1523,7 @@ Maps should support:
 
 The game uses a top-down readable presentation.
 
-Current visuals may use prototype sprites and placeholders.
+Current visuals may use prototype sprites, generated terrain tiles, and placeholders.
 
 Visual priorities:
 
@@ -1532,16 +1532,23 @@ Visual priorities:
 - NPCs should be easy to identify in prototype hub spaces
 - resources should be visible and readable
 - movement direction should be understandable
+- terrain, walls, obstacles, labels, and feedback should remain readable at the current prototype render scale
 - feedback should make combat, gathering, and skills readable
 
 Enemy and NPC name labels may be used as UI-facing readability aids. Name labels must not define simulation behavior, targeting rules, NPC behavior, dialogue, or final content pipeline rules.
 
+Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, and input targeting while rendering larger floor chunks as background terrain.
+
+Current generated terrain asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, and larger floor tile variants for visual testing.
+
+Terrain asset size and render scale are UI-facing presentation choices. They must not define simulation coordinates, movement, collision, map geometry, entity placement, gameplay range, final art direction, or a production asset pipeline.
 
 Prototype art assets are allowed while systems are being built.
 
 Art assets should not define game logic.
 
 Final art direction may evolve later.
+
 
 ---
 

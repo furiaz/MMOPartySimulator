@@ -1498,11 +1498,14 @@ Map data is still development/prototype data and should not define final world c
 
 Current prototype map dimensions:
 
-- `hub`: 50 columns by 26 rows
-- `map-1`: 160 columns by 26 rows
-- `map-2`: 160 columns by 26 rows
-- `map-3`: 160 columns by 26 rows
-- `map-4`: 160 columns by 26 rows
+- `hub`: 50 columns by 30 rows
+- `map-1`: 160 columns by 30 rows
+- `map-2`: 160 columns by 30 rows
+- `map-3`: 160 columns by 30 rows
+- `map-4`: 160 columns by 30 rows
+
+The current row count reflects prototype debug-map presentation space. It is not final world scale or final zone design.
+
 
 ---
 
@@ -1641,7 +1644,9 @@ Current generated asset groups include:
 
 - `Asserts/Generated/now-pack`
 - `Asserts/Generated/map-wilderness`
+- `Asserts/Generated/map-wilderness/128`
 - `Asserts/Generated/hub-floors`
+- `Asserts/Generated/hub-floors/New/128`
 
 Current sprite asset groups include:
 
@@ -1674,13 +1679,28 @@ Current NPC visuals:
 
 Current map tile visuals:
 
+- the React map renderer uses a 32px construction-cell pixel size for coordinate anchoring, walls, obstacles, click conversion, camera math, overlays, entities, resources, NPCs, teleports, labels, and effects
+- current floor imagery renders as 128px floor chunks spanning 4x4 construction cells
+- wilderness floor chunks currently use 128px generated wilderness floor assets
+- hub floor chunks currently use 128px generated hub floor assets
+- wilderness floor tile selection may use the subzone containing the floor chunk center so each subsection has stable floor texture selection
 - wilderness maps may use generated grass, tree, and bush image tiles
-- the hub may use generated stone floor imagery for the city interior
+- the hub may use generated stone and outside-grass floor imagery
 - fallback floor and wall visuals use placeholder class names
 
-Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, image icon mappings, and placeholder class names.
+Current generated terrain asset direction may include:
 
-Simulation logic must not depend on sprite assets.
+- 32x32 bush or obstacle assets
+- 64x64 tree assets
+- 64x64 floor assets for visual testing
+- 128x128 floor assets for the active floor-chunk render experiment
+
+The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement. Floor chunk size and terrain asset size must not change simulation coordinates, movement, collision, pathing, map geometry, entity placement, teleports, gameplay ranges, or game logic.
+
+Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, image icon mappings, terrain image mappings, and placeholder class names.
+
+Simulation logic must not depend on sprite assets, floor chunk size, or terrain image dimensions.
+
 
 
 ---
