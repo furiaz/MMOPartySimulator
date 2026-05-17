@@ -4,8 +4,8 @@ const nowAssetPackPath = "/Asserts/Generated/now-pack";
 const wildernessMapAssetPath = "/Asserts/Generated/map-wilderness";
 const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
 const beginnerSkillEffectsPath = "/Asserts/Generated/beginner-skill-effects-50/sprites";
-const wildernessMapFloor64AssetPath = `${wildernessMapAssetPath}/64`;
-const hubFloor64AssetPath = `${hubFloorAssetPath}/New/64`;
+const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
+const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
 export const INVENTORY_ITEM_ICON_SRC: Partial<Record<ItemId, string>> = {
   wood: `${nowAssetPackPath}/wood-node.png`,
@@ -63,18 +63,18 @@ export const NPC_ICON_SRC: Partial<Record<NpcEntity["npcRole"], string>> = {
 export const WILDERNESS_MAP_TILE_SRC = {
   grassA: `${wildernessMapAssetPath}/grass-a.png`,
   grassB: `${wildernessMapAssetPath}/grass-b.png`,
-  grass64: `${wildernessMapFloor64AssetPath}/forest-grass-floor-atlas-64.png`,
-  grassDetail64: `${wildernessMapFloor64AssetPath}/forest-grass-detail-floor-atlas-64.png`,
-  grassImagegen64: `${wildernessMapFloor64AssetPath}/forest-grass-detail-floor-imagegen-64.png`,
-  grassFlowers64: `${wildernessMapFloor64AssetPath}/forest-grass-flowers-floor-atlas-64.png`,
+  grass128: `${wildernessMapFloor128AssetPath}/forest-grass-floor-atlas-128.png`,
+  grassDetail128: `${wildernessMapFloor128AssetPath}/forest-grass-detail-floor-atlas-128.png`,
+  grassBackup128: `${wildernessMapFloor128AssetPath}/forest-grass-backup-floor-atlas-128.png`,
+  grassFlowers128: `${wildernessMapFloor128AssetPath}/forest-grass-flowers-floor-atlas-128.png`,
   tree: `${wildernessMapAssetPath}/tree.png`,
   bush: `${wildernessMapAssetPath}/bush.png`,
 } as const;
 
 export const HUB_MAP_TILE_SRC = {
   stone: `${hubFloorAssetPath}/hub-city-stone-seamless.png`,
-  grass64: `${hubFloor64AssetPath}/hub-outside-grass-floor-atlas-64.png`,
-  stone64: `${hubFloor64AssetPath}/hub-stone-floor-atlas-64.png`,
+  grass128: `${hubFloor128AssetPath}/hub-outside-grass-floor-atlas-128.png`,
+  stone128: `${hubFloor128AssetPath}/hub-stone-floor-atlas-128.png`,
 } as const;
 
 export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {

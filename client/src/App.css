@@ -751,11 +751,11 @@
 
 .floor-tile {
   z-index: 0;
-  width: 64px;
-  height: 64px;
+  width: 128px;
+  height: 128px;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 66px 66px;
+  background-size: 130px 130px;
   image-rendering: pixelated;
   pointer-events: none;
   user-select: none;

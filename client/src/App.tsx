@@ -122,7 +122,7 @@ import {
 const debugMap = createDebugMap();
 const gameVersion = "0.01";
 const mapConstructionCellPixelSize = 32;
-const floorChunkCellSpan = 2;
+const floorChunkCellSpan = 4;
 const floorChunkPixelSize =
   mapConstructionCellPixelSize * floorChunkCellSpan;
 const enemyAggroRange = getEnemyDetectionRange();
@@ -267,10 +267,10 @@ function isPositionInsideSubzoneBounds(
 
 function getWildernessFloorTileSrc(chunk: Position, map: GameMap): string {
   const wildernessFloorTiles = [
-    WILDERNESS_MAP_TILE_SRC.grass64,
-    WILDERNESS_MAP_TILE_SRC.grassDetail64,
-    WILDERNESS_MAP_TILE_SRC.grassImagegen64,
-    WILDERNESS_MAP_TILE_SRC.grassFlowers64,
+    WILDERNESS_MAP_TILE_SRC.grass128,
+    WILDERNESS_MAP_TILE_SRC.grassDetail128,
+    WILDERNESS_MAP_TILE_SRC.grassBackup128,
+    WILDERNESS_MAP_TILE_SRC.grassFlowers128,
   ] as const;
   const chunkCenter = {
     x: chunk.x + floorChunkCellSpan / 2,
@@ -285,7 +285,7 @@ function getWildernessFloorTileSrc(chunk: Position, map: GameMap): string {
     return wildernessFloorTiles[subzoneIndex % wildernessFloorTiles.length];
   }
 
-  return WILDERNESS_MAP_TILE_SRC.grass64;
+  return WILDERNESS_MAP_TILE_SRC.grass128;
 }
 
 function getHubFloorTileSrc(chunk: Position): string {
@@ -295,7 +295,7 @@ function getHubFloorTileSrc(chunk: Position): string {
     chunk.y >= 6 &&
     chunk.y <= 18;
 
-  return isCityFloorChunk ? HUB_MAP_TILE_SRC.stone64 : HUB_MAP_TILE_SRC.grass64;
+  return isCityFloorChunk ? HUB_MAP_TILE_SRC.stone128 : HUB_MAP_TILE_SRC.grass128;
 }
 
 function getWildernessWallTileKind(position: Position): "tree" | "bush" {
