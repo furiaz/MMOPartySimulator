@@ -14,9 +14,9 @@ import type {
 import { bakeNavigationGrid } from "./navigation";
 
 export const DEBUG_MAP_COLUMNS = 50;
-export const DEBUG_MAP_ROWS = 26;
+export const DEBUG_MAP_ROWS = 30;
 export const WILDERNESS_MAP_COLUMNS = 160;
-export const WILDERNESS_MAP_ROWS = 26;
+export const WILDERNESS_MAP_ROWS = 30;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const MAP_TWO_TO_MAP_THREE_TELEPORTER_ID = "map-2-to-map-3";
 export const MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID = "map-3-to-map-4";

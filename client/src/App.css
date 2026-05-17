@@ -516,7 +516,7 @@
 .entity-marker {
   width: 22px;
   height: 22px;
-  margin: 7px;
+  margin: 5px;
   border-radius: 999px;
   box-shadow: 0 0 0 2px #ffffff, 0 1px 4px rgba(15, 23, 42, 0.32);
 }
@@ -548,7 +548,7 @@
   left: 0;
   bottom: -6px;
   z-index: 3;
-  width: 36px;
+  width: 32px;
   height: 3px;
   border: 1px solid #334155;
   background: #ffffff;
@@ -739,8 +739,8 @@
 }
 
 .wall-tile {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
 }
 
 .wall-tile.wall-default {
@@ -751,8 +751,11 @@
 
 .floor-tile {
   z-index: 0;
-  width: 36px;
-  height: 36px;
+  width: 64px;
+  height: 64px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 66px 66px;
   image-rendering: pixelated;
   pointer-events: none;
   user-select: none;
@@ -834,8 +837,8 @@
 }
 
 .companion {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   margin: 0;
   overflow: visible;
   border-radius: 0;
@@ -849,8 +852,8 @@
 }
 
 .entity-marker.sprite-entity {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   margin: 0;
   overflow: visible;
   border-radius: 0;
@@ -912,8 +915,8 @@
 }
 
 .npc-image-entity {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   margin: 0;
   overflow: visible;
   border-radius: 0;

@@ -121,7 +121,10 @@ import {
 
 const debugMap = createDebugMap();
 const gameVersion = "0.01";
-const cellSize = 36;
+const mapConstructionCellPixelSize = 32;
+const floorChunkCellSpan = 2;
+const floorChunkPixelSize =
+  mapConstructionCellPixelSize * floorChunkCellSpan;
 const enemyAggroRange = getEnemyDetectionRange();
 const visualMovementGraceMs = 180;
 const visualMovementReachedDistance = 1;
@@ -194,23 +197,47 @@ function getVisibleTileBounds({
   bufferTiles?: number;
 }): TileBounds {
   return {
-    minX: clamp(Math.floor(cameraOffset.x / cellSize) - bufferTiles, 0, map.columns - 1),
-    maxX: clamp(Math.ceil((cameraOffset.x + viewportSize.width) / cellSize) + bufferTiles, 0, map.columns - 1),
-    minY: clamp(Math.floor(cameraOffset.y / cellSize) - bufferTiles, 0, map.rows - 1),
-    maxY: clamp(Math.ceil((cameraOffset.y + viewportSize.height) / cellSize) + bufferTiles, 0, map.rows - 1),
+    minX: clamp(
+      Math.floor(cameraOffset.x / mapConstructionCellPixelSize) - bufferTiles,
+      0,
+      map.columns - 1,
+    ),
+    maxX: clamp(
+      Math.ceil(
+        (cameraOffset.x + viewportSize.width) / mapConstructionCellPixelSize,
+      ) + bufferTiles,
+      0,
+      map.columns - 1,
+    ),
+    minY: clamp(
+      Math.floor(cameraOffset.y / mapConstructionCellPixelSize) - bufferTiles,
+      0,
+      map.rows - 1,
+    ),
+    maxY: clamp(
+      Math.ceil(
+        (cameraOffset.y + viewportSize.height) / mapConstructionCellPixelSize,
+      ) + bufferTiles,
+      0,
+      map.rows - 1,
+    ),
   };
 }
 
-function createVisibleFloorTilePositions(bounds: TileBounds): Position[] {
-  const tiles: Position[] = [];
+function createVisibleFloorChunkPositions(bounds: TileBounds): Position[] {
+  const chunks: Position[] = [];
+  const startX =
+    Math.floor(bounds.minX / floorChunkCellSpan) * floorChunkCellSpan;
+  const startY =
+    Math.floor(bounds.minY / floorChunkCellSpan) * floorChunkCellSpan;
 
-  for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
-    for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
-      tiles.push({ x, y });
+  for (let y = startY; y <= bounds.maxY; y += floorChunkCellSpan) {
+    for (let x = startX; x <= bounds.maxX; x += floorChunkCellSpan) {
+      chunks.push({ x, y });
     }
   }
 
-  return tiles;
+  return chunks;
 }
 
 function isPositionInTileBounds(position: Position, bounds: TileBounds): boolean {
@@ -226,20 +253,49 @@ function getCoordinateHash(position: Position): number {
   return Math.abs(position.x * 31 + position.y * 17 + position.x * position.y * 7);
 }
 
-function getWildernessFloorTileSrc(position: Position): string {
-  return getCoordinateHash(position) % 4 === 0
-    ? WILDERNESS_MAP_TILE_SRC.grassB
-    : WILDERNESS_MAP_TILE_SRC.grassA;
+function isPositionInsideSubzoneBounds(
+  position: Position,
+  subzone: NonNullable<GameMap["subzones"]>[number],
+): boolean {
+  return (
+    position.x >= subzone.bounds.x &&
+    position.x < subzone.bounds.x + subzone.bounds.width &&
+    position.y >= subzone.bounds.y &&
+    position.y < subzone.bounds.y + subzone.bounds.height
+  );
 }
 
-function getHubFloorTileSrc(position: Position): string {
-  const isCityInterior =
-    position.x >= 13 &&
-    position.x <= 34 &&
-    position.y >= 7 &&
-    position.y <= 18;
+function getWildernessFloorTileSrc(chunk: Position, map: GameMap): string {
+  const wildernessFloorTiles = [
+    WILDERNESS_MAP_TILE_SRC.grass64,
+    WILDERNESS_MAP_TILE_SRC.grassDetail64,
+    WILDERNESS_MAP_TILE_SRC.grassImagegen64,
+    WILDERNESS_MAP_TILE_SRC.grassFlowers64,
+  ] as const;
+  const chunkCenter = {
+    x: chunk.x + floorChunkCellSpan / 2,
+    y: chunk.y + floorChunkCellSpan / 2,
+  };
+  const subzoneIndex =
+    map.subzones?.findIndex((subzone) =>
+      isPositionInsideSubzoneBounds(chunkCenter, subzone),
+    ) ?? -1;
 
-  return isCityInterior ? HUB_MAP_TILE_SRC.stone : getWildernessFloorTileSrc(position);
+  if (subzoneIndex >= 0) {
+    return wildernessFloorTiles[subzoneIndex % wildernessFloorTiles.length];
+  }
+
+  return WILDERNESS_MAP_TILE_SRC.grass64;
+}
+
+function getHubFloorTileSrc(chunk: Position): string {
+  const isCityFloorChunk =
+    chunk.x >= 12 &&
+    chunk.x <= 34 &&
+    chunk.y >= 6 &&
+    chunk.y <= 18;
+
+  return isCityFloorChunk ? HUB_MAP_TILE_SRC.stone64 : HUB_MAP_TILE_SRC.grass64;
 }
 
 function getWildernessWallTileKind(position: Position): "tree" | "bush" {
@@ -251,14 +307,14 @@ function getWildernessWallTileSrc(position: Position): string {
 }
 
 const TerrainLayer = memo(function TerrainLayer({
-  floorTiles,
+  floorChunks,
   map,
   useHubVisuals,
   useImageFloorTiles,
   useWildernessVisuals,
   visibleTileBounds,
 }: {
-  floorTiles: Position[];
+  floorChunks: Position[];
   map: GameMap;
   useHubVisuals: boolean;
   useImageFloorTiles: boolean;
@@ -268,23 +324,26 @@ const TerrainLayer = memo(function TerrainLayer({
   return (
     <div className="map-terrain" aria-hidden="true">
       {useImageFloorTiles
-        ? floorTiles.map((tile) => (
-            <img
-              key={`floor-${tile.x}-${tile.y}`}
-              alt=""
-              className="floor-tile"
-              src={
-                useHubVisuals
-                  ? getHubFloorTileSrc(tile)
-                  : getWildernessFloorTileSrc(tile)
-              }
-              style={{
-                transform: `translate(${tile.x * cellSize}px, ${
-                  tile.y * cellSize
-                }px)`,
-              }}
-            />
-          ))
+        ? floorChunks.map((chunk) => {
+            const floorTileSrc = useHubVisuals
+              ? getHubFloorTileSrc(chunk)
+              : getWildernessFloorTileSrc(chunk, map);
+
+            return (
+              <div
+                key={`floor-${chunk.x}-${chunk.y}`}
+                className="floor-tile"
+                style={{
+                  width: floorChunkPixelSize,
+                  height: floorChunkPixelSize,
+                  backgroundImage: `url("${floorTileSrc}")`,
+                  transform: `translate(${
+                    chunk.x * mapConstructionCellPixelSize
+                  }px, ${chunk.y * mapConstructionCellPixelSize}px)`,
+                }}
+              />
+            );
+          })
         : null}
       {map.walls
         .filter((wall) => isPositionInTileBounds(wall, visibleTileBounds))
@@ -297,8 +356,8 @@ const TerrainLayer = memo(function TerrainLayer({
                 : mapTileVisualAssets.wall.className
             }`}
             style={{
-              transform: `translate(${wall.x * cellSize}px, ${
-                wall.y * cellSize
+              transform: `translate(${wall.x * mapConstructionCellPixelSize}px, ${
+                wall.y * mapConstructionCellPixelSize
               }px)`,
             }}
           >
@@ -1431,10 +1490,10 @@ function App() {
     const visualCameraOffset = visualCameraOffsetRef.current;
     const targetPosition = {
       x: Math.floor(
-        (event.clientX - bounds.left + visualCameraOffset.x) / cellSize,
+        (event.clientX - bounds.left + visualCameraOffset.x) / mapConstructionCellPixelSize,
       ),
       y: Math.floor(
-        (event.clientY - bounds.top + visualCameraOffset.y) / cellSize,
+        (event.clientY - bounds.top + visualCameraOffset.y) / mapConstructionCellPixelSize,
       ),
     };
 
@@ -1590,12 +1649,12 @@ function App() {
   const useWildernessVisuals = isWildernessVisualMap(currentMap.id);
   const useHubVisuals = isHubVisualMap(currentMap.id);
   const useImageFloorTiles = useWildernessVisuals || useHubVisuals;
-  const mapPixelWidth = currentMap.columns * cellSize;
-  const mapPixelHeight = currentMap.rows * cellSize;
+  const mapPixelWidth = currentMap.columns * mapConstructionCellPixelSize;
+  const mapPixelHeight = currentMap.rows * mapConstructionCellPixelSize;
   const leaderCameraPosition = leader?.position ?? { x: 0, y: 0 };
   const leaderCameraFocusPosition = {
-    x: leaderCameraPosition.x * cellSize + cellSize / 2,
-    y: leaderCameraPosition.y * cellSize + cellSize / 2,
+    x: leaderCameraPosition.x * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
+    y: leaderCameraPosition.y * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
   };
   const currentMapKey = currentMap.id ?? currentMap.debugName;
   const terrainCameraOffset = getDeadZoneCameraOffset({
@@ -1610,10 +1669,10 @@ function App() {
     viewportSize,
     map: currentMap,
   });
-  const floorTiles = useMemo(
+  const floorChunks = useMemo(
     () =>
       useImageFloorTiles
-        ? createVisibleFloorTilePositions(visibleTileBounds)
+        ? createVisibleFloorChunkPositions(visibleTileBounds)
         : [],
     [
       useImageFloorTiles,
@@ -1797,7 +1856,7 @@ function App() {
             }}
           >
             <TerrainLayer
-              floorTiles={floorTiles}
+              floorChunks={floorChunks}
               map={currentMap}
               useHubVisuals={useHubVisuals}
               useImageFloorTiles={useImageFloorTiles}
@@ -1808,12 +1867,12 @@ function App() {
               <div
                 className="teleport-range"
                 style={{
-                  width: activeTeleport.range * cellSize * 2,
-                  height: activeTeleport.range * cellSize * 2,
+                  width: activeTeleport.range * mapConstructionCellPixelSize * 2,
+                  height: activeTeleport.range * mapConstructionCellPixelSize * 2,
                   transform: `translate(${
-                    (activeTeleport.position.x - activeTeleport.range) * cellSize
+                    (activeTeleport.position.x - activeTeleport.range) * mapConstructionCellPixelSize
                   }px, ${
-                    (activeTeleport.position.y - activeTeleport.range) * cellSize
+                    (activeTeleport.position.y - activeTeleport.range) * mapConstructionCellPixelSize
                   }px)`,
                 }}
                 title="Teleport rally range"
@@ -1824,8 +1883,8 @@ function App() {
                 key={label.id}
                 className="subzone-name-label"
                 style={{
-                  transform: `translate(${label.position.x * cellSize}px, ${
-                    label.position.y * cellSize
+                  transform: `translate(${label.position.x * mapConstructionCellPixelSize}px, ${
+                    label.position.y * mapConstructionCellPixelSize
                   }px) translate(-50%, -50%)`,
                 }}
                 title={label.text}
@@ -1839,8 +1898,8 @@ function App() {
                   <div
                     className="poi-ring teleport-poi"
                     style={{
-                      transform: `translate(${teleport.position.x * cellSize}px, ${
-                        teleport.position.y * cellSize
+                      transform: `translate(${teleport.position.x * mapConstructionCellPixelSize}px, ${
+                        teleport.position.y * mapConstructionCellPixelSize
                       }px)`,
                     }}
                     title={`${teleport.id} point of interest`}
@@ -1853,8 +1912,8 @@ function App() {
                     triggerTeleport(teleport.id);
                   }}
                   style={{
-                    transform: `translate(${teleport.position.x * cellSize}px, ${
-                      teleport.position.y * cellSize
+                    transform: `translate(${teleport.position.x * mapConstructionCellPixelSize}px, ${
+                      teleport.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={`${teleport.id}: ${teleport.sourceMapId} to ${teleport.targetMapId}`}
@@ -1874,8 +1933,8 @@ function App() {
                 key={fountain.id}
                 className="healing-fountain"
                 style={{
-                  transform: `translate(${fountain.position.x * cellSize}px, ${
-                    fountain.position.y * cellSize
+                  transform: `translate(${fountain.position.x * mapConstructionCellPixelSize}px, ${
+                    fountain.position.y * mapConstructionCellPixelSize
                   }px)`,
                 }}
                 title="Healing fountain"
@@ -1895,8 +1954,8 @@ function App() {
                   key={shield.id}
                   className="skill-shield-block"
                   style={{
-                    transform: `translate(${shield.position.x * cellSize}px, ${
-                      shield.position.y * cellSize
+                    transform: `translate(${shield.position.x * mapConstructionCellPixelSize}px, ${
+                      shield.position.y * mapConstructionCellPixelSize
                     }px) rotate(${shield.rotationRadians}rad)`,
                   }}
                   title="Guard Wall"
@@ -1927,9 +1986,9 @@ function App() {
                   src={iconSrc}
                   style={{
                     transform: `translate(${
-                      spritePosition.x * cellSize + cellSize / 2
+                      spritePosition.x * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2
                     }px, ${
-                      spritePosition.y * cellSize + cellSize / 2
+                      spritePosition.y * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2
                     }px) translate(-50%, -50%)`,
                   }}
                 />
@@ -1947,7 +2006,7 @@ function App() {
 
               const xDistance = target.position.x - source.position.x;
               const yDistance = target.position.y - source.position.y;
-              const length = Math.hypot(xDistance, yDistance) * cellSize;
+              const length = Math.hypot(xDistance, yDistance) * mapConstructionCellPixelSize;
               const angle = Math.atan2(yDistance, xDistance);
 
               return (
@@ -1957,9 +2016,9 @@ function App() {
                   style={{
                     width: length,
                     transform: `translate(${
-                      source.position.x * cellSize + cellSize / 2
+                      source.position.x * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2
                     }px, ${
-                      source.position.y * cellSize + cellSize / 2
+                      source.position.y * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2
                     }px) rotate(${angle}rad)`,
                   }}
                 />
@@ -1977,8 +2036,8 @@ function App() {
                   key={event.id}
                   className="skill-slash"
                   style={{
-                    transform: `translate(${source.position.x * cellSize}px, ${
-                      source.position.y * cellSize
+                    transform: `translate(${source.position.x * mapConstructionCellPixelSize}px, ${
+                      source.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                 />
@@ -1999,8 +2058,8 @@ function App() {
                   className={`drop-visual ${itemDefinition.category}`}
                   style={{
                     opacity: 1 - progress,
-                    transform: `translate(${event.position.x * cellSize}px, ${
-                      visualY * cellSize
+                    transform: `translate(${event.position.x * mapConstructionCellPixelSize}px, ${
+                      visualY * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={itemDefinition.displayName}
@@ -2032,8 +2091,8 @@ function App() {
                   key={event.id}
                   className={`combat-feedback ${event.type}`}
                   style={{
-                    transform: `translate(${entity.position.x * cellSize}px, ${
-                      entity.position.y * cellSize
+                    transform: `translate(${entity.position.x * mapConstructionCellPixelSize}px, ${
+                      entity.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                 >
@@ -2047,8 +2106,8 @@ function App() {
                   key={`idle-${member.id}`}
                   className="idle-feedback"
                   style={{
-                    transform: `translate(${member.position.x * cellSize}px, ${
-                      member.position.y * cellSize
+                    transform: `translate(${member.position.x * mapConstructionCellPixelSize}px, ${
+                      member.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={`Party member ${index + 1} is idle`}
@@ -2061,8 +2120,8 @@ function App() {
               <div
                 className="poi-ring enemy-poi"
                 style={{
-                  transform: `translate(${enemyPoiPosition.x * cellSize}px, ${
-                    enemyPoiPosition.y * cellSize
+                  transform: `translate(${enemyPoiPosition.x * mapConstructionCellPixelSize}px, ${
+                    enemyPoiPosition.y * mapConstructionCellPixelSize
                   }px)`,
                 }}
                 title="Enemy point of interest"
@@ -2072,8 +2131,8 @@ function App() {
               <div
                 className="poi-ring move-poi"
                 style={{
-                  transform: `translate(${movePoiPosition.x * cellSize}px, ${
-                    movePoiPosition.y * cellSize
+                  transform: `translate(${movePoiPosition.x * mapConstructionCellPixelSize}px, ${
+                    movePoiPosition.y * mapConstructionCellPixelSize
                   }px)`,
                 }}
                 title="Move point of interest"
@@ -2086,16 +2145,16 @@ function App() {
                       key={`aggro-${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
                       className="enemy-aggro-range"
                       style={{
-                        width: enemyAggroRange * cellSize * 2,
-                        height: enemyAggroRange * cellSize * 2,
+                        width: enemyAggroRange * mapConstructionCellPixelSize * 2,
+                        height: enemyAggroRange * mapConstructionCellPixelSize * 2,
                         transform: `translate(${
-                          enemy.position.x * cellSize +
-                          cellSize / 2 -
-                          enemyAggroRange * cellSize
+                          enemy.position.x * mapConstructionCellPixelSize +
+                          mapConstructionCellPixelSize / 2 -
+                          enemyAggroRange * mapConstructionCellPixelSize
                         }px, ${
-                          enemy.position.y * cellSize +
-                          cellSize / 2 -
-                          enemyAggroRange * cellSize
+                          enemy.position.y * mapConstructionCellPixelSize +
+                          mapConstructionCellPixelSize / 2 -
+                          enemyAggroRange * mapConstructionCellPixelSize
                         }px)`,
                       }}
                       title="Enemy detection range"
@@ -2137,8 +2196,8 @@ function App() {
                     commandPartyToMoveToPosition(member.position);
                   }}
                   style={{
-                    transform: `translate(${member.position.x * cellSize}px, ${
-                      member.position.y * cellSize
+                    transform: `translate(${member.position.x * mapConstructionCellPixelSize}px, ${
+                      member.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={
@@ -2180,8 +2239,8 @@ function App() {
                   key={`${gameState.currentMapId ?? HUB_MAP_ID}-${enemy.id}`}
                   className="dead-label"
                   style={{
-                    transform: `translate(${enemy.position.x * cellSize}px, ${
-                      enemy.position.y * cellSize
+                    transform: `translate(${enemy.position.x * mapConstructionCellPixelSize}px, ${
+                      enemy.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={getEnemyTooltip(enemy)}
@@ -2228,8 +2287,8 @@ function App() {
                     commandPartyToTargetEnemy(enemy.id);
                   }}
                   style={{
-                    transform: `translate(${enemy.position.x * cellSize}px, ${
-                      enemy.position.y * cellSize
+                    transform: `translate(${enemy.position.x * mapConstructionCellPixelSize}px, ${
+                      enemy.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={getEnemyTooltip(enemy)}
@@ -2281,8 +2340,8 @@ function App() {
                   key={`${gameState.currentMapId ?? HUB_MAP_ID}-${resource.id}`}
                   className="depleted-label"
                   style={{
-                    transform: `translate(${resource.position.x * cellSize}px, ${
-                      resource.position.y * cellSize
+                    transform: `translate(${resource.position.x * mapConstructionCellPixelSize}px, ${
+                      resource.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={getResourceTooltip(resource)}
@@ -2314,8 +2373,8 @@ function App() {
                     commandCompanionsToGatherResource(resource.id);
                   }}
                   style={{
-                    transform: `translate(${resource.position.x * cellSize}px, ${
-                      resource.position.y * cellSize
+                    transform: `translate(${resource.position.x * mapConstructionCellPixelSize}px, ${
+                      resource.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={getResourceTooltip(resource)}
@@ -2359,8 +2418,8 @@ function App() {
                     commandPartyToMoveToPosition(npc.position);
                   }}
                   style={{
-                    transform: `translate(${npc.position.x * cellSize}px, ${
-                      npc.position.y * cellSize
+                    transform: `translate(${npc.position.x * mapConstructionCellPixelSize}px, ${
+                      npc.position.y * mapConstructionCellPixelSize
                     }px)`,
                   }}
                   title={
@@ -2604,3 +2663,4 @@ function App() {
 }
 
 export default App;
+
