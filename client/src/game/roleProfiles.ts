@@ -117,7 +117,7 @@ export const ROLE_TUNING: Record<PartyMemberRole, RoleTuning> = {
     resourceSearchRange: 30,
     combatAssistRange: 3,
     chaseLimit: 0,
-    leashDistance: 15,
+    leashDistance: 32,
     interruptBuffer: 30,
     dangerThreshold: 2,
   },

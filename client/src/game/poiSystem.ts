@@ -32,6 +32,13 @@ import {
   hasQuestGiverWork,
   updateQuestGiverInteraction,
 } from "./questSystem";
+import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
+import {
+  createGathererResourceReservations,
+  getCurrentPartyGatherResourceTargetId,
+  type GathererResourceReservations,
+  type ResourceWorkContext,
+} from "./gathererResourceReservation";
 import type { PointOfInterest, PoiCategory, PoiMapType } from "./poiTypes";
 import type {
   DebugMapId,
@@ -39,6 +46,7 @@ import type {
   Position,
   ResourceEntity,
   ResourceType,
+  ZoneSubzone,
 } from "./types";
 import type {
   GlobalPoiIntent,
@@ -59,6 +67,7 @@ const NEARBY_RESOURCE_PATH_DISTANCE = 3;
 const NEARBY_RESOURCE_SCORE_BONUS = -12;
 const IDLE_CITY_POINT: Position = { x: 22, y: 16 };
 const WILD_POI_REEVALUATE_INTERVAL_MS = 500;
+const QUEST_RESOURCE_POI_COMMITMENT_MS = 2000;
 
 type PoiTargetOption = {
   poi: PointOfInterest;
@@ -77,7 +86,10 @@ type ScoredPoiTarget = {
   pathDistance: number;
 };
 
-export function updatePoiSystem(state: GameState): GameState {
+export function updatePoiSystem(
+  state: GameState,
+  resourceWorkContext?: ResourceWorkContext,
+): GameState {
   if (!state.autoModeEnabled || state.activeTeleport) {
     return clearPoiSelection(state);
   }
@@ -96,7 +108,12 @@ export function updatePoiSystem(state: GameState): GameState {
     return clearPoiSelection(state);
   }
 
-  if (canReuseWildPoiSelection(state, leader)) {
+  const gathererReservations = createGathererResourceReservations(
+    state,
+    resourceWorkContext,
+  );
+
+  if (canReuseWildPoiSelection(state, leader, gathererReservations)) {
     return applyLocalTargetToLeaderIntent(state, state.localPoiTarget);
   }
 
@@ -104,7 +121,11 @@ export function updatePoiSystem(state: GameState): GameState {
     updateReachedPoiInteractions(state),
   );
   const globalPoiIntent = getGlobalPoiIntent(interactionState);
-  const selection = selectLocalPoiTarget(interactionState, globalPoiIntent);
+  const selection = selectLocalPoiTarget(
+    interactionState,
+    globalPoiIntent,
+    gathererReservations,
+  );
   let nextState: GameState = {
     ...interactionState,
     globalPoiIntent,
@@ -124,6 +145,12 @@ export function updatePoiSystem(state: GameState): GameState {
   if (selection.localTarget) {
     nextState = recordPoiSelected(nextState, selection.localTarget);
     nextState = applyLocalTargetToLeaderIntent(nextState, selection.localTarget);
+  } else if (
+    nextState.leaderIntent?.type === "gather" &&
+    nextState.leaderIntent.source !== "player" &&
+    !getCurrentPartyGatherResourceTargetId(nextState)
+  ) {
+    nextState = setLeaderIntent(nextState, null);
   } else if (globalPoiIntent.type === "idle") {
     nextState = setLeaderIntent(nextState, null);
   }
@@ -134,6 +161,7 @@ export function updatePoiSystem(state: GameState): GameState {
 function canReuseWildPoiSelection(
   state: GameState,
   leader: { position: Position },
+  gathererReservations: GathererResourceReservations,
 ): state is GameState & { localPoiTarget: LocalPoiTarget } {
   if (state.currentMapId === HUB_MAP_ID || !state.localPoiTarget) {
     return false;
@@ -142,14 +170,35 @@ function canReuseWildPoiSelection(
   const evaluatedAtMs = state.lastPoiDecision?.evaluatedAtMs;
   const nowMs = state.simulationTimeMs ?? 0;
 
-  if (
-    evaluatedAtMs === undefined ||
-    nowMs - evaluatedAtMs >= WILD_POI_REEVALUATE_INTERVAL_MS
-  ) {
+  if (evaluatedAtMs === undefined) {
     return false;
   }
 
   if (!isLocalPoiTargetStillValid(state, state.localPoiTarget)) {
+    return false;
+  }
+
+  if (
+    isQuestResourcePoi(state.localPoiTarget) &&
+    !isActiveQuestResourcePoiStillRelevant(state, state.localPoiTarget)
+  ) {
+    return false;
+  }
+
+  if (
+    nowMs - evaluatedAtMs >=
+    getWildPoiReevaluateIntervalMs(state, state.localPoiTarget)
+  ) {
+    return false;
+  }
+
+  if (
+    isReservedGathererResourcePoi(
+      state,
+      state.localPoiTarget,
+      gathererReservations,
+    )
+  ) {
     return false;
   }
 
@@ -189,10 +238,71 @@ function isLocalPoiTargetStillValid(
   }
 
   if (target.category === "resource") {
-    return entity.kind === "resource" && !entity.isDepleted;
+    return entity.kind === "resource" && !entity.isDepleted && entity.quantity > 0;
   }
 
   return true;
+}
+
+function isReservedGathererResourcePoi(
+  state: GameState,
+  target: LocalPoiTarget,
+  gathererReservations: GathererResourceReservations,
+): boolean {
+  if (target.targetEntityId === getCurrentPartyGatherResourceTargetId(state)) {
+    return false;
+  }
+
+  return (
+    target.category === "resource" &&
+    Boolean(
+      target.targetEntityId &&
+        gathererReservations.resourceIds.has(target.targetEntityId),
+    )
+  );
+}
+
+function getWildPoiReevaluateIntervalMs(
+  state: GameState,
+  target: LocalPoiTarget,
+): number {
+  return isActiveQuestResourcePoiStillRelevant(state, target)
+    ? QUEST_RESOURCE_POI_COMMITMENT_MS
+    : WILD_POI_REEVALUATE_INTERVAL_MS;
+}
+
+function isQuestResourcePoi(target: LocalPoiTarget): boolean {
+  return (
+    target.category === "resource" &&
+    Boolean(target.questId && target.objectiveId)
+  );
+}
+
+function isActiveQuestResourcePoiStillRelevant(
+  state: GameState,
+  target: LocalPoiTarget,
+): boolean {
+  if (!isQuestResourcePoi(target) || !target.questId || !target.objectiveId) {
+    return false;
+  }
+
+  const activeQuest = getActiveQuest(state);
+
+  if (!activeQuest || activeQuest.questId !== target.questId) {
+    return false;
+  }
+
+  const objective = getFirstIncompleteObjective(state, target.questId);
+
+  if (
+    !objective ||
+    objective.id !== target.objectiveId ||
+    objective.type !== "gather_item_count"
+  ) {
+    return false;
+  }
+
+  return getResourceTypeFromLocalTarget(state, target) === objective.resourceType;
 }
 
 export function getMapType(mapId: DebugMapId | undefined): PoiMapType {
@@ -295,14 +405,20 @@ function getGlobalPoiIntent(state: GameState): GlobalPoiIntent {
 function selectLocalPoiTarget(
   state: GameState,
   globalPoiIntent: GlobalPoiIntent,
+  gathererReservations: GathererResourceReservations,
 ): {
   localTarget: LocalPoiTarget | null;
   consideredTargets: PoiConsideration[];
   skippedReasons: Record<string, string>;
 } {
   const skippedReasons: Record<string, string> = {};
-  const candidates = buildPoiCandidates(state);
-  const options = getPoiTargetOptions(state, globalPoiIntent, candidates);
+  const candidates = buildPoiCandidates(state, gathererReservations);
+  const options = getPoiTargetOptions(
+    state,
+    globalPoiIntent,
+    candidates,
+    gathererReservations,
+  );
   const distanceMap = createPoiDistanceMap(state, options);
   const scoredTargets = scorePoiTargets(state, options, distanceMap, skippedReasons);
   const selectedTarget = selectStablePoiTarget(state, scoredTargets);
@@ -319,9 +435,13 @@ function getPoiTargetOptions(
   state: GameState,
   globalPoiIntent: GlobalPoiIntent,
   candidates: PointOfInterest[],
+  gathererReservations: GathererResourceReservations,
 ): PoiTargetOption[] {
   const mapType = getMapType(state.currentMapId);
   const stayInMap = Boolean(state.poiPreferences?.stayInMap);
+  const leader = getPartyLeader(state);
+  const leaderSubzone = getLeaderSubzoneRestriction(state);
+  const isGathererLeader = leader?.role === "gatherer";
 
   if (globalPoiIntent.type === "travel_to_map" && globalPoiIntent.targetMapId) {
     const teleportPoi = getTeleportPoiTowardMap(state, globalPoiIntent.targetMapId);
@@ -343,12 +463,17 @@ function getPoiTargetOptions(
     candidates,
     mapType,
     stayInMap,
+    gathererReservations,
+  );
+  const subzoneQuestOptions = filterPoiOptionsToLeaderSubzone(
+    questOptions,
+    leaderSubzone,
   );
 
   if (mapType === "hub") {
     return [
       ...getHubMerchantOptions(state, candidates),
-      ...questOptions,
+      ...subzoneQuestOptions,
       {
         poi: createIdlePoi(state.currentMapId ?? HUB_MAP_ID),
         priority: 100,
@@ -357,24 +482,75 @@ function getPoiTargetOptions(
     ];
   }
 
-  if (globalPoiIntent.type !== "idle" && questOptions.length > 0) {
-    return questOptions;
+  if (globalPoiIntent.type !== "idle" && subzoneQuestOptions.length > 0) {
+    return subzoneQuestOptions;
   }
 
   if (globalPoiIntent.type !== "idle" && !stayInMap) {
     return [];
   }
 
-  return getWildFallbackOptions(candidates);
+  return getWildFallbackOptions(
+    filterPoisToLeaderSubzone(candidates, leaderSubzone),
+    isGathererLeader,
+  );
 }
 
-function getWildFallbackOptions(candidates: PointOfInterest[]): PoiTargetOption[] {
+function getLeaderSubzoneRestriction(state: GameState): ZoneSubzone | null {
+  if (!state.poiPreferences?.stayInMap) {
+    return null;
+  }
+
+  const leader = getPartyLeader(state);
+
+  return getSubzoneAtPosition(state.map, leader?.position);
+}
+
+function filterPoiOptionsToLeaderSubzone(
+  options: PoiTargetOption[],
+  leaderSubzone: ZoneSubzone | null,
+): PoiTargetOption[] {
+  if (!leaderSubzone) {
+    return options;
+  }
+
+  return options.filter((option) =>
+    option.poi.category === "teleport" ||
+    isPositionInsideSubzone(option.poi.position, leaderSubzone),
+  );
+}
+
+function filterPoisToLeaderSubzone(
+  candidates: PointOfInterest[],
+  leaderSubzone: ZoneSubzone | null,
+): PointOfInterest[] {
+  if (!leaderSubzone) {
+    return candidates;
+  }
+
+  return candidates.filter((poi) =>
+    poi.category === "teleport" ||
+    isPositionInsideSubzone(poi.position, leaderSubzone),
+  );
+}
+
+function getWildFallbackOptions(
+  candidates: PointOfInterest[],
+  prioritizeResources = false,
+): PoiTargetOption[] {
+  const combatPriority = prioritizeResources
+    ? FALLBACK_POI_PRIORITY + 1
+    : FALLBACK_POI_PRIORITY;
+  const resourcePriority = prioritizeResources
+    ? FALLBACK_POI_PRIORITY - 1
+    : FALLBACK_POI_PRIORITY;
+
   return [
     ...candidates
       .filter((poi) => poi.category === "combat")
       .map((poi) => ({
         poi,
-        priority: FALLBACK_POI_PRIORITY,
+        priority: combatPriority,
         scoreBase: FALLBACK_ENEMY_SCORE_BASE,
         reason: "wild enemy fallback",
       })),
@@ -382,7 +558,7 @@ function getWildFallbackOptions(candidates: PointOfInterest[]): PoiTargetOption[
       .filter((poi) => poi.category === "resource")
       .map((poi) => ({
         poi,
-        priority: FALLBACK_POI_PRIORITY,
+        priority: resourcePriority,
         scoreBase: FALLBACK_RESOURCE_SCORE_BASE,
         nearbyResourceBonus: NEARBY_RESOURCE_SCORE_BONUS,
         reason: "wild resource fallback",
@@ -420,6 +596,7 @@ function getQuestTargetOptions(
   candidates: PointOfInterest[],
   mapType: PoiMapType,
   stayInMap: boolean,
+  gathererReservations: GathererResourceReservations,
 ): PoiTargetOption[] {
   if (!globalPoiIntent.questId || !state.currentMapId) {
     return [];
@@ -488,7 +665,7 @@ function getQuestTargetOptions(
   }
 
   if (objective.type === "gather_item_count") {
-    return candidates
+    return getQuestResourcePois(state, gathererReservations)
       .filter(
         (poi) =>
           poi.category === "resource" &&
@@ -750,7 +927,10 @@ function getPoiPathDistance(
   return distanceMap?.[getNavigationPositionKey(poi.position)] ?? null;
 }
 
-function buildPoiCandidates(state: GameState): PointOfInterest[] {
+function buildPoiCandidates(
+  state: GameState,
+  gathererReservations: GathererResourceReservations,
+): PointOfInterest[] {
   if (!state.currentMapId) {
     return [];
   }
@@ -759,7 +939,7 @@ function buildPoiCandidates(state: GameState): PointOfInterest[] {
     ...getNpcPois(state),
     ...getTeleportPois(state),
     ...getEnemyPois(state),
-    ...getResourcePois(state),
+    ...getResourcePois(state, gathererReservations),
   ];
 }
 
@@ -810,7 +990,28 @@ function getEnemyPois(state: GameState): PointOfInterest[] {
     }));
 }
 
-function getResourcePois(state: GameState): PointOfInterest[] {
+function getResourcePois(
+  state: GameState,
+  gathererReservations: GathererResourceReservations,
+): PointOfInterest[] {
+  const partyGatherResourceTargetId = getCurrentPartyGatherResourceTargetId(state);
+
+  return getAllResourcePois(state).filter(
+    (resourcePoi) =>
+      !resourcePoi.targetEntityId ||
+      resourcePoi.targetEntityId === partyGatherResourceTargetId ||
+      !gathererReservations.resourceIds.has(resourcePoi.targetEntityId),
+  );
+}
+
+function getQuestResourcePois(
+  state: GameState,
+  gathererReservations: GathererResourceReservations,
+): PointOfInterest[] {
+  return getResourcePois(state, gathererReservations);
+}
+
+function getAllResourcePois(state: GameState): PointOfInterest[] {
   return Object.values(state.entities)
     .filter(
       (entity): entity is ResourceEntity =>
@@ -1030,6 +1231,21 @@ function getResourceTypeFromPoi(
   poi: PointOfInterest,
 ): ResourceType | null {
   const entity = poi.targetEntityId ? state.entities[poi.targetEntityId] : undefined;
+
+  if (!entity || entity.kind !== "resource") {
+    return null;
+  }
+
+  return entity.resourceType;
+}
+
+function getResourceTypeFromLocalTarget(
+  state: GameState,
+  target: LocalPoiTarget,
+): ResourceType | null {
+  const entity = target.targetEntityId
+    ? state.entities[target.targetEntityId]
+    : undefined;
 
   if (!entity || entity.kind !== "resource") {
     return null;

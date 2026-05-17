@@ -60,6 +60,7 @@ Current files include:
 - `followSystem.ts`
 - `gameLoop.ts`
 - `gatherSystem.ts`
+- `gathererResourceReservation.ts`
 - `healingFountainSystem.ts`
 - `healthSystem.ts`
 - `index.ts`
@@ -88,6 +89,7 @@ Current files include:
 - `skillRuntime.ts`
 - `skillSystem.ts`
 - `skillTargeting.ts`
+- `subzoneSystem.ts`
 - `skills.ts`
 - `state.ts`
 - `stats.ts`
@@ -261,7 +263,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, debug options, and debug telemetry.
 
 
 
@@ -284,6 +286,11 @@ Current POI and travel fields include:
 - `lastPoiDecision`
 - `interruptedPoiTarget`
 - `poiPreferences`
+Current POI preferences include:
+
+- `stayInMap`
+
+`stayInMap` currently represents the Stay in Subzone prototype control. When enabled, POI and autonomous gatherer selection use the leader's current subzone as a local boundary where supported.
 
 Current prototype skill runtime fields include:
 
@@ -301,6 +308,15 @@ Current resurrection and recovery fields include:
 - `resurrectionChannelsByHelperId`
 - `worldWipeRecovery`
 
+Current health runtime fields include:
+
+- `lastHealthRegenAtByCompanionId`
+
+Current debug option fields include:
+
+- `superSpeedEnabled`
+- `superExpEnabled`
+- `deepNavigationTelemetryEnabled`
 
 State helpers should remain low-level and safe. Systems should own behavior decisions.
 
@@ -721,14 +737,17 @@ Current intended POI priority order:
 3. ready quest turn-in target
 4. active quest objective target on the current map
 5. available quest acceptance target on the current map
-6. quest-required prototype teleport when the active objective is on a connected map
-7. nearby combat target when combat is relevant
-8. nearby resource target when gathering is relevant
+6. quest-required prototype teleport when the active objective is on another reachable prototype map
+7. reachable wild combat target when combat fallback is relevant
+8. reachable wild resource target when gathering fallback is relevant
 9. reachable unexplored exploration point
 10. safe idle hub point
 
+POI selection should skip targets that are invalid, unreachable, depleted, dead, completed, locked, already satisfied, reserved by autonomous gatherer work, blocked by Stay in Subzone rules, or not relevant to the current map.
 
-POI selection should skip targets that are invalid, unreachable, depleted, dead, completed, locked, already satisfied, or not relevant to the current map.
+POI selection may score candidates by priority, path distance, fallback score, nearby-resource bonus, and stable-target switching rules.
+
+Wild POI selection may reuse a valid target briefly before reevaluating. Active quest resource POIs may use a longer short commitment window than generic wild fallback POIs.
 
 POI selection should record debug telemetry for selected POIs and skipped POIs where useful.
 
@@ -738,6 +757,22 @@ The POI system may set leader intent toward quest givers, combat targets, resour
 
 The POI system must remain a prototype debug-map guidance layer and must not become the final world-routing, dialogue, or quest content pipeline unless explicitly requested.
 
+## Gatherer Resource Reservation
+
+`gathererResourceReservation.ts` coordinates autonomous gatherer resource targeting.
+
+Current responsibilities include:
+
+- building a per-update resource work context
+- reserving valid resources for autonomous gatherers
+- respecting resource `maxGatherers`
+- avoiding autonomous gatherer conflicts with party-level gather intent
+- caching gatherer target checks during an update
+- caching resource reachability checks
+- keeping gatherer work within the leader's subzone when Stay in Subzone is enabled
+- allowing gatherers to work within their leader leash when not restricted to the leader's subzone
+
+This is prototype gatherer coordination. It must not become a full job scheduler, worker assignment system, logistics system, or production resource economy unless explicitly requested.
 ---
 
 ## Systems
@@ -1506,7 +1541,20 @@ Current prototype map dimensions:
 
 The current row count reflects prototype debug-map presentation space. It is not final world scale or final zone design.
 
+## Subzone System
 
+`subzoneSystem.ts` owns lightweight helpers for detecting whether a position is inside an authored prototype subzone.
+
+Current responsibilities include:
+
+- finding the subzone at a position
+- checking whether a position is inside a subzone's bounds
+
+Current wilderness maps are authored with three prototype subzones each.
+
+Subzones are used by current map organization, floor texture selection, Stay in Subzone behavior, encounter area placement, resource location placement, and UI-facing subzone labels.
+
+Subzones are prototype map-organization data. They are not final zones, final region content, persistent zone state, or the production world model.
 ---
 
 ## Teleport System
@@ -1861,7 +1909,7 @@ The Quests view may display prototype quest state and objective progress from ga
 
 The Inventory view may display wallet balance, but wallet and inventory rules must remain in game logic.
 
-The World Travel view may display current map and available prototype connected destinations. Selecting a destination may issue supported travel intent toward an existing prototype teleport point.
+The World Travel view may display the current map and known prototype region destinations. Selecting a destination may set `worldTravelTargetMapId`; the POI system then guides the party toward the next valid teleport step along the current prototype route.
 
 Merchant UI may call existing merchant helper functions, but must not define exchange rules inside React. Buy and Sell panels may exist as placeholders only until a real shop system is explicitly requested.
 

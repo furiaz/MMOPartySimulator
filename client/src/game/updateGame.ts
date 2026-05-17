@@ -17,6 +17,7 @@ import {
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
+import { createResourceWorkContext } from "./gathererResourceReservation";
 import { updateResurrectionSystem } from "./resurrectionSystem";
 import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
@@ -89,7 +90,9 @@ export function updateGame(
     );
   }
 
-  nextState = updatePoiSystem(nextState);
+  let resourceWorkContext = createResourceWorkContext(nextState);
+
+  nextState = updatePoiSystem(nextState, resourceWorkContext);
   nextState = updateHealingFountainSystem(nextState);
   nextState = updateResurrectionSystem(
     nextState,
@@ -97,6 +100,7 @@ export function updateGame(
     timing.nowMs,
     timing.deltaMs,
   );
+  resourceWorkContext = createResourceWorkContext(nextState);
 
   const shouldMovePartyTowardPoi =
     Boolean(nextState.leaderIntent) ||
@@ -104,7 +108,7 @@ export function updateGame(
     isMapTeleportPoiActive(nextState);
 
   if (nextState.autoModeEnabled) {
-    nextState = updateRoleSystem(nextState);
+    nextState = updateRoleSystem(nextState, resourceWorkContext);
     nextState = updateSkillSystem(nextState, timing.nowMs);
   }
 
@@ -127,7 +131,12 @@ export function updateGame(
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
-  nextState = updateGatherSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = updateGatherSystem(
+    nextState,
+    movedEntityIds,
+    timing.nowMs,
+    resourceWorkContext,
+  );
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);
 

@@ -23,23 +23,35 @@ import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
 import { protectPartyMember } from "./partyProtectionSystem";
 import { recordResourceGatheredForQuests } from "./questSystem";
+import { ROLE_TUNING } from "./roleProfiles";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import {
+  createGathererResourceReservations,
+  findAllowedGathererResourceTarget,
+  isWithinGathererLeaderBoundary,
+  type GathererResourceReservations,
+  type ResourceWorkContext,
+} from "./gathererResourceReservation";
 import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
 const GATHER_COOLDOWN_MS = 1000;
-const GATHERER_PARTY_RETURN_DISTANCE = 15;
 const GATHER_APPROACH_BUFFER = 0.15;
 
 export function updateGatherSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
   now = Date.now(),
+  resourceWorkContext?: ResourceWorkContext,
 ): GameState {
   let nextState = state;
   const allowedGathererIdsByResource = getAllowedGathererIdsByResource(state);
+  const gathererReservations = createGathererResourceReservations(
+    state,
+    resourceWorkContext,
+  );
 
   for (const entity of Object.values(state.entities)) {
     const gatherer = getEntityById(nextState, entity.id);
@@ -95,7 +107,18 @@ export function updateGatherSystem(
       continue;
     }
 
-    const preGatherAggro = interruptGathererForEnemyAggro(nextState, gatherer);
+    const shouldStayFocusedOnResource = shouldAutonomousGathererStayFocusedOnResource(
+      nextState,
+      gatherer,
+      resource,
+      gathererReservations,
+      resourceWorkContext,
+    );
+    const preGatherAggro = interruptGathererForEnemyAggro(
+      nextState,
+      gatherer,
+      shouldStayFocusedOnResource,
+    );
     if (preGatherAggro.interrupted) {
       nextState = preGatherAggro.state;
       continue;
@@ -112,7 +135,11 @@ export function updateGatherSystem(
         const movedGatherer = getEntityById(nextState, gatherer.id);
 
         if (movedGatherer && isGatheringEntity(movedGatherer)) {
-          const postMoveAggro = interruptGathererForEnemyAggro(nextState, movedGatherer);
+          const postMoveAggro = interruptGathererForEnemyAggro(
+            nextState,
+            movedGatherer,
+            shouldStayFocusedOnResource,
+          );
           if (postMoveAggro.interrupted) {
             nextState = postMoveAggro.state;
           }
@@ -189,8 +216,13 @@ export function updateGatherSystem(
 function interruptGathererForEnemyAggro(
   state: GameState,
   gatherer: AutonomousEntity,
+  shouldStayFocusedOnResource = false,
 ): { state: GameState; interrupted: boolean } {
   if (gatherer.kind !== "companion") {
+    return { state, interrupted: false };
+  }
+
+  if (shouldStayFocusedOnResource) {
     return { state, interrupted: false };
   }
 
@@ -297,6 +329,29 @@ function isCommittedGatherer(entity: AutonomousEntity): boolean {
   );
 }
 
+function shouldAutonomousGathererStayFocusedOnResource(
+  state: GameState,
+  gatherer: AutonomousEntity,
+  resource: ResourceEntity,
+  gathererReservations: GathererResourceReservations,
+  resourceWorkContext?: ResourceWorkContext,
+): boolean {
+  if (
+    gatherer.kind !== "companion" ||
+    gatherer.role !== "gatherer" ||
+    gatherer.commandPriority !== "autonomous" ||
+    gatherer.currentTargetId !== resource.id
+  ) {
+    return false;
+  }
+
+  return (
+    gathererReservations.resourceIdByGathererId.get(gatherer.id) === resource.id ||
+    findAllowedGathererResourceTarget(state, gatherer, resourceWorkContext)?.id ===
+      resource.id
+  );
+}
+
 function getAllowedGathererIdsByResource(
   state: GameState,
 ): Map<string, Set<string>> {
@@ -377,12 +432,20 @@ function shouldGathererReturnToParty(
     return true;
   }
 
+  if (
+    gatherer.kind === "companion" &&
+    leader.kind === "companion" &&
+    isWithinGathererLeaderBoundary(state, gatherer, leader)
+  ) {
+    return false;
+  }
+
   return (
     getBoundedPathDistance(
       state,
       gatherer,
       leader.position,
-      GATHERER_PARTY_RETURN_DISTANCE,
+      ROLE_TUNING.gatherer.leashDistance,
     ) === null
   );
 }

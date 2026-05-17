@@ -61,6 +61,7 @@ import {
   HUB_MAP_ID,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
+  ROLE_TUNING,
   addItemToInventoryState,
   getAttackCooldownMs,
   getEnemyArchetype,
@@ -126,6 +127,7 @@ const floorChunkCellSpan = 4;
 const floorChunkPixelSize =
   mapConstructionCellPixelSize * floorChunkCellSpan;
 const enemyAggroRange = getEnemyDetectionRange();
+const gathererSearchRange = ROLE_TUNING.gatherer.resourceSearchRange ?? 30;
 const visualMovementGraceMs = 180;
 const visualMovementReachedDistance = 1;
 const cameraSettleFactor = 0.08;
@@ -1815,7 +1817,7 @@ function App() {
                 }}
                 type="button"
               >
-                Stay in Map {gameState.poiPreferences.stayInMap ? "On" : "Off"}
+                Stay in Subzone {gameState.poiPreferences.stayInMap ? "On" : "Off"}
               </button>
             </div>
             <span>debug: {currentMap.debugName}</span>
@@ -2158,6 +2160,30 @@ function App() {
                         }px)`,
                       }}
                       title="Enemy detection range"
+                    />
+                  ) : null,
+                )
+              : null}
+            {showEntityInfo
+              ? partyMembers.map((member) =>
+                  member.role === "gatherer" ? (
+                    <div
+                      key={`gatherer-search-${gameState.currentMapId ?? HUB_MAP_ID}-${member.id}`}
+                      className="gatherer-search-range"
+                      style={{
+                        width: gathererSearchRange * mapConstructionCellPixelSize * 2,
+                        height: gathererSearchRange * mapConstructionCellPixelSize * 2,
+                        transform: `translate(${
+                          member.position.x * mapConstructionCellPixelSize +
+                          mapConstructionCellPixelSize / 2 -
+                          gathererSearchRange * mapConstructionCellPixelSize
+                        }px, ${
+                          member.position.y * mapConstructionCellPixelSize +
+                          mapConstructionCellPixelSize / 2 -
+                          gathererSearchRange * mapConstructionCellPixelSize
+                        }px)`,
+                      }}
+                      title="Gatherer resource search range"
                     />
                   ) : null,
                 )

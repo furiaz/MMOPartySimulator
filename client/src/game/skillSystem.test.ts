@@ -101,6 +101,24 @@ describe("beginner skill system", () => {
     ).toBe(true);
   });
 
+  it("dedupes repeated skipped skill telemetry while keeping the first reason", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 0, y: 0 });
+    const state = startDebugTelemetryRecording(createSkillState([fighter]));
+
+    const firstState = updateSkillSystem(state, 1000);
+    const secondState = updateSkillSystem(firstState, 1100);
+    const matchingSkips =
+      secondState.debugTelemetry?.events.filter(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.entityId === fighter.id &&
+          event.skillId === "throw_rock" &&
+          event.reason === "no_target",
+      ) ?? [];
+
+    expect(matchingSkips).toHaveLength(1);
+  });
+
   it("records Beginner skill ids on emitted visual events", () => {
     const cases: Array<{
       skillId: string;

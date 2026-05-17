@@ -30,6 +30,7 @@ import type { SimulationTiming } from "./simulationTiming";
 
 const DEFAULT_MAX_DEBUG_TICKS = 1000;
 const DEBUG_TELEMETRY_SAMPLE_INTERVAL_MS = 100;
+const SKILL_SKIP_DEDUPE_WINDOW_TICKS = 10;
 
 export function createDebugTelemetryState(
   maxTicks = DEFAULT_MAX_DEBUG_TICKS,
@@ -111,6 +112,10 @@ export function appendDebugTelemetryEvent(
   const debugTelemetry = state.debugTelemetry;
 
   if (!debugTelemetry?.isRecording) {
+    return state;
+  }
+
+  if (shouldDedupeSkillSkip(debugTelemetry, event)) {
     return state;
   }
 
@@ -206,6 +211,26 @@ export function recordDebugTelemetryTick(
       ),
     },
   };
+}
+
+function shouldDedupeSkillSkip(
+  debugTelemetry: DebugTelemetryState,
+  event: Omit<DebugTelemetryEvent, "tick">,
+): boolean {
+  if (event.type !== "skill_skipped") {
+    return false;
+  }
+
+  const currentTick = debugTelemetry.tickNumber;
+
+  return debugTelemetry.events.some(
+    (currentEvent) =>
+      currentEvent.type === "skill_skipped" &&
+      currentEvent.entityId === event.entityId &&
+      currentEvent.skillId === event.skillId &&
+      currentEvent.reason === event.reason &&
+      currentTick - currentEvent.tick < SKILL_SKIP_DEDUPE_WINDOW_TICKS,
+  );
 }
 
 function shouldRecordTelemetrySample(
@@ -406,13 +431,18 @@ function getNavigationTelemetry(
     ? getNavigationGrid(state.map).cellsByKey[getNavigationPositionKey(nextCell)]
     : undefined;
   const maxPathDistance = state.map.columns * state.map.rows * 2;
+  const shouldIncludeTargetPathDistance =
+    movementResult === "blocked" ||
+    movementResult === "failed" ||
+    getCurrentTargetId(previousEntity) !== getCurrentTargetId(entity) ||
+    Boolean(state.debugOptions?.deepNavigationTelemetryEnabled);
 
   return {
     startCell,
     targetCell,
     nextCell,
     pathLength: movementPath?.waypoints.length,
-    targetPathDistance: targetCell
+    targetPathDistance: targetCell && shouldIncludeTargetPathDistance
       ? getNavigationDistance(
           state.map,
           startCell,

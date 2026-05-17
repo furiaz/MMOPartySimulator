@@ -83,9 +83,16 @@ type MovementOptions = WalkablePositionOptions & {
   speedMultiplier?: number;
 };
 
+type NavigationBlockerLookup = {
+  resourceKeys: Set<string>;
+  reservedKeys: Set<string>;
+  blockingEntityKeys: Set<string>;
+};
+
 export type DebugOptions = {
   superSpeedEnabled: boolean;
   superExpEnabled: boolean;
+  deepNavigationTelemetryEnabled?: boolean;
 };
 
 export type PoiPreferences = {
@@ -749,11 +756,23 @@ export function getBoundedNavigationDistance(
     return directDistance <= maxDistance ? directDistance : null;
   }
 
+  const blockerLookup = createNavigationBlockerLookup(
+    state,
+    ignoredEntityId,
+    options,
+  );
+
   return getNavigationDistance(state.map, start, position, maxDistance, {
     isBlocked: (candidate) =>
       ignoredEntityId
-        ? isNavigationPositionBlocked(state, candidate, ignoredEntityId, options)
-        : isNavigationPositionBlockedByResources(state, candidate),
+        ? isNavigationPositionBlocked(
+            state,
+            candidate,
+            ignoredEntityId,
+            options,
+            blockerLookup,
+          )
+        : isNavigationPositionBlockedByResources(state, candidate, blockerLookup),
   });
 }
 
@@ -940,9 +959,17 @@ function getFreshPathWaypoints(
     return [];
   }
 
+  const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
+
   return findNavigationPath(state.map, entity.position, goals, {
     isBlocked: (position) =>
-      isNavigationPositionBlocked(state, position, entity.id, options),
+      isNavigationPositionBlocked(
+        state,
+        position,
+        entity.id,
+        options,
+        blockerLookup,
+      ),
   });
 }
 
@@ -1031,10 +1058,18 @@ function findNextPathPosition(
     return null;
   }
 
+  const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
+
   return (
     findNavigationPath(state.map, entity.position, getPathGoals(state, entity, target, options), {
       isBlocked: (position) =>
-        isNavigationPositionBlocked(state, position, entity.id, options),
+        isNavigationPositionBlocked(
+          state,
+          position,
+          entity.id,
+          options,
+          blockerLookup,
+        ),
     })[0] ?? null
   );
 }
@@ -1210,12 +1245,92 @@ function isNavigationPositionWalkable(
     : isInMapBounds(state, position);
 }
 
+function createNavigationBlockerLookup(
+  state: GameState,
+  ignoredEntityId: string | undefined,
+  options: WalkablePositionOptions,
+): NavigationBlockerLookup {
+  const lookup: NavigationBlockerLookup = {
+    resourceKeys: new Set<string>(),
+    reservedKeys: new Set<string>(),
+    blockingEntityKeys: new Set<string>(),
+  };
+  const movingEntity = ignoredEntityId ? state.entities[ignoredEntityId] : undefined;
+
+  for (const entity of Object.values(state.entities)) {
+    if (entity.id === ignoredEntityId) {
+      continue;
+    }
+
+    if (entity.kind === "resource") {
+      if (!entity.isDepleted && entity.quantity > 0) {
+        addCollisionPositionKeys(lookup.resourceKeys, entity.position, RESOURCE_COLLISION_DISTANCE);
+      }
+      continue;
+    }
+
+    if (
+      entity.state !== "dead" &&
+      !canPassThroughPartyEntity(movingEntity, entity, options)
+    ) {
+      addCollisionPositionKeys(
+        lookup.blockingEntityKeys,
+        entity.position,
+        ENTITY_COLLISION_DISTANCE,
+      );
+    }
+  }
+
+  for (const [entityId, reservedPosition] of Object.entries(
+    state.reservedPositionsByEntityId ?? {},
+  )) {
+    if (entityId !== ignoredEntityId) {
+      addCollisionPositionKeys(
+        lookup.reservedKeys,
+        reservedPosition,
+        POSITION_EPSILON,
+      );
+    }
+  }
+
+  return lookup;
+}
+
+function addCollisionPositionKeys(
+  keys: Set<string>,
+  position: Position,
+  collisionDistance: number,
+): void {
+  const center = toNavigationNode(position);
+
+  for (let y = center.y - 1; y <= center.y + 1; y += 1) {
+    for (let x = center.x - 1; x <= center.x + 1; x += 1) {
+      const candidate = { x, y };
+
+      if (getEuclideanDistance(candidate, position) < collisionDistance) {
+        keys.add(getNavigationPositionKey(candidate));
+      }
+    }
+  }
+}
+
 function isNavigationPositionBlocked(
   state: GameState,
   position: Position,
   ignoredEntityId: string,
   options: WalkablePositionOptions,
+  lookup?: NavigationBlockerLookup,
 ): boolean {
+  if (lookup) {
+    const key = getNavigationPositionKey(position);
+
+    return (
+      lookup.resourceKeys.has(key) ||
+      lookup.reservedKeys.has(key) ||
+      lookup.blockingEntityKeys.has(key)
+    );
+  }
+
   return (
     isActiveResourcePosition(state, position, ignoredEntityId) ||
     isReservedPosition(state, position, ignoredEntityId) ||
@@ -1231,7 +1346,12 @@ function isNavigationPositionBlocked(
 function isNavigationPositionBlockedByResources(
   state: GameState,
   position: Position,
+  lookup?: NavigationBlockerLookup,
 ): boolean {
+  if (lookup) {
+    return lookup.resourceKeys.has(getNavigationPositionKey(position));
+  }
+
   return isActiveResourcePosition(state, position);
 }
 

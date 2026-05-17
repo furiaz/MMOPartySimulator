@@ -142,13 +142,12 @@ export function getNavigationDistance(
   }
 
   const visited = new Set<string>();
-  const queue: { position: Position; distance: number }[] = [
-    { position: startNode, distance: 0 },
-  ];
+  const bestDistanceByKey = new Map<string, number>([[startKey, 0]]);
+  const queue = new NavigationPriorityQueue();
+  queue.push({ position: startNode, distance: 0 });
 
   while (queue.length > 0) {
-    queue.sort((a, b) => a.distance - b.distance);
-    const current = queue.shift();
+    const current = queue.pop();
 
     if (!current) {
       continue;
@@ -179,14 +178,105 @@ export function getNavigationDistance(
 
       const movementCost =
         grid.cellsByKey[neighborKey]?.movementCost ?? NORMAL_MOVEMENT_COST;
-      queue.push({
-        position: neighbor,
-        distance: current.distance + movementCost,
-      });
+      const nextDistance = current.distance + movementCost;
+      const bestDistance = bestDistanceByKey.get(neighborKey);
+
+      if (bestDistance !== undefined && nextDistance >= bestDistance) {
+        continue;
+      }
+
+      bestDistanceByKey.set(neighborKey, nextDistance);
+      queue.push({ position: neighbor, distance: nextDistance });
     }
   }
 
   return null;
+}
+
+type NavigationQueueNode = {
+  position: Position;
+  distance: number;
+};
+
+class NavigationPriorityQueue {
+  private readonly nodes: NavigationQueueNode[] = [];
+
+  get length(): number {
+    return this.nodes.length;
+  }
+
+  push(node: NavigationQueueNode): void {
+    this.nodes.push(node);
+    this.bubbleUp(this.nodes.length - 1);
+  }
+
+  pop(): NavigationQueueNode | undefined {
+    const first = this.nodes[0];
+    const last = this.nodes.pop();
+
+    if (!first || !last) {
+      return first;
+    }
+
+    if (this.nodes.length > 0) {
+      this.nodes[0] = last;
+      this.bubbleDown(0);
+    }
+
+    return first;
+  }
+
+  private bubbleUp(index: number): void {
+    let currentIndex = index;
+
+    while (currentIndex > 0) {
+      const parentIndex = Math.floor((currentIndex - 1) / 2);
+
+      if (this.nodes[parentIndex].distance <= this.nodes[currentIndex].distance) {
+        return;
+      }
+
+      this.swap(parentIndex, currentIndex);
+      currentIndex = parentIndex;
+    }
+  }
+
+  private bubbleDown(index: number): void {
+    let currentIndex = index;
+
+    while (true) {
+      const leftIndex = currentIndex * 2 + 1;
+      const rightIndex = currentIndex * 2 + 2;
+      let smallestIndex = currentIndex;
+
+      if (
+        this.nodes[leftIndex] &&
+        this.nodes[leftIndex].distance < this.nodes[smallestIndex].distance
+      ) {
+        smallestIndex = leftIndex;
+      }
+
+      if (
+        this.nodes[rightIndex] &&
+        this.nodes[rightIndex].distance < this.nodes[smallestIndex].distance
+      ) {
+        smallestIndex = rightIndex;
+      }
+
+      if (smallestIndex === currentIndex) {
+        return;
+      }
+
+      this.swap(currentIndex, smallestIndex);
+      currentIndex = smallestIndex;
+    }
+  }
+
+  private swap(firstIndex: number, secondIndex: number): void {
+    const first = this.nodes[firstIndex];
+    this.nodes[firstIndex] = this.nodes[secondIndex];
+    this.nodes[secondIndex] = first;
+  }
 }
 
 export function findNearestReachableNavigationPosition(

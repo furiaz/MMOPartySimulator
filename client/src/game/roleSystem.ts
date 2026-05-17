@@ -2,38 +2,54 @@ import { isCombatEntity } from "./entities";
 import { isWithinFollowLeash } from "./followSystem";
 import {
   getFollowTrailPosition,
+  getEntityById,
   updateEntity,
   type GameState,
 } from "./state";
 import { getPartyLeader, isPartyMember, type PartyMember } from "./partySystem";
 import { ROLE_TUNING } from "./roleProfiles";
-import { findResourceTarget } from "./targetSelection";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import {
+  createGathererResourceReservations,
+  findAllowedGathererResourceTarget,
+  isWithinGathererLeaderBoundary,
+  type GathererResourceReservations,
+  type ResourceWorkContext,
+} from "./gathererResourceReservation";
 import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
   Enemy,
   GameEntity,
   Position,
-  ResourceEntity,
 } from "./types";
 
-export const GATHERER_RESOURCE_SEARCH_PATH_DISTANCE =
-  ROLE_TUNING.gatherer.resourceSearchRange ?? 30;
 const DEFENDER_ENEMY_SEARCH_RADIUS = ROLE_TUNING.defender.engageRange ?? 6;
 const DEFENDER_ANCHOR_LEASH_DISTANCE = 6;
 const DEFENDER_LEADER_LEASH_DISTANCE = 8;
 const LEADER_INTENT_DISTANCE = 1;
 
-export function updateRoleSystem(state: GameState): GameState {
+export function updateRoleSystem(
+  state: GameState,
+  resourceWorkContext?: ResourceWorkContext,
+): GameState {
   let nextState = state;
+  const gathererReservations = createGathererResourceReservations(
+    state,
+    resourceWorkContext,
+  );
 
   for (const entity of Object.values(state.entities)) {
     if (!canUseRoleBehavior(nextState, entity)) {
       continue;
     }
 
-    const roleTarget = getRoleTarget(nextState, entity);
+    const roleTarget = getRoleTarget(
+      nextState,
+      entity,
+      gathererReservations,
+      resourceWorkContext,
+    );
 
     if (!roleTarget) {
       continue;
@@ -60,9 +76,19 @@ function canUseRoleBehavior(
     entity.commandPriority === "direct" ||
     (entity.state !== "idle" &&
       entity.state !== "follow" &&
+      entity.state !== "attack" &&
+      entity.state !== "gather" &&
       entity.state !== "defend")
   ) {
     return false;
+  }
+
+  if (entity.state === "attack") {
+    return entity.role === "gatherer";
+  }
+
+  if (entity.state === "gather") {
+    return entity.role === "gatherer";
   }
 
   if (entity.state === "idle" || entity.state === "defend") {
@@ -71,12 +97,20 @@ function canUseRoleBehavior(
 
   const followTarget = getPartyLeader(state);
 
+  if (entity.role === "gatherer") {
+    return Boolean(
+      followTarget && isWithinGathererLeaderBoundary(state, entity, followTarget),
+    );
+  }
+
   return Boolean(followTarget && isWithinFollowLeash(state, entity, followTarget));
 }
 
 function getRoleTarget(
   state: GameState,
   partyMember: PartyMember,
+  gathererReservations: GathererResourceReservations,
+  resourceWorkContext?: ResourceWorkContext,
 ): { state: "attack" | "gather" | "follow" | "defend"; targetId: string | null } | null {
   const leader = getPartyLeader(state);
   const isTravelFormation = isFormationTravelMovementActive(state);
@@ -100,10 +134,24 @@ function getRoleTarget(
   }
 
   if (partyMember.role === "gatherer") {
-    const resource = findGathererTarget(state, partyMember);
+    if (leader && !isWithinGathererLeaderBoundary(state, partyMember, leader)) {
+      return getFollowTarget(partyMember, leader);
+    }
+
+    if (partyMember.state === "gather") {
+      return null;
+    }
+
+    const resource =
+      getReservedGathererResource(state, partyMember, gathererReservations) ??
+      findAllowedGathererResourceTarget(state, partyMember, resourceWorkContext);
 
     if (resource) {
       return { state: "gather", targetId: resource.id };
+    }
+
+    if (partyMember.state === "attack") {
+      return null;
     }
 
     if (isTravelFormation) {
@@ -132,18 +180,6 @@ function getRoleTarget(
   return null;
 }
 
-function findGathererTarget(
-  state: GameState,
-  partyMember: PartyMember,
-): ResourceEntity | undefined {
-  return findResourceTarget(
-    state,
-    partyMember,
-    getGathererWorkOrigin(state, partyMember),
-    { maxDistance: GATHERER_RESOURCE_SEARCH_PATH_DISTANCE },
-  );
-}
-
 function isFormationTravelMovementActive(state: GameState): boolean {
   return (
     state.partyFormation?.phase === "forming" ||
@@ -151,14 +187,15 @@ function isFormationTravelMovementActive(state: GameState): boolean {
   );
 }
 
-export function getGathererWorkOrigin(
+function getReservedGathererResource(
   state: GameState,
   partyMember: PartyMember,
-): Position {
-  return (
-    getPartyLeader(state)?.position ??
-    partyMember.position
-  );
+  gathererReservations: GathererResourceReservations,
+) {
+  const resourceId = gathererReservations.resourceIdByGathererId.get(partyMember.id);
+  const resource = resourceId ? getEntityById(state, resourceId) : undefined;
+
+  return resource?.kind === "resource" ? resource : undefined;
 }
 
 function getFollowTarget(

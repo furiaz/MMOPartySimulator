@@ -256,8 +256,12 @@ Gatherers:
 
 - can leave the party to gather
 - have their own gathering search range
-- prioritize gathering over following while a valid gathering task exists
-- rejoin the party when not actively gathering
+- prioritize gathering over following while a valid reachable gathering task exists
+- avoid selecting resources already reserved by other autonomous gatherers when reservation capacity is full
+- respect resource `maxGatherers`
+- may stay committed to their current valid resource even when normal interruption logic would otherwise pull them away
+- rejoin the party when not actively gathering or when their target becomes invalid
+- must stay within the current gatherer leash behavior or the leader's current subzone boundary when Stay in Subzone is enabled
 - should not abandon gathering for distant combat, minor threats, or ally damage far away
 
 ---
@@ -844,7 +848,7 @@ The Quests menu must not implement a full quest journal, branching dialogue, que
 
 ### World Travel Menu
 
-The World Travel menu is a prototype navigation menu for choosing available known prototype map destinations.
+The World Travel menu is a prototype navigation menu for choosing known prototype map destinations in the current prototype region.
 
 It may show:
 
@@ -854,7 +858,7 @@ It may show:
 - whether a destination can currently be selected
 - simple unavailable-state messaging when travel is blocked
 
-World Travel selection may request travel to an available prototype teleport destination by setting party travel intent toward the relevant teleport point.
+World Travel selection may request travel to a known prototype map destination. The POI system should route the party toward the next valid teleport step along the current prototype route.
 
 World Travel must use existing prototype teleport route data and current map state. It must not create final zone routing, persistent zone state, fast travel rules, map discovery rules, production travel costs, or a full world map unless explicitly requested.
 
@@ -939,15 +943,17 @@ Current intended POI priority order:
 3. ready quest turn-in target
 4. active quest objective target on the current map
 5. available quest acceptance target on the current map
-6. quest-required prototype teleport when the active objective is on a connected map
-7. nearby combat target when combat is relevant
-8. nearby resource target when gathering is relevant
+6. quest-required prototype teleport when the active objective is on another reachable prototype map
+7. reachable wild combat target when combat fallback is relevant
+8. reachable wild resource target when gathering fallback is relevant
 9. reachable unexplored exploration point
 10. safe idle hub point
 
-POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, or already satisfied targets.
+POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, already satisfied, or gatherer-reserved resource targets.
 
-POI selection should not repeatedly choose the same failed target when a better valid target exists.
+POI selection may use path distance, priority, target scoring, and short commitment windows to avoid unstable target switching.
+
+When Stay in Subzone is enabled, POI selection should prefer targets inside the leader's current subzone, while still allowing valid teleport POIs and local quest interactions.
 
 POI direction may route the leader toward quest givers, combat targets, resources, exploration points, idle hub positions, or prototype teleports.
 
@@ -1487,7 +1493,7 @@ Subzones and encounter areas are current prototype map-organization data. They m
 
 Prototype teleport behavior should not define the final world structure.
 
-The World Travel menu may expose currently available prototype/debug map destinations and guide the party toward the matching teleport point.
+The World Travel menu may expose known prototype/debug map destinations and guide the party toward the next teleport point needed to reach the selected map.
 
 World Travel is menu-driven travel intent for existing prototype routes. It is not instant fast travel unless explicitly implemented that way later.
 

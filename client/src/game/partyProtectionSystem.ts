@@ -67,6 +67,14 @@ function canProtectPartyMember(
     return false;
   }
 
+  if (
+    entity.id === attackedMember.id &&
+    entity.commandPriority !== "direct" &&
+    isGathererBusy(state, entity)
+  ) {
+    return false;
+  }
+
   if (entity.id === attackedMember.id) {
     return entity.state === "idle" || entity.state === "follow" || entity.state === "gather";
   }

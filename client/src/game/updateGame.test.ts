@@ -15,7 +15,7 @@ import { createInitialQuestStates } from "./questSystem";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";
-import type { GameEntity, GameMap, Position } from "./types";
+import type { GameEntity, GameMap, Position, ZoneSubzone } from "./types";
 import type { QuestId, QuestStatus } from "./questTypes";
 
 describe("game update intent priority", () => {
@@ -79,6 +79,479 @@ describe("game update intent priority", () => {
     expect(nextState.entities[follower.id]).toMatchObject({
       state: "gather",
       currentTargetId: wood.id,
+    });
+  });
+
+  it("keeps current gather quest resources eligible while a gatherer works them", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 4 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const wood = createResource("quest-wood", { x: 6, y: 4 }, {
+      resourceType: "wood",
+    });
+    const enemy = createEnemy("fallback-enemy", { x: 8, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, wood, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationTimeMs: 2200,
+        leaderIntent: {
+          type: "gather",
+          targetId: wood.id,
+          targetPosition: wood.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: wood.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: wood.position,
+          targetEntityId: wood.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_wood",
+          reason: "active quest gather wood",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 0,
+          selectedPoiId: wood.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: wood.position,
+          selectedReason: "active quest gather wood",
+          skippedReasons: {},
+        },
+        quests: createQuestStates({
+          gather_expedition_supplies: "active",
+        }),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "resource",
+      targetEntityId: wood.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: wood.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: wood.id,
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: wood.id,
+    });
+  });
+
+  it("keeps a quest resource POI committed while the gatherer is targeting it", () => {
+    const leader = createLeader({ x: 19, y: 4 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 4 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "quest-wood",
+    };
+    const currentWood = createResource("quest-wood", { x: 6, y: 4 }, {
+      resourceType: "wood",
+    });
+    const closerWood = createResource("closer-quest-wood", { x: 20, y: 4 }, {
+      resourceType: "wood",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, currentWood, closerWood], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationTimeMs: 1500,
+        leaderIntent: {
+          type: "gather",
+          targetId: currentWood.id,
+          targetPosition: currentWood.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: currentWood.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: currentWood.position,
+          targetEntityId: currentWood.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_wood",
+          reason: "active quest gather wood",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 0,
+          selectedPoiId: currentWood.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: currentWood.position,
+          selectedReason: "active quest gather wood",
+          skippedReasons: {},
+        },
+        quests: createQuestStates({
+          gather_expedition_supplies: "active",
+        }),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      targetEntityId: currentWood.id,
+      reason: "active quest gather wood",
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: currentWood.id,
+    });
+  });
+
+  it("keeps the current quest gather target in candidates after commitment expires", () => {
+    const leader = createLeader({ x: 5, y: 4 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 5 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "quest-wood",
+    };
+    const currentWood = createResource("quest-wood", { x: 6, y: 4 }, {
+      resourceType: "wood",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, currentWood], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationTimeMs: 2200,
+        leaderIntent: {
+          type: "gather",
+          targetId: currentWood.id,
+          targetPosition: currentWood.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: currentWood.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: currentWood.position,
+          targetEntityId: currentWood.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_wood",
+          reason: "active quest gather wood",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 0,
+          selectedPoiId: currentWood.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: currentWood.position,
+          selectedReason: "active quest gather wood",
+          skippedReasons: {},
+        },
+        quests: createQuestStates({
+          gather_expedition_supplies: "active",
+        }),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(
+      nextState.lastPoiDecision?.consideredTargets?.map(
+        (target) => target.targetEntityId,
+      ),
+    ).toContain(currentWood.id);
+    expect(nextState.localPoiTarget).toMatchObject({
+      targetEntityId: currentWood.id,
+    });
+  });
+
+  it("allows quest resource POI switching after the commitment window", () => {
+    const leader = createLeader({ x: 19, y: 4 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 4 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "distant-quest-wood",
+    };
+    const distantWood = createResource("distant-quest-wood", { x: 6, y: 4 }, {
+      resourceType: "wood",
+    });
+    const closerWood = createResource("closer-quest-wood", { x: 20, y: 4 }, {
+      resourceType: "wood",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, distantWood, closerWood], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationTimeMs: 2200,
+        leaderIntent: {
+          type: "gather",
+          targetId: distantWood.id,
+          targetPosition: distantWood.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: distantWood.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: distantWood.position,
+          targetEntityId: distantWood.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_wood",
+          reason: "active quest gather wood",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 0,
+          selectedPoiId: distantWood.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: distantWood.position,
+          selectedReason: "active quest gather wood",
+          skippedReasons: {},
+        },
+        quests: createQuestStates({
+          gather_expedition_supplies: "active",
+        }),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      targetEntityId: closerWood.id,
+      reason: "active quest gather wood",
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: closerWood.id,
+    });
+  });
+
+  it("breaks quest resource POI commitment when the current target is depleted", () => {
+    const leader = createLeader({ x: 19, y: 4 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 4 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "depleted-quest-wood",
+    };
+    const depletedWood = {
+      ...createResource("depleted-quest-wood", { x: 6, y: 4 }, {
+        resourceType: "wood",
+        quantity: 0,
+      }),
+      isDepleted: true,
+    };
+    const validWood = createResource("valid-quest-wood", { x: 20, y: 4 }, {
+      resourceType: "wood",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, depletedWood, validWood], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationTimeMs: 1500,
+        leaderIntent: {
+          type: "gather",
+          targetId: depletedWood.id,
+          targetPosition: depletedWood.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: depletedWood.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: depletedWood.position,
+          targetEntityId: depletedWood.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_wood",
+          reason: "active quest gather wood",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 0,
+          selectedPoiId: depletedWood.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: depletedWood.position,
+          selectedReason: "active quest gather wood",
+          skippedReasons: {},
+        },
+        quests: createQuestStates({
+          gather_expedition_supplies: "active",
+        }),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget?.targetEntityId).not.toBe(depletedWood.id);
+    expect(nextState.leaderIntent?.targetId).not.toBe(depletedWood.id);
+  });
+
+  it("makes autonomous gatherers abandon valid resources to resurrect dead companions", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const deadCompanion = {
+      ...createCompanion("dead-companion", { x: 5, y: 5 }, leader.id, "fighter"),
+      state: "dead" as const,
+      health: 0,
+    };
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 4 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("nearby-resource", { x: 6, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.resurrectionChannelsByHelperId?.[gatherer.id]).toMatchObject({
+      helperId: gatherer.id,
+      targetId: deadCompanion.id,
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: deadCompanion.id,
+    });
+  });
+
+  it("allows autonomous gatherers to resurrect when no valid resource is available", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const deadCompanion = {
+      ...createCompanion("dead-companion", { x: 5, y: 5 }, leader.id, "fighter"),
+      state: "dead" as const,
+      health: 0,
+    };
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 4 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const depletedResource = {
+      ...createResource("depleted-resource", { x: 6, y: 4 }),
+      isDepleted: true,
+      quantity: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion, gatherer, depletedResource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.resurrectionChannelsByHelperId?.[gatherer.id]).toMatchObject({
+      helperId: gatherer.id,
+      targetId: deadCompanion.id,
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: deadCompanion.id,
+    });
+  });
+
+  it("makes the only living gatherer prioritize resurrection over gathering", () => {
+    const deadLeader = {
+      ...createLeader({ x: 4, y: 4 }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 4 }, deadLeader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "nearby-resource",
+    };
+    const resource = createResource("nearby-resource", { x: 6, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([deadLeader, gatherer, resource], {
+        partyLeaderId: deadLeader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.resurrectionChannelsByHelperId?.[gatherer.id]).toMatchObject({
+      helperId: gatherer.id,
+      targetId: deadLeader.id,
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: deadLeader.id,
+    });
+  });
+
+  it("keeps direct gather commands from being taken over by resurrection", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const deadCompanion = {
+      ...createCompanion("dead-companion", { x: 5, y: 5 }, leader.id, "fighter"),
+      state: "dead" as const,
+      health: 0,
+    };
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 4 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "direct-resource",
+      commandPriority: "direct" as const,
+    };
+    const resource = createResource("direct-resource", { x: 6, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.resurrectionChannelsByHelperId?.[gatherer.id]).toBeUndefined();
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
+    });
+  });
+
+  it("prioritizes resurrection over active gather quest resources", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const deadCompanion = {
+      ...createCompanion("dead-companion", { x: 5, y: 5 }, leader.id, "fighter"),
+      state: "dead" as const,
+      health: 0,
+    };
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 4 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const wood = createResource("quest-wood", { x: 6, y: 4 }, {
+      resourceType: "wood",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion, gatherer, wood], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates({
+          gather_expedition_supplies: "active",
+        }),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toBeNull();
+    expect(nextState.resurrectionChannelsByHelperId?.[gatherer.id]).toMatchObject({
+      helperId: gatherer.id,
+      targetId: deadCompanion.id,
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: deadCompanion.id,
     });
   });
 
@@ -818,6 +1291,902 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("lets gatherers choose nearby resources from their own position within leader leash", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 14, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("gatherer-resource", { x: 15, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 20, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps autonomous gatherers focused on nearby resources when aggressive enemies are nearby", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("gatherer-resource", { x: 6, y: 2 });
+    const enemy = createEnemy("nearby-aggressive-enemy", { x: 9, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 20, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps gatherer-claimed resources out of whole-party POI selection", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "claimed-resource",
+    };
+    const resource = createResource("claimed-resource", { x: 6, y: 2 });
+    const enemy = createEnemy("party-enemy", { x: 14, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "combat",
+      targetEntityId: enemy.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: enemy.id,
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("reserves non-leader gatherer resources from party POI before the gatherer is busy", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("reserved-resource", { x: 6, y: 2 });
+    const enemy = createEnemy("party-enemy", { x: 14, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "combat",
+      targetEntityId: enemy.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: enemy.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      currentTargetId: enemy.id,
+    });
+    expect(nextState.entities[leader.id].state).not.toBe("gather");
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps autonomous gatherer reservations within resource capacity", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const firstGatherer = {
+      ...createCompanion("gatherer-a", { x: 5, y: 2 }, leader.id, "gatherer", 1),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const secondGatherer = {
+      ...createCompanion("gatherer-b", { x: 5.2, y: 2 }, leader.id, "gatherer", 2),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const firstResource = createResource("reserved-resource-a", { x: 6, y: 2 }, {
+      maxGatherers: 1,
+    });
+    const secondResource = createResource("reserved-resource-b", { x: 8, y: 2 }, {
+      maxGatherers: 1,
+    });
+    const enemy = createEnemy("party-enemy", { x: 14, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState(
+        [leader, firstGatherer, secondGatherer, firstResource, secondResource, enemy],
+        {
+          partyLeaderId: leader.id,
+          map: createOpenTestMap(),
+          quests: createQuestStates(),
+        },
+      ),
+    );
+
+    expect(nextState.entities[firstGatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: firstResource.id,
+    });
+    expect(nextState.entities[secondGatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: secondResource.id,
+    });
+    expect(nextState.localPoiTarget?.targetEntityId).toBe(enemy.id);
+  });
+
+  it("does not reuse a recently selected resource POI once a non-leader gatherer reserves it", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("reserved-resource", { x: 6, y: 2 });
+    const enemy = createEnemy("party-enemy", { x: 14, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationTimeMs: 1100,
+        localPoiTarget: {
+          poiId: resource.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: resource.position,
+          targetEntityId: resource.id,
+          reason: "wild resource fallback",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 1000,
+          selectedPoiId: resource.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: resource.position,
+          selectedReason: "wild resource fallback",
+          skippedReasons: {},
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "combat",
+      targetEntityId: enemy.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: enemy.id,
+    });
+    expect(nextState.entities[leader.id].state).not.toBe("gather");
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("does not reserve invalid gatherer resources from party POI", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const invalidResource = {
+      ...createResource("depleted-resource", { x: 6, y: 2 }),
+      isDepleted: true,
+      quantity: 0,
+    };
+    const fallbackResource = createResource("party-resource", { x: 36, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, invalidResource, fallbackResource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "resource",
+      targetEntityId: fallbackResource.id,
+    });
+    expect(nextState.localPoiTarget?.targetEntityId).not.toBe(invalidResource.id);
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: fallbackResource.id,
+    });
+  });
+
+  it("lets a gatherer leader make their claimed resource the whole-party POI", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 5, y: 2 }, "leader", "gatherer", 0),
+      state: "gather" as const,
+      currentTargetId: "leader-resource",
+    };
+    const resource = createResource("leader-resource", { x: 6, y: 2 });
+    const enemy = createEnemy("fallback-enemy", { x: 14, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "resource",
+      targetEntityId: resource.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: resource.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps autonomous gatherers rejoining when the leader is beyond gatherer leash", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 35, y: 2 }, leader.id, "gatherer"),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+    const resource = createResource("gatherer-resource", { x: 36, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("switches active autonomous gatherers to follow when the leader moves beyond gatherer leash", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const resource = createResource("gatherer-resource", { x: 36, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 35, y: 2 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("allows same-subzone autonomous gatherer resources beyond leader leash", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 35, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("same-subzone-resource", { x: 36, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createSingleSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps same-subzone gatherers on resources after yielding beyond leader leash", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 35, y: 2 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "same-subzone-resource",
+      lastGatherAt: 0,
+    };
+    const resource = createResource("same-subzone-resource", { x: 36, y: 2 }, {
+      durability: 1,
+      maxDurability: 1,
+      quantity: 2,
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createSingleSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        quests: createQuestStates(),
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("ignores cross-subzone autonomous gatherer resources beyond leader leash", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 35, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("cross-subzone-resource", { x: 36, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: false,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("keeps direct gather commands active even when the leader is far away", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const resource = createResource("direct-resource", { x: 24, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 23, y: 2 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
+    });
+  });
+
+  it("does not acquire autonomous gatherer resources beyond search range", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("outside-search-range", { x: 36, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("does not acquire autonomous gatherer resources beyond leader leash even when inside search range", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 30, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("outside-leash-resource", { x: 35, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("uses straight-line search range for gatherer resource acquisition even when the path is longer", () => {
+    const leader = createLeader({ x: 8, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 8, y: 3 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("detour-resource", { x: 12, y: 3 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createDetourTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 8, y: 10 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("uses straight-line search range for same-subzone resources even when the path is longer", () => {
+    const leader = createLeader({ x: 8, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 8, y: 3 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("detour-resource", { x: 12, y: 3 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createDetourTestMap({ withSubzone: true }),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 8, y: 10 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps autonomous gatherers inside the leader subzone when the preference is on", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 3 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("outside-subzone-resource", { x: 21, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 18, y: 10 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("lets autonomous gatherers choose outside-subzone resources when the preference is off", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 3 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("outside-subzone-resource", { x: 21, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: false,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 18, y: 10 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps autonomous gatherers focused on same-subzone resources when nearby enemies aggro", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 3 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("same-subzone-resource", { x: 12, y: 2 });
+    const enemy = createEnemy("nearby-aggressive-enemy", { x: 16, y: 3 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource, enemy], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 18, y: 10 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps direct gather commands outside the leader subzone active", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const resource = createResource("outside-subzone-resource", { x: 21, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 3 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 18, y: 10 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
+    });
+  });
+
+  it("lets autonomous gatherers leave fallback combat for nearby resources", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const enemy = createEnemy("fallback-enemy", { x: 7, y: 2 });
+    const resource = createResource("priority-resource", { x: 6, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "attack" as const,
+      currentTargetId: enemy.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, enemy, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "attack",
+          targetId: enemy.id,
+          targetPosition: enemy.position,
+          source: "ai",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("lets autonomous gatherers leave fallback combat for resources inside the leader subzone", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const enemy = createEnemy("fallback-enemy", { x: 21, y: 2 });
+    const resource = createResource("inside-subzone-resource", { x: 12, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 14, y: 2 }, leader.id, "gatherer"),
+      state: "attack" as const,
+      currentTargetId: enemy.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, enemy, resource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "attack",
+          targetId: enemy.id,
+          targetPosition: enemy.position,
+          source: "ai",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
+  it("keeps autonomous gatherers in fallback combat when no allowed resource is nearby", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const enemy = createEnemy("fallback-enemy", { x: 21, y: 2 });
+    const resource = createResource("outside-subzone-resource", { x: 21, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 18, y: 3 }, leader.id, "gatherer"),
+      state: "attack" as const,
+      currentTargetId: enemy.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, enemy, resource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        leaderIntent: {
+          type: "attack",
+          targetId: enemy.id,
+          targetPosition: enemy.position,
+          source: "ai",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+    });
+  });
+
+  it("allows aggressive enemies to interrupt autonomous gatherers when no valid resource is available", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const depletedResource = {
+      ...createResource("depleted-resource", { x: 6, y: 2 }),
+      isDepleted: true,
+      quantity: 0,
+    };
+    const enemy = createEnemy("nearby-aggressive-enemy", { x: 7, y: 2 }, "aggressive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, depletedResource, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 20, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+    });
+  });
+
+  it("clears auto POI during player move while gatherers still choose nearby resources", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const resource = createResource("gatherer-resource", { x: 6, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 15, y: 2 },
+          source: "player",
+        },
+        localPoiTarget: {
+          poiId: "stale-poi",
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: resource.position,
+          targetEntityId: resource.id,
+          reason: "stale test poi",
+        },
+        globalPoiIntent: {
+          type: "idle",
+          reason: "stale test intent",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.globalPoiIntent).toBeNull();
+    expect(nextState.localPoiTarget).toBeNull();
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "move",
+      source: "player",
+    });
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+    });
+  });
+
   it("prioritizes hub Merchant quick exchange before quest work", () => {
     const leader = createLeader({ x: 7, y: 20 });
     const stateWithJunk = addItemToInventoryState(
@@ -854,7 +2223,7 @@ describe("game update intent priority", () => {
     expect(nextState.quests.gather_expedition_supplies.status).toBe("available");
   });
 
-  it("Stay in Map blocks cross-map quest delivery and chooses a local fallback", () => {
+  it("Stay in Subzone blocks cross-map quest delivery and chooses a local fallback", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const localEnemy = createEnemy("local-enemy", { x: 4, y: 2 });
 
@@ -874,7 +2243,7 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent?.targetId).toBe(localEnemy.id);
   });
 
-  it("Stay in Map still allows same-map active quest objectives", () => {
+  it("Stay in Subzone still allows same-subzone active quest objectives", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const questEnemy = createEnemy("quest-enemy", { x: 4, y: 2 });
 
@@ -894,7 +2263,7 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent?.targetId).toBe(questEnemy.id);
   });
 
-  it("Stay in Map still allows local hub quest turn-in", () => {
+  it("Stay in Subzone still allows local hub quest turn-in", () => {
     const leader = createLeader({ x: 22, y: 13 });
 
     const nextState = updateGame(
@@ -912,7 +2281,7 @@ describe("game update intent priority", () => {
     expect(nextState.quests.clear_the_shore.status).toBe("completed");
   });
 
-  it("Stay in Map blocks hub routing toward a wild objective", () => {
+  it("Stay in Subzone blocks hub routing toward a wild objective", () => {
     const leader = createLeader({ x: 22, y: 13 });
 
     const nextState = updateGame(
@@ -1059,7 +2428,47 @@ describe("game update intent priority", () => {
     expect(nextState.globalPoiIntent?.type).not.toBe("travel_to_map");
   });
 
-  it("world travel ignores Stay in Map", () => {
+  it("Stay in Subzone filters local fallback POI candidates to the leader subzone", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const outsideEnemy = createEnemy("outside-subzone-enemy", { x: 21, y: 2 });
+    const insideResource = createResource("inside-subzone-resource", { x: 12, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, outsideEnemy, insideResource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: true,
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.targetEntityId).toBe(insideResource.id);
+    expect(nextState.localPoiTarget?.category).toBe("resource");
+  });
+
+  it("allows local fallback POI candidates outside the leader subzone when preference is off", () => {
+    const leader = createLeader({ x: 18, y: 2 });
+    const outsideEnemy = createEnemy("outside-subzone-enemy", { x: 21, y: 2 });
+    const insideResource = createResource("inside-subzone-resource", { x: 12, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, outsideEnemy, insideResource], {
+        partyLeaderId: leader.id,
+        map: createSubzoneTestMap(),
+        poiPreferences: {
+          stayInMap: false,
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.targetEntityId).toBe(outsideEnemy.id);
+    expect(nextState.localPoiTarget?.category).toBe("combat");
+  });
+
+  it("world travel ignores Stay in Subzone", () => {
     const leader = createLeader({ x: 22, y: 13 });
 
     const nextState = updateGame(
@@ -1201,6 +2610,104 @@ function createBlockedTargetMap(blockedPosition: Position): GameMap {
     ],
     teleports: [],
     healingFountains: [],
+  };
+}
+
+function createOpenTestMap(): GameMap {
+  return {
+    id: MAP_ONE_ID,
+    displayName: "Open Test Map",
+    debugName: "open-test-map",
+    columns: 40,
+    rows: 20,
+    walls: [],
+    teleports: [],
+    healingFountains: [],
+  };
+}
+
+function createSubzoneTestMap(): GameMap {
+  const subzones: ZoneSubzone[] = [
+    createTestSubzone("west-test-subzone", "West Test Subzone", {
+      x: 0,
+      y: 0,
+      width: 20,
+      height: 20,
+    }),
+    createTestSubzone("east-test-subzone", "East Test Subzone", {
+      x: 20,
+      y: 0,
+      width: 20,
+      height: 20,
+    }),
+  ];
+
+  return {
+    ...createOpenTestMap(),
+    subzones,
+  };
+}
+
+function createSingleSubzoneTestMap(): GameMap {
+  return {
+    ...createOpenTestMap(),
+    subzones: [
+      createTestSubzone("single-test-subzone", "Single Test Subzone", {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+      }),
+    ],
+  };
+}
+
+function createDetourTestMap(options: { withSubzone?: boolean } = {}): GameMap {
+  const map: GameMap = {
+    id: MAP_ONE_ID,
+    displayName: "Detour Test Map",
+    debugName: "detour-test-map",
+    columns: 30,
+    rows: 30,
+    walls: Array.from({ length: 25 }, (_, y) => ({ x: 10, y })),
+    teleports: [],
+    healingFountains: [],
+  };
+
+  if (!options.withSubzone) {
+    return map;
+  }
+
+  return {
+    ...map,
+    subzones: [
+      createTestSubzone("detour-test-subzone", "Detour Test Subzone", {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 30,
+      }),
+    ],
+  };
+}
+
+function createTestSubzone(
+  id: string,
+  displayName: string,
+  bounds: ZoneSubzone["bounds"],
+): ZoneSubzone {
+  return {
+    id,
+    displayName,
+    bounds,
+    levelRange: {
+      min: 1,
+      max: 1,
+    },
+    enemyArchetypeIds: [],
+    encounterAreas: [],
+    resourceLocations: [],
+    passages: [],
   };
 }
 

@@ -10,6 +10,7 @@ type EnemyTargetOptions = {
 
 type ResourceTargetOptions = {
   maxDistance: number;
+  isCandidatePositionAllowed?: (position: Position) => boolean;
 };
 
 export function findEnemyTarget(
@@ -43,11 +44,13 @@ export function findResourceTarget(
   const resources = Object.values(state.entities).filter(
     (entity): entity is ResourceEntity =>
       isValidResourceTarget(entity) &&
+      isResourcePositionAllowed(entity.position, options) &&
+      getEuclideanDistance(searchOrigin, entity.position) <= options.maxDistance &&
       isPositionReachableWithin(
         state,
         searchOrigin,
         entity.position,
-        options.maxDistance,
+        getReachabilitySearchLimit(state),
         entity.id,
       ),
   );
@@ -63,6 +66,7 @@ export function isResourceTargetInRange(
 ): boolean {
   return (
     isValidResourceTarget(resource) &&
+    isResourcePositionAllowed(resource.position, options) &&
     isPositionReachableWithin(
       state,
       searchOrigin,
@@ -71,6 +75,13 @@ export function isResourceTargetInRange(
       resource.id,
     )
   );
+}
+
+function isResourcePositionAllowed(
+  position: Position,
+  options: ResourceTargetOptions,
+): boolean {
+  return options.isCandidatePositionAllowed?.(position) ?? true;
 }
 
 function isValidEnemyTarget(entity: GameEntity): entity is Enemy {
@@ -162,4 +173,10 @@ function isPositionReachableWithin(
       ignoredEntityId,
     ) !== null
   );
+}
+
+function getReachabilitySearchLimit(state: GameState): number {
+  return state.map
+    ? state.map.columns * state.map.rows
+    : Number.POSITIVE_INFINITY;
 }
