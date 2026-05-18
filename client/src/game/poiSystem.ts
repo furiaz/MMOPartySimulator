@@ -9,18 +9,19 @@ import {
 } from "./debugMap";
 import { getQuickExchangeItems, quickExchangeParts } from "./merchant";
 import {
+  getNavigationGrid,
   getNavigationNeighborPositions,
   getNavigationPositionKey,
-  isNavigationCellWalkable,
   toNavigationNode,
 } from "./navigation";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
-  isActiveResourcePosition,
+  getPoiSearchScope,
   setLeaderIntent,
   updateEntity,
   type GameState,
+  type PoiSearchScope,
 } from "./state";
 import {
   QUEST_DEFINITIONS,
@@ -66,8 +67,10 @@ const FALLBACK_DISTANCE_SCORE_MULTIPLIER = 1;
 const NEARBY_RESOURCE_PATH_DISTANCE = 3;
 const NEARBY_RESOURCE_SCORE_BONUS = -12;
 const IDLE_CITY_POINT: Position = { x: 22, y: 16 };
-const WILD_POI_REEVALUATE_INTERVAL_MS = 500;
-const QUEST_RESOURCE_POI_COMMITMENT_MS = 2000;
+const WILD_POI_REEVALUATE_INTERVAL_MS = 4000;
+const QUEST_RESOURCE_POI_COMMITMENT_MS = 4000;
+const FALLBACK_POI_PATH_DISTANCE_TIERS = [35, 70, 120] as const;
+const FALLBACK_POI_WHOLE_MAP_REEVALUATE_INTERVAL_MS = 4000;
 
 type PoiTargetOption = {
   poi: PointOfInterest;
@@ -84,6 +87,14 @@ type ScoredPoiTarget = {
   priority: number;
   score: number;
   pathDistance: number;
+};
+
+type PoiDistanceMapOptions = {
+  maxDistance?: number;
+};
+
+type ScorePoiTargetsOptions = {
+  recordUnreachable?: (option: PoiTargetOption) => boolean;
 };
 
 export function updatePoiSystem(
@@ -419,8 +430,7 @@ function selectLocalPoiTarget(
     candidates,
     gathererReservations,
   );
-  const distanceMap = createPoiDistanceMap(state, options);
-  const scoredTargets = scorePoiTargets(state, options, distanceMap, skippedReasons);
+  const scoredTargets = selectScoredPoiTargets(state, options, skippedReasons);
   const selectedTarget = selectStablePoiTarget(state, scoredTargets);
   const consideredTargets = getPoiConsiderations(scoredTargets, selectedTarget);
 
@@ -438,7 +448,7 @@ function getPoiTargetOptions(
   gathererReservations: GathererResourceReservations,
 ): PoiTargetOption[] {
   const mapType = getMapType(state.currentMapId);
-  const stayInMap = Boolean(state.poiPreferences?.stayInMap);
+  const searchScope = getPoiSearchScope(state);
   const leader = getPartyLeader(state);
   const leaderSubzone = getLeaderSubzoneRestriction(state);
   const isGathererLeader = leader?.role === "gatherer";
@@ -462,7 +472,7 @@ function getPoiTargetOptions(
     globalPoiIntent,
     candidates,
     mapType,
-    stayInMap,
+    searchScope,
     gathererReservations,
   );
   const subzoneQuestOptions = filterPoiOptionsToLeaderSubzone(
@@ -486,7 +496,7 @@ function getPoiTargetOptions(
     return subzoneQuestOptions;
   }
 
-  if (globalPoiIntent.type !== "idle" && !stayInMap) {
+  if (globalPoiIntent.type !== "idle" && searchScope === "free_travel") {
     return [];
   }
 
@@ -497,7 +507,7 @@ function getPoiTargetOptions(
 }
 
 function getLeaderSubzoneRestriction(state: GameState): ZoneSubzone | null {
-  if (!state.poiPreferences?.stayInMap) {
+  if (getPoiSearchScope(state) !== "subzone_only") {
     return null;
   }
 
@@ -595,7 +605,7 @@ function getQuestTargetOptions(
   globalPoiIntent: GlobalPoiIntent,
   candidates: PointOfInterest[],
   mapType: PoiMapType,
-  stayInMap: boolean,
+  searchScope: PoiSearchScope,
   gathererReservations: GathererResourceReservations,
 ): PoiTargetOption[] {
   if (!globalPoiIntent.questId || !state.currentMapId) {
@@ -610,7 +620,7 @@ function getQuestTargetOptions(
       : getQuestTargetMapId(state, questId);
 
   if (targetMapId !== state.currentMapId) {
-    if (stayInMap) {
+    if (searchScope !== "free_travel") {
       return [];
     }
 
@@ -695,18 +705,108 @@ function getQuestTargetOptions(
   return [];
 }
 
+function selectScoredPoiTargets(
+  state: GameState,
+  options: PoiTargetOption[],
+  skippedReasons: Record<string, string>,
+): ScoredPoiTarget[] {
+  if (options.length === 0) {
+    return [];
+  }
+
+  if (options.every(isWildFallbackOption)) {
+    return selectProgressiveFallbackTargets(state, options, skippedReasons);
+  }
+
+  const distanceMap = createPoiDistanceMap(state, options);
+  return scorePoiTargets(state, options, distanceMap, skippedReasons);
+}
+
+function selectProgressiveFallbackTargets(
+  state: GameState,
+  options: PoiTargetOption[],
+  skippedReasons: Record<string, string>,
+): ScoredPoiTarget[] {
+  const widestBoundedTier =
+    FALLBACK_POI_PATH_DISTANCE_TIERS[
+      FALLBACK_POI_PATH_DISTANCE_TIERS.length - 1
+    ] ?? 0;
+  const boundedDistanceMap = createPoiDistanceMap(state, options, {
+    maxDistance: widestBoundedTier,
+  });
+  const boundedSkippedReasons: Record<string, string> = {};
+  const boundedTargets = scorePoiTargets(
+    state,
+    options,
+    boundedDistanceMap,
+    boundedSkippedReasons,
+    {
+      recordUnreachable: (option) =>
+        getPoiMinimumDistance(state, option.poi) <= widestBoundedTier,
+    },
+  );
+
+  for (const tier of FALLBACK_POI_PATH_DISTANCE_TIERS) {
+    const tierTargets = boundedTargets.filter(
+      (target) => target.pathDistance <= tier,
+    );
+
+    if (tierTargets.length > 0) {
+      Object.assign(skippedReasons, boundedSkippedReasons);
+      return tierTargets;
+    }
+  }
+
+  if (!canRunWholeMapFallback(state)) {
+    return [];
+  }
+
+  const distanceMap = createPoiDistanceMap(state, options);
+  return scorePoiTargets(state, options, distanceMap, skippedReasons);
+}
+
+function isWildFallbackOption(option: PoiTargetOption): boolean {
+  return (
+    option.reason === "wild enemy fallback" ||
+    option.reason === "wild resource fallback"
+  );
+}
+
+function canRunWholeMapFallback(state: GameState): boolean {
+  const evaluatedAtMs = state.lastPoiDecision?.evaluatedAtMs;
+
+  if (evaluatedAtMs === undefined) {
+    return true;
+  }
+
+  if (
+    state.localPoiTarget &&
+    !isLocalPoiTargetStillValid(state, state.localPoiTarget)
+  ) {
+    return true;
+  }
+
+  return (
+    (state.simulationTimeMs ?? 0) - evaluatedAtMs >=
+    FALLBACK_POI_WHOLE_MAP_REEVALUATE_INTERVAL_MS
+  );
+}
+
 function scorePoiTargets(
   state: GameState,
   options: PoiTargetOption[],
   distanceMap: Record<string, number> | null,
   skippedReasons: Record<string, string>,
+  scoreOptions: ScorePoiTargetsOptions = {},
 ): ScoredPoiTarget[] {
   return options
     .map((option) => {
       const pathDistance = getPoiPathDistance(state, option.poi, distanceMap);
 
       if (pathDistance === null) {
-        skippedReasons[option.poi.id] = "unreachable";
+        if (scoreOptions.recordUnreachable?.(option) ?? true) {
+          skippedReasons[option.poi.id] = "unreachable";
+        }
         return null;
       }
 
@@ -728,6 +828,12 @@ function scorePoiTargets(
       first.pathDistance - second.pathDistance ||
       first.localTarget.poiId.localeCompare(second.localTarget.poiId),
     );
+}
+
+function getPoiMinimumDistance(state: GameState, poi: PointOfInterest): number {
+  const leader = getPartyLeader(state);
+
+  return leader ? getDistance(leader.position, poi.position) : Number.POSITIVE_INFINITY;
 }
 
 function selectStablePoiTarget(
@@ -820,6 +926,7 @@ function getPoiScore(option: PoiTargetOption, pathDistance: number): number {
 function createPoiDistanceMap(
   state: GameState,
   options: PoiTargetOption[],
+  distanceOptions: PoiDistanceMapOptions = {},
 ): Record<string, number> | null {
   const leader = getPartyLeader(state);
 
@@ -828,8 +935,9 @@ function createPoiDistanceMap(
   }
 
   const start = toNavigationNode(leader.position);
+  const navigationGrid = getNavigationGrid(state.map);
 
-  if (!isNavigationCellWalkable(state.map, start)) {
+  if (!isNavigationGridCellWalkable(navigationGrid, start)) {
     return {};
   }
 
@@ -838,6 +946,7 @@ function createPoiDistanceMap(
       .filter((option) => option.poi.mapId === state.currentMapId)
       .map((option) => getNavigationPositionKey(option.poi.position)),
   );
+  const resourceBlockerKeys = createActiveResourceBlockerKeys(state);
   const startKey = getNavigationPositionKey(start);
   const distanceByKey: Record<string, number> = {
     [startKey]: 0,
@@ -875,19 +984,28 @@ function createPoiDistanceMap(
 
     visited.add(currentKey);
 
+    const currentDistance = distanceByKey[currentKey] ?? 0;
+
+    if (
+      distanceOptions.maxDistance !== undefined &&
+      currentDistance >= distanceOptions.maxDistance
+    ) {
+      continue;
+    }
+
     for (const neighbor of getNavigationNeighborPositions(current)) {
       const neighborKey = getNavigationPositionKey(neighbor);
+      const nextDistance = currentDistance + 1;
 
       if (
         visited.has(neighborKey) ||
-        !isNavigationCellWalkable(state.map, neighbor) ||
-        (!targetKeys.has(neighborKey) && isActiveResourcePosition(state, neighbor))
+        (distanceOptions.maxDistance !== undefined &&
+          nextDistance > distanceOptions.maxDistance) ||
+        !isNavigationGridCellWalkable(navigationGrid, neighbor) ||
+        (!targetKeys.has(neighborKey) && resourceBlockerKeys.has(neighborKey))
       ) {
         continue;
       }
-
-      const nextDistance =
-        (distanceByKey[currentKey] ?? 0) + 1;
 
       if (
         distanceByKey[neighborKey] !== undefined &&
@@ -907,6 +1025,30 @@ function createPoiDistanceMap(
   }
 
   return distanceByKey;
+}
+
+function isNavigationGridCellWalkable(
+  navigationGrid: ReturnType<typeof getNavigationGrid>,
+  position: Position,
+): boolean {
+  return Boolean(
+    navigationGrid.cellsByKey[getNavigationPositionKey(position)]?.walkable,
+  );
+}
+
+function createActiveResourceBlockerKeys(state: GameState): Set<string> {
+  return new Set(
+    Object.values(state.entities)
+      .filter(
+        (entity): entity is ResourceEntity =>
+          entity.kind === "resource" &&
+          !entity.isDepleted &&
+          entity.quantity > 0,
+      )
+      .map((resource) =>
+        getNavigationPositionKey(toNavigationNode(resource.position)),
+      ),
+  );
 }
 
 function getPoiPathDistance(

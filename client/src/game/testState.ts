@@ -14,6 +14,7 @@ export function createTestGameState(
     worldTravelTargetMapId: null,
     poiPreferences: {
       stayInMap: false,
+      searchScope: "free_travel",
     },
     simulationTick: 0,
     simulationFrame: 0,

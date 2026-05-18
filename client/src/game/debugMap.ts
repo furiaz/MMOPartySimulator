@@ -17,6 +17,7 @@ export const DEBUG_MAP_COLUMNS = 50;
 export const DEBUG_MAP_ROWS = 30;
 export const WILDERNESS_MAP_COLUMNS = 160;
 export const WILDERNESS_MAP_ROWS = 30;
+export const MAP_ONE_ROWS = 90;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const MAP_TWO_TO_MAP_THREE_TELEPORTER_ID = "map-2-to-map-3";
 export const MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID = "map-3-to-map-4";
@@ -94,6 +95,8 @@ export const resourceIds = [
   "test-resource-ore-5",
   "test-resource-herb-5",
   "test-resource-wood-6",
+  "test-resource-ore-6",
+  "test-resource-herb-6",
 ];
 
 export const npcIds = [
@@ -126,11 +129,11 @@ export const mapTwoCompanionStartPositions: Position[] = [
   { x: 29, y: 15 },
 ];
 
-export const teleporterPosition: Position = { x: 154, y: 12 };
+export const teleporterPosition: Position = { x: 154, y: 44 };
 export const mapTwoForwardTeleporterPosition: Position = { x: 154, y: 12 };
 export const mapThreeForwardTeleporterPosition: Position = { x: 154, y: 12 };
 export const hubTeleporterPosition: Position = { x: 22, y: 20 };
-export const mapOneHubTeleporterPosition: Position = { x: 5, y: 12 };
+export const mapOneHubTeleporterPosition: Position = { x: 5, y: 44 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 12 };
 export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 12 };
 export const mapFourReturnTeleporterPosition: Position = { x: 5, y: 12 };
@@ -151,24 +154,24 @@ const hubArrivalPositions: Position[] = [
 ];
 
 const mapOneHubArrivalPositions: Position[] = [
-  { x: 5, y: 14 },
-  { x: 6, y: 14 },
-  { x: 5, y: 15 },
-  { x: 6, y: 15 },
+  { x: 7, y: 44 },
+  { x: 8, y: 44 },
+  { x: 7, y: 45 },
+  { x: 8, y: 45 },
 ];
 
 const mapOneMapTwoArrivalPositions: Position[] = [
-  { x: 28, y: 14 },
-  { x: 29, y: 14 },
-  { x: 28, y: 15 },
-  { x: 29, y: 15 },
+  { x: 7, y: 12 },
+  { x: 8, y: 12 },
+  { x: 7, y: 13 },
+  { x: 8, y: 13 },
 ];
 
 const mapTwoMapOneArrivalPositions: Position[] = [
-  { x: 154, y: 14 },
-  { x: 153, y: 14 },
-  { x: 154, y: 15 },
-  { x: 153, y: 15 },
+  { x: 154, y: 46 },
+  { x: 153, y: 46 },
+  { x: 154, y: 47 },
+  { x: 153, y: 47 },
 ];
 
 const mapTwoMapThreeArrivalPositions: Position[] = [
@@ -240,16 +243,76 @@ export const hubNpcStartData = [
 
 const MAP_ONE_PASSAGES: ZoneSubzonePassage[] = [
   {
-    id: "north-west-to-north-center",
-    fromSubzoneId: "north-west",
-    toSubzoneId: "north-center",
-    position: { x: 52, y: 12 },
+    id: "top-left-to-top-center",
+    fromSubzoneId: "top-left",
+    toSubzoneId: "top-center",
+    position: { x: 52, y: 15 },
   },
   {
-    id: "north-west-to-south-west",
-    fromSubzoneId: "north-west",
-    toSubzoneId: "south-west",
-    position: { x: 26, y: 24 },
+    id: "top-center-to-top-right",
+    fromSubzoneId: "top-center",
+    toSubzoneId: "top-right",
+    position: { x: 105, y: 15 },
+  },
+  {
+    id: "middle-left-to-middle-center",
+    fromSubzoneId: "middle-left",
+    toSubzoneId: "middle-center",
+    position: { x: 52, y: 44 },
+  },
+  {
+    id: "middle-center-to-middle-right",
+    fromSubzoneId: "middle-center",
+    toSubzoneId: "middle-right",
+    position: { x: 105, y: 44 },
+  },
+  {
+    id: "bottom-left-to-bottom-center",
+    fromSubzoneId: "bottom-left",
+    toSubzoneId: "bottom-center",
+    position: { x: 52, y: 73 },
+  },
+  {
+    id: "bottom-center-to-bottom-right",
+    fromSubzoneId: "bottom-center",
+    toSubzoneId: "bottom-right",
+    position: { x: 105, y: 73 },
+  },
+  {
+    id: "top-left-to-middle-left",
+    fromSubzoneId: "top-left",
+    toSubzoneId: "middle-left",
+    position: { x: 26, y: 29 },
+  },
+  {
+    id: "top-center-to-middle-center",
+    fromSubzoneId: "top-center",
+    toSubzoneId: "middle-center",
+    position: { x: 79, y: 29 },
+  },
+  {
+    id: "top-right-to-middle-right",
+    fromSubzoneId: "top-right",
+    toSubzoneId: "middle-right",
+    position: { x: 132, y: 29 },
+  },
+  {
+    id: "middle-left-to-bottom-left",
+    fromSubzoneId: "middle-left",
+    toSubzoneId: "bottom-left",
+    position: { x: 26, y: 59 },
+  },
+  {
+    id: "middle-center-to-bottom-center",
+    fromSubzoneId: "middle-center",
+    toSubzoneId: "bottom-center",
+    position: { x: 79, y: 59 },
+  },
+  {
+    id: "middle-right-to-bottom-right",
+    fromSubzoneId: "middle-right",
+    toSubzoneId: "bottom-right",
+    position: { x: 132, y: 59 },
   },
 ];
 
@@ -295,21 +358,6 @@ const MAP_FOUR_PASSAGES: ZoneSubzonePassage[] = [
     fromSubzoneId: "south-east",
     toSubzoneId: "north-east",
     position: { x: 132, y: 24 },
-  },
-];
-
-const MAP_ONE_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
-  {
-    id: "north-west-to-north-center",
-    fromSubzoneId: "north-west",
-    toSubzoneId: "north-center",
-    position: { x: 52, y: 12 },
-  },
-  {
-    id: "north-center-to-south-west",
-    fromSubzoneId: "north-center",
-    toSubzoneId: "south-west",
-    position: { x: 105, y: 12 },
   },
 ];
 
@@ -360,45 +408,121 @@ const MAP_FOUR_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
 
 const mapOneSourceSubzones: ZoneSubzone[] = [
   {
-    id: "north-west",
+    id: "top-left",
     displayName: "Shore Fringe",
-    bounds: { x: 1, y: 1, width: 51, height: 23 },
+    bounds: { x: 1, y: 1, width: 51, height: 28 },
     levelRange: { min: 1, max: 1 },
     enemyArchetypeIds: ["slime"],
-    encounterAreas: [{ id: "shore-fringe-den", subzoneId: "north-west", center: { x: 26, y: 13 }, radius: 17, leashRadius: 19 }],
+    encounterAreas: [{ id: "top-left-den", subzoneId: "top-left", center: { x: 26, y: 15 }, radius: 17, leashRadius: 19 }],
     resourceLocations: [
-      { id: resourceIds[0], subzoneId: "north-west", position: { x: 47, y: 21 }, resourceType: "wood" },
-      { id: resourceIds[10], subzoneId: "north-west", position: { x: 8, y: 20 }, resourceType: "herb" },
+      { id: resourceIds[0], subzoneId: "top-left", position: { x: 7, y: 7 }, resourceType: "wood" },
+      { id: resourceIds[1], subzoneId: "top-left", position: { x: 47, y: 25 }, resourceType: "herb" },
     ],
-    passages: getPassagesForSubzone("north-west", MAP_ONE_PASSAGES),
+    passages: getPassagesForSubzone("top-left", MAP_ONE_PASSAGES),
   },
   {
-    id: "north-center",
+    id: "top-center",
     displayName: "Mossy Glade",
-    bounds: { x: 53, y: 1, width: 52, height: 23 },
-    levelRange: { min: 1, max: 2 },
-    enemyArchetypeIds: ["slime", "cave_bat"],
-    encounterAreas: [{ id: "mossy-glade-nest", subzoneId: "north-center", center: { x: 81, y: 16 }, radius: 18, leashRadius: 20 }],
+    bounds: { x: 53, y: 1, width: 52, height: 28 },
+    levelRange: { min: 2, max: 2 },
+    enemyArchetypeIds: ["cave_bat"],
+    encounterAreas: [{ id: "top-center-den", subzoneId: "top-center", center: { x: 79, y: 15 }, radius: 18, leashRadius: 20 }],
     resourceLocations: [
-      { id: resourceIds[1], subzoneId: "north-center", position: { x: 56, y: 20 }, resourceType: "ore" },
-      { id: resourceIds[2], subzoneId: "north-center", position: { x: 102, y: 20 }, resourceType: "herb" },
-      { id: resourceIds[11], subzoneId: "north-center", position: { x: 58, y: 4 }, resourceType: "wood" },
+      { id: resourceIds[2], subzoneId: "top-center", position: { x: 58, y: 25 }, resourceType: "ore" },
+      { id: resourceIds[3], subzoneId: "top-center", position: { x: 101, y: 25 }, resourceType: "wood" },
     ],
-    passages: getPassagesForSubzone("north-center", MAP_ONE_PASSAGES),
+    passages: getPassagesForSubzone("top-center", MAP_ONE_PASSAGES),
   },
   {
-    id: "south-west",
+    id: "top-right",
     displayName: "Lower Shore",
-    bounds: { x: 1, y: 25, width: 51, height: 22 },
-    levelRange: { min: 2, max: 3 },
-    enemyArchetypeIds: ["cave_bat", "forest_spider"],
-    encounterAreas: [{ id: "lower-shore-roost", subzoneId: "south-west", center: { x: 27, y: 38 }, radius: 17, leashRadius: 19 }],
+    bounds: { x: 106, y: 1, width: 53, height: 28 },
+    levelRange: { min: 3, max: 3 },
+    enemyArchetypeIds: ["forest_spider"],
+    encounterAreas: [{ id: "top-right-den", subzoneId: "top-right", center: { x: 132, y: 15 }, radius: 18, leashRadius: 20 }],
     resourceLocations: [
-      { id: resourceIds[4], subzoneId: "south-west", position: { x: 8, y: 43 }, resourceType: "ore" },
-      { id: resourceIds[5], subzoneId: "south-west", position: { x: 48, y: 43 }, resourceType: "herb" },
-      { id: resourceIds[12], subzoneId: "south-west", position: { x: 7, y: 28 }, resourceType: "wood" },
+      { id: resourceIds[4], subzoneId: "top-right", position: { x: 110, y: 25 }, resourceType: "herb" },
+      { id: resourceIds[5], subzoneId: "top-right", position: { x: 154, y: 25 }, resourceType: "ore" },
     ],
-    passages: getPassagesForSubzone("south-west", MAP_ONE_PASSAGES),
+    passages: getPassagesForSubzone("top-right", MAP_ONE_PASSAGES),
+  },
+  {
+    id: "middle-left",
+    displayName: "Shore Fringe",
+    bounds: { x: 1, y: 31, width: 51, height: 28 },
+    levelRange: { min: 1, max: 1 },
+    enemyArchetypeIds: ["slime"],
+    encounterAreas: [{ id: "middle-left-den", subzoneId: "middle-left", center: { x: 26, y: 44 }, radius: 17, leashRadius: 19 }],
+    resourceLocations: [
+      { id: resourceIds[6], subzoneId: "middle-left", position: { x: 8, y: 55 }, resourceType: "wood" },
+      { id: resourceIds[7], subzoneId: "middle-left", position: { x: 48, y: 39 }, resourceType: "herb" },
+    ],
+    passages: getPassagesForSubzone("middle-left", MAP_ONE_PASSAGES),
+  },
+  {
+    id: "middle-center",
+    displayName: "Mossy Glade",
+    bounds: { x: 53, y: 31, width: 52, height: 28 },
+    levelRange: { min: 2, max: 2 },
+    enemyArchetypeIds: ["cave_bat"],
+    encounterAreas: [{ id: "middle-center-den", subzoneId: "middle-center", center: { x: 79, y: 44 }, radius: 18, leashRadius: 20 }],
+    resourceLocations: [
+      { id: resourceIds[8], subzoneId: "middle-center", position: { x: 58, y: 55 }, resourceType: "ore" },
+      { id: resourceIds[9], subzoneId: "middle-center", position: { x: 102, y: 39 }, resourceType: "wood" },
+    ],
+    passages: getPassagesForSubzone("middle-center", MAP_ONE_PASSAGES),
+  },
+  {
+    id: "middle-right",
+    displayName: "Lower Shore",
+    bounds: { x: 106, y: 31, width: 53, height: 28 },
+    levelRange: { min: 3, max: 3 },
+    enemyArchetypeIds: ["forest_spider"],
+    encounterAreas: [{ id: "middle-right-den", subzoneId: "middle-right", center: { x: 132, y: 44 }, radius: 18, leashRadius: 20 }],
+    resourceLocations: [
+      { id: resourceIds[10], subzoneId: "middle-right", position: { x: 110, y: 55 }, resourceType: "herb" },
+      { id: resourceIds[11], subzoneId: "middle-right", position: { x: 154, y: 39 }, resourceType: "ore" },
+    ],
+    passages: getPassagesForSubzone("middle-right", MAP_ONE_PASSAGES),
+  },
+  {
+    id: "bottom-left",
+    displayName: "Shore Fringe",
+    bounds: { x: 1, y: 60, width: 51, height: 28 },
+    levelRange: { min: 1, max: 1 },
+    enemyArchetypeIds: ["slime"],
+    encounterAreas: [{ id: "bottom-left-den", subzoneId: "bottom-left", center: { x: 26, y: 73 }, radius: 17, leashRadius: 19 }],
+    resourceLocations: [
+      { id: resourceIds[12], subzoneId: "bottom-left", position: { x: 8, y: 84 }, resourceType: "wood" },
+      { id: resourceIds[13], subzoneId: "bottom-left", position: { x: 48, y: 69 }, resourceType: "herb" },
+    ],
+    passages: getPassagesForSubzone("bottom-left", MAP_ONE_PASSAGES),
+  },
+  {
+    id: "bottom-center",
+    displayName: "Mossy Glade",
+    bounds: { x: 53, y: 60, width: 52, height: 28 },
+    levelRange: { min: 2, max: 2 },
+    enemyArchetypeIds: ["cave_bat"],
+    encounterAreas: [{ id: "bottom-center-den", subzoneId: "bottom-center", center: { x: 79, y: 73 }, radius: 18, leashRadius: 20 }],
+    resourceLocations: [
+      { id: resourceIds[14], subzoneId: "bottom-center", position: { x: 58, y: 84 }, resourceType: "ore" },
+      { id: resourceIds[15], subzoneId: "bottom-center", position: { x: 102, y: 69 }, resourceType: "wood" },
+    ],
+    passages: getPassagesForSubzone("bottom-center", MAP_ONE_PASSAGES),
+  },
+  {
+    id: "bottom-right",
+    displayName: "Lower Shore",
+    bounds: { x: 106, y: 60, width: 53, height: 28 },
+    levelRange: { min: 3, max: 3 },
+    enemyArchetypeIds: ["forest_spider"],
+    encounterAreas: [{ id: "bottom-right-den", subzoneId: "bottom-right", center: { x: 132, y: 73 }, radius: 18, leashRadius: 20 }],
+    resourceLocations: [
+      { id: resourceIds[16], subzoneId: "bottom-right", position: { x: 110, y: 84 }, resourceType: "herb" },
+      { id: resourceIds[17], subzoneId: "bottom-right", position: { x: 154, y: 69 }, resourceType: "ore" },
+    ],
+    passages: getPassagesForSubzone("bottom-right", MAP_ONE_PASSAGES),
   },
 ];
 
@@ -534,10 +658,6 @@ const mapFourSourceSubzones: ZoneSubzone[] = [
   },
 ];
 
-const MAP_ONE_COMPACT_OFFSETS: Record<string, Position> = {
-  "south-west": { x: 105, y: -24 },
-};
-
 const MAP_TWO_COMPACT_OFFSETS: Record<string, Position> = {
   "south-center": { x: -52, y: -24 },
   "south-east": { x: -52, y: -24 },
@@ -555,11 +675,7 @@ const MAP_FOUR_COMPACT_OFFSETS: Record<string, Position> = {
   "south-east": { x: 0, y: -24 },
 };
 
-export const mapOneSubzones: ZoneSubzone[] = compactSubzones(
-  mapOneSourceSubzones,
-  MAP_ONE_COMPACT_OFFSETS,
-  MAP_ONE_COMPACT_PASSAGES,
-);
+export const mapOneSubzones: ZoneSubzone[] = mapOneSourceSubzones;
 
 export const mapTwoSubzones: ZoneSubzone[] = compactSubzones(
   mapTwoSourceSubzones,
@@ -580,11 +696,15 @@ export const mapFourSubzones: ZoneSubzone[] = compactSubzones(
 );
 
 const mapOneSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-1-shore-fringe-entry-label", subzoneId: "north-west", text: "Shore Fringe", position: { x: 8, y: 14 } },
-  { id: "map-1-shore-fringe-mossy-label", subzoneId: "north-west", text: "Shore Fringe", position: { x: 47, y: 12 } },
-  { id: "map-1-mossy-glade-shore-label", subzoneId: "north-center", text: "Mossy Glade", position: { x: 57, y: 12 } },
-  { id: "map-1-shore-fringe-lower-label", subzoneId: "north-west", text: "Shore Fringe", position: { x: 26, y: 21 } },
-  { id: "map-1-lower-shore-shore-label", subzoneId: "south-west", text: "Lower Shore", position: { x: 26, y: 27 } },
+  { id: "map-1-top-left-label", subzoneId: "top-left", text: "Shore Fringe", position: { x: 26, y: 12 } },
+  { id: "map-1-top-center-label", subzoneId: "top-center", text: "Mossy Glade", position: { x: 79, y: 12 } },
+  { id: "map-1-top-right-label", subzoneId: "top-right", text: "Lower Shore", position: { x: 132, y: 12 } },
+  { id: "map-1-middle-left-label", subzoneId: "middle-left", text: "Shore Fringe", position: { x: 12, y: 44 } },
+  { id: "map-1-middle-center-label", subzoneId: "middle-center", text: "Mossy Glade", position: { x: 79, y: 44 } },
+  { id: "map-1-middle-right-label", subzoneId: "middle-right", text: "Lower Shore", position: { x: 132, y: 44 } },
+  { id: "map-1-bottom-left-label", subzoneId: "bottom-left", text: "Shore Fringe", position: { x: 26, y: 73 } },
+  { id: "map-1-bottom-center-label", subzoneId: "bottom-center", text: "Mossy Glade", position: { x: 79, y: 73 } },
+  { id: "map-1-bottom-right-label", subzoneId: "bottom-right", text: "Lower Shore", position: { x: 132, y: 73 } },
 ];
 
 const mapTwoSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
@@ -613,10 +733,8 @@ const mapFourSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
   { id: "map-4-ash-hollow-orc-label", subzoneId: "north-east", text: "Ash Hollow", position: { x: 132, y: 21 } },
 ];
 
-export const mapOneSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
-  mapOneSourceSubzoneNameLabels,
-  MAP_ONE_COMPACT_OFFSETS,
-);
+export const mapOneSubzoneNameLabels: ZoneSubzoneNameLabel[] =
+  mapOneSourceSubzoneNameLabels;
 
 export const mapTwoSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
   mapTwoSourceSubzoneNameLabels,
@@ -632,6 +750,45 @@ export const mapFourSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNa
   mapFourSourceSubzoneNameLabels,
   MAP_FOUR_COMPACT_OFFSETS,
 );
+
+const mapOneStressEnemyStartData: EnemyStartData[] = [
+  { id: enemyIds[0], position: { x: 10, y: 18 }, archetypeId: "slime", subzoneId: "top-left", encounterAreaId: "top-left-den" },
+  { id: enemyIds[1], position: { x: 20, y: 13 }, archetypeId: "slime", subzoneId: "top-left", encounterAreaId: "top-left-den" },
+  { id: enemyIds[2], position: { x: 28, y: 18 }, archetypeId: "slime", subzoneId: "top-left", encounterAreaId: "top-left-den" },
+  { id: enemyIds[3], position: { x: 39, y: 14 }, archetypeId: "slime", subzoneId: "top-left", encounterAreaId: "top-left-den" },
+  { id: enemyIds[4], position: { x: 63, y: 13 }, archetypeId: "cave_bat", subzoneId: "top-center", encounterAreaId: "top-center-den" },
+  { id: enemyIds[5], position: { x: 75, y: 18 }, archetypeId: "cave_bat", subzoneId: "top-center", encounterAreaId: "top-center-den" },
+  { id: enemyIds[6], position: { x: 84, y: 13 }, archetypeId: "cave_bat", subzoneId: "top-center", encounterAreaId: "top-center-den" },
+  { id: enemyIds[7], position: { x: 96, y: 17 }, archetypeId: "cave_bat", subzoneId: "top-center", encounterAreaId: "top-center-den" },
+  { id: enemyIds[8], position: { x: 116, y: 14 }, archetypeId: "forest_spider", subzoneId: "top-right", encounterAreaId: "top-right-den" },
+  { id: enemyIds[9], position: { x: 126, y: 18 }, archetypeId: "forest_spider", subzoneId: "top-right", encounterAreaId: "top-right-den" },
+  { id: enemyIds[10], position: { x: 137, y: 13 }, archetypeId: "forest_spider", subzoneId: "top-right", encounterAreaId: "top-right-den" },
+  { id: enemyIds[11], position: { x: 147, y: 17 }, archetypeId: "forest_spider", subzoneId: "top-right", encounterAreaId: "top-right-den" },
+  { id: enemyIds[12], position: { x: 11, y: 48 }, archetypeId: "slime", subzoneId: "middle-left", encounterAreaId: "middle-left-den" },
+  { id: enemyIds[13], position: { x: 20, y: 43 }, archetypeId: "slime", subzoneId: "middle-left", encounterAreaId: "middle-left-den" },
+  { id: enemyIds[14], position: { x: 30, y: 48 }, archetypeId: "slime", subzoneId: "middle-left", encounterAreaId: "middle-left-den" },
+  { id: enemyIds[15], position: { x: 42, y: 43 }, archetypeId: "slime", subzoneId: "middle-left", encounterAreaId: "middle-left-den" },
+  { id: enemyIds[16], position: { x: 63, y: 43 }, archetypeId: "cave_bat", subzoneId: "middle-center", encounterAreaId: "middle-center-den" },
+  { id: enemyIds[17], position: { x: 75, y: 48 }, archetypeId: "cave_bat", subzoneId: "middle-center", encounterAreaId: "middle-center-den" },
+  { id: enemyIds[18], position: { x: 84, y: 43 }, archetypeId: "cave_bat", subzoneId: "middle-center", encounterAreaId: "middle-center-den" },
+  { id: enemyIds[19], position: { x: 96, y: 48 }, archetypeId: "cave_bat", subzoneId: "middle-center", encounterAreaId: "middle-center-den" },
+  { id: enemyIds[20], position: { x: 116, y: 43 }, archetypeId: "forest_spider", subzoneId: "middle-right", encounterAreaId: "middle-right-den" },
+  { id: enemyIds[21], position: { x: 126, y: 48 }, archetypeId: "forest_spider", subzoneId: "middle-right", encounterAreaId: "middle-right-den" },
+  { id: enemyIds[22], position: { x: 137, y: 43 }, archetypeId: "forest_spider", subzoneId: "middle-right", encounterAreaId: "middle-right-den" },
+  { id: enemyIds[23], position: { x: 147, y: 48 }, archetypeId: "forest_spider", subzoneId: "middle-right", encounterAreaId: "middle-right-den" },
+  { id: enemyIds[24], position: { x: 11, y: 77 }, archetypeId: "slime", subzoneId: "bottom-left", encounterAreaId: "bottom-left-den" },
+  { id: enemyIds[25], position: { x: 20, y: 72 }, archetypeId: "slime", subzoneId: "bottom-left", encounterAreaId: "bottom-left-den" },
+  { id: enemyIds[26], position: { x: 30, y: 77 }, archetypeId: "slime", subzoneId: "bottom-left", encounterAreaId: "bottom-left-den" },
+  { id: enemyIds[27], position: { x: 42, y: 72 }, archetypeId: "slime", subzoneId: "bottom-left", encounterAreaId: "bottom-left-den" },
+  { id: enemyIds[28], position: { x: 63, y: 72 }, archetypeId: "cave_bat", subzoneId: "bottom-center", encounterAreaId: "bottom-center-den" },
+  { id: enemyIds[29], position: { x: 75, y: 77 }, archetypeId: "cave_bat", subzoneId: "bottom-center", encounterAreaId: "bottom-center-den" },
+  { id: enemyIds[30], position: { x: 84, y: 72 }, archetypeId: "cave_bat", subzoneId: "bottom-center", encounterAreaId: "bottom-center-den" },
+  { id: enemyIds[31], position: { x: 96, y: 77 }, archetypeId: "cave_bat", subzoneId: "bottom-center", encounterAreaId: "bottom-center-den" },
+  { id: enemyIds[32], position: { x: 116, y: 72 }, archetypeId: "forest_spider", subzoneId: "bottom-right", encounterAreaId: "bottom-right-den" },
+  { id: enemyIds[33], position: { x: 126, y: 77 }, archetypeId: "forest_spider", subzoneId: "bottom-right", encounterAreaId: "bottom-right-den" },
+  { id: enemyIds[34], position: { x: 137, y: 72 }, archetypeId: "forest_spider", subzoneId: "bottom-right", encounterAreaId: "bottom-right-den" },
+  { id: enemyIds[35], position: { x: 147, y: 77 }, archetypeId: "forest_spider", subzoneId: "bottom-right", encounterAreaId: "bottom-right-den" },
+];
 
 const mapOneProgressionEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[0], position: { x: 10, y: 9 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
@@ -678,7 +835,7 @@ const mapOneProgressionEnemyStartData: EnemyStartData[] = [
 
 export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapOneSubzones,
-  compactEnemyStartData(mapOneProgressionEnemyStartData, MAP_ONE_COMPACT_OFFSETS),
+  mapOneStressEnemyStartData,
 );
 
 export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(
@@ -806,22 +963,29 @@ const HUB_WALLS = dedupeWalls([
 ]);
 
 const MAP_ONE_WALLS = dedupeWalls([
-  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
-  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
-  ...createHorizontalWall(5, 18, 30, []),
-  ...createVerticalWall(24, 5, 11, []),
-  ...createHorizontalWall(15, 30, 42, []),
-  ...createVerticalWall(41, 15, 20, []),
-  ...createHorizontalWall(6, 60, 73, []),
-  ...createVerticalWall(73, 6, 12, []),
-  ...createHorizontalWall(14, 82, 96, []),
-  ...createVerticalWall(90, 14, 21, []),
-  ...createHorizontalWall(6, 114, 130, []),
-  ...createVerticalWall(130, 6, 13, []),
-  ...createHorizontalWall(17, 112, 124, []),
-  ...createVerticalWall(144, 11, 19, []),
-  ...createHorizontalWall(22, 134, 149, []),
+  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, MAP_ONE_ROWS),
+  ...createVerticalWall(52, 3, MAP_ONE_ROWS - 4, [[13, 17], [42, 47], [71, 76]]),
+  ...createVerticalWall(105, 3, MAP_ONE_ROWS - 4, [[13, 17], [42, 47], [71, 76]]),
+  ...createHorizontalWall(29, 3, WILDERNESS_MAP_COLUMNS - 4, [[24, 30], [77, 83], [130, 136]]),
+  ...createHorizontalWall(59, 3, WILDERNESS_MAP_COLUMNS - 4, [[24, 30], [77, 83], [130, 136]]),
+  ...createWallBlock(14, 24, 5, 7),
+  ...createWallBlock(36, 45, 21, 23),
+  ...createWallBlock(65, 74, 5, 7),
+  ...createWallBlock(88, 99, 20, 22),
+  ...createWallBlock(118, 128, 5, 7),
+  ...createWallBlock(142, 153, 20, 22),
+  ...createWallBlock(13, 22, 35, 37),
+  ...createWallBlock(35, 46, 52, 54),
+  ...createWallBlock(62, 73, 35, 37),
+  ...createWallBlock(88, 99, 52, 54),
+  ...createWallBlock(116, 127, 35, 37),
+  ...createWallBlock(142, 153, 52, 54),
+  ...createWallBlock(12, 23, 64, 66),
+  ...createWallBlock(34, 45, 80, 82),
+  ...createWallBlock(62, 73, 64, 66),
+  ...createWallBlock(88, 99, 80, 82),
+  ...createWallBlock(116, 127, 64, 66),
+  ...createWallBlock(140, 151, 80, 82),
 ]);
 
 const MAP_TWO_WALLS = dedupeWalls([
@@ -875,7 +1039,7 @@ export const debugMapDefinitions: Record<
     displayName: "First Wild Map",
     debugName: "map-1",
     columns: WILDERNESS_MAP_COLUMNS,
-    rows: WILDERNESS_MAP_ROWS,
+    rows: MAP_ONE_ROWS,
     walls: MAP_ONE_WALLS,
     healingFountains: [],
     subzones: mapOneSubzones,
@@ -1023,6 +1187,21 @@ function createVerticalWall(
     }
 
     walls.push({ x, y });
+  }
+
+  return walls;
+}
+
+function createWallBlock(
+  startX: number,
+  endX: number,
+  startY: number,
+  endY: number,
+) {
+  const walls = [];
+
+  for (let y = startY; y <= endY; y += 1) {
+    walls.push(...createHorizontalWall(y, startX, endX, []));
   }
 
   return walls;

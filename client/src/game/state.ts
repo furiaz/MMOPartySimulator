@@ -95,8 +95,11 @@ export type DebugOptions = {
   deepNavigationTelemetryEnabled?: boolean;
 };
 
+export type PoiSearchScope = "free_travel" | "zone_only" | "subzone_only";
+
 export type PoiPreferences = {
   stayInMap: boolean;
+  searchScope?: PoiSearchScope;
 };
 
 type MovementPath = {
@@ -392,11 +395,26 @@ export function setStayInMapEnabled(
   state: GameState,
   stayInMap: boolean,
 ): GameState {
+  return setPoiSearchScope(state, stayInMap ? "subzone_only" : "free_travel");
+}
+
+export function getPoiSearchScope(state: GameState): PoiSearchScope {
+  return (
+    state.poiPreferences.searchScope ??
+    (state.poiPreferences.stayInMap ? "subzone_only" : "free_travel")
+  );
+}
+
+export function setPoiSearchScope(
+  state: GameState,
+  searchScope: PoiSearchScope,
+): GameState {
   return {
     ...state,
     poiPreferences: {
       ...state.poiPreferences,
-      stayInMap,
+      searchScope,
+      stayInMap: searchScope === "subzone_only",
     },
   };
 }

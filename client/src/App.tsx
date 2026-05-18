@@ -50,6 +50,7 @@ import {
   QUEST_DEFINITIONS,
   addItemToInventoryState,
   getPartyLeader,
+  getPoiSearchScope,
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
   issueCompanionCommands,
@@ -65,7 +66,7 @@ import {
   setPartyLeader,
   setPartyMemberRole,
   setPartyOrder,
-  setStayInMapEnabled,
+  setPoiSearchScope,
   setWorldTravelTargetMapId,
   startGameLoop,
   startDebugTelemetryRecording,
@@ -82,6 +83,7 @@ import {
   type PartyMemberRole,
   type PrimaryStatId,
   type PoiConsideration,
+  type PoiSearchScope,
   type Position,
   type QuestId,
   type ResourceEntity,
@@ -98,6 +100,24 @@ const cameraSnapDistance = 0.35;
 const cameraDeadZoneWidthRatio = 0.34;
 const cameraDeadZoneHeightRatio = 0.3;
 const wildernessMapIds = new Set(["map-1", "map-2", "map-3", "map-4"]);
+const poiSearchScopeLabels: Record<PoiSearchScope, string> = {
+  free_travel: "Free Travel",
+  zone_only: "Zone Only",
+  subzone_only: "Subzone Only",
+};
+const poiSearchScopeCycle: PoiSearchScope[] = [
+  "free_travel",
+  "zone_only",
+  "subzone_only",
+];
+
+function getNextPoiSearchScope(scope: PoiSearchScope): PoiSearchScope {
+  const currentIndex = poiSearchScopeCycle.indexOf(scope);
+
+  return poiSearchScopeCycle[
+    (currentIndex + 1) % poiSearchScopeCycle.length
+  ] ?? "free_travel";
+}
 
 type EntityVisualMovement = {
   direction: SpriteDirection;
@@ -109,6 +129,36 @@ type MerchantPanel = "buy" | "sell";
 type ViewportSize = {
   width: number;
   height: number;
+};
+
+type PerformanceMemorySnapshot = {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+};
+
+type BrowserPerformance = Performance & {
+  memory?: PerformanceMemorySnapshot;
+};
+
+type PerformanceOverlayStats = {
+  fps: number;
+  frameMs: number;
+  slowFrames: number;
+  simFramesPerSecond: number;
+  entityCount: number;
+  companionCount: number;
+  enemyCount: number;
+  livingEnemyCount: number;
+  resourceCount: number;
+  activeResourceCount: number;
+  npcCount: number;
+  mapCells: number;
+  wallCount: number;
+  pathCount: number;
+  memoryUsedMb: number | null;
+  memoryTotalMb: number | null;
+  memoryLimitMb: number | null;
 };
 
 function isWildernessVisualMap(mapId: string | undefined): boolean {
@@ -173,6 +223,221 @@ function LeaderPoiPanel({
       )}
     </aside>
   );
+}
+
+function PerformanceOverlay({
+  currentMap,
+  gameState,
+}: {
+  currentMap: {
+    columns: number;
+    rows: number;
+    walls: Position[];
+  };
+  gameState: GameState;
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [stats, setStats] = useState<PerformanceOverlayStats>(() =>
+    getPerformanceOverlayStats(gameState, currentMap, {
+      fps: 0,
+      frameMs: 0,
+      slowFrames: 0,
+      simFramesPerSecond: 0,
+    }),
+  );
+  const latestGameStateRef = useRef(gameState);
+  const latestMapRef = useRef(currentMap);
+
+  useEffect(() => {
+    latestGameStateRef.current = gameState;
+    latestMapRef.current = currentMap;
+  }, [currentMap, gameState]);
+
+  useEffect(() => {
+    let animationFrameId = 0;
+    let previousFrameAt = performance.now();
+    let previousSampleAt = previousFrameAt;
+    let previousSimulationFrame =
+      latestGameStateRef.current.simulationFrame ??
+      latestGameStateRef.current.simulationTick ??
+      0;
+    let frameCount = 0;
+    let frameMsTotal = 0;
+    let slowFrames = 0;
+
+    function sampleFrame(now: number) {
+      const frameMs = now - previousFrameAt;
+      previousFrameAt = now;
+      frameCount += 1;
+      frameMsTotal += frameMs;
+
+      if (frameMs > 33) {
+        slowFrames += 1;
+      }
+
+      if (now - previousSampleAt >= 500) {
+        const elapsedSeconds = (now - previousSampleAt) / 1000;
+        const currentState = latestGameStateRef.current;
+        const currentSimulationFrame =
+          currentState.simulationFrame ?? currentState.simulationTick ?? 0;
+        const simulationFrameDelta =
+          currentSimulationFrame - previousSimulationFrame;
+        const timingStats = {
+          fps: frameCount / elapsedSeconds,
+          frameMs: frameMsTotal / frameCount,
+          slowFrames,
+          simFramesPerSecond: simulationFrameDelta / elapsedSeconds,
+        };
+
+        setStats(
+          getPerformanceOverlayStats(
+            currentState,
+            latestMapRef.current,
+            timingStats,
+          ),
+        );
+
+        previousSampleAt = now;
+        previousSimulationFrame = currentSimulationFrame;
+        frameCount = 0;
+        frameMsTotal = 0;
+        slowFrames = 0;
+      }
+
+      animationFrameId = window.requestAnimationFrame(sampleFrame);
+    }
+
+    animationFrameId = window.requestAnimationFrame(sampleFrame);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return (
+    <aside
+      className={`performance-overlay${isCollapsed ? " collapsed" : ""}`}
+      aria-label="Performance overlay"
+    >
+      <div className="performance-overlay-header">
+        <h2>Performance</h2>
+        <button onClick={() => setIsCollapsed(!isCollapsed)} type="button">
+          {isCollapsed ? "Show" : "Hide"}
+        </button>
+      </div>
+      {isCollapsed ? null : (
+        <dl className="performance-overlay-stats">
+          <PerformanceStat label="FPS" value={formatStat(stats.fps)} />
+          <PerformanceStat label="Frame" value={`${formatStat(stats.frameMs)}ms`} />
+          <PerformanceStat label="Slow" value={stats.slowFrames.toString()} />
+          <PerformanceStat label="Sim" value={`${formatStat(stats.simFramesPerSecond)}/s`} />
+          <PerformanceStat label="Entities" value={stats.entityCount.toString()} />
+          <PerformanceStat
+            label="Party"
+            value={stats.companionCount.toString()}
+          />
+          <PerformanceStat
+            label="Enemies"
+            value={`${stats.livingEnemyCount}/${stats.enemyCount}`}
+          />
+          <PerformanceStat
+            label="Resources"
+            value={`${stats.activeResourceCount}/${stats.resourceCount}`}
+          />
+          <PerformanceStat label="NPCs" value={stats.npcCount.toString()} />
+          <PerformanceStat
+            label="Map"
+            value={`${currentMap.columns}x${currentMap.rows}`}
+          />
+          <PerformanceStat label="Cells" value={stats.mapCells.toLocaleString()} />
+          <PerformanceStat label="Walls" value={stats.wallCount.toLocaleString()} />
+          <PerformanceStat label="Paths" value={stats.pathCount.toLocaleString()} />
+          <PerformanceStat
+            label="Heap"
+            value={
+              stats.memoryUsedMb === null
+                ? "n/a"
+                : `${formatStat(stats.memoryUsedMb)} MB`
+            }
+          />
+        </dl>
+      )}
+    </aside>
+  );
+}
+
+function PerformanceStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="performance-overlay-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function getPerformanceOverlayStats(
+  gameState: GameState,
+  currentMap: {
+    columns: number;
+    rows: number;
+    walls: Position[];
+  },
+  timingStats: Pick<
+    PerformanceOverlayStats,
+    "fps" | "frameMs" | "slowFrames" | "simFramesPerSecond"
+  >,
+): PerformanceOverlayStats {
+  const entities = Object.values(gameState.entities);
+  const companions = entities.filter((entity) => entity.kind === "companion");
+  const enemies = entities.filter((entity) => entity.kind === "enemy");
+  const resources = entities.filter((entity) => entity.kind === "resource");
+  const npcs = entities.filter((entity) => entity.kind === "npc");
+  const memorySnapshot = getPerformanceMemorySnapshot();
+
+  return {
+    ...timingStats,
+    entityCount: entities.length,
+    companionCount: companions.length,
+    enemyCount: enemies.length,
+    livingEnemyCount: enemies.filter((enemy) => enemy.state !== "dead").length,
+    resourceCount: resources.length,
+    activeResourceCount: resources.filter(
+      (resource) => !("isDepleted" in resource) || !resource.isDepleted,
+    ).length,
+    npcCount: npcs.length,
+    mapCells: currentMap.columns * currentMap.rows,
+    wallCount: currentMap.walls.length,
+    pathCount: Object.keys(gameState.movementPathsByEntityId ?? {}).length,
+    memoryUsedMb: memorySnapshot
+      ? bytesToMegabytes(memorySnapshot.usedJSHeapSize)
+      : null,
+    memoryTotalMb: memorySnapshot
+      ? bytesToMegabytes(memorySnapshot.totalJSHeapSize)
+      : null,
+    memoryLimitMb: memorySnapshot
+      ? bytesToMegabytes(memorySnapshot.jsHeapSizeLimit)
+      : null,
+  };
+}
+
+function getPerformanceMemorySnapshot(): PerformanceMemorySnapshot | null {
+  return (performance as BrowserPerformance).memory ?? null;
+}
+
+function bytesToMegabytes(bytes: number): number {
+  return bytes / 1024 / 1024;
+}
+
+function formatStat(value: number): string {
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: value < 10 ? 1 : 0,
+  });
 }
 
 function isSamePosition(first: Position, second: Position): boolean {
@@ -414,6 +679,7 @@ function createInitialState(): GameState {
     worldTravelTargetMapId: null,
     poiPreferences: {
       stayInMap: false,
+      searchScope: "free_travel",
     },
     simulationTick: 0,
     simulationFrame: 0,
@@ -526,6 +792,7 @@ function App() {
     .map((id) => gameState.entities[id] as ResourceEntity | undefined)
     .filter((resource): resource is ResourceEntity => Boolean(resource));
   const displayQuest = getDisplayQuest(gameState.quests);
+  const poiSearchScope = getPoiSearchScope(gameState);
   const activeQuestIds = getQuestLogQuests(gameState.quests).map(
     (quest) => quest.questId,
   );
@@ -650,9 +917,12 @@ function App() {
     );
   }
 
-  function toggleStayInMap() {
+  function cyclePoiSearchScope() {
     setGameState((state) =>
-      setStayInMapEnabled(state, !state.poiPreferences.stayInMap),
+      setPoiSearchScope(
+        state,
+        getNextPoiSearchScope(getPoiSearchScope(state)),
+      ),
     );
   }
 
@@ -1194,15 +1464,15 @@ function App() {
               <strong>{currentMap.displayName}</strong>
               <button
                 className={`stay-in-map-toggle${
-                  gameState.poiPreferences.stayInMap ? " active" : ""
+                  poiSearchScope !== "free_travel" ? " active" : ""
                 }`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  toggleStayInMap();
+                  cyclePoiSearchScope();
                 }}
                 type="button"
               >
-                Stay in Subzone {gameState.poiPreferences.stayInMap ? "On" : "Off"}
+                Scope: {poiSearchScopeLabels[poiSearchScope]}
               </button>
             </div>
             <span>debug: {currentMap.debugName}</span>
@@ -1229,6 +1499,7 @@ function App() {
               Super Exp {gameState.debugOptions?.superExpEnabled ? "On" : "Off"}
             </button>
           </div>
+          <PerformanceOverlay currentMap={currentMap} gameState={gameState} />
           <LeaderPoiPanel
             autoModeEnabled={gameState.autoModeEnabled}
             consideredTargets={gameState.lastPoiDecision?.consideredTargets}

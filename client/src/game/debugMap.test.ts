@@ -4,6 +4,7 @@ import {
   DEBUG_MAP_ROWS,
   HUB_MAP_ID,
   MAP_FOUR_ID,
+  MAP_ONE_ROWS,
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_TWO_ID,
@@ -79,7 +80,7 @@ describe("debug maps", () => {
     });
     expect(createDebugMap(MAP_ONE_ID)).toMatchObject({
       columns: WILDERNESS_MAP_COLUMNS,
-      rows: WILDERNESS_MAP_ROWS,
+      rows: MAP_ONE_ROWS,
     });
     expect(createDebugMap(MAP_TWO_ID)).toMatchObject({
       columns: WILDERNESS_MAP_COLUMNS,
@@ -97,9 +98,14 @@ describe("debug maps", () => {
 
   it("keeps wilderness enemies and resources on reachable open floor", () => {
     for (const wildernessMap of wildernessMaps) {
-      expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
-      expect(wildernessMap.enemyPositions.length).toBeLessThanOrEqual(22);
-      expect(wildernessMap.resources).toHaveLength(8);
+      if (wildernessMap.mapId === MAP_ONE_ID) {
+        expect(wildernessMap.enemyPositions).toHaveLength(36);
+        expect(wildernessMap.resources).toHaveLength(18);
+      } else {
+        expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
+        expect(wildernessMap.enemyPositions.length).toBeLessThanOrEqual(22);
+        expect(wildernessMap.resources).toHaveLength(8);
+      }
       assertMapPlacements(wildernessMap.mapId, [
         ...wildernessMap.enemyPositions,
         ...wildernessMap.resources.map((resource) => resource.position),
@@ -131,9 +137,11 @@ describe("debug maps", () => {
     }
   });
 
-  it("defines three authored subzones for each wilderness map", () => {
+  it("defines the authored subzone layout for each wilderness map", () => {
     for (const wildernessMap of wildernessMaps) {
-      expect(wildernessMap.subzones).toHaveLength(3);
+      expect(wildernessMap.subzones).toHaveLength(
+        wildernessMap.mapId === MAP_ONE_ID ? 9 : 3,
+      );
       expect(createDebugMap(wildernessMap.mapId).subzones).toBe(wildernessMap.subzones);
     }
     expect(createDebugMap(MAP_ONE_ID).subzones).toBe(mapOneSubzones);
@@ -193,30 +201,55 @@ describe("debug maps", () => {
     }
   });
 
-  it("starts map one in the weakest subzone and ramps toward harder areas", () => {
+  it("lays out map one as a 3x3 stress-test sheet with column-based enemies", () => {
     const mapOneDefinition = debugMapDefinitions[MAP_ONE_ID];
     const hubEntry = mapOneDefinition.teleports.find(
       (teleport) => teleport.targetMapId === HUB_MAP_ID,
     );
-    const shoreFringe = getSubzone(mapOneSubzones, "north-west");
+    const forwardEntry = mapOneDefinition.teleports.find(
+      (teleport) => teleport.targetMapId === MAP_TWO_ID,
+    );
+    const middleLeft = getSubzone(mapOneSubzones, "middle-left");
+    const middleRight = getSubzone(mapOneSubzones, "middle-right");
 
     expect(hubEntry).toBeDefined();
-    expect(hubEntry && isInsideSubzone(shoreFringe, hubEntry.position)).toBe(true);
+    expect(forwardEntry).toBeDefined();
+    expect(hubEntry && isInsideSubzone(middleLeft, hubEntry.position)).toBe(true);
+    expect(forwardEntry && isInsideSubzone(middleRight, forwardEntry.position)).toBe(true);
     for (const arrivalPosition of debugMapDefinitions[HUB_MAP_ID].teleports[0].arrivalPositions) {
-      expect(isInsideSubzone(shoreFringe, arrivalPosition)).toBe(true);
+      expect(isInsideSubzone(middleLeft, arrivalPosition)).toBe(true);
     }
-    expect(shoreFringe.enemyArchetypeIds).toEqual(["slime"]);
-    expect(
-      mapOneEnemyStartData
-        .filter((enemy) => enemy.subzoneId === shoreFringe.id)
-        .map((enemy) => enemy.archetypeId),
-    ).toEqual(["slime", "slime", "slime", "slime", "slime", "slime"]);
-    expect(getSubzone(mapOneSubzones, "north-center").levelRange.min).toBeGreaterThanOrEqual(
-      shoreFringe.levelRange.max,
-    );
-    expect(getSubzone(mapOneSubzones, "south-west").levelRange.min).toBeGreaterThan(
-      shoreFringe.levelRange.max,
-    );
+    for (const arrivalPosition of debugMapDefinitions[MAP_TWO_ID].teleports[0].arrivalPositions) {
+      expect(isInsideSubzone(middleRight, arrivalPosition)).toBe(true);
+    }
+
+    const expectedColumnArchetypes = new Map([
+      ["left", "slime"],
+      ["center", "cave_bat"],
+      ["right", "forest_spider"],
+    ]);
+
+    for (const subzone of mapOneSubzones) {
+      const column = subzone.id.endsWith("left")
+        ? "left"
+        : subzone.id.endsWith("center")
+          ? "center"
+          : "right";
+      const expectedArchetype = expectedColumnArchetypes.get(column);
+
+      expect(subzone.enemyArchetypeIds).toEqual([expectedArchetype]);
+      expect(
+        mapOneEnemyStartData
+          .filter((enemy) => enemy.subzoneId === subzone.id)
+          .map((enemy) => enemy.archetypeId),
+      ).toEqual([
+        expectedArchetype,
+        expectedArchetype,
+        expectedArchetype,
+        expectedArchetype,
+      ]);
+    }
+
     expect(getSubzone(mapTwoSubzones, "south-center").levelRange.min).toBeGreaterThanOrEqual(3);
     expect(getSubzone(mapTwoSubzones, "south-east").levelRange.min).toBeGreaterThanOrEqual(4);
     expect(getSubzone(mapTwoSubzones, "north-east").levelRange.min).toBeGreaterThanOrEqual(5);
@@ -256,7 +289,7 @@ function assertSubzoneContentDensity(
 ) {
   for (const subzone of subzones) {
     const enemyCount = enemies.filter((enemy) => enemy.subzoneId === subzone.id).length;
-    expect(enemyCount).toBeGreaterThanOrEqual(6);
+    expect(enemyCount).toBeGreaterThanOrEqual(4);
     expect(enemyCount).toBeLessThanOrEqual(10);
     expect(subzone.resourceLocations.length).toBeGreaterThanOrEqual(2);
     expect(subzone.resourceLocations.length).toBeLessThanOrEqual(3);
@@ -373,10 +406,12 @@ function assertEnemyStartData(
     expect(subzone).toBeDefined();
     expect(encounterArea).toBeDefined();
     expect(subzone && isInsideSubzone(subzone, enemy.position)).toBe(true);
-    expect(
+    if (
       encounterArea &&
-        getDistance(enemy.position, encounterArea.center) <= encounterArea.radius,
-    ).toBe(true);
+      getDistance(enemy.position, encounterArea.center) > encounterArea.radius
+    ) {
+      throw new Error(`${enemy.id} is outside ${enemy.encounterAreaId}`);
+    }
     assertOpenReachablePosition(map, enemy.position);
     if (isWallAdjacent(map, enemy.position)) {
       throw new Error(`${enemy.id} is wall-adjacent`);

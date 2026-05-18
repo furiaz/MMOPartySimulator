@@ -145,6 +145,7 @@ export {
   clearExpiredCombatFeedback,
   clearExpiredSkillRuntimeState,
   getEntityById,
+  getPoiSearchScope,
   setAutoModeEnabled,
   setCompanionDefendPosition,
   setCompanionRole,
@@ -153,9 +154,11 @@ export {
   setPartyMemberClass,
   setPartyMemberRole,
   setPartyOrder,
+  setPoiSearchScope,
   setStayInMapEnabled,
   setWorldTravelTargetMapId,
   updateEntity,
+  type PoiSearchScope,
 } from "./state";
 export {
   ITEM_DEFINITIONS,

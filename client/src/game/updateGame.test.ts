@@ -12,7 +12,13 @@ import {
 import { updateExplorationSystem } from "./explorationSystem";
 import { addItemToInventoryState } from "./inventory";
 import { createInitialQuestStates } from "./questSystem";
-import { addEntity, type GameState } from "./state";
+import {
+  addEntity,
+  getPoiSearchScope,
+  setPoiSearchScope,
+  setStayInMapEnabled,
+  type GameState,
+} from "./state";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";
 import type { GameEntity, GameMap, Position, ZoneSubzone } from "./types";
@@ -98,7 +104,7 @@ describe("game update intent priority", () => {
       createMapOneState([leader, gatherer, wood, enemy], {
         partyLeaderId: leader.id,
         map: createOpenTestMap(),
-        simulationTimeMs: 2200,
+        simulationTimeMs: 4200,
         leaderIntent: {
           type: "gather",
           targetId: wood.id,
@@ -225,7 +231,7 @@ describe("game update intent priority", () => {
       createMapOneState([leader, gatherer, currentWood], {
         partyLeaderId: leader.id,
         map: createOpenTestMap(),
-        simulationTimeMs: 2200,
+        simulationTimeMs: 4200,
         leaderIntent: {
           type: "gather",
           targetId: currentWood.id,
@@ -268,7 +274,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("allows quest resource POI switching after the commitment window", () => {
+  it("preserves a valid quest resource POI after the commitment window", () => {
     const leader = createLeader({ x: 19, y: 4 });
     const gatherer = {
       ...createCompanion("gatherer", { x: 18, y: 4 }, leader.id, "gatherer"),
@@ -320,12 +326,13 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.localPoiTarget).toMatchObject({
-      targetEntityId: closerWood.id,
+      targetEntityId: distantWood.id,
       reason: "active quest gather wood",
     });
+    expect(nextState.localPoiTarget?.targetEntityId).not.toBe(closerWood.id);
     expect(nextState.leaderIntent).toMatchObject({
       type: "gather",
-      targetId: closerWood.id,
+      targetId: distantWood.id,
     });
   });
 
@@ -1143,6 +1150,36 @@ describe("game update intent priority", () => {
     expect(nextState.lastPoiDecision?.evaluatedAtMs).toBe(1000);
   });
 
+  it("throttles whole-map fallback when no progressive tier finds a target", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const farEnemy = createEnemy("far-whole-map-enemy", { x: 150, y: 2 });
+    const recentNoTargetState = createMapOneState([leader, farEnemy], {
+      partyLeaderId: leader.id,
+      map: createWideOpenTestMap(),
+      simulationTimeMs: 1200,
+      lastPoiDecision: {
+        evaluatedAtMs: 1000,
+        skippedReasons: {},
+      },
+      quests: createQuestStates(),
+    });
+
+    const throttledState = updateGame(recentNoTargetState);
+
+    expect(throttledState.localPoiTarget).toBeNull();
+
+    const nextAllowedState = updateGame({
+      ...recentNoTargetState,
+      simulationTimeMs: 5100,
+    });
+
+    expect(nextAllowedState.localPoiTarget?.targetEntityId).toBe(farEnemy.id);
+    expect(nextAllowedState.lastPoiDecision?.consideredTargets?.[0]).toMatchObject({
+      poiId: farEnemy.id,
+      pathDistance: 148,
+    });
+  });
+
   it("switches from a resource POI to a much better enemy fallback", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const resource = createResource("fallback-resource", { x: 12, y: 2 });
@@ -1818,7 +1855,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("uses straight-line search range for gatherer resource acquisition even when the path is longer", () => {
+  it("uses path-distance search range for gatherer resource acquisition", () => {
     const leader = createLeader({ x: 8, y: 2 });
     const gatherer = {
       ...createCompanion("gatherer", { x: 8, y: 3 }, leader.id, "gatherer"),
@@ -1842,12 +1879,12 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.entities[gatherer.id]).toMatchObject({
-      state: "gather",
-      currentTargetId: resource.id,
+      state: "follow",
+      currentTargetId: leader.id,
     });
   });
 
-  it("uses straight-line search range for same-subzone resources even when the path is longer", () => {
+  it("uses path-distance search range for same-subzone resources", () => {
     const leader = createLeader({ x: 8, y: 2 });
     const gatherer = {
       ...createCompanion("gatherer", { x: 8, y: 3 }, leader.id, "gatherer"),
@@ -1874,8 +1911,8 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.entities[gatherer.id]).toMatchObject({
-      state: "gather",
-      currentTargetId: resource.id,
+      state: "follow",
+      currentTargetId: leader.id,
     });
   });
 
@@ -2221,6 +2258,61 @@ describe("game update intent priority", () => {
 
     expect(nextState.quests.clear_the_shore.status).toBe("completed");
     expect(nextState.quests.gather_expedition_supplies.status).toBe("available");
+  });
+
+  it("maps legacy Stay in Subzone preferences to the new POI search scope", () => {
+    const state = createTestGameState();
+    const subzoneState = setStayInMapEnabled(state, true);
+    const freeTravelState = setStayInMapEnabled(subzoneState, false);
+    const zoneOnlyState = setPoiSearchScope(freeTravelState, "zone_only");
+
+    expect(getPoiSearchScope(subzoneState)).toBe("subzone_only");
+    expect(subzoneState.poiPreferences.stayInMap).toBe(true);
+    expect(getPoiSearchScope(freeTravelState)).toBe("free_travel");
+    expect(freeTravelState.poiPreferences.stayInMap).toBe(false);
+    expect(getPoiSearchScope(zoneOnlyState)).toBe("zone_only");
+    expect(zoneOnlyState.poiPreferences.stayInMap).toBe(false);
+  });
+
+  it("Free Travel routes cross-map quest delivery through teleports", () => {
+    const leader = createLeader({ x: 10, y: 12 });
+
+    const nextState = updateGame(
+      createMapOneState([leader], {
+        partyLeaderId: leader.id,
+        poiPreferences: {
+          stayInMap: false,
+          searchScope: "free_travel",
+        },
+        quests: createQuestStates({
+          clear_the_shore: "ready_to_turn_in",
+        }),
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).toBe("map-1-to-hub");
+    expect(nextState.localPoiTarget?.reason).toBe("route toward hub");
+  });
+
+  it("Zone Only blocks autonomous cross-map quest routing and chooses a local fallback", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const localEnemy = createEnemy("zone-local-enemy", { x: 4, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, localEnemy], {
+        partyLeaderId: leader.id,
+        poiPreferences: {
+          stayInMap: false,
+          searchScope: "zone_only",
+        },
+        quests: createQuestStates({
+          clear_the_shore: "ready_to_turn_in",
+        }),
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.category).toBe("combat");
+    expect(nextState.leaderIntent?.targetId).toBe(localEnemy.id);
   });
 
   it("Stay in Subzone blocks cross-map quest delivery and chooses a local fallback", () => {
@@ -2623,6 +2715,15 @@ function createOpenTestMap(): GameMap {
     walls: [],
     teleports: [],
     healingFountains: [],
+  };
+}
+
+function createWideOpenTestMap(): GameMap {
+  return {
+    ...createOpenTestMap(),
+    displayName: "Wide Open Test Map",
+    debugName: "wide-open-test-map",
+    columns: 200,
   };
 }
 

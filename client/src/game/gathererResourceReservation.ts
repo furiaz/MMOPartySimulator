@@ -2,7 +2,7 @@ import { getNavigationPositionKey } from "./navigation";
 import { getPartyLeader, getPartyMembers, type PartyMember } from "./partySystem";
 import { getEuclideanDistance, getGridDistance } from "./positionUtils";
 import { ROLE_TUNING } from "./roleProfiles";
-import { getEntityById, type GameState } from "./state";
+import { getEntityById, getPoiSearchScope, type GameState } from "./state";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
 import { isResourceTargetInRange } from "./targetSelection";
 import type { Position, ResourceEntity, ZoneSubzone } from "./types";
@@ -276,7 +276,7 @@ function isResourceReachableForGatherer(
   context?: ResourceWorkContext,
 ): boolean {
   const searchOrigin = getGathererWorkOrigin(gatherer);
-  const maxDistance = getReachableSearchLimit(state);
+  const maxDistance = GATHERER_RESOURCE_SEARCH_PATH_DISTANCE;
   const cacheKey = getResourceReachabilityCacheKey(
     state,
     gatherer,
@@ -338,7 +338,7 @@ function isPositionAllowedForGatherer(
   }
 
   if (
-    state.poiPreferences?.stayInMap &&
+    getPoiSearchScope(state) === "subzone_only" &&
     !isPositionInLeaderSubzone(state, position, leaderSubzone)
   ) {
     return false;
@@ -401,10 +401,4 @@ function getBlockingInputsCacheKey(state: GameState): string {
       .sort()
       .join(","),
   ].join("#");
-}
-
-function getReachableSearchLimit(state: GameState): number {
-  return state.map
-    ? state.map.columns * state.map.rows
-    : Number.POSITIVE_INFINITY;
 }
