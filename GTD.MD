@@ -532,7 +532,7 @@ type SkillVisualType =
   | "heal";
 ```
 
-Current skill runtime state includes marks, self buffs, binds, shield blocks, cooldowns, and visual events.
+Current skill runtime state includes marks, self buffs, gather buffs, binds, shield blocks, cooldowns, and visual events.
 
 Do not expand this into a full ability framework unless explicitly requested.
 
@@ -785,6 +785,7 @@ Current systems include:
 - POI System
 - POI Resume System
 - Healing Fountain System
+- Health System
 - Resurrection System
 - Role System
 - Skill System
@@ -1017,7 +1018,7 @@ Current attack behavior:
 - enemies may use archetype or entity-specific attack ranges
 - enemies may use entity-specific attack cooldowns
 - attackers can take a small final positioning step when just outside range
-- damage is applied directly
+- damage is resolved through `combatResolver.ts` using derived combat stats, mitigation, evasion, block, critical hits, and prototype skill damage modifiers
 - prototype skill damage modifiers can increase damage
 - shield blocks can block incoming enemy attacks
 - defeated targets enter dead state
@@ -1029,12 +1030,12 @@ Current attack behavior:
 - enemy defeats can trigger prototype drop rolls
 
 
-Current basic attack constants:
+Current basic attack constants and helpers:
 
-- `ATTACK_RANGE = 1`
-- `ATTACK_DAMAGE = 1`
+- `DEFAULT_COMPANION_ATTACK_RANGE = 1`
 - `ATTACK_COOLDOWN_MS = 1000`
 - `TARGET_SWITCH_DISTANCE = 6`
+- enemy attack range may come from enemy entity data, enemy archetype data, or the default enemy attack range
 
 Combat movement order uses role priority for party members.
 
@@ -1486,6 +1487,11 @@ Current prototype equipment stat modifiers may include:
 - evasion
 - magicPower
 - healingPower
+- magicDefense
+- accuracy
+- criticalChance
+- criticalDamage
+- healthRegen
 
 Short Bow and Claw Gauntlets currently occupy both hands as prototype exceptions.
 
@@ -1555,6 +1561,7 @@ Current wilderness maps are authored with three prototype subzones each.
 Subzones are used by current map organization, floor texture selection, Stay in Subzone behavior, encounter area placement, resource location placement, and UI-facing subzone labels.
 
 Subzones are prototype map-organization data. They are not final zones, final region content, persistent zone state, or the production world model.
+
 ---
 
 ## Teleport System
@@ -1688,13 +1695,14 @@ Current public asset path root:
 
 - `client/public/Asserts/`
 
-Current generated asset groups include:
+Current generated asset groups referenced by UI include:
 
 - `Asserts/Generated/now-pack`
 - `Asserts/Generated/map-wilderness`
 - `Asserts/Generated/map-wilderness/128`
 - `Asserts/Generated/hub-floors`
 - `Asserts/Generated/hub-floors/New/128`
+- `Asserts/Generated/beginner-skill-effects-50/sprites`
 
 Current sprite asset groups include:
 
@@ -1890,8 +1898,8 @@ Current intended Party Management sections and controls:
 - leadership switch action for living eligible companions
 - Role Select
 - Party Order
-- Formation placeholder
-- Behavior Settings placeholder
+- Formation placeholder for UI only; automatic formation behavior lives in `partyFormationSystem.ts`
+- Behavior Settings placeholder for UI only
 
 
 Role Select must use the existing `PartyMemberRole` values:

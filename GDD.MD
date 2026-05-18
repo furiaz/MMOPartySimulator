@@ -277,10 +277,25 @@ The leader moves toward the current intent:
 - exploration point
 - direct move target
 - prototype map transition point
+- prototype World Travel route step
 
-Other party members follow the leader unless their role or direct command gives them another task.
+Other party members follow the leader unless their role, current task, resurrection channel, or direct command gives them another task.
 
-The party does not use a strict grid formation.
+The party does not use a player-authored grid formation.
+
+Current prototype movement uses a lightweight automatic party formation and cohesion layer.
+
+Current prototype party formation behavior:
+
+- tracks whether the party is idle, traveling, or in combat
+- assigns shared travel or combat intent from the leader's current target or POI target
+- moves the leader toward the current POI or target when cohesion allows it
+- moves followers toward the leader or soft follow positions
+- allows party members to pass through each other in specific party movement cases
+- may assign all autonomous party members to gather when the leader intent is a shared gather target
+- assigns combat targets to autonomous party members when combat begins
+- clears formation state when no valid target or travel point remains
+- records formation changes in debug telemetry
 
 Party members should:
 
@@ -295,6 +310,8 @@ Gatherers are allowed to temporarily leave the group while gathering.
 
 Direct-commanded party members are not forced back into group movement by autonomous behavior.
 
+This is an automatic prototype movement aid, not a final formation editor, tactical formation system, or player-authored positioning system.
+
 ---
 
 ## Party Cohesion
@@ -304,14 +321,18 @@ Party cohesion is based on simple distance from the leader.
 During travel:
 
 - required party members should remain close enough to the leader
-- if party members fall too far behind, the leader may wait or slow progression
+- if party members fall moderately behind, the leader may slow down
+- if party members fall too far behind, the leader may wait
+- followers may briefly catch up faster when they are too far from the leader
 - movement resumes naturally once the group catches up
 
-Required party members include alive/non-incapacitated Defenders, Fighters, and Supports.
+Required party members include alive/non-incapacitated Defenders, Fighters, Supports, and non-busy party members.
 
-Gatherers are required for cohesion only when they are not actively gathering.
+Gatherers are required for cohesion only when they are not actively gathering and are close enough to be rejoining the party.
 
-Direct-commanded members are excluded from autonomous cohesion behavior.
+Direct-commanded members and resurrection-channeling members are excluded from autonomous cohesion behavior.
+
+Current prototype cohesion distances are implementation tuning values and should not be treated as final balance.
 
 ---
 
@@ -516,16 +537,30 @@ Enemy drops currently use lightweight prototype drop tables.
 
 Current enemy drop behavior:
 
-- defeated enemies may roll junk drops by enemy family and loot tier
+- defeated enemies may roll drops by enemy family and loot tier
 - loot tier is currently derived from enemy level
 - Tier 1 currently covers enemies below level 10
 - Tier 2 currently covers enemies level 10 and above
-- current family drop tables may exist for Slime, Bat, Spider, Goblin, Imp, Wolf, Crawler, Mossling, Wisp, and Orc families
 - family/tier drops route prototype junk items into shared inventory
-- Goblin Shaman may also roll a low-chance archetype-specific Holy Lantern equipment drop
+- Goblin Shaman may also roll a low-chance archetype-specific Holy Lantern equipment drop at Tier 2
 - drop results use short-lived visual feedback before being routed into shared inventory
 - drops do not create persistent ground loot
 - inventory overflow may partially or fully reject dropped items
+
+Current prototype drop chances:
+
+- Slime Tier 1: Slime Gel 70%, Slime Core 12%
+- Bat Tier 1: Bat Wing 65%, Bat Ear 10%
+- Spider Tier 1: Spider Silk 65%, Spider Fang 10%
+- Goblin Tier 1: Goblin Ear 60%, Goblin Tooth 9%
+- Goblin Tier 2: Goblin Ear 60%, Goblin Tooth 9%
+- Imp Tier 1: Imp Horn Chip 60%, Imp Tail 8%
+- Wolf Tier 1: Wolf Pelt 60%, Wolf Fang 8%
+- Crawler Tier 1: Crawler Pebble 55%, Crawler Plate 7%
+- Mossling Tier 1: Moss Tuft 55%, Mossling Cap 7%
+- Wisp Tier 2: Wisp Ash 55%, Wisp Ember 7%
+- Orc Tier 2: Orc Hide 55%, Orc Tusk 7%
+- Goblin Shaman Tier 2 archetype drop: Holy Lantern 2%
 
 Current prototype gathered materials:
 
@@ -616,7 +651,7 @@ Equipment is gameplay-facing, not sprite-facing.
 Equipped items:
 
 - affect prototype equipment data
-- may expose simple prototype stat modifiers such as attack, defense, max health, block, evasion, magic power, or healing power
+- may expose simple prototype stat modifiers such as attack, defense, max health, block, evasion, magic power, healing power, magic defense, accuracy, critical chance, critical damage, or health regeneration
 - may be displayed in UI summaries
 - do not imply a complete stat scaling system
 - do not visually change character sprites
@@ -660,11 +695,24 @@ Current shared prototype armor and accessory examples include:
 - Travel Boots
 - Plain Charm
 
+Current prototype equipment rewards and definitions may also include:
+
+- Worn Cap
+- Worn Tunic
+- Worn Pants
+- Worn Gloves
+- Worn Boots
+- Reinforced Helm
+- Reinforced Armor
+- Reinforced Legguards
+- Reinforced Gloves
+- Reinforced Boots
+
 Current archetype-specific prototype equipment drops may include:
 
 - Holy Lantern from Goblin Shaman
 
-Older prototype armor items may still exist as item definitions, but they should not be treated as current enemy drop behavior unless a drop table explicitly uses them again.
+Older prototype armor items may exist as item definitions or quest rewards, but they should not be treated as current enemy drop behavior unless a drop table explicitly uses them.
 
 
 
@@ -813,7 +861,7 @@ Role changes affect role priority behavior. Leader identity remains separate fro
 
 Party Order may support ordering companions for party behavior and display.
 
-Formation and Behavior Settings may appear as placeholders only until those systems are explicitly implemented.
+Formation and Behavior Settings may appear as UI placeholders only. The current simulation already has lightweight automatic party formation behavior, but there is no player-facing formation editor or behavior-settings system yet.
 
 Party Management should not own companion-specific Stats, Equipment, Skills, or Skill Preferences unless explicitly redesigned later.
 
@@ -897,9 +945,22 @@ Talk-to-POI and return-to-POI objective types are lightweight type support and s
 Current prototype quests:
 
 - Clear the Shore
+  - Objective: defeat 5 enemies on First Wild Map
+  - Rewards: 25 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Worn Cap
+  - Unlocks: Gather Expedition Supplies and Scout the Northern Road
+
 - Gather Expedition Supplies
+  - Objective: gather 1 Wood, 1 Ore, and 1 Herb on First Wild Map
+  - Rewards: 20 Crowns, 6 character XP, 3 Field Herb
+
 - Scout the Northern Road
+  - Objective: reach Second Wild Map
+  - Rewards: 30 Crowns, 10 character XP, 1 Travel Boots
+
 - Threat Beyond the Pass
+  - Requirements: Gather Expedition Supplies completed and Scout the Northern Road completed
+  - Objective: defeat 5 enemies on Second Wild Map
+  - Rewards: 75 Crowns, 20 character XP, 2 Tier 2 Orc Tusk, 1 Reinforced Armor
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches the interaction range.
 
@@ -939,15 +1000,17 @@ POI selection should prefer progression-relevant targets before generic local ac
 Current intended POI priority order:
 
 1. active World Travel route target
-2. hub Merchant quick exchange when eligible junk is available
+2. active quest objective on the current map
 3. ready quest turn-in target
-4. active quest objective target on the current map
-5. available quest acceptance target on the current map
-6. quest-required prototype teleport when the active objective is on another reachable prototype map
+4. available quest acceptance target on the current map
+5. quest-required prototype teleport when the active objective is on another reachable prototype map
+6. hub Merchant quick exchange when eligible junk is available
 7. reachable wild combat target when combat fallback is relevant
 8. reachable wild resource target when gathering fallback is relevant
-9. reachable unexplored exploration point
+9. reachable exploration target for reach objectives
 10. safe idle hub point
+
+When the party is in the hub, eligible merchant quick exchange may be considered before quest and idle targets.
 
 POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, already satisfied, or gatherer-reserved resource targets.
 
@@ -1486,7 +1549,14 @@ Current readable prototype/debug map names:
 - `map-3`: Third Wild Map
 - `map-4`: Fourth Wild Map
 
-Current prototype wilderness maps may contain named subzones, encounter areas, encounter leashes, resource locations, and UI-facing subzone labels.
+Current prototype wilderness subzones are:
+
+- First Wild Map: Shore Fringe, Mossy Glade, Lower Shore
+- Second Wild Map: Scout Rise, Old Grove, Wolf Causeway
+- Third Wild Map: Broken Thicket, Crawler Shelf, Imp Fen
+- Fourth Wild Map: Shaman Watch, Ash Hollow, Orc Approach
+
+Current prototype subzones may define level ranges, enemy archetype lists, encounter areas, encounter leash radii, resource locations, passages, and UI-facing name labels.
 
 Subzones and encounter areas are current prototype map-organization data. They must not be treated as the final zone system, final region content model, final encounter design pipeline, or persistent world-state structure.
 
