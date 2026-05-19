@@ -1,4 +1,10 @@
-import type { DebugMapId, ItemId, Position, ResourceType } from "./types";
+import type {
+  DebugMapId,
+  EnemyArchetypeId,
+  ItemId,
+  Position,
+  ResourceType,
+} from "./types";
 import type { PoiCategory } from "./poiTypes";
 
 export type QuestId =
@@ -19,14 +25,21 @@ export type QuestObjectiveType =
   | "reach_poi"
   | "defeat_enemy_count"
   | "gather_item_count"
+  | "inspect_poi"
+  | "guide_npc_to_poi"
   | "return_to_poi";
 
 export type QuestObjectiveDefinition = {
   id: string;
   type: QuestObjectiveType;
   targetMapId?: DebugMapId;
+  targetSubzoneId?: string;
   targetPoiId?: string;
+  targetPosition?: Position;
+  guideNpcId?: string;
+  guideStartPosition?: Position;
   enemyMapId?: DebugMapId;
+  enemyArchetypeId?: EnemyArchetypeId;
   resourceType?: ResourceType;
   requiredCount?: number;
 };

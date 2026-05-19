@@ -17,6 +17,10 @@ import {
   getLeaderIntentPosition,
   getLeaderMovementDirection,
 } from "./roleSystem";
+import {
+  getActiveQuestGuide,
+  QUEST_GUIDE_ESCORT_RANGE,
+} from "./questGuideSystem";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
@@ -288,13 +292,14 @@ function getDefenderTarget(
 ): Enemy | undefined {
   const leaderTarget = getLeaderEnemyTarget(state, leader);
 
-  if (leaderTarget) {
+  if (leaderTarget && isRelevantGuideEscortThreat(state, leaderTarget)) {
     return leaderTarget;
   }
 
   const enemyAttackingLeader = Object.values(state.entities).find(
     (entity): entity is Enemy =>
       isLiveEnemy(entity) &&
+      isRelevantGuideEscortThreat(state, entity) &&
       entity.state === "attack" &&
       entity.currentTargetId === leader.id &&
       getGridDistance(entity.position, leader.position) <=
@@ -308,7 +313,20 @@ function getDefenderTarget(
   return Object.values(state.entities).find(
     (entity): entity is Enemy =>
       isLiveEnemy(entity) &&
+      isRelevantGuideEscortThreat(state, entity) &&
       isEnemyRelevantToGuard(defender, leader, defendPosition, entity),
+  );
+}
+
+function isRelevantGuideEscortThreat(
+  state: GameState,
+  enemy: Enemy,
+): boolean {
+  const guide = getActiveQuestGuide(state);
+
+  return (
+    !guide ||
+    getGridDistance(enemy.position, guide.position) <= QUEST_GUIDE_ESCORT_RANGE
   );
 }
 

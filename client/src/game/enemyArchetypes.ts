@@ -20,7 +20,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 1,
     maxHealth: 2,
     attackCooldownMs: 1200,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 1,
   },
   cave_bat: {
@@ -32,7 +32,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 2,
     maxHealth: 2,
     attackCooldownMs: 900,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 1,
   },
   forest_spider: {
@@ -44,7 +44,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 3,
     maxHealth: 3,
     attackCooldownMs: 1200,
-    detectionRange: 4,
+    detectionRange: 8,
     attackRange: 1,
   },
   goblin_scout: {
@@ -56,7 +56,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 4,
     maxHealth: 3,
     attackCooldownMs: 1000,
-    detectionRange: 6,
+    detectionRange: 12,
     attackRange: 1,
   },
   goblin_thrower: {
@@ -68,7 +68,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 7,
     maxHealth: 3,
     attackCooldownMs: 1300,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 4,
   },
   bog_imp: {
@@ -80,7 +80,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 5,
     maxHealth: 3,
     attackCooldownMs: 1300,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 3,
   },
   stone_crawler: {
@@ -92,7 +92,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 8,
     maxHealth: 5,
     attackCooldownMs: 1500,
-    detectionRange: 4,
+    detectionRange: 8,
     attackRange: 1,
   },
   goblin_shaman: {
@@ -104,7 +104,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 10,
     maxHealth: 3,
     attackCooldownMs: 1500,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 3,
   },
   ash_wisp: {
@@ -116,7 +116,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 11,
     maxHealth: 3,
     attackCooldownMs: 1200,
-    detectionRange: 6,
+    detectionRange: 12,
     attackRange: 4,
   },
   mossling: {
@@ -128,7 +128,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 9,
     maxHealth: 2,
     attackCooldownMs: 1400,
-    detectionRange: 4,
+    detectionRange: 8,
     attackRange: 1,
   },
   wolf: {
@@ -140,7 +140,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 6,
     maxHealth: 3,
     attackCooldownMs: 1000,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 1,
   },
   orc: {
@@ -152,7 +152,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
     level: 12,
     maxHealth: 6,
     attackCooldownMs: 1330,
-    detectionRange: 5,
+    detectionRange: 10,
     attackRange: 1,
   },
 };

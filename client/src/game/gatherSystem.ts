@@ -6,10 +6,10 @@ import {
   setLastGatherAt,
 } from "./entities";
 import {
+  getEnemyAggroRange,
   getEnemyAttackLeashDistance,
-  getEnemyDetectionRange as getDefaultEnemyDetectionRange,
 } from "./enemyAISystem";
-import { getEnemyDetectionRange, getEnemyTemperament } from "./enemyArchetypes";
+import { getEnemyTemperament } from "./enemyArchetypes";
 import {
   addCombatFeedback,
   ENTITY_COLLISION_DISTANCE,
@@ -181,7 +181,7 @@ export function updateGatherSystem(
       nextState = itemAdd.state;
       nextState = recordResourceGatheredForQuests(
         nextState,
-        gatheredResource.resourceType,
+        gatheredResource,
         nextState.currentMapId,
         itemAdd.result.addedQuantity,
       );
@@ -260,10 +260,7 @@ function findGathererAggroThreat(
       continue;
     }
 
-    const detectionRange = getEnemyDetectionRange(
-      entity,
-      getDefaultEnemyDetectionRange(),
-    );
+    const detectionRange = getEnemyAggroRange(entity);
 
     if (
       getDistanceSquared(entity.position, gatherer.position) > detectionRange * detectionRange ||

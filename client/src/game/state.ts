@@ -27,7 +27,6 @@ import type {
   DebugNavigationReason,
   DebugTelemetryState,
   ActiveTeleport,
-  Companion,
   DebugMapId,
   GameMap,
   GameEntity,
@@ -1180,11 +1179,18 @@ function getMovementDeltaMs(
   options: MovementOptions = {},
 ): number {
   const debugSpeedMultiplier =
-    entity.kind === "companion" && state.debugOptions?.superSpeedEnabled ? 5 : 1;
+    usesCompanionDebugSpeed(entity) && state.debugOptions?.superSpeedEnabled ? 5 : 1;
 
   return (state.simulationDeltaMs ?? GAME_LOOP_TICK_MS) *
     (options.speedMultiplier ?? 1) *
     debugSpeedMultiplier;
+}
+
+function usesCompanionDebugSpeed(entity: GameEntity): boolean {
+  return (
+    entity.kind === "companion" ||
+    (entity.kind === "npc" && entity.npcRole === "quest_guide")
+  );
 }
 
 function addAlternativeStepCandidates(
@@ -1485,8 +1491,11 @@ function canPassThroughPartyEntity(
   );
 }
 
-function isPartyEntity(entity: GameEntity): entity is Companion {
-  return entity.kind === "companion";
+function isPartyEntity(entity: GameEntity): boolean {
+  return (
+    entity.kind === "companion" ||
+    (entity.kind === "npc" && entity.npcRole === "quest_guide")
+  );
 }
 
 function getSwapCandidate(

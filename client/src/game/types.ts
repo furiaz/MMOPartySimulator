@@ -58,6 +58,7 @@ export type EnemyTargetDecisionReason =
   | "closest"
   | "leader"
   | "lowest_health"
+  | "guide_attraction"
   | "passive_no_auto_target"
   | "outside_detection"
   | "outside_leash"
@@ -1181,7 +1182,14 @@ export type ResourceEntity = BaseEntity & {
 export type NpcEntity = BaseEntity & {
   kind: "npc";
   displayName: string;
-  npcRole: "quest_giver" | "merchant" | "smith" | "dog" | "test_blade" | "test_hunter";
+  npcRole:
+    | "quest_giver"
+    | "merchant"
+    | "smith"
+    | "dog"
+    | "test_blade"
+    | "test_hunter"
+    | "quest_guide";
 };
 
 export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity;

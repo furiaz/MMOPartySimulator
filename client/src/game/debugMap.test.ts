@@ -35,6 +35,7 @@ import {
 } from "./debugMap";
 import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
 import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
+import { QUEST_DEFINITIONS } from "./questSystem";
 import type { DebugMapId, GameMap, Position, ZoneSubzone } from "./types";
 
 const wildernessMaps = [
@@ -99,8 +100,8 @@ describe("debug maps", () => {
   it("keeps wilderness enemies and resources on reachable open floor", () => {
     for (const wildernessMap of wildernessMaps) {
       if (wildernessMap.mapId === MAP_ONE_ID) {
-        expect(wildernessMap.enemyPositions).toHaveLength(36);
-        expect(wildernessMap.resources).toHaveLength(18);
+        expect(wildernessMap.enemyPositions).toHaveLength(48);
+        expect(wildernessMap.resources).toHaveLength(9);
       } else {
         expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
         expect(wildernessMap.enemyPositions.length).toBeLessThanOrEqual(22);
@@ -140,7 +141,7 @@ describe("debug maps", () => {
   it("defines the authored subzone layout for each wilderness map", () => {
     for (const wildernessMap of wildernessMaps) {
       expect(wildernessMap.subzones).toHaveLength(
-        wildernessMap.mapId === MAP_ONE_ID ? 9 : 3,
+        3,
       );
       expect(createDebugMap(wildernessMap.mapId).subzones).toBe(wildernessMap.subzones);
     }
@@ -201,7 +202,53 @@ describe("debug maps", () => {
     }
   });
 
-  it("lays out map one as a 3x3 stress-test sheet with column-based enemies", () => {
+  it("keeps map one quest inspection and guide points reachable inside their subzones", () => {
+    const questPoints = [
+      {
+        subzoneId: "shore-fringe",
+        position:
+          QUEST_DEFINITIONS.clear_the_shore.objectives.find(
+            (objective) => objective.id === "inspect_shore_fringe_marker",
+          )?.targetPosition,
+      },
+      {
+        subzoneId: "shore-fringe",
+        position:
+          QUEST_DEFINITIONS.gather_expedition_supplies.objectives.find(
+            (objective) => objective.id === "guide_mossy_glade_surveyor",
+          )?.guideStartPosition,
+      },
+      {
+        subzoneId: "mossy-glade",
+        position:
+          QUEST_DEFINITIONS.gather_expedition_supplies.objectives.find(
+            (objective) => objective.id === "guide_mossy_glade_surveyor",
+          )?.targetPosition,
+      },
+      {
+        subzoneId: "lower-shore",
+        position:
+          QUEST_DEFINITIONS.scout_the_northern_road.objectives.find(
+            (objective) => objective.id === "inspect_lower_shore_wreckage",
+          )?.targetPosition,
+      },
+    ];
+    const map = createDebugMap(MAP_ONE_ID);
+
+    for (const questPoint of questPoints) {
+      expect(questPoint.position).toBeDefined();
+      const position = questPoint.position as Position;
+      const subzone = getSubzone(mapOneSubzones, questPoint.subzoneId);
+
+      expect(isInsideSubzone(subzone, position)).toBe(true);
+      assertOpenReachablePosition(map, position);
+      if (isWallAdjacent(map, position)) {
+        throw new Error(`${questPoint.subzoneId} quest point is wall-adjacent`);
+      }
+    }
+  });
+
+  it("lays out map one as three taller subzones with expanded enemy density", () => {
     const mapOneDefinition = debugMapDefinitions[MAP_ONE_ID];
     const hubEntry = mapOneDefinition.teleports.find(
       (teleport) => teleport.targetMapId === HUB_MAP_ID,
@@ -209,46 +256,46 @@ describe("debug maps", () => {
     const forwardEntry = mapOneDefinition.teleports.find(
       (teleport) => teleport.targetMapId === MAP_TWO_ID,
     );
-    const middleLeft = getSubzone(mapOneSubzones, "middle-left");
-    const middleRight = getSubzone(mapOneSubzones, "middle-right");
+    const shoreFringe = getSubzone(mapOneSubzones, "shore-fringe");
+    const mossyGlade = getSubzone(mapOneSubzones, "mossy-glade");
+    const lowerShore = getSubzone(mapOneSubzones, "lower-shore");
 
     expect(hubEntry).toBeDefined();
     expect(forwardEntry).toBeDefined();
-    expect(hubEntry && isInsideSubzone(middleLeft, hubEntry.position)).toBe(true);
-    expect(forwardEntry && isInsideSubzone(middleRight, forwardEntry.position)).toBe(true);
+    expect(mapOneDefinition.rows).toBe(MAP_ONE_ROWS);
+    expect(MAP_ONE_ROWS).toBe(Math.round(WILDERNESS_MAP_ROWS * 1.9));
+    expect(hubEntry && isInsideSubzone(shoreFringe, hubEntry.position)).toBe(true);
+    expect(forwardEntry && isInsideSubzone(lowerShore, forwardEntry.position)).toBe(true);
     for (const arrivalPosition of debugMapDefinitions[HUB_MAP_ID].teleports[0].arrivalPositions) {
-      expect(isInsideSubzone(middleLeft, arrivalPosition)).toBe(true);
+      expect(isInsideSubzone(shoreFringe, arrivalPosition)).toBe(true);
     }
     for (const arrivalPosition of debugMapDefinitions[MAP_TWO_ID].teleports[0].arrivalPositions) {
-      expect(isInsideSubzone(middleRight, arrivalPosition)).toBe(true);
+      expect(isInsideSubzone(lowerShore, arrivalPosition)).toBe(true);
     }
 
-    const expectedColumnArchetypes = new Map([
-      ["left", "slime"],
-      ["center", "cave_bat"],
-      ["right", "forest_spider"],
+    const expectedSubzoneArchetypes = new Map([
+      ["shore-fringe", "slime"],
+      ["mossy-glade", "cave_bat"],
+      ["lower-shore", "forest_spider"],
     ]);
 
     for (const subzone of mapOneSubzones) {
-      const column = subzone.id.endsWith("left")
-        ? "left"
-        : subzone.id.endsWith("center")
-          ? "center"
-          : "right";
-      const expectedArchetype = expectedColumnArchetypes.get(column);
+      const expectedArchetype = expectedSubzoneArchetypes.get(subzone.id);
 
       expect(subzone.enemyArchetypeIds).toEqual([expectedArchetype]);
-      expect(
-        mapOneEnemyStartData
-          .filter((enemy) => enemy.subzoneId === subzone.id)
-          .map((enemy) => enemy.archetypeId),
-      ).toEqual([
-        expectedArchetype,
-        expectedArchetype,
-        expectedArchetype,
-        expectedArchetype,
-      ]);
+      const subzoneEnemies = mapOneEnemyStartData.filter(
+        (enemy) => enemy.subzoneId === subzone.id,
+      );
+
+      expect(subzoneEnemies).toHaveLength(16);
+      expect(subzoneEnemies.map((enemy) => enemy.archetypeId)).toEqual(
+        Array.from({ length: 16 }, () => expectedArchetype),
+      );
     }
+
+    expect(shoreFringe.bounds.height).toBe(55);
+    expect(mossyGlade.bounds.height).toBe(55);
+    expect(lowerShore.bounds.height).toBe(55);
 
     expect(getSubzone(mapTwoSubzones, "south-center").levelRange.min).toBeGreaterThanOrEqual(3);
     expect(getSubzone(mapTwoSubzones, "south-east").levelRange.min).toBeGreaterThanOrEqual(4);
@@ -290,7 +337,7 @@ function assertSubzoneContentDensity(
   for (const subzone of subzones) {
     const enemyCount = enemies.filter((enemy) => enemy.subzoneId === subzone.id).length;
     expect(enemyCount).toBeGreaterThanOrEqual(4);
-    expect(enemyCount).toBeLessThanOrEqual(10);
+    expect(enemyCount).toBeLessThanOrEqual(16);
     expect(subzone.resourceLocations.length).toBeGreaterThanOrEqual(2);
     expect(subzone.resourceLocations.length).toBeLessThanOrEqual(3);
   }

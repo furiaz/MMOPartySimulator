@@ -126,7 +126,9 @@ export function getObjectiveLabel(
   requiredCount = objective.requiredCount ?? 1,
 ): string {
   if (objective.type === "defeat_enemy_count") {
-    return `Kill ${requiredCount} Enemies`;
+    return `Kill ${requiredCount} ${formatQuestEnemyName(
+      objective.enemyArchetypeId,
+    )}`;
   }
 
   if (objective.type === "gather_item_count") {
@@ -139,6 +141,14 @@ export function getObjectiveLabel(
     return `Explore ${formatQuestMapName(objective.targetMapId)}`;
   }
 
+  if (objective.type === "inspect_poi") {
+    return "Inspect Marker";
+  }
+
+  if (objective.type === "guide_npc_to_poi") {
+    return "Guide Surveyor";
+  }
+
   if (objective.type === "return_to_poi") {
     return "Return to Quest Giver";
   }
@@ -148,6 +158,24 @@ export function getObjectiveLabel(
   }
 
   return objective.type;
+}
+
+function formatQuestEnemyName(
+  enemyArchetypeId: QuestObjectiveDefinition["enemyArchetypeId"],
+): string {
+  if (enemyArchetypeId === "slime") {
+    return "Slimes";
+  }
+
+  if (enemyArchetypeId === "cave_bat") {
+    return "Cave Bats";
+  }
+
+  if (enemyArchetypeId === "forest_spider") {
+    return "Forest Spiders";
+  }
+
+  return "Enemies";
 }
 
 function formatQuestResourceName(
@@ -164,19 +192,19 @@ function formatQuestMapName(mapId: QuestObjectiveDefinition["targetMapId"]): str
   }
 
   if (mapId === "map-1") {
-    return "First Wild Map";
+    return "First Wild Zone";
   }
 
   if (mapId === "map-2") {
-    return "Second Wild Map";
+    return "Second Wild Zone";
   }
 
   if (mapId === "map-3") {
-    return "Third Wild Map";
+    return "Third Wild Zone";
   }
 
   if (mapId === "map-4") {
-    return "Fourth Wild Map";
+    return "Fourth Wild Zone";
   }
 
   return "Region";

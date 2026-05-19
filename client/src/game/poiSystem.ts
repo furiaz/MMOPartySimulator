@@ -29,8 +29,11 @@ import {
   getActiveQuest,
   getAvailableQuest,
   getFirstIncompleteObjective,
+  getIncompleteObjectives,
   getQuestTargetMapId,
   hasQuestGiverWork,
+  matchesObjectiveSubzoneAtPosition,
+  recordQuestPoiReachedForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
@@ -48,11 +51,13 @@ import type {
   ResourceEntity,
   ResourceType,
   ZoneSubzone,
+  ZoneSubzonePassage,
 } from "./types";
 import type {
   GlobalPoiIntent,
   LocalPoiTarget,
   PoiConsideration,
+  QuestObjectiveDefinition,
   QuestId,
 } from "./questTypes";
 
@@ -125,7 +130,14 @@ export function updatePoiSystem(
   );
 
   if (canReuseWildPoiSelection(state, leader, gathererReservations)) {
-    return applyLocalTargetToLeaderIntent(state, state.localPoiTarget);
+    const localPoiTarget = refreshLocalPoiTarget(state, state.localPoiTarget);
+    return applyLocalTargetToLeaderIntent(
+      {
+        ...state,
+        localPoiTarget,
+      },
+      localPoiTarget,
+    );
   }
 
   const interactionState = clearReachedWorldTravelTarget(
@@ -186,6 +198,10 @@ function canReuseWildPoiSelection(
   }
 
   if (!isLocalPoiTargetStillValid(state, state.localPoiTarget)) {
+    return false;
+  }
+
+  if (!isQuestLinkedPoiStillRelevant(state, state.localPoiTarget)) {
     return false;
   }
 
@@ -255,6 +271,24 @@ function isLocalPoiTargetStillValid(
   return true;
 }
 
+function refreshLocalPoiTarget(
+  state: GameState,
+  target: LocalPoiTarget,
+): LocalPoiTarget {
+  if (!target.targetEntityId) {
+    return target;
+  }
+
+  const entity = state.entities[target.targetEntityId];
+
+  return entity
+    ? {
+        ...target,
+        position: entity.position,
+      }
+    : target;
+}
+
 function isReservedGathererResourcePoi(
   state: GameState,
   target: LocalPoiTarget,
@@ -289,6 +323,28 @@ function isQuestResourcePoi(target: LocalPoiTarget): boolean {
   );
 }
 
+function isQuestLinkedPoiStillRelevant(
+  state: GameState,
+  target: LocalPoiTarget,
+): boolean {
+  if (!target.questId || !target.objectiveId) {
+    return true;
+  }
+
+  const activeQuest = getActiveQuest(state);
+
+  if (
+    activeQuest?.questId !== target.questId ||
+    activeQuest.status !== "active"
+  ) {
+    return false;
+  }
+
+  return getIncompleteObjectives(state, target.questId).some(
+    (objective) => objective.id === target.objectiveId,
+  );
+}
+
 function isActiveQuestResourcePoiStillRelevant(
   state: GameState,
   target: LocalPoiTarget,
@@ -303,7 +359,9 @@ function isActiveQuestResourcePoiStillRelevant(
     return false;
   }
 
-  const objective = getFirstIncompleteObjective(state, target.questId);
+  const objective = getIncompleteObjectives(state, target.questId).find(
+    (incompleteObjective) => incompleteObjective.id === target.objectiveId,
+  );
 
   if (
     !objective ||
@@ -313,7 +371,10 @@ function isActiveQuestResourcePoiStillRelevant(
     return false;
   }
 
-  return getResourceTypeFromLocalTarget(state, target) === objective.resourceType;
+  return (
+    getResourceTypeFromLocalTarget(state, target) === objective.resourceType &&
+    matchesObjectiveSubzoneAtPosition(state, objective, target.position)
+  );
 }
 
 export function getMapType(mapId: DebugMapId | undefined): PoiMapType {
@@ -335,12 +396,14 @@ function clearReachedWorldTravelTarget(state: GameState): GameState {
 }
 
 function updateReachedPoiInteractions(state: GameState): GameState {
-  if (state.currentMapId !== HUB_MAP_ID) {
-    return state;
+  let nextState = updateReachedQuestInspectInteraction(state);
+
+  if (nextState.currentMapId !== HUB_MAP_ID) {
+    return nextState;
   }
 
-  const leader = getPartyLeader(state);
-  const merchant = Object.values(state.entities).find(
+  const leader = getPartyLeader(nextState);
+  const merchant = Object.values(nextState.entities).find(
     (entity) => entity.kind === "npc" && entity.npcRole === "merchant",
   );
 
@@ -348,12 +411,12 @@ function updateReachedPoiInteractions(state: GameState): GameState {
     leader &&
     merchant &&
     getDistance(leader.position, merchant.position) <= DEFAULT_POI_INTERACTION_RANGE &&
-    getQuickExchangeItems(state).length > 0
+    getQuickExchangeItems(nextState).length > 0
   ) {
-    return quickExchangeParts(state, merchant.id).state;
+    return quickExchangeParts(nextState, merchant.id).state;
   }
 
-  const questGiver = Object.values(state.entities).find(
+  const questGiver = Object.values(nextState.entities).find(
     (entity) => entity.kind === "npc" && entity.npcRole === "quest_giver",
   );
 
@@ -361,12 +424,39 @@ function updateReachedPoiInteractions(state: GameState): GameState {
     !leader ||
     !questGiver ||
     getDistance(leader.position, questGiver.position) > QUEST_GIVER_INTERACTION_RANGE ||
-    !hasQuestGiverWork(state)
+    !hasQuestGiverWork(nextState)
+  ) {
+    return nextState;
+  }
+
+  return updateQuestGiverInteraction(nextState);
+}
+
+function updateReachedQuestInspectInteraction(state: GameState): GameState {
+  const leader = getPartyLeader(state);
+  const target = state.localPoiTarget;
+
+  if (
+    !leader ||
+    !target?.questId ||
+    !target.objectiveId ||
+    target.mapId !== state.currentMapId ||
+    getDistance(leader.position, target.position) > DEFAULT_POI_INTERACTION_RANGE
   ) {
     return state;
   }
 
-  return updateQuestGiverInteraction(state);
+  const objective = getQuestObjective(target.questId, target.objectiveId);
+
+  if (objective?.type !== "inspect_poi" || !objective.targetPoiId) {
+    return state;
+  }
+
+  return recordQuestPoiReachedForQuests(
+    state,
+    objective.targetPoiId,
+    state.currentMapId,
+  );
 }
 
 function getGlobalPoiIntent(state: GameState): GlobalPoiIntent {
@@ -576,6 +666,27 @@ function getWildFallbackOptions(
   ];
 }
 
+function isQuestCombatPoi(
+  state: GameState,
+  poi: PointOfInterest,
+  objective: QuestObjectiveDefinition,
+): boolean {
+  if (poi.category !== "combat" || !poi.targetEntityId) {
+    return false;
+  }
+
+  const entity = state.entities[poi.targetEntityId];
+
+  return (
+    entity?.kind === "enemy" &&
+    entity.state !== "dead" &&
+    (!objective.enemyArchetypeId ||
+      entity.archetypeId === objective.enemyArchetypeId) &&
+    (!objective.targetSubzoneId ||
+      entity.subzoneId === objective.targetSubzoneId)
+  );
+}
+
 function getHubMerchantOptions(
   state: GameState,
   candidates: PointOfInterest[],
@@ -598,6 +709,142 @@ function getHubMerchantOptions(
         },
       ]
     : [];
+}
+
+function getQuestSubzoneRoutePoi(
+  state: GameState,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+): PointOfInterest | null {
+  if (!objective.targetSubzoneId || !state.currentMapId || !state.map?.subzones) {
+    return null;
+  }
+
+  const leader = getPartyLeader(state);
+  const currentSubzone = getSubzoneAtPosition(state.map, leader?.position);
+  const targetSubzone = state.map.subzones.find(
+    (subzone) => subzone.id === objective.targetSubzoneId,
+  );
+
+  if (
+    !leader ||
+    !currentSubzone ||
+    !targetSubzone ||
+    currentSubzone.id === targetSubzone.id
+  ) {
+    return null;
+  }
+
+  const routeStep = findNextSubzoneRouteStep(
+    state.map.subzones,
+    currentSubzone.id,
+    targetSubzone.id,
+  );
+
+  if (!routeStep) {
+    return null;
+  }
+
+  const routePosition = getSubzoneRoutePosition(routeStep.passage, routeStep.nextSubzone);
+
+  return {
+    id: `route-${currentSubzone.id}-to-${targetSubzone.id}-${routeStep.passage.id}`,
+    category: "exploration",
+    mapId: state.currentMapId,
+    displayName: `Route to ${targetSubzone.displayName}`,
+    position: routePosition,
+    linkedQuestId: questId,
+    linkedObjectiveId: objective.id,
+  };
+}
+
+function findNextSubzoneRouteStep(
+  subzones: ZoneSubzone[],
+  startSubzoneId: string,
+  targetSubzoneId: string,
+): { nextSubzone: ZoneSubzone; passage: ZoneSubzonePassage } | null {
+  const subzoneById = new Map(subzones.map((subzone) => [subzone.id, subzone]));
+  const visited = new Set<string>([startSubzoneId]);
+  const queue: Array<{
+    subzoneId: string;
+    firstStep: { nextSubzone: ZoneSubzone; passage: ZoneSubzonePassage } | null;
+  }> = [{ subzoneId: startSubzoneId, firstStep: null }];
+  let queueIndex = 0;
+
+  while (queueIndex < queue.length) {
+    const current = queue[queueIndex];
+    queueIndex += 1;
+
+    if (!current) {
+      continue;
+    }
+
+    const currentSubzone = subzoneById.get(current.subzoneId);
+
+    if (!currentSubzone) {
+      continue;
+    }
+
+    for (const passage of currentSubzone.passages) {
+      const nextSubzoneId = getConnectedSubzoneId(passage, current.subzoneId);
+      const nextSubzone = nextSubzoneId ? subzoneById.get(nextSubzoneId) : undefined;
+
+      if (!nextSubzone || visited.has(nextSubzone.id)) {
+        continue;
+      }
+
+      const firstStep = current.firstStep ?? {
+        nextSubzone,
+        passage,
+      };
+
+      if (nextSubzone.id === targetSubzoneId) {
+        return firstStep;
+      }
+
+      visited.add(nextSubzone.id);
+      queue.push({
+        subzoneId: nextSubzone.id,
+        firstStep,
+      });
+    }
+  }
+
+  return null;
+}
+
+function getConnectedSubzoneId(
+  passage: ZoneSubzonePassage,
+  subzoneId: string,
+): string | null {
+  if (passage.fromSubzoneId === subzoneId) {
+    return passage.toSubzoneId;
+  }
+
+  if (passage.toSubzoneId === subzoneId) {
+    return passage.fromSubzoneId;
+  }
+
+  return null;
+}
+
+function getSubzoneRoutePosition(
+  passage: ZoneSubzonePassage,
+  nextSubzone: ZoneSubzone,
+): Position {
+  if (isPositionInsideSubzone(passage.position, nextSubzone)) {
+    return passage.position;
+  }
+
+  const candidates = [
+    passage.position,
+    ...getNavigationNeighborPositions(passage.position),
+  ];
+
+  return (
+    candidates.find((position) => isPositionInsideSubzone(position, nextSubzone)) ??
+    passage.position
+  );
 }
 
 function getQuestTargetOptions(
@@ -656,15 +903,53 @@ function getQuestTargetOptions(
       : [];
   }
 
-  const objective = getFirstIncompleteObjective(state, questId);
+  return getIncompleteObjectives(state, questId).flatMap((objective) =>
+    getQuestObjectiveTargetOptions(
+      state,
+      questId,
+      objective,
+      candidates,
+      gathererReservations,
+    ),
+  );
+}
 
-  if (!objective) {
-    return [];
+function getQuestObjectiveTargetOptions(
+  state: GameState,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+  candidates: PointOfInterest[],
+  gathererReservations: GathererResourceReservations,
+): PoiTargetOption[] {
+  if (objective.type === "guide_npc_to_poi") {
+    return [
+      {
+        poi: createGuideObjectivePoi(state, questId, objective),
+        priority: 8,
+        reason: "active quest guide objective",
+        questId,
+        objectiveId: objective.id,
+      },
+    ];
+  }
+
+  const subzoneRoutePoi = getQuestSubzoneRoutePoi(state, questId, objective);
+
+  if (subzoneRoutePoi) {
+    return [
+      {
+        poi: subzoneRoutePoi,
+        priority: 10,
+        reason: "route to quest subzone",
+        questId,
+        objectiveId: objective.id,
+      },
+    ];
   }
 
   if (objective.type === "defeat_enemy_count") {
     return candidates
-      .filter((poi) => poi.category === "combat")
+      .filter((poi) => isQuestCombatPoi(state, poi, objective))
       .map((poi) => ({
         poi,
         priority: 10,
@@ -679,7 +964,8 @@ function getQuestTargetOptions(
       .filter(
         (poi) =>
           poi.category === "resource" &&
-          getResourceTypeFromPoi(state, poi) === objective.resourceType,
+          getResourceTypeFromPoi(state, poi) === objective.resourceType &&
+          matchesObjectiveSubzoneAtPosition(state, objective, poi.position),
       )
       .map((poi) => ({
         poi,
@@ -688,6 +974,23 @@ function getQuestTargetOptions(
         questId,
         objectiveId: objective.id,
       }));
+  }
+
+  if (objective.type === "inspect_poi") {
+    return [
+      {
+        poi: createObjectivePositionPoi(
+          state,
+          questId,
+          objective,
+          objective.targetPoiId ?? `${questId}-${objective.id}-inspect`,
+        ),
+        priority: 10,
+        reason: "active quest inspect objective",
+        questId,
+        objectiveId: objective.id,
+      },
+    ];
   }
 
   if (objective.type === "reach_poi") {
@@ -1274,6 +1577,64 @@ function createExplorationPoi(
     linkedQuestId: questId,
     linkedObjectiveId: objectiveId,
   };
+}
+
+function createObjectivePositionPoi(
+  state: GameState,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+  poiId: string,
+): PointOfInterest {
+  const mapId = state.currentMapId ?? objective.targetMapId ?? MAP_ONE_ID;
+
+  return {
+    id: poiId,
+    category: "exploration",
+    mapId,
+    displayName: QUEST_DEFINITIONS[questId].displayName,
+    position: objective.targetPosition ?? getMapExplorationTarget(mapId),
+    linkedQuestId: questId,
+    linkedObjectiveId: objective.id,
+  };
+}
+
+function createGuideObjectivePoi(
+  state: GameState,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+): PointOfInterest {
+  const guide =
+    objective.guideNpcId ? state.entities[objective.guideNpcId] : undefined;
+  const isGuideFollowing =
+    guide?.kind === "npc" &&
+    guide.npcRole === "quest_guide" &&
+    guide.state === "follow";
+
+  return {
+    id: objective.guideNpcId ?? `${questId}-${objective.id}-guide-start`,
+    category: "npc",
+    mapId: state.currentMapId ?? objective.targetMapId ?? MAP_ONE_ID,
+    displayName: isGuideFollowing ? "Guard Surveyor" : "Surveyor",
+    position:
+      guide?.kind === "npc"
+        ? guide.position
+        : objective.guideStartPosition ?? objective.targetPosition ?? getMapExplorationTarget(MAP_ONE_ID),
+    interactionRange: DEFAULT_POI_INTERACTION_RANGE,
+    targetEntityId: guide?.kind === "npc" ? guide.id : undefined,
+    linkedQuestId: questId,
+    linkedObjectiveId: objective.id,
+  };
+}
+
+function getQuestObjective(
+  questId: QuestId,
+  objectiveId: string,
+): QuestObjectiveDefinition | null {
+  return (
+    QUEST_DEFINITIONS[questId].objectives.find(
+      (objective) => objective.id === objectiveId,
+    ) ?? null
+  );
 }
 
 function getMapExplorationTarget(mapId: DebugMapId): Position {

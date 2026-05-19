@@ -15,9 +15,9 @@ describe("enemy attack leash movement", () => {
   });
 
   it("lets enemies pursue beyond roam leash while inside attack leash", () => {
-    const companion = createIdleCompanion("leader", { x: 6, y: 0 });
+    const companion = createIdleCompanion("leader", { x: 12, y: 0 });
     const enemy = {
-      ...createEnemy("enemy", { x: 3.95, y: 0 }, "aggressive"),
+      ...createEnemy("enemy", { x: 7.95, y: 0 }, "aggressive"),
       state: "attack" as const,
       currentTargetId: companion.id,
       homePosition: { x: 0, y: 0 },
@@ -26,15 +26,16 @@ describe("enemy attack leash movement", () => {
     const nextState = updateAttackSystem(createState([companion, enemy]));
     const nextEnemy = nextState.entities[enemy.id] as Enemy;
 
-    expect(nextEnemy.position.x).toBeGreaterThan(4);
+    expect(nextEnemy.position.x).toBeGreaterThan(8);
+    expect(nextEnemy.position.x).toBeGreaterThan(8.2);
     expect(nextEnemy.state).toBe("attack");
     expect(nextEnemy.currentTargetId).toBe(companion.id);
   });
 
   it("stops enemies from chasing targets outside attack leash and attack range", () => {
-    const companion = createIdleCompanion("leader", { x: 10, y: 0 });
+    const companion = createIdleCompanion("leader", { x: 18, y: 0 });
     const enemy = {
-      ...createEnemy("enemy", { x: 7, y: 0 }, "aggressive"),
+      ...createEnemy("enemy", { x: 15, y: 0 }, "aggressive"),
       state: "attack" as const,
       currentTargetId: companion.id,
       homePosition: { x: 0, y: 0 },

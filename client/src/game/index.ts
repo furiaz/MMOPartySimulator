@@ -346,7 +346,9 @@ export {
   type EnemyScalingResult,
 } from "./enemyScaling";
 export {
+  getEnemyAggroRange,
   getEnemyAttackLeashDistance,
+  getEnemyChaseSpeedMultiplier,
   getEnemyDetectionRange,
   updateEnemyAISystem,
 } from "./enemyAISystem";

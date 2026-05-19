@@ -325,7 +325,7 @@ export function getMovementStepDistance(
 ): number {
   const deltaSeconds = deltaMs / 1000;
 
-  if (entity.kind === "companion") {
+  if (usesCompanionMovementSpeed(entity)) {
     return COMPANION_MOVEMENT_SPEED_PER_SECOND * deltaSeconds;
   }
 
@@ -334,6 +334,13 @@ export function getMovementStepDistance(
   }
 
   return MOVEMENT_SPEED_PER_SECOND * deltaSeconds;
+}
+
+function usesCompanionMovementSpeed(entity: GameEntity): boolean {
+  return (
+    entity.kind === "companion" ||
+    (entity.kind === "npc" && entity.npcRole === "quest_guide")
+  );
 }
 
 function stepToward(

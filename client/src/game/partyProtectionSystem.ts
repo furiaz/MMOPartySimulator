@@ -1,7 +1,12 @@
 import { isWithinFollowLeash } from "./followSystem";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
+import {
+  getActiveQuestGuide,
+  QUEST_GUIDE_ESCORT_RANGE,
+} from "./questGuideSystem";
 import { setLeaderIntent, updateEntity, type GameState } from "./state";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
+import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
 
 export function protectPartyMember(
@@ -10,6 +15,10 @@ export function protectPartyMember(
   attacker: Enemy,
 ): GameState {
   if (attackedMember.state === "dead" || attacker.state === "dead") {
+    return state;
+  }
+
+  if (!isRelevantGuideEscortAttack(state, attackedMember, attacker)) {
     return state;
   }
 
@@ -36,6 +45,23 @@ export function protectPartyMember(
 }
 
 export const protectLeader = protectPartyMember;
+
+function isRelevantGuideEscortAttack(
+  state: GameState,
+  attackedMember: AutonomousEntity,
+  attacker: Enemy,
+): boolean {
+  const guide = getActiveQuestGuide(state);
+
+  if (!guide || !isPartyMember(attackedMember)) {
+    return true;
+  }
+
+  return (
+    getGridDistance(attacker.position, guide.position) <=
+      QUEST_GUIDE_ESCORT_RANGE
+  );
+}
 
 function canProtectPartyMember(
   state: GameState,

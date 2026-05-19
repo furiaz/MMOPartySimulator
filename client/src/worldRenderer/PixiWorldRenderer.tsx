@@ -22,7 +22,7 @@ import type {
   SkillShieldBlockState,
   SkillVisualEvent,
 } from "../game";
-import { getItemDefinition, QUEST_GIVER_POI_ID } from "../game";
+import { getEnemyAggroRange, getItemDefinition, QUEST_GIVER_POI_ID } from "../game";
 import {
   entityVisualAssets,
   getEntityVisualAsset,
@@ -562,6 +562,45 @@ function drawPoiRing(
   graphics
     .circle(center.x, center.y, radius + 5)
     .stroke({ color, alpha: 0.32, width: 2 });
+}
+
+function isEntityVisuallyMoving(
+  entity: GameEntity,
+  currentTime: number,
+  visualMovementByEntityId: Record<string, EntityVisualMovement>,
+): boolean {
+  const visualMovement = visualMovementByEntityId[entity.id];
+
+  return Boolean(visualMovement && visualMovement.expiresAt > currentTime);
+}
+
+function shouldDrawEnemyAggroRange(
+  entity: GameEntity,
+  currentTime: number,
+  visualMovementByEntityId: Record<string, EntityVisualMovement>,
+): entity is Extract<GameEntity, { kind: "enemy" }> {
+  return (
+    entity.kind === "enemy" &&
+    entity.state !== "dead" &&
+    entity.health > 0 &&
+    !isEntityVisuallyMoving(entity, currentTime, visualMovementByEntityId)
+  );
+}
+
+function drawEnemyAggroRange(
+  graphics: Graphics,
+  enemy: Extract<GameEntity, { kind: "enemy" }>,
+  transform: FullTransform,
+) {
+  const center = toFullPosition(enemy.position, transform);
+  const radius = getEnemyAggroRange(enemy) * transform.cellPixelSize;
+
+  graphics
+    .circle(center.x, center.y, radius)
+    .fill({ color: 0xef4444, alpha: 0.06 });
+  graphics
+    .circle(center.x, center.y, radius)
+    .stroke({ color: 0xef4444, alpha: 0.2, width: 2 });
 }
 
 function drawHealthBar(
@@ -1621,6 +1660,12 @@ function drawFullMap({
           subzone.bounds.height * cellPixelSize,
         )
         .stroke({ color: 0xd9f99d, alpha: 0.42, width: 2 });
+    }
+
+    for (const entity of entities) {
+      if (shouldDrawEnemyAggroRange(entity, currentTime, visualMovementByEntityId)) {
+        drawEnemyAggroRange(overlayGraphics, entity, transform);
+      }
     }
   }
 

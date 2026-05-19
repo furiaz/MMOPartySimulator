@@ -21,7 +21,10 @@ import { protectPartyMember } from "./partyProtectionSystem";
 import { getRolePriority } from "./roleProfiles";
 import { isEnemyBound } from "./skillRuntime";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
-import { getEnemyAttackLeashDistance } from "./enemyAISystem";
+import {
+  getEnemyAttackLeashDistance,
+  getEnemyChaseSpeedMultiplier,
+} from "./enemyAISystem";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
   cancelResurrectionChannelForHelper,
@@ -220,6 +223,7 @@ export function updateAttackSystem(
 
     nextState = moveEntityTowardPositionIfUnoccupied(nextState, currentAttacker, movementTarget, {
       allowPartyPassThrough: true,
+      speedMultiplier: isEnemy(currentAttacker) ? getEnemyChaseSpeedMultiplier() : 1,
     });
 
     const movedAttacker = getEntityById(nextState, currentAttacker.id);

@@ -1,45 +1,63 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createEnemy } from "./entities";
+import { createCompanion, createEnemy, createResource } from "./entities";
 import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debugTelemetry";
+import { createDebugMap, MAP_ONE_ID } from "./debugMap";
 import {
   createInitialQuestStates,
   recordEnemyDefeatedForQuests,
+  recordQuestPoiReachedForQuests,
+  recordResourceGatheredForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
 import { createTestGameState } from "./testState";
+import type { EnemyArchetypeId } from "./types";
 import type { QuestId, QuestState } from "./questTypes";
 
 describe("prototype quest system", () => {
   it("accepts, progresses, readies, turns in, and unlocks quests", () => {
     let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
       quests: createInitialQuestStates(),
     });
     const defeatedEnemy = {
-      ...createEnemy("enemy-1", { x: 0, y: 0 }),
+      ...createEnemy("enemy-1", { x: 10, y: 10 }, undefined, {
+        archetypeId: "slime",
+        subzoneId: "shore-fringe",
+      }),
       state: "dead" as const,
       health: 0,
     };
+    const shoreWood = createResource("shore-wood", { x: 9, y: 8 }, {
+      resourceType: "wood",
+    });
 
     state = updateQuestGiverInteraction(state);
     expect(state.quests.clear_the_shore.status).toBe("active");
 
-    for (let count = 0; count < 5; count += 1) {
-      state = recordEnemyDefeatedForQuests(state, defeatedEnemy, "map-1");
+    for (let count = 0; count < 20; count += 1) {
+      state = recordEnemyDefeatedForQuests(state, defeatedEnemy, MAP_ONE_ID);
     }
+    state = recordResourceGatheredForQuests(state, shoreWood, MAP_ONE_ID, 3);
+    state = recordQuestPoiReachedForQuests(
+      state,
+      "shore-fringe-supply-marker",
+      MAP_ONE_ID,
+    );
 
     expect(state.quests.clear_the_shore.status).toBe("ready_to_turn_in");
     expect(
-      state.quests.clear_the_shore.objectiveProgress.clear_map_1_enemies,
+      state.quests.clear_the_shore.objectiveProgress.defeat_shore_fringe_slimes,
     ).toEqual({
-      objectiveId: "clear_map_1_enemies",
-      currentCount: 5,
+      objectiveId: "defeat_shore_fringe_slimes",
+      currentCount: 20,
       completed: true,
     });
 
     state = updateQuestGiverInteraction(state);
     expect(state.quests.clear_the_shore.status).toBe("completed");
     expect(state.quests.gather_expedition_supplies.status).toBe("available");
-    expect(state.quests.scout_the_northern_road.status).toBe("available");
+    expect(state.quests.scout_the_northern_road.status).toBe("locked");
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(25);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
@@ -71,6 +89,132 @@ describe("prototype quest system", () => {
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(0);
     expect(state.inventory.slots).toEqual([{ itemId: "wolf_pelt", quantity: 1 }]);
     expect(getCompanion(state, "companion-1").characterXp).toBe(0);
+  });
+
+  it("filters Map 1 combat quest progress by subzone and archetype", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      quests: createQuestStates({
+        clear_the_shore: "active",
+        gather_expedition_supplies: "active",
+        scout_the_northern_road: "active",
+      }),
+    });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-shore-bat", "cave_bat", "shore-fringe"),
+      MAP_ONE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("shore-slime", "slime", "shore-fringe"),
+      MAP_ONE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("glade-bat", "cave_bat", "mossy-glade"),
+      MAP_ONE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("lower-spider", "forest_spider", "lower-shore"),
+      MAP_ONE_ID,
+    );
+
+    expect(
+      state.quests.clear_the_shore.objectiveProgress.defeat_shore_fringe_slimes
+        .currentCount,
+    ).toBe(1);
+    expect(
+      state.quests.gather_expedition_supplies.objectiveProgress
+        .defeat_mossy_glade_bats.currentCount,
+    ).toBe(1);
+    expect(
+      state.quests.scout_the_northern_road.objectiveProgress
+        .defeat_lower_shore_spiders.currentCount,
+    ).toBe(1);
+  });
+
+  it("filters Map 1 gathering quest progress by resource type and subzone", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      quests: createQuestStates({
+        gather_expedition_supplies: "active",
+      }),
+    });
+    const shoreHerb = createResource("shore-herb", { x: 47, y: 25 }, {
+      resourceType: "herb",
+    });
+    const gladeWood = createResource("glade-wood", { x: 101, y: 8 }, {
+      resourceType: "wood",
+    });
+    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
+      resourceType: "herb",
+    });
+
+    state = recordResourceGatheredForQuests(state, shoreHerb, MAP_ONE_ID, 1);
+    state = recordResourceGatheredForQuests(state, gladeWood, MAP_ONE_ID, 1);
+    state = recordResourceGatheredForQuests(state, gladeHerb, MAP_ONE_ID, 3);
+
+    expect(
+      state.quests.gather_expedition_supplies.objectiveProgress
+        .gather_mossy_glade_herbs,
+    ).toMatchObject({
+      currentCount: 3,
+      completed: true,
+    });
+  });
+
+  it("allows Map 1 quest objectives to complete in any order", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      quests: createQuestStates({
+        gather_expedition_supplies: "active",
+      }),
+    });
+    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
+      resourceType: "herb",
+    });
+    const defeatedBat = createDefeatedEnemy(
+      "glade-bat",
+      "cave_bat",
+      "mossy-glade",
+    );
+
+    state = recordResourceGatheredForQuests(state, gladeHerb, MAP_ONE_ID, 3);
+    expect(state.quests.gather_expedition_supplies.status).toBe("active");
+    expect(
+      state.quests.gather_expedition_supplies.objectiveProgress
+        .gather_mossy_glade_herbs.completed,
+    ).toBe(true);
+
+    for (let count = 0; count < 20; count += 1) {
+      state = recordEnemyDefeatedForQuests(state, defeatedBat, MAP_ONE_ID);
+    }
+
+    expect(state.quests.gather_expedition_supplies.status).toBe("active");
+    expect(
+      state.quests.gather_expedition_supplies.objectiveProgress
+        .defeat_mossy_glade_bats.completed,
+    ).toBe(true);
+
+    state = recordQuestPoiReachedForQuests(
+      state,
+      "mossy-glade-route-marker",
+      MAP_ONE_ID,
+    );
+
+    expect(
+      state.quests.gather_expedition_supplies.objectiveProgress
+        .guide_mossy_glade_surveyor.completed,
+    ).toBe(true);
+    expect(state.quests.gather_expedition_supplies.status).toBe(
+      "ready_to_turn_in",
+    );
   });
 
   it("uses existing stack space before requiring new reward slots", () => {
@@ -216,6 +360,21 @@ function createQuestStates(statuses: Partial<Record<QuestId, QuestState["status"
   }
 
   return quests;
+}
+
+function createDefeatedEnemy(
+  id: string,
+  archetypeId: EnemyArchetypeId,
+  subzoneId: string,
+) {
+  return {
+    ...createEnemy(id, { x: 0, y: 0 }, undefined, {
+      archetypeId,
+      subzoneId,
+    }),
+    state: "dead" as const,
+    health: 0,
+  };
 }
 
 function getCompanion(state: ReturnType<typeof createTestGameState>, companionId: string) {

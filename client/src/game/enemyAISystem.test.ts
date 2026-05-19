@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
-import { updateEnemyAISystem } from "./enemyAISystem";
+import {
+  getEnemyAggroRange,
+  getEnemyAttackLeashDistance,
+  getEnemyDetectionRange,
+  getEnemyHomeLeashDistance,
+  updateEnemyAISystem,
+} from "./enemyAISystem";
 import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
@@ -24,10 +30,30 @@ describe("enemy AI aggro and roaming", () => {
     });
   });
 
+  it("uses doubled prototype leash and aggro tuning values", () => {
+    expect(getEnemyHomeLeashDistance()).toBe(8);
+    expect(getEnemyAttackLeashDistance()).toBe(16);
+    expect(getEnemyDetectionRange()).toBe(10);
+    expect(
+      getEnemyAggroRange(
+        createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+          archetypeId: "forest_spider",
+        }),
+      ),
+    ).toBe(8);
+    expect(
+      getEnemyAggroRange(
+        createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+          archetypeId: "goblin_scout",
+        }),
+      ),
+    ).toBe(12);
+  });
+
   it("does not acquire a companion inside detection range but outside attack leash", () => {
-    const leader = createIdleCompanion("leader", { x: 9, y: 0 });
+    const leader = createIdleCompanion("leader", { x: 17, y: 0 });
     const enemy = {
-      ...createEnemy("enemy", { x: 4, y: 0 }, "aggressive"),
+      ...createEnemy("enemy", { x: 8, y: 0 }, "aggressive"),
       homePosition: { x: 0, y: 0 },
     };
 
@@ -115,7 +141,7 @@ describe("enemy AI aggro and roaming", () => {
     ENEMY_ARCHETYPES.wolf.targetPreference = "leader";
 
     try {
-      const distantLeader = createIdleCompanion("leader", { x: 9, y: 0 });
+      const distantLeader = createIdleCompanion("leader", { x: 13, y: 0 });
       const closerCompanion = createIdleCompanion("closer", { x: 2, y: 0 });
       const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
         archetypeId: "wolf",
@@ -136,9 +162,9 @@ describe("enemy AI aggro and roaming", () => {
   });
 
   it("clears ranged archetype targets outside attack leash", () => {
-    const leader = createIdleCompanion("leader", { x: 10, y: 0 });
+    const leader = createIdleCompanion("leader", { x: 17, y: 0 });
     const enemy = {
-      ...createEnemy("enemy", { x: 7, y: 0 }, undefined, {
+      ...createEnemy("enemy", { x: 15, y: 0 }, undefined, {
         archetypeId: "goblin_thrower",
       }),
       state: "attack" as const,
@@ -155,9 +181,9 @@ describe("enemy AI aggro and roaming", () => {
   });
 
   it("clears a target that leaves attack leash and attack range", () => {
-    const leader = createIdleCompanion("leader", { x: 9, y: 0 });
+    const leader = createIdleCompanion("leader", { x: 17, y: 0 });
     const enemy = {
-      ...createEnemy("enemy", { x: 4, y: 0 }, "aggressive"),
+      ...createEnemy("enemy", { x: 15, y: 0 }, "aggressive"),
       state: "attack" as const,
       currentTargetId: leader.id,
       homePosition: { x: 0, y: 0 },
@@ -187,7 +213,7 @@ describe("enemy AI aggro and roaming", () => {
     expect(nextEnemy.roamTargetPosition).toBeTruthy();
     expect(
       getDistance(nextEnemy.homePosition, nextEnemy.roamTargetPosition!),
-    ).toBeLessThanOrEqual(4);
+    ).toBeLessThanOrEqual(8);
   });
 
   it("continues roaming across small real-time movement frames", () => {
@@ -209,9 +235,9 @@ describe("enemy AI aggro and roaming", () => {
 
     const nextEnemy = state.entities[enemy.id] as Enemy;
 
-    expect(nextEnemy.position.x).toBeGreaterThan(0.1);
+    expect(nextEnemy.position.x).toBeGreaterThan(0.2);
     expect(nextEnemy.roamTargetPosition).toEqual(enemy.roamTargetPosition);
-    expect(getDistance(nextEnemy.homePosition, nextEnemy.position)).toBeLessThanOrEqual(4);
+    expect(getDistance(nextEnemy.homePosition, nextEnemy.position)).toBeLessThanOrEqual(8);
   });
 });
 

@@ -2,6 +2,10 @@ import { createEnemy, createNpc, createResource, moveEntityTo } from "./entities
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { recordMapReachedForQuests } from "./questSystem";
 import {
+  createQuestGuideNpc,
+  shouldSpawnQuestGuide,
+} from "./questGuideSystem";
+import {
   companionIds,
   createDebugMap,
   debugMapDefinitions,
@@ -394,6 +398,11 @@ function getMapEntities(
       resourceType: resource.resourceType,
       tier: resource.tier,
     });
+  }
+
+  if (shouldSpawnQuestGuide(state, mapId)) {
+    const guide = createQuestGuideNpc();
+    entities[guide.id] = guide;
   }
 
   return entities;

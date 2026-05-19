@@ -15,6 +15,10 @@ import {
   getEnemyTargetPreference,
   getEnemyTemperament,
 } from "./enemyArchetypes";
+import {
+  QUEST_GUIDE_ATTRACTION_RANGE_MULTIPLIER,
+  getActiveQuestGuide,
+} from "./questGuideSystem";
 import type {
   AutonomousEntity,
   Enemy,
@@ -23,9 +27,11 @@ import type {
   Position,
 } from "./types";
 
-const ENEMY_DETECTION_RANGE = 5;
-const ENEMY_ROAM_LEASH_DISTANCE = 4;
-const ENEMY_ATTACK_LEASH_DISTANCE = 8;
+const ENEMY_DETECTION_RANGE = 10;
+const ENEMY_ROAM_LEASH_DISTANCE = 8;
+const ENEMY_ATTACK_LEASH_DISTANCE = 16;
+const ENEMY_ROAM_SPEED_MULTIPLIER = 2;
+const ENEMY_CHASE_SPEED_MULTIPLIER = 3;
 const ENEMY_ROAM_MOVE_MIN_MS = 1000;
 const ENEMY_ROAM_MOVE_MAX_MS = 2000;
 const ENEMY_ROAM_IDLE_MIN_MS = 2000;
@@ -138,6 +144,14 @@ export function getEnemyDetectionRange(): number {
   return ENEMY_DETECTION_RANGE;
 }
 
+export function getEnemyAggroRange(enemy: Enemy): number {
+  return getArchetypeDetectionRange(enemy, ENEMY_DETECTION_RANGE);
+}
+
+export function getEnemyChaseSpeedMultiplier(): number {
+  return ENEMY_CHASE_SPEED_MULTIPLIER;
+}
+
 function clearEnemyTarget(enemy: Enemy, now = Date.now()): Enemy {
   return {
     ...enemy,
@@ -156,7 +170,10 @@ function findPreferredTarget(
   const candidates = getValidTargetCandidates(enemy, Object.values(state.entities));
 
   if (candidates.length === 0) {
-    return getNoTargetReason(enemy, Object.values(state.entities));
+    return (
+      getGuideAttractionTarget(state, enemy) ??
+      getNoTargetReason(enemy, Object.values(state.entities))
+    );
   }
 
   const preference = getEnemyTargetPreference(enemy);
@@ -187,11 +204,40 @@ function findPreferredTarget(
   };
 }
 
+function getGuideAttractionTarget(
+  state: GameState,
+  enemy: Enemy,
+): TargetSearchResult | null {
+  const guide = getActiveQuestGuide(state);
+
+  if (!guide || guide.state !== "follow" || !isInsideAttackLeash(enemy, guide.position)) {
+    return null;
+  }
+
+  const detectionRange = getEnemyAggroRange(enemy) *
+    QUEST_GUIDE_ATTRACTION_RANGE_MULTIPLIER;
+
+  if (getDistanceSquared(enemy, guide) > detectionRange * detectionRange) {
+    return null;
+  }
+
+  const candidates = Object.values(state.entities).filter(
+    (entity): entity is AutonomousEntity =>
+      isValidEnemyTarget(entity) &&
+      getDistanceSquared(enemy, entity) <= detectionRange * detectionRange &&
+      isInsideAttackLeash(enemy, entity.position),
+  );
+
+  const target = findClosestCandidate(enemy, candidates);
+
+  return target ? { target, reason: "guide_attraction" } : null;
+}
+
 function getValidTargetCandidates(
   enemy: Enemy,
   entities: GameEntity[],
 ): AutonomousEntity[] {
-  const detectionRange = getArchetypeDetectionRange(enemy, ENEMY_DETECTION_RANGE);
+  const detectionRange = getEnemyAggroRange(enemy);
 
   return entities.filter(
     (entity): entity is AutonomousEntity =>
@@ -205,7 +251,7 @@ function getNoTargetReason(
   enemy: Enemy,
   entities: GameEntity[],
 ): TargetSearchResult {
-  const detectionRange = getArchetypeDetectionRange(enemy, ENEMY_DETECTION_RANGE);
+  const detectionRange = getEnemyAggroRange(enemy);
   const validTargets = entities.filter(isValidEnemyTarget);
 
   if (
@@ -303,7 +349,12 @@ function moveEnemyTowardHome(state: GameState, enemy: Enemy, now: number): GameS
       ? state
       : updateEntity(state, clearedEnemy);
 
-  return moveEntityTowardPositionIfUnoccupied(nextState, clearedEnemy, enemy.homePosition);
+  return moveEntityTowardPositionIfUnoccupied(
+    nextState,
+    clearedEnemy,
+    enemy.homePosition,
+    { speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER },
+  );
 }
 
 function moveEnemyTowardRoamTarget(
@@ -321,7 +372,9 @@ function moveEnemyTowardRoamTarget(
     return updateEntity(state, finishEnemyRoam(enemy, now));
   }
 
-  const movedState = moveEntityTowardPositionIfUnoccupied(state, enemy, roamTarget);
+  const movedState = moveEntityTowardPositionIfUnoccupied(state, enemy, roamTarget, {
+    speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
+  });
   const movedEnemy = getEntityById(movedState, enemy.id);
 
   if (!movedEnemy || !isEnemy(movedEnemy)) {
@@ -372,7 +425,10 @@ function getRandomWanderTarget(enemy: Enemy, roamMoveDuration: number): Position
 }
 
 function getRoamDistanceForDuration(enemy: Enemy, roamMoveDuration: number): number {
-  return getMovementStepDistance(enemy, roamMoveDuration);
+  return getMovementStepDistance(
+    enemy,
+    roamMoveDuration * ENEMY_ROAM_SPEED_MULTIPLIER,
+  );
 }
 
 function clampToRoamLeash(homePosition: Position, position: Position): Position {

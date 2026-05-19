@@ -26,9 +26,11 @@ export function updateResurrectionSystem(
 ): GameState {
   let nextState = clearInvalidResurrectionChannels(state, now);
 
-  if (!isPartyInCombat(nextState)) {
-    nextState = assignAvailableResurrectionHelpers(nextState, now);
-  }
+  nextState = assignAvailableResurrectionHelpers(
+    nextState,
+    now,
+    isPartyInCombat(nextState),
+  );
 
   nextState = moveResurrectionHelpers(nextState, movedEntityIds);
   nextState = progressResurrectionChannels(nextState, now, deltaMs);
@@ -61,6 +63,7 @@ export function cancelResurrectionChannelForHelper(
 function assignAvailableResurrectionHelpers(
   state: GameState,
   now: number,
+  partyInCombat: boolean,
 ): GameState {
   let nextState = state;
   const deadCompanions = getDeadCompanions(nextState);
@@ -72,7 +75,8 @@ function assignAvailableResurrectionHelpers(
   for (const helper of getLivingCompanions(nextState)) {
     if (
       helper.commandPriority === "direct" ||
-      isCompanionResurrectionChanneling(nextState, helper.id)
+      isCompanionResurrectionChanneling(nextState, helper.id) ||
+      (partyInCombat && isCompanionTargetedByEnemy(nextState, helper.id))
     ) {
       continue;
     }
@@ -88,6 +92,18 @@ function assignAvailableResurrectionHelpers(
   }
 
   return nextState;
+}
+
+function isCompanionTargetedByEnemy(
+  state: GameState,
+  companionId: string,
+): boolean {
+  return Object.values(state.entities).some(
+    (entity) =>
+      isLivingEnemy(entity) &&
+      entity.state === "attack" &&
+      entity.currentTargetId === companionId,
+  );
 }
 
 function moveResurrectionHelpers(

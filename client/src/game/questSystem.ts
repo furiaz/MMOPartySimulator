@@ -9,12 +9,15 @@ import {
 } from "./leveling";
 import { getPartyMembers } from "./partySystem";
 import { updateEntity, type GameState } from "./state";
+import { getSubzoneAtPosition } from "./subzoneSystem";
 import { addCurrencyToWalletState } from "./wallet";
 import type {
   DebugMapId,
   Enemy,
   InventorySlot,
   ItemId,
+  Position,
+  ResourceEntity,
   ResourceType,
 } from "./types";
 import type {
@@ -39,21 +42,37 @@ export const QUEST_ORDER: QuestId[] = [
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
   clear_the_shore: {
     id: "clear_the_shore",
-    displayName: "Clear the Shore",
+    displayName: "Secure the Landing",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
     objectives: [
       {
-        id: "clear_map_1_enemies",
+        id: "defeat_shore_fringe_slimes",
         type: "defeat_enemy_count",
         enemyMapId: MAP_ONE_ID,
-        requiredCount: 5,
+        targetSubzoneId: "shore-fringe",
+        enemyArchetypeId: "slime",
+        requiredCount: 20,
+      },
+      {
+        id: "gather_shore_fringe_wood",
+        type: "gather_item_count",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "shore-fringe",
+        resourceType: "wood",
+        requiredCount: 3,
+      },
+      {
+        id: "inspect_shore_fringe_marker",
+        type: "inspect_poi",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "shore-fringe",
+        targetPoiId: "shore-fringe-supply-marker",
+        targetPosition: { x: 46, y: 22 },
+        requiredCount: 1,
       },
     ],
-    unlocksQuestIds: [
-      "gather_expedition_supplies",
-      "scout_the_northern_road",
-    ],
+    unlocksQuestIds: ["gather_expedition_supplies"],
     rewards: {
       crowns: 25,
       characterXp: 8,
@@ -63,32 +82,39 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
   },
   gather_expedition_supplies: {
     id: "gather_expedition_supplies",
-    displayName: "Gather Expedition Supplies",
+    displayName: "Mark the Glade Route",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
     objectives: [
       {
-        id: "gather_wood",
-        type: "gather_item_count",
+        id: "guide_mossy_glade_surveyor",
+        type: "guide_npc_to_poi",
         targetMapId: MAP_ONE_ID,
-        resourceType: "wood",
+        targetSubzoneId: "mossy-glade",
+        targetPoiId: "mossy-glade-route-marker",
+        targetPosition: { x: 101, y: 25 },
+        guideNpcId: "map-1-mossy-guide",
+        guideStartPosition: { x: 10, y: 29 },
         requiredCount: 1,
       },
       {
-        id: "gather_ore",
+        id: "gather_mossy_glade_herbs",
         type: "gather_item_count",
         targetMapId: MAP_ONE_ID,
-        resourceType: "ore",
-        requiredCount: 1,
-      },
-      {
-        id: "gather_herb",
-        type: "gather_item_count",
-        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "mossy-glade",
         resourceType: "herb",
-        requiredCount: 1,
+        requiredCount: 3,
+      },
+      {
+        id: "defeat_mossy_glade_bats",
+        type: "defeat_enemy_count",
+        enemyMapId: MAP_ONE_ID,
+        targetSubzoneId: "mossy-glade",
+        enemyArchetypeId: "cave_bat",
+        requiredCount: 20,
       },
     ],
+    unlocksQuestIds: ["scout_the_northern_road"],
     rewards: {
       crowns: 20,
       characterXp: 6,
@@ -97,17 +123,37 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
   },
   scout_the_northern_road: {
     id: "scout_the_northern_road",
-    displayName: "Scout the Northern Road",
+    displayName: "Cut the Web Line",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
     objectives: [
       {
-        id: "reach_map_2",
-        type: "reach_poi",
-        targetMapId: MAP_TWO_ID,
+        id: "defeat_lower_shore_spiders",
+        type: "defeat_enemy_count",
+        enemyMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        enemyArchetypeId: "forest_spider",
+        requiredCount: 20,
+      },
+      {
+        id: "gather_lower_shore_ore",
+        type: "gather_item_count",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        resourceType: "ore",
+        requiredCount: 3,
+      },
+      {
+        id: "inspect_lower_shore_wreckage",
+        type: "inspect_poi",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        targetPoiId: "lower-shore-webbed-wreckage",
+        targetPosition: { x: 150, y: 28 },
         requiredCount: 1,
       },
     ],
+    unlocksQuestIds: ["threat_beyond_the_pass"],
     rewards: {
       crowns: 30,
       characterXp: 10,
@@ -119,10 +165,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "Threat Beyond the Pass",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
-    requiresCompletedQuestIds: [
-      "gather_expedition_supplies",
-      "scout_the_northern_road",
-    ],
+    requiresCompletedQuestIds: ["scout_the_northern_road"],
     objectives: [
       {
         id: "clear_map_2_enemies",
@@ -204,13 +247,18 @@ export function getFirstIncompleteObjective(
   state: GameState,
   questId: QuestId,
 ): QuestObjectiveDefinition | null {
+  return getIncompleteObjectives(state, questId)[0] ?? null;
+}
+
+export function getIncompleteObjectives(
+  state: GameState,
+  questId: QuestId,
+): QuestObjectiveDefinition[] {
   const quest = state.quests[questId];
   const definition = QUEST_DEFINITIONS[questId];
 
-  return (
-    definition.objectives.find(
-      (objective) => !quest.objectiveProgress[objective.id]?.completed,
-    ) ?? null
+  return definition.objectives.filter(
+    (objective) => !quest.objectiveProgress[objective.id]?.completed,
   );
 }
 
@@ -255,14 +303,16 @@ export function recordEnemyDefeatedForQuests(
     state,
     (objective) =>
       objective.type === "defeat_enemy_count" &&
-      objective.enemyMapId === mapId,
+      objective.enemyMapId === mapId &&
+      matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) &&
+      matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId),
     1,
   );
 }
 
 export function recordResourceGatheredForQuests(
   state: GameState,
-  resourceType: ResourceType,
+  resource: ResourceEntity | ResourceType,
   mapId: DebugMapId | undefined,
   quantity: number,
 ): GameState {
@@ -270,12 +320,20 @@ export function recordResourceGatheredForQuests(
     return state;
   }
 
+  const resourceType =
+    typeof resource === "string" ? resource : resource.resourceType;
+  const resourceSubzoneId =
+    typeof resource === "string"
+      ? undefined
+      : getSubzoneIdAtPosition(state, resource.position);
+
   return updateMatchingQuestObjectives(
     state,
     (objective) =>
       objective.type === "gather_item_count" &&
       objective.targetMapId === mapId &&
-      objective.resourceType === resourceType,
+      objective.resourceType === resourceType &&
+      matchesOptionalSubzone(objective, resourceSubzoneId),
     quantity,
   );
 }
@@ -290,6 +348,44 @@ export function recordMapReachedForQuests(
       objective.type === "reach_poi" &&
       objective.targetMapId === mapId,
     1,
+  );
+}
+
+export function recordQuestPoiReachedForQuests(
+  state: GameState,
+  poiId: string,
+  mapId: DebugMapId | undefined,
+): GameState {
+  if (!mapId) {
+    return state;
+  }
+
+  return updateMatchingQuestObjectives(
+    state,
+    (objective) =>
+      (objective.type === "inspect_poi" ||
+        objective.type === "guide_npc_to_poi") &&
+      objective.targetMapId === mapId &&
+      objective.targetPoiId === poiId,
+    1,
+  );
+}
+
+export function getSubzoneIdAtPosition(
+  state: GameState,
+  position: Position | undefined,
+): string | undefined {
+  return getSubzoneAtPosition(state.map, position)?.id;
+}
+
+export function matchesObjectiveSubzoneAtPosition(
+  state: GameState,
+  objective: QuestObjectiveDefinition,
+  position: Position | undefined,
+): boolean {
+  return matchesOptionalSubzone(
+    objective,
+    getSubzoneIdAtPosition(state, position),
   );
 }
 
@@ -809,6 +905,20 @@ function unlockAvailableQuests(state: GameState, completedQuestId: QuestId): Gam
   }
 
   return nextState;
+}
+
+function matchesOptionalSubzone(
+  objective: QuestObjectiveDefinition,
+  subzoneId: string | undefined,
+): boolean {
+  return !objective.targetSubzoneId || objective.targetSubzoneId === subzoneId;
+}
+
+function matchesOptionalEnemyArchetype(
+  objective: QuestObjectiveDefinition,
+  archetypeId: Enemy["archetypeId"],
+): boolean {
+  return !objective.enemyArchetypeId || objective.enemyArchetypeId === archetypeId;
 }
 
 function updateMatchingQuestObjectives(

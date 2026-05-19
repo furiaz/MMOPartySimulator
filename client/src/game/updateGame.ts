@@ -17,6 +17,7 @@ import {
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
+import { updateQuestGuideSystem } from "./questGuideSystem";
 import { createResourceWorkContext } from "./gathererResourceReservation";
 import { updateResurrectionSystem } from "./resurrectionSystem";
 import { getPartyMembers } from "./partySystem";
@@ -125,6 +126,7 @@ export function updateGame(
     nextState = updateExplorationSystem(nextState, movedEntityIds);
   }
   nextState = updateFollowSystem(nextState, movedEntityIds);
+  nextState = updateQuestGuideSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState, timing);
   nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);

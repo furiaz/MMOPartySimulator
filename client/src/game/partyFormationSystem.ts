@@ -9,6 +9,12 @@ import {
   type PartyMember,
 } from "./partySystem";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
+import {
+  getActiveQuestGuide,
+  QUEST_GUIDE_ESCORT_RANGE,
+  QUEST_GUIDE_OBJECTIVE_ID,
+  isQuestGuideObjectiveRelevant,
+} from "./questGuideSystem";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import {
   getEntityById,
@@ -367,7 +373,18 @@ function maybeFinishReachedPoi(
     return state;
   }
 
+  if (isActiveGuidePoi(state)) {
+    return state;
+  }
+
   return setLeaderIntent(clearFormationTarget(state), null);
+}
+
+function isActiveGuidePoi(state: GameState): boolean {
+  return (
+    isQuestGuideObjectiveRelevant(state) &&
+    state.localPoiTarget?.objectiveId === QUEST_GUIDE_OBJECTIVE_ID
+  );
 }
 
 function clearFinishedCombat(state: GameState): GameState {
@@ -548,6 +565,8 @@ function createIdleFormation(): PartyFormationState {
 }
 
 function getPartyAggroTarget(state: GameState): Enemy | null {
+  const guide = getActiveQuestGuide(state);
+
   for (const enemy of Object.values(state.entities)) {
     if (!isLiveEnemy(enemy) || enemy.state !== "attack" || !enemy.currentTargetId) {
       continue;
@@ -555,12 +574,22 @@ function getPartyAggroTarget(state: GameState): Enemy | null {
 
     const target = state.entities[enemy.currentTargetId];
 
-    if (isPartyMember(target)) {
+    if (
+      isPartyMember(target) &&
+      (!guide || isRelevantGuideEscortThreat(enemy, guide.position))
+    ) {
       return enemy;
     }
   }
 
   return null;
+}
+
+function isRelevantGuideEscortThreat(
+  enemy: Enemy,
+  guidePosition: Position,
+): boolean {
+  return getDistance(enemy.position, guidePosition) <= QUEST_GUIDE_ESCORT_RANGE;
 }
 
 function getIntentEnemyTarget(state: GameState): Enemy | null {
