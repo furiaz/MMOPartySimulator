@@ -1275,7 +1275,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("interrupts gathering when companions are inside enemy aggro range", () => {
+  it("keeps direct gather commands when companions are inside enemy aggro range", () => {
     const resource = createResource("danger-wood", { x: 6, y: 5 }, {
       resourceType: "wood",
       durability: 5,
@@ -1311,17 +1311,20 @@ describe("game update intent priority", () => {
 
     expect(nextState.entities[enemy.id]).toMatchObject({
       state: "attack",
-      currentTargetId: leader.id,
     });
+    expect([leader.id, ally.id]).toContain(
+      (nextState.entities[enemy.id] as { currentTargetId: string | null })
+        .currentTargetId,
+    );
     expect(nextState.entities[leader.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: enemy.id,
-      commandPriority: "autonomous",
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
     });
     expect(nextState.entities[ally.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: enemy.id,
-      commandPriority: "autonomous",
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
     });
     expect(nextState.entities[resource.id]).toMatchObject({
       durability: resource.durability,
@@ -1353,6 +1356,95 @@ describe("game update intent priority", () => {
 
     expect(nextState.leaderIntent?.type).toBe("attack");
     expect(nextState.leaderIntent?.targetId).toBe(attacker.id);
+  });
+
+  it("keeps direct player move intent from being replaced by combat aggro", () => {
+    const leader = {
+      ...createLeader({ x: 4, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: "attacking-enemy",
+    };
+    const ally = {
+      ...createCompanion("companion-2", { x: 4.5, y: 4 }, leader.id, "fighter"),
+      state: "attack" as const,
+      currentTargetId: "attacking-enemy",
+    };
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const moveTarget = { x: 10, y: 4 };
+
+    const nextState = updateGame(
+      createMapOneState([leader, ally, attacker], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: moveTarget,
+          source: "player",
+        },
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "move",
+      targetId: null,
+      targetPosition: moveTarget,
+      source: "player",
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: null,
+    });
+    expect(nextState.entities[ally.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+    expect(nextState.entities[attacker.id]).toMatchObject({
+      state: "attack",
+    });
+    expect([leader.id, ally.id]).toContain(
+      (nextState.entities[attacker.id] as { currentTargetId: string | null })
+        .currentTargetId,
+    );
+  });
+
+  it("keeps direct player attack intent from being replaced by another attacker", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const chosenEnemy = createEnemy("chosen-enemy", { x: 5, y: 4 });
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 4, y: 5 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, chosenEnemy, attacker], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "attack",
+          targetId: chosenEnemy.id,
+          targetPosition: chosenEnemy.position,
+          source: "player",
+        },
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: chosenEnemy.id,
+      source: "player",
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: chosenEnemy.id,
+    });
   });
 
   it("remembers the interrupted POI when enemy aggro pulls the party into combat", () => {
@@ -2854,7 +2946,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("allows aggressive enemies to interrupt autonomous gatherers when no valid resource is available", () => {
+  it("keeps direct player move intent when aggressive enemies threaten autonomous gatherers", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const gatherer = {
       ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
@@ -2883,8 +2975,13 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.entities[gatherer.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: enemy.id,
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "move",
+      targetPosition: { x: 20, y: 2 },
+      source: "player",
     });
   });
 

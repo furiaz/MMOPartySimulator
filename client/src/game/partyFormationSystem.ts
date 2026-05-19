@@ -18,6 +18,7 @@ import {
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import {
   getEntityById,
+  hasDirectPlayerLeaderIntent,
   moveEntityTowardPositionIfUnoccupied,
   setLeaderIntent,
   updateEntity,
@@ -109,6 +110,24 @@ export function updatePartyFormationSystem(
 }
 
 function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
+  if (hasDirectPlayerLeaderIntent(state)) {
+    const intentTarget = getIntentEnemyTarget(state);
+
+    return {
+      phase:
+        intentTarget &&
+        getDistance(leader.position, intentTarget.position) <= COMBAT_BREAK_DISTANCE
+          ? "combat"
+          : "traveling",
+      target: intentTarget,
+      targetPosition:
+        intentTarget?.position ??
+        state.leaderIntent?.targetPosition ??
+        null,
+      isAggroInterruption: false,
+    };
+  }
+
   const aggroTarget = getPartyAggroTarget(state);
   const intentTarget = getIntentEnemyTarget(state);
   const leaderTarget = getLeaderEnemyTarget(state, leader);

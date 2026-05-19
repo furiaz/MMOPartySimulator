@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion } from "./entities";
+import { createCompanion, getMovementStepDistance } from "./entities";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { createTestGameState } from "./testState";
 
@@ -30,7 +30,7 @@ describe("party formation real-time cohesion", () => {
     const movedLeader = nextState.entities[leader.id];
 
     expect(movedLeader.position.x).toBeGreaterThan(0);
-    expect(movedLeader.position.x).toBeLessThan(0.2);
+    expect(movedLeader.position.x).toBeLessThan(getMovementStepDistance(leader, 100));
   });
 
   it("still waits when followers are severely separated", () => {
@@ -87,7 +87,9 @@ describe("party formation real-time cohesion", () => {
     const nextState = updatePartyFormationSystem(state);
 
     expect(nextState.entities[leader.id].position.x).toBeGreaterThan(0);
-    expect(nextState.entities[leader.id].position.x).toBeLessThan(0.2);
+    expect(nextState.entities[leader.id].position.x).toBeLessThan(
+      getMovementStepDistance(leader, 100),
+    );
   });
 
   it("keeps slowing instead of stopping for repeated blockage before severe separation", () => {
@@ -117,7 +119,9 @@ describe("party formation real-time cohesion", () => {
     const nextState = updatePartyFormationSystem(state);
 
     expect(nextState.entities[leader.id].position.x).toBeGreaterThan(0);
-    expect(nextState.entities[leader.id].position.x).toBeLessThan(0.2);
+    expect(nextState.entities[leader.id].position.x).toBeLessThan(
+      getMovementStepDistance(leader, 100),
+    );
   });
 
   it("waits when a blocked follower becomes severely separated", () => {

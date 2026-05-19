@@ -4,7 +4,12 @@ import {
   getActiveQuestGuide,
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
-import { setLeaderIntent, updateEntity, type GameState } from "./state";
+import {
+  hasDirectPlayerLeaderIntent,
+  setLeaderIntent,
+  updateEntity,
+  type GameState,
+} from "./state";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
@@ -19,6 +24,10 @@ export function protectPartyMember(
   }
 
   if (!isRelevantGuideEscortAttack(state, attackedMember, attacker)) {
+    return state;
+  }
+
+  if (hasDirectPlayerLeaderIntent(state)) {
     return state;
   }
 
@@ -73,6 +82,10 @@ function canProtectPartyMember(
     return false;
   }
 
+  if (entity.commandPriority === "direct") {
+    return false;
+  }
+
   if (
     entity.kind === "companion" &&
     entity.id !== attackedMember.id &&
@@ -95,7 +108,6 @@ function canProtectPartyMember(
 
   if (
     entity.id === attackedMember.id &&
-    entity.commandPriority !== "direct" &&
     isGathererBusy(state, entity)
   ) {
     return false;

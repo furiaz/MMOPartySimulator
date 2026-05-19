@@ -428,6 +428,10 @@ export function setLeaderIntent(
   };
 }
 
+export function hasDirectPlayerLeaderIntent(state: GameState): boolean {
+  return state.leaderIntent?.source === "player";
+}
+
 export function setCompanionRole(
   state: GameState,
   companionId: string,

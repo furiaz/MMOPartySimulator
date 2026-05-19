@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createEnemy } from "./entities";
+import { createCompanion, createEnemy, getMovementStepDistance } from "./entities";
 import { updateDefendSystem } from "./defendSystem";
 import { createTestGameState } from "./testState";
 
@@ -44,6 +44,6 @@ describe("defender real-time movement", () => {
       movedDefender.position.y - defender.position.y,
     );
 
-    expect(distanceMoved).toBeCloseTo(0.2);
+    expect(distanceMoved).toBeCloseTo(getMovementStepDistance(defender, 50) * 2);
   });
 });
