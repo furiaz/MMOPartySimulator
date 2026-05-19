@@ -651,13 +651,15 @@ Equipment is gameplay-facing, not sprite-facing.
 Equipped items:
 
 - affect prototype equipment data
-- may expose simple prototype stat modifiers such as attack, defense, max health, block, evasion, magic power, healing power, magic defense, accuracy, critical chance, critical damage, or health regeneration
+- may expose simple prototype primary stat modifiers
+- may expose simple prototype derived stat modifiers such as attack, defense, max health, block, evasion, magic power, healing power, magic defense, accuracy, critical chance, critical damage, or health regeneration
+- may have a tier
+- may have a level requirement
 - may be displayed in UI summaries
 - do not imply a complete stat scaling system
 - do not visually change character sprites
 - do not add visible weapon swaps
 - do not add paper-doll rendering, weapon anchoring, or sprite attachments
-
 
 Current companion equipment slots:
 
@@ -683,43 +685,74 @@ Current prototype class equipment permissions:
 - Lightbearer: Holy Mace, Holy Lantern
 - Penitent: Thorn Whip, Sacrificial Dagger
 
+Current prototype weapon and offhand item examples include:
+
+- Training Sword
+- Iron Sword
+- Guard Mace
+- Claw Gauntlets
+- Thorn Whip
+- Short Bow
+- Apprentice Orb
+- Rune Lantern
+- Holy Mace
+- Wooden Shield
+- Simple Talisman
+- Holy Lantern
+- Sacrificial Dagger
+
+Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
+
 Armor and accessories are currently shared prototype equipment categories and are not class-restricted unless explicitly defined later.
 
+Current armor families:
 
-Current shared prototype armor and accessory examples include:
+- Cloth
+- Leather
+- Mail
+- Plate
 
-- Cloth Cap
-- Padded Chest
-- Padded Legs
-- Cloth Gloves
-- Travel Boots
+Current prototype armor identity:
+
+- Cloth armor may support healing, magic power, magic defense, wisdom, intelligence, constitution, or evasion.
+- Leather armor may support evasion, dexterity, accuracy, attack, critical chance, or light defense.
+- Mail armor may support balanced defense, constitution, strength, max health, block, attack, accuracy, and small evasion penalties.
+- Plate armor may support heavy defense, block, max health, strength, attack, accuracy, and larger evasion penalties.
+
+Current armor level requirement intent:
+
+- Cloth and Leather Tier 1 armor may be available from level 1.
+- Mail Tier 1 armor may require level 5.
+- Plate Tier 1 armor may require level 10.
+
+Current prototype armor sets may include:
+
+- Acolyte cloth armor
+- Scholar cloth armor
+- Scout leather armor
+- Stalker leather armor
+- Guard mail armor
+- Vanguard mail armor
+- Bulwark plate armor
+- Warplate armor
+
+Current prototype accessory examples include:
+
 - Plain Charm
 
-Current prototype equipment rewards and definitions may also include:
+Current prototype quest equipment rewards may include:
 
-- Worn Cap
-- Worn Tunic
-- Worn Pants
-- Worn Gloves
-- Worn Boots
-- Reinforced Helm
-- Reinforced Armor
-- Reinforced Legguards
-- Reinforced Gloves
-- Reinforced Boots
+- Acolyte Hood
+- Scout Boots
+- Bulwark Cuirass
 
 Current archetype-specific prototype equipment drops may include:
 
 - Holy Lantern from Goblin Shaman
 
-Older prototype armor items may exist as item definitions or quest rewards, but they should not be treated as current enemy drop behavior unless a drop table explicitly uses them.
+This is a prototype equipment foundation, not a full equipment economy.
 
-
-
-Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
-
-Do not implement generalized dual wield, arbitrary two-handed combinations, subclass equipment expansion, equipment visuals, full stat scaling, gear recycling, or a full equipment economy unless explicitly requested.
-
+Do not implement generalized dual wield, arbitrary two-handed combinations, subclass equipment expansion, equipment visuals, gear recycling, rarity, affixes, upgrades, durability, sockets, set bonuses, item comparison, or a full equipment economy unless explicitly requested.
 
 
 
@@ -929,40 +962,61 @@ Supported prototype quest objective type definitions:
 
 - talk to POI
 - reach POI
+- inspect POI
+- guide NPC to POI
 - defeat enemy count
 - gather item count
 - return to POI
 
 Current prototype quest content currently uses:
 
-- reach POI
+- inspect POI
+- guide NPC to POI
 - defeat enemy count
 - gather item count
 
-Talk-to-POI and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
-
+Talk-to-POI, reach-POI, and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
 
 Current prototype quests:
 
-- Clear the Shore
-  - Objective: defeat 5 enemies on First Wild Map
-  - Rewards: 25 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Worn Cap
-  - Unlocks: Gather Expedition Supplies and Scout the Northern Road
+- Secure the Landing
+  - Quest id: clear_the_shore
+  - Objectives: defeat 20 Slimes in Shore Fringe, gather 3 Wood in Shore Fringe, and inspect the Shore Fringe supply marker
+  - Rewards: 25 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Acolyte Hood
+  - Unlocks: Mark the Glade Route
 
-- Gather Expedition Supplies
-  - Objective: gather 1 Wood, 1 Ore, and 1 Herb on First Wild Map
+- Mark the Glade Route
+  - Quest id: gather_expedition_supplies
+  - Objectives: guide the Glade Surveyor to the Mossy Glade route marker, gather 3 Herbs in Mossy Glade, and defeat 20 Cave Bats in Mossy Glade
   - Rewards: 20 Crowns, 6 character XP, 3 Field Herb
+  - Unlocks: Cut the Web Line
 
-- Scout the Northern Road
-  - Objective: reach Second Wild Map
-  - Rewards: 30 Crowns, 10 character XP, 1 Travel Boots
+- Cut the Web Line
+  - Quest id: scout_the_northern_road
+  - Objectives: defeat 20 Forest Spiders in Lower Shore, gather 3 Ore in Lower Shore, and inspect the Lower Shore webbed wreckage
+  - Rewards: 30 Crowns, 10 character XP, 1 Scout Boots
+  - Unlocks: Threat Beyond the Pass
 
 - Threat Beyond the Pass
-  - Requirements: Gather Expedition Supplies completed and Scout the Northern Road completed
-  - Objective: defeat 5 enemies on Second Wild Map
-  - Rewards: 75 Crowns, 20 character XP, 2 Tier 2 Orc Tusk, 1 Reinforced Armor
+  - Quest id: threat_beyond_the_pass
+  - Requirements: Cut the Web Line completed
+  - Objective: defeat 5 enemies on Second Wild Zone
+  - Rewards: 75 Crowns, 20 character XP, 2 Tier 2 Orc Tusk, 1 Bulwark Cuirass
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches the interaction range.
+
+Current prototype quest guide behavior:
+
+- the Glade Surveyor is a temporary guide NPC for Mark the Glade Route
+- the guide appears only while the guide objective is active and incomplete
+- the guide waits near the First Wild Zone entry area until contacted
+- the guide moves toward the Mossy Glade route marker after contact
+- the guide moves at a slower prototype escort speed
+- the guide pauses if no companion is within escort range
+- the objective completes when the guide reaches the route marker
+- party protection and enemy targeting should account for nearby escort threats without pulling the party away to unrelated distant enemies
+
+The quest guide is a prototype escort objective, not a full follower, recruitment, dialogue, companion, town NPC, or production escort system.
 
 Current prototype quest reward behavior:
 
@@ -1007,21 +1061,20 @@ Current intended POI priority order:
 6. hub Merchant quick exchange when eligible junk is available
 7. reachable wild combat target when combat fallback is relevant
 8. reachable wild resource target when gathering fallback is relevant
-9. reachable exploration target for reach objectives
+9. reachable exploration or inspect target for quest objectives
 10. safe idle hub point
 
 When the party is in the hub, eligible merchant quick exchange may be considered before quest and idle targets.
 
 POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, already satisfied, or gatherer-reserved resource targets.
 
-POI selection may use path distance, priority, target scoring, and short commitment windows to avoid unstable target switching.
+POI selection may use path distance, priority, target scoring, progressive fallback, local target preference, and short commitment windows to avoid unstable target switching.
 
 When Stay in Subzone is enabled, POI selection should prefer targets inside the leader's current subzone, while still allowing valid teleport POIs and local quest interactions.
 
-POI direction may route the leader toward quest givers, combat targets, resources, exploration points, idle hub positions, or prototype teleports.
+POI direction may route the leader toward quest givers, combat targets, resources, exploration points, inspect points, escort points, idle hub positions, or prototype teleports.
 
 If combat interrupts an active POI target, the prototype may preserve the interrupted POI and restore it after combat ends when the target is still valid and no direct party command blocks it.
-
 
 This is a prototype guidance layer for current debug maps. It is not a full quest system, dialogue system, final POI framework, final zone-routing system, or production content pipeline.
 
@@ -1490,7 +1543,7 @@ Current prototype hub:
 
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
-- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, and a clear exit to the first wild map.
+- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, and a clear exit to the first wild zone.
 - Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and Test Hunter.
 - The Quest Giver supports the lightweight prototype quest chain only.
 - The Merchant supports prototype quick exchange of eligible junk items for Crowns only.
@@ -1544,17 +1597,17 @@ Current prototype/debug map routes are:
 Current readable prototype/debug map names:
 
 - `hub`: Harbor Union Bastion
-- `map-1`: First Wild Map
-- `map-2`: Second Wild Map
-- `map-3`: Third Wild Map
-- `map-4`: Fourth Wild Map
+- `map-1`: First Wild Zone
+- `map-2`: Second Wild Zone
+- `map-3`: Third Wild Zone
+- `map-4`: Fourth Wild Zone
 
 Current prototype wilderness subzones are:
 
-- First Wild Map: Shore Fringe, Mossy Glade, Lower Shore
-- Second Wild Map: Scout Rise, Old Grove, Wolf Causeway
-- Third Wild Map: Broken Thicket, Crawler Shelf, Imp Fen
-- Fourth Wild Map: Shaman Watch, Ash Hollow, Orc Approach
+- First Wild Zone: Shore Fringe, Mossy Glade, Lower Shore
+- Second Wild Zone: Scout Rise, Old Grove, Wolf Causeway
+- Third Wild Zone: Broken Thicket, Crawler Shelf, Imp Fen
+- Fourth Wild Zone: Shaman Watch, Ash Hollow, Orc Approach
 
 Current prototype subzones may define level ranges, enemy archetype lists, encounter areas, encounter leash radii, resource locations, passages, and UI-facing name labels.
 
@@ -1599,23 +1652,25 @@ Maps should support:
 
 The game uses a top-down readable presentation.
 
-Current visuals may use prototype sprites, generated terrain tiles, and placeholders.
+Current world rendering uses a PixiJS renderer for the main map view.
+
+Current visuals may use prototype sprites, generated terrain tiles, generated icons, and placeholders.
 
 Visual priorities:
 
 - party members should be easy to identify
 - enemies should be easy to distinguish from party members
-- NPCs should be easy to identify in prototype hub spaces
+- NPCs should be easy to identify in prototype hub and quest spaces
 - resources should be visible and readable
 - movement direction should be understandable
-- terrain, walls, obstacles, labels, and feedback should remain readable at the current prototype render scale
-- feedback should make combat, gathering, and skills readable
+- terrain, walls, obstacles, labels, teleports, and feedback should remain readable at the current prototype render scale
+- feedback should make combat, gathering, drops, quest guidance, escort behavior, and skills readable
 
-Enemy and NPC name labels may be used as UI-facing readability aids. Name labels must not define simulation behavior, targeting rules, NPC behavior, dialogue, or final content pipeline rules.
+Enemy, NPC, and subzone name labels may be used as UI-facing readability aids. Name labels must not define simulation behavior, targeting rules, NPC behavior, dialogue, or final content pipeline rules.
 
-Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, and input targeting while rendering larger floor chunks as background terrain.
+Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, labels, effects, camera math, and input targeting while rendering larger floor chunks as background terrain.
 
-Current generated terrain asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, and larger floor tile variants for visual testing.
+Current generated terrain asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, and generated skill or feedback sprites.
 
 Terrain asset size and render scale are UI-facing presentation choices. They must not define simulation coordinates, movement, collision, map geometry, entity placement, gameplay range, final art direction, or a production asset pipeline.
 
@@ -1624,7 +1679,6 @@ Prototype art assets are allowed while systems are being built.
 Art assets should not define game logic.
 
 Final art direction may evolve later.
-
 
 ---
 
@@ -1672,6 +1726,8 @@ Temporary debug tools may include:
 - inspect enemy scaling, respawn, subzone, and encounter area behavior
 - inspect resurrection and world-wipe recovery behavior
 - inspect interrupted POI restore behavior
+- inspect quest guide escort behavior
+- inspect PixiJS world rendering behavior
 
 
 Debug tools are not part of final gameplay.
@@ -1703,6 +1759,7 @@ Do not implement these unless explicitly requested:
 - final death penalty, checkpoint, resurrection economy, or recovery system beyond prototype resurrection and world-wipe recovery
 - production enemy respawn, encounter reset, or spawn scheduling beyond current prototype wild-map respawn behavior
 - production POI framework beyond current debug-map guidance
+- production escort, follower, recruitment, or companion NPC systems beyond the current quest guide prototype
 
 
 ---

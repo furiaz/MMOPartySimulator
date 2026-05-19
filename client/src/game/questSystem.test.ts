@@ -61,7 +61,7 @@ describe("prototype quest system", () => {
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(25);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
-      { itemId: "worn_cap", quantity: 1 },
+      { itemId: "acolyte_hood", quantity: 1 },
     ]);
     expect(getCompanion(state, "companion-1").characterLevel).toBe(2);
     expect(getCompanion(state, "companion-1").characterXp).toBe(2);
@@ -300,7 +300,7 @@ describe("prototype quest system", () => {
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(25);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
-      { itemId: "worn_cap", quantity: 1 },
+      { itemId: "acolyte_hood", quantity: 1 },
     ]);
   });
 

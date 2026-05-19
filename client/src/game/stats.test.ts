@@ -71,6 +71,39 @@ describe("prototype companion stats", () => {
     });
   });
 
+  it("adds equipped primary stat modifiers to actual companion stats", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      equipment: {
+        ...createCompanion("equipment-source", { x: 0, y: 0 }, "equipment-source")
+          .equipment,
+        head: "acolyte_hood" as const,
+      },
+    };
+
+    expect(getCompanionActualStats(companion).wisdom).toBe(2);
+  });
+
+  it("flows equipped primary stat modifiers and penalties into derived stats", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 10,
+      equipment: {
+        ...createCompanion("equipment-source", { x: 0, y: 0 }, "equipment-source")
+          .equipment,
+        chest: "bulwark_cuirass" as const,
+        legs: "bulwark_greaves" as const,
+      },
+    };
+
+    expect(getCompanionDerivedStats(companion)).toMatchObject({
+      defense: 8,
+      maxHealth: 37,
+      evasion: -4,
+      block: 1,
+    });
+  });
+
   it("lets wisdom contribute to defense, magic power, and healing power", () => {
     const companion = {
       ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),

@@ -1,4 +1,7 @@
-import { getCompanionEquipmentStatModifiers } from "./equipmentRules";
+import {
+  getCompanionEquipmentPrimaryStatModifiers,
+  getCompanionEquipmentStatModifiers,
+} from "./equipmentRules";
 import type {
   ClassId,
   Companion,
@@ -148,12 +151,18 @@ export function allocateCompanionStatPoint(
 export function getCompanionActualStats(
   companion: Companion,
   temporaryStatModifiers: CompanionPrimaryStatModifiers = {},
+  equipmentPrimaryStatModifiers: CompanionPrimaryStatModifiers =
+    getCompanionEquipmentPrimaryStatModifiers(companion),
 ): CompanionPrimaryStats {
   const permanentStats = addCompanionPrimaryStats(
     companion.naturalStats,
     companion.allocatedStats,
   );
-  const actualStats = addCompanionPrimaryStats(permanentStats, temporaryStatModifiers);
+  const equipmentStats = addCompanionPrimaryStats(
+    permanentStats,
+    equipmentPrimaryStatModifiers,
+  );
+  const actualStats = addCompanionPrimaryStats(equipmentStats, temporaryStatModifiers);
 
   return createCompanionPrimaryStatsFromValues(
     clampActualPrimaryStat(actualStats.strength),
@@ -168,12 +177,14 @@ export function getCompanionDerivedStats(
   companion: Companion,
   options: {
     temporaryStatModifiers?: CompanionPrimaryStatModifiers;
+    equipmentPrimaryStatModifiers?: CompanionPrimaryStatModifiers;
     equipmentStatModifiers?: EquipmentStatModifiers;
   } = {},
 ): CompanionDerivedStats {
   const actualStats = getCompanionActualStats(
     companion,
     options.temporaryStatModifiers,
+    options.equipmentPrimaryStatModifiers,
   );
   const equipmentStatModifiers =
     options.equipmentStatModifiers ?? getCompanionEquipmentStatModifiers(companion);

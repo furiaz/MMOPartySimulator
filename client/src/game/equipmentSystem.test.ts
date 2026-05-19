@@ -13,15 +13,19 @@ function createStateWithCompanion(
   classId: ClassId,
   itemIds: ItemId[] = [],
   capacity = 10,
+  characterLevel = 10,
 ): { state: GameState; companion: Companion } {
-  const companion = createCompanion(
-    "companion-1",
-    { x: 0, y: 0 },
-    "companion-1",
-    "fighter",
-    0,
-    classId,
-  );
+  const companion = {
+    ...createCompanion(
+      "companion-1",
+      { x: 0, y: 0 },
+      "companion-1",
+      "fighter",
+      0,
+      classId,
+    ),
+    characterLevel,
+  };
   const state = itemIds.reduce(
     (nextState, itemId) =>
       addItemToInventoryState(nextState, itemId, 1, "debug").state,
@@ -119,15 +123,15 @@ describe("prototype equipment system", () => {
 
   it("returns replaced equipment to inventory without deleting items", () => {
     const { state, companion } = createStateWithCompanion("aegis", [
-      "training_mace",
+      "guard_mace",
       "wooden_shield",
-      "cloth_cap",
+      "acolyte_hood",
     ]);
     const equippedState = equipItemToCompanion(
       equipItemToCompanion(
         state,
         companion.id,
-        "training_mace",
+        "guard_mace",
         "mainHand",
       ).state,
       companion.id,
@@ -138,20 +142,20 @@ describe("prototype equipment system", () => {
     const { state: nextState, result } = equipItemToCompanion(
       equippedState,
       companion.id,
-      "cloth_cap",
+      "acolyte_hood",
       "head",
     );
     const nextCompanion = nextState.entities[companion.id] as Companion;
 
     expect(result.status).toBe("success");
-    expect(nextCompanion.equipment.mainHand).toBe("training_mace");
+    expect(nextCompanion.equipment.mainHand).toBe("guard_mace");
     expect(nextCompanion.equipment.offhand).toBe("wooden_shield");
-    expect(nextCompanion.equipment.head).toBe("cloth_cap");
+    expect(nextCompanion.equipment.head).toBe("acolyte_hood");
   });
 
   it("clears and returns offhand when equipping a both-hands weapon", () => {
     const { state, companion } = createStateWithCompanion("aegis", [
-      "training_mace",
+      "guard_mace",
       "wooden_shield",
       "short_bow",
     ]);
@@ -159,7 +163,7 @@ describe("prototype equipment system", () => {
       equipItemToCompanion(
         state,
         companion.id,
-        "training_mace",
+        "guard_mace",
         "mainHand",
       ).state,
       companion.id,
@@ -191,10 +195,48 @@ describe("prototype equipment system", () => {
     expect(nextCompanion.equipment.offhand).toBeNull();
     expect(nextState.inventory.slots).toEqual(
       expect.arrayContaining([
-        { itemId: "training_mace", quantity: 1 },
+        { itemId: "guard_mace", quantity: 1 },
         { itemId: "wooden_shield", quantity: 1 },
       ]),
     );
+  });
+
+  it("lets armor ignore class restrictions when level requirements are met", () => {
+    const { state, companion } = createStateWithCompanion("elementalist", [
+      "bulwark_cuirass",
+    ]);
+
+    const { state: nextState, result } = equipItemToCompanion(
+      state,
+      companion.id,
+      "bulwark_cuirass",
+      "chest",
+    );
+    const nextCompanion = nextState.entities[companion.id] as Companion;
+
+    expect(result.status).toBe("success");
+    expect(nextCompanion.equipment.chest).toBe("bulwark_cuirass");
+  });
+
+  it("rejects armor when the companion is below its level requirement", () => {
+    const { state, companion } = createStateWithCompanion(
+      "elementalist",
+      ["bulwark_cuirass"],
+      10,
+      1,
+    );
+
+    const { result } = equipItemToCompanion(
+      state,
+      companion.id,
+      "bulwark_cuirass",
+      "chest",
+    );
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "level_requirement_not_met",
+    });
   });
 
   it("does not unequip when inventory is full", () => {

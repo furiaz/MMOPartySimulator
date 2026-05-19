@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
 import {
+  ARMOR_FAMILY_LABELS,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   getItemDefinition,
@@ -12,7 +13,16 @@ import {
   type ItemId,
   type PartyInventory,
   type PartyWallet,
+  type PrimaryStatId,
 } from "./game";
+
+const primaryStatLabels: Record<PrimaryStatId, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+};
 
 function getInventorySlotTitle(slot: PartyInventory["slots"][number]): string {
   const itemDefinition = getItemDefinition(slot.itemId);
@@ -22,7 +32,7 @@ function getInventorySlotTitle(slot: PartyInventory["slots"][number]): string {
     `Category ${itemDefinition.category}`,
     `Quantity ${slot.quantity}/${itemDefinition.maxStack}`,
     getEquipmentDetailText(itemDefinition),
-    getStatModifierText(itemDefinition),
+    getItemModifierText(itemDefinition),
   ].join("\n");
 }
 
@@ -117,7 +127,7 @@ export function InventoryPanel({
           <div>
             <strong>{selectedItemDefinition.displayName}</strong>
             <span>{getEquipmentDetailText(selectedItemDefinition)}</span>
-            <span>{getStatModifierText(selectedItemDefinition)}</span>
+            <span>{getItemModifierText(selectedItemDefinition)}</span>
           </div>
           {selectedItemDefinition.category === "equipment" ? (
             <button onClick={onOpenEquipmentManagement} type="button">
@@ -193,6 +203,10 @@ function getEquipmentDetailText(itemDefinition: ItemDefinition): string {
     itemDefinition.equipmentType
       ? `Type ${EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]}`
       : null,
+    itemDefinition.armorFamily
+      ? `Family ${ARMOR_FAMILY_LABELS[itemDefinition.armorFamily]}`
+      : null,
+    itemDefinition.tier ? `Tier ${itemDefinition.tier}` : null,
     itemDefinition.occupiesBothHands ? "Occupies both hands" : null,
     itemDefinition.levelRequirement
       ? `Level ${itemDefinition.levelRequirement}+`
@@ -202,20 +216,29 @@ function getEquipmentDetailText(itemDefinition: ItemDefinition): string {
     .join(" | ");
 }
 
-function getStatModifierText(itemDefinition: ItemDefinition): string {
-  const statModifiers = itemDefinition.statModifiers;
+function getItemModifierText(itemDefinition: ItemDefinition): string {
+  const primaryStats = Object.entries(itemDefinition.primaryStatModifiers ?? {})
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(
+      ([stat, value]) =>
+        `${primaryStatLabels[stat as PrimaryStatId]} ${formatModifier(value)}`,
+    );
+  const derivedStats = Object.entries(itemDefinition.statModifiers ?? {})
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(([stat, value]) => `${formatStatName(stat)} ${formatModifier(value)}`);
+  const stats = [...primaryStats, ...derivedStats];
 
-  if (!statModifiers) {
-    return itemDefinition.category === "equipment" ? "Stats none" : "";
-  }
-
-  const stats = Object.entries(statModifiers)
-    .filter(([, value]) => Boolean(value))
-    .map(([stat, value]) => `${formatStatName(stat)} +${value}`);
-
-  return stats.length > 0 ? stats.join(", ") : "Stats none";
+  return stats.length > 0
+    ? stats.join(", ")
+    : itemDefinition.category === "equipment"
+      ? "Stats none"
+      : "";
 }
 
 function formatStatName(stat: string): string {
   return stat.replace(/[A-Z]/g, (letter) => ` ${letter}`).toLowerCase();
+}
+
+function formatModifier(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}`;
 }

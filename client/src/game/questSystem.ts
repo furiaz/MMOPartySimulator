@@ -77,7 +77,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
       crowns: 25,
       characterXp: 8,
       items: [{ itemId: "wolf_pelt", quantity: 2 }],
-      equipment: [{ itemId: "worn_cap", quantity: 1 }],
+      equipment: [{ itemId: "acolyte_hood", quantity: 1 }],
     },
   },
   gather_expedition_supplies: {
@@ -157,7 +157,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     rewards: {
       crowns: 30,
       characterXp: 10,
-      equipment: [{ itemId: "travel_boots", quantity: 1 }],
+      equipment: [{ itemId: "scout_boots", quantity: 1 }],
     },
   },
   threat_beyond_the_pass: {
@@ -178,7 +178,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
       crowns: 75,
       characterXp: 20,
       items: [{ itemId: "orc_tusk", quantity: 2 }],
-      equipment: [{ itemId: "reinforced_armor", quantity: 1 }],
+      equipment: [{ itemId: "bulwark_cuirass", quantity: 1 }],
     },
   },
 };

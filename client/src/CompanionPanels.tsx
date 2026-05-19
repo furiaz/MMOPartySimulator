@@ -4,12 +4,14 @@ import {
   INVENTORY_ITEM_ICON_SRC,
 } from "./assetIcons";
 import {
+  ARMOR_FAMILY_LABELS,
   CLASS_DEFINITIONS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
   getCharacterXpProgress,
+  getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
   getCompanionActualStats,
   getCompanionDerivedStats,
@@ -19,6 +21,7 @@ import {
   getSkillsForClass,
   validateEquipmentItemForCompanion,
   type Companion,
+  type CompanionPrimaryStatModifiers,
   type EquipmentSlot,
   type EquipmentStatModifiers,
   type ItemDefinition,
@@ -646,6 +649,7 @@ function PartyEquipmentSection({
       selectedSlot,
     )
   );
+  const primaryStatModifiers = getCompanionEquipmentPrimaryStatModifiers(member);
   const statModifiers = getCompanionEquipmentStatModifiers(member);
   const selectedItemId = member.equipment[selectedSlot];
   const selectedItemDefinition = selectedItemId
@@ -685,7 +689,10 @@ function PartyEquipmentSection({
           );
         })}
       </div>
-      <StatModifierSummary statModifiers={statModifiers} />
+      <StatModifierSummary
+        primaryStatModifiers={primaryStatModifiers}
+        statModifiers={statModifiers}
+      />
       {selectedEquipmentSlot ? (
         <div className="equipment-popover-backdrop" role="presentation">
           <aside className="equipment-popover" aria-label="Equipment slot options">
@@ -793,6 +800,8 @@ function EquipmentInventoryRow({
             : "Equipment"}
         </span>
       </span>
+      <span>{getEquipmentMetadataText(itemDefinition)}</span>
+      <span>{getItemModifierText(itemDefinition)}</span>
       <span>{getEquipmentValidityText(member, itemDefinition, targetSlot)}</span>
       <div>
         <button
@@ -808,25 +817,63 @@ function EquipmentInventoryRow({
 }
 
 function StatModifierSummary({
+  primaryStatModifiers,
   statModifiers,
 }: {
+  primaryStatModifiers: CompanionPrimaryStatModifiers;
   statModifiers: EquipmentStatModifiers;
 }) {
-  const entries = Object.entries(statModifiers).filter(([, value]) =>
-    Boolean(value)
-  );
+  const primaryEntries = Object.entries(primaryStatModifiers)
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(
+      ([stat, value]) =>
+        `${primaryStatLabels[stat as PrimaryStatId]} ${formatModifier(value)}`,
+    );
+  const derivedEntries = Object.entries(statModifiers)
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(([stat, value]) => `${formatStatName(stat)} ${formatModifier(value)}`);
+  const entries = [...primaryEntries, ...derivedEntries];
 
   return (
     <div className="equipment-stat-summary">
       {entries.length > 0
-        ? entries.map(([stat, value]) => (
-            <span key={stat}>
-              {formatStatName(stat)} +{value}
-            </span>
-          ))
+        ? entries.map((entry) => <span key={entry}>{entry}</span>)
         : "No equipment stat modifiers"}
     </div>
   );
+}
+
+function getEquipmentMetadataText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.category !== "equipment") {
+    return "";
+  }
+
+  return [
+    itemDefinition.armorFamily
+      ? ARMOR_FAMILY_LABELS[itemDefinition.armorFamily]
+      : null,
+    itemDefinition.tier ? `Tier ${itemDefinition.tier}` : null,
+    itemDefinition.levelRequirement
+      ? `Level ${itemDefinition.levelRequirement}+`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function getItemModifierText(itemDefinition: ItemDefinition): string {
+  const primaryStats = Object.entries(itemDefinition.primaryStatModifiers ?? {})
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(
+      ([stat, value]) =>
+        `${primaryStatLabels[stat as PrimaryStatId]} ${formatModifier(value)}`,
+    );
+  const derivedStats = Object.entries(itemDefinition.statModifiers ?? {})
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(([stat, value]) => `${formatStatName(stat)} ${formatModifier(value)}`);
+  const stats = [...primaryStats, ...derivedStats];
+
+  return stats.length > 0 ? stats.join(", ") : "Stats none";
 }
 
 function getTargetSlotsForItem(itemDefinition: ItemDefinition): EquipmentSlot[] {
@@ -875,6 +922,10 @@ function formatReason(reason: string): string {
 
 function formatStatName(stat: string): string {
   return stat.replace(/[A-Z]/g, (letter) => ` ${letter}`).toLowerCase();
+}
+
+function formatModifier(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}`;
 }
 
 function RoleSelectSection({

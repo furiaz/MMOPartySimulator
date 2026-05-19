@@ -193,6 +193,8 @@ export type EquipmentSlot =
 
 export type EquipmentKind = "weapon" | "offhand" | "armor" | "accessory";
 
+export type ArmorFamily = "cloth" | "leather" | "mail" | "plate";
+
 export type WeaponType =
   | "training_sword"
   | "one_handed_sword"
@@ -295,7 +297,7 @@ export type JunkItemId =
 export type EquipmentItemId =
   | "training_sword"
   | "iron_sword"
-  | "training_mace"
+  | "guard_mace"
   | "claw_gauntlets"
   | "thorn_whip"
   | "short_bow"
@@ -306,22 +308,47 @@ export type EquipmentItemId =
   | "simple_talisman"
   | "holy_lantern"
   | "sacrificial_dagger"
-  | "cloth_cap"
-  | "padded_chest"
-  | "padded_legs"
-  | "cloth_gloves"
-  | "travel_boots"
-  | "plain_charm"
-  | "worn_cap"
-  | "worn_tunic"
-  | "worn_pants"
-  | "worn_gloves"
-  | "worn_boots"
-  | "reinforced_helm"
-  | "reinforced_armor"
-  | "reinforced_legguards"
-  | "reinforced_gloves"
-  | "reinforced_boots";
+  | "acolyte_hood"
+  | "acolyte_robe"
+  | "acolyte_pants"
+  | "acolyte_wraps"
+  | "acolyte_sandals"
+  | "scholar_hood"
+  | "scholar_robe"
+  | "scholar_pants"
+  | "scholar_gloves"
+  | "scholar_sandals"
+  | "scout_cap"
+  | "scout_jacket"
+  | "scout_trousers"
+  | "scout_gloves"
+  | "scout_boots"
+  | "stalker_mask"
+  | "stalker_vest"
+  | "stalker_leggings"
+  | "stalker_grips"
+  | "stalker_boots"
+  | "guard_coif"
+  | "guard_hauberk"
+  | "guard_legguards"
+  | "guard_gloves"
+  | "guard_boots"
+  | "vanguard_coif"
+  | "vanguard_hauberk"
+  | "vanguard_legguards"
+  | "vanguard_gloves"
+  | "vanguard_boots"
+  | "bulwark_helm"
+  | "bulwark_cuirass"
+  | "bulwark_greaves"
+  | "bulwark_gauntlets"
+  | "bulwark_sabatons"
+  | "warplate_helm"
+  | "warplate_cuirass"
+  | "warplate_greaves"
+  | "warplate_gauntlets"
+  | "warplate_sabatons"
+  | "plain_charm";
 
 export type ItemId = ResourceItemId | JunkItemId | EquipmentItemId;
 
@@ -349,7 +376,9 @@ export type ItemDefinition = {
   equipmentSlot?: EquipmentSlot;
   equipmentKind?: EquipmentKind;
   equipmentType?: EquipmentType;
+  armorFamily?: ArmorFamily;
   allowedClassIds?: ClassId[];
+  primaryStatModifiers?: CompanionPrimaryStatModifiers;
   statModifiers?: EquipmentStatModifiers;
   levelRequirement?: number;
   occupiesBothHands?: boolean;

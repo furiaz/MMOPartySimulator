@@ -28,7 +28,7 @@ const DEFAULT_DEBUG_OPTIONS = {
 const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "training_sword",
   "iron_sword",
-  "training_mace",
+  "guard_mace",
   "claw_gauntlets",
   "thorn_whip",
   "short_bow",
@@ -39,11 +39,14 @@ const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "simple_talisman",
   "holy_lantern",
   "sacrificial_dagger",
-  "cloth_cap",
-  "padded_chest",
-  "padded_legs",
-  "cloth_gloves",
-  "travel_boots",
+  "acolyte_hood",
+  "scholar_robe",
+  "scout_boots",
+  "stalker_grips",
+  "guard_hauberk",
+  "vanguard_gloves",
+  "bulwark_cuirass",
+  "warplate_gauntlets",
   "plain_charm",
 ] as const;
 

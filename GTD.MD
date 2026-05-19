@@ -20,13 +20,16 @@ The game is divided into:
 
 - Game Logic: `client/src/game/`
 - UI Layer: React components in `client/src/`
+- World renderer: `client/src/worldRenderer/PixiWorldRenderer.tsx`
 - Visual asset registry, image icon mappings, and sprite helpers: `client/src/visualAssets.ts`, `client/src/assetIcons.ts`, and `client/src/SpriteAnimation.tsx`
 
-Game logic must not depend on React.
+Game logic must not depend on React or PixiJS.
 
-React may display game state, issue commands into game logic, start/stop the simulation loop for development, expose temporary debug controls, and render temporary visual effects and sprite animations from game state.
+React may display game state, issue commands into game logic, start/stop the simulation loop for development, expose temporary debug controls, host the PixiJS world renderer, and render temporary UI overlays from game state.
 
-React must not contain core simulation rules.
+PixiJS may render world visuals from game state, but must not own simulation behavior.
+
+React and PixiJS must not contain core simulation rules.
 
 ---
 
@@ -68,7 +71,6 @@ Current files include:
 - `items.ts`
 - `leveling.ts`
 - `merchant.ts`
-- `movementCadence.ts`
 - `movementState.ts`
 - `navigation.ts`
 - `partyFormationSystem.ts`
@@ -79,6 +81,7 @@ Current files include:
 - `poiSystem.ts`
 - `poiTypes.ts`
 - `positionUtils.ts`
+- `questGuideSystem.ts`
 - `questSystem.ts`
 - `questTypes.ts`
 - `resurrectionSystem.ts`
@@ -118,8 +121,7 @@ Current entity kinds:
 type EntityKind = "companion" | "enemy" | "resource" | "npc";
 ```
 
-NPC entities are prototype placeholders for safe hub map visuals. Current prototype NPC behavior is limited to Quest Giver quest interaction and Merchant quick exchange. NPCs do not implement dialogue, full shops, crafting, recruitment, smithing, or relationship behavior.
-
+NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior. Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, placeholder hub NPC display, and the temporary quest guide escort NPC. NPCs do not implement dialogue, full shops, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
 
 
 The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
@@ -605,7 +607,7 @@ Allocated stats represent player-assigned stat points.
 
 Unspent stat points represent available allocation points.
 
-Equipment stat modifiers are reused by derived stat calculation and remain flat prototype modifiers.
+Equipment may provide primary stat modifiers and derived stat modifiers. Primary stat modifiers are included when calculating actual companion stats, and derived stat modifiers are included when calculating derived combat stats.
 
 Derived max health is synchronized onto companions when relevant state changes occur.
 
@@ -689,15 +691,39 @@ Leader intent may be cleared when a point of interest is reached, combat ends, o
 
 Prototype quest definitions live in `questSystem.ts` and quest types live in `questTypes.ts`.
 
+Quest guide escort behavior lives in `questGuideSystem.ts`.
+
 Quest state is stored on `GameState` as `quests: Record<QuestId, QuestState>`.
 
 Current quest ids are `clear_the_shore`, `gather_expedition_supplies`, `scout_the_northern_road`, and `threat_beyond_the_pass`.
 
+Current quest display names are:
+
+- `clear_the_shore`: Secure the Landing
+- `gather_expedition_supplies`: Mark the Glade Route
+- `scout_the_northern_road`: Cut the Web Line
+- `threat_beyond_the_pass`: Threat Beyond the Pass
+
 Current quest statuses are `locked`, `available`, `active`, `ready_to_turn_in`, and `completed`.
+
+Current quest objective types are:
+
+```ts
+type QuestObjectiveType =
+  | "talk_to_poi"
+  | "reach_poi"
+  | "defeat_enemy_count"
+  | "gather_item_count"
+  | "inspect_poi"
+  | "guide_npc_to_poi"
+  | "return_to_poi";
+```
 
 Current quest reward source types are `npc`, `mapTrigger`, and `objectTrigger`.
 
-Only NPC quest turn-in is implemented. Map trigger and object trigger sources are future-facing type support only.
+Only NPC quest acceptance and turn-in are implemented. Map trigger and object trigger sources are future-facing type support only.
+
+Current implemented quest objective behavior includes defeat counts, gather counts, inspect POIs, and guide NPC escort objectives.
 
 Current quest rewards may include:
 
@@ -722,6 +748,22 @@ Quest reward claim behavior:
 - Non-repeatable quests cannot grant rewards more than once.
 - Inventory-full failures leave the quest `ready_to_turn_in`.
 
+`questGuideSystem.ts` currently owns the Glade Surveyor escort objective for Mark the Glade Route.
+
+Current quest guide behavior:
+
+- uses NPC id `map-1-mossy-guide`
+- spawns only on `map-1` while the guide objective is active and incomplete
+- starts at `{ x: 10, y: 29 }`
+- waits until the leader reaches contact range
+- moves toward the Mossy Glade route marker at `{ x: 101, y: 25 }`
+- moves only while at least one companion is within escort range
+- uses a slower guide movement speed multiplier
+- completes the quest objective when it reaches the target position
+- is protected by nearby party behavior and escort-aware threat checks
+
+The quest guide is a prototype escort system. It must not become a general follower, recruitment, companion NPC, or production escort framework unless explicitly requested.
+
 POI selection types live in `poiTypes.ts`.
 
 Current POI categories are `npc`, `quest`, `combat`, `resource`, `teleport`, `exploration`, `idle`, and `event`.
@@ -733,25 +775,25 @@ POI selection should evaluate progression targets before generic map activity.
 Current intended POI priority order:
 
 1. active World Travel route target
-2. hub Merchant quick exchange when eligible junk is available
+2. active quest objective target on the current map
 3. ready quest turn-in target
-4. active quest objective target on the current map
-5. available quest acceptance target on the current map
-6. quest-required prototype teleport when the active objective is on another reachable prototype map
+4. available quest acceptance target on the current map
+5. quest-required prototype teleport when the active objective is on another reachable prototype map
+6. hub Merchant quick exchange when eligible junk is available
 7. reachable wild combat target when combat fallback is relevant
 8. reachable wild resource target when gathering fallback is relevant
-9. reachable unexplored exploration point
+9. reachable exploration or inspect target
 10. safe idle hub point
 
 POI selection should skip targets that are invalid, unreachable, depleted, dead, completed, locked, already satisfied, reserved by autonomous gatherer work, blocked by Stay in Subzone rules, or not relevant to the current map.
 
-POI selection may score candidates by priority, path distance, fallback score, nearby-resource bonus, and stable-target switching rules.
+POI selection may score candidates by priority, path distance, fallback score, nearby-resource bonus, progressive fallback, local target preference, and stable-target switching rules.
 
 Wild POI selection may reuse a valid target briefly before reevaluating. Active quest resource POIs may use a longer short commitment window than generic wild fallback POIs.
 
 POI selection should record debug telemetry for selected POIs and skipped POIs where useful.
 
-The POI system may set leader intent toward quest givers, combat targets, resources, exploration points, idle hub points, or prototype teleports.
+The POI system may set leader intent toward quest givers, combat targets, resources, exploration points, inspect points, escort targets, idle hub points, or prototype teleports.
 
 `poiResumeSystem.ts` can capture an interrupted POI target when combat interrupts travel, gathering, or world-route intent. It may restore that target after combat ends if the map still matches, the target is still valid, no live party aggro remains, and no blocking direct party command exists.
 
@@ -793,6 +835,7 @@ Current systems include:
 - Exploration System
 - Defend System
 - Follow System
+- Quest Guide System
 - Enemy AI System
 - Attack System
 - Drop System
@@ -807,7 +850,7 @@ Each system reads `GameState`, updates entities through state helpers, runs duri
 
 Systems must avoid conflicting movement updates.
 
-Each entity should perform only one movement behavior per tick unless a system explicitly uses multi-step catch-up behavior.
+Each entity should perform only one movement behavior per tick. Catch-up and special movement should use speed multipliers or delta-scaled movement instead of repeated movement bursts unless explicitly documented.
 
 ---
 
@@ -833,16 +876,17 @@ Current high-level order:
 14. Update defender behavior
 15. If auto mode is enabled, update exploration
 16. Update follow behavior
-17. Update enemy AI
-18. Update attacks
-19. Restore interrupted POI target when valid
-20. Update passive health regeneration
-21. Update drop system
-22. Update enemy respawn system
-23. Update gathering
-24. Update skill shield block positions
-25. Idle autonomous party members when no POI or leader intent is active
-26. Record debug telemetry
+17. Update quest guide escort behavior
+18. Update enemy AI
+19. Update attacks
+20. Restore interrupted POI target when valid
+21. Update passive health regeneration
+22. Update drop system
+23. Update enemy respawn system
+24. Update gathering
+25. Update skill shield block positions
+26. Idle autonomous party members when no POI or leader intent is active
+27. Record debug telemetry
 
 
 
@@ -928,7 +972,7 @@ Direct-commanded members are excluded from autonomous cohesion behavior.
 
 A follower may move when it is a party member, is in follow state, is not the leader, is not direct-commanded, is not a busy gatherer, has not already moved this tick, and is outside follow leash distance.
 
-Followers that are far away may take extra catch-up steps.
+Followers that are far away may use catch-up speed tuning, but should not rely on repeated multi-step movement bursts.
 
 ---
 
@@ -1150,6 +1194,7 @@ Current behavior:
 - busy gatherers are not pulled by distant threats
 - protection requires party members to be close enough to the attacked member
 - `protectLeader` currently aliases `protectPartyMember`
+- escort-aware protection may keep defenders and party members focused near the active quest guide instead of chasing unrelated distant threats
 
 ---
 
@@ -1404,6 +1449,12 @@ Current equipment kinds are:
 type EquipmentKind = "weapon" | "offhand" | "armor" | "accessory";
 ```
 
+Current armor families are:
+
+```ts
+type ArmorFamily = "cloth" | "leather" | "mail" | "plate";
+```
+
 Current weapon types are:
 
 ```ts
@@ -1446,15 +1497,17 @@ Current accessory type is:
 type AccessoryType = "accessory";
 ```
 
-Equipment rules validate slot, class permission, both-hands occupancy, inventory removal, inventory return on unequip, and telemetry results.
+Equipment rules validate slot, class permission, level requirement, both-hands occupancy, inventory removal, inventory return on unequip, and telemetry results.
+
+Armor and accessories currently ignore class restrictions when level requirements are met.
 
 Equipment remains gameplay-facing data only. It must not require sprite swaps, weapon anchoring, paper-doll rendering, or visible attachment systems.
 
-Current prototype class-restricted equipment items include:
+Current prototype class-restricted weapon and offhand items include:
 
 - Beginner: Training Sword
 - Blade: Iron Sword
-- Aegis: Training Mace, Wooden Shield
+- Aegis: Guard Mace, Wooden Shield
 - Hunter: Short Bow
 - Beast: Claw Gauntlets
 - Elementalist: Apprentice Orb
@@ -1462,23 +1515,41 @@ Current prototype class-restricted equipment items include:
 - Lightbearer: Holy Mace, Holy Lantern
 - Penitent: Thorn Whip, Sacrificial Dagger
 
-Current shared prototype armor and accessory items include:
+Current shared prototype armor families include:
 
-- Cloth Cap
-- Padded Chest
-- Padded Legs
-- Cloth Gloves
-- Travel Boots
+- Cloth
+- Leather
+- Mail
+- Plate
+
+Current prototype armor item groups include:
+
+- Acolyte cloth armor
+- Scholar cloth armor
+- Scout leather armor
+- Stalker leather armor
+- Guard mail armor
+- Vanguard mail armor
+- Bulwark plate armor
+- Warplate armor
+
+Current shared prototype accessory items include:
+
 - Plain Charm
 
 Current archetype-specific prototype equipment drops may include:
 
 - Holy Lantern from Goblin Shaman
 
-Older prototype armor items may still exist as equipment item definitions, but they should not be treated as current enemy drop behavior unless a drop table explicitly uses them again.
+Current prototype equipment primary stat modifiers may include:
 
+- strength
+- dexterity
+- constitution
+- intelligence
+- wisdom
 
-Current prototype equipment stat modifiers may include:
+Current prototype equipment derived stat modifiers may include:
 
 - attack
 - defense
@@ -1528,10 +1599,10 @@ type DebugMapId = "hub" | "map-1" | "map-2" | "map-3" | "map-4";
 Current readable map names:
 
 - `hub`: Harbor Union Bastion
-- `map-1`: First Wild Map
-- `map-2`: Second Wild Map
-- `map-3`: Third Wild Map
-- `map-4`: Fourth Wild Map
+- `map-1`: First Wild Zone
+- `map-2`: Second Wild Zone
+- `map-3`: Third Wild Zone
+- `map-4`: Fourth Wild Zone
 
 Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, display/debug names, prototype teleport points, optional subzones, optional subzone labels, encounter areas, encounter leashes, and resource locations.
 
@@ -1540,7 +1611,7 @@ Map data is still development/prototype data and should not define final world c
 Current prototype map dimensions:
 
 - `hub`: 50 columns by 30 rows
-- `map-1`: 160 columns by 30 rows
+- `map-1`: 160 columns by 57 rows
 - `map-2`: 160 columns by 30 rows
 - `map-3`: 160 columns by 30 rows
 - `map-4`: 160 columns by 30 rows
@@ -1683,13 +1754,14 @@ Combat feedback may be used by attacks, gathering, skill effects, and temporary 
 
 ## Visual Assets
 
-Visual assets are currently UI-facing and are not part of core simulation rules.
+Visual assets and world rendering are currently UI-facing and are not part of core simulation rules.
 
-Current visual asset files:
+Current visual and rendering files:
 
 - `client/src/visualAssets.ts`
 - `client/src/assetIcons.ts`
 - `client/src/SpriteAnimation.tsx`
+- `client/src/worldRenderer/PixiWorldRenderer.tsx`
 
 Current public asset path root:
 
@@ -1703,6 +1775,7 @@ Current generated asset groups referenced by UI include:
 - `Asserts/Generated/hub-floors`
 - `Asserts/Generated/hub-floors/New/128`
 - `Asserts/Generated/beginner-skill-effects-50/sprites`
+- `Asserts/Generated/hub-castle-walls`
 
 Current sprite asset groups include:
 
@@ -1711,6 +1784,14 @@ Current sprite asset groups include:
 - `Asserts/Characters/Test-Enemy2`
 - `Asserts/Characters/Test-NPC`
 - `Asserts/Characters/Prototype-Enemies`
+
+Current world renderer behavior:
+
+- PixiJS renders the main world view.
+- React hosts the renderer and passes game state and command callbacks.
+- The renderer supports preview and full modes.
+- The renderer may draw floor chunks, walls, obstacles, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, drop visuals, resurrection feedback, and camera-follow presentation.
+- PixiJS rendering must not own simulation rules, targeting rules, movement rules, combat rules, quest rules, or map data generation.
 
 Current companion visuals:
 
@@ -1731,18 +1812,19 @@ Current NPC visuals:
 
 - Quest Giver, Merchant, Smith, and Dog may use generated image icons
 - Test Blade and Test Hunter may use Test-NPC image assets
+- quest guide NPCs may use temporary NPC visuals
 - unsupported NPC visuals fall back to placeholder classes
 
 Current map tile visuals:
 
-- the React map renderer uses a 32px construction-cell pixel size for coordinate anchoring, walls, obstacles, click conversion, camera math, overlays, entities, resources, NPCs, teleports, labels, and effects
+- the PixiJS world renderer uses a 32px construction-cell pixel size for coordinate anchoring, walls, obstacles, click conversion, camera math, overlays, entities, resources, NPCs, teleports, labels, and effects
 - current floor imagery renders as 128px floor chunks spanning 4x4 construction cells
 - wilderness floor chunks currently use 128px generated wilderness floor assets
 - hub floor chunks currently use 128px generated hub floor assets
 - wilderness floor tile selection may use the subzone containing the floor chunk center so each subsection has stable floor texture selection
 - wilderness maps may use generated grass, tree, and bush image tiles
-- the hub may use generated stone and outside-grass floor imagery
-- fallback floor and wall visuals use placeholder class names
+- the hub may use generated stone, outside-grass, and castle-wall imagery
+- fallback floor and wall visuals use placeholder classes or renderer fallback drawing
 
 Current generated terrain asset direction may include:
 
@@ -1750,13 +1832,13 @@ Current generated terrain asset direction may include:
 - 64x64 tree assets
 - 64x64 floor assets for visual testing
 - 128x128 floor assets for the active floor-chunk render experiment
+- hub castle wall assets
 
 The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement. Floor chunk size and terrain asset size must not change simulation coordinates, movement, collision, pathing, map geometry, entity placement, teleports, gameplay ranges, or game logic.
 
 Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, image icon mappings, terrain image mappings, and placeholder class names.
 
-Simulation logic must not depend on sprite assets, floor chunk size, or terrain image dimensions.
-
+Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or terrain image dimensions.
 
 
 ---
@@ -1827,6 +1909,8 @@ Debug/testing helpers may exist for development:
 - enemy scaling and respawn testing
 - subzone, encounter area, and subzone label validation
 - interrupted POI restore testing
+- quest guide escort testing
+- PixiJS world renderer inspection
 
 
 These should remain isolated from core systems and must not define final gameplay behavior.
@@ -1835,7 +1919,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
 
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.

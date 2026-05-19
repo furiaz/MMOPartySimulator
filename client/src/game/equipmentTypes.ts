@@ -1,6 +1,8 @@
 import type {
+  ArmorFamily,
   ClassId,
   CompanionEquipment,
+  CompanionPrimaryStatModifiers,
   EquipmentSlot,
   EquipmentStatModifiers,
   EquipmentType,
@@ -52,6 +54,13 @@ export const EQUIPMENT_TYPE_LABELS: Record<EquipmentType, string> = {
   gloves_armor: "Gloves Armor",
   boots_armor: "Boots Armor",
   accessory: "Accessory",
+};
+
+export const ARMOR_FAMILY_LABELS: Record<ArmorFamily, string> = {
+  cloth: "Cloth",
+  leather: "Leather",
+  mail: "Mail",
+  plate: "Plate",
 };
 
 export type ClassEquipmentProfile = {
@@ -134,5 +143,20 @@ export function addEquipmentStatModifiers(
       (first.criticalDamage ?? 0) + (second.criticalDamage ?? 0) || undefined,
     healthRegen:
       (first.healthRegen ?? 0) + (second.healthRegen ?? 0) || undefined,
+  };
+}
+
+export function addPrimaryStatModifiers(
+  first: CompanionPrimaryStatModifiers,
+  second: CompanionPrimaryStatModifiers,
+): CompanionPrimaryStatModifiers {
+  return {
+    strength: (first.strength ?? 0) + (second.strength ?? 0) || undefined,
+    dexterity: (first.dexterity ?? 0) + (second.dexterity ?? 0) || undefined,
+    constitution:
+      (first.constitution ?? 0) + (second.constitution ?? 0) || undefined,
+    intelligence:
+      (first.intelligence ?? 0) + (second.intelligence ?? 0) || undefined,
+    wisdom: (first.wisdom ?? 0) + (second.wisdom ?? 0) || undefined,
   };
 }

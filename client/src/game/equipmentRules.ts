@@ -4,6 +4,7 @@ import type { GameState } from "./state";
 import type {
   ClassId,
   Companion,
+  CompanionPrimaryStatModifiers,
   EquipmentSlot,
   EquipmentStatModifiers,
   EquipmentType,
@@ -12,6 +13,7 @@ import type {
 } from "./types";
 import {
   addEquipmentStatModifiers,
+  addPrimaryStatModifiers,
   CLASS_EQUIPMENT_PROFILES,
 } from "./equipmentTypes";
 
@@ -305,6 +307,24 @@ export function getCompanionEquipmentStatModifiers(
       return addEquipmentStatModifiers(
         statModifiers,
         getItemDefinition(itemId).statModifiers ?? {},
+      );
+    },
+    {},
+  );
+}
+
+export function getCompanionEquipmentPrimaryStatModifiers(
+  companion: Companion,
+): CompanionPrimaryStatModifiers {
+  return Object.values(companion.equipment).reduce<CompanionPrimaryStatModifiers>(
+    (statModifiers, itemId) => {
+      if (!itemId) {
+        return statModifiers;
+      }
+
+      return addPrimaryStatModifiers(
+        statModifiers,
+        getItemDefinition(itemId).primaryStatModifiers ?? {},
       );
     },
     {},

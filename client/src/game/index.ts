@@ -50,6 +50,7 @@ export type {
   CurrencyMutationSource,
   CurrencyMutationStatus,
   AccessoryType,
+  ArmorFamily,
   ArmorType,
   EquipmentItemId,
   EquipmentKind,
@@ -166,10 +167,12 @@ export {
   getItemDefinitionForResourceType,
 } from "./items";
 export {
+  ARMOR_FAMILY_LABELS,
   CLASS_EQUIPMENT_PROFILES,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
+  addPrimaryStatModifiers,
   addEquipmentStatModifiers,
   createEmptyCompanionEquipment,
   type ClassEquipmentProfile,
@@ -196,6 +199,7 @@ export {
 } from "./stats";
 export {
   getAllowedEquipmentTypeLabels,
+  getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
   getItemsReturnedByEquip,
   isClassAllowedForEquipment,
