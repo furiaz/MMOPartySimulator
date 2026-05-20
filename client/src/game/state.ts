@@ -62,7 +62,7 @@ import {
 } from "./simulationTiming";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
-const COMBAT_FEEDBACK_DURATION_MS = 900;
+const COMBAT_FEEDBACK_DURATION_MS = 1000;
 const POSITION_EPSILON = 0.001;
 export const ENTITY_COLLISION_DISTANCE = 0.7;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
@@ -182,6 +182,7 @@ export type GameState = {
   resurrectionChannelsByHelperId?: Record<string, ResurrectionChannelState>;
   worldWipeRecovery?: WorldWipeRecoveryState;
   lastHealthRegenAtByCompanionId?: Record<string, number>;
+  lastTargetDummyRegenAtByEnemyId?: Record<string, number>;
   debugTelemetry?: DebugTelemetryState;
   debugOptions?: DebugOptions;
 };

@@ -209,6 +209,9 @@ export function debugResurrectEnemy(
     maxHealth: entity.maxHealth || DEBUG_ENEMY_HEALTH,
     currentTargetId: null,
     lastAttackAt: 0,
+    attackWindupStartedAt: undefined,
+    attackWindupDurationMs: undefined,
+    attackWindupTargetId: null,
   };
 
   return updateEntity(state, enemy);

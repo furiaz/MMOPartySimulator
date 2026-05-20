@@ -797,6 +797,11 @@ export type DebugTelemetryEventType =
   | "merchant_interaction_opened"
   | "merchant_interaction_closed"
   | "merchant_menu_selected"
+  | "merchant_buy_attempt"
+  | "merchant_buy_currency_removed"
+  | "merchant_buy_item_added"
+  | "merchant_buy_completed"
+  | "merchant_buy_failed"
   | "quick_exchange_attempt"
   | "quick_exchange_item_selected"
   | "quick_exchange_item_removed"
@@ -1153,6 +1158,7 @@ export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  isTargetDummy?: true;
   archetypeId?: EnemyArchetypeId;
   enemyType?: EnemyType;
   homePosition: Position;
@@ -1174,6 +1180,9 @@ export type Enemy = LivingEntity & {
   scalingOverrides: string[];
   attackCooldownMs?: number;
   attackRange?: number;
+  attackWindupStartedAt?: number;
+  attackWindupDurationMs?: number;
+  attackWindupTargetId?: string | null;
   targetDecisionReason?: EnemyTargetDecisionReason;
 };
 
@@ -1217,7 +1226,6 @@ export type NpcEntity = BaseEntity & {
     | "smith"
     | "dog"
     | "test_blade"
-    | "test_hunter"
     | "quest_guide";
 };
 

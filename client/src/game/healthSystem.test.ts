@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion } from "./entities";
-import { updatePassiveHealthRegen } from "./healthSystem";
+import { createCompanion, createTargetDummy } from "./entities";
+import {
+  updatePassiveHealthRegen,
+  updateTargetDummyHealthRegen,
+} from "./healthSystem";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 
@@ -39,5 +42,23 @@ describe("passive health regen", () => {
       state: "dead",
       health: 0,
     });
+  });
+
+  it("heals target dummies every five seconds without exceeding max health", () => {
+    const dummy = {
+      ...createTargetDummy("dummy", { x: 0, y: 0 }),
+      health: 85,
+    };
+    const state = addEntity(
+      createTestGameState({
+        lastTargetDummyRegenAtByEnemyId: { [dummy.id]: 0 },
+      }),
+      dummy,
+    );
+    const nextState = updateTargetDummyHealthRegen(state, 5000);
+    const cappedState = updateTargetDummyHealthRegen(nextState, 10000);
+
+    expect(nextState.entities[dummy.id]).toMatchObject({ health: 95 });
+    expect(cappedState.entities[dummy.id]).toMatchObject({ health: 100 });
   });
 });

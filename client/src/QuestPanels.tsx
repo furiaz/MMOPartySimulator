@@ -13,6 +13,9 @@ import {
   getQuestTurnInErrorText,
 } from "./questUiHelpers";
 
+const questObjectiveCompleteSrc =
+  "Asserts/Generated/prototype-vfx/sprites/quest-objective-complete.png";
+
 export function QuestTrackerPanel({ quest }: { quest: QuestState | null }) {
   if (!quest || quest.status === "completed" || quest.status === "locked") {
     return null;
@@ -33,9 +36,21 @@ export function QuestTrackerPanel({ quest }: { quest: QuestState | null }) {
           const requiredCount = objective.requiredCount ?? 1;
 
           return (
-            <div key={objective.id} className="quest-tracker-objective">
+            <div
+              key={objective.id}
+              className={`quest-tracker-objective${
+                progress?.completed ? " completed" : ""
+              }`}
+            >
               <span>{getObjectiveLabel(objective, requiredCount)}</span>
               <span>
+                {progress?.completed ? (
+                  <img
+                    alt=""
+                    className="quest-objective-complete-vfx"
+                    src={questObjectiveCompleteSrc}
+                  />
+                ) : null}
                 {progress?.currentCount ?? 0}/{requiredCount}
               </span>
             </div>

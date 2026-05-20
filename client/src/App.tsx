@@ -23,6 +23,9 @@ import { PixiWorldRenderer } from "./worldRenderer/PixiWorldRenderer";
 import {
   addEntity,
   allocateCompanionStatPoint,
+  ARMOR_FAMILY_LABELS,
+  buyMerchantItem,
+  CLASS_DEFINITIONS,
   companionIds,
   companionStartPositions,
   createCompanion,
@@ -31,6 +34,7 @@ import {
   createEmptyPartyWallet,
   createInitialQuestStates,
   createNpc,
+  createTargetDummy,
   clearDebugTelemetry,
   debugAddCompanionToParty,
   debugKillOneCompanion,
@@ -44,9 +48,15 @@ import {
   equipItemToCompanion,
   exportDebugTelemetryReport,
   formatCurrencyDisplay,
+  getAvailableInventorySlots,
+  getCurrencyBalance,
+  getItemDefinition,
+  getMerchantBuyStock,
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
+  EQUIPMENT_SLOT_LABELS,
+  EQUIPMENT_TYPE_LABELS,
   QUEST_DEFINITIONS,
   addItemToInventoryState,
   getPartyLeader,
@@ -71,14 +81,21 @@ import {
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
+  targetDummyId,
+  targetDummyPosition,
   unequipItemFromCompanion,
   updateEntity,
   type Companion,
   type DebugMapId,
   type Enemy,
   type EquipmentSlot,
+  type EquipmentStatModifiers,
   type GameState,
+  type ItemDefinition,
   type ItemId,
+  type MerchantBuyFailureReason,
+  type MerchantStockEntry,
+  type MerchantStockGroup,
   type NpcEntity,
   type PartyMemberRole,
   type PrimaryStatId,
@@ -93,6 +110,9 @@ import { type SpriteDirection } from "./visualAssets";
 
 const debugMap = createDebugMap();
 const gameVersion = "0.01";
+const currencyGainFeedbackDurationMs = 1200;
+const currencyGainBurstSrc =
+  "Asserts/Generated/prototype-vfx/sprites/currency-gain-burst.png";
 const mapConstructionCellPixelSize = 32;
 const visualMovementGraceMs = 180;
 const cameraSettleFactor = 0.08;
@@ -125,6 +145,49 @@ type EntityVisualMovement = {
 };
 
 type MerchantPanel = "buy" | "sell";
+
+type MerchantBuyFilter = "all" | MerchantStockGroup;
+
+const merchantBuyFilterLabels: Record<MerchantBuyFilter, string> = {
+  all: "All",
+  weapons: "Weapons",
+  offhands: "Offhands",
+  cloth: "Cloth",
+  leather: "Leather",
+  mail: "Mail",
+  plate: "Plate",
+  accessories: "Accessories",
+};
+
+const merchantBuyFilters: MerchantBuyFilter[] = [
+  "all",
+  "weapons",
+  "offhands",
+  "cloth",
+  "leather",
+  "mail",
+  "plate",
+  "accessories",
+];
+
+const primaryStatLabels: Record<PrimaryStatId, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+};
+
+const merchantBuyFailureMessages: Record<MerchantBuyFailureReason, string> = {
+  invalid_merchant: "Merchant unavailable",
+  item_not_in_stock: "Item is not in stock",
+  invalid_item: "Item cannot be purchased",
+  invalid_price: "Item price is invalid",
+  insufficient_crowns: "Not enough Crowns",
+  inventory_full: "Inventory is full",
+  inventory_add_failed: "Inventory could not receive the item",
+  currency_remove_failed: "Crowns could not be spent",
+};
 
 type ViewportSize = {
   width: number;
@@ -668,7 +731,12 @@ function createInitialState(): GameState {
     createNpc(npc.id, npc.position, npc.displayName, npc.npcRole),
   );
 
-  const initialState = [leader, secondCompanion, ...npcs].reduce(addEntity, {
+  const initialState = [
+    leader,
+    secondCompanion,
+    ...npcs,
+    createTargetDummy(targetDummyId, targetDummyPosition),
+  ].reduce(addEntity, {
     entities: {},
     inventory: createEmptyPartyInventory(),
     wallet: createEmptyPartyWallet(),
@@ -732,6 +800,229 @@ function formatCurrencyAmount(amount: number): string {
   return Math.max(0, Math.floor(amount)).toLocaleString();
 }
 
+function MerchantBuyPanel({
+  merchantNpcId,
+  state,
+  onBuy,
+}: {
+  merchantNpcId: string;
+  state: GameState;
+  onBuy: (itemId: ItemId) => void;
+}) {
+  const [activeFilter, setActiveFilter] = useState<MerchantBuyFilter>("all");
+  const [selectedItemId, setSelectedItemId] = useState<ItemId | null>(null);
+  const stock = getMerchantBuyStock(state, merchantNpcId);
+  const filteredStock =
+    activeFilter === "all"
+      ? stock
+      : stock.filter((entry) => entry.group === activeFilter);
+  const selectedEntry =
+    filteredStock.find((entry) => entry.itemId === selectedItemId) ??
+    filteredStock[0] ??
+    null;
+  const selectedItemDefinition = selectedEntry
+    ? getItemDefinition(selectedEntry.itemId)
+    : null;
+  const availableSlots = getAvailableInventorySlots(state.inventory);
+  const crownBalance = getCurrencyBalance(state.wallet, "crowns");
+  const selectedBlockReason = selectedEntry
+    ? getMerchantBuyBlockReason(selectedEntry, state)
+    : "No item selected";
+
+  return (
+    <aside className="merchant-detail-panel merchant-buy-panel" aria-label="Merchant buy">
+      <div className="merchant-buy-header">
+        <div>
+          <h2>Buy</h2>
+          <span>
+            Slots {state.inventory.slots.length}/{state.inventory.capacity}
+          </span>
+        </div>
+        <strong>{formatCurrencyDisplay(state.wallet, "crowns")}</strong>
+      </div>
+      <nav className="merchant-buy-filter-tabs" aria-label="Merchant stock filters">
+        {merchantBuyFilters.map((filter) => (
+          <button
+            key={filter}
+            className={activeFilter === filter ? "active" : ""}
+            onClick={() => setActiveFilter(filter)}
+            type="button"
+          >
+            {merchantBuyFilterLabels[filter]}
+          </button>
+        ))}
+      </nav>
+      <div className="merchant-buy-layout">
+        <div className="merchant-stock-list" aria-label="Merchant stock">
+          {filteredStock.length > 0 ? (
+            filteredStock.map((entry) => {
+              const itemDefinition = getItemDefinition(entry.itemId);
+              const isSelected = selectedEntry?.itemId === entry.itemId;
+              const canAffordItem = crownBalance >= entry.priceCrowns;
+
+              return (
+                <button
+                  key={entry.itemId}
+                  className={`merchant-stock-row${
+                    isSelected ? " selected" : ""
+                  }${canAffordItem ? "" : " unaffordable"}`}
+                  onClick={() => setSelectedItemId(entry.itemId)}
+                  type="button"
+                >
+                  <span>
+                    <strong>{itemDefinition.displayName}</strong>
+                    <small>{getMerchantItemTagText(itemDefinition)}</small>
+                  </span>
+                  <b>{entry.priceCrowns}</b>
+                </button>
+              );
+            })
+          ) : (
+            <span className="merchant-empty-stock">No stock in this category</span>
+          )}
+        </div>
+        <div className="merchant-buy-detail" aria-label="Selected stock item">
+          {selectedEntry && selectedItemDefinition ? (
+            <>
+              <div>
+                <span className="merchant-detail-kicker">
+                  {merchantBuyFilterLabels[selectedEntry.group]}
+                </span>
+                <h3>{selectedItemDefinition.displayName}</h3>
+                <p>{selectedItemDefinition.description}</p>
+              </div>
+              <dl className="merchant-item-stat-grid">
+                <div>
+                  <dt>Price</dt>
+                  <dd>{selectedEntry.priceCrowns} Crowns</dd>
+                </div>
+                <div>
+                  <dt>Slot</dt>
+                  <dd>{getMerchantSlotText(selectedItemDefinition)}</dd>
+                </div>
+                <div>
+                  <dt>Type</dt>
+                  <dd>{getMerchantTypeText(selectedItemDefinition)}</dd>
+                </div>
+                <div>
+                  <dt>Requirement</dt>
+                  <dd>{getMerchantRequirementText(selectedItemDefinition)}</dd>
+                </div>
+              </dl>
+              <div className="merchant-modifier-list">
+                <span className="merchant-detail-kicker">Modifiers</span>
+                <p>{getMerchantModifierText(selectedItemDefinition)}</p>
+              </div>
+              <button
+                className="merchant-buy-action"
+                disabled={Boolean(selectedBlockReason)}
+                onClick={() => onBuy(selectedEntry.itemId)}
+                title={selectedBlockReason || `Buy ${selectedItemDefinition.displayName}`}
+                type="button"
+              >
+                {selectedBlockReason || "Buy Item"}
+              </button>
+              {availableSlots <= 0 ? (
+                <span className="merchant-buy-warning">Inventory full</span>
+              ) : null}
+            </>
+          ) : (
+            <span className="merchant-empty-stock">Select an item</span>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function getMerchantBuyBlockReason(
+  entry: MerchantStockEntry,
+  state: GameState,
+): string | null {
+  if (getCurrencyBalance(state.wallet, "crowns") < entry.priceCrowns) {
+    return "Not enough Crowns";
+  }
+
+  if (getAvailableInventorySlots(state.inventory) < 1) {
+    return "Inventory Full";
+  }
+
+  return null;
+}
+
+function getMerchantItemTagText(itemDefinition: ItemDefinition): string {
+  return [
+    getMerchantTypeText(itemDefinition),
+    itemDefinition.armorFamily
+      ? ARMOR_FAMILY_LABELS[itemDefinition.armorFamily]
+      : null,
+    itemDefinition.tier ? `Tier ${itemDefinition.tier}` : null,
+    itemDefinition.levelRequirement
+      ? `Lv ${itemDefinition.levelRequirement}+`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function getMerchantSlotText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.equipmentKind === "accessory") {
+    return "Accessory";
+  }
+
+  return itemDefinition.equipmentSlot
+    ? EQUIPMENT_SLOT_LABELS[itemDefinition.equipmentSlot]
+    : "Equipment";
+}
+
+function getMerchantTypeText(itemDefinition: ItemDefinition): string {
+  return itemDefinition.equipmentType
+    ? EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]
+    : "Equipment";
+}
+
+function getMerchantRequirementText(itemDefinition: ItemDefinition): string {
+  const levelText = itemDefinition.levelRequirement
+    ? `Level ${itemDefinition.levelRequirement}+`
+    : "No level requirement";
+  const classText =
+    itemDefinition.allowedClassIds && itemDefinition.allowedClassIds.length > 0
+      ? itemDefinition.allowedClassIds
+          .map((classId) => CLASS_DEFINITIONS[classId].displayName)
+          .join(", ")
+      : "Any class";
+
+  return `${levelText} | ${classText}`;
+}
+
+function getMerchantModifierText(itemDefinition: ItemDefinition): string {
+  const primaryStats = Object.entries(itemDefinition.primaryStatModifiers ?? {})
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(
+      ([stat, value]) =>
+        `${primaryStatLabels[stat as PrimaryStatId]} ${formatMerchantModifier(value)}`,
+    );
+  const derivedStats = Object.entries(
+    (itemDefinition.statModifiers ?? {}) as EquipmentStatModifiers,
+  )
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(
+      ([stat, value]) =>
+        `${formatMerchantStatName(stat)} ${formatMerchantModifier(value)}`,
+    );
+  const stats = [...primaryStats, ...derivedStats];
+
+  return stats.length > 0 ? stats.join(", ") : "No stat modifiers";
+}
+
+function formatMerchantStatName(stat: string): string {
+  return stat.replace(/[A-Z]/g, (letter) => ` ${letter}`).toLowerCase();
+}
+
+function formatMerchantModifier(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
@@ -756,6 +1047,7 @@ function App() {
   const [merchantResultMessage, setMerchantResultMessage] =
     useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [currencyGainFeedbackUntil, setCurrencyGainFeedbackUntil] = useState(0);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -770,6 +1062,8 @@ function App() {
   const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
   const cameraMapIdRef = useRef<string | undefined>(undefined);
   const previousCameraFocusRef = useRef<Position | null>(null);
+  const currentCrownBalance = getCurrencyBalance(gameState.wallet, "crowns");
+  const previousCrownBalanceRef = useRef(currentCrownBalance);
   const currentMap = gameState.map ?? debugMap;
   const allEntities = Object.values(gameState.entities);
 
@@ -811,6 +1105,8 @@ function App() {
       : null;
   const shouldShowWalletToast =
     !activeMerchant && (gameState.wallet.visibleUntil ?? 0) > currentTime;
+  const shouldShowCurrencyGainFeedback =
+    currencyGainFeedbackUntil > currentTime;
   const pendingWorldWipeRecovery =
     gameState.worldWipeRecovery?.status === "pending_choice"
       ? gameState.worldWipeRecovery
@@ -820,6 +1116,16 @@ function App() {
     gameState.worldWipeRecovery.expiresAt > currentTime
       ? gameState.worldWipeRecovery
       : null;
+
+  useEffect(() => {
+    const previousCrownBalance = previousCrownBalanceRef.current;
+
+    if (currentCrownBalance > previousCrownBalance) {
+      setCurrencyGainFeedbackUntil(Date.now() + currencyGainFeedbackDurationMs);
+    }
+
+    previousCrownBalanceRef.current = currentCrownBalance;
+  }, [currentCrownBalance]);
 
   useEffect(() => {
     let animationFrameId = 0;
@@ -1213,6 +1519,24 @@ function App() {
     setGameState(exchange.state);
   }
 
+  function buyMerchantStockItem(itemId: ItemId) {
+    if (!activeMerchantNpcId) {
+      return;
+    }
+
+    const purchase = buyMerchantItem(gameState, activeMerchantNpcId, itemId);
+
+    if (purchase.result.status === "success") {
+      setMerchantResultMessage(
+        `Bought ${purchase.result.displayName} for ${purchase.result.priceCrowns} Crowns`,
+      );
+    } else {
+      setMerchantResultMessage(merchantBuyFailureMessages[purchase.result.reason]);
+    }
+
+    setGameState(purchase.state);
+  }
+
   function closeMerchantInteraction() {
     const merchantNpcId = activeMerchantNpcId;
 
@@ -1578,16 +1902,31 @@ function App() {
               ) : null}
             </div>
             {activeMerchantPanel ? (
-              <aside className="merchant-detail-panel">
-                <h2>{activeMerchantPanel === "buy" ? "Buy" : "Sell"}</h2>
-                <p>Placeholder</p>
-              </aside>
+              activeMerchantPanel === "buy" ? (
+                <MerchantBuyPanel
+                  merchantNpcId={activeMerchant.id}
+                  state={gameState}
+                  onBuy={buyMerchantStockItem}
+                />
+              ) : (
+                <aside className="merchant-detail-panel">
+                  <h2>Sell</h2>
+                  <p>Placeholder</p>
+                </aside>
+              )
             ) : null}
           </section>
         ) : null}
 
         {shouldShowWalletToast ? (
           <div className="wallet-visibility-toast" aria-label="Wallet balance">
+            {shouldShowCurrencyGainFeedback ? (
+              <img
+                alt=""
+                className="currency-gain-vfx"
+                src={currencyGainBurstSrc}
+              />
+            ) : null}
             {formatCurrencyDisplay(gameState.wallet, "crowns")}
           </div>
         ) : null}

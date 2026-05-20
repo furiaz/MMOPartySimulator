@@ -32,6 +32,16 @@ export type PlaceholderVisualAsset = {
 export type ImageVisualAsset = {
   kind: "image";
   src: string;
+  naturalSize?: {
+    width: number;
+    height: number;
+  };
+  contentBounds?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 };
 
 export type EntityVisualAsset =
@@ -204,10 +214,30 @@ export const entityVisualAssets = {
   testBlade: {
     kind: "image",
     src: `${testNpcBasePath}/Bladesouth.png`,
+    naturalSize: {
+      width: 224,
+      height: 224,
+    },
+    contentBounds: {
+      x: 77,
+      y: 57,
+      width: 69,
+      height: 111,
+    },
   },
   testHunter: {
     kind: "image",
     src: `${testNpcBasePath}/Huntersouth.png`,
+    naturalSize: {
+      width: 124,
+      height: 124,
+    },
+    contentBounds: {
+      x: 45,
+      y: 32,
+      width: 34,
+      height: 59,
+    },
   },
 } satisfies {
   testCharacter: SpriteVisualAsset;
@@ -257,13 +287,13 @@ export function getEntityVisualAsset(
       return entityVisualAssets.testBlade;
     }
 
-    if (entity.npcRole === "test_hunter") {
-      return entityVisualAssets.testHunter;
-    }
-
     return entity.npcRole === "dog"
       ? entityVisualAssets.dog
       : entityVisualAssets.npc;
+  }
+
+  if (entity.isTargetDummy) {
+    return entityVisualAssets.testHunter;
   }
 
   const prototypeEnemyVisual = entity.archetypeId

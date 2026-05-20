@@ -22,6 +22,7 @@ import {
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isTargetDummyEnemy } from "./entityGuards";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
@@ -348,6 +349,7 @@ function isEnemyRelevantToGuard(
 function isLiveEnemy(entity: GameEntity | undefined): entity is Enemy {
   return (
     entity?.kind === "enemy" &&
+    !isTargetDummyEnemy(entity) &&
     entity.state !== "dead" &&
     entity.health > 0
   );

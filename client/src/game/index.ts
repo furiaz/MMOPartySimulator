@@ -125,6 +125,7 @@ export {
   createEnemy,
   createNpc,
   createResource,
+  createTargetDummy,
   damageEntity,
   gatherResource,
   isCombatEntity,
@@ -250,6 +251,8 @@ export {
   type WorldWipeRecoveryOptions,
 } from "./worldWipeRecovery";
 export {
+  buyMerchantItem,
+  getMerchantBuyStock,
   getQuickExchangeItemDefinitions,
   getQuickExchangeItems,
   isMerchantNpc,
@@ -258,7 +261,11 @@ export {
   recordMerchantInteractionClosed,
   recordMerchantInteractionOpened,
   recordMerchantMenuSelected,
+  type MerchantBuyFailureReason,
+  type MerchantBuyResult,
   type MerchantMenuSelection,
+  type MerchantStockEntry,
+  type MerchantStockGroup,
   type QuickExchangeItem,
   type QuickExchangeResult,
 } from "./merchant";
@@ -418,6 +425,8 @@ export {
   MAP_FOUR_ID,
   MAP_TWO_ID,
   resourceIds,
+  targetDummyId,
+  targetDummyPosition,
   teleporterPosition,
   TELEPORTER_RANGE,
 } from "./debugMap";

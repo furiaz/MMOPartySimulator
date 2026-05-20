@@ -35,56 +35,9 @@ export const companionIds = [
   "test-companion-4",
 ];
 
-export const enemyIds = [
-  "test-enemy",
-  "test-enemy-2",
-  "test-enemy-3",
-  "test-enemy-4",
-  "test-enemy-5",
-  "test-enemy-6",
-  "test-enemy-7",
-  "test-enemy-8",
-  "test-enemy-9",
-  "test-enemy-10",
-  "test-enemy-11",
-  "test-enemy-12",
-  "test-enemy-13",
-  "test-enemy-14",
-  "test-enemy-15",
-  "test-enemy-16",
-  "test-enemy-17",
-  "test-enemy-18",
-  "test-enemy-19",
-  "test-enemy-20",
-  "test-enemy-21",
-  "test-enemy-22",
-  "test-enemy-23",
-  "test-enemy-24",
-  "test-enemy-25",
-  "test-enemy-26",
-  "test-enemy-27",
-  "test-enemy-28",
-  "test-enemy-29",
-  "test-enemy-30",
-  "test-enemy-31",
-  "test-enemy-32",
-  "test-enemy-33",
-  "test-enemy-34",
-  "test-enemy-35",
-  "test-enemy-36",
-  "test-enemy-37",
-  "test-enemy-38",
-  "test-enemy-39",
-  "test-enemy-40",
-  "test-enemy-41",
-  "test-enemy-42",
-  "test-enemy-43",
-  "test-enemy-44",
-  "test-enemy-45",
-  "test-enemy-46",
-  "test-enemy-47",
-  "test-enemy-48",
-];
+export const enemyIds = Array.from({ length: 72 }, (_, index) =>
+  index === 0 ? "test-enemy" : `test-enemy-${index + 1}`,
+);
 
 export const resourceIds = [
   "test-resource-wood",
@@ -113,7 +66,6 @@ export const npcIds = [
   "hub-smith",
   "hub-dog",
   "hub-test-blade",
-  "hub-test-hunter",
 ];
 
 export const companionStartPositions: Position[] = [
@@ -153,6 +105,8 @@ export const hubHealingFountains: HealingFountain[] = [
     range: HUB_HEALING_FOUNTAIN_RANGE,
   },
 ];
+export const targetDummyId = "hub-target-dummy";
+export const targetDummyPosition: Position = { x: 32, y: 15 };
 
 const hubArrivalPositions: Position[] = [
   { x: 22, y: 21 },
@@ -240,12 +194,6 @@ export const hubNpcStartData = [
     position: { x: 30, y: 13 },
     displayName: "Test Blade",
     npcRole: "test_blade",
-  },
-  {
-    id: npcIds[5],
-    position: { x: 30, y: 17 },
-    displayName: "Test Hunter",
-    npcRole: "test_hunter",
   },
 ] as const;
 
@@ -679,6 +627,30 @@ const mapOneStressEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[45], position: { x: 124, y: 35 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
   { id: enemyIds[46], position: { x: 137, y: 52 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
   { id: enemyIds[47], position: { x: 153, y: 39 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { id: enemyIds[48], position: { x: 17, y: 20 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { id: enemyIds[49], position: { x: 25, y: 11 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { id: enemyIds[50], position: { x: 37, y: 13 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { id: enemyIds[51], position: { x: 43, y: 22 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { id: enemyIds[52], position: { x: 17, y: 49 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { id: enemyIds[53], position: { x: 25, y: 40 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { id: enemyIds[54], position: { x: 39, y: 46 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { id: enemyIds[55], position: { x: 48, y: 43 }, archetypeId: "slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { id: enemyIds[56], position: { x: 60, y: 10 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { id: enemyIds[57], position: { x: 68, y: 23 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { id: enemyIds[58], position: { x: 84, y: 13 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { id: enemyIds[59], position: { x: 101, y: 17 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { id: enemyIds[60], position: { x: 59, y: 44 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { id: enemyIds[61], position: { x: 70, y: 52 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { id: enemyIds[62], position: { x: 86, y: 35 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { id: enemyIds[63], position: { x: 98, y: 44 }, archetypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { id: enemyIds[64], position: { x: 111, y: 17 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { id: enemyIds[65], position: { x: 122, y: 9 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { id: enemyIds[66], position: { x: 137, y: 12 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { id: enemyIds[67], position: { x: 150, y: 22 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { id: enemyIds[68], position: { x: 112, y: 44 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { id: enemyIds[69], position: { x: 126, y: 52 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { id: enemyIds[70], position: { x: 139, y: 37 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { id: enemyIds[71], position: { x: 151, y: 45 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
 ];
 
 const mapOneProgressionEnemyStartData: EnemyStartData[] = [

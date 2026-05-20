@@ -1,6 +1,10 @@
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import { getLeaderEnemyTarget } from "./roleSystem";
-import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
+import {
+  isLivingCompanion,
+  isLivingEnemy,
+  isTargetDummyEnemy,
+} from "./entityGuards";
 import { getGridDistance } from "./positionUtils";
 import { getEntityById, type GameState } from "./state";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
@@ -97,7 +101,9 @@ export function findEnemyTarget(
 
   return Object.values(state.entities).find(
     (entity): entity is Enemy =>
-      isLivingEnemy(entity) && isEnemyInRange(caster, entity, range),
+      isLivingEnemy(entity) &&
+      !isTargetDummyEnemy(entity) &&
+      isEnemyInRange(caster, entity, range),
   );
 }
 

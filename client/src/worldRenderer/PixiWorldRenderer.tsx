@@ -22,11 +22,17 @@ import type {
   SkillShieldBlockState,
   SkillVisualEvent,
 } from "../game";
-import { getEnemyAggroRange, getItemDefinition, QUEST_GIVER_POI_ID } from "../game";
+import {
+  getEnemyAggroRange,
+  getItemDefinition,
+  QUEST_GIVER_POI_ID,
+  SKILL_DEFINITIONS,
+} from "../game";
 import {
   entityVisualAssets,
   getEntityVisualAsset,
   getSpriteAnimation,
+  type ImageVisualAsset,
   type SpriteAnimationAsset,
   type SpriteDirection,
   type SpriteVisualAsset,
@@ -38,6 +44,33 @@ const previewPadding = 8;
 const defaultCellPixelSize = 32;
 const floorChunkCellSpan = 4;
 const wildernessMapIds = new Set(["map-1", "map-2", "map-3", "map-4"]);
+const defaultFeedbackFontSize = 11;
+const emphasizedFeedbackFontSize = defaultFeedbackFontSize * 2;
+const damageNumberAnimationDurationMs = 1000;
+const damageNumberRisePixels = 32;
+const damageNumberDriftPixels = 18;
+const damageNumberRotationRadians = 0.32;
+const criticalHitBackingSize = 128;
+const deadEnemyFadeDurationMs = 2500;
+const entityFeedbackTintDurationMs = 260;
+const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
+const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
+const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
+const damageHitSparkSrc = `${prototypeVfxSpritePath}/damage-hit-spark.png`;
+const deathDownedPuffSrc = `${prototypeVfxSpritePath}/death-downed-puff.png`;
+const healSparkleSrc = `${prototypeVfxSpritePath}/heal-sparkle.png`;
+const gatherCompleteSparkleSrc = `${prototypeVfxSpritePath}/gather-complete-sparkle.png`;
+const inventoryFullWarningSrc = `${prototypeVfxSpritePath}/inventory-full-warning.png`;
+const missEvadePuffSrc = `${prototypeVfxSpritePath}/miss-evade-puff.png`;
+const resourceDepletedPuffSrc = `${prototypeVfxSpritePath}/resource-depleted-puff.png`;
+const resourceHitHerbSrc = `${prototypeVfxSpritePath}/resource-hit-herb.png`;
+const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png`;
+const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
+const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
+const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
+const skillFeedbackDisplayNames = new Set(
+  Object.values(SKILL_DEFINITIONS).map((skill) => skill.displayName),
+);
 
 type PixiRendererMode = "preview" | "full";
 
@@ -122,6 +155,18 @@ type InteractableEntityKind = "enemy" | "resource" | "npc";
 
 type InteractableEntity = GameEntity & {
   kind: InteractableEntityKind;
+};
+
+type EntitySpriteLayout = {
+  anchorX: number;
+  anchorY: number;
+  height: number;
+  width: number;
+};
+
+type EntityTint = {
+  alpha: number;
+  color: number;
 };
 
 type DrawWorldOptions = {
@@ -503,10 +548,17 @@ function isInteractableEntity(entity: GameEntity): entity is InteractableEntity 
   return entity.kind === "npc";
 }
 
-function getNearestInteractableEntity(
-  entities: GameEntity[],
-  mapPosition: Position,
-): InteractableEntity | null {
+function getNearestInteractableEntity({
+  cellPixelSize,
+  entities,
+  map,
+  mapPosition,
+}: {
+  cellPixelSize: number;
+  entities: GameEntity[];
+  map: GameMap;
+  mapPosition: Position;
+}): InteractableEntity | null {
   const priorities: InteractableEntityKind[] = ["npc", "resource", "enemy"];
   const maximumDistanceSquared =
     fullModeInteractionRadius * fullModeInteractionRadius;
@@ -517,7 +569,20 @@ function getNearestInteractableEntity(
         (entity): entity is InteractableEntity =>
           entity.kind === kind && isInteractableEntity(entity),
       )
+      .filter((entity) => {
+        if (isInsideImageContentBounds(entity, map, mapPosition, cellPixelSize)) {
+          return true;
+        }
+
+        return !hasImageContentBounds(entity, map);
+      })
       .map((entity) => {
+        const isContentBoundsHit = isInsideImageContentBounds(
+          entity,
+          map,
+          mapPosition,
+          cellPixelSize,
+        );
         const anchorXDistance = mapPosition.x - entity.position.x;
         const anchorYDistance = mapPosition.y - entity.position.y;
         const centerXDistance = mapPosition.x - (entity.position.x + 0.5);
@@ -528,7 +593,9 @@ function getNearestInteractableEntity(
           centerXDistance * centerXDistance + centerYDistance * centerYDistance;
 
         return {
-          distanceSquared: Math.min(anchorDistanceSquared, centerDistanceSquared),
+          distanceSquared: isContentBoundsHit
+            ? 0
+            : Math.min(anchorDistanceSquared, centerDistanceSquared),
           entity,
         };
       })
@@ -545,6 +612,58 @@ function getNearestInteractableEntity(
   }
 
   return null;
+}
+
+function hasImageContentBounds(entity: GameEntity, map: GameMap): boolean {
+  const visualAsset = getEntityVisualAsset(entity, map.id);
+
+  return Boolean(visualAsset.kind === "image" && visualAsset.contentBounds);
+}
+
+function isInsideImageContentBounds(
+  entity: GameEntity,
+  map: GameMap,
+  mapPosition: Position,
+  cellPixelSize: number,
+): boolean {
+  const visualAsset = getEntityVisualAsset(entity, map.id);
+
+  if (visualAsset.kind !== "image" || !visualAsset.contentBounds) {
+    return false;
+  }
+
+  const layout = getEntitySpriteLayout(entity, cellPixelSize, visualAsset);
+  const scaleX = visualAsset.naturalSize
+    ? layout.width / visualAsset.naturalSize.width
+    : 1;
+  const scaleY = visualAsset.naturalSize
+    ? layout.height / visualAsset.naturalSize.height
+    : 1;
+  const anchorWorldPixel = {
+    x: entity.position.x * cellPixelSize + cellPixelSize / 2,
+    y: entity.position.y * cellPixelSize + cellPixelSize,
+  };
+  const spriteTopLeft = {
+    x: anchorWorldPixel.x - layout.anchorX * layout.width,
+    y: anchorWorldPixel.y - layout.anchorY * layout.height,
+  };
+  const contentLeft = spriteTopLeft.x + visualAsset.contentBounds.x * scaleX;
+  const contentTop = spriteTopLeft.y + visualAsset.contentBounds.y * scaleY;
+  const contentRight =
+    contentLeft + visualAsset.contentBounds.width * scaleX;
+  const contentBottom =
+    contentTop + visualAsset.contentBounds.height * scaleY;
+  const mapPixelPosition = {
+    x: mapPosition.x * cellPixelSize,
+    y: mapPosition.y * cellPixelSize,
+  };
+
+  return (
+    mapPixelPosition.x >= contentLeft &&
+    mapPixelPosition.x <= contentRight &&
+    mapPixelPosition.y >= contentTop &&
+    mapPixelPosition.y <= contentBottom
+  );
 }
 
 function drawPoiRing(
@@ -618,24 +737,71 @@ function drawHealthBar(
   const width = transform.cellPixelSize * 0.72;
   const height = 4;
   const x = center.x - width / 2;
-  const y = center.y - transform.cellPixelSize * 0.48;
-  const healthColor = healthPercent > 0.45 ? 0x22c55e : 0xef4444;
+  const y =
+    entity.kind === "companion"
+      ? center.y + transform.cellPixelSize * 0.68
+      : center.y - transform.cellPixelSize * 0.48;
+  const healthColor =
+    healthPercent <= 0.25
+      ? 0xef4444
+      : healthPercent <= 0.5
+        ? 0xfacc15
+        : 0x22c55e;
 
   graphics.rect(x, y, width, height).fill({ color: 0x0f172a, alpha: 0.9 });
   graphics.rect(x, y, width * healthPercent, height).fill(healthColor);
 }
 
+function drawEnemyAttackWindupBar(
+  graphics: Graphics,
+  entity: GameEntity,
+  currentTime: number,
+  transform: FullTransform,
+) {
+  if (
+    entity.kind !== "enemy" ||
+    entity.state === "dead" ||
+    entity.health <= 0 ||
+    entity.attackWindupStartedAt === undefined
+  ) {
+    return;
+  }
+
+  const durationMs = entity.attackWindupDurationMs ?? 500;
+  const windupPercent = Math.max(
+    0,
+    Math.min(1, (currentTime - entity.attackWindupStartedAt) / durationMs),
+  );
+  const center = toFullPosition(entity.position, transform);
+  const width = transform.cellPixelSize * 0.72;
+  const height = 3;
+  const x = center.x - width / 2;
+  const y = center.y - transform.cellPixelSize * 0.48 - height - 3;
+
+  graphics.rect(x, y, width, height).fill({ color: 0x451a03, alpha: 0.86 });
+  graphics.rect(x, y, width * windupPercent, height).fill(0xf97316);
+}
+
 function drawFallbackEntity(
   graphics: Graphics,
   entity: GameEntity,
+  currentTime: number,
   transform: FullTransform,
+  tint: EntityTint | null = null,
 ) {
   const entityPosition = toFullPosition(entity.position, transform);
   const entityRadius = Math.max(8, transform.cellPixelSize * 0.33);
+  const alpha = getEntityRenderAlpha(entity, currentTime);
 
   graphics
     .circle(entityPosition.x, entityPosition.y, entityRadius)
-    .fill(getEntityColor(entity));
+    .fill({ color: getEntityColor(entity), alpha });
+
+  if (tint) {
+    graphics
+      .circle(entityPosition.x, entityPosition.y, entityRadius)
+      .fill({ color: tint.color, alpha: tint.alpha });
+  }
 }
 
 function drawImageSprite({
@@ -647,7 +813,9 @@ function drawImageSprite({
   layer,
   position,
   requestRedraw,
+  rotation = 0,
   src,
+  tint,
   width,
 }: {
   alpha?: number;
@@ -658,7 +826,9 @@ function drawImageSprite({
   layer: Container;
   position: Position;
   requestRedraw?: () => void;
+  rotation?: number;
   src: string;
+  tint?: number;
   width: number;
 }): boolean {
   const sprite = createSprite(src, cache, requestRedraw);
@@ -670,6 +840,10 @@ function drawImageSprite({
   sprite.anchor.set(anchorX, anchorY);
   sprite.alpha = alpha;
   sprite.position.set(position.x, position.y);
+  sprite.rotation = rotation;
+  if (tint !== undefined) {
+    sprite.tint = tint;
+  }
   sprite.width = width;
   sprite.height = height;
   layer.addChild(sprite);
@@ -734,9 +908,24 @@ function getEntityIdleSpriteSrc(entity: GameEntity, map: GameMap): string | null
   return null;
 }
 
-function getEntitySpriteSize(entity: GameEntity, cellPixelSize: number) {
+function getEntitySpriteLayout(
+  entity: GameEntity,
+  cellPixelSize: number,
+  visualAsset: ReturnType<typeof getEntityVisualAsset>,
+): EntitySpriteLayout {
+  if (visualAsset.kind === "image" && visualAsset.naturalSize) {
+    return {
+      anchorX: getImageContentAnchorX(visualAsset),
+      anchorY: getImageContentAnchorY(visualAsset),
+      width: visualAsset.naturalSize.width,
+      height: visualAsset.naturalSize.height,
+    };
+  }
+
   if (entity.kind === "resource") {
     return {
+      anchorX: 0.5,
+      anchorY: 1,
       width: cellPixelSize * 1.2,
       height: cellPixelSize * 1.2,
     };
@@ -744,15 +933,96 @@ function getEntitySpriteSize(entity: GameEntity, cellPixelSize: number) {
 
   if (entity.kind === "npc") {
     return {
+      anchorX: 0.5,
+      anchorY: 1,
       width: cellPixelSize * 1.7,
       height: cellPixelSize * 1.7,
     };
   }
 
   return {
+    anchorX: 0.5,
+    anchorY: 1,
     width: cellPixelSize * 2.25,
     height: cellPixelSize * 2.25,
   };
+}
+
+function getImageContentAnchorX(visualAsset: ImageVisualAsset): number {
+  if (!visualAsset.naturalSize || !visualAsset.contentBounds) {
+    return 0.5;
+  }
+
+  return (
+    (visualAsset.contentBounds.x + visualAsset.contentBounds.width / 2) /
+    visualAsset.naturalSize.width
+  );
+}
+
+function getImageContentAnchorY(visualAsset: ImageVisualAsset): number {
+  if (!visualAsset.naturalSize || !visualAsset.contentBounds) {
+    return 1;
+  }
+
+  return (
+    (visualAsset.contentBounds.y + visualAsset.contentBounds.height) /
+    visualAsset.naturalSize.height
+  );
+}
+
+function getEntityRenderAlpha(entity: GameEntity, currentTime: number): number {
+  if (entity.kind !== "enemy" || entity.state !== "dead") {
+    return 1;
+  }
+
+  const defeatedAtMs = entity.defeatedAtMs ?? currentTime;
+  const fadeProgress = Math.min(
+    1,
+    Math.max(0, (currentTime - defeatedAtMs) / deadEnemyFadeDurationMs),
+  );
+
+  return 1 - fadeProgress;
+}
+
+function getEntityFeedbackTint({
+  combatFeedbackEvents,
+  currentTime,
+  entity,
+  skillShieldBlocksById,
+}: {
+  combatFeedbackEvents: CombatFeedbackEvent[];
+  currentTime: number;
+  entity: GameEntity;
+  skillShieldBlocksById: Record<string, SkillShieldBlockState>;
+}): EntityTint | null {
+  if (entity.state === "dead") {
+    return { color: 0x64748b, alpha: 0.5 };
+  }
+
+  const recentEvents = combatFeedbackEvents.filter(
+    (event) =>
+      event.entityId === entity.id &&
+      currentTime - event.createdAt <= entityFeedbackTintDurationMs,
+  );
+
+  if (recentEvents.some(isHealingNumberFeedback)) {
+    return { color: 0xd9f99d, alpha: 0.5 };
+  }
+
+  if (recentEvents.some(isDamageNumberFeedback)) {
+    return { color: 0xef4444, alpha: 0.5 };
+  }
+
+  if (
+    entity.kind === "companion" &&
+    Object.values(skillShieldBlocksById).some(
+      (shield) => shield.ownerId === entity.id && shield.expiresAt > currentTime,
+    )
+  ) {
+    return { color: 0xe0f2fe, alpha: 0.5 };
+  }
+
+  return null;
 }
 
 function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
@@ -781,7 +1051,7 @@ function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
 
 function createFeedbackText({
   color,
-  fontSize = 11,
+  fontSize = defaultFeedbackFontSize,
   text,
 }: {
   color: number;
@@ -805,8 +1075,507 @@ function createFeedbackText({
   return label;
 }
 
+function getCombatFeedbackFontSize(event: CombatFeedbackEvent): number {
+  if (
+    skillFeedbackDisplayNames.has(event.text) ||
+    isDamageNumberFeedback(event) ||
+    event.text === "Critical"
+  ) {
+    return emphasizedFeedbackFontSize;
+  }
+
+  if (event.text === "Dodged" || event.text === "Blocked") {
+    return defaultFeedbackFontSize;
+  }
+
+  return defaultFeedbackFontSize;
+}
+
+function isDamageNumberFeedback(event: CombatFeedbackEvent): boolean {
+  return event.type === "damage" && /^-\d+ HP$/.test(event.text);
+}
+
+function isHealingNumberFeedback(event: CombatFeedbackEvent): boolean {
+  return event.type === "heal" && /^\+\d+ HP$/.test(event.text);
+}
+
+function hasPairedCriticalFeedback(
+  event: CombatFeedbackEvent,
+  combatFeedbackEvents: CombatFeedbackEvent[],
+): boolean {
+  if (!isDamageNumberFeedback(event)) {
+    return false;
+  }
+
+  return combatFeedbackEvents.some(
+    (candidate) =>
+      candidate.entityId === event.entityId &&
+      candidate.createdAt === event.createdAt &&
+      candidate.text === "Critical",
+  );
+}
+
+function hasSameMomentFeedback(
+  event: CombatFeedbackEvent,
+  combatFeedbackEvents: CombatFeedbackEvent[],
+  text: string,
+): boolean {
+  return combatFeedbackEvents.some(
+    (candidate) =>
+      candidate.entityId === event.entityId &&
+      candidate.createdAt === event.createdAt &&
+      candidate.text === text,
+  );
+}
+
+function shouldDrawSkippedFrequentEffect(event: CombatFeedbackEvent): boolean {
+  const hash = Array.from(event.id).reduce(
+    (total, character) => total + character.charCodeAt(0),
+    0,
+  );
+
+  return hash % 2 === 0;
+}
+
+function getCombatFeedbackColor(
+  event: CombatFeedbackEvent,
+  isCriticalDamage = false,
+): number {
+  if (isCriticalDamage || event.text === "Critical") {
+    return 0xf97316;
+  }
+
+  if (event.text === "Blocked") {
+    return 0x38bdf8;
+  }
+
+  if (event.text === "Dodged") {
+    return 0xcbd5e1;
+  }
+
+  if (isDamageNumberFeedback(event)) {
+    return 0xf43f1f;
+  }
+
+  if (isHealingNumberFeedback(event) || event.type === "heal") {
+    return 0x65a30d;
+  }
+
+  const colorByType = {
+    attack: 0x1d4ed8,
+    damage: 0xb91c1c,
+    death: 0x111827,
+    gather: 0x047857,
+    heal: 0x65a30d,
+  } satisfies Record<CombatFeedbackEvent["type"], number>;
+
+  return colorByType[event.type];
+}
+
+function getResourceHitEffectSrc(resource: Extract<GameEntity, { kind: "resource" }>): string {
+  if (resource.resourceType === "ore") {
+    return resourceHitOreSrc;
+  }
+
+  if (resource.resourceType === "herb") {
+    return resourceHitHerbSrc;
+  }
+
+  return resourceHitWoodSrc;
+}
+
+function shouldDrawCombatFeedbackEvent(
+  event: CombatFeedbackEvent,
+  entity: GameEntity,
+): boolean {
+  if (event.type === "attack" && event.text === "Attack") {
+    return false;
+  }
+
+  if (event.type === "death" && entity.kind === "enemy") {
+    return false;
+  }
+
+  return true;
+}
+
+function getDamageNumberProgress(event: CombatFeedbackEvent, currentTime: number): number {
+  return Math.min(
+    1,
+    Math.max(0, (currentTime - event.createdAt) / damageNumberAnimationDurationMs),
+  );
+}
+
+function getDamageNumberDirection(event: CombatFeedbackEvent): -1 | 1 {
+  const hash = Array.from(event.id).reduce(
+    (total, character) => total + character.charCodeAt(0),
+    0,
+  );
+
+  return hash % 2 === 0 ? -1 : 1;
+}
+
+function getCombatFeedbackPosition(
+  event: CombatFeedbackEvent,
+  entity: GameEntity,
+  currentTime: number,
+  map: GameMap,
+  transform: FullTransform,
+): Position {
+  const center = toFullPosition(entity.position, transform);
+
+  if (!isDamageNumberFeedback(event)) {
+    return {
+      x: center.x,
+      y: center.y + (event.type === "attack" ? -34 : -18),
+    };
+  }
+
+  const visualAsset = getEntityVisualAsset(entity, map.id);
+  const layout = getEntitySpriteLayout(
+    entity,
+    transform.cellPixelSize,
+    visualAsset,
+  );
+  const progress = getDamageNumberProgress(event, currentTime);
+  const easedProgress = 1 - (1 - progress) * (1 - progress);
+  const direction = getDamageNumberDirection(event);
+
+  return {
+    x: center.x + direction * damageNumberDriftPixels * easedProgress,
+    y:
+      center.y +
+      transform.cellPixelSize / 2 -
+      layout.anchorY * layout.height -
+      6 -
+      damageNumberRisePixels * easedProgress,
+  };
+}
+
+function applyDamageNumberAnimation(
+  label: Text,
+  event: CombatFeedbackEvent,
+  currentTime: number,
+) {
+  const progress = getDamageNumberProgress(event, currentTime);
+  const direction = getDamageNumberDirection(event);
+
+  label.alpha = 1 - progress;
+  label.rotation = direction * damageNumberRotationRadians * progress;
+  label.scale.set(1 - progress * 0.3);
+}
+
 function getEntityById(entities: GameEntity[]) {
   return new Map(entities.map((entity) => [entity.id, entity]));
+}
+
+function getSameMomentAttacker(
+  event: CombatFeedbackEvent,
+  combatFeedbackEvents: CombatFeedbackEvent[],
+  entitiesById: Map<string, GameEntity>,
+): GameEntity | undefined {
+  const attackEvent = combatFeedbackEvents.find(
+    (candidate) =>
+      candidate.createdAt === event.createdAt &&
+      candidate.type === "attack" &&
+      candidate.entityId !== event.entityId,
+  );
+
+  return attackEvent ? entitiesById.get(attackEvent.entityId) : undefined;
+}
+
+function drawBetweenEntitiesEffect({
+  alpha = 1,
+  cache,
+  currentTime,
+  event,
+  eventEntity,
+  eventPosition,
+  height,
+  layer,
+  requestRedraw,
+  source,
+  src,
+  target,
+  transform,
+  width,
+}: {
+  alpha?: number;
+  cache: TextureCache;
+  currentTime: number;
+  event: CombatFeedbackEvent;
+  eventEntity: GameEntity;
+  eventPosition: Position;
+  height: number;
+  layer: Container;
+  requestRedraw?: () => void;
+  source?: GameEntity;
+  src: string;
+  target?: GameEntity;
+  transform: FullTransform;
+  width: number;
+}) {
+  const sourcePosition = source
+    ? toFullPosition(source.position, transform)
+    : undefined;
+  const targetPosition = target
+    ? toFullPosition(target.position, transform)
+    : toFullPosition(eventEntity.position, transform);
+  const progress = getDamageNumberProgress(event, currentTime);
+  const effectPosition = sourcePosition
+    ? {
+        x: sourcePosition.x + (targetPosition.x - sourcePosition.x) * 0.72,
+        y: sourcePosition.y + (targetPosition.y - sourcePosition.y) * 0.72,
+      }
+    : eventPosition;
+  const rotation = sourcePosition
+    ? Math.atan2(
+        targetPosition.y - sourcePosition.y,
+        targetPosition.x - sourcePosition.x,
+      )
+    : 0;
+
+  drawImageSprite({
+    alpha: alpha * (1 - progress),
+    anchorX: 0.5,
+    anchorY: 0.5,
+    cache,
+    height,
+    layer,
+    position: effectPosition,
+    requestRedraw,
+    rotation,
+    src,
+    width,
+  });
+}
+
+function drawCombatFeedbackSpriteEffect({
+  cache,
+  combatFeedbackEvents,
+  currentTime,
+  entitiesById,
+  entity,
+  event,
+  layer,
+  map,
+  requestRedraw,
+  transform,
+}: {
+  cache: TextureCache;
+  combatFeedbackEvents: CombatFeedbackEvent[];
+  currentTime: number;
+  entitiesById: Map<string, GameEntity>;
+  entity: GameEntity;
+  event: CombatFeedbackEvent;
+  layer: Container;
+  map: GameMap;
+  requestRedraw?: () => void;
+  transform: FullTransform;
+}) {
+  const position = getCombatFeedbackPosition(
+    event,
+    entity,
+    currentTime,
+    map,
+    transform,
+  );
+  const progress = getDamageNumberProgress(event, currentTime);
+
+  if (
+    isDamageNumberFeedback(event) &&
+    !hasPairedCriticalFeedback(event, combatFeedbackEvents) &&
+    !hasSameMomentFeedback(event, combatFeedbackEvents, "Blocked") &&
+    !hasSameMomentFeedback(event, combatFeedbackEvents, "Dodged")
+  ) {
+    drawImageSprite({
+      alpha: 0.92 * (1 - progress),
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache,
+      height: 38,
+      layer,
+      position,
+      requestRedraw,
+      src: damageHitSparkSrc,
+      width: 38,
+    });
+  }
+
+  if (event.text === "Dodged" && shouldDrawSkippedFrequentEffect(event)) {
+    drawImageSprite({
+      alpha: 0.72 * (1 - progress),
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache,
+      height: 26,
+      layer,
+      position: {
+        x: position.x + transform.cellPixelSize * 0.35,
+        y: position.y + transform.cellPixelSize * 0.12,
+      },
+      requestRedraw,
+      src: missEvadePuffSrc,
+      width: 26,
+    });
+  }
+
+  if (event.text === "Blocked") {
+    const source =
+      event.type === "attack"
+        ? entity
+        : getSameMomentAttacker(event, combatFeedbackEvents, entitiesById);
+    const target =
+      event.type === "attack" && "currentTargetId" in entity
+        ? entitiesById.get(entity.currentTargetId ?? "")
+        : entity;
+
+    drawBetweenEntitiesEffect({
+      alpha: 0.9,
+      cache,
+      currentTime,
+      event,
+      eventEntity: entity,
+      eventPosition: position,
+      height: 36,
+      layer,
+      requestRedraw,
+      source,
+      src: blockImpactSrc,
+      target,
+      transform,
+      width: 36,
+    });
+
+    if (event.type === "attack" && target) {
+      const targetPosition = toFullPosition(target.position, transform);
+
+      drawImageSprite({
+        alpha: 0.85 * (1 - progress),
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache,
+        height: 34,
+        layer,
+        position: targetPosition,
+        requestRedraw,
+        src: shieldInvulnerableGlintSrc,
+        width: 34,
+      });
+    }
+  }
+
+  if (isHealingNumberFeedback(event)) {
+    drawImageSprite({
+      alpha: 0.84 * (1 - progress),
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache,
+      height: 36,
+      layer,
+      position: {
+        x: position.x,
+        y: position.y + transform.cellPixelSize * 0.18,
+      },
+      requestRedraw,
+      src: healSparkleSrc,
+      width: 36,
+    });
+  }
+
+  if (event.type === "death") {
+    const center = toFullPosition(entity.position, transform);
+
+    drawImageSprite({
+      alpha: 0.82 * (1 - progress),
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache,
+      height: 42,
+      layer,
+      position: center,
+      requestRedraw,
+      src: deathDownedPuffSrc,
+      width: 42,
+    });
+  }
+
+  if (event.type === "gather" && event.text === "Gather") {
+    const resource =
+      "currentTargetId" in entity
+        ? entitiesById.get(entity.currentTargetId ?? "")
+        : undefined;
+
+    if (resource?.kind === "resource") {
+      const resourcePosition = toFullPosition(resource.position, transform);
+
+      drawImageSprite({
+        alpha: 0.82 * (1 - progress),
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache,
+        height: 34,
+        layer,
+        position: resourcePosition,
+        requestRedraw,
+        src: getResourceHitEffectSrc(resource),
+        width: 34,
+      });
+    }
+  }
+
+  if (event.type === "gather" && entity.kind === "resource") {
+    const resourcePosition = toFullPosition(entity.position, transform);
+
+    if (entity.isDepleted) {
+      drawImageSprite({
+        alpha: 0.78 * (1 - progress),
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache,
+        height: 38,
+        layer,
+        position: resourcePosition,
+        requestRedraw,
+        src: resourceDepletedPuffSrc,
+        width: 38,
+      });
+    }
+
+    if (event.text === "Inventory Full") {
+      drawImageSprite({
+        alpha: 0.92 * (1 - progress),
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache,
+        height: 38,
+        layer,
+        position: {
+          x: resourcePosition.x,
+          y: resourcePosition.y - transform.cellPixelSize * 0.62,
+        },
+        requestRedraw,
+        src: inventoryFullWarningSrc,
+        width: 38,
+      });
+    } else {
+      drawImageSprite({
+        alpha: 0.86 * (1 - progress),
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache,
+        height: 34,
+        layer,
+        position: {
+          x: resourcePosition.x,
+          y: resourcePosition.y - transform.cellPixelSize * 0.4,
+        },
+        requestRedraw,
+        src: gatherCompleteSparkleSrc,
+        width: 34,
+      });
+    }
+  }
 }
 
 function drawSkillLink(
@@ -1081,21 +1850,65 @@ function drawFullEffects({
       continue;
     }
 
-    const center = toFullPosition(entity.position, transform);
-    const colorByType = {
-      attack: 0x1d4ed8,
-      damage: 0xb91c1c,
-      death: 0x111827,
-      gather: 0x047857,
-      heal: 0x047857,
-    } satisfies Record<CombatFeedbackEvent["type"], number>;
+    drawCombatFeedbackSpriteEffect({
+      cache,
+      combatFeedbackEvents,
+      currentTime,
+      entitiesById,
+      entity,
+      event,
+      layer,
+      map,
+      requestRedraw,
+      transform,
+    });
+
+    if (!shouldDrawCombatFeedbackEvent(event, entity)) {
+      continue;
+    }
+
+    const isCriticalDamage = hasPairedCriticalFeedback(
+      event,
+      combatFeedbackEvents,
+    );
+    const labelPosition = getCombatFeedbackPosition(
+      event,
+      entity,
+      currentTime,
+      map,
+      transform,
+    );
+
+    if (isCriticalDamage) {
+      const progress = getDamageNumberProgress(event, currentTime);
+      const direction = getDamageNumberDirection(event);
+      const backingSize = criticalHitBackingSize * (1 - progress * 0.3);
+
+      drawImageSprite({
+        alpha: 0.88 * (1 - progress),
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache,
+        height: backingSize,
+        layer,
+        position: labelPosition,
+        requestRedraw,
+        rotation: direction * damageNumberRotationRadians * progress,
+        src: criticalHitBackingSrc,
+        width: backingSize,
+      });
+    }
+
     const label = createFeedbackText({
-      color: colorByType[event.type],
+      color: getCombatFeedbackColor(event, isCriticalDamage),
+      fontSize: getCombatFeedbackFontSize(event),
       text: event.text,
     });
-    const yOffset = event.type === "attack" ? -34 : -18;
 
-    label.position.set(center.x, center.y + yOffset);
+    label.position.set(labelPosition.x, labelPosition.y);
+    if (isDamageNumberFeedback(event)) {
+      applyDamageNumberAnimation(label, event, currentTime);
+    }
     layer.addChild(label);
   }
 }
@@ -1289,22 +2102,26 @@ function drawFullMapObjects({
 
 function drawFullEntities({
   cache,
+  combatFeedbackEvents,
   currentTime,
   entities,
   fallbackGraphics,
   layer,
   map,
   requestRedraw,
+  skillShieldBlocksById,
   transform,
   visualMovementByEntityId,
 }: {
   cache: TextureCache;
+  combatFeedbackEvents: CombatFeedbackEvent[];
   currentTime: number;
   entities: GameEntity[];
   fallbackGraphics: Graphics;
   layer: Container;
   map: GameMap;
   requestRedraw?: () => void;
+  skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   transform: FullTransform;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }) {
@@ -1322,25 +2139,42 @@ function drawFullEntities({
     });
     const idleSpriteSrc = getEntityIdleSpriteSrc(entity, map);
     const entityPosition = toFullPosition(entity.position, transform);
-    const size = getEntitySpriteSize(entity, transform.cellPixelSize);
+    const visualAsset = getEntityVisualAsset(entity, map.id);
+    const layout = getEntitySpriteLayout(
+      entity,
+      transform.cellPixelSize,
+      visualAsset,
+    );
+    const alpha = getEntityRenderAlpha(entity, currentTime);
+    const tint = getEntityFeedbackTint({
+      combatFeedbackEvents,
+      currentTime,
+      entity,
+      skillShieldBlocksById,
+    });
+    const spritePosition = {
+      x: entityPosition.x,
+      y: entityPosition.y + transform.cellPixelSize / 2,
+    };
+    let drawnSpriteSrc: string | null = null;
     let didDraw = spriteSrc
       ? drawImageSprite({
-          alpha: entity.kind === "enemy" && entity.state === "dead" ? 0.45 : 1,
+          alpha,
+          anchorX: layout.anchorX,
+          anchorY: layout.anchorY,
           cache,
-          height: size.height,
+          height: layout.height,
           layer,
-          position: {
-            x: entityPosition.x,
-            y: entityPosition.y + transform.cellPixelSize / 2,
-          },
+          position: spritePosition,
           requestRedraw,
           src: spriteSrc,
-          width: size.width,
+          width: layout.width,
         })
       : false;
 
     if (didDraw && spriteSrc) {
       cache.lastEntitySpriteSrcById.set(entity.id, spriteSrc);
+      drawnSpriteSrc = spriteSrc;
     }
 
     if (!didDraw) {
@@ -1348,43 +2182,62 @@ function drawFullEntities({
 
       if (lastSpriteSrc && lastSpriteSrc !== spriteSrc) {
         didDraw = drawImageSprite({
-          alpha: entity.kind === "enemy" && entity.state === "dead" ? 0.45 : 1,
+          alpha,
+          anchorX: layout.anchorX,
+          anchorY: layout.anchorY,
           cache,
-          height: size.height,
+          height: layout.height,
           layer,
-          position: {
-            x: entityPosition.x,
-            y: entityPosition.y + transform.cellPixelSize / 2,
-          },
+          position: spritePosition,
           requestRedraw,
           src: lastSpriteSrc,
-          width: size.width,
+          width: layout.width,
         });
+
+        if (didDraw) {
+          drawnSpriteSrc = lastSpriteSrc;
+        }
       }
     }
 
     if (!didDraw && idleSpriteSrc && idleSpriteSrc !== spriteSrc) {
       didDraw = drawImageSprite({
-        alpha: entity.kind === "enemy" && entity.state === "dead" ? 0.45 : 1,
+        alpha,
+        anchorX: layout.anchorX,
+        anchorY: layout.anchorY,
         cache,
-        height: size.height,
+        height: layout.height,
         layer,
-        position: {
-          x: entityPosition.x,
-          y: entityPosition.y + transform.cellPixelSize / 2,
-        },
+        position: spritePosition,
         requestRedraw,
         src: idleSpriteSrc,
-        width: size.width,
+        width: layout.width,
       });
 
       if (didDraw) {
         cache.lastEntitySpriteSrcById.set(entity.id, idleSpriteSrc);
+        drawnSpriteSrc = idleSpriteSrc;
       }
     }
 
+    if (drawnSpriteSrc && tint) {
+      drawImageSprite({
+        alpha: tint.alpha * alpha,
+        anchorX: layout.anchorX,
+        anchorY: layout.anchorY,
+        cache,
+        height: layout.height,
+        layer,
+        position: spritePosition,
+        requestRedraw,
+        src: drawnSpriteSrc,
+        tint: tint.color,
+        width: layout.width,
+      });
+    }
+
     if (!didDraw) {
-      drawFallbackEntity(fallbackGraphics, entity, transform);
+      drawFallbackEntity(fallbackGraphics, entity, currentTime, transform, tint);
     }
   }
 }
@@ -1618,12 +2471,14 @@ function drawFullMap({
   });
   drawFullEntities({
     cache: textureCache,
+    combatFeedbackEvents,
     currentTime,
     entities,
     fallbackGraphics,
     layer: layers.entityLayer,
     map,
     requestRedraw,
+    skillShieldBlocksById,
     transform,
     visualMovementByEntityId,
   });
@@ -1643,6 +2498,24 @@ function drawFullMap({
     skillVisualEvents,
     transform,
   });
+  if (activeTeleport) {
+    const activeTeleportPosition = toFullPosition(activeTeleport.position, transform);
+    const pulseProgress = (currentTime % 900) / 900;
+    const pulseSize = transform.cellPixelSize * (1.65 + pulseProgress * 0.45);
+
+    drawImageSprite({
+      alpha: 0.78 * (1 - pulseProgress * 0.55),
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache: textureCache,
+      height: pulseSize,
+      layer: layers.effectsLayer,
+      position: activeTeleportPosition,
+      requestRedraw,
+      src: teleportPulseSrc,
+      width: pulseSize,
+    });
+  }
   drawQuestGiverMarker(
     layers.effectsLayer,
     entities,
@@ -1683,6 +2556,7 @@ function drawFullMap({
 
   for (const entity of entities) {
     drawHealthBar(overlayGraphics, entity, transform);
+    drawEnemyAttackWindupBar(overlayGraphics, entity, currentTime, transform);
   }
 
   const targetEntity = leaderIntent?.targetId
@@ -2068,7 +2942,12 @@ export function PixiWorldRenderer({
         cellPixelSize,
       },
     );
-    const entity = getNearestInteractableEntity(sortedEntities, mapPosition);
+    const entity = getNearestInteractableEntity({
+      cellPixelSize,
+      entities: sortedEntities,
+      map,
+      mapPosition,
+    });
 
     if (entity?.kind === "npc") {
       onNpcClick?.(entity.id);

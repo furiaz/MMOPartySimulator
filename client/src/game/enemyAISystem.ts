@@ -7,7 +7,7 @@ import {
   type GameState,
 } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
-import { isEnemyEntity } from "./entityGuards";
+import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
 import { GAME_LOOP_TICK_MS, type SimulationTiming } from "./simulationTiming";
 import { getPartyLeader } from "./partySystem";
 import {
@@ -58,6 +58,11 @@ export function updateEnemyAISystem(
 
   for (const entity of Object.values(state.entities)) {
     if (!isEnemy(entity) || entity.state === "dead") {
+      continue;
+    }
+
+    if (isTargetDummyEnemy(entity)) {
+      nextState = updateEntity(nextState, keepTargetDummyStationary(entity));
       continue;
     }
 
@@ -130,6 +135,19 @@ export function updateEnemyAISystem(
   }
 
   return nextState;
+}
+
+function keepTargetDummyStationary(enemy: Enemy): Enemy {
+  return {
+    ...enemy,
+    position: enemy.homePosition,
+    state: "idle",
+    currentTargetId: null,
+    roamTargetPosition: null,
+    nextRoamAt: undefined,
+    roamMoveUntil: undefined,
+    targetDecisionReason: "passive_no_auto_target",
+  };
 }
 
 export function getEnemyHomeLeashDistance(): number {

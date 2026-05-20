@@ -1,4 +1,5 @@
 import { isCombatEntity, isResourceEntity } from "./entities";
+import { isTargetDummyEnemy } from "./entityGuards";
 import { getBoundedNavigationDistance, type GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
@@ -87,6 +88,7 @@ function isResourcePositionAllowed(
 function isValidEnemyTarget(entity: GameEntity): entity is Enemy {
   return (
     entity.kind === "enemy" &&
+    !isTargetDummyEnemy(entity) &&
     isCombatEntity(entity) &&
     entity.state !== "dead" &&
     entity.health > 0

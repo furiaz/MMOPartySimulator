@@ -18,6 +18,12 @@ export function isEnemyEntity(
   return entity?.kind === "enemy";
 }
 
+export function isTargetDummyEnemy(
+  entity: GameEntity | undefined,
+): entity is Enemy & { isTargetDummy: true } {
+  return Boolean(isEnemyEntity(entity) && entity.isTargetDummy);
+}
+
 export function isResourceGameEntity(
   entity: GameEntity | undefined,
 ): entity is ResourceEntity {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createEnemy } from "./entities";
+import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import { DEFAULT_COMPANION_ATTACK_RANGE, getCompanionAttackRange } from "./companionCombat";
-import { updateAttackSystem } from "./attackSystem";
+import { ENEMY_ATTACK_WINDUP_MS, updateAttackSystem } from "./attackSystem";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
@@ -68,7 +68,26 @@ describe("enemy attack leash movement", () => {
     expect(nextEnemy.currentTargetId).toBe(companion.id);
   });
 
-  it("lets ranged enemy archetypes attack from numeric range without closing to melee", () => {
+  it("keeps target dummies alive and non-retaliatory when attacked", () => {
+    const companion = {
+      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: "dummy",
+    };
+    const dummy = {
+      ...createTargetDummy("dummy", { x: 0, y: 0 }),
+      health: 2,
+    };
+
+    const nextState = updateAttackSystem(createState([companion, dummy]));
+    const nextDummy = nextState.entities[dummy.id] as Enemy;
+
+    expect(nextDummy.health).toBe(1);
+    expect(nextDummy.state).toBe("idle");
+    expect(nextDummy.currentTargetId).toBeNull();
+  });
+
+  it("winds up ranged enemy attacks from numeric range without closing to melee", () => {
     const companion = createIdleCompanion("leader", { x: 4, y: 0 });
     const enemy = {
       ...createEnemy("enemy", { x: 0, y: 0 }, undefined, {
@@ -76,13 +95,36 @@ describe("enemy attack leash movement", () => {
       }),
       state: "attack" as const,
       currentTargetId: companion.id,
+      lastAttackAt: -1000,
     };
 
-    const nextState = updateAttackSystem(createState([companion, enemy]));
+    const windupState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const windupEnemy = windupState.entities[enemy.id] as Enemy;
+    const windupCompanion = windupState.entities[companion.id];
+
+    expect(windupEnemy.position).toEqual(enemy.position);
+    expect(windupEnemy.attackWindupStartedAt).toBe(1000);
+    expect(windupEnemy.attackWindupDurationMs).toBe(ENEMY_ATTACK_WINDUP_MS);
+    expect(windupEnemy.attackWindupTargetId).toBe(companion.id);
+    expect(windupCompanion).toMatchObject({
+      health: companion.health,
+    });
+
+    const nextState = updateAttackSystem(
+      windupState,
+      new Set(),
+      1000 + ENEMY_ATTACK_WINDUP_MS,
+    );
     const nextEnemy = nextState.entities[enemy.id] as Enemy;
     const nextCompanion = nextState.entities[companion.id];
 
     expect(nextEnemy.position).toEqual(enemy.position);
+    expect(nextEnemy.attackWindupStartedAt).toBeUndefined();
+    expect(nextEnemy.attackWindupTargetId).toBeNull();
     expect(nextCompanion).toMatchObject({
       health: companion.health - enemy.attack,
     });

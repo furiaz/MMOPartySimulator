@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addEntity } from "./state";
-import { addItemToInventoryState } from "./inventory";
+import { addItemToInventoryState, countInventoryItem } from "./inventory";
 import { createNpc } from "./entities";
 import { createTestGameState } from "./testState";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
@@ -9,6 +9,8 @@ import {
   setCurrencyBalanceForDebug,
 } from "./wallet";
 import {
+  buyMerchantItem,
+  getMerchantBuyStock,
   getQuickExchangeItems,
   quickExchangeParts,
 } from "./merchant";
@@ -119,6 +121,163 @@ describe("merchant quick exchange", () => {
           previousCurrencyBalance: 0,
           nextCurrencyBalance: 1,
           totalExchangeValue: 1,
+        }),
+      ]),
+    );
+  });
+});
+
+describe("merchant buy", () => {
+  it("returns fixed starter equipment stock for merchant NPCs", () => {
+    const stock = getMerchantBuyStock(createMerchantState(), MERCHANT_ID);
+
+    expect(stock).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: "training_sword",
+          priceCrowns: 12,
+          group: "weapons",
+        }),
+        expect.objectContaining({
+          itemId: "plain_charm",
+          priceCrowns: 25,
+          group: "accessories",
+        }),
+      ]),
+    );
+  });
+
+  it("buys stock equipment into shared inventory for Crowns", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "training_sword",
+    );
+
+    expect(result).toMatchObject({
+      status: "success",
+      itemId: "training_sword",
+      priceCrowns: 12,
+      previousCrowns: 100,
+      newCrowns: 88,
+    });
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(88);
+    expect(countInventoryItem(nextState.inventory, "training_sword")).toBe(1);
+  });
+
+  it("does not mutate state when Crowns are insufficient", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 5).state;
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "training_sword",
+    );
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "insufficient_crowns",
+      previousCrowns: 5,
+      newCrowns: 5,
+    });
+    expect(nextState.inventory).toEqual(state.inventory);
+    expect(nextState.wallet).toEqual(state.wallet);
+  });
+
+  it("does not mutate state when inventory is full", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    for (let index = 0; index < state.inventory.capacity; index += 1) {
+      state = addItemToInventoryState(state, "training_sword", 1, "debug").state;
+    }
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "plain_charm",
+    );
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "inventory_full",
+      previousCrowns: 100,
+      newCrowns: 100,
+    });
+    expect(nextState.inventory).toEqual(state.inventory);
+    expect(nextState.wallet).toEqual(state.wallet);
+  });
+
+  it("fails safely for invalid merchants and non-stock items", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const invalidMerchantResult = buyMerchantItem(
+      state,
+      "missing-merchant",
+      "training_sword",
+    );
+    const nonStockResult = buyMerchantItem(state, MERCHANT_ID, "holy_lantern");
+
+    expect(invalidMerchantResult.result).toMatchObject({
+      status: "failed",
+      reason: "invalid_merchant",
+    });
+    expect(nonStockResult.result).toMatchObject({
+      status: "failed",
+      reason: "item_not_in_stock",
+    });
+    expect(invalidMerchantResult.state.inventory).toEqual(state.inventory);
+    expect(invalidMerchantResult.state.wallet).toEqual(state.wallet);
+    expect(nonStockResult.state.inventory).toEqual(state.inventory);
+    expect(nonStockResult.state.wallet).toEqual(state.wallet);
+  });
+
+  it("allows buying equipment before class or level requirements are met", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "iron_sword",
+    );
+
+    expect(result.status).toBe("success");
+    expect(countInventoryItem(nextState.inventory, "iron_sword")).toBe(1);
+  });
+
+  it("records buy telemetry while debug recording is active", () => {
+    let state = startDebugTelemetryRecording(createMerchantState());
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const { state: nextState } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "training_sword",
+    );
+
+    expect(nextState.debugTelemetry?.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "merchant_buy_attempt",
+        "merchant_buy_currency_removed",
+        "merchant_buy_item_added",
+        "merchant_buy_completed",
+      ]),
+    );
+    expect(nextState.debugTelemetry?.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "merchant_buy_completed",
+          entityId: MERCHANT_ID,
+          itemId: "training_sword",
+          currencyAmount: 12,
+          previousCurrencyBalance: 100,
+          nextCurrencyBalance: 88,
         }),
       ]),
     );

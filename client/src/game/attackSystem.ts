@@ -35,7 +35,7 @@ import {
   getEuclideanDistance,
   getGridDistance,
 } from "./positionUtils";
-import { isEnemyEntity } from "./entityGuards";
+import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
 import { getEnemyAttackRange } from "./enemyArchetypes";
 import {
   DEFAULT_COMPANION_ATTACK_RANGE,
@@ -50,6 +50,7 @@ import type {
 } from "./types";
 
 export const ATTACK_COOLDOWN_MS = 1000;
+export const ENEMY_ATTACK_WINDUP_MS = 500;
 const TARGET_SWITCH_DISTANCE = 6;
 const MAX_ATTACK_SLOT_PATH_DISTANCE = 6;
 const FINAL_STEP_ATTACK_DISTANCE = MOVEMENT_STEP_DISTANCE * 0.5;
@@ -82,7 +83,7 @@ export function updateAttackSystem(
 
     if (target.id !== attacker.currentTargetId) {
       nextState = updateEntity(nextState, {
-        ...attacker,
+        ...clearAttackWindup(attacker),
         currentTargetId: target.id,
       });
     }
@@ -123,12 +124,27 @@ export function updateAttackSystem(
 
     if (isInAttackRange(attackReadyAttacker, target)) {
       if (!canAttack(currentAttacker, now)) {
+        nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;
       }
 
-      const combatResult = resolveAndApplyCombatDamage(
+      const windupResult = updateEnemyAttackWindup(
         nextState,
         attackReadyAttacker,
+        target,
+        now,
+      );
+      nextState = windupResult.state;
+
+      if (!windupResult.isComplete) {
+        continue;
+      }
+
+      const windupReadyAttacker = windupResult.attacker;
+
+      const combatResult = resolveAndApplyCombatDamage(
+        nextState,
+        windupReadyAttacker,
         target,
         {
           damageType: "physical",
@@ -142,21 +158,23 @@ export function updateAttackSystem(
       nextState = combatResult.state;
       const updatedTarget = updateTargetAfterDamage(
         combatResult.target,
-        attackReadyAttacker,
+        windupReadyAttacker,
       );
-      const updatedAttacker = setLastAttackAt(attackReadyAttacker, now);
+      const updatedAttacker = clearAttackWindup(
+        setLastAttackAt(windupReadyAttacker, now),
+      );
 
       nextState = updateEntity(nextState, updatedTarget);
 
       if (
-        isPartyCombatEntity(attackReadyAttacker) &&
+        isPartyCombatEntity(windupReadyAttacker) &&
         isEnemy(updatedTarget) &&
         updatedTarget.state === "dead"
       ) {
         nextState = grantCharacterXpToParty(
           nextState,
           updatedTarget,
-          attackReadyAttacker.id,
+          windupReadyAttacker.id,
         );
         nextState = recordEnemyDefeatedForQuests(
           nextState,
@@ -166,24 +184,24 @@ export function updateAttackSystem(
         nextState = handleEnemyDefeatedDrops(
           nextState,
           updatedTarget,
-          attackReadyAttacker.id,
+          windupReadyAttacker.id,
           now,
         );
       }
 
-      if (isEnemy(attackReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
+      if (isEnemy(windupReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
         nextState = cancelResurrectionChannelForHelper(
           nextState,
           updatedTarget.id,
           now,
           "attacked",
         );
-        nextState = protectPartyMember(nextState, updatedTarget, attackReadyAttacker);
+        nextState = protectPartyMember(nextState, updatedTarget, windupReadyAttacker);
       }
 
       const currentUpdatedAttacker = getEntityById(nextState, updatedAttacker.id);
       const finalUpdatedAttacker = isCombatEntity(currentUpdatedAttacker)
-        ? setLastAttackAt(currentUpdatedAttacker, now)
+        ? clearAttackWindup(setLastAttackAt(currentUpdatedAttacker, now))
         : updatedAttacker;
 
       nextState = updateEntity(
@@ -194,6 +212,8 @@ export function updateAttackSystem(
       );
       continue;
     }
+
+    nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
 
     if (movedEntityIds.has(currentAttacker.id)) {
       continue;
@@ -250,6 +270,70 @@ export function updateAttackSystem(
   }
 
   return nextState;
+}
+
+function updateEnemyAttackWindup(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+  now: number,
+): {
+  state: GameState;
+  attacker: CombatEntity;
+  isComplete: boolean;
+} {
+  if (!isEnemy(attacker)) {
+    return { state, attacker, isComplete: true };
+  }
+
+  const durationMs = attacker.attackWindupDurationMs ?? ENEMY_ATTACK_WINDUP_MS;
+  const startedAt =
+    attacker.attackWindupTargetId === target.id &&
+    attacker.attackWindupStartedAt !== undefined
+      ? attacker.attackWindupStartedAt
+      : now;
+  const updatedAttacker = {
+    ...attacker,
+    attackWindupStartedAt: startedAt,
+    attackWindupDurationMs: durationMs,
+    attackWindupTargetId: target.id,
+  };
+  const nextState = updateEntity(state, updatedAttacker);
+
+  return {
+    state: nextState,
+    attacker: updatedAttacker,
+    isComplete: now - startedAt >= durationMs,
+  };
+}
+
+function clearAttackWindup<T extends CombatEntity>(entity: T): T {
+  if (!isEnemy(entity)) {
+    return entity;
+  }
+
+  return {
+    ...entity,
+    attackWindupStartedAt: undefined,
+    attackWindupDurationMs: undefined,
+    attackWindupTargetId: null,
+  };
+}
+
+function clearAttackWindupInState(
+  state: GameState,
+  entity: CombatEntity,
+): GameState {
+  if (
+    !isEnemy(entity) ||
+    (entity.attackWindupStartedAt === undefined &&
+      entity.attackWindupDurationMs === undefined &&
+      entity.attackWindupTargetId == null)
+  ) {
+    return state;
+  }
+
+  return updateEntity(state, clearAttackWindup(entity));
 }
 
 function getValidTarget(
@@ -341,6 +425,7 @@ function updateTargetAfterDamage(
 ): CombatEntity {
   if (
     !isEnemy(target) ||
+    isTargetDummyEnemy(target) ||
     target.state === "dead" ||
     !isAutonomousEntity(attacker)
   ) {
@@ -357,7 +442,7 @@ function updateTargetAfterDamage(
 function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
   if (!isAutonomousEntity(attacker) || !isPartyMember(attacker)) {
     return {
-      ...attacker,
+      ...clearAttackWindup(attacker),
       state: "idle",
       currentTargetId: null,
     };
@@ -367,7 +452,7 @@ function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
 
   if (sharedTarget) {
     return {
-      ...attacker,
+      ...clearAttackWindup(attacker),
       state: "attack",
       currentTargetId: sharedTarget.id,
       commandPriority: "autonomous",
@@ -375,7 +460,7 @@ function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
   }
 
   return {
-    ...attacker,
+    ...clearAttackWindup(attacker),
     state: "follow",
     currentTargetId: attacker.id === state.partyLeaderId ? null : state.partyLeaderId,
     commandPriority: "autonomous",

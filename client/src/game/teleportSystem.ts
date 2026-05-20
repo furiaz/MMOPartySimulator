@@ -1,4 +1,10 @@
-import { createEnemy, createNpc, createResource, moveEntityTo } from "./entities";
+import {
+  createEnemy,
+  createNpc,
+  createResource,
+  createTargetDummy,
+  moveEntityTo,
+} from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { recordMapReachedForQuests } from "./questSystem";
 import {
@@ -19,6 +25,8 @@ import {
   mapFourResourceStartData,
   mapTwoEnemyStartData,
   mapTwoResourceStartData,
+  targetDummyId,
+  targetDummyPosition,
 } from "./debugMap";
 import {
   moveEntityTowardPositionIfUnoccupied,
@@ -364,6 +372,7 @@ function getMapEntities(
         npc.npcRole,
       );
     }
+    entities[targetDummyId] = createTargetDummy(targetDummyId, targetDummyPosition);
 
     return entities;
   }

@@ -4,8 +4,10 @@ import {
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
+  targetDummyId,
+  targetDummyPosition,
 } from "./debugMap";
-import { createNpc, moveEntityTo } from "./entities";
+import { createNpc, createTargetDummy, moveEntityTo } from "./entities";
 import { recordMapReachedForQuests } from "./questSystem";
 import { updateEntity, type GameState } from "./state";
 import type {
@@ -308,6 +310,7 @@ function getRescueHubEntities(
         npc.npcRole,
       );
     }
+    entities[targetDummyId] = createTargetDummy(targetDummyId, targetDummyPosition);
   }
 
   return entities;

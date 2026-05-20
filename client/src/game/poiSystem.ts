@@ -1,4 +1,5 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { isTargetDummyEnemy } from "./entityGuards";
 import {
   debugMapDefinitions,
   HUB_MAP_ID,
@@ -1422,6 +1423,7 @@ function getEnemyPois(state: GameState): PointOfInterest[] {
     .filter(
       (entity) =>
         entity.kind === "enemy" &&
+        !isTargetDummyEnemy(entity) &&
         entity.state !== "dead" &&
         entity.health > 0,
     )

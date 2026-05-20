@@ -44,6 +44,8 @@ const DEFAULT_RESOURCE_TYPE: ResourceType = "wood";
 const STARTING_CHARACTER_LEVEL = 1;
 const STARTING_CHARACTER_XP = 0;
 const STARTING_ENEMY_LEVEL = 1;
+const TARGET_DUMMY_MAX_HEALTH = 100;
+const TARGET_DUMMY_REWARD_XP = 0;
 
 type CreateResourceOptions = {
   durability?: number;
@@ -55,6 +57,7 @@ type CreateResourceOptions = {
 };
 
 type CreateEnemyOptions = {
+  isTargetDummy?: true;
   archetypeId?: EnemyArchetypeId;
   level?: number;
   xpReward?: number;
@@ -92,6 +95,7 @@ export function createEnemy(
     lastAttackAt: 0,
     currentTargetId: null,
     aggressionMode: aggressionMode ?? archetype?.temperament ?? "passive",
+    isTargetDummy: options.isTargetDummy,
     archetypeId: options.archetypeId,
     enemyType: options.enemyType,
     homePosition: position,
@@ -110,6 +114,18 @@ export function createEnemy(
     attackCooldownMs: options.attackCooldownMs ?? archetype?.attackCooldownMs,
     attackRange: options.attackRange ?? archetype?.attackRange,
   };
+}
+
+export function createTargetDummy(id: string, position: Position): Enemy {
+  return createEnemy(id, position, "passive", {
+    isTargetDummy: true,
+    maxHealth: TARGET_DUMMY_MAX_HEALTH,
+    xpReward: TARGET_DUMMY_REWARD_XP,
+    attack: 0,
+    defense: 0,
+    magicDefense: 0,
+    evasion: 0,
+  });
 }
 
 export function createCompanion(
@@ -227,7 +243,8 @@ export function damageEntity<T extends CombatEntity>(
   entity: T,
   damage: number,
 ): T {
-  const health = Math.max(0, entity.health - damage);
+  const minimumHealth = entity.kind === "enemy" && entity.isTargetDummy ? 1 : 0;
+  const health = Math.max(minimumHealth, entity.health - damage);
 
   return {
     ...entity,

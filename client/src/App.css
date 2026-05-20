@@ -461,6 +461,25 @@
   font-weight: 800;
 }
 
+.quest-tracker-objective.completed {
+  border-color: rgba(202, 138, 4, 0.62);
+  background: rgba(254, 243, 199, 0.78);
+}
+
+.quest-tracker-objective span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.quest-objective-complete-vfx {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
 .quest-tracker-objective span:first-child,
 .quest-list-item span:first-child,
 .quest-objective-row span {
@@ -637,15 +656,180 @@
   font-size: 13px;
 }
 
+.merchant-buy-panel {
+  width: min(700px, calc(100vw - 270px));
+}
+
+.merchant-buy-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3a5a60;
+}
+
+.merchant-buy-header div {
+  display: grid;
+  gap: 4px;
+}
+
+.merchant-buy-header span,
+.merchant-detail-kicker,
+.merchant-empty-stock,
+.merchant-buy-warning {
+  color: #aec6ca;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.merchant-buy-header strong,
+.merchant-stock-row b {
+  color: #f3df93;
+}
+
+.merchant-buy-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.merchant-buy-filter-tabs button {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.merchant-buy-filter-tabs button.active {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+  color: #ffffff;
+}
+
+.merchant-buy-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.95fr) minmax(260px, 1fr);
+  gap: 10px;
+  min-height: 300px;
+}
+
+.merchant-stock-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  max-height: 390px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.merchant-stock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px;
+  border-color: #2f4c52;
+  text-align: left;
+}
+
+.merchant-stock-row.selected {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+  color: #ffffff;
+}
+
+.merchant-stock-row.unaffordable {
+  opacity: 0.72;
+}
+
+.merchant-stock-row span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.merchant-stock-row small {
+  color: #aec6ca;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.merchant-buy-detail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(58, 90, 96, 0.8);
+  background: rgba(12, 22, 26, 0.35);
+}
+
+.merchant-buy-detail h3 {
+  margin: 2px 0 6px;
+  font-size: 18px;
+}
+
+.merchant-item-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.merchant-item-stat-grid div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid rgba(58, 90, 96, 0.6);
+}
+
+.merchant-item-stat-grid dt {
+  color: #7aa6ad;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.merchant-item-stat-grid dd {
+  margin: 0;
+  color: #e6f0f2;
+  font-size: 13px;
+}
+
+.merchant-modifier-list {
+  display: grid;
+  gap: 4px;
+}
+
+.merchant-buy-action {
+  min-height: 42px;
+  font-weight: 800;
+}
+
+.merchant-buy-warning {
+  color: #f3b08f;
+}
+
 .wallet-visibility-toast {
   position: fixed;
   top: 76px;
   left: 16px;
   z-index: 13;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 10px;
   border: 1px solid #3a5a60;
   background: rgba(26, 42, 47, 0.88);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+}
+
+.currency-gain-vfx {
+  width: 22px;
+  height: 22px;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 
 .rescue-overlay {
@@ -1612,11 +1796,29 @@ button {
 }
 
 @media (max-width: 520px) {
+  .merchant-interaction {
+    right: 16px;
+    flex-direction: column;
+  }
+
+  .merchant-buy-panel {
+    width: min(100%, calc(100vw - 32px));
+  }
+
+  .merchant-buy-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-stock-list {
+    max-height: 220px;
+  }
+
   .game-menu-tabs,
   .menu-split-layout,
   .compact-stat-grid,
   .full-stat-grid,
   .base-stat-grid,
+  .merchant-item-stat-grid,
   .equipment-slot-list,
   .equipment-slot-picker,
   .equipment-stat-summary,

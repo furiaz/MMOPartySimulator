@@ -13,6 +13,7 @@ import { updateHealingFountainSystem } from "./healingFountainSystem";
 import {
   syncPartyDerivedMaxHealth,
   updatePassiveHealthRegen,
+  updateTargetDummyHealthRegen,
 } from "./healthSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
@@ -131,6 +132,7 @@ export function updateGame(
   nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
+  nextState = updateTargetDummyHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(

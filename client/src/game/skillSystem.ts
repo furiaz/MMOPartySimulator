@@ -16,7 +16,11 @@ import {
   type GameState,
 } from "./state";
 import { getLeaderMovementDirection } from "./roleSystem";
-import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
+import {
+  isLivingCompanion,
+  isLivingEnemy,
+  isTargetDummyEnemy,
+} from "./entityGuards";
 import { findEnemyTarget, getSkillTarget } from "./skillTargeting";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
@@ -605,7 +609,7 @@ function applyTaunt(
 
   const currentTarget = nextState.entities[target.id];
 
-  if (isLivingEnemy(currentTarget)) {
+  if (isLivingEnemy(currentTarget) && !isTargetDummyEnemy(currentTarget)) {
     nextState = updateEntity(nextState, {
       ...currentTarget,
       state: "attack",

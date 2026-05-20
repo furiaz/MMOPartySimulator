@@ -1,10 +1,17 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { countInventoryItem, removeItemFromInventoryState } from "./inventory";
+import {
+  addItemToInventoryState,
+  countInventoryItem,
+  getAvailableInventorySlots,
+  removeItemFromInventoryState,
+} from "./inventory";
 import { getItemDefinition, ITEM_DEFINITIONS } from "./items";
 import type { GameState } from "./state";
 import {
   addCurrencyToWalletState,
+  canAfford,
   getCurrencyBalance,
+  removeCurrencyFromWalletState,
 } from "./wallet";
 import type {
   DebugTelemetryEventType,
@@ -15,6 +22,21 @@ import type {
 } from "./types";
 
 export type MerchantMenuSelection = "buy" | "sell" | "quick_exchange_parts" | "leave";
+
+export type MerchantStockGroup =
+  | "weapons"
+  | "offhands"
+  | "cloth"
+  | "leather"
+  | "mail"
+  | "plate"
+  | "accessories";
+
+export type MerchantStockEntry = {
+  itemId: ItemId;
+  priceCrowns: number;
+  group: MerchantStockGroup;
+};
 
 export type QuickExchangeItem = {
   itemId: ItemId;
@@ -52,6 +74,37 @@ export type QuickExchangeResult =
       reason: string;
     };
 
+export type MerchantBuyFailureReason =
+  | "invalid_merchant"
+  | "item_not_in_stock"
+  | "invalid_item"
+  | "invalid_price"
+  | "insufficient_crowns"
+  | "inventory_full"
+  | "inventory_add_failed"
+  | "currency_remove_failed";
+
+export type MerchantBuyResult =
+  | {
+      status: "success";
+      merchantNpcId: string;
+      itemId: ItemId;
+      displayName: string;
+      priceCrowns: number;
+      previousCrowns: number;
+      newCrowns: number;
+    }
+  | {
+      status: "failed";
+      merchantNpcId: string;
+      itemId: ItemId;
+      displayName?: string;
+      priceCrowns?: number;
+      previousCrowns: number;
+      newCrowns: number;
+      reason: MerchantBuyFailureReason;
+    };
+
 type RemoveItemFromInventory = (
   state: GameState,
   itemId: ItemId,
@@ -63,6 +116,59 @@ type QuickExchangeOptions = {
   removeItemFromInventory?: RemoveItemFromInventory;
 };
 
+const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
+  { itemId: "training_sword", priceCrowns: 12, group: "weapons" },
+  { itemId: "iron_sword", priceCrowns: 60, group: "weapons" },
+  { itemId: "guard_mace", priceCrowns: 60, group: "weapons" },
+  { itemId: "claw_gauntlets", priceCrowns: 65, group: "weapons" },
+  { itemId: "thorn_whip", priceCrowns: 65, group: "weapons" },
+  { itemId: "short_bow", priceCrowns: 65, group: "weapons" },
+  { itemId: "apprentice_orb", priceCrowns: 60, group: "weapons" },
+  { itemId: "rune_lantern", priceCrowns: 60, group: "weapons" },
+  { itemId: "holy_mace", priceCrowns: 60, group: "weapons" },
+  { itemId: "wooden_shield", priceCrowns: 45, group: "offhands" },
+  { itemId: "simple_talisman", priceCrowns: 40, group: "offhands" },
+  { itemId: "sacrificial_dagger", priceCrowns: 40, group: "offhands" },
+  { itemId: "acolyte_robe", priceCrowns: 32, group: "cloth" },
+  { itemId: "acolyte_pants", priceCrowns: 24, group: "cloth" },
+  { itemId: "acolyte_wraps", priceCrowns: 22, group: "cloth" },
+  { itemId: "acolyte_sandals", priceCrowns: 22, group: "cloth" },
+  { itemId: "scholar_hood", priceCrowns: 24, group: "cloth" },
+  { itemId: "scholar_robe", priceCrowns: 32, group: "cloth" },
+  { itemId: "scholar_pants", priceCrowns: 24, group: "cloth" },
+  { itemId: "scholar_gloves", priceCrowns: 22, group: "cloth" },
+  { itemId: "scholar_sandals", priceCrowns: 22, group: "cloth" },
+  { itemId: "scout_cap", priceCrowns: 26, group: "leather" },
+  { itemId: "scout_jacket", priceCrowns: 35, group: "leather" },
+  { itemId: "scout_trousers", priceCrowns: 28, group: "leather" },
+  { itemId: "scout_gloves", priceCrowns: 24, group: "leather" },
+  { itemId: "stalker_mask", priceCrowns: 28, group: "leather" },
+  { itemId: "stalker_vest", priceCrowns: 36, group: "leather" },
+  { itemId: "stalker_leggings", priceCrowns: 28, group: "leather" },
+  { itemId: "stalker_grips", priceCrowns: 26, group: "leather" },
+  { itemId: "stalker_boots", priceCrowns: 26, group: "leather" },
+  { itemId: "guard_coif", priceCrowns: 42, group: "mail" },
+  { itemId: "guard_hauberk", priceCrowns: 60, group: "mail" },
+  { itemId: "guard_legguards", priceCrowns: 50, group: "mail" },
+  { itemId: "guard_gloves", priceCrowns: 42, group: "mail" },
+  { itemId: "guard_boots", priceCrowns: 42, group: "mail" },
+  { itemId: "vanguard_coif", priceCrowns: 44, group: "mail" },
+  { itemId: "vanguard_hauberk", priceCrowns: 60, group: "mail" },
+  { itemId: "vanguard_legguards", priceCrowns: 50, group: "mail" },
+  { itemId: "vanguard_gloves", priceCrowns: 46, group: "mail" },
+  { itemId: "vanguard_boots", priceCrowns: 44, group: "mail" },
+  { itemId: "bulwark_helm", priceCrowns: 62, group: "plate" },
+  { itemId: "bulwark_greaves", priceCrowns: 74, group: "plate" },
+  { itemId: "bulwark_gauntlets", priceCrowns: 62, group: "plate" },
+  { itemId: "bulwark_sabatons", priceCrowns: 62, group: "plate" },
+  { itemId: "warplate_helm", priceCrowns: 64, group: "plate" },
+  { itemId: "warplate_cuirass", priceCrowns: 90, group: "plate" },
+  { itemId: "warplate_greaves", priceCrowns: 74, group: "plate" },
+  { itemId: "warplate_gauntlets", priceCrowns: 66, group: "plate" },
+  { itemId: "warplate_sabatons", priceCrowns: 64, group: "plate" },
+  { itemId: "plain_charm", priceCrowns: 25, group: "accessories" },
+];
+
 export function isMerchantNpc(entity: unknown): entity is NpcEntity {
   return Boolean(
     entity &&
@@ -72,6 +178,204 @@ export function isMerchantNpc(entity: unknown): entity is NpcEntity {
       "npcRole" in entity &&
       entity.npcRole === "merchant",
   );
+}
+
+export function getMerchantBuyStock(
+  state: GameState,
+  merchantNpcId: string,
+): MerchantStockEntry[] {
+  const merchant = state.entities[merchantNpcId];
+
+  return isMerchantNpc(merchant) ? DEFAULT_MERCHANT_BUY_STOCK : [];
+}
+
+export function buyMerchantItem(
+  state: GameState,
+  merchantNpcId: string,
+  itemId: ItemId,
+): { state: GameState; result: MerchantBuyResult } {
+  const previousCrowns = getCurrencyBalance(state.wallet, "crowns");
+  const merchant = state.entities[merchantNpcId];
+
+  if (!isMerchantNpc(merchant)) {
+    return createMerchantBuyFailure(
+      state,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "invalid_merchant",
+    );
+  }
+
+  const stockEntry = getMerchantBuyStock(state, merchantNpcId).find(
+    (entry) => entry.itemId === itemId,
+  );
+
+  if (!stockEntry) {
+    return createMerchantBuyFailure(
+      state,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "item_not_in_stock",
+    );
+  }
+
+  const itemDefinition = getItemDefinition(stockEntry.itemId);
+
+  if (!itemDefinition || itemDefinition.category !== "equipment") {
+    return createMerchantBuyFailure(
+      state,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "invalid_item",
+      stockEntry,
+      itemDefinition,
+    );
+  }
+
+  if (!Number.isFinite(stockEntry.priceCrowns) || stockEntry.priceCrowns <= 0) {
+    return createMerchantBuyFailure(
+      state,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "invalid_price",
+      stockEntry,
+      itemDefinition,
+    );
+  }
+
+  let nextState = appendMerchantBuyTelemetry(
+    state,
+    "merchant_buy_attempt",
+    merchantNpcId,
+    stockEntry,
+    itemDefinition,
+    {
+      result: "attempt",
+      previousCurrencyBalance: previousCrowns,
+      nextCurrencyBalance: previousCrowns,
+    },
+  );
+
+  if (!canAfford(nextState.wallet, "crowns", stockEntry.priceCrowns)) {
+    return createMerchantBuyFailure(
+      nextState,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "insufficient_crowns",
+      stockEntry,
+      itemDefinition,
+    );
+  }
+
+  if (getAvailableInventorySlots(nextState.inventory) < 1) {
+    return createMerchantBuyFailure(
+      nextState,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "inventory_full",
+      stockEntry,
+      itemDefinition,
+    );
+  }
+
+  const currencyResult = removeCurrencyFromWalletState(
+    nextState,
+    "crowns",
+    stockEntry.priceCrowns,
+    "merchant",
+  );
+
+  if (currencyResult.result.status !== "success") {
+    return createMerchantBuyFailure(
+      nextState,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "currency_remove_failed",
+      stockEntry,
+      itemDefinition,
+    );
+  }
+
+  nextState = appendMerchantBuyTelemetry(
+    currencyResult.state,
+    "merchant_buy_currency_removed",
+    merchantNpcId,
+    stockEntry,
+    itemDefinition,
+    {
+      result: "success",
+      currencyAmount: stockEntry.priceCrowns,
+      previousCurrencyBalance: previousCrowns,
+      nextCurrencyBalance: currencyResult.result.newBalance,
+    },
+  );
+
+  const inventoryResult = addItemToInventoryState(
+    nextState,
+    itemId,
+    1,
+    "merchant",
+  );
+
+  if (inventoryResult.result.status !== "success") {
+    return createMerchantBuyFailure(
+      state,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "inventory_add_failed",
+      stockEntry,
+      itemDefinition,
+    );
+  }
+
+  nextState = appendMerchantBuyTelemetry(
+    inventoryResult.state,
+    "merchant_buy_item_added",
+    merchantNpcId,
+    stockEntry,
+    itemDefinition,
+    {
+      result: "success",
+      addedQuantity: 1,
+      previousCurrencyBalance: previousCrowns,
+      nextCurrencyBalance: currencyResult.result.newBalance,
+    },
+  );
+  nextState = appendMerchantBuyTelemetry(
+    nextState,
+    "merchant_buy_completed",
+    merchantNpcId,
+    stockEntry,
+    itemDefinition,
+    {
+      result: "success",
+      currencyAmount: stockEntry.priceCrowns,
+      addedQuantity: 1,
+      previousCurrencyBalance: previousCrowns,
+      nextCurrencyBalance: currencyResult.result.newBalance,
+    },
+  );
+
+  return {
+    state: nextState,
+    result: {
+      status: "success",
+      merchantNpcId,
+      itemId,
+      displayName: itemDefinition.displayName,
+      priceCrowns: stockEntry.priceCrowns,
+      previousCrowns,
+      newCrowns: currencyResult.result.newBalance,
+    },
+  };
 }
 
 export function getQuickExchangeItemDefinitions(): ItemDefinition[] {
@@ -317,6 +621,77 @@ export function recordMerchantMenuSelected(
   return appendMerchantTelemetry(state, "merchant_menu_selected", merchantNpcId, {
     result: selection,
     reason: selection,
+  });
+}
+
+function createMerchantBuyFailure(
+  state: GameState,
+  merchantNpcId: string,
+  itemId: ItemId,
+  previousCrowns: number,
+  reason: MerchantBuyFailureReason,
+  stockEntry?: MerchantStockEntry,
+  itemDefinition = getItemDefinition(itemId),
+): { state: GameState; result: MerchantBuyResult } {
+  const failedState = appendMerchantBuyTelemetry(
+    state,
+    "merchant_buy_failed",
+    merchantNpcId,
+    stockEntry ?? { itemId, priceCrowns: 0, group: "weapons" },
+    itemDefinition,
+    {
+      result: "failed",
+      reason,
+      previousCurrencyBalance: previousCrowns,
+      nextCurrencyBalance: previousCrowns,
+    },
+  );
+
+  return {
+    state: failedState,
+    result: {
+      status: "failed",
+      merchantNpcId,
+      itemId,
+      displayName: itemDefinition?.displayName,
+      priceCrowns: stockEntry?.priceCrowns,
+      previousCrowns,
+      newCrowns: previousCrowns,
+      reason,
+    },
+  };
+}
+
+function appendMerchantBuyTelemetry(
+  state: GameState,
+  type: DebugTelemetryEventType,
+  merchantNpcId: string,
+  stockEntry: MerchantStockEntry,
+  itemDefinition: ItemDefinition | undefined,
+  event: {
+    result: string;
+    reason?: string;
+    currencyAmount?: number;
+    addedQuantity?: number;
+    previousCurrencyBalance: number;
+    nextCurrencyBalance: number;
+  },
+): GameState {
+  return appendMerchantTelemetry(state, type, merchantNpcId, {
+    itemId: stockEntry.itemId,
+    itemDisplayName: itemDefinition?.displayName,
+    itemCategory: itemDefinition?.category,
+    equipmentType: itemDefinition?.equipmentType,
+    valueEach: stockEntry.priceCrowns,
+    currencyId: "crowns",
+    currencyAmount: event.currencyAmount ?? stockEntry.priceCrowns,
+    addedQuantity: event.addedQuantity,
+    previousCurrencyBalance: event.previousCurrencyBalance,
+    nextCurrencyBalance: event.nextCurrencyBalance,
+    inventoryUsedSlots: state.inventory.slots.length,
+    inventoryCapacity: state.inventory.capacity,
+    result: event.result,
+    reason: event.reason,
   });
 }
 
