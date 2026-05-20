@@ -100,7 +100,7 @@ describe("debug maps", () => {
   it("keeps wilderness enemies and resources on reachable open floor", () => {
     for (const wildernessMap of wildernessMaps) {
       if (wildernessMap.mapId === MAP_ONE_ID) {
-        expect(wildernessMap.enemyPositions).toHaveLength(48);
+        expect(wildernessMap.enemyPositions).toHaveLength(72);
         expect(wildernessMap.resources).toHaveLength(9);
       } else {
         expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
@@ -177,7 +177,7 @@ describe("debug maps", () => {
     }
   });
 
-  it("keeps authored wilderness density bounded per smaller map", () => {
+  it("keeps authored wilderness density bounded per map", () => {
     for (const wildernessMap of wildernessMaps) {
       assertSubzoneContentDensity(wildernessMap.subzones, wildernessMap.enemies);
     }
@@ -287,9 +287,9 @@ describe("debug maps", () => {
         (enemy) => enemy.subzoneId === subzone.id,
       );
 
-      expect(subzoneEnemies).toHaveLength(16);
+      expect(subzoneEnemies).toHaveLength(24);
       expect(subzoneEnemies.map((enemy) => enemy.archetypeId)).toEqual(
-        Array.from({ length: 16 }, () => expectedArchetype),
+        Array.from({ length: 24 }, () => expectedArchetype),
       );
     }
 
@@ -337,7 +337,7 @@ function assertSubzoneContentDensity(
   for (const subzone of subzones) {
     const enemyCount = enemies.filter((enemy) => enemy.subzoneId === subzone.id).length;
     expect(enemyCount).toBeGreaterThanOrEqual(4);
-    expect(enemyCount).toBeLessThanOrEqual(16);
+    expect(enemyCount).toBeLessThanOrEqual(24);
     expect(subzone.resourceLocations.length).toBeGreaterThanOrEqual(2);
     expect(subzone.resourceLocations.length).toBeLessThanOrEqual(3);
   }
