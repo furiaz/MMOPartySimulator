@@ -263,6 +263,7 @@ function LeaderPoiPanel({
   consideredTargets: PoiConsideration[] | undefined;
   hasLeader: boolean;
 }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   let emptyMessage: string | null = null;
 
   if (!autoModeEnabled) {
@@ -274,29 +275,43 @@ function LeaderPoiPanel({
   }
 
   return (
-    <aside className="leader-poi-panel" aria-label="Leader POIs">
-      <h2>Leader POIs</h2>
-      {emptyMessage ? (
-        <p className="leader-poi-empty">{emptyMessage}</p>
-      ) : (
-        <ol className="leader-poi-list">
-          {consideredTargets?.map((target) => (
-            <li
-              key={`${target.mapId}-${target.poiId}`}
-              className={`leader-poi-row${target.isSelected ? " selected" : ""}`}
-            >
-              <span className="leader-poi-main">
-                <strong>{formatIdentifierName(target.category)}</strong>
-                <span>{target.poiId}</span>
-              </span>
-              <span className="leader-poi-reason">{target.reason}</span>
-              <span className="leader-poi-distance">
-                {Math.round(target.pathDistance)} steps
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+    <aside
+      className={`leader-poi-panel${isCollapsed ? " collapsed" : ""}`}
+      aria-label="Leader POIs"
+    >
+      <div className="leader-poi-header">
+        <h2>Leader POIs</h2>
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsCollapsed((currentValue) => !currentValue);
+          }}
+          type="button"
+        >
+          {isCollapsed ? "Show" : "Hide"}
+        </button>
+      </div>
+      {isCollapsed ? null : emptyMessage ? (
+          <p className="leader-poi-empty">{emptyMessage}</p>
+        ) : (
+          <ol className="leader-poi-list">
+            {consideredTargets?.map((target) => (
+              <li
+                key={`${target.mapId}-${target.poiId}`}
+                className={`leader-poi-row${target.isSelected ? " selected" : ""}`}
+              >
+                <span className="leader-poi-main">
+                  <strong>{formatIdentifierName(target.category)}</strong>
+                  <span>{target.poiId}</span>
+                </span>
+                <span className="leader-poi-reason">{target.reason}</span>
+                <span className="leader-poi-distance">
+                  {Math.round(target.pathDistance)} steps
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
     </aside>
   );
 }
@@ -1403,41 +1418,6 @@ function App() {
     });
   }
 
-  function commandCompanionsToFollow() {
-    if (!leader || activePartyMemberIds.length === 0) {
-      return;
-    }
-
-    setGameState((state) => {
-      const livingLeader = getPartyLeader(state);
-
-      if (!livingLeader) {
-        return state;
-      }
-
-      return issueCompanionCommands(
-        state,
-        activePartyMemberIds.filter((entityId) => entityId !== livingLeader.id),
-        {
-          type: "follow",
-          targetId: livingLeader.id,
-        },
-      );
-    });
-  }
-
-  function commandCompanionsToIdle() {
-    if (activePartyMemberIds.length === 0) {
-      return;
-    }
-
-    setGameState((state) =>
-      issueCompanionCommands(state, activePartyMemberIds, {
-        type: "idle",
-      }),
-    );
-  }
-
   function commandPartyToTargetEnemy(targetEnemyId = targetEnemy?.id) {
     if (!targetEnemyId) {
       return;
@@ -1968,45 +1948,47 @@ function App() {
           aria-label="Follow system top-down test area"
         >
           <div className="map-label-overlay">
-            <div className="map-title-row">
-              <span className="map-version">v{gameVersion}</span>
-              <strong>{currentMap.displayName}</strong>
+            <div className="map-label-content">
+              <div className="map-title-row">
+                <span className="map-version">v{gameVersion}</span>
+                <strong>{currentMap.displayName}</strong>
+                <button
+                  className={`stay-in-map-toggle${
+                    poiSearchScope !== "free_travel" ? " active" : ""
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    cyclePoiSearchScope();
+                  }}
+                  type="button"
+                >
+                  Scope: {poiSearchScopeLabels[poiSearchScope]}
+                </button>
+              </div>
+              <span>debug: {currentMap.debugName}</span>
+            </div>
+            <div className="map-debug-toggle-controls" aria-label="Debug multipliers">
               <button
-                className={`stay-in-map-toggle${
-                  poiSearchScope !== "free_travel" ? " active" : ""
-                }`}
+                className={gameState.debugOptions?.superSpeedEnabled ? "active" : ""}
                 onClick={(event) => {
                   event.stopPropagation();
-                  cyclePoiSearchScope();
+                  toggleSuperSpeed();
                 }}
                 type="button"
               >
-                Scope: {poiSearchScopeLabels[poiSearchScope]}
+                Super Speed {gameState.debugOptions?.superSpeedEnabled ? "On" : "Off"}
+              </button>
+              <button
+                className={gameState.debugOptions?.superExpEnabled ? "active" : ""}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleSuperExp();
+                }}
+                type="button"
+              >
+                Super Exp {gameState.debugOptions?.superExpEnabled ? "On" : "Off"}
               </button>
             </div>
-            <span>debug: {currentMap.debugName}</span>
-          </div>
-          <div className="map-debug-toggle-controls" aria-label="Debug multipliers">
-            <button
-              className={gameState.debugOptions?.superSpeedEnabled ? "active" : ""}
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleSuperSpeed();
-              }}
-              type="button"
-            >
-              Super Speed {gameState.debugOptions?.superSpeedEnabled ? "On" : "Off"}
-            </button>
-            <button
-              className={gameState.debugOptions?.superExpEnabled ? "active" : ""}
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleSuperExp();
-              }}
-              type="button"
-            >
-              Super Exp {gameState.debugOptions?.superExpEnabled ? "On" : "Off"}
-            </button>
           </div>
           <PerformanceOverlay currentMap={currentMap} gameState={gameState} />
           <LeaderPoiPanel
@@ -2194,97 +2176,87 @@ function App() {
           </div>
         ) : null}
 
-        <div
-          className={`test-controls${
-            showDebugTools ? "" : " test-controls-debug-hidden"
-          }`}
-        >
-          <button onClick={toggleSimulationLoop}>
-            {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
-          </button>
-          <button onClick={toggleAutoMode}>
-            Auto Mode {gameState.autoModeEnabled ? "On" : "Off"}
-          </button>
-          <button onClick={commandCompanionsToFollow}>Follow All</button>
-          <button onClick={commandCompanionsToIdle}>Idle All</button>
-          <button onClick={() => commandPartyToTargetEnemy()}>
-            Target Enemy
-          </button>
-          <button onClick={() => commandCompanionsToGatherResource()}>
-            Gather Resource All
-          </button>
-        </div>
-
-        <section
-          className={`debug-tools${showDebugTools ? "" : " debug-tools-hidden"}`}
-          aria-label="Debug tools"
-        >
-          <h2>Debug Tools</h2>
-          <div className="test-controls">
-            <button onClick={toggleDebugTools}>
-              {showDebugTools ? "Hide Debug UI" : "Show Debug UI"}
+        <div className="bottom-hud-controls">
+          <div className="test-controls simulation-controls">
+            <button onClick={toggleSimulationLoop}>
+              {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
             </button>
-            {showDebugTools ? (
-              <>
-                <button onClick={addCompanionToParty}>
-                  Add Companion to Party
-                </button>
-                <button onClick={removeCompanionFromParty}>
-                  Remove Companion from Party
-                </button>
-                <button onClick={resurrectEnemy}>Resurrect Enemy</button>
-                <button onClick={restorePartyHealth}>Restore Party HP</button>
-                <button onClick={addPrototypeConsumables}>
-                  Add Prototype Consumables
-                </button>
-                <button onClick={killOneCompanion}>Kill One Companion</button>
-                <button onClick={refreshGatherPoints}>
-                  Refresh Gather Points
-                </button>
-                <button onClick={toggleEntityInfo}>
-                  {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
-                </button>
-                <button onClick={toggleDebugTelemetryRecording}>
-                  {gameState.debugTelemetry?.isRecording
-                    ? "Stop Debug Recording"
-                    : "Start Debug Recording"}
-                </button>
-                <button onClick={exportDebugTelemetryJson}>
-                  Export Debug JSON
-                </button>
-                <button onClick={clearDebugTelemetryReport}>
-                  Clear Debug Report
-                </button>
-                <span>
-                  Debug Recording{" "}
-                  {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Samples{" "}
-                  {gameState.debugTelemetry?.ticks.length ?? 0}/
-                  {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
-                  {gameState.debugTelemetry?.events.length ?? 0}
-                </span>
-                <span>
-                  Quest{" "}
-                  {displayQuest
-                    ? `${QUEST_DEFINITIONS[displayQuest.questId].displayName} (${formatQuestStatus(displayQuest.status)})`
-                    : "none"}
-                </span>
-                <span>Objective {getQuestObjectiveText(displayQuest)}</span>
-                <span>
-                  Global POI {gameState.globalPoiIntent?.reason ?? "none"}
-                </span>
-                <span>
-                  Local POI{" "}
-                  {gameState.localPoiTarget
-                    ? `${gameState.localPoiTarget.poiId} (${gameState.localPoiTarget.category})`
-                    : "none"}
-                </span>
-                <span>
-                  POI Reason {gameState.lastPoiDecision?.selectedReason ?? "none"}
-                </span>
-              </>
-            ) : null}
+            <button onClick={toggleAutoMode}>
+              Auto Mode {gameState.autoModeEnabled ? "On" : "Off"}
+            </button>
           </div>
-        </section>
+
+          <section
+            className={`debug-tools${showDebugTools ? "" : " debug-tools-hidden"}`}
+            aria-label="Debug tools"
+          >
+            <h2>Debug Tools</h2>
+            <div className="test-controls">
+              <button onClick={toggleDebugTools}>
+                {showDebugTools ? "Hide Debug UI" : "Show Debug UI"}
+              </button>
+              {showDebugTools ? (
+                <>
+                  <button onClick={addCompanionToParty}>
+                    Add Companion to Party
+                  </button>
+                  <button onClick={removeCompanionFromParty}>
+                    Remove Companion from Party
+                  </button>
+                  <button onClick={resurrectEnemy}>Resurrect Enemy</button>
+                  <button onClick={restorePartyHealth}>Restore Party HP</button>
+                  <button onClick={addPrototypeConsumables}>
+                    Add Prototype Consumables
+                  </button>
+                  <button onClick={killOneCompanion}>Kill One Companion</button>
+                  <button onClick={refreshGatherPoints}>
+                    Refresh Gather Points
+                  </button>
+                  <button onClick={toggleEntityInfo}>
+                    {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
+                  </button>
+                  <button onClick={toggleDebugTelemetryRecording}>
+                    {gameState.debugTelemetry?.isRecording
+                      ? "Stop Debug Recording"
+                      : "Start Debug Recording"}
+                  </button>
+                  <button onClick={exportDebugTelemetryJson}>
+                    Export Debug JSON
+                  </button>
+                  <button onClick={clearDebugTelemetryReport}>
+                    Clear Debug Report
+                  </button>
+                  <span>
+                    Debug Recording{" "}
+                    {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Samples{" "}
+                    {gameState.debugTelemetry?.ticks.length ?? 0}/
+                    {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
+                    {gameState.debugTelemetry?.events.length ?? 0}
+                  </span>
+                  <span>
+                    Quest{" "}
+                    {displayQuest
+                      ? `${QUEST_DEFINITIONS[displayQuest.questId].displayName} (${formatQuestStatus(displayQuest.status)})`
+                      : "none"}
+                  </span>
+                  <span>Objective {getQuestObjectiveText(displayQuest)}</span>
+                  <span>
+                    Global POI {gameState.globalPoiIntent?.reason ?? "none"}
+                  </span>
+                  <span>
+                    Local POI{" "}
+                    {gameState.localPoiTarget
+                      ? `${gameState.localPoiTarget.poiId} (${gameState.localPoiTarget.category})`
+                      : "none"}
+                  </span>
+                  <span>
+                    POI Reason {gameState.lastPoiDecision?.selectedReason ?? "none"}
+                  </span>
+                </>
+              ) : null}
+            </div>
+          </section>
+        </div>
       </section>
     </main>
   );

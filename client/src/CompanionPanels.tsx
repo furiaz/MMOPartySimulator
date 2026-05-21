@@ -33,7 +33,9 @@ import {
   type PartyMemberRole,
   type PrimaryStatId,
   type SkillDefinition,
+  type ClassPath,
 } from "./game";
+import { entityVisualAssets } from "./visualAssets";
 
 export type GameMenuTab =
   | "party"
@@ -70,6 +72,13 @@ const partyMemberRoleLabels: Record<PartyMemberRole, string> = {
   support: "Support",
   gatherer: "Gatherer",
   none: "None / Unassigned",
+};
+
+const classPathLabels: Record<ClassPath, string> = {
+  honor: "Honor Path",
+  primal: "Primal Path",
+  arcane: "Arcane Path",
+  holy: "Holy Path",
 };
 
 const partyMenuSectionLabels: Record<PartyMenuSection, string> = {
@@ -1504,37 +1513,73 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
   return (
     <section className="companion-vitals-panel" aria-label="Companion vitals">
       {orderedMembers.map((member) => {
+        const classDefinition = CLASS_DEFINITIONS[member.classId];
+        const classPath = classDefinition.path;
+        const classPathLabel = classPath ? classPathLabels[classPath] : "Beginner";
+        const equippedFlaskDefinition = member.consumables.flask
+          ? getItemDefinition(member.consumables.flask.itemId)
+          : null;
+        const assignedFoodDefinition = member.consumables.foodItemId
+          ? getItemDefinition(member.consumables.foodItemId)
+          : null;
         const derivedStats = getCompanionDerivedStats(member);
         const healthPercent =
           derivedStats.maxHealth > 0
             ? Math.max(0, Math.min(100, (member.health / derivedStats.maxHealth) * 100))
             : 0;
-        const characterXpProgress = getCharacterXpProgress(member);
         const companionNumber = companionIds.indexOf(member.id) + 1;
+        const companionLabel =
+          companionNumber > 0 ? `Companion ${companionNumber}` : member.id;
+        const portraitSrc = entityVisualAssets.testCharacter.animations.idle.frames[0];
+        const pathClassName = classPath ?? "beginner";
 
         return (
-          <div key={member.id} className="companion-vitals-row">
-            <div className="companion-vitals-header">
-              <span>Lv {member.characterLevel} C{companionNumber}</span>
-              <span>
-                {member.health}/{derivedStats.maxHealth} HP
-              </span>
+          <article
+            key={member.id}
+            className={`companion-vitals-card companion-vitals-card-${pathClassName}`}
+          >
+            <div className="companion-vitals-portrait-frame">
+              <img
+                alt=""
+                className="companion-vitals-portrait"
+                draggable={false}
+                src={portraitSrc}
+              />
             </div>
-            <span
-              className="companion-vitals-bar companion-vitals-hp"
-              title={`HP ${member.health}/${derivedStats.maxHealth}`}
-            >
-              <span style={{ width: `${healthPercent}%` }} />
-            </span>
-            <span
-              className={`companion-vitals-bar companion-vitals-xp${
-                characterXpProgress.isMaxLevel ? " companion-vitals-xp-max" : ""
-              }`}
-              title={`Character XP ${getCharacterXpText(member)}`}
-            >
-              <span style={{ width: `${characterXpProgress.percent}%` }} />
-            </span>
-          </div>
+            <div className="companion-vitals-main">
+              <div className="companion-vitals-header">
+                <span>{companionLabel}</span>
+                <span>Lv {member.characterLevel}</span>
+              </div>
+              <div className="companion-vitals-class">
+                <span>{classDefinition.displayName}</span>
+                <span>{classPathLabel}</span>
+              </div>
+              <div className="companion-vitals-health-row">
+                <span>HP</span>
+                <span>
+                  {member.health}/{derivedStats.maxHealth}
+                </span>
+              </div>
+              <span
+                className="companion-vitals-bar companion-vitals-hp"
+                title={`HP ${member.health}/${derivedStats.maxHealth}`}
+              >
+                <span style={{ width: `${healthPercent}%` }} />
+              </span>
+              <div className="companion-vitals-slots">
+                <span title={equippedFlaskDefinition?.displayName ?? "No flask equipped"}>
+                  Flask:{" "}
+                  {equippedFlaskDefinition
+                    ? `${equippedFlaskDefinition.displayName} (${member.consumables.flask?.charges ?? 0})`
+                    : "Empty"}
+                </span>
+                <span title={assignedFoodDefinition?.displayName ?? "No food assigned"}>
+                  Food: {assignedFoodDefinition?.displayName ?? "Empty"}
+                </span>
+              </div>
+            </div>
+          </article>
         );
       })}
     </section>
