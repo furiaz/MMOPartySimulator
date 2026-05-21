@@ -3,7 +3,13 @@ import { createCompanion, createEnemy, createResource } from "./entities";
 import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debugTelemetry";
 import { createDebugMap, MAP_ONE_ID } from "./debugMap";
 import {
+  acceptQuestFromQuestGiver,
   createInitialQuestStates,
+  finishReadyQuestsForQuestGiver,
+  getQuestGiverAvailableQuests,
+  getQuestGiverCurrentQuests,
+  getQuestGiverReadyQuests,
+  QUEST_GIVER_POI_ID,
   recordEnemyDefeatedForQuests,
   recordQuestPoiReachedForQuests,
   recordResourceGatheredForQuests,
@@ -89,6 +95,116 @@ describe("prototype quest system", () => {
     expect(state.quests.clear_the_shore.lastTurnInError).toBe("inventory_full");
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(0);
     expect(state.inventory.slots).toEqual([{ itemId: "wolf_pelt", quantity: 1 }]);
+    expect(getCompanion(state, "companion-1").characterXp).toBe(0);
+  });
+
+  it("accepts a selected available quest from the quest giver", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        clear_the_shore: "available",
+        gather_expedition_supplies: "available",
+      }),
+    });
+
+    state = acceptQuestFromQuestGiver(
+      state,
+      QUEST_GIVER_POI_ID,
+      "gather_expedition_supplies",
+    );
+
+    expect(state.quests.clear_the_shore.status).toBe("available");
+    expect(state.quests.gather_expedition_supplies.status).toBe("active");
+  });
+
+  it("lists quest giver quests by menu status", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({
+        clear_the_shore: "available",
+        gather_expedition_supplies: "active",
+        scout_the_northern_road: "ready_to_turn_in",
+        threat_beyond_the_pass: "completed",
+      }),
+    });
+
+    expect(
+      getQuestGiverAvailableQuests(state, QUEST_GIVER_POI_ID).map(
+        (quest) => quest.questId,
+      ),
+    ).toEqual(["clear_the_shore"]);
+    expect(
+      getQuestGiverCurrentQuests(state, QUEST_GIVER_POI_ID).map(
+        (quest) => quest.questId,
+      ),
+    ).toEqual(["gather_expedition_supplies"]);
+    expect(
+      getQuestGiverReadyQuests(state, QUEST_GIVER_POI_ID).map(
+        (quest) => quest.questId,
+      ),
+    ).toEqual(["scout_the_northern_road"]);
+  });
+
+  it("leaves state unchanged when finishing with no ready quests", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({
+        clear_the_shore: "available",
+        gather_expedition_supplies: "active",
+      }),
+    });
+
+    expect(finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID)).toBe(state);
+  });
+
+  it("finishes all ready quest giver quests when combined rewards fit", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        clear_the_shore: "ready_to_turn_in",
+        gather_expedition_supplies: "ready_to_turn_in",
+      }),
+    });
+
+    state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
+
+    expect(state.quests.clear_the_shore.status).toBe("completed");
+    expect(state.quests.gather_expedition_supplies.status).toBe("completed");
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(45);
+    expect(state.inventory.slots).toEqual([
+      { itemId: "wolf_pelt", quantity: 2 },
+      { itemId: "minor_recovery_flask", quantity: 1 },
+      { itemId: "acolyte_hood", quantity: 1 },
+      { itemId: "field_herb", quantity: 3 },
+    ]);
+    expect(getCompanion(state, "companion-1").lastCharacterXpGained).toBe(6);
+  });
+
+  it("does not partially finish ready quests when combined rewards cannot fit", () => {
+    let state = createStateWithParty({
+      inventory: {
+        capacity: 4,
+        slots: [],
+      },
+      quests: createQuestStates({
+        clear_the_shore: "ready_to_turn_in",
+        gather_expedition_supplies: "ready_to_turn_in",
+        scout_the_northern_road: "ready_to_turn_in",
+      }),
+    });
+
+    state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
+
+    expect(state.quests.clear_the_shore.status).toBe("ready_to_turn_in");
+    expect(state.quests.gather_expedition_supplies.status).toBe(
+      "ready_to_turn_in",
+    );
+    expect(state.quests.scout_the_northern_road.status).toBe("ready_to_turn_in");
+    expect(state.quests.clear_the_shore.lastTurnInError).toBe("inventory_full");
+    expect(state.quests.gather_expedition_supplies.lastTurnInError).toBe(
+      "inventory_full",
+    );
+    expect(state.quests.scout_the_northern_road.lastTurnInError).toBe(
+      "inventory_full",
+    );
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(0);
+    expect(state.inventory.slots).toEqual([]);
     expect(getCompanion(state, "companion-1").characterXp).toBe(0);
   });
 

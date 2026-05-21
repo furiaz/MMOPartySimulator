@@ -14,8 +14,12 @@ import {
 import {
   formatQuestStatus,
   getDisplayQuest,
+  getObjectiveLabel,
   getQuestLogQuests,
   getQuestObjectiveText,
+  getQuestProgressTotals,
+  getQuestRewardText,
+  getQuestTurnInErrorText,
 } from "./questUiHelpers";
 import { QuestTrackerPanel } from "./QuestPanels";
 import { PixiWorldRenderer } from "./worldRenderer/PixiWorldRenderer";
@@ -63,8 +67,13 @@ import {
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   QUEST_DEFINITIONS,
+  acceptQuestFromQuestGiver,
   addItemToInventoryState,
+  finishReadyQuestsForQuestGiver,
   getPartyLeader,
+  getQuestGiverAvailableQuests,
+  getQuestGiverCurrentQuests,
+  getQuestGiverReadyQuests,
   getPoiSearchScope,
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
@@ -113,6 +122,7 @@ import {
   type PoiSearchScope,
   type Position,
   type QuestId,
+  type QuestState,
   type ResourceEntity,
   type WorldWipeRecoveryChoice,
 } from "./game";
@@ -140,6 +150,8 @@ const poiSearchScopeCycle: PoiSearchScope[] = [
   "zone_only",
   "subzone_only",
 ];
+const questGiverInteractionRange = 2;
+const defaultNpcInteractionRange = 1.5;
 
 function getNextPoiSearchScope(scope: PoiSearchScope): PoiSearchScope {
   const currentIndex = poiSearchScopeCycle.indexOf(scope);
@@ -155,6 +167,8 @@ type EntityVisualMovement = {
 };
 
 type MerchantPanel = "buy" | "sell";
+type QuestGiverPanel = "available" | "current";
+type NpcInteractionKind = "merchant" | "quest_giver";
 
 type MerchantBuyFilter = "all" | MerchantStockGroup;
 
@@ -246,6 +260,27 @@ function isHubVisualMap(mapId: string | undefined): boolean {
   return mapId === HUB_MAP_ID;
 }
 
+function getNpcInteractionKind(npc: NpcEntity): NpcInteractionKind | null {
+  if (npc.npcRole === "merchant") {
+    return "merchant";
+  }
+
+  if (npc.npcRole === "quest_giver") {
+    return "quest_giver";
+  }
+
+  return null;
+}
+
+function getNpcInteractionRange(npc: NpcEntity): number {
+  return npc.npcRole === "quest_giver"
+    ? questGiverInteractionRange
+    : defaultNpcInteractionRange;
+}
+
+function getPositionDistance(first: Position, second: Position): number {
+  return Math.hypot(second.x - first.x, second.y - first.y);
+}
 
 function formatIdentifierName(identifier: string): string {
   return identifier
@@ -1021,6 +1056,66 @@ function MerchantBuyPanel({
   );
 }
 
+function QuestGiverDetailPanel({
+  quest,
+  canAccept,
+  onAccept,
+  onIgnore,
+}: {
+  quest: QuestState;
+  canAccept: boolean;
+  onAccept: (questId: QuestId) => void;
+  onIgnore: () => void;
+}) {
+  const definition = QUEST_DEFINITIONS[quest.questId];
+  const turnInErrorText = getQuestTurnInErrorText(quest);
+
+  return (
+    <aside className="merchant-detail-panel quest-giver-detail-panel">
+      <div className="menu-section-heading">
+        <span>{definition.displayName}</span>
+        <span>{formatQuestStatus(quest.status)}</span>
+      </div>
+      <div className="quest-objective-list">
+        {definition.objectives.map((objective) => {
+          const progress = quest.objectiveProgress[objective.id];
+          const requiredCount = objective.requiredCount ?? 1;
+
+          return (
+            <div
+              key={objective.id}
+              className={`quest-objective-row${
+                progress?.completed ? " completed" : ""
+              }`}
+            >
+              <span>{getObjectiveLabel(objective, requiredCount)}</span>
+              <strong>
+                {progress?.currentCount ?? 0}/{requiredCount}
+              </strong>
+            </div>
+          );
+        })}
+      </div>
+      <div className="placeholder-box">
+        Rewards: {getQuestRewardText(definition.rewards)}
+      </div>
+      {turnInErrorText ? (
+        <div className="placeholder-box">{turnInErrorText}</div>
+      ) : null}
+      <div className="quest-giver-detail-actions">
+        {canAccept ? (
+          <button onClick={() => onAccept(quest.questId)} type="button">
+            Accept
+          </button>
+        ) : null}
+        <button onClick={onIgnore} type="button">
+          Ignore
+        </button>
+      </div>
+    </aside>
+  );
+}
+
 function getMerchantBuyBlockReason(
   entry: MerchantStockEntry,
   state: GameState,
@@ -1176,6 +1271,18 @@ function App() {
     useState<MerchantPanel | null>(null);
   const [merchantResultMessage, setMerchantResultMessage] =
     useState<string | null>(null);
+  const [activeQuestGiverNpcId, setActiveQuestGiverNpcId] = useState<
+    string | null
+  >(null);
+  const [activeQuestGiverPanel, setActiveQuestGiverPanel] =
+    useState<QuestGiverPanel | null>(null);
+  const [selectedQuestGiverQuestId, setSelectedQuestGiverQuestId] =
+    useState<QuestId | null>(null);
+  const [questGiverResultMessage, setQuestGiverResultMessage] =
+    useState<string | null>(null);
+  const [pendingNpcInteractionId, setPendingNpcInteractionId] = useState<
+    string | null
+  >(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [currencyGainFeedbackUntil, setCurrencyGainFeedbackUntil] = useState(0);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => ({
@@ -1233,8 +1340,37 @@ function App() {
     activeMerchantNpcId && isMerchantNpc(gameState.entities[activeMerchantNpcId])
       ? gameState.entities[activeMerchantNpcId]
       : null;
+  const activeQuestGiver =
+    activeQuestGiverNpcId &&
+    gameState.entities[activeQuestGiverNpcId]?.kind === "npc" &&
+    gameState.entities[activeQuestGiverNpcId].npcRole === "quest_giver"
+      ? gameState.entities[activeQuestGiverNpcId]
+      : null;
+  const activeQuestGiverReadyQuests = activeQuestGiver
+    ? getQuestGiverReadyQuests(gameState, activeQuestGiver.id)
+    : [];
+  const activeQuestGiverAvailableQuests = activeQuestGiver
+    ? getQuestGiverAvailableQuests(gameState, activeQuestGiver.id)
+    : [];
+  const activeQuestGiverCurrentQuests = activeQuestGiver
+    ? getQuestGiverCurrentQuests(gameState, activeQuestGiver.id)
+    : [];
+  const activeQuestGiverPanelQuests =
+    activeQuestGiverPanel === "available"
+      ? activeQuestGiverAvailableQuests
+      : activeQuestGiverPanel === "current"
+        ? activeQuestGiverCurrentQuests
+        : [];
+  const selectedQuestGiverQuest =
+    selectedQuestGiverQuestId === null
+      ? null
+      : activeQuestGiverPanelQuests.find(
+          (quest) => quest.questId === selectedQuestGiverQuestId,
+        ) ?? null;
   const shouldShowWalletToast =
-    !activeMerchant && (gameState.wallet.visibleUntil ?? 0) > currentTime;
+    !activeMerchant &&
+    !activeQuestGiver &&
+    (gameState.wallet.visibleUntil ?? 0) > currentTime;
   const shouldShowCurrencyGainFeedback =
     currencyGainFeedbackUntil > currentTime;
   const pendingWorldWipeRecovery =
@@ -1251,6 +1387,112 @@ function App() {
     gameState.hubDepartureFoodWarning.expiresAt > currentTime
       ? gameState.hubDepartureFoodWarning
       : null;
+  const previousInteractionMapIdRef = useRef(currentMap.id);
+
+  useEffect(() => {
+    const previousMapId = previousInteractionMapIdRef.current;
+    previousInteractionMapIdRef.current = currentMap.id;
+
+    if (
+      previousMapId !== currentMap.id &&
+      (activeMerchantNpcId || activeQuestGiverNpcId || pendingNpcInteractionId)
+    ) {
+      closeNpcInteractions();
+    }
+  }, [
+    activeMerchantNpcId,
+    activeQuestGiverNpcId,
+    currentMap.id,
+    pendingNpcInteractionId,
+  ]);
+
+  useEffect(() => {
+    if (!activeMerchantNpcId && !activeQuestGiverNpcId) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeNpcInteractions();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeMerchantNpcId, activeQuestGiverNpcId]);
+
+  useEffect(() => {
+    if (!activeMerchantNpcId && !activeQuestGiverNpcId) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".npc-interaction")
+      ) {
+        return;
+      }
+
+      closeNpcInteractions();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [activeMerchantNpcId, activeQuestGiverNpcId]);
+
+  useEffect(() => {
+    if (!leader) {
+      if (activeMerchantNpcId || activeQuestGiverNpcId || pendingNpcInteractionId) {
+        closeNpcInteractions();
+      }
+      return;
+    }
+
+    const activeNpcId = activeMerchantNpcId ?? activeQuestGiverNpcId;
+    const activeNpc =
+      activeNpcId && gameState.entities[activeNpcId]?.kind === "npc"
+        ? gameState.entities[activeNpcId]
+        : null;
+
+    if (
+      activeNpc &&
+      getPositionDistance(leader.position, activeNpc.position) >
+        getNpcInteractionRange(activeNpc)
+    ) {
+      closeNpcInteractions();
+      return;
+    }
+
+    const pendingNpc =
+      pendingNpcInteractionId &&
+      gameState.entities[pendingNpcInteractionId]?.kind === "npc"
+        ? gameState.entities[pendingNpcInteractionId]
+        : null;
+
+    if (!pendingNpc) {
+      if (pendingNpcInteractionId) {
+        setPendingNpcInteractionId(null);
+      }
+      return;
+    }
+
+    if (
+      getPositionDistance(leader.position, pendingNpc.position) <=
+      getNpcInteractionRange(pendingNpc)
+    ) {
+      openNpcInteraction(pendingNpc);
+    }
+  }, [
+    activeMerchantNpcId,
+    activeQuestGiverNpcId,
+    gameState.entities,
+    leader?.position.x,
+    leader?.position.y,
+    pendingNpcInteractionId,
+  ]);
 
   useEffect(() => {
     const previousCrownBalance = previousCrownBalanceRef.current;
@@ -1641,10 +1883,62 @@ function App() {
   }
 
   function openMerchantInteraction(npc: NpcEntity) {
+    setPendingNpcInteractionId(null);
+    setActiveQuestGiverNpcId(null);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
     setActiveMerchantNpcId(npc.id);
     setActiveMerchantPanel(null);
     setMerchantResultMessage(null);
     setGameState((state) => recordMerchantInteractionOpened(state, npc.id));
+  }
+
+  function openQuestGiverInteraction(npc: NpcEntity) {
+    setPendingNpcInteractionId(null);
+    setActiveMerchantNpcId(null);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+    setActiveQuestGiverNpcId(npc.id);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+  }
+
+  function openNpcInteraction(npc: NpcEntity) {
+    const interactionKind = getNpcInteractionKind(npc);
+
+    if (interactionKind === "merchant") {
+      openMerchantInteraction(npc);
+      return;
+    }
+
+    if (interactionKind === "quest_giver") {
+      openQuestGiverInteraction(npc);
+    }
+  }
+
+  function closeNpcInteractions() {
+    const merchantNpcId = activeMerchantNpcId;
+
+    setPendingNpcInteractionId(null);
+    setActiveMerchantNpcId(null);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+    setActiveQuestGiverNpcId(null);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+
+    if (!merchantNpcId) {
+      return;
+    }
+
+    setGameState((state) => {
+      const selectedState = recordMerchantMenuSelected(state, merchantNpcId, "leave");
+
+      return recordMerchantInteractionClosed(selectedState, merchantNpcId);
+    });
   }
 
   function selectMerchantPanel(panel: MerchantPanel) {
@@ -1703,22 +1997,48 @@ function App() {
     setGameState(purchase.state);
   }
 
-  function closeMerchantInteraction() {
-    const merchantNpcId = activeMerchantNpcId;
+  function selectQuestGiverPanel(panel: QuestGiverPanel) {
+    setActiveQuestGiverPanel(panel);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+  }
 
-    setActiveMerchantNpcId(null);
-    setActiveMerchantPanel(null);
-    setMerchantResultMessage(null);
-
-    if (!merchantNpcId) {
+  function finishQuestGiverQuests() {
+    if (!activeQuestGiverNpcId || activeQuestGiverReadyQuests.length === 0) {
       return;
     }
 
-    setGameState((state) => {
-      const selectedState = recordMerchantMenuSelected(state, merchantNpcId, "leave");
+    const readyCount = activeQuestGiverReadyQuests.length;
+    const nextState = finishReadyQuestsForQuestGiver(
+      gameState,
+      activeQuestGiverNpcId,
+    );
+    const completedCount = activeQuestGiverReadyQuests.filter(
+      (quest) => nextState.quests[quest.questId]?.status === "completed",
+    ).length;
 
-      return recordMerchantInteractionClosed(selectedState, merchantNpcId);
-    });
+    setQuestGiverResultMessage(
+      completedCount === readyCount
+        ? `Finished ${completedCount} quest${completedCount === 1 ? "" : "s"}`
+        : "Inventory too full for quest rewards",
+    );
+    setGameState(nextState);
+  }
+
+  function acceptQuestGiverQuest(questId: QuestId) {
+    if (!activeQuestGiverNpcId) {
+      return;
+    }
+
+    setGameState((state) =>
+      acceptQuestFromQuestGiver(state, activeQuestGiverNpcId, questId),
+    );
+    setQuestGiverResultMessage("Quest accepted");
+    setSelectedQuestGiverQuestId(null);
+  }
+
+  function closeMerchantInteraction() {
+    closeNpcInteractions();
   }
 
   function chooseWorldWipeRecoveryHub(hubId: string) {
@@ -1803,11 +2123,25 @@ function App() {
       return;
     }
 
-    if (npc.npcRole === "merchant") {
-      openMerchantInteraction(npc);
+    const interactionKind = getNpcInteractionKind(npc);
+
+    if (!interactionKind) {
+      closeNpcInteractions();
+      commandPartyToMoveToPosition(npc.position);
       return;
     }
 
+    if (
+      leader &&
+      getPositionDistance(leader.position, npc.position) <=
+        getNpcInteractionRange(npc)
+    ) {
+      openNpcInteraction(npc);
+      return;
+    }
+
+    closeNpcInteractions();
+    setPendingNpcInteractionId(npc.id);
     commandPartyToMoveToPosition(npc.position);
   }
 
@@ -2065,7 +2399,10 @@ function App() {
         </div>
 
         {activeMerchant ? (
-          <section className="merchant-interaction" aria-label="Merchant menu">
+          <section
+            className="merchant-interaction npc-interaction"
+            aria-label="Merchant menu"
+          >
             <div className="merchant-menu">
               <div className="merchant-menu-header">
                 <h2>{activeMerchant.displayName}</h2>
@@ -2108,6 +2445,124 @@ function App() {
                   <p>Placeholder</p>
                 </aside>
               )
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeQuestGiver ? (
+          <section
+            className="merchant-interaction npc-interaction"
+            aria-label="Quest Giver menu"
+          >
+            <div className="merchant-menu quest-giver-menu">
+              <div className="merchant-menu-header">
+                <h2>{activeQuestGiver.displayName}</h2>
+                <span>{activeQuestGiverReadyQuests.length} Ready</span>
+              </div>
+              <button
+                className={activeQuestGiverPanel ? "active" : ""}
+                onClick={() => {
+                  if (!activeQuestGiverPanel) {
+                    selectQuestGiverPanel("available");
+                  }
+                }}
+                type="button"
+              >
+                Quests
+              </button>
+              <button disabled type="button">
+                Talk
+              </button>
+              {activeQuestGiverPanel ? (
+                <>
+                  <button
+                    disabled={activeQuestGiverReadyQuests.length === 0}
+                    onClick={finishQuestGiverQuests}
+                    type="button"
+                  >
+                    Finish Quests
+                  </button>
+                  <button
+                    className={
+                      activeQuestGiverPanel === "available" ? "active" : ""
+                    }
+                    onClick={() => selectQuestGiverPanel("available")}
+                    type="button"
+                  >
+                    Available Quests
+                  </button>
+                  <button
+                    className={activeQuestGiverPanel === "current" ? "active" : ""}
+                    onClick={() => selectQuestGiverPanel("current")}
+                    type="button"
+                  >
+                    Current Quests
+                  </button>
+                </>
+              ) : null}
+              <button onClick={closeNpcInteractions} type="button">
+                Leave
+              </button>
+              {questGiverResultMessage ? (
+                <p className="merchant-result-message">
+                  {questGiverResultMessage}
+                </p>
+              ) : null}
+            </div>
+            {activeQuestGiverPanel ? (
+              <aside className="merchant-detail-panel quest-giver-list-panel">
+                <div className="menu-section-heading">
+                  <span>
+                    {activeQuestGiverPanel === "available"
+                      ? "Available Quests"
+                      : "Current Quests"}
+                  </span>
+                  <span>{activeQuestGiverPanelQuests.length}</span>
+                </div>
+                {activeQuestGiverPanelQuests.length > 0 ? (
+                  <div className="quest-list">
+                    {activeQuestGiverPanelQuests.map((quest) => {
+                      const definition = QUEST_DEFINITIONS[quest.questId];
+                      const progressTotals = getQuestProgressTotals(quest);
+                      const isSelected =
+                        selectedQuestGiverQuest?.questId === quest.questId;
+
+                      return (
+                        <button
+                          key={quest.questId}
+                          className={`quest-list-item${
+                            isSelected ? " selected" : ""
+                          }`}
+                          onClick={() =>
+                            setSelectedQuestGiverQuestId(quest.questId)
+                          }
+                          type="button"
+                        >
+                          <span>{definition.displayName}</span>
+                          <span>
+                            {progressTotals.currentCount}/
+                            {progressTotals.requiredCount}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="placeholder-box">
+                    {activeQuestGiverPanel === "available"
+                      ? "No available quests."
+                      : "No current quests."}
+                  </div>
+                )}
+              </aside>
+            ) : null}
+            {selectedQuestGiverQuest ? (
+              <QuestGiverDetailPanel
+                canAccept={activeQuestGiverPanel === "available"}
+                quest={selectedQuestGiverQuest}
+                onAccept={acceptQuestGiverQuest}
+                onIgnore={() => setSelectedQuestGiverQuestId(null)}
+              />
             ) : null}
           </section>
         ) : null}

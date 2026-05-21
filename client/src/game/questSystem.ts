@@ -26,7 +26,6 @@ import type {
   QuestObjectiveDefinition,
   QuestReward,
   QuestRewardItem,
-  QuestSourceType,
   QuestState,
 } from "./questTypes";
 
@@ -197,6 +196,7 @@ type QuestRewardValidationResult =
       status: "failed_inventory_full" | "failed_invalid";
       reason: string;
       itemId?: ItemId;
+      questId?: QuestId;
       requiredNewSlots: number;
       inventoryUsedSlots: number;
       inventoryCapacity: number;
@@ -242,6 +242,29 @@ export function getAvailableQuest(state: GameState): QuestState | null {
   return getQuestByStatuses(state, ["available"]);
 }
 
+export function getQuestGiverAvailableQuests(
+  state: GameState,
+  questGiverPoiId: string,
+): QuestState[] {
+  return getQuestGiverQuestsByStatuses(state, questGiverPoiId, ["available"]);
+}
+
+export function getQuestGiverCurrentQuests(
+  state: GameState,
+  questGiverPoiId: string,
+): QuestState[] {
+  return getQuestGiverQuestsByStatuses(state, questGiverPoiId, ["active"]);
+}
+
+export function getQuestGiverReadyQuests(
+  state: GameState,
+  questGiverPoiId: string,
+): QuestState[] {
+  return getQuestGiverQuestsByStatuses(state, questGiverPoiId, [
+    "ready_to_turn_in",
+  ]);
+}
+
 export function getQuestDefinition(questId: QuestId): QuestDefinition {
   return QUEST_DEFINITIONS[questId];
 }
@@ -285,12 +308,115 @@ export function updateQuestGiverInteraction(state: GameState): GameState {
   const readyQuest = getQuestByStatuses(state, ["ready_to_turn_in"]);
 
   if (readyQuest) {
-    return claimQuestReward(nextState, readyQuest.questId, "npc");
+    return claimQuestReward(nextState, readyQuest.questId, QUEST_GIVER_POI_ID);
   }
 
   const availableQuest = getAvailableQuest(nextState);
 
-  return availableQuest ? acceptQuest(nextState, availableQuest.questId) : nextState;
+  return availableQuest
+    ? acceptQuestFromQuestGiver(nextState, QUEST_GIVER_POI_ID, availableQuest.questId)
+    : nextState;
+}
+
+export function acceptQuestFromQuestGiver(
+  state: GameState,
+  questGiverPoiId: string,
+  questId: QuestId,
+): GameState {
+  if (QUEST_DEFINITIONS[questId].questGiverPoiId !== questGiverPoiId) {
+    return state;
+  }
+
+  return acceptQuest(state, questId, questGiverPoiId);
+}
+
+export function finishReadyQuestsForQuestGiver(
+  state: GameState,
+  questGiverPoiId: string,
+): GameState {
+  const readyQuests = getQuestGiverReadyQuests(state, questGiverPoiId);
+
+  if (readyQuests.length === 0) {
+    return state;
+  }
+
+  let nextState = state;
+
+  for (const quest of readyQuests) {
+    nextState = appendDebugTelemetryEvent(nextState, {
+      type: "quest_finish_selected",
+      entityId: questGiverPoiId,
+      questId: quest.questId,
+      currentMapId: nextState.currentMapId,
+      currentMapDisplayName: nextState.map?.displayName,
+      currentMapDebugName: nextState.map?.debugName,
+    });
+  }
+
+  for (const quest of readyQuests) {
+    nextState = appendQuestRewardValidationStarted(
+      nextState,
+      quest.questId,
+      questGiverPoiId,
+    );
+  }
+
+  const validation = validateQuestRewards(
+    nextState,
+    readyQuests.map((quest) => quest.questId),
+  );
+
+  if (validation.status !== "success") {
+    const errorType =
+      validation.status === "failed_inventory_full"
+        ? "inventory_full"
+        : "invalid_reward";
+    const failureEventType =
+      validation.status === "failed_inventory_full"
+        ? "quest_reward_validation_failed_inventory_full"
+        : "quest_reward_claim_failed";
+    const failedQuests = Object.fromEntries(
+      readyQuests.map((quest) => [
+        quest.questId,
+        {
+          ...nextState.quests[quest.questId],
+          lastTurnInError: errorType,
+        },
+      ]),
+    ) as Partial<Record<QuestId, QuestState>>;
+
+    return appendDebugTelemetryEvent(
+      {
+        ...nextState,
+        quests: {
+          ...nextState.quests,
+          ...failedQuests,
+        },
+      },
+      {
+        type: failureEventType,
+        entityId: questGiverPoiId,
+        questId: validation.questId,
+        itemId: validation.itemId,
+        result: validation.status,
+        reason: validation.reason,
+        inventoryUsedSlots: validation.inventoryUsedSlots,
+        inventoryCapacity: validation.inventoryCapacity,
+        currentMapId: nextState.currentMapId,
+        currentMapDisplayName: nextState.map?.displayName,
+        currentMapDebugName: nextState.map?.debugName,
+      },
+    );
+  }
+
+  for (const quest of readyQuests) {
+    nextState = claimQuestReward(nextState, quest.questId, questGiverPoiId, {
+      skipValidation: true,
+      skipFinishSelectedTelemetry: true,
+    });
+  }
+
+  return nextState;
 }
 
 export function recordEnemyDefeatedForQuests(
@@ -392,7 +518,11 @@ export function matchesObjectiveSubzoneAtPosition(
   );
 }
 
-function acceptQuest(state: GameState, questId: QuestId): GameState {
+function acceptQuest(
+  state: GameState,
+  questId: QuestId,
+  questGiverPoiId = QUEST_GIVER_POI_ID,
+): GameState {
   const quest = state.quests[questId];
 
   if (quest?.status !== "available") {
@@ -413,7 +543,7 @@ function acceptQuest(state: GameState, questId: QuestId): GameState {
     },
     {
       type: "quest_accepted",
-      entityId: QUEST_GIVER_POI_ID,
+      entityId: questGiverPoiId,
       questId,
       currentMapId: state.currentMapId,
       currentMapDisplayName: state.map?.displayName,
@@ -425,39 +555,49 @@ function acceptQuest(state: GameState, questId: QuestId): GameState {
 function claimQuestReward(
   state: GameState,
   questId: QuestId,
-  sourceType: QuestSourceType,
+  questGiverPoiId: string,
+  options: {
+    skipValidation?: boolean;
+    skipFinishSelectedTelemetry?: boolean;
+  } = {},
 ): GameState {
   const quest = state.quests[questId];
 
   if (
     quest?.status !== "ready_to_turn_in" ||
-    sourceType !== "npc" ||
+    QUEST_DEFINITIONS[questId].questGiverPoiId !== questGiverPoiId ||
     quest.rewardClaimedCycle === quest.completedCycle
   ) {
     return state;
   }
 
-  let nextState = appendDebugTelemetryEvent(state, {
-    type: "quest_finish_selected",
-    entityId: QUEST_GIVER_POI_ID,
-    questId,
-    currentMapId: state.currentMapId,
-    currentMapDisplayName: state.map?.displayName,
-    currentMapDebugName: state.map?.debugName,
-  });
+  let nextState = options.skipFinishSelectedTelemetry
+    ? state
+    : appendDebugTelemetryEvent(state, {
+        type: "quest_finish_selected",
+        entityId: questGiverPoiId,
+        questId,
+        currentMapId: state.currentMapId,
+        currentMapDisplayName: state.map?.displayName,
+        currentMapDebugName: state.map?.debugName,
+      });
 
-  nextState = appendDebugTelemetryEvent(nextState, {
-    type: "quest_reward_validation_started",
-    entityId: QUEST_GIVER_POI_ID,
-    questId,
-    inventoryUsedSlots: nextState.inventory.slots.length,
-    inventoryCapacity: nextState.inventory.capacity,
-    currentMapId: nextState.currentMapId,
-    currentMapDisplayName: nextState.map?.displayName,
-    currentMapDebugName: nextState.map?.debugName,
-  });
+  if (!options.skipValidation) {
+    nextState = appendQuestRewardValidationStarted(
+      nextState,
+      questId,
+      questGiverPoiId,
+    );
+  }
 
-  const validation = validateQuestReward(nextState, questId);
+  const validation = options.skipValidation
+    ? {
+        status: "success" as const,
+        requiredNewSlots: 0,
+        inventoryUsedSlots: nextState.inventory.slots.length,
+        inventoryCapacity: nextState.inventory.capacity,
+      }
+    : validateQuestRewards(nextState, [questId]);
 
   if (validation.status !== "success") {
     const errorType =
@@ -482,7 +622,7 @@ function claimQuestReward(
       },
       {
         type: failureEventType,
-        entityId: QUEST_GIVER_POI_ID,
+        entityId: questGiverPoiId,
         questId,
         itemId: validation.itemId,
         result: validation.status,
@@ -498,7 +638,7 @@ function claimQuestReward(
 
   nextState = appendDebugTelemetryEvent(nextState, {
     type: "quest_reward_claim_started",
-    entityId: QUEST_GIVER_POI_ID,
+    entityId: questGiverPoiId,
     questId,
     inventoryUsedSlots: validation.inventoryUsedSlots,
     inventoryCapacity: validation.inventoryCapacity,
@@ -524,7 +664,7 @@ function claimQuestReward(
     },
     {
       type: "quest_turned_in",
-      entityId: QUEST_GIVER_POI_ID,
+      entityId: questGiverPoiId,
       questId,
       currentMapId: nextState.currentMapId,
       currentMapDisplayName: nextState.map?.displayName,
@@ -534,7 +674,7 @@ function claimQuestReward(
 
   nextState = appendDebugTelemetryEvent(nextState, {
     type: "quest_completed",
-    entityId: QUEST_GIVER_POI_ID,
+    entityId: questGiverPoiId,
     questId,
     currentMapId: nextState.currentMapId,
     currentMapDisplayName: nextState.map?.displayName,
@@ -543,7 +683,7 @@ function claimQuestReward(
 
   nextState = appendDebugTelemetryEvent(nextState, {
     type: "quest_reward_claim_succeeded",
-    entityId: QUEST_GIVER_POI_ID,
+    entityId: questGiverPoiId,
     questId,
     result: "success",
     currentMapId: nextState.currentMapId,
@@ -554,52 +694,50 @@ function claimQuestReward(
   return unlockAvailableQuests(nextState, questId);
 }
 
-function validateQuestReward(
+function validateQuestRewards(
   state: GameState,
-  questId: QuestId,
+  questIds: QuestId[],
 ): QuestRewardValidationResult {
-  const reward = QUEST_DEFINITIONS[questId].rewards;
   const inventoryUsedSlots = state.inventory.slots.length;
   const inventoryCapacity = state.inventory.capacity;
-
-  if (!reward) {
-    return {
-      status: "success",
-      requiredNewSlots: 0,
-      inventoryUsedSlots,
-      inventoryCapacity,
-    };
-  }
-
-  const rewardValueValidation = validateRewardValues(reward);
-
-  if (rewardValueValidation) {
-    return {
-      status: "failed_invalid",
-      reason: rewardValueValidation,
-      requiredNewSlots: 0,
-      inventoryUsedSlots,
-      inventoryCapacity,
-    };
-  }
-
-  const rewardItems = getRewardInventoryItems(reward);
   const slots = state.inventory.slots.map((slot) => ({ ...slot }));
   let requiredNewSlots = 0;
 
-  for (const rewardItem of rewardItems) {
-    const result = simulateRewardItemAdd(slots, inventoryCapacity, rewardItem);
-    requiredNewSlots += result.createdSlots;
+  for (const questId of questIds) {
+    const reward = QUEST_DEFINITIONS[questId].rewards;
 
-    if (result.status !== "success") {
+    if (!reward) {
+      continue;
+    }
+
+    const rewardValueValidation = validateRewardValues(reward);
+
+    if (rewardValueValidation) {
       return {
-        status: result.status,
-        reason: result.reason,
-        itemId: rewardItem.itemId,
+        status: "failed_invalid",
+        reason: rewardValueValidation,
+        questId,
         requiredNewSlots,
         inventoryUsedSlots,
         inventoryCapacity,
       };
+    }
+
+    for (const rewardItem of getRewardInventoryItems(reward)) {
+      const result = simulateRewardItemAdd(slots, inventoryCapacity, rewardItem);
+      requiredNewSlots += result.createdSlots;
+
+      if (result.status !== "success") {
+        return {
+          status: result.status,
+          reason: result.reason,
+          questId,
+          itemId: rewardItem.itemId,
+          requiredNewSlots,
+          inventoryUsedSlots,
+          inventoryCapacity,
+        };
+      }
     }
   }
 
@@ -609,6 +747,23 @@ function validateQuestReward(
     inventoryUsedSlots,
     inventoryCapacity,
   };
+}
+
+function appendQuestRewardValidationStarted(
+  state: GameState,
+  questId: QuestId,
+  questGiverPoiId: string,
+): GameState {
+  return appendDebugTelemetryEvent(state, {
+    type: "quest_reward_validation_started",
+    entityId: questGiverPoiId,
+    questId,
+    inventoryUsedSlots: state.inventory.slots.length,
+    inventoryCapacity: state.inventory.capacity,
+    currentMapId: state.currentMapId,
+    currentMapDisplayName: state.map?.displayName,
+    currentMapDebugName: state.map?.debugName,
+  });
 }
 
 function validateRewardValues(reward: QuestReward): string | null {
@@ -1059,6 +1214,22 @@ function getQuestByStatuses(
   }
 
   return null;
+}
+
+function getQuestGiverQuestsByStatuses(
+  state: GameState,
+  questGiverPoiId: string,
+  statuses: QuestState["status"][],
+): QuestState[] {
+  return QUEST_ORDER
+    .map((questId) => state.quests[questId])
+    .filter((quest): quest is QuestState => {
+      return (
+        Boolean(quest) &&
+        QUEST_DEFINITIONS[quest.questId].questGiverPoiId === questGiverPoiId &&
+        statuses.includes(quest.status)
+      );
+    });
 }
 
 export function getQuestTargetMapId(

@@ -771,6 +771,14 @@
   color: #ffffff;
 }
 
+.merchant-menu button:disabled,
+.quest-giver-detail-actions button:disabled {
+  cursor: not-allowed;
+  border-color: rgba(98, 117, 121, 0.45);
+  background: rgba(50, 62, 66, 0.48);
+  color: #73888d;
+}
+
 .merchant-result-message {
   margin: 0;
   padding-top: 4px;
@@ -791,6 +799,28 @@
   margin: 0;
   color: #aec6ca;
   font-size: 13px;
+}
+
+.quest-giver-list-panel {
+  width: 280px;
+}
+
+.quest-giver-list-panel .quest-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.quest-giver-detail-panel {
+  width: 320px;
+}
+
+.quest-giver-detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quest-giver-detail-actions button {
+  flex: 1;
 }
 
 .merchant-buy-panel {
@@ -2012,6 +2042,11 @@ button {
   }
 
   .merchant-buy-panel {
+    width: min(100%, calc(100vw - 32px));
+  }
+
+  .quest-giver-list-panel,
+  .quest-giver-detail-panel {
     width: min(100%, calc(100vw - 32px));
   }
 
