@@ -322,6 +322,7 @@ export {
   getManhattanDistance,
   getPositionKey,
 } from "./positionUtils";
+export { resolveNavigationClickTarget } from "./navigationClick";
 export {
   isActiveResource,
   isCompanionEntity,

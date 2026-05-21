@@ -75,6 +75,7 @@ import {
   recordMerchantInteractionOpened,
   recordMerchantMenuSelected,
   resourceIds,
+  resolveNavigationClickTarget,
   resolveWorldWipeRecoveryChoice,
   setAutoModeEnabled,
   setLeaderIntent,
@@ -1770,6 +1771,31 @@ function App() {
     commandPartyToMoveToPosition(targetPosition);
   }
 
+  function commandPartyToMoveFromMinimapPosition(clickedPosition: Position) {
+    setGameState((state) => {
+      const resolvedPosition = resolveNavigationClickTarget(state, clickedPosition);
+      const leader = getPartyLeader(state);
+
+      if (!resolvedPosition || !leader) {
+        return state;
+      }
+
+      const leaderIntentState = setLeaderIntent(state, {
+        type: "move",
+        targetId: null,
+        targetPosition: resolvedPosition,
+        source: "player",
+      });
+
+      return updateEntity(leaderIntentState, {
+        ...leader,
+        state: "follow",
+        currentTargetId: null,
+        commandPriority: "autonomous",
+      });
+    });
+  }
+
   function commandPartyToInteractWithNpc(npcId: string) {
     const npc = gameState.entities[npcId];
 
@@ -2032,6 +2058,7 @@ function App() {
             leaderIntent={gameState.leaderIntent}
             map={currentMap}
             mode="preview"
+            onFloorClick={commandPartyToMoveFromMinimapPosition}
             viewportSize={viewportSize}
             visualMovementByEntityId={visualMovementByEntityId}
           />

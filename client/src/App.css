@@ -185,6 +185,7 @@
   height: 144px;
   border: 1px solid rgba(15, 23, 42, 0.62);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+  pointer-events: auto;
 }
 
 .pixi-world-renderer-full {

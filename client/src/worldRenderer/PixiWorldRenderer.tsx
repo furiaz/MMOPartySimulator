@@ -127,6 +127,8 @@ type RenderSize = {
   height: number;
 };
 
+type ClientBounds = Pick<DOMRect, "left" | "top" | "width" | "height">;
+
 type TileBounds = {
   minX: number;
   maxX: number;
@@ -485,7 +487,7 @@ function toFullPosition(position: Position, transform: FullTransform) {
 
 function getFullMapPosition(
   clientPosition: Position,
-  bounds: DOMRect,
+  bounds: ClientBounds,
   transform: FullTransform,
 ): Position {
   return {
@@ -496,6 +498,49 @@ function getFullMapPosition(
       (clientPosition.y - bounds.top + transform.cameraOffset.y) /
       transform.cellPixelSize,
   };
+}
+
+export function getPreviewMapPosition(
+  clientPosition: Position,
+  bounds: ClientBounds,
+  map: GameMap,
+): Position | null {
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return null;
+  }
+
+  const transform = getPreviewTransform(map);
+  const previewPosition = {
+    x: ((clientPosition.x - bounds.left) / bounds.width) * previewWidth,
+    y: ((clientPosition.y - bounds.top) / bounds.height) * previewHeight,
+  };
+  const mapWidth = map.columns * transform.scale;
+  const mapHeight = map.rows * transform.scale;
+
+  if (
+    previewPosition.x < transform.xOffset ||
+    previewPosition.x >= transform.xOffset + mapWidth ||
+    previewPosition.y < transform.yOffset ||
+    previewPosition.y >= transform.yOffset + mapHeight
+  ) {
+    return null;
+  }
+
+  const mapPosition = {
+    x: Math.floor((previewPosition.x - transform.xOffset) / transform.scale),
+    y: Math.floor((previewPosition.y - transform.yOffset) / transform.scale),
+  };
+
+  if (
+    mapPosition.x < 0 ||
+    mapPosition.x >= map.columns ||
+    mapPosition.y < 0 ||
+    mapPosition.y >= map.rows
+  ) {
+    return null;
+  }
+
+  return mapPosition;
 }
 
 function getFloorPosition(position: Position): Position {
@@ -2932,11 +2977,28 @@ export function PixiWorldRenderer({
   ]);
 
   function handleRendererClick(event: MouseEvent<HTMLDivElement>) {
-    if (mode !== "full") {
+    event.stopPropagation();
+
+    if (mode === "preview") {
+      const bounds =
+        appRef.current?.canvas.getBoundingClientRect() ??
+        event.currentTarget.getBoundingClientRect();
+      const mapPosition = getPreviewMapPosition(
+        { x: event.clientX, y: event.clientY },
+        bounds,
+        map,
+      );
+
+      if (mapPosition) {
+        onFloorClick?.(mapPosition);
+      }
+
       return;
     }
 
-    event.stopPropagation();
+    if (mode !== "full") {
+      return;
+    }
 
     const bounds = event.currentTarget.getBoundingClientRect();
     const mapPosition = getFullMapPosition(
