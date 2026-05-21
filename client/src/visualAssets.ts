@@ -1,4 +1,4 @@
-import type { DebugMapId, EnemyArchetypeId, GameEntity } from "./game";
+import type { ClassId, DebugMapId, EnemyArchetypeId, GameEntity } from "./game";
 import { NPC_ICON_SRC, RESOURCE_ICON_SRC } from "./assetIcons";
 
 export type SpriteAnimationAsset = {
@@ -59,6 +59,7 @@ const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
 const testEnemyTwoBasePath = "/Asserts/Characters/Test-Enemy2";
 const prototypeEnemyBasePath = "/Asserts/Characters/Prototype-Enemies";
 const testNpcBasePath = "/Asserts/Characters/Test-NPC";
+const classPortraitBasePath = "/Asserts/Generated/class-portraits";
 const defaultFrameDurationMs = 100;
 
 function createFrames(
@@ -125,6 +126,18 @@ const prototypeEnemyVisualAssets: Partial<Record<EnemyArchetypeId, SpriteVisualA
   goblin_shaman: createStaticEnemySprite(`${prototypeEnemyBasePath}/thorn-shaman-se.png`),
   ash_wisp: createStaticEnemySprite(`${prototypeEnemyBasePath}/ash-wisp-se.png`),
   mossling: createStaticEnemySprite(`${prototypeEnemyBasePath}/mossling-se.png`),
+};
+
+export const CLASS_PORTRAIT_SRC: Record<ClassId, string> = {
+  beginner: `${classPortraitBasePath}/beginner.png`,
+  blade: `${classPortraitBasePath}/blade.png`,
+  aegis: `${classPortraitBasePath}/aegis.png`,
+  hunter: `${classPortraitBasePath}/hunter.png`,
+  beast: `${classPortraitBasePath}/beast.png`,
+  elementalist: `${classPortraitBasePath}/elementalist.png`,
+  runecaster: `${classPortraitBasePath}/runecaster.png`,
+  lightbearer: `${classPortraitBasePath}/lightbearer.png`,
+  penitent: `${classPortraitBasePath}/penitent.png`,
 };
 
 export const entityVisualAssets = {

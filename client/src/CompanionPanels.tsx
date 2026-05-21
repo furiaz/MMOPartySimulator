@@ -35,7 +35,7 @@ import {
   type SkillDefinition,
   type ClassPath,
 } from "./game";
-import { entityVisualAssets } from "./visualAssets";
+import { CLASS_PORTRAIT_SRC } from "./visualAssets";
 
 export type GameMenuTab =
   | "party"
@@ -1530,7 +1530,7 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
         const companionNumber = companionIds.indexOf(member.id) + 1;
         const companionLabel =
           companionNumber > 0 ? `Companion ${companionNumber}` : member.id;
-        const portraitSrc = entityVisualAssets.testCharacter.animations.idle.frames[0];
+        const portraitSrc = CLASS_PORTRAIT_SRC[member.classId];
         const pathClassName = classPath ?? "beginner";
 
         return (

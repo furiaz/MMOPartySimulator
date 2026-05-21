@@ -452,8 +452,8 @@
   min-height: 0;
   place-items: center;
   overflow: hidden;
-  border: 1px solid rgba(51, 65, 85, 0.58);
-  background: rgba(248, 250, 252, 0.72);
+  border: 0;
+  background: transparent;
 }
 
 .companion-vitals-portrait {
