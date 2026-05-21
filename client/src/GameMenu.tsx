@@ -30,6 +30,7 @@ export function GameMenu({
   isOpen,
   leaderId,
   members,
+  currentTime,
   quests,
   currentMapId,
   worldTravelTargetMapId,
@@ -39,7 +40,10 @@ export function GameMenu({
   onAllocateStatPoint,
   onChangeLeader,
   onChangeRole,
+  onAssignFood,
+  onChangeConsumableBehavior,
   onEquipEquipment,
+  onEquipFlask,
   onOpenEquipmentManagement,
   onSelectCompanion,
   onSelectManagementSection,
@@ -50,6 +54,7 @@ export function GameMenu({
   onClearWorldTravelRoute,
   onToggle,
   onUnequipEquipment,
+  onUnequipFlask,
   onMovePartyOrder,
 }: {
   activeTab: GameMenuTab | null;
@@ -60,6 +65,7 @@ export function GameMenu({
   isOpen: boolean;
   leaderId: string;
   members: Companion[];
+  currentTime: number;
   quests: GameState["quests"];
   currentMapId?: DebugMapId;
   worldTravelTargetMapId: DebugMapId | null;
@@ -69,11 +75,17 @@ export function GameMenu({
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onAssignFood: (companionId: string, itemId: ItemId | null) => void;
+  onChangeConsumableBehavior: (
+    companionId: string,
+    update: Partial<Companion["consumableBehavior"]>,
+  ) => void;
   onEquipEquipment: (
     companionId: string,
     itemId: ItemId,
     targetSlot: EquipmentSlot,
   ) => void;
+  onEquipFlask: (companionId: string, itemId: ItemId) => void;
   onOpenEquipmentManagement: () => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectManagementSection: (section: PartyManagementSection) => void;
@@ -84,6 +96,7 @@ export function GameMenu({
   onClearWorldTravelRoute: () => void;
   onToggle: () => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onUnequipFlask: (companionId: string) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
   return (
@@ -137,13 +150,17 @@ export function GameMenu({
                   activeSection={activePartySection}
                   inventory={inventory}
                   members={members}
+                  currentTime={currentTime}
                   selectedCompanionId={selectedCompanionId}
                   totalPartyLevel={totalPartyLevel}
                   onAllocateStatPoint={onAllocateStatPoint}
+                  onAssignFood={onAssignFood}
                   onEquipEquipment={onEquipEquipment}
+                  onEquipFlask={onEquipFlask}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectPartySection}
                   onUnequipEquipment={onUnequipEquipment}
+                  onUnequipFlask={onUnequipFlask}
                 />
               ) : activeTab === "partyManagement" ? (
                 <PartyManagementPanel
@@ -153,6 +170,7 @@ export function GameMenu({
                   selectedCompanionId={selectedCompanionId}
                   totalPartyLevel={totalPartyLevel}
                   onChangeLeader={onChangeLeader}
+                  onChangeConsumableBehavior={onChangeConsumableBehavior}
                   onChangeRole={onChangeRole}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectManagementSection}

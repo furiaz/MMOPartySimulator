@@ -2,6 +2,14 @@ import {
   getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
 } from "./equipmentRules";
+import {
+  addEquipmentStatModifiers,
+  addPrimaryStatModifiers,
+} from "./equipmentTypes";
+import {
+  getCompanionConsumablePrimaryStatModifiers,
+  getCompanionConsumableStatModifiers,
+} from "./consumables";
 import type {
   ClassId,
   Companion,
@@ -162,7 +170,11 @@ export function getCompanionActualStats(
     permanentStats,
     equipmentPrimaryStatModifiers,
   );
-  const actualStats = addCompanionPrimaryStats(equipmentStats, temporaryStatModifiers);
+  const consumableStats = addPrimaryStatModifiers(
+    getCompanionConsumablePrimaryStatModifiers(companion),
+    temporaryStatModifiers,
+  );
+  const actualStats = addCompanionPrimaryStats(equipmentStats, consumableStats);
 
   return createCompanionPrimaryStatsFromValues(
     clampActualPrimaryStat(actualStats.strength),
@@ -186,8 +198,10 @@ export function getCompanionDerivedStats(
     options.temporaryStatModifiers,
     options.equipmentPrimaryStatModifiers,
   );
-  const equipmentStatModifiers =
-    options.equipmentStatModifiers ?? getCompanionEquipmentStatModifiers(companion);
+  const equipmentStatModifiers = addEquipmentStatModifiers(
+    options.equipmentStatModifiers ?? getCompanionEquipmentStatModifiers(companion),
+    getCompanionConsumableStatModifiers(companion),
+  );
 
   return {
     attack:

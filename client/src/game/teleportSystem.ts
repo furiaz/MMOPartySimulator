@@ -6,6 +6,7 @@ import {
   moveEntityTo,
 } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { addHubDepartureFoodWarningIfNeeded } from "./consumables";
 import { recordMapReachedForQuests } from "./questSystem";
 import {
   createQuestGuideNpc,
@@ -253,6 +254,10 @@ function completeTeleport(state: GameState): GameState {
 
   const previousMapId = state.currentMapId;
   const previousMap = state.map;
+  const hubDepartureFoodWarning =
+    previousMapId === HUB_MAP_ID && teleport.targetMapId !== HUB_MAP_ID
+      ? addHubDepartureFoodWarningIfNeeded(state, Date.now()).hubDepartureFoodWarning
+      : state.hubDepartureFoodWarning;
   const positionsBeforeTransition = getEntityPositions(state.entities);
   const entities = getMapEntities(state, teleport.targetMapId);
   const targetMap = createDebugMap(teleport.targetMapId);
@@ -261,6 +266,7 @@ function completeTeleport(state: GameState): GameState {
     entities,
     currentMapId: teleport.targetMapId,
     map: targetMap,
+    hubDepartureFoodWarning,
     activeTeleport: null,
     leaderIntent: null,
     interruptedPoiTarget: null,

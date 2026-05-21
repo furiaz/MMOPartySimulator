@@ -18,6 +18,11 @@ import type {
 } from "./types";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { createEmptyCompanionEquipment } from "./equipmentTypes";
+import {
+  createEmptyCompanionConsumableBuffs,
+  createEmptyCompanionConsumables,
+  createDefaultCompanionConsumableBehavior,
+} from "./consumables";
 import { getEnemyArchetype } from "./enemyArchetypes";
 import { getScaledEnemyStats } from "./enemyScaling";
 import {
@@ -160,6 +165,9 @@ export function createCompanion(
     gatherSpeed: STARTING_GATHER_SPEED,
     commandPriority: "autonomous",
     equipment: createEmptyCompanionEquipment(),
+    consumables: createEmptyCompanionConsumables(),
+    consumableBuffs: createEmptyCompanionConsumableBuffs(),
+    consumableBehavior: createDefaultCompanionConsumableBehavior(),
   });
 }
 

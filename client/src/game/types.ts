@@ -270,6 +270,10 @@ export type CompanionDerivedStats = {
 
 export type CompanionEquipment = Record<EquipmentSlot, ItemId | null>;
 
+export type ConsumableKind = "flask" | "food";
+
+export type ConsumableUseSource = "manual" | "ai";
+
 export type JunkItemId =
   | "slime_gel_t1"
   | "slime_core_t1"
@@ -350,7 +354,17 @@ export type EquipmentItemId =
   | "warplate_sabatons"
   | "plain_charm";
 
-export type ItemId = ResourceItemId | JunkItemId | EquipmentItemId;
+export type ConsumableItemId =
+  | "minor_recovery_flask"
+  | "soldiers_recovery_flask"
+  | "hearty_trail_rations"
+  | "skirmisher_rations";
+
+export type ItemId =
+  | ResourceItemId
+  | JunkItemId
+  | EquipmentItemId
+  | ConsumableItemId;
 
 export type ItemRarity =
   | "common"
@@ -373,6 +387,13 @@ export type ItemDefinition = {
   exchangeCategory?: "parts";
   canQuickExchange?: boolean;
   effectId?: string;
+  consumableKind?: ConsumableKind;
+  useDurationMs?: number;
+  cooldownMs?: number;
+  maxCharges?: number;
+  chargeCost?: number;
+  healPercent?: number;
+  buffDurationMs?: number;
   equipmentSlot?: EquipmentSlot;
   equipmentKind?: EquipmentKind;
   equipmentType?: EquipmentType;
@@ -382,6 +403,52 @@ export type ItemDefinition = {
   statModifiers?: EquipmentStatModifiers;
   levelRequirement?: number;
   occupiesBothHands?: boolean;
+};
+
+export type EquippedFlaskState = {
+  itemId: ConsumableItemId;
+  charges: number;
+  lastUsedAt: number | null;
+};
+
+export type CompanionConsumables = {
+  flask: EquippedFlaskState | null;
+  foodItemId: ConsumableItemId | null;
+};
+
+export type ConsumableBuffState = {
+  itemId: ConsumableItemId;
+  kind: ConsumableKind;
+  expiresAt: number;
+  primaryStatModifiers?: CompanionPrimaryStatModifiers;
+  statModifiers?: EquipmentStatModifiers;
+};
+
+export type CompanionConsumableBuffs = {
+  flask: ConsumableBuffState | null;
+  food: ConsumableBuffState | null;
+};
+
+export type CompanionConsumableBehavior = {
+  autoFlaskEnabled: boolean;
+  autoFlaskHpThresholdPercent: number;
+};
+
+export type ConsumableUseState = {
+  companionId: string;
+  itemId: ConsumableItemId;
+  kind: ConsumableKind;
+  source: ConsumableUseSource;
+  startedAt: number;
+  completesAt: number;
+  durationMs: number;
+  healthAtStart: number;
+};
+
+export type HubDepartureFoodWarningState = {
+  companionIds: string[];
+  createdAt: number;
+  expiresAt: number;
 };
 
 export type InventorySlot = {
@@ -414,6 +481,7 @@ export type InventoryMutationSource =
   | "combat_loot"
   | "quest_reward"
   | "merchant"
+  | "consumable"
   | "unknown";
 
 export type CurrencyMutationSource =
@@ -817,7 +885,11 @@ export type DebugTelemetryEventType =
   | "resurrection_channel_started"
   | "resurrection_channel_progressed"
   | "resurrection_channel_canceled"
-  | "companion_resurrected";
+  | "companion_resurrected"
+  | "flask_fountain_refilled"
+  | "flask_recharge_kill_progress"
+  | "flask_charge_gained"
+  | "flask_recharge_noop_capped";
 
 export type ResurrectionCancelReason =
   | "attacked"
@@ -978,6 +1050,13 @@ export type DebugTelemetryEvent = {
   itemId?: ItemId;
   itemDisplayName?: string;
   itemCategory?: ItemCategory;
+  flaskChargesBefore?: number;
+  flaskChargesAfter?: number;
+  flaskMaxCharges?: number;
+  flaskRechargeKillCounter?: number;
+  flaskRechargeKillThreshold?: number;
+  flaskRechargeCountedEnemyDefeatMarker?: number;
+  flaskRechargeSource?: "hub_fountain" | "enemy_kills";
   targetSlot?: EquipmentSlot;
   equipmentType?: EquipmentType;
   enemyType?: EnemyType;
@@ -1204,6 +1283,9 @@ export type Companion = LivingEntity & {
   gatherSpeed: number;
   commandPriority: CommandPriority;
   equipment: CompanionEquipment;
+  consumables: CompanionConsumables;
+  consumableBuffs: CompanionConsumableBuffs;
+  consumableBehavior: CompanionConsumableBehavior;
 };
 
 export type ResourceEntity = BaseEntity & {

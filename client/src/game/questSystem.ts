@@ -76,7 +76,10 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     rewards: {
       crowns: 25,
       characterXp: 8,
-      items: [{ itemId: "wolf_pelt", quantity: 2 }],
+      items: [
+        { itemId: "wolf_pelt", quantity: 2 },
+        { itemId: "minor_recovery_flask", quantity: 1 },
+      ],
       equipment: [{ itemId: "acolyte_hood", quantity: 1 }],
     },
   },

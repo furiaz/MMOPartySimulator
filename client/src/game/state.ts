@@ -24,6 +24,7 @@ import type {
   CombatFeedbackEvent,
   CombatFeedbackType,
   ClassId,
+  ConsumableUseState,
   DebugNavigationReason,
   DebugTelemetryState,
   ActiveTeleport,
@@ -31,6 +32,7 @@ import type {
   GameMap,
   GameEntity,
   Enemy,
+  HubDepartureFoodWarningState,
   LeaderIntent,
   PartyInventory,
   PartyWallet,
@@ -177,6 +179,10 @@ export type GameState = {
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
+  consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
+  hubDepartureFoodWarning?: HubDepartureFoodWarningState | null;
+  flaskRechargeEnemyKillCounter?: number;
+  flaskRechargeCountedEnemyDefeats?: Record<string, number>;
   dropVisualEvents?: DropVisualEvent[];
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
   resurrectionChannelsByHelperId?: Record<string, ResurrectionChannelState>;

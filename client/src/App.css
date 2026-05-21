@@ -118,6 +118,23 @@
   line-height: 1.2;
 }
 
+.hub-food-warning-toast {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  z-index: 14;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 9px 12px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(180, 83, 9, 0.72);
+  background: rgba(255, 247, 237, 0.94);
+  color: #7c2d12;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  pointer-events: none;
+}
+
 .map-debug-toggle-controls {
   z-index: 12;
   top: 8px;
@@ -695,6 +712,14 @@
   gap: 6px;
 }
 
+.merchant-buy-filter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 .merchant-buy-filter-tabs button {
   padding: 7px 8px;
   font-size: 12px;
@@ -704,6 +729,24 @@
   border-color: #7aa6ad;
   background: rgba(58, 90, 96, 0.62);
   color: #ffffff;
+}
+
+.merchant-buy-compatible-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: #d7e7df;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.merchant-buy-compatible-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #7aa6ad;
 }
 
 .merchant-buy-layout {
@@ -1392,6 +1435,38 @@
   flex-wrap: wrap;
 }
 
+.behavior-settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.behavior-toggle-row,
+.behavior-range-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.24);
+  color: #e6f0f2;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.behavior-toggle-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.behavior-range-row {
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 2fr) 64px auto;
+}
+
+.behavior-range-row input[type="number"] {
+  width: 64px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .party-submenu-tabs,
 .class-skill-tabs {
   padding-bottom: 2px;
@@ -1412,6 +1487,21 @@
 
 .party-equipment-section {
   position: relative;
+}
+
+.equipment-consumable-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.equipment-consumable-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.2);
 }
 
 .equipment-slot-picker button {

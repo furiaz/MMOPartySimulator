@@ -1,4 +1,11 @@
 import { updateAttackSystem } from "./attackSystem";
+import {
+  clearExpiredHubDepartureFoodWarning,
+  clearExpiredConsumableBuffs,
+  updateConsumableBehaviorSystem,
+  updateConsumableSystem,
+  updateFlaskRechargeFromEnemyKills,
+} from "./consumables";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
@@ -58,10 +65,15 @@ export function updateGame(
     ),
     timing.nowMs,
   );
+  nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
+  nextState = clearExpiredHubDepartureFoodWarning(nextState, timing.nowMs);
   const movedEntityIds = new Set<string>();
   const mapIdBeforeTeleport = nextState.currentMapId;
   const wasTeleportActive = Boolean(nextState.activeTeleport);
 
+  nextState = syncPartyDerivedMaxHealth(nextState);
+  nextState = updateConsumableBehaviorSystem(nextState, timing.nowMs);
+  nextState = updateConsumableSystem(nextState, timing.nowMs);
   nextState = syncPartyDerivedMaxHealth(nextState);
 
   const mapIdBeforeWipeRecovery = nextState.currentMapId;
@@ -130,6 +142,7 @@ export function updateGame(
   nextState = updateQuestGuideSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState, timing);
   nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = updateFlaskRechargeFromEnemyKills(nextState, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateTargetDummyHealthRegen(nextState, timing.nowMs);

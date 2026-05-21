@@ -68,6 +68,7 @@ const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png`;
 const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
 const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
 const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
+const prototypeTeleporterSpriteYOffsetPx = 30;
 const skillFeedbackDisplayNames = new Set(
   Object.values(SKILL_DEFINITIONS).map((skill) => skill.displayName),
 );
@@ -2063,11 +2064,15 @@ function drawFullMapObjects({
 
   for (const teleport of map.teleports) {
     const teleportPosition = toFullPosition(teleport.position, transform);
+    const teleporterSpritePosition = {
+      x: teleportPosition.x,
+      y: teleportPosition.y + prototypeTeleporterSpriteYOffsetPx,
+    };
     const didDraw = drawImageSprite({
       cache,
       height: objectSize,
       layer,
-      position: teleportPosition,
+      position: teleporterSpritePosition,
       requestRedraw,
       src: MAP_OBJECT_ICON_SRC.teleportPoint,
       width: objectSize,

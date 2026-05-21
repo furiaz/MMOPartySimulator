@@ -37,6 +37,7 @@ import {
   createTargetDummy,
   clearDebugTelemetry,
   debugAddCompanionToParty,
+  debugAddPrototypeConsumablesToInventory,
   debugKillOneCompanion,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
@@ -45,13 +46,17 @@ import {
   debugToggleSuperExp,
   debugToggleSuperSpeed,
   enemyIds,
+  assignFoodToCompanion,
   equipItemToCompanion,
+  equipFlaskToCompanion,
   exportDebugTelemetryReport,
   formatCurrencyDisplay,
   getAvailableInventorySlots,
   getCurrencyBalance,
+  getFilteredMerchantBuyStock,
   getItemDefinition,
   getMerchantBuyStock,
+  getMerchantSecondaryFilterOptions,
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
@@ -78,14 +83,18 @@ import {
   setPartyOrder,
   setPoiSearchScope,
   setWorldTravelTargetMapId,
+  startPartyConsumableUse,
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
   targetDummyId,
   targetDummyPosition,
   unequipItemFromCompanion,
+  unequipFlaskFromCompanion,
   updateEntity,
+  updateCompanionConsumableBehavior,
   type Companion,
+  type ConsumableBehaviorUpdate,
   type DebugMapId,
   type Enemy,
   type EquipmentSlot,
@@ -150,6 +159,8 @@ type MerchantBuyFilter = "all" | MerchantStockGroup;
 
 const merchantBuyFilterLabels: Record<MerchantBuyFilter, string> = {
   all: "All",
+  flasks: "Flasks",
+  food: "Food",
   weapons: "Weapons",
   offhands: "Offhands",
   cloth: "Cloth",
@@ -161,6 +172,8 @@ const merchantBuyFilterLabels: Record<MerchantBuyFilter, string> = {
 
 const merchantBuyFilters: MerchantBuyFilter[] = [
   "all",
+  "flasks",
+  "food",
   "weapons",
   "offhands",
   "cloth",
@@ -810,12 +823,19 @@ function MerchantBuyPanel({
   onBuy: (itemId: ItemId) => void;
 }) {
   const [activeFilter, setActiveFilter] = useState<MerchantBuyFilter>("all");
+  const [activeSecondaryFilter, setActiveSecondaryFilter] = useState<string | null>(null);
+  const [partyCompatibleOnly, setPartyCompatibleOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<ItemId | null>(null);
   const stock = getMerchantBuyStock(state, merchantNpcId);
-  const filteredStock =
+  const secondaryFilterOptions =
     activeFilter === "all"
-      ? stock
-      : stock.filter((entry) => entry.group === activeFilter);
+      ? []
+      : getMerchantSecondaryFilterOptions(stock, activeFilter);
+  const filteredStock = getFilteredMerchantBuyStock(state, merchantNpcId, {
+    mainFilter: activeFilter,
+    secondaryFilter: activeSecondaryFilter,
+    partyCompatibleOnly,
+  });
   const selectedEntry =
     filteredStock.find((entry) => entry.itemId === selectedItemId) ??
     filteredStock[0] ??
@@ -828,6 +848,15 @@ function MerchantBuyPanel({
   const selectedBlockReason = selectedEntry
     ? getMerchantBuyBlockReason(selectedEntry, state)
     : "No item selected";
+
+  useEffect(() => {
+    if (
+      activeSecondaryFilter &&
+      !secondaryFilterOptions.some((option) => option.id === activeSecondaryFilter)
+    ) {
+      setActiveSecondaryFilter(null);
+    }
+  }, [activeSecondaryFilter, secondaryFilterOptions]);
 
   return (
     <aside className="merchant-detail-panel merchant-buy-panel" aria-label="Merchant buy">
@@ -845,13 +874,54 @@ function MerchantBuyPanel({
           <button
             key={filter}
             className={activeFilter === filter ? "active" : ""}
-            onClick={() => setActiveFilter(filter)}
+            onClick={() => {
+              setActiveFilter(filter);
+              setActiveSecondaryFilter(null);
+              setSelectedItemId(null);
+            }}
             type="button"
           >
             {merchantBuyFilterLabels[filter]}
           </button>
         ))}
       </nav>
+      <div className="merchant-buy-filter-controls">
+        {secondaryFilterOptions.length > 0 ? (
+          <nav className="merchant-buy-filter-tabs" aria-label="Merchant stock subtype filters">
+            <button
+              className={activeSecondaryFilter === null ? "active" : ""}
+              onClick={() => setActiveSecondaryFilter(null)}
+              type="button"
+            >
+              All
+            </button>
+            {secondaryFilterOptions.map((filter) => (
+              <button
+                key={filter.id}
+                className={activeSecondaryFilter === filter.id ? "active" : ""}
+                onClick={() => {
+                  setActiveSecondaryFilter(filter.id);
+                  setSelectedItemId(null);
+                }}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
+        <label className="merchant-buy-compatible-toggle">
+          <input
+            checked={partyCompatibleOnly}
+            onChange={(event) => {
+              setPartyCompatibleOnly(event.currentTarget.checked);
+              setSelectedItemId(null);
+            }}
+            type="checkbox"
+          />
+          Party compatible
+        </label>
+      </div>
       <div className="merchant-buy-layout">
         <div className="merchant-stock-list" aria-label="Merchant stock">
           {filteredStock.length > 0 ? (
@@ -943,11 +1013,31 @@ function getMerchantBuyBlockReason(
     return "Not enough Crowns";
   }
 
-  if (getAvailableInventorySlots(state.inventory) < 1) {
+  const itemDefinition = getItemDefinition(entry.itemId);
+
+  if (!itemDefinition || !canInventoryAcceptMerchantItem(state, itemDefinition)) {
     return "Inventory Full";
   }
 
   return null;
+}
+
+function canInventoryAcceptMerchantItem(
+  state: GameState,
+  itemDefinition: ItemDefinition,
+): boolean {
+  if (
+    itemDefinition.stackable &&
+    state.inventory.slots.some(
+      (slot) =>
+        slot.itemId === itemDefinition.id &&
+        slot.quantity < itemDefinition.maxStack,
+    )
+  ) {
+    return true;
+  }
+
+  return getAvailableInventorySlots(state.inventory) > 0;
 }
 
 function getMerchantItemTagText(itemDefinition: ItemDefinition): string {
@@ -966,6 +1056,14 @@ function getMerchantItemTagText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantSlotText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.consumableKind === "flask") {
+    return "Flask Slot";
+  }
+
+  if (itemDefinition.consumableKind === "food") {
+    return "Food Assignment";
+  }
+
   if (itemDefinition.equipmentKind === "accessory") {
     return "Accessory";
   }
@@ -976,6 +1074,14 @@ function getMerchantSlotText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantTypeText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.consumableKind === "flask") {
+    return "Flask";
+  }
+
+  if (itemDefinition.consumableKind === "food") {
+    return "Food";
+  }
+
   return itemDefinition.equipmentType
     ? EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]
     : "Equipment";
@@ -996,6 +1102,14 @@ function getMerchantRequirementText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantModifierText(itemDefinition: ItemDefinition): string {
+  const consumableEffects = [
+    itemDefinition.healPercent
+      ? `Heals ${Math.round(itemDefinition.healPercent * 100)}% max HP`
+      : null,
+    itemDefinition.maxCharges
+      ? `${itemDefinition.maxCharges} max charges`
+      : null,
+  ].filter(Boolean);
   const primaryStats = Object.entries(itemDefinition.primaryStatModifiers ?? {})
     .filter(([, value]) => value !== undefined && value !== 0)
     .map(
@@ -1010,7 +1124,7 @@ function getMerchantModifierText(itemDefinition: ItemDefinition): string {
       ([stat, value]) =>
         `${formatMerchantStatName(stat)} ${formatMerchantModifier(value)}`,
     );
-  const stats = [...primaryStats, ...derivedStats];
+  const stats = [...consumableEffects, ...primaryStats, ...derivedStats];
 
   return stats.length > 0 ? stats.join(", ") : "No stat modifiers";
 }
@@ -1116,6 +1230,11 @@ function App() {
     gameState.worldWipeRecovery.expiresAt > currentTime
       ? gameState.worldWipeRecovery
       : null;
+  const hubDepartureFoodWarning =
+    gameState.hubDepartureFoodWarning &&
+    gameState.hubDepartureFoodWarning.expiresAt > currentTime
+      ? gameState.hubDepartureFoodWarning
+      : null;
 
   useEffect(() => {
     const previousCrownBalance = previousCrownBalanceRef.current;
@@ -1204,6 +1323,41 @@ function App() {
         return positionsById;
       }, {});
   }, [enemies, partyMembers]);
+
+  useEffect(() => {
+    function handleConsumableShortcut(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase();
+
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      if (event.key !== "1" && event.key !== "2") {
+        return;
+      }
+
+      event.preventDefault();
+      setGameState((state) =>
+        startPartyConsumableUse(
+          state,
+          event.key === "1" ? "flask" : "food",
+          Date.now(),
+        ),
+      );
+    }
+
+    window.addEventListener("keydown", handleConsumableShortcut);
+
+    return () => {
+      window.removeEventListener("keydown", handleConsumableShortcut);
+    };
+  }, []);
 
   function toggleSimulationLoop() {
     if (stopLoopRef.current) {
@@ -1360,6 +1514,10 @@ function App() {
     setGameState(debugRestorePartyHealth);
   }
 
+  function addPrototypeConsumables() {
+    setGameState(debugAddPrototypeConsumablesToInventory);
+  }
+
   function killOneCompanion() {
     setGameState(debugKillOneCompanion);
   }
@@ -1380,6 +1538,33 @@ function App() {
   ) {
     setGameState((state) =>
       unequipItemFromCompanion(state, companionId, targetSlot).state,
+    );
+  }
+
+  function equipFlask(companionId: string, itemId: ItemId) {
+    setGameState((state) =>
+      equipFlaskToCompanion(state, companionId, itemId).state,
+    );
+  }
+
+  function unequipFlask(companionId: string) {
+    setGameState((state) =>
+      unequipFlaskFromCompanion(state, companionId).state,
+    );
+  }
+
+  function assignFood(companionId: string, itemId: ItemId | null) {
+    setGameState((state) =>
+      assignFoodToCompanion(state, companionId, itemId).state,
+    );
+  }
+
+  function changeConsumableBehavior(
+    companionId: string,
+    update: ConsumableBehaviorUpdate,
+  ) {
+    setGameState((state) =>
+      updateCompanionConsumableBehavior(state, companionId, update),
     );
   }
 
@@ -1972,6 +2157,7 @@ function App() {
           isOpen={isGameMenuOpen}
           leaderId={gameState.partyLeaderId}
           members={partyMembers}
+          currentTime={currentTime}
           quests={gameState.quests}
           currentMapId={gameState.currentMapId}
           worldTravelTargetMapId={gameState.worldTravelTargetMapId}
@@ -1981,7 +2167,10 @@ function App() {
           onAllocateStatPoint={allocateStatPoint}
           onChangeLeader={changePartyLeader}
           onChangeRole={changePartyMemberRole}
+          onAssignFood={assignFood}
+          onChangeConsumableBehavior={changeConsumableBehavior}
           onEquipEquipment={equipEquipment}
+          onEquipFlask={equipFlask}
           onOpenEquipmentManagement={openEquipmentManagementFromInventory}
           onSelectCompanion={setSelectedCompanionId}
           onSelectManagementSection={setActivePartyManagementSection}
@@ -1992,10 +2181,18 @@ function App() {
           onClearWorldTravelRoute={clearWorldTravelRoute}
           onToggle={toggleGameMenu}
           onUnequipEquipment={unequipEquipment}
+          onUnequipFlask={unequipFlask}
           onMovePartyOrder={movePartyMemberOrder}
         />
         <CompanionVitalsPanel members={partyMembers} />
         <QuestTrackerPanel quest={displayQuest} />
+        {hubDepartureFoodWarning ? (
+          <div className="hub-food-warning-toast" role="status">
+            Food buffs missing for {hubDepartureFoodWarning.companionIds.length}{" "}
+            companion
+            {hubDepartureFoodWarning.companionIds.length === 1 ? "" : "s"}
+          </div>
+        ) : null}
 
         <div
           className={`test-controls${
@@ -2037,6 +2234,9 @@ function App() {
                 </button>
                 <button onClick={resurrectEnemy}>Resurrect Enemy</button>
                 <button onClick={restorePartyHealth}>Restore Party HP</button>
+                <button onClick={addPrototypeConsumables}>
+                  Add Prototype Consumables
+                </button>
                 <button onClick={killOneCompanion}>Kill One Companion</button>
                 <button onClick={refreshGatherPoints}>
                   Refresh Gather Points

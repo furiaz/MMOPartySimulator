@@ -1,4 +1,5 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
+import { PROTOTYPE_CONSUMABLE_ITEM_IDS } from "./consumables";
 import { syncCompanionDerivedMaxHealth } from "./stats";
 import { addItemToInventoryState } from "./inventory";
 import {
@@ -293,6 +294,19 @@ export function debugAddPrototypeEquipmentToInventory(state: GameState): GameSta
         nextState,
         itemId,
         DEBUG_TEST_ITEM_QUANTITY,
+        "debug",
+      ).state,
+    state,
+  );
+}
+
+export function debugAddPrototypeConsumablesToInventory(state: GameState): GameState {
+  return PROTOTYPE_CONSUMABLE_ITEM_IDS.reduce(
+    (nextState, itemId) =>
+      addItemToInventoryState(
+        nextState,
+        itemId,
+        itemId.endsWith("_rations") ? 5 : 1,
         "debug",
       ).state,
     state,

@@ -10,12 +10,15 @@ import {
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
+  getConsumableCooldownRemainingMs,
   getCharacterXpProgress,
   getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
   getCompanionActualStats,
   getCompanionDerivedStats,
   getItemDefinition,
+  isFlaskItemDefinition,
+  isFoodItemDefinition,
   getPartySizeUnlockRequirement,
   getSkillRoleScore,
   getSkillsForClass,
@@ -145,28 +148,36 @@ export function PartyMenuPanel({
   activeSection,
   inventory,
   members,
+  currentTime,
   selectedCompanionId,
   totalPartyLevel,
   onAllocateStatPoint,
+  onAssignFood,
   onEquipEquipment,
+  onEquipFlask,
   onSelectCompanion,
   onSelectSection,
   onUnequipEquipment,
+  onUnequipFlask,
 }: {
   activeSection: PartyMenuSection;
   inventory: PartyInventory;
   members: Companion[];
+  currentTime: number;
   selectedCompanionId: string | null;
   totalPartyLevel: number;
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
+  onAssignFood: (companionId: string, itemId: ItemId | null) => void;
   onEquipEquipment: (
     companionId: string,
     itemId: ItemId,
     targetSlot: EquipmentSlot,
   ) => void;
+  onEquipFlask: (companionId: string, itemId: ItemId) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectSection: (section: PartyMenuSection) => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onUnequipFlask: (companionId: string) => void;
 }) {
   const orderedMembers = getOrderedMenuMembers(members);
   const selectedMember =
@@ -199,11 +210,15 @@ export function PartyMenuPanel({
         {selectedMember ? (
           <PartyMenuSectionPanel
             activeSection={activeSection}
+            currentTime={currentTime}
             inventory={inventory}
             member={selectedMember}
             onAllocateStatPoint={onAllocateStatPoint}
+            onAssignFood={onAssignFood}
             onEquipEquipment={onEquipEquipment}
+            onEquipFlask={onEquipFlask}
             onUnequipEquipment={onUnequipEquipment}
+            onUnequipFlask={onUnequipFlask}
           />
         ) : (
           <span className="party-menu-empty">Select a companion</span>
@@ -215,13 +230,18 @@ export function PartyMenuPanel({
 
 function PartyMenuSectionPanel({
   activeSection,
+  currentTime,
   inventory,
   member,
   onEquipEquipment,
   onAllocateStatPoint,
+  onAssignFood,
+  onEquipFlask,
   onUnequipEquipment,
+  onUnequipFlask,
 }: {
   activeSection: PartyMenuSection;
+  currentTime: number;
   inventory: PartyInventory;
   member: Companion;
   onEquipEquipment: (
@@ -230,7 +250,10 @@ function PartyMenuSectionPanel({
     targetSlot: EquipmentSlot,
   ) => void;
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
+  onAssignFood: (companionId: string, itemId: ItemId | null) => void;
+  onEquipFlask: (companionId: string, itemId: ItemId) => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onUnequipFlask: (companionId: string) => void;
 }) {
   if (activeSection === "stats") {
     return (
@@ -244,10 +267,14 @@ function PartyMenuSectionPanel({
   if (activeSection === "equipment") {
     return (
       <PartyEquipmentSection
+        currentTime={currentTime}
         inventory={inventory}
         member={member}
+        onAssignFood={onAssignFood}
         onEquipEquipment={onEquipEquipment}
+        onEquipFlask={onEquipFlask}
         onUnequipEquipment={onUnequipEquipment}
+        onUnequipFlask={onUnequipFlask}
       />
     );
   }
@@ -482,6 +509,7 @@ export function PartyManagementPanel({
   selectedCompanionId,
   totalPartyLevel,
   onChangeLeader,
+  onChangeConsumableBehavior,
   onChangeRole,
   onSelectCompanion,
   onSelectSection,
@@ -493,6 +521,10 @@ export function PartyManagementPanel({
   selectedCompanionId: string | null;
   totalPartyLevel: number;
   onChangeLeader: (companionId: string) => void;
+  onChangeConsumableBehavior: (
+    companionId: string,
+    update: Partial<Companion["consumableBehavior"]>,
+  ) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectSection: (section: PartyManagementSection) => void;
@@ -536,6 +568,7 @@ export function PartyManagementPanel({
             member={selectedMember}
             members={orderedMembers}
             onChangeLeader={onChangeLeader}
+            onChangeConsumableBehavior={onChangeConsumableBehavior}
             onChangeRole={onChangeRole}
             onMovePartyOrder={onMovePartyOrder}
           />
@@ -589,6 +622,7 @@ function PartyManagementSectionPanel({
   member,
   members,
   onChangeLeader,
+  onChangeConsumableBehavior,
   onChangeRole,
   onMovePartyOrder,
 }: {
@@ -597,6 +631,10 @@ function PartyManagementSectionPanel({
   member: Companion;
   members: Companion[];
   onChangeLeader: (companionId: string) => void;
+  onChangeConsumableBehavior: (
+    companionId: string,
+    update: Partial<Companion["consumableBehavior"]>,
+  ) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
@@ -616,6 +654,15 @@ function PartyManagementSectionPanel({
     );
   }
 
+  if (activeSection === "behaviorSettings") {
+    return (
+      <BehaviorSettingsSection
+        member={member}
+        onChangeConsumableBehavior={onChangeConsumableBehavior}
+      />
+    );
+  }
+
   return (
     <PlaceholderSection title={partyManagementSectionLabels[activeSection]}>
       {partyManagementSectionLabels[activeSection]} is a future-facing
@@ -625,19 +672,27 @@ function PartyManagementSectionPanel({
 }
 
 function PartyEquipmentSection({
+  currentTime,
   inventory,
   member,
+  onAssignFood,
   onEquipEquipment,
+  onEquipFlask,
   onUnequipEquipment,
+  onUnequipFlask,
 }: {
+  currentTime: number;
   inventory: PartyInventory;
   member: Companion;
+  onAssignFood: (companionId: string, itemId: ItemId | null) => void;
   onEquipEquipment: (
     companionId: string,
     itemId: ItemId,
     targetSlot: EquipmentSlot,
   ) => void;
+  onEquipFlask: (companionId: string, itemId: ItemId) => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
+  onUnequipFlask: (companionId: string) => void;
 }) {
   const [selectedEquipmentSlot, setSelectedEquipmentSlot] =
     useState<EquipmentSlot | null>(null);
@@ -655,6 +710,30 @@ function PartyEquipmentSection({
   const selectedItemDefinition = selectedItemId
     ? getItemDefinition(selectedItemId)
     : null;
+  const flaskInventorySlots = getGroupedConsumableInventorySlots(
+    inventory,
+    isFlaskItemDefinition,
+  );
+  const foodInventorySlots = getGroupedConsumableInventorySlots(
+    inventory,
+    isFoodItemDefinition,
+  );
+  const equippedFlask = member.consumables.flask;
+  const equippedFlaskDefinition = equippedFlask
+    ? getItemDefinition(equippedFlask.itemId)
+    : null;
+  const assignedFoodDefinition = member.consumables.foodItemId
+    ? getItemDefinition(member.consumables.foodItemId)
+    : null;
+  const assignedFoodCount = member.consumables.foodItemId
+    ? inventory.slots
+        .filter((slot) => slot.itemId === member.consumables.foodItemId)
+        .reduce((total, slot) => total + slot.quantity, 0)
+    : 0;
+  const cooldownRemainingMs = getConsumableCooldownRemainingMs(
+    member,
+    currentTime,
+  );
 
   return (
     <section className="management-section-card party-equipment-section" aria-label="Equipment">
@@ -688,6 +767,126 @@ function PartyEquipmentSection({
             </button>
           );
         })}
+      </div>
+      <div className="equipment-consumable-grid">
+        <div className="equipment-consumable-card">
+          <span className="equipment-section-label">Flask Slot</span>
+          {equippedFlask ? (
+            <span className="equipment-inventory-item-name">
+              {INVENTORY_ITEM_ICON_SRC[equippedFlask.itemId] ? (
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="equipment-inventory-item-icon"
+                  src={INVENTORY_ITEM_ICON_SRC[equippedFlask.itemId]}
+                />
+              ) : null}
+              <strong>{equippedFlaskDefinition?.displayName ?? "None"}</strong>
+            </span>
+          ) : (
+            <strong>None</strong>
+          )}
+          <span>
+            {equippedFlask && equippedFlaskDefinition
+              ? `${equippedFlask.charges}/${equippedFlaskDefinition.maxCharges ?? 0} charges | ${cooldownRemainingMs > 0 ? `${Math.ceil(cooldownRemainingMs / 1000)}s cooldown` : "Ready"}`
+              : "No flask equipped"}
+          </span>
+          <div className="equipment-inventory-list">
+            {flaskInventorySlots.length > 0 ? (
+              flaskInventorySlots.map((slot) => {
+                const itemDefinition = getItemDefinition(slot.itemId);
+
+                return (
+                  <div
+                    className="equipment-inventory-row"
+                    key={`flask-${slot.itemId}`}
+                  >
+                    <span className="equipment-inventory-item-name">
+                      {INVENTORY_ITEM_ICON_SRC[slot.itemId] ? (
+                        <img
+                          alt=""
+                          aria-hidden="true"
+                          className="equipment-inventory-item-icon"
+                          src={INVENTORY_ITEM_ICON_SRC[slot.itemId]}
+                        />
+                      ) : null}
+                      <span>{itemDefinition.displayName} x{slot.quantity}</span>
+                    </span>
+                    <span>{getConsumableMetadataText(itemDefinition)}</span>
+                    <button
+                      onClick={() => onEquipFlask(member.id, slot.itemId)}
+                      type="button"
+                    >
+                      Equip Flask
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <span className="party-menu-empty">No flasks in inventory</span>
+            )}
+          </div>
+          {equippedFlask ? (
+            <button onClick={() => onUnequipFlask(member.id)} type="button">
+              Unequip Flask
+            </button>
+          ) : null}
+        </div>
+        <div className="equipment-consumable-card">
+          <span className="equipment-section-label">Food Assignment</span>
+          <strong>{assignedFoodDefinition?.displayName ?? "None"}</strong>
+          <span>
+            {assignedFoodDefinition
+              ? `${assignedFoodCount} available | ${getActiveFoodBuffText(member, currentTime)}`
+              : "No food assigned"}
+          </span>
+          <div className="equipment-inventory-list">
+            {foodInventorySlots.length > 0 ? (
+              foodInventorySlots.map((slot) => {
+                const itemDefinition = getItemDefinition(slot.itemId);
+                const levelRequirementMet =
+                  !itemDefinition.levelRequirement ||
+                  member.characterLevel >= itemDefinition.levelRequirement;
+
+                return (
+                  <div
+                    className="equipment-inventory-row"
+                    key={`food-${slot.itemId}`}
+                  >
+                    <span className="equipment-inventory-item-name">
+                      {INVENTORY_ITEM_ICON_SRC[slot.itemId] ? (
+                        <img
+                          alt=""
+                          aria-hidden="true"
+                          className="equipment-inventory-item-icon"
+                          src={INVENTORY_ITEM_ICON_SRC[slot.itemId]}
+                        />
+                      ) : null}
+                      <span>{itemDefinition.displayName} x{slot.quantity}</span>
+                    </span>
+                    <span>{getConsumableMetadataText(itemDefinition)}</span>
+                    <button
+                      disabled={!levelRequirementMet}
+                      onClick={() => onAssignFood(member.id, slot.itemId)}
+                      type="button"
+                    >
+                      {levelRequirementMet
+                        ? "Assign Food"
+                        : `Requires Level ${itemDefinition.levelRequirement}`}
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <span className="party-menu-empty">No food in inventory</span>
+            )}
+          </div>
+          {assignedFoodDefinition ? (
+            <button onClick={() => onAssignFood(member.id, null)} type="button">
+              Clear Food
+            </button>
+          ) : null}
+        </div>
       </div>
       <StatModifierSummary
         primaryStatModifiers={primaryStatModifiers}
@@ -876,6 +1075,63 @@ function getItemModifierText(itemDefinition: ItemDefinition): string {
   return stats.length > 0 ? stats.join(", ") : "Stats none";
 }
 
+function getConsumableMetadataText(itemDefinition: ItemDefinition): string {
+  const parts = [
+    itemDefinition.levelRequirement
+      ? `Level ${itemDefinition.levelRequirement}+`
+      : null,
+    itemDefinition.useDurationMs
+      ? `${itemDefinition.useDurationMs / 1000}s use`
+      : null,
+    itemDefinition.cooldownMs
+      ? `${itemDefinition.cooldownMs / 1000}s cooldown`
+      : null,
+    itemDefinition.healPercent
+      ? `Heals ${Math.round(itemDefinition.healPercent * 100)}%`
+      : null,
+    getItemModifierText(itemDefinition) !== "Stats none"
+      ? getItemModifierText(itemDefinition)
+      : null,
+  ];
+
+  return parts.filter(Boolean).join(" | ");
+}
+
+function getGroupedConsumableInventorySlots(
+  inventory: PartyInventory,
+  predicate: (itemDefinition: ItemDefinition) => boolean,
+): { itemId: ItemId; quantity: number }[] {
+  const quantityByItemId = new Map<ItemId, number>();
+
+  for (const slot of inventory.slots) {
+    const itemDefinition = getItemDefinition(slot.itemId);
+
+    if (!predicate(itemDefinition)) {
+      continue;
+    }
+
+    quantityByItemId.set(
+      slot.itemId,
+      (quantityByItemId.get(slot.itemId) ?? 0) + slot.quantity,
+    );
+  }
+
+  return [...quantityByItemId.entries()].map(([itemId, quantity]) => ({
+    itemId,
+    quantity,
+  }));
+}
+
+function getActiveFoodBuffText(member: Companion, currentTime: number): string {
+  const foodBuff = member.consumableBuffs.food;
+
+  if (!foodBuff || foodBuff.expiresAt <= currentTime) {
+    return "No active food buff";
+  }
+
+  return `${Math.ceil((foodBuff.expiresAt - currentTime) / 1000)}s food buff`;
+}
+
 function getTargetSlotsForItem(itemDefinition: ItemDefinition): EquipmentSlot[] {
   if (itemDefinition.equipmentKind === "accessory") {
     return ["accessory1", "accessory2"];
@@ -952,6 +1208,65 @@ function RoleSelectSection({
             {partyMemberRoleLabels[role]}
           </button>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function BehaviorSettingsSection({
+  member,
+  onChangeConsumableBehavior,
+}: {
+  member: Companion;
+  onChangeConsumableBehavior: (
+    companionId: string,
+    update: Partial<Companion["consumableBehavior"]>,
+  ) => void;
+}) {
+  const threshold = member.consumableBehavior.autoFlaskHpThresholdPercent;
+
+  return (
+    <section className="management-section-card" aria-label="Behavior Settings">
+      <h3>Behavior Settings</h3>
+      <div className="behavior-settings-list">
+        <label className="behavior-toggle-row">
+          <input
+            checked={member.consumableBehavior.autoFlaskEnabled}
+            onChange={(event) =>
+              onChangeConsumableBehavior(member.id, {
+                autoFlaskEnabled: event.target.checked,
+              })
+            }
+            type="checkbox"
+          />
+          <span>Auto-use Flask</span>
+        </label>
+        <label className="behavior-range-row">
+          <span>Flask HP Threshold</span>
+          <input
+            max={100}
+            min={1}
+            onChange={(event) =>
+              onChangeConsumableBehavior(member.id, {
+                autoFlaskHpThresholdPercent: Number(event.target.value),
+              })
+            }
+            type="range"
+            value={threshold}
+          />
+          <input
+            max={100}
+            min={1}
+            onChange={(event) =>
+              onChangeConsumableBehavior(member.id, {
+                autoFlaskHpThresholdPercent: Number(event.target.value),
+              })
+            }
+            type="number"
+            value={threshold}
+          />
+          <strong>{threshold}%</strong>
+        </label>
       </div>
     </section>
   );

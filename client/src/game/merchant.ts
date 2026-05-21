@@ -7,6 +7,8 @@ import {
 } from "./inventory";
 import { getItemDefinition, ITEM_DEFINITIONS } from "./items";
 import type { GameState } from "./state";
+import { EQUIPMENT_SLOT_LABELS, EQUIPMENT_TYPE_LABELS } from "./equipmentTypes";
+import { isClassAllowedForEquipment } from "./equipmentRules";
 import {
   addCurrencyToWalletState,
   canAfford,
@@ -15,15 +17,19 @@ import {
 } from "./wallet";
 import type {
   DebugTelemetryEventType,
+  EquipmentSlot,
   InventoryRemoveResult,
   ItemDefinition,
   ItemId,
+  Companion,
   NpcEntity,
 } from "./types";
 
 export type MerchantMenuSelection = "buy" | "sell" | "quick_exchange_parts" | "leave";
 
 export type MerchantStockGroup =
+  | "flasks"
+  | "food"
   | "weapons"
   | "offhands"
   | "cloth"
@@ -36,6 +42,19 @@ export type MerchantStockEntry = {
   itemId: ItemId;
   priceCrowns: number;
   group: MerchantStockGroup;
+};
+
+export type MerchantBuyFilter = "all" | MerchantStockGroup;
+
+export type MerchantStockFilterOptions = {
+  mainFilter?: MerchantBuyFilter;
+  secondaryFilter?: string | null;
+  partyCompatibleOnly?: boolean;
+};
+
+export type MerchantSecondaryFilterOption = {
+  id: string;
+  label: string;
 };
 
 export type QuickExchangeItem = {
@@ -117,6 +136,10 @@ type QuickExchangeOptions = {
 };
 
 const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
+  { itemId: "minor_recovery_flask", priceCrowns: 30, group: "flasks" },
+  { itemId: "soldiers_recovery_flask", priceCrowns: 45, group: "flasks" },
+  { itemId: "hearty_trail_rations", priceCrowns: 15, group: "food" },
+  { itemId: "skirmisher_rations", priceCrowns: 15, group: "food" },
   { itemId: "training_sword", priceCrowns: 12, group: "weapons" },
   { itemId: "iron_sword", priceCrowns: 60, group: "weapons" },
   { itemId: "guard_mace", priceCrowns: 60, group: "weapons" },
@@ -189,6 +212,85 @@ export function getMerchantBuyStock(
   return isMerchantNpc(merchant) ? DEFAULT_MERCHANT_BUY_STOCK : [];
 }
 
+export function getFilteredMerchantBuyStock(
+  state: GameState,
+  merchantNpcId: string,
+  filters: MerchantStockFilterOptions = {},
+): MerchantStockEntry[] {
+  return getMerchantBuyStock(state, merchantNpcId).filter((entry) => {
+    const itemDefinition = getItemDefinition(entry.itemId);
+
+    if (!itemDefinition) {
+      return false;
+    }
+
+    if (filters.mainFilter && filters.mainFilter !== "all" && entry.group !== filters.mainFilter) {
+      return false;
+    }
+
+    if (
+      filters.secondaryFilter &&
+      !doesMerchantSecondaryFilterMatch(entry, itemDefinition, filters.secondaryFilter)
+    ) {
+      return false;
+    }
+
+    return !filters.partyCompatibleOnly ||
+      isMerchantStockEntryCompatibleWithParty(state, entry);
+  });
+}
+
+export function getMerchantSecondaryFilterOptions(
+  stock: MerchantStockEntry[],
+  group: MerchantStockGroup,
+): MerchantSecondaryFilterOption[] {
+  const optionsById = new Map<string, MerchantSecondaryFilterOption>();
+
+  for (const entry of stock) {
+    if (entry.group !== group) {
+      continue;
+    }
+
+    const itemDefinition = getItemDefinition(entry.itemId);
+    const option = itemDefinition
+      ? getMerchantSecondaryFilterOption(entry, itemDefinition)
+      : null;
+
+    if (option) {
+      optionsById.set(option.id, option);
+    }
+  }
+
+  return [...optionsById.values()].sort((first, second) =>
+    first.label.localeCompare(second.label),
+  );
+}
+
+export function isMerchantStockEntryCompatibleWithParty(
+  state: GameState,
+  entry: MerchantStockEntry,
+): boolean {
+  const itemDefinition = getItemDefinition(entry.itemId);
+
+  if (!itemDefinition) {
+    return false;
+  }
+
+  if (itemDefinition.category === "consumable") {
+    return true;
+  }
+
+  if (itemDefinition.category !== "equipment") {
+    return false;
+  }
+
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.kind === "companion" &&
+      isMerchantEquipmentCompatibleWithCompanion(entity, itemDefinition),
+  );
+}
+
 export function buyMerchantItem(
   state: GameState,
   merchantNpcId: string,
@@ -223,7 +325,10 @@ export function buyMerchantItem(
 
   const itemDefinition = getItemDefinition(stockEntry.itemId);
 
-  if (!itemDefinition || itemDefinition.category !== "equipment") {
+  if (
+    !itemDefinition ||
+    (itemDefinition.category !== "equipment" && itemDefinition.category !== "consumable")
+  ) {
     return createMerchantBuyFailure(
       state,
       merchantNpcId,
@@ -272,7 +377,7 @@ export function buyMerchantItem(
     );
   }
 
-  if (getAvailableInventorySlots(nextState.inventory) < 1) {
+  if (!canInventoryAcceptMerchantPurchase(nextState, itemDefinition)) {
     return createMerchantBuyFailure(
       nextState,
       merchantNpcId,
@@ -376,6 +481,98 @@ export function buyMerchantItem(
       newCrowns: currencyResult.result.newBalance,
     },
   };
+}
+
+function canInventoryAcceptMerchantPurchase(
+  state: GameState,
+  itemDefinition: ItemDefinition,
+): boolean {
+  if (
+    itemDefinition.stackable &&
+    state.inventory.slots.some(
+      (slot) =>
+        slot.itemId === itemDefinition.id &&
+        slot.quantity < itemDefinition.maxStack,
+    )
+  ) {
+    return true;
+  }
+
+  return getAvailableInventorySlots(state.inventory) > 0;
+}
+
+function doesMerchantSecondaryFilterMatch(
+  entry: MerchantStockEntry,
+  itemDefinition: ItemDefinition,
+  secondaryFilter: string,
+): boolean {
+  const option = getMerchantSecondaryFilterOption(entry, itemDefinition);
+
+  return option?.id === secondaryFilter;
+}
+
+function getMerchantSecondaryFilterOption(
+  entry: MerchantStockEntry,
+  itemDefinition: ItemDefinition,
+): MerchantSecondaryFilterOption | null {
+  if ((entry.group === "weapons" || entry.group === "offhands") && itemDefinition.equipmentType) {
+    return {
+      id: itemDefinition.equipmentType,
+      label: EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType],
+    };
+  }
+
+  if (
+    (entry.group === "cloth" ||
+      entry.group === "leather" ||
+      entry.group === "mail" ||
+      entry.group === "plate") &&
+    itemDefinition.equipmentSlot
+  ) {
+    return {
+      id: itemDefinition.equipmentSlot,
+      label: getArmorSlotLabel(itemDefinition.equipmentSlot),
+    };
+  }
+
+  if (entry.group === "accessories" && itemDefinition.equipmentType) {
+    return {
+      id: itemDefinition.equipmentType,
+      label: "Charm",
+    };
+  }
+
+  return null;
+}
+
+function getArmorSlotLabel(slot: EquipmentSlot): string {
+  return EQUIPMENT_SLOT_LABELS[slot].replace(" Armor", "");
+}
+
+function isMerchantEquipmentCompatibleWithCompanion(
+  companion: Companion,
+  itemDefinition: ItemDefinition,
+): boolean {
+  if (itemDefinition.category !== "equipment") {
+    return false;
+  }
+
+  if (itemDefinition.equipmentKind === "armor" || itemDefinition.equipmentKind === "accessory") {
+    return true;
+  }
+
+  if (!itemDefinition.equipmentSlot || !itemDefinition.equipmentType) {
+    return false;
+  }
+
+  if (
+    itemDefinition.equipmentSlot !== "mainHand" &&
+    itemDefinition.equipmentSlot !== "offhand"
+  ) {
+    return false;
+  }
+
+  return isClassAllowedForEquipment(companion.classId, itemDefinition);
 }
 
 export function getQuickExchangeItemDefinitions(): ItemDefinition[] {

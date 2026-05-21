@@ -39,6 +39,10 @@ export const INVENTORY_ITEM_ICON_SRC: Partial<Record<ItemId, string>> = {
   wisp_ember_t2: `${nowAssetPackPath}/ore-node.png`,
   orc_tusk: `${nowAssetPackPath}/ore-node.png`,
   orc_hide: `${nowAssetPackPath}/wood-node.png`,
+  minor_recovery_flask: `${beginnerSkillEffectsPath}/first_aid.png`,
+  soldiers_recovery_flask: `${beginnerSkillEffectsPath}/rally_call.png`,
+  hearty_trail_rations: `${nowAssetPackPath}/herb-node.png`,
+  skirmisher_rations: `${nowAssetPackPath}/herb-node.png`,
   training_sword: `${nowAssetPackPath}/training-sword.png`,
 };
 

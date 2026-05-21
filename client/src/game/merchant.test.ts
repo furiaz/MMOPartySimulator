@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addEntity } from "./state";
 import { addItemToInventoryState, countInventoryItem } from "./inventory";
-import { createNpc } from "./entities";
+import { createCompanion, createNpc } from "./entities";
 import { createTestGameState } from "./testState";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import {
@@ -10,7 +10,9 @@ import {
 } from "./wallet";
 import {
   buyMerchantItem,
+  getFilteredMerchantBuyStock,
   getMerchantBuyStock,
+  getMerchantSecondaryFilterOptions,
   getQuickExchangeItems,
   quickExchangeParts,
 } from "./merchant";
@@ -128,11 +130,21 @@ describe("merchant quick exchange", () => {
 });
 
 describe("merchant buy", () => {
-  it("returns fixed starter equipment stock for merchant NPCs", () => {
+  it("returns fixed starter equipment and consumable stock for merchant NPCs", () => {
     const stock = getMerchantBuyStock(createMerchantState(), MERCHANT_ID);
 
     expect(stock).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          itemId: "minor_recovery_flask",
+          priceCrowns: 30,
+          group: "flasks",
+        }),
+        expect.objectContaining({
+          itemId: "hearty_trail_rations",
+          priceCrowns: 15,
+          group: "food",
+        }),
         expect.objectContaining({
           itemId: "training_sword",
           priceCrowns: 12,
@@ -166,6 +178,27 @@ describe("merchant buy", () => {
     });
     expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(88);
     expect(countInventoryItem(nextState.inventory, "training_sword")).toBe(1);
+  });
+
+  it("buys stock consumables into shared inventory for Crowns", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "minor_recovery_flask",
+    );
+
+    expect(result).toMatchObject({
+      status: "success",
+      itemId: "minor_recovery_flask",
+      priceCrowns: 30,
+      previousCrowns: 100,
+      newCrowns: 70,
+    });
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(70);
+    expect(countInventoryItem(nextState.inventory, "minor_recovery_flask")).toBe(1);
   });
 
   it("does not mutate state when Crowns are insufficient", () => {
@@ -210,6 +243,26 @@ describe("merchant buy", () => {
     });
     expect(nextState.inventory).toEqual(state.inventory);
     expect(nextState.wallet).toEqual(state.wallet);
+  });
+
+  it("allows stackable consumable purchases when full inventory has matching stack space", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+    state = addItemToInventoryState(state, "minor_recovery_flask", 98, "debug").state;
+
+    for (let index = 1; index < state.inventory.capacity; index += 1) {
+      state = addItemToInventoryState(state, "training_sword", 1, "debug").state;
+    }
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "minor_recovery_flask",
+    );
+
+    expect(result.status).toBe("success");
+    expect(countInventoryItem(nextState.inventory, "minor_recovery_flask")).toBe(99);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(70);
   });
 
   it("fails safely for invalid merchants and non-stock items", () => {
@@ -282,4 +335,56 @@ describe("merchant buy", () => {
       ]),
     );
   });
+
+  it("filters merchant stock by main filter, secondary filter, and party compatibility", () => {
+    let state = createMerchantStateWithParty();
+    const stock = getMerchantBuyStock(state, MERCHANT_ID);
+
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, { mainFilter: "flasks" })
+        .map((entry) => entry.itemId),
+    ).toEqual(["minor_recovery_flask", "soldiers_recovery_flask"]);
+    expect(
+      getMerchantSecondaryFilterOptions(stock, "weapons"),
+    ).toEqual(
+      expect.arrayContaining([
+        { id: "training_sword", label: "Training Sword" },
+        { id: "one_handed_sword", label: "One-Handed Sword" },
+      ]),
+    );
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "weapons",
+        secondaryFilter: "training_sword",
+        partyCompatibleOnly: true,
+      }).map((entry) => entry.itemId),
+    ).toEqual(["training_sword"]);
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "weapons",
+        secondaryFilter: "one_handed_sword",
+        partyCompatibleOnly: true,
+      }),
+    ).toEqual([]);
+
+    const blade = createCompanion("blade", { x: 0, y: 0 }, "blade", "fighter", 0, "blade");
+    state = addEntity(state, blade);
+
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "weapons",
+        secondaryFilter: "one_handed_sword",
+        partyCompatibleOnly: true,
+      }).map((entry) => entry.itemId),
+    ).toEqual(["iron_sword"]);
+  });
 });
+
+function createMerchantStateWithParty() {
+  const leader = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+
+  return addEntity(
+    addEntity(createMerchantState(), leader),
+    createCompanion("companion-2", { x: 1, y: 0 }, leader.id),
+  );
+}
