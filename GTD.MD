@@ -121,7 +121,7 @@ Current entity kinds:
 type EntityKind = "companion" | "enemy" | "resource" | "npc";
 ```
 
-NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior. Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, placeholder hub NPC display, and the temporary quest guide escort NPC. NPCs do not implement dialogue, full shops, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
+NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior. Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, and the temporary quest guide escort NPC. NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
 
 
 The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
@@ -187,6 +187,9 @@ Party members currently support:
 - `gatherSpeed`
 - `commandPriority`
 - `equipment`
+- `consumables`
+- `consumableBuffs`
+- `consumableBehavior`
 
 Shared party-member behavior is handled through `partySystem.ts`.
 
@@ -265,7 +268,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
 
 
 
@@ -294,6 +297,13 @@ Current POI preferences include:
 
 `stayInMap` currently represents the Stay in Subzone prototype control. When enabled, POI and autonomous gatherer selection use the leader's current subzone as a local boundary where supported.
 
+Current prototype consumable runtime fields include:
+
+- `consumableUsesByCompanionId`
+- `hubDepartureFoodWarning`
+- `flaskRechargeEnemyKillCounter`
+- `flaskRechargeCountedEnemyDefeats`
+
 Current prototype skill runtime fields include:
 
 - `skillMarksByEnemyId`
@@ -313,6 +323,7 @@ Current resurrection and recovery fields include:
 Current health runtime fields include:
 
 - `lastHealthRegenAtByCompanionId`
+- `lastTargetDummyRegenAtByEnemyId`
 
 Current debug option fields include:
 
@@ -828,6 +839,7 @@ Current systems include:
 - POI Resume System
 - Healing Fountain System
 - Health System
+- Consumable System
 - Resurrection System
 - Role System
 - Skill System
@@ -861,32 +873,39 @@ The game loop runs continuously while enabled, executes systems in order, update
 Current high-level order:
 
 1. Advance simulation timing and clear expired combat feedback, skill runtime state, and frame movement planning
-2. Synchronize derived max health
-3. Update world-wipe recovery
-4. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
-5. Update teleport system
-6. If teleport is active or map transition happened, record telemetry and stop the tick early
-7. Update POI system
-8. Update healing fountain system
-9. Update resurrection system
-10. If auto mode is enabled, update role behavior
-11. If auto mode is enabled, update prototype skills
-12. If leader intent, auto mode, or teleport POI movement is active, update party formation movement
-13. If auto mode is enabled, reserve exploration movement
-14. Update defender behavior
-15. If auto mode is enabled, update exploration
-16. Update follow behavior
-17. Update quest guide escort behavior
-18. Update enemy AI
-19. Update attacks
-20. Restore interrupted POI target when valid
-21. Update passive health regeneration
-22. Update drop system
-23. Update enemy respawn system
-24. Update gathering
-25. Update skill shield block positions
-26. Idle autonomous party members when no POI or leader intent is active
-27. Record debug telemetry
+2. Clear expired consumable buffs
+3. Clear expired hub departure food warnings
+4. Synchronize derived max health
+5. Update consumable behavior
+6. Update active consumable use
+7. Synchronize derived max health again after consumable changes
+8. Update world-wipe recovery
+9. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
+10. Update teleport system
+11. If teleport is active or map transition happened, record telemetry and stop the tick early
+12. Update POI system
+13. Update healing fountain system
+14. Update resurrection system
+15. If auto mode is enabled, update role behavior
+16. If auto mode is enabled, update prototype skills
+17. If leader intent, auto mode, or teleport POI movement is active, update party formation movement
+18. If auto mode is enabled, reserve exploration movement
+19. Update defender behavior
+20. If auto mode is enabled, update exploration
+21. Update follow behavior
+22. Update quest guide escort behavior
+23. Update enemy AI
+24. Update attacks
+25. Update flask recharge from counted enemy defeats
+26. Restore interrupted POI target when valid
+27. Update passive health regeneration
+28. Update target dummy health regeneration
+29. Update drop system
+30. Update enemy respawn system
+31. Update gathering
+32. Update skill shield block positions
+33. Idle autonomous party members when no POI or leader intent is active
+34. Record debug telemetry
 
 
 
@@ -1017,7 +1036,8 @@ Current tuning fields include:
 - `interruptBuffer`
 - `dangerThreshold`
 - `protectionRadius`
-- support health threshold placeholders
+- `criticalHpPercent`
+- `preferredHealHpPercent`
 - `resourceSearchRange`
 - `combatAssistRange`
 
@@ -1293,7 +1313,7 @@ type ResourceItemId =
 
 The base `wood`, `ore`, and `herb` item ids are legacy compatibility material ids. Current resource yields should use tiered material ids.
 
-## Prototype Inventory, Wallet, Drops, and Merchant Exchange
+## Prototype Inventory, Wallet, Consumables, Drops, and Merchant
 
 Prototype inventory game logic lives under `client/src/game/`.
 
@@ -1327,6 +1347,26 @@ Current currency id:
 - `crowns`
 
 Currency does not use inventory slots.
+
+Prototype consumable logic lives in `consumables.ts`.
+
+Current consumable kinds are:
+
+- flask
+- food
+
+Current consumable behavior:
+
+- companions may equip one flask
+- companions may assign one food item
+- flasks use charges, cooldowns, use duration, healing, and optional temporary buffs
+- food uses inventory quantity only after completed use
+- food may only be used in the hub while the party is safe
+- food use is canceled if the companion takes damage before completion
+- auto-flask behavior can start flask use at or below a companion HP threshold
+- equipped flasks can be refilled by the hub healing fountain
+- equipped flasks gain one charge after 20 counted enemy defeats
+- consumable buffs feed into companion stat calculations
 
 Enemy drop logic lives in:
 
@@ -1400,19 +1440,24 @@ type JunkItemId =
   | "orc_hide";
 ```
 
-Merchant quick exchange logic lives in `merchant.ts`.
+Merchant logic lives in `merchant.ts`.
 
 Current merchant behavior:
 
 - identifies Merchant NPCs by `npcRole: "merchant"`
-- finds eligible junk items with positive sell value
-- removes eligible junk items from shared inventory
+- finds eligible junk items with positive sell value for quick exchange
+- removes eligible quick-exchange junk items from shared inventory
 - adds Crowns to the shared wallet
-- records merchant and wallet telemetry
+- exposes fixed prototype Merchant Buy stock
+- supports buying selected equipment and consumables for Crowns
+- validates merchant identity, stock membership, item category, price, wallet balance, and inventory capacity
+- adds purchased items to shared inventory
+- supports stock filtering by group and party equipment compatibility
+- records merchant buy, quick exchange, inventory, and wallet telemetry
 
-The Merchant Buy and Sell panels are currently UI placeholders only. There is no merchant stock list, purchase transaction, sell transaction, shop inventory, or buy/sell economy.
+The Merchant Sell panel is currently a UI placeholder only. Full selling rules, dynamic shop inventory, shop restocking, price simulation, and a full shop economy are not implemented.
 
-This prototype inventory/wallet/drop/merchant layer does not include bank storage, persistent ground loot, consumable item effects, full selling, buying, shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
+This prototype inventory/wallet/consumable/drop/merchant layer does not include bank storage, persistent ground loot, full selling, dynamic shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
 
 
 
@@ -1663,7 +1708,7 @@ Current teleport behavior:
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
-- map-local enemies, resources, hub placeholders, explored tiles, movement planning, formation state, combat feedback, skill visuals, drop visuals, and follow trails are reset or rebuilt for the new map
+- map-local enemies, resources, hub placeholders, hub target dummy, explored tiles, movement planning, formation state, combat feedback, skill visuals, drop visuals, and follow trails are reset or rebuilt for the new map
 - companion progression, class, role, level, XP, health, party identity, and party order are preserved
 
 Current active teleport state:
@@ -1811,7 +1856,7 @@ Current resource visuals use generated image icons by resource type.
 Current NPC visuals:
 
 - Quest Giver, Merchant, Smith, and Dog may use generated image icons
-- Test Blade and Test Hunter may use Test-NPC image assets
+- Test Blade may use Test-NPC image assets
 - quest guide NPCs may use temporary NPC visuals
 - unsupported NPC visuals fall back to placeholder classes
 
@@ -1847,7 +1892,7 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, quick exchange results, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, and companion resurrection.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, companion resurrection, flask fountain refills, flask recharge progress, and flask charge gains.
 
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
@@ -1902,6 +1947,8 @@ Debug/testing helpers may exist for development:
 - randomize positions
 - debug telemetry recording/export
 - debug maps
+- add prototype consumables to shared inventory
+- hub target dummy testing
 - explicit aggressive-enemy test setups
 - prototype teleport/map transition testing
 - prototype resurrection testing
@@ -1919,7 +1966,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, merchant quick exchange UI, merchant Buy/Sell placeholder panels, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummy, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
 
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
@@ -1946,6 +1993,8 @@ React may:
 - call existing party leader helper functions for leadership switching
 - call existing stat allocation helpers for supported stat allocation actions
 - call existing equipment helpers for supported equipment actions
+- call existing consumable helpers for supported flask, food, and auto-flask actions
+- call existing merchant helpers for supported quick exchange and Merchant Buy actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
 - display placeholder sections for future systems
 
@@ -1983,7 +2032,7 @@ Current intended Party Management sections and controls:
 - Role Select
 - Party Order
 - Formation placeholder for UI only; automatic formation behavior lives in `partyFormationSystem.ts`
-- Behavior Settings placeholder for UI only
+- Behavior Settings for supported prototype auto-flask controls
 
 
 Role Select must use the existing `PartyMemberRole` values:
@@ -2003,7 +2052,7 @@ The Inventory view may display wallet balance, but wallet and inventory rules mu
 
 The World Travel view may display the current map and known prototype region destinations. Selecting a destination may set `worldTravelTargetMapId`; the POI system then guides the party toward the next valid teleport step along the current prototype route.
 
-Merchant UI may call existing merchant helper functions, but must not define exchange rules inside React. Buy and Sell panels may exist as placeholders only until a real shop system is explicitly requested.
+Merchant UI may call existing merchant helper functions, but must not define exchange, buy, pricing, stock, inventory, or wallet rules inside React. Merchant Buy may display and purchase from fixed prototype stock through game logic. Merchant Sell may exist as a placeholder only until a real selling system is explicitly requested.
 
 
 ## World Structure Future Work
@@ -2046,7 +2095,7 @@ Do not implement unless requested:
 - production asset pipeline
 - final world content pipeline
 - full quest journal, dialogue system, quest reward economy, or production quest content beyond the prototype quest chain
-- full shop, selling, buying, and merchant economy beyond prototype quick exchange
+- full shop, selling, buying, and merchant economy beyond prototype quick exchange and fixed prototype Merchant Buy stock
 - persistent ground loot beyond prototype drop visual events and drop-to-inventory behavior
 - final death penalty, checkpoint, resurrection economy, or recovery system beyond prototype resurrection and world-wipe recovery
 - production enemy respawn, encounter reset, or spawn scheduling beyond current prototype wild-map respawn behavior

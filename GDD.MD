@@ -524,6 +524,30 @@ Current item categories:
 - event
 - junk
 
+Current prototype consumable behavior:
+
+- consumables currently include flasks and food
+- companions may equip one flask from shared inventory
+- equipped flasks start with zero charges when equipped
+- companions may assign one food item from shared inventory
+- assigned food remains in inventory until a completed food use consumes one item
+- manual party consumable use can start flask or food use for eligible living companions
+- flasks have use duration, cooldown, charges, charge cost, healing, and optional temporary stat buffs
+- food has use duration, level requirements, temporary stat buffs, and can only be consumed in the hub while the party is safe
+- food use is canceled if the companion takes damage before completion
+- auto-flask behavior can start flask use when a companion reaches their configured HP threshold
+- equipped flasks can be refilled at the hub healing fountain
+- equipped flasks gain one charge after 20 counted enemy defeats
+- consumable buffs contribute to companion primary and derived stat calculations while active
+- leaving the hub may show a short non-blocking food warning when assigned food is available but the companion has no active food buff
+
+Current prototype consumable items:
+
+- Minor Recovery Flask
+- Soldier's Recovery Flask
+- Hearty Trail Rations
+- Skirmisher Rations
+
 The prototype wallet is shared by the party.
 
 Current wallet rules:
@@ -602,24 +626,21 @@ Current prototype enemy equipment drops may include:
 
 - Holy Lantern from Goblin Shaman
 
-Current quick exchange behavior:
+Current merchant behavior:
 
 - the hub Merchant can exchange eligible junk items for Crowns
 - eligible quick-exchange junk items are prototype junk items with sell value
 - quick exchange removes eligible junk items from shared inventory
 - quick exchange adds Crowns to the shared wallet
-- this is a prototype exchange action, not a full selling or shop economy
-
-
-Current merchant UI may show Buy and Sell placeholder panels.
-
-Buy and Sell placeholder panels:
-
-- may be visible in the merchant interaction UI
-- do not currently implement buying or selling rules
-- must not be treated as full shop behavior
-- must not define economy rules in React UI
-
+- the hub Merchant has a fixed prototype buy stock
+- Merchant Buy can purchase selected equipment and consumables for Crowns
+- Merchant Buy validates merchant identity, stock membership, price, wallet balance, and inventory capacity
+- purchased items are added to shared party inventory
+- Merchant Buy may filter stock by group and party equipment compatibility
+- current Merchant Buy stock groups include flasks, food, weapons, offhands, cloth armor, leather armor, mail armor, plate armor, and accessories
+- the Sell panel may be visible as a placeholder only
+- full selling rules are not implemented
+- this is prototype merchant behavior, not a full shop economy
 
 
 
@@ -629,9 +650,9 @@ Do not implement these unless explicitly requested:
 
 - bank storage
 - persistent ground loot
-- consumable item effects
-- full selling or buying flows
-- full shops
+- full selling flows
+- dynamic shop inventories or full shop economy beyond the fixed prototype Merchant buy stock
+- advanced consumable systems beyond current prototype flasks, food assignment, auto-flask behavior, hub food behavior, and temporary buffs
 - crafting
 - trading
 - save/load
@@ -861,6 +882,15 @@ Stat allocation controls may appear in the Party Stats UI only when backed by ga
 
 Equipment may show companion equipment slots and valid equipment choices from the shared party inventory. Equipment rules must remain in game logic.
 
+Current Equipment section may also show prototype consumable controls:
+
+- equipped flask
+- available flask choices from shared inventory
+- assigned food
+- available food choices from shared inventory
+- active food buff timing
+- basic consumable effect and requirement text
+
 Skills may show the selected companion's current class skills. Current class tabs may show only the companion's current class until class-history or multi-class progression data exists.
 
 Skill Preferences may appear as a placeholder only until a supported skill-preference system exists.
@@ -894,7 +924,14 @@ Role changes affect role priority behavior. Leader identity remains separate fro
 
 Party Order may support ordering companions for party behavior and display.
 
-Formation and Behavior Settings may appear as UI placeholders only. The current simulation already has lightweight automatic party formation behavior, but there is no player-facing formation editor or behavior-settings system yet.
+Formation may appear as a UI placeholder only. The current simulation already has lightweight automatic party formation behavior, but there is no player-facing formation editor yet.
+
+Behavior Settings currently supports prototype auto-flask controls:
+
+- Auto-use Flask toggle
+- Flask HP Threshold setting from 1 percent to 100 percent
+
+Behavior Settings should not define new autonomous behavior outside supported game-logic settings.
 
 Party Management should not own companion-specific Stats, Equipment, Skills, or Skill Preferences unless explicitly redesigned later.
 
@@ -981,8 +1018,8 @@ Current prototype quests:
 
 - Secure the Landing
   - Quest id: clear_the_shore
-  - Objectives: defeat 20 Slimes in Shore Fringe, gather 3 Wood in Shore Fringe, and inspect the Shore Fringe supply marker
-  - Rewards: 25 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Acolyte Hood
+  - Objectives: defeat 10 Slimes in Shore Fringe, gather 3 Wood in Shore Fringe, and inspect the Shore Fringe supply marker
+  - Rewards: 25 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Minor Recovery Flask, 1 Acolyte Hood
   - Unlocks: Mark the Glade Route
 
 - Mark the Glade Route
@@ -1544,12 +1581,13 @@ Current prototype hub:
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
 - It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, and a clear exit to the first wild zone.
-- Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and Test Hunter.
+- Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and a hub target dummy.
 - The Quest Giver supports the lightweight prototype quest chain only.
-- The Merchant supports prototype quick exchange of eligible junk items for Crowns only.
-- The healing fountain restores party member health when party members are in range.
+- The Merchant supports prototype quick exchange of eligible junk items for Crowns and a fixed prototype buy stock for selected equipment and consumables.
+- The hub target dummy is a passive 100 HP debug enemy with no XP reward. It can be manually attacked for combat testing, is not selected by autonomous POI behavior, and regenerates health over time.
+- The healing fountain restores party member health and refills equipped flask charges when party members are in range.
 - The prototype hub should not spawn hostile enemies for now.
-- The prototype hub must not implement full town systems, interiors, branching dialogue, shops, crafting, recruitment, smithing, or NPC relationship systems unless explicitly requested.
+- The prototype hub must not implement full town systems, interiors, branching dialogue, full shops beyond the fixed prototype Merchant buy stock, crafting, recruitment, smithing, or NPC relationship systems unless explicitly requested.
 
 
 
@@ -1720,15 +1758,16 @@ Temporary debug tools may include:
 - debug map transitions
 - export debug telemetry
 - inspect quest state and POI decisions
-- inspect wallet, drops, and merchant exchange telemetry
-- inspect healing fountain behavior
+- inspect wallet, drops, merchant exchange, and Merchant Buy telemetry
+- inspect consumable assignment, flask use, food use, auto-flask behavior, food warnings, and flask recharge behavior
+- inspect healing fountain health restoration and flask refill behavior
 - inspect enemy archetype, combat style, target preference, attack range, and target decision behavior
 - inspect enemy scaling, respawn, subzone, and encounter area behavior
 - inspect resurrection and world-wipe recovery behavior
 - inspect interrupted POI restore behavior
 - inspect quest guide escort behavior
 - inspect PixiJS world rendering behavior
-
+- add prototype consumables to shared inventory
 
 Debug tools are not part of final gameplay.
 
@@ -1754,7 +1793,7 @@ Do not implement these unless explicitly requested:
 - production asset pipeline
 - final world content pipeline
 - full quest journal, branching dialogue, production quest content, or full quest reward economy beyond prototype quest rewards
-- full shop, selling, buying, and merchant economy beyond prototype quick exchange
+- full shop, selling, buying, and merchant economy beyond prototype quick exchange and fixed prototype Merchant buy stock
 - persistent ground loot beyond prototype drop-to-inventory behavior
 - final death penalty, checkpoint, resurrection economy, or recovery system beyond prototype resurrection and world-wipe recovery
 - production enemy respawn, encounter reset, or spawn scheduling beyond current prototype wild-map respawn behavior
