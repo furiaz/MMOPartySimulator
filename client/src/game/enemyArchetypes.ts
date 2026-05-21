@@ -14,7 +14,7 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   slime: {
     id: "slime",
     displayName: "Slime",
-    temperament: "aggressive",
+    temperament: "passive",
     combatStyle: "melee",
     targetPreference: "closest",
     level: 1,

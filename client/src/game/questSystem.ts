@@ -52,7 +52,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         enemyMapId: MAP_ONE_ID,
         targetSubzoneId: "shore-fringe",
         enemyArchetypeId: "slime",
-        requiredCount: 20,
+        requiredCount: 10,
       },
       {
         id: "gather_shore_fringe_wood",

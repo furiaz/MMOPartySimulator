@@ -104,7 +104,7 @@ describe("game update intent priority", () => {
   it("completes inspect POIs when the leader reaches the quest target", () => {
     const leader = createLeader({ x: 46, y: 22 });
     const quests = createQuestStates({ clear_the_shore: "active" });
-    markObjectiveCompleted(quests, "clear_the_shore", "defeat_shore_fringe_slimes", 20);
+    markObjectiveCompleted(quests, "clear_the_shore", "defeat_shore_fringe_slimes", 10);
     markObjectiveCompleted(quests, "clear_the_shore", "gather_shore_fringe_wood", 3);
 
     const nextState = updateGame(
@@ -653,6 +653,54 @@ describe("game update intent priority", () => {
       type: "attack",
       targetId: gladeBat.id,
     });
+  });
+
+  it("skips completed kill objective enemies when choosing active quest fallback targets", () => {
+    const leader = createLeader({ x: 5, y: 4 });
+    const completedObjectiveBat = createEnemy(
+      "completed-objective-bat",
+      { x: 6, y: 4 },
+      undefined,
+      {
+        archetypeId: "cave_bat",
+        subzoneId: "mossy-glade",
+      },
+    );
+    const fallbackOre = createResource("fallback-ore", { x: 7, y: 4 }, {
+      resourceType: "ore",
+    });
+    const quests = createPostGuideQuestStates();
+    markObjectiveCompleted(
+      quests,
+      "gather_expedition_supplies",
+      "defeat_mossy_glade_bats",
+      20,
+    );
+
+    const nextState = updateGame(
+      createMapOneState([leader, completedObjectiveBat, fallbackOre], {
+        partyLeaderId: leader.id,
+        map: createMossyQuestTestMap(),
+        poiPreferences: {
+          stayInMap: false,
+          searchScope: "zone_only",
+        },
+        quests,
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "resource",
+      targetEntityId: fallbackOre.id,
+      reason: "wild resource fallback",
+    });
+    expect(nextState.lastPoiDecision?.consideredTargets).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetEntityId: completedObjectiveBat.id,
+        }),
+      ]),
+    );
   });
 
   it("routes Lower Shore quest objectives through each Map 1 subzone hop", () => {

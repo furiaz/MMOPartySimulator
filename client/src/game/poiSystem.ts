@@ -592,6 +592,7 @@ function getPoiTargetOptions(
   }
 
   return getWildFallbackOptions(
+    state,
     filterPoisToLeaderSubzone(candidates, leaderSubzone),
     isGathererLeader,
   );
@@ -636,6 +637,7 @@ function filterPoisToLeaderSubzone(
 }
 
 function getWildFallbackOptions(
+  state: GameState,
   candidates: PointOfInterest[],
   prioritizeResources = false,
 ): PoiTargetOption[] {
@@ -648,7 +650,11 @@ function getWildFallbackOptions(
 
   return [
     ...candidates
-      .filter((poi) => poi.category === "combat")
+      .filter(
+        (poi) =>
+          poi.category === "combat" &&
+          !isCompletedActiveQuestDefeatEnemyPoi(state, poi),
+      )
       .map((poi) => ({
         poi,
         priority: combatPriority,
@@ -665,6 +671,42 @@ function getWildFallbackOptions(
         reason: "wild resource fallback",
       })),
   ];
+}
+
+function isCompletedActiveQuestDefeatEnemyPoi(
+  state: GameState,
+  poi: PointOfInterest,
+): boolean {
+  if (poi.category !== "combat" || !poi.targetEntityId || !state.currentMapId) {
+    return false;
+  }
+
+  const activeQuest = getActiveQuest(state);
+
+  if (
+    !activeQuest ||
+    activeQuest.status !== "active" ||
+    getIncompleteObjectives(state, activeQuest.questId).length === 0
+  ) {
+    return false;
+  }
+
+  const entity = state.entities[poi.targetEntityId];
+
+  if (entity?.kind !== "enemy") {
+    return false;
+  }
+
+  return QUEST_DEFINITIONS[activeQuest.questId].objectives.some(
+    (objective) =>
+      objective.type === "defeat_enemy_count" &&
+      Boolean(activeQuest.objectiveProgress[objective.id]?.completed) &&
+      objective.enemyMapId === state.currentMapId &&
+      (!objective.enemyArchetypeId ||
+        entity.archetypeId === objective.enemyArchetypeId) &&
+      (!objective.targetSubzoneId ||
+        entity.subzoneId === objective.targetSubzoneId),
+  );
 }
 
 function isQuestCombatPoi(

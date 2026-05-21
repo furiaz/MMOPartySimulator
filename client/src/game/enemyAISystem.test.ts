@@ -77,7 +77,7 @@ describe("enemy AI aggro and roaming", () => {
     });
   });
 
-  it("lets current slime archetypes acquire nearby targets", () => {
+  it("keeps starter slime archetypes from acquiring nearby targets", () => {
     const leader = createIdleCompanion("leader", { x: 1, y: 0 });
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
       archetypeId: "slime",
@@ -86,9 +86,8 @@ describe("enemy AI aggro and roaming", () => {
     const nextState = updateEnemyAISystem(createState([leader, enemy]));
 
     expect(nextState.entities[enemy.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: leader.id,
-      targetDecisionReason: "closest",
+      state: "idle",
+      currentTargetId: null,
     });
   });
 

@@ -25,9 +25,13 @@ describe("prototype enemy archetypes", () => {
     }
   });
 
-  it("keeps current prototype monster archetypes aggressive", () => {
+  it("keeps starter slimes passive and later prototype monster archetypes aggressive", () => {
     for (const archetype of Object.values(ENEMY_ARCHETYPES)) {
-      expect(archetype.temperament).toBe("aggressive");
+      if (archetype.id === "slime") {
+        expect(archetype.temperament).toBe("passive");
+      } else {
+        expect(archetype.temperament).toBe("aggressive");
+      }
     }
   });
 
@@ -47,6 +51,15 @@ describe("prototype enemy archetypes", () => {
     expect(enemy.scalingBand).toBe("starter");
     expect(enemy.attackCooldownMs).toBe(1300);
     expect(enemy.attackRange).toBe(4);
+  });
+
+  it("creates slime archetypes as passive starter enemies", () => {
+    const enemy = createEnemy("starter-slime", { x: 0, y: 0 }, undefined, {
+      archetypeId: "slime",
+    });
+
+    expect(enemy.aggressionMode).toBe("passive");
+    expect(enemy.level).toBe(1);
   });
 
   it("lets explicit enemy setup options override archetype defaults", () => {

@@ -183,10 +183,15 @@ describe("debug maps", () => {
     }
   });
 
-  it("makes current prototype wilderness monsters aggressive", () => {
+  it("keeps Map 1 starter slimes passive and other wilderness monsters aggressive", () => {
     for (const wildernessMap of wildernessMaps) {
       for (const enemy of wildernessMap.enemies) {
-        expect(ENEMY_ARCHETYPES[enemy.archetypeId].temperament).toBe("aggressive");
+        const expectedTemperament =
+          enemy.archetypeId === "slime" ? "passive" : "aggressive";
+
+        expect(ENEMY_ARCHETYPES[enemy.archetypeId].temperament).toBe(
+          expectedTemperament,
+        );
       }
     }
   });

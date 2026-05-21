@@ -35,7 +35,7 @@ describe("prototype quest system", () => {
     state = updateQuestGiverInteraction(state);
     expect(state.quests.clear_the_shore.status).toBe("active");
 
-    for (let count = 0; count < 20; count += 1) {
+    for (let count = 0; count < 10; count += 1) {
       state = recordEnemyDefeatedForQuests(state, defeatedEnemy, MAP_ONE_ID);
     }
     state = recordResourceGatheredForQuests(state, shoreWood, MAP_ONE_ID, 3);
@@ -50,7 +50,7 @@ describe("prototype quest system", () => {
       state.quests.clear_the_shore.objectiveProgress.defeat_shore_fringe_slimes,
     ).toEqual({
       objectiveId: "defeat_shore_fringe_slimes",
-      currentCount: 20,
+      currentCount: 10,
       completed: true,
     });
 
