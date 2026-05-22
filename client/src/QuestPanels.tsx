@@ -16,47 +16,71 @@ import {
 const questObjectiveCompleteSrc =
   "Asserts/Generated/prototype-vfx/sprites/quest-objective-complete.png";
 
-export function QuestTrackerPanel({ quest }: { quest: QuestState | null }) {
-  if (!quest || quest.status === "completed" || quest.status === "locked") {
+export function QuestTrackerPanel({
+  isHidden,
+  onShow,
+  quest,
+  onHide,
+}: {
+  isHidden: boolean;
+  onShow: () => void;
+  quest: QuestState | null;
+  onHide: () => void;
+}) {
+  if (quest?.status === "completed" || quest?.status === "locked") {
     return null;
   }
 
-  const definition = QUEST_DEFINITIONS[quest.questId];
+  const definition = quest ? QUEST_DEFINITIONS[quest.questId] : null;
 
   return (
-    <section className="quest-tracker-panel" aria-label="Current quests">
+    <section
+      className={`quest-tracker-panel${isHidden ? " collapsed" : ""}`}
+      aria-label="Current quests"
+    >
       <div className="quest-tracker-header">
-        <span>Current Quest</span>
-        <span>{formatQuestStatus(quest.status)}</span>
+        <h2>Quests</h2>
+        <button onClick={isHidden ? onShow : onHide} type="button">
+          {isHidden ? "Show" : "Hide"}
+        </button>
       </div>
-      <strong>{definition.displayName}</strong>
-      <div className="quest-tracker-objectives">
-        {definition.objectives.map((objective) => {
-          const progress = quest.objectiveProgress[objective.id];
-          const requiredCount = objective.requiredCount ?? 1;
+      {isHidden ? null : quest && definition ? (
+        <>
+          <div className="quest-tracker-title">
+            <strong>{definition.displayName}</strong>
+            <span>{formatQuestStatus(quest.status)}</span>
+          </div>
+          <div className="quest-tracker-objectives">
+            {definition.objectives.map((objective) => {
+              const progress = quest.objectiveProgress[objective.id];
+              const requiredCount = objective.requiredCount ?? 1;
 
-          return (
-            <div
-              key={objective.id}
-              className={`quest-tracker-objective${
-                progress?.completed ? " completed" : ""
-              }`}
-            >
-              <span>{getObjectiveLabel(objective, requiredCount)}</span>
-              <span>
-                {progress?.completed ? (
-                  <img
-                    alt=""
-                    className="quest-objective-complete-vfx"
-                    src={questObjectiveCompleteSrc}
-                  />
-                ) : null}
-                {progress?.currentCount ?? 0}/{requiredCount}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+              return (
+                <div
+                  key={objective.id}
+                  className={`quest-tracker-objective${
+                    progress?.completed ? " completed" : ""
+                  }`}
+                >
+                  <span>{getObjectiveLabel(objective, requiredCount)}</span>
+                  <span>
+                    {progress?.completed ? (
+                      <img
+                        alt=""
+                        className="quest-objective-complete-vfx"
+                        src={questObjectiveCompleteSrc}
+                      />
+                    ) : null}
+                    {progress?.currentCount ?? 0}/{requiredCount}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="quest-tracker-empty">No acquired quests</div>
+      )}
     </section>
   );
 }
@@ -106,7 +130,7 @@ export function QuestsPanel({
           {selectedQuest ? <QuestDetailPanel quest={selectedQuest} /> : null}
         </div>
       ) : (
-        <div className="placeholder-box">No current quests.</div>
+        <div className="placeholder-box">No acquired quests.</div>
       )}
     </section>
   );

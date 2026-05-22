@@ -22,8 +22,7 @@ export function getDisplayQuest(quests: GameState["quests"]): QuestState | null 
 
     if (
       quest.status === "active" ||
-      quest.status === "ready_to_turn_in" ||
-      quest.status === "available"
+      quest.status === "ready_to_turn_in"
     ) {
       return quest;
     }
@@ -37,7 +36,6 @@ export function getQuestLogQuests(quests: GameState["quests"]): QuestState[] {
     .map((questId) => quests[questId])
     .filter(
       (quest): quest is QuestState =>
-        quest.status === "available" ||
         quest.status === "active" ||
         quest.status === "ready_to_turn_in",
     );

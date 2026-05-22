@@ -1267,6 +1267,7 @@ function App() {
     null,
   );
   const [selectedQuestId, setSelectedQuestId] = useState<QuestId | null>(null);
+  const [isQuestTrackerHidden, setIsQuestTrackerHidden] = useState(false);
   const [activeMerchantNpcId, setActiveMerchantNpcId] = useState<string | null>(
     null,
   );
@@ -2692,7 +2693,12 @@ function App() {
           onMovePartyOrder={movePartyMemberOrder}
         />
         <CompanionVitalsPanel members={partyMembers} />
-        <QuestTrackerPanel quest={displayQuest} />
+        <QuestTrackerPanel
+          isHidden={isQuestTrackerHidden}
+          onShow={() => setIsQuestTrackerHidden(false)}
+          quest={displayQuest}
+          onHide={() => setIsQuestTrackerHidden(true)}
+        />
         {hubDepartureFoodWarning ? (
           <div className="hub-food-warning-toast" role="status">
             Food buffs missing for {hubDepartureFoodWarning.companionIds.length}{" "}

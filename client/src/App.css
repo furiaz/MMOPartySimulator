@@ -579,6 +579,11 @@
   opacity: 1;
 }
 
+.quest-tracker-panel.collapsed {
+  width: 156px;
+  max-height: none;
+}
+
 .quest-tracker-header,
 .quest-tracker-objective,
 .quest-list-item,
@@ -591,23 +596,63 @@
 }
 
 .quest-tracker-header {
+  color: #1f2937;
+}
+
+.quest-tracker-header h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.quest-tracker-header button {
+  min-width: 52px;
+  padding: 4px 7px;
+  border-color: rgba(51, 65, 85, 0.72);
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.quest-tracker-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quest-tracker-title strong,
+.quest-tracker-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quest-tracker-title strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.quest-tracker-title span {
   color: #475569;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.quest-tracker-panel strong {
-  overflow: hidden;
-  font-size: 14px;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .quest-tracker-objectives {
   display: grid;
   gap: 5px;
+}
+
+.quest-tracker-empty {
+  padding: 6px;
+  border: 1px solid rgba(100, 116, 139, 0.42);
+  background: rgba(241, 245, 249, 0.72);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .quest-tracker-objective {
