@@ -78,10 +78,12 @@ import {
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
   issueCompanionCommands,
+  isMerchantUnlockedForQuests,
   isMerchantNpc,
   quickExchangeParts,
   recordMerchantInteractionClosed,
   recordMerchantInteractionOpened,
+  recordMerchantLockedForQuest,
   recordMerchantMenuSelected,
   resourceIds,
   resolveNavigationClickTarget,
@@ -215,6 +217,7 @@ const merchantBuyFailureMessages: Record<MerchantBuyFailureReason, string> = {
   inventory_full: "Inventory is full",
   inventory_add_failed: "Inventory could not receive the item",
   currency_remove_failed: "Crowns could not be spent",
+  merchant_locked_for_quest: "Merchant unlocks during Outfit the Expedition",
 };
 
 type ViewportSize = {
@@ -1340,6 +1343,8 @@ function App() {
     activeMerchantNpcId && isMerchantNpc(gameState.entities[activeMerchantNpcId])
       ? gameState.entities[activeMerchantNpcId]
       : null;
+  const activeMerchantLocked =
+    Boolean(activeMerchant) && !isMerchantUnlockedForQuests(gameState);
   const activeQuestGiver =
     activeQuestGiverNpcId &&
     gameState.entities[activeQuestGiverNpcId]?.kind === "npc" &&
@@ -1890,8 +1895,16 @@ function App() {
     setQuestGiverResultMessage(null);
     setActiveMerchantNpcId(npc.id);
     setActiveMerchantPanel(null);
-    setMerchantResultMessage(null);
-    setGameState((state) => recordMerchantInteractionOpened(state, npc.id));
+    setMerchantResultMessage(
+      isMerchantUnlockedForQuests(gameState)
+        ? null
+        : "Merchant unlocks during Outfit the Expedition",
+    );
+    setGameState((state) =>
+      isMerchantUnlockedForQuests(state)
+        ? recordMerchantInteractionOpened(state, npc.id)
+        : recordMerchantLockedForQuest(state, npc.id, "merchant_interaction_locked"),
+    );
   }
 
   function openQuestGiverInteraction(npc: NpcEntity) {
@@ -1946,6 +1959,18 @@ function App() {
       return;
     }
 
+    if (!isMerchantUnlockedForQuests(gameState)) {
+      setMerchantResultMessage("Merchant unlocks during Outfit the Expedition");
+      setGameState((state) =>
+        recordMerchantLockedForQuest(
+          state,
+          activeMerchantNpcId,
+          "merchant_menu_locked",
+        ),
+      );
+      return;
+    }
+
     setActiveMerchantPanel(panel);
     setMerchantResultMessage(null);
     setGameState((state) =>
@@ -1955,6 +1980,18 @@ function App() {
 
   function exchangeMerchantJunk() {
     if (!activeMerchantNpcId) {
+      return;
+    }
+
+    if (!isMerchantUnlockedForQuests(gameState)) {
+      setMerchantResultMessage("Merchant unlocks during Outfit the Expedition");
+      setGameState((state) =>
+        recordMerchantLockedForQuest(
+          state,
+          activeMerchantNpcId,
+          "merchant_exchange_locked",
+        ),
+      );
       return;
     }
 
@@ -2410,6 +2447,7 @@ function App() {
               </div>
               <button
                 className={activeMerchantPanel === "buy" ? "active" : ""}
+                disabled={activeMerchantLocked}
                 onClick={() => selectMerchantPanel("buy")}
                 type="button"
               >
@@ -2417,12 +2455,17 @@ function App() {
               </button>
               <button
                 className={activeMerchantPanel === "sell" ? "active" : ""}
+                disabled={activeMerchantLocked}
                 onClick={() => selectMerchantPanel("sell")}
                 type="button"
               >
                 Sell
               </button>
-              <button onClick={exchangeMerchantJunk} type="button">
+              <button
+                disabled={activeMerchantLocked}
+                onClick={exchangeMerchantJunk}
+                type="button"
+              >
                 Quick Exchange Junk
               </button>
               <button onClick={closeMerchantInteraction} type="button">

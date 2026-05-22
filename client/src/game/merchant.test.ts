@@ -16,12 +16,19 @@ import {
   getQuickExchangeItems,
   quickExchangeParts,
 } from "./merchant";
+import { createInitialQuestStates } from "./questSystem";
 
 const MERCHANT_ID = "test-merchant";
 
 function createMerchantState() {
+  const quests = createInitialQuestStates();
+  quests.outfit_the_expedition = {
+    ...quests.outfit_the_expedition,
+    status: "completed",
+  };
+
   return addEntity(
-    createTestGameState({ currentMapId: "hub" }),
+    createTestGameState({ currentMapId: "hub", quests }),
     createNpc(MERCHANT_ID, { x: 1, y: 1 }, "Merchant", "merchant"),
   );
 }

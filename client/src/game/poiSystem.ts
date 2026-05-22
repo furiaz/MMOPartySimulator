@@ -33,7 +33,9 @@ import {
   getIncompleteObjectives,
   getQuestTargetMapId,
   hasQuestGiverWork,
+  isMerchantUnlockedForQuests,
   matchesObjectiveSubzoneAtPosition,
+  recordMerchantLockedForQuest,
   recordQuestPoiReachedForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
@@ -141,9 +143,10 @@ export function updatePoiSystem(
     );
   }
 
-  const interactionState = clearReachedWorldTravelTarget(
+  let interactionState = clearReachedWorldTravelTarget(
     updateReachedPoiInteractions(state),
   );
+  interactionState = recordLockedMerchantPoiIfNeeded(interactionState);
   const globalPoiIntent = getGlobalPoiIntent(interactionState);
   const selection = selectLocalPoiTarget(
     interactionState,
@@ -734,7 +737,10 @@ function getHubMerchantOptions(
   state: GameState,
   candidates: PointOfInterest[],
 ): PoiTargetOption[] {
-  if (getQuickExchangeItems(state).length === 0) {
+  if (
+    getQuickExchangeItems(state).length === 0 ||
+    !isMerchantUnlockedForQuests(state)
+  ) {
     return [];
   }
 
@@ -752,6 +758,24 @@ function getHubMerchantOptions(
         },
       ]
     : [];
+}
+
+function recordLockedMerchantPoiIfNeeded(state: GameState): GameState {
+  if (
+    state.currentMapId !== HUB_MAP_ID ||
+    isMerchantUnlockedForQuests(state) ||
+    getQuickExchangeItems(state).length === 0
+  ) {
+    return state;
+  }
+
+  const merchant = Object.values(state.entities).find(
+    (entity) => entity.kind === "npc" && entity.npcRole === "merchant",
+  );
+
+  return merchant
+    ? recordMerchantLockedForQuest(state, merchant.id, "merchant_poi_locked")
+    : state;
 }
 
 function getQuestSubzoneRoutePoi(

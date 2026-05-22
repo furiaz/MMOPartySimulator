@@ -6,6 +6,11 @@ import {
   removeItemFromInventoryState,
 } from "./inventory";
 import { getItemDefinition, ITEM_DEFINITIONS } from "./items";
+import {
+  isMerchantUnlockedForQuests,
+  recordMerchantEquipmentPurchasedForQuests,
+  recordMerchantLockedForQuest,
+} from "./questSystem";
 import type { GameState } from "./state";
 import { EQUIPMENT_SLOT_LABELS, EQUIPMENT_TYPE_LABELS } from "./equipmentTypes";
 import { isClassAllowedForEquipment } from "./equipmentRules";
@@ -101,7 +106,8 @@ export type MerchantBuyFailureReason =
   | "insufficient_crowns"
   | "inventory_full"
   | "inventory_add_failed"
-  | "currency_remove_failed";
+  | "currency_remove_failed"
+  | "merchant_locked_for_quest";
 
 export type MerchantBuyResult =
   | {
@@ -309,6 +315,22 @@ export function buyMerchantItem(
     );
   }
 
+  if (!isMerchantUnlockedForQuests(state)) {
+    const lockedState = recordMerchantLockedForQuest(
+      state,
+      merchantNpcId,
+      "merchant_buy_locked",
+    );
+
+    return createMerchantBuyFailure(
+      lockedState,
+      merchantNpcId,
+      itemId,
+      previousCrowns,
+      "merchant_locked_for_quest",
+    );
+  }
+
   const stockEntry = getMerchantBuyStock(state, merchantNpcId).find(
     (entry) => entry.itemId === itemId,
   );
@@ -468,6 +490,7 @@ export function buyMerchantItem(
       nextCurrencyBalance: currencyResult.result.newBalance,
     },
   );
+  nextState = recordMerchantEquipmentPurchasedForQuests(nextState, itemId);
 
   return {
     state: nextState,

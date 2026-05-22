@@ -14,6 +14,7 @@ import { addCurrencyToWalletState } from "./wallet";
 import type {
   DebugMapId,
   Enemy,
+  EquipmentSlot,
   InventorySlot,
   ItemId,
   Position,
@@ -30,9 +31,11 @@ import type {
 } from "./questTypes";
 
 export const QUEST_GIVER_POI_ID = npcIds[0];
+export const EQUIPMENT_TUTORIAL_QUEST_ID: QuestId = "outfit_the_expedition";
 
 export const QUEST_ORDER: QuestId[] = [
   "clear_the_shore",
+  EQUIPMENT_TUTORIAL_QUEST_ID,
   "gather_expedition_supplies",
   "scout_the_northern_road",
   "threat_beyond_the_pass",
@@ -71,15 +74,53 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         requiredCount: 1,
       },
     ],
-    unlocksQuestIds: ["gather_expedition_supplies"],
+    unlocksQuestIds: [EQUIPMENT_TUTORIAL_QUEST_ID],
     rewards: {
-      crowns: 25,
+      crowns: 50,
       characterXp: 8,
       items: [
         { itemId: "wolf_pelt", quantity: 2 },
         { itemId: "minor_recovery_flask", quantity: 1 },
       ],
       equipment: [{ itemId: "acolyte_hood", quantity: 1 }],
+    },
+  },
+  outfit_the_expedition: {
+    id: EQUIPMENT_TUTORIAL_QUEST_ID,
+    displayName: "Outfit the Expedition",
+    sourceType: "npc",
+    questGiverPoiId: QUEST_GIVER_POI_ID,
+    objectives: [
+      {
+        id: "equip_training_sword",
+        type: "equip_item",
+        itemId: "training_sword",
+        targetSlot: "mainHand",
+        requiredCount: 1,
+      },
+      {
+        id: "equip_acolyte_hood",
+        type: "equip_item",
+        itemId: "acolyte_hood",
+        targetSlot: "head",
+        requiredCount: 1,
+      },
+      {
+        id: "equip_minor_recovery_flask",
+        type: "equip_flask",
+        itemId: "minor_recovery_flask",
+        requiredCount: 1,
+      },
+      {
+        id: "buy_merchant_equipment",
+        type: "buy_merchant_equipment",
+        requiredCount: 1,
+      },
+    ],
+    unlocksQuestIds: ["gather_expedition_supplies"],
+    rewards: {
+      crowns: 10,
+      characterXp: 4,
     },
   },
   gather_expedition_supplies: {
@@ -297,6 +338,33 @@ export function hasQuestGiverWork(state: GameState): boolean {
   );
 }
 
+export function isMerchantUnlockedForQuests(state: GameState): boolean {
+  const status = state.quests[EQUIPMENT_TUTORIAL_QUEST_ID]?.status;
+
+  return (
+    status === "active" ||
+    status === "ready_to_turn_in" ||
+    status === "completed"
+  );
+}
+
+export function recordMerchantLockedForQuest(
+  state: GameState,
+  merchantNpcId: string,
+  reason: string,
+): GameState {
+  return appendDebugTelemetryEvent(state, {
+    type: "merchant_locked_for_quest",
+    entityId: merchantNpcId,
+    questId: EQUIPMENT_TUTORIAL_QUEST_ID,
+    result: "blocked",
+    reason,
+    currentMapId: state.currentMapId,
+    currentMapDisplayName: state.map?.displayName,
+    currentMapDebugName: state.map?.debugName,
+  });
+}
+
 export function updateQuestGiverInteraction(state: GameState): GameState {
   let nextState = appendDebugTelemetryEvent(state, {
     type: "quest_dialog_opened",
@@ -500,6 +568,77 @@ export function recordQuestPoiReachedForQuests(
   );
 }
 
+export function recordEquippedItemObjectivesForQuests(
+  state: GameState,
+  reason = "equipment_state_check",
+): GameState {
+  let nextState = state;
+
+  for (const questId of QUEST_ORDER) {
+    const quest = nextState.quests[questId];
+
+    if (quest?.status !== "active") {
+      continue;
+    }
+
+    for (const objective of QUEST_DEFINITIONS[questId].objectives) {
+      if (
+        (objective.type !== "equip_item" && objective.type !== "equip_flask") ||
+        quest.objectiveProgress[objective.id]?.completed ||
+        !objective.itemId
+      ) {
+        continue;
+      }
+
+      const isEquipped =
+        objective.type === "equip_flask"
+          ? isFlaskEquippedByAnyCompanion(nextState, objective.itemId)
+          : isItemEquippedByAnyCompanion(
+              nextState,
+              objective.itemId,
+              objective.targetSlot,
+            );
+
+      nextState = appendDebugTelemetryEvent(nextState, {
+        type: "quest_equipment_state_checked",
+        entityId: "party",
+        questId,
+        objectiveId: objective.id,
+        itemId: objective.itemId,
+        targetSlot: objective.targetSlot,
+        result: isEquipped ? "matched" : "not_matched",
+        reason,
+        currentMapId: nextState.currentMapId,
+        currentMapDisplayName: nextState.map?.displayName,
+        currentMapDebugName: nextState.map?.debugName,
+      });
+
+      if (isEquipped) {
+        nextState = updateObjectiveProgress(nextState, questId, objective, 1);
+      }
+    }
+  }
+
+  return nextState;
+}
+
+export function recordMerchantEquipmentPurchasedForQuests(
+  state: GameState,
+  itemId: ItemId,
+): GameState {
+  const itemDefinition = getItemDefinition(itemId);
+
+  if (!itemDefinition || itemDefinition.category !== "equipment") {
+    return state;
+  }
+
+  return updateMatchingQuestObjectives(
+    state,
+    (objective) => objective.type === "buy_merchant_equipment",
+    1,
+  );
+}
+
 export function getSubzoneIdAtPosition(
   state: GameState,
   position: Position | undefined,
@@ -529,9 +668,11 @@ function acceptQuest(
     return state;
   }
 
-  return appendDebugTelemetryEvent(
+  let nextState = appendDebugTelemetryEvent(
     {
       ...state,
+      autoModeEnabled:
+        questId === EQUIPMENT_TUTORIAL_QUEST_ID ? false : state.autoModeEnabled,
       quests: {
         ...state.quests,
         [questId]: {
@@ -550,6 +691,15 @@ function acceptQuest(
       currentMapDebugName: state.map?.debugName,
     },
   );
+
+  if (questId === EQUIPMENT_TUTORIAL_QUEST_ID) {
+    nextState = recordEquippedItemObjectivesForQuests(
+      nextState,
+      "quest_acceptance",
+    );
+  }
+
+  return nextState;
 }
 
 function claimQuestReward(
@@ -1077,6 +1227,32 @@ function matchesOptionalEnemyArchetype(
   archetypeId: Enemy["archetypeId"],
 ): boolean {
   return !objective.enemyArchetypeId || objective.enemyArchetypeId === archetypeId;
+}
+
+function isItemEquippedByAnyCompanion(
+  state: GameState,
+  itemId: ItemId,
+  targetSlot: EquipmentSlot | undefined,
+): boolean {
+  return Object.values(state.entities).some((entity) => {
+    if (entity.kind !== "companion") {
+      return false;
+    }
+
+    return targetSlot
+      ? entity.equipment[targetSlot] === itemId
+      : Object.values(entity.equipment).includes(itemId);
+  });
+}
+
+function isFlaskEquippedByAnyCompanion(state: GameState, itemId: ItemId): boolean {
+  return Object.values(state.entities).some((entity) => {
+    if (entity.kind !== "companion") {
+      return false;
+    }
+
+    return entity.consumables.flask?.itemId === itemId;
+  });
 }
 
 function updateMatchingQuestObjectives(

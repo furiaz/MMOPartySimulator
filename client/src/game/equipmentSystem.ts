@@ -3,6 +3,7 @@ import {
   addItemToInventoryState,
   removeItemFromInventoryState,
 } from "./inventory";
+import { recordEquippedItemObjectivesForQuests } from "./questSystem";
 import { updateEntity } from "./state";
 import type { GameState } from "./state";
 import type {
@@ -130,6 +131,10 @@ export function equipItemToCompanion(
     previousItemId,
     result: "success",
   });
+  nextState = recordEquippedItemObjectivesForQuests(
+    nextState,
+    "equipment_equipped",
+  );
 
   return {
     state: nextState,

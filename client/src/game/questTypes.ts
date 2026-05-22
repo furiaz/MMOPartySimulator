@@ -1,6 +1,7 @@
 import type {
   DebugMapId,
   EnemyArchetypeId,
+  EquipmentSlot,
   ItemId,
   Position,
   ResourceType,
@@ -9,6 +10,7 @@ import type { PoiCategory } from "./poiTypes";
 
 export type QuestId =
   | "clear_the_shore"
+  | "outfit_the_expedition"
   | "gather_expedition_supplies"
   | "scout_the_northern_road"
   | "threat_beyond_the_pass";
@@ -25,6 +27,9 @@ export type QuestObjectiveType =
   | "reach_poi"
   | "defeat_enemy_count"
   | "gather_item_count"
+  | "equip_item"
+  | "equip_flask"
+  | "buy_merchant_equipment"
   | "inspect_poi"
   | "guide_npc_to_poi"
   | "return_to_poi";
@@ -41,6 +46,8 @@ export type QuestObjectiveDefinition = {
   enemyMapId?: DebugMapId;
   enemyArchetypeId?: EnemyArchetypeId;
   resourceType?: ResourceType;
+  itemId?: ItemId;
+  targetSlot?: EquipmentSlot;
   requiredCount?: number;
 };
 

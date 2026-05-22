@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createEnemy, createResource } from "./entities";
+import { createCompanion, createEnemy, createNpc, createResource } from "./entities";
 import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debugTelemetry";
 import { createDebugMap, MAP_ONE_ID } from "./debugMap";
+import { addItemToInventoryState } from "./inventory";
+import { buyMerchantItem } from "./merchant";
+import { addEntity } from "./state";
+import { equipFlaskToCompanion } from "./consumables";
 import {
   acceptQuestFromQuestGiver,
   createInitialQuestStates,
@@ -9,12 +13,15 @@ import {
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
+  isMerchantUnlockedForQuests,
   QUEST_GIVER_POI_ID,
+  recordEquippedItemObjectivesForQuests,
   recordEnemyDefeatedForQuests,
   recordQuestPoiReachedForQuests,
   recordResourceGatheredForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
+import { equipItemToCompanion } from "./equipmentSystem";
 import { createTestGameState } from "./testState";
 import type { EnemyArchetypeId } from "./types";
 import type { QuestId, QuestState } from "./questTypes";
@@ -62,9 +69,10 @@ describe("prototype quest system", () => {
 
     state = updateQuestGiverInteraction(state);
     expect(state.quests.clear_the_shore.status).toBe("completed");
-    expect(state.quests.gather_expedition_supplies.status).toBe("available");
+    expect(state.quests.outfit_the_expedition.status).toBe("available");
+    expect(state.quests.gather_expedition_supplies.status).toBe("locked");
     expect(state.quests.scout_the_northern_road.status).toBe("locked");
-    expect(state.wallet.balancesByCurrencyId.crowns).toBe(25);
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(50);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
@@ -76,6 +84,171 @@ describe("prototype quest system", () => {
     expect(getCompanion(state, "companion-2").characterLevel).toBe(2);
     expect(getCompanion(state, "companion-2").characterXp).toBe(2);
     expect(getCompanion(state, "companion-2").lastCharacterXpGained).toBe(8);
+  });
+
+  it("completes equipment tutorial objectives from current equipment state", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        outfit_the_expedition: "active",
+      }),
+    });
+
+    state = addItemToInventoryState(state, "training_sword", 1, "debug").state;
+    state = addItemToInventoryState(state, "acolyte_hood", 1, "debug").state;
+    state = addItemToInventoryState(state, "minor_recovery_flask", 1, "debug").state;
+    state = equipItemToCompanion(
+      state,
+      "companion-1",
+      "training_sword",
+      "mainHand",
+    ).state;
+    state = equipItemToCompanion(
+      state,
+      "companion-1",
+      "acolyte_hood",
+      "head",
+    ).state;
+    state = equipFlaskToCompanion(
+      state,
+      "companion-1",
+      "minor_recovery_flask",
+    ).state;
+
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.equip_training_sword,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.equip_acolyte_hood,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.equip_minor_recovery_flask,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(state.quests.outfit_the_expedition.status).toBe("active");
+  });
+
+  it("checks already-equipped tutorial items when the quest is accepted", () => {
+    const leader = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      equipment: {
+        ...createCompanion("companion-template", { x: 0, y: 0 }, "companion-1")
+          .equipment,
+        mainHand: "training_sword" as const,
+        head: "acolyte_hood" as const,
+      },
+      consumables: {
+        ...createCompanion("companion-template", { x: 0, y: 0 }, "companion-1")
+          .consumables,
+        flask: {
+          itemId: "minor_recovery_flask" as const,
+          charges: 0,
+          lastUsedAt: null,
+        },
+      },
+    };
+    let state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+      },
+      partyLeaderId: leader.id,
+      followTrailsByEntityId: {
+        [leader.id]: [],
+      },
+      autoModeEnabled: true,
+      quests: createQuestStates({
+        outfit_the_expedition: "available",
+      }),
+    });
+
+    state = acceptQuestFromQuestGiver(
+      state,
+      QUEST_GIVER_POI_ID,
+      "outfit_the_expedition",
+    );
+
+    expect(state.autoModeEnabled).toBe(false);
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.equip_training_sword
+        .completed,
+    ).toBe(true);
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.equip_acolyte_hood
+        .completed,
+    ).toBe(true);
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress
+        .equip_minor_recovery_flask.completed,
+    ).toBe(true);
+  });
+
+  it("completes the merchant equipment objective only for equipment purchases", () => {
+    const merchant = createNpc("merchant-1", { x: 2, y: 0 }, "Merchant", "merchant");
+    let state = createStateWithParty({
+      wallet: {
+        balancesByCurrencyId: {
+          crowns: 100,
+        },
+      },
+      quests: createQuestStates({
+        outfit_the_expedition: "active",
+      }),
+    });
+    state = addEntity(state, merchant);
+
+    state = buyMerchantItem(state, merchant.id, "minor_recovery_flask").state;
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.buy_merchant_equipment,
+    ).toMatchObject({
+      currentCount: 0,
+      completed: false,
+    });
+
+    state = buyMerchantItem(state, merchant.id, "training_sword").state;
+    expect(
+      state.quests.outfit_the_expedition.objectiveProgress.buy_merchant_equipment,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+  });
+
+  it("keeps the merchant locked before the equipment tutorial is accepted", () => {
+    const merchant = createNpc("merchant-1", { x: 2, y: 0 }, "Merchant", "merchant");
+    let state = createStateWithParty({
+      wallet: {
+        balancesByCurrencyId: {
+          crowns: 100,
+        },
+      },
+      quests: createQuestStates({
+        outfit_the_expedition: "available",
+      }),
+    });
+    state = addEntity(state, merchant);
+
+    expect(isMerchantUnlockedForQuests(state)).toBe(false);
+
+    const lockedPurchase = buyMerchantItem(state, merchant.id, "training_sword");
+    expect(lockedPurchase.result).toMatchObject({
+      status: "failed",
+      reason: "merchant_locked_for_quest",
+    });
+
+    state = acceptQuestFromQuestGiver(
+      state,
+      QUEST_GIVER_POI_ID,
+      "outfit_the_expedition",
+    );
+
+    expect(isMerchantUnlockedForQuests(state)).toBe(true);
   });
 
   it("keeps rewards all-or-nothing when equipment reward cannot fit", () => {
@@ -166,7 +339,7 @@ describe("prototype quest system", () => {
 
     expect(state.quests.clear_the_shore.status).toBe("completed");
     expect(state.quests.gather_expedition_supplies.status).toBe("completed");
-    expect(state.wallet.balancesByCurrencyId.crowns).toBe(45);
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(70);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
@@ -414,7 +587,7 @@ describe("prototype quest system", () => {
     state = updateQuestGiverInteraction(state);
 
     expect(state.quests.clear_the_shore.status).toBe("completed");
-    expect(state.wallet.balancesByCurrencyId.crowns).toBe(25);
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(50);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
@@ -444,6 +617,39 @@ describe("prototype quest system", () => {
     expect(eventTypes).toContain("quest_reward_item_added");
     expect(eventTypes).toContain("quest_reward_equipment_added");
     expect(eventTypes).toContain("quest_reward_claim_succeeded");
+  });
+
+  it("records equipment objective check telemetry", () => {
+    let state = startDebugTelemetryRecording(
+      createStateWithParty({
+        debugTelemetry: createDebugTelemetryState(),
+        quests: createQuestStates({
+          outfit_the_expedition: "active",
+        }),
+      }),
+    );
+
+    state = recordEquippedItemObjectivesForQuests(state, "test_check");
+
+    expect(state.debugTelemetry?.events).toContainEqual(
+      expect.objectContaining({
+        type: "quest_equipment_state_checked",
+        questId: "outfit_the_expedition",
+        objectiveId: "equip_training_sword",
+        itemId: "training_sword",
+        targetSlot: "mainHand",
+        result: "not_matched",
+      }),
+    );
+    expect(state.debugTelemetry?.events).toContainEqual(
+      expect.objectContaining({
+        type: "quest_equipment_state_checked",
+        questId: "outfit_the_expedition",
+        objectiveId: "equip_minor_recovery_flask",
+        itemId: "minor_recovery_flask",
+        result: "not_matched",
+      }),
+    );
   });
 });
 

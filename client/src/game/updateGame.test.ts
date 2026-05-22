@@ -3099,6 +3099,25 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget?.reason).toBe("merchant quick exchange");
   });
 
+  it("does not choose hub Merchant quick exchange before the equipment tutorial is accepted", () => {
+    const leader = createLeader({ x: 7, y: 20 });
+    const stateWithJunk = addItemToInventoryState(
+      createHubState([leader, ...createHubNpcs()], {
+        partyLeaderId: leader.id,
+        quests: createQuestStates({
+          outfit_the_expedition: "available",
+        }),
+      }),
+      "wolf_pelt",
+      1,
+    ).state;
+
+    const nextState = updateGame(stateWithJunk);
+
+    expect(nextState.localPoiTarget?.poiId).not.toBe(npcIds[1]);
+    expect(nextState.localPoiTarget?.reason).toBe("accept available quest");
+  });
+
   it("delivers a ready hub quest before accepting a new quest", () => {
     const leader = createLeader({ x: 22, y: 13 });
 

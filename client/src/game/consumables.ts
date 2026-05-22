@@ -12,6 +12,7 @@ import {
 } from "./inventory";
 import { getItemDefinition } from "./items";
 import { getPartyMembers } from "./partySystem";
+import { recordEquippedItemObjectivesForQuests } from "./questSystem";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   Companion,
@@ -210,6 +211,7 @@ export function equipFlaskToCompanion(
       },
     },
   });
+  nextState = recordEquippedItemObjectivesForQuests(nextState, "flask_equipped");
 
   return {
     state: nextState,

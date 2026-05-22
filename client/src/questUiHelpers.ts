@@ -137,6 +137,20 @@ export function getObjectiveLabel(
     )}`;
   }
 
+  if (objective.type === "equip_item" || objective.type === "equip_flask") {
+    const itemDefinition = objective.itemId
+      ? getItemDefinition(objective.itemId)
+      : null;
+
+    return itemDefinition
+      ? `Equip ${itemDefinition.displayName}`
+      : "Equip Item";
+  }
+
+  if (objective.type === "buy_merchant_equipment") {
+    return "Buy Equipment";
+  }
+
   if (objective.type === "reach_poi") {
     return `Explore ${formatQuestMapName(objective.targetMapId)}`;
   }
