@@ -790,14 +790,20 @@
 }
 
 .merchant-interaction {
+  --npc-interaction-left: 16px;
   position: fixed;
   top: 76px;
-  left: 16px;
+  left: var(--npc-interaction-left);
   z-index: 14;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   color: #e6f0f2;
+}
+
+.merchant-interaction.quest-tracker-offset {
+  --npc-interaction-left: 248px;
+  top: 12px;
 }
 
 .merchant-menu,
@@ -895,7 +901,7 @@
 }
 
 .merchant-buy-panel {
-  width: min(700px, calc(100vw - 270px));
+  width: min(700px, calc(100vw - var(--npc-interaction-left) - 254px));
 }
 
 .merchant-buy-header {
@@ -1148,6 +1154,63 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.guide-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 12, 16, 0.56);
+}
+
+.guide-popup-panel {
+  display: grid;
+  gap: 14px;
+  width: min(420px, 100%);
+  padding: 18px;
+  box-sizing: border-box;
+  border: 1px solid #8fb8bf;
+  background: rgba(26, 42, 47, 0.97);
+  color: #e6f0f2;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.36);
+}
+
+.guide-popup-panel h2,
+.guide-popup-panel p {
+  margin: 0;
+}
+
+.guide-popup-panel h2 {
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.guide-popup-panel p {
+  line-height: 1.45;
+}
+
+.guide-popup-kicker {
+  color: #f3df93;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.guide-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.guide-popup-actions button {
+  min-width: 82px;
+}
+
+.guide-popup-primary-action {
+  font-weight: 800;
 }
 
 .inventory-panel,
@@ -2123,6 +2186,8 @@ button {
 
 @media (max-width: 520px) {
   .merchant-interaction {
+    --npc-interaction-left: 16px;
+    left: 16px;
     right: 16px;
     flex-direction: column;
   }

@@ -773,6 +773,13 @@ function drawHealthBar(
   entity: GameEntity,
   transform: FullTransform,
 ) {
+  if (
+    entity.kind === "enemy" &&
+    (entity.state === "dead" || entity.health <= 0)
+  ) {
+    return;
+  }
+
   const healthPercent = getEntityHealthPercent(entity);
 
   if (healthPercent === null) {

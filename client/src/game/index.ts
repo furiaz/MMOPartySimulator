@@ -434,6 +434,7 @@ export {
   updateResurrectionSystem,
 } from "./resurrectionSystem";
 export {
+  EQUIPMENT_TUTORIAL_QUEST_ID,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
   QUEST_ORDER,

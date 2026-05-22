@@ -1,10 +1,16 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 import "./App.css";
 import { GameMenu } from "./GameMenu";
+import {
+  GuidePopup,
+  guidePopupDefinitions,
+  type GuidePopupId,
+} from "./GuidePopup";
 import {
   CompanionVitalsPanel,
   type GameMenuTab,
@@ -54,6 +60,7 @@ import {
   equipItemToCompanion,
   equipFlaskToCompanion,
   exportDebugTelemetryReport,
+  EQUIPMENT_TUTORIAL_QUEST_ID,
   formatCurrencyDisplay,
   getAvailableInventorySlots,
   getCurrencyBalance,
@@ -1267,6 +1274,15 @@ function App() {
     null,
   );
   const [selectedQuestId, setSelectedQuestId] = useState<QuestId | null>(null);
+  const [activeGuidePopupId, setActiveGuidePopupId] =
+    useState<GuidePopupId | null>(null);
+  const [activeGuidePanelIndex, setActiveGuidePanelIndex] = useState(0);
+  const [viewedGuidePopupIds, setViewedGuidePopupIds] = useState<GuidePopupId[]>(
+    [],
+  );
+  const [queuedGuidePopupIds, setQueuedGuidePopupIds] = useState<GuidePopupId[]>(
+    [],
+  );
   const [isQuestTrackerHidden, setIsQuestTrackerHidden] = useState(false);
   const [activeMerchantNpcId, setActiveMerchantNpcId] = useState<string | null>(
     null,
@@ -1298,6 +1314,11 @@ function App() {
     setVisualMovementByEntityId,
   ] = useState<Record<string, EntityVisualMovement>>({});
   const stopLoopRef = useRef<(() => void) | null>(null);
+  const activeGuidePopupIdRef = useRef<GuidePopupId | null>(null);
+  const viewedGuidePopupIdsRef = useRef(new Set<GuidePopupId>());
+  const queuedGuidePopupIdsRef = useRef<GuidePopupId[]>([]);
+  const isGuideSequenceActiveRef = useRef(false);
+  const shouldResumeAfterGuideSequenceRef = useRef(false);
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
@@ -1394,6 +1415,114 @@ function App() {
       ? gameState.hubDepartureFoodWarning
       : null;
   const previousInteractionMapIdRef = useRef(currentMap.id);
+  const equipmentTutorialQuestStatus =
+    gameState.quests[EQUIPMENT_TUTORIAL_QUEST_ID]?.status ?? null;
+  const previousEquipmentTutorialQuestStatusRef = useRef(
+    equipmentTutorialQuestStatus,
+  );
+  const rescuedWipeId =
+    gameState.worldWipeRecovery?.status === "rescued"
+      ? gameState.worldWipeRecovery.wipeId
+      : null;
+  const previousRescuedWipeIdRef = useRef(rescuedWipeId);
+  const activeGuidePopup = activeGuidePopupId
+    ? guidePopupDefinitions[activeGuidePopupId]
+    : null;
+
+  const startSimulationLoop = useCallback(() => {
+    if (stopLoopRef.current) {
+      return;
+    }
+
+    stopLoopRef.current = startGameLoop(setGameState);
+    setIsSimulationRunning(true);
+  }, []);
+
+  const stopSimulationLoop = useCallback(() => {
+    if (!stopLoopRef.current) {
+      return;
+    }
+
+    stopLoopRef.current();
+    stopLoopRef.current = null;
+    setIsSimulationRunning(false);
+  }, []);
+
+  const queueGuidePopup = useCallback((guidePopupId: GuidePopupId) => {
+    if (
+      viewedGuidePopupIdsRef.current.has(guidePopupId) ||
+      activeGuidePopupIdRef.current === guidePopupId ||
+      queuedGuidePopupIdsRef.current.includes(guidePopupId)
+    ) {
+      return;
+    }
+
+    setQueuedGuidePopupIds((currentQueue) => {
+      if (currentQueue.includes(guidePopupId)) {
+        return currentQueue;
+      }
+
+      const nextQueue = [...currentQueue, guidePopupId];
+      queuedGuidePopupIdsRef.current = nextQueue;
+
+      return nextQueue;
+    });
+  }, []);
+
+  useEffect(() => {
+    viewedGuidePopupIdsRef.current = new Set(viewedGuidePopupIds);
+  }, [viewedGuidePopupIds]);
+
+  useEffect(() => {
+    activeGuidePopupIdRef.current = activeGuidePopupId;
+  }, [activeGuidePopupId]);
+
+  useEffect(() => {
+    if (activeGuidePopupId || queuedGuidePopupIds.length === 0) {
+      return;
+    }
+
+    const [nextGuidePopupId, ...remainingGuidePopupIds] = queuedGuidePopupIds;
+
+    queuedGuidePopupIdsRef.current = remainingGuidePopupIds;
+    setQueuedGuidePopupIds(remainingGuidePopupIds);
+
+    if (!isGuideSequenceActiveRef.current) {
+      isGuideSequenceActiveRef.current = true;
+      shouldResumeAfterGuideSequenceRef.current = Boolean(stopLoopRef.current);
+      stopSimulationLoop();
+    }
+
+    activeGuidePopupIdRef.current = nextGuidePopupId;
+    setActiveGuidePopupId(nextGuidePopupId);
+    setActiveGuidePanelIndex(0);
+  }, [activeGuidePopupId, queuedGuidePopupIds, stopSimulationLoop]);
+
+  useEffect(() => {
+    queueGuidePopup("welcome");
+  }, [queueGuidePopup]);
+
+  useEffect(() => {
+    const previousStatus = previousEquipmentTutorialQuestStatusRef.current;
+    previousEquipmentTutorialQuestStatusRef.current =
+      equipmentTutorialQuestStatus;
+
+    if (
+      previousStatus !== "active" &&
+      equipmentTutorialQuestStatus === "active"
+    ) {
+      queueGuidePopup("equipment_setup");
+    }
+  }, [equipmentTutorialQuestStatus, queueGuidePopup]);
+
+  useEffect(() => {
+    const previousWipeId = previousRescuedWipeIdRef.current;
+    previousRescuedWipeIdRef.current = rescuedWipeId;
+
+    if (rescuedWipeId && rescuedWipeId !== previousWipeId) {
+      queueGuidePopup("first_wipe_rescue");
+    }
+  }, [queueGuidePopup, rescuedWipeId]);
 
   useEffect(() => {
     const previousMapId = previousInteractionMapIdRef.current;
@@ -1625,20 +1754,62 @@ function App() {
 
   function toggleSimulationLoop() {
     if (stopLoopRef.current) {
-      stopLoopRef.current();
-      stopLoopRef.current = null;
-      setIsSimulationRunning(false);
+      stopSimulationLoop();
       return;
     }
 
-    stopLoopRef.current = startGameLoop(setGameState);
-    setIsSimulationRunning(true);
+    startSimulationLoop();
   }
 
   function toggleAutoMode() {
     setGameState((state) =>
       setAutoModeEnabled(state, !state.autoModeEnabled),
     );
+  }
+
+  function showPreviousGuidePanel() {
+    setActiveGuidePanelIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+  }
+
+  function showNextGuidePanel() {
+    if (!activeGuidePopupId) {
+      return;
+    }
+
+    const lastPanelIndex =
+      guidePopupDefinitions[activeGuidePopupId].panels.length - 1;
+
+    setActiveGuidePanelIndex((currentIndex) =>
+      Math.min(currentIndex + 1, lastPanelIndex),
+    );
+  }
+
+  function closeActiveGuidePopup() {
+    if (!activeGuidePopupId) {
+      return;
+    }
+
+    viewedGuidePopupIdsRef.current.add(activeGuidePopupId);
+    setViewedGuidePopupIds((currentViewedIds) =>
+      currentViewedIds.includes(activeGuidePopupId)
+        ? currentViewedIds
+        : [...currentViewedIds, activeGuidePopupId],
+    );
+    activeGuidePopupIdRef.current = null;
+    setActiveGuidePopupId(null);
+    setActiveGuidePanelIndex(0);
+
+    if (queuedGuidePopupIdsRef.current.length > 0) {
+      return;
+    }
+
+    const shouldResumeSimulation = shouldResumeAfterGuideSequenceRef.current;
+    isGuideSequenceActiveRef.current = false;
+    shouldResumeAfterGuideSequenceRef.current = false;
+
+    if (shouldResumeSimulation) {
+      startSimulationLoop();
+    }
   }
 
   function cyclePoiSearchScope() {
@@ -2438,7 +2609,7 @@ function App() {
 
         {activeMerchant ? (
           <section
-            className="merchant-interaction npc-interaction"
+            className="merchant-interaction quest-tracker-offset npc-interaction"
             aria-label="Merchant menu"
           >
             <div className="merchant-menu">
@@ -2654,6 +2825,16 @@ function App() {
               </p>
             </div>
           </section>
+        ) : null}
+
+        {activeGuidePopup ? (
+          <GuidePopup
+            guide={activeGuidePopup}
+            panelIndex={activeGuidePanelIndex}
+            onBack={showPreviousGuidePanel}
+            onClose={closeActiveGuidePopup}
+            onNext={showNextGuidePanel}
+          />
         ) : null}
 
         <GameMenu
