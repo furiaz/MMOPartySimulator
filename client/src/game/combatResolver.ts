@@ -296,6 +296,9 @@ function addCombatResolutionFeedback(
   let nextState = addCombatFeedback(state, {
     type: "attack",
     entityId: attacker.id,
+    sourceEntityId: attacker.id,
+    targetEntityId: target.id,
+    feedbackKind: "attack",
     text: options.label ?? "Attack",
     now: options.now,
   });
@@ -304,6 +307,10 @@ function addCombatResolutionFeedback(
     return addCombatFeedback(nextState, {
       type: "damage",
       entityId: target.id,
+      sourceEntityId: attacker.id,
+      targetEntityId: target.id,
+      damageType: options.damageType,
+      feedbackKind: "dodged",
       text: "Dodged",
       now: options.now,
     });
@@ -317,6 +324,10 @@ function addCombatResolutionFeedback(
     nextState = addCombatFeedback(nextState, {
       type: "damage",
       entityId: target.id,
+      sourceEntityId: attacker.id,
+      targetEntityId: target.id,
+      damageType: options.damageType,
+      feedbackKind: "blocked",
       text: "Blocked",
       now: options.now,
     });
@@ -326,6 +337,10 @@ function addCombatResolutionFeedback(
     nextState = addCombatFeedback(nextState, {
       type: "damage",
       entityId: target.id,
+      sourceEntityId: attacker.id,
+      targetEntityId: target.id,
+      damageType: options.damageType,
+      feedbackKind: "critical",
       text: "Critical",
       now: options.now,
     });
@@ -334,6 +349,11 @@ function addCombatResolutionFeedback(
   nextState = addCombatFeedback(nextState, {
     type: "damage",
     entityId: target.id,
+    sourceEntityId: attacker.id,
+    targetEntityId: target.id,
+    damageType: options.damageType,
+    feedbackKind: "damage",
+    amount: outcome.finalDamage,
     text: `-${outcome.finalDamage} HP`,
     now: options.now,
   });
@@ -342,6 +362,9 @@ function addCombatResolutionFeedback(
     nextState = addCombatFeedback(nextState, {
       type: "death",
       entityId: target.id,
+      sourceEntityId: attacker.id,
+      targetEntityId: target.id,
+      feedbackKind: "death",
       text: "Defeated",
       now: options.now,
     });

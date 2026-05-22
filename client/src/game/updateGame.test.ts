@@ -415,7 +415,7 @@ describe("game update intent priority", () => {
     );
   });
 
-  it("uses guide attraction without targeting or damaging the guide", () => {
+  it("does not let the guide attract enemies outside normal aggro range", () => {
     const leader = createLeader({ x: 92, y: 28 });
     const guide = {
       ...createQuestGuideNpc(),
@@ -437,8 +437,9 @@ describe("game update intent priority", () => {
     const updatedEnemy = nextState.entities[enemy.id];
 
     expect(updatedEnemy).toMatchObject({
-      currentTargetId: leader.id,
-      targetDecisionReason: "guide_attraction",
+      state: "idle",
+      currentTargetId: null,
+      targetDecisionReason: "outside_detection",
     });
     expect(updatedEnemy).not.toMatchObject({ currentTargetId: guide.id });
     expect(nextState.entities[guide.id]).not.toHaveProperty("health");

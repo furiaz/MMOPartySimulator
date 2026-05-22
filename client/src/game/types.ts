@@ -58,7 +58,6 @@ export type EnemyTargetDecisionReason =
   | "closest"
   | "leader"
   | "lowest_health"
-  | "guide_attraction"
   | "passive_no_auto_target"
   | "outside_detection"
   | "outside_leash"
@@ -554,9 +553,14 @@ export type CombatFeedbackType =
   | "heal";
 
 export type CombatFeedbackEvent = {
+  amount?: number;
+  damageType?: CombatDamageType;
   id: string;
   type: CombatFeedbackType;
   entityId: string;
+  feedbackKind?: string;
+  sourceEntityId?: string;
+  targetEntityId?: string;
   text: string;
   createdAt: number;
   expiresAt: number;

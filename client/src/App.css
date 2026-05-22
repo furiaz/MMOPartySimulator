@@ -204,7 +204,8 @@
   z-index: 11;
   display: grid;
   width: 256px;
-  max-height: calc(52vh - 190px);
+  max-height: calc(100vh - 184px);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
   box-sizing: border-box;
   padding: 7px;
@@ -251,7 +252,11 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   min-width: 0;
+  min-height: 0;
   margin: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
 }
 
 .performance-overlay-row {

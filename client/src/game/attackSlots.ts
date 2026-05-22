@@ -5,6 +5,7 @@ import {
   previewMoveTowardPosition,
   type GameState,
 } from "./state";
+import { recordAttackSlotCheck } from "./performanceMetrics";
 import {
   arePositionsEqual,
   getGridDistance,
@@ -24,13 +25,25 @@ const ATTACK_SLOT_DIRECTIONS: Position[] = [
 ];
 
 type AttackSlotOptions = {
+  attackSlotReuseMs?: number;
   maxPathDistance?: number;
   leader?: GameEntity;
   leaderSafeDistance?: number;
   leaderMaxPathDistance?: number;
   preferredSlotIndex?: number;
   allowPartyPassThrough?: boolean;
+  nowMs?: number;
+  pathDistanceCache?: AttackSlotPathDistanceCache;
+  targetId?: string;
 };
+
+export type AttackSlotPathDistanceCache = Map<string, number>;
+
+const DEFAULT_ATTACK_SLOT_REUSE_MS = 250;
+
+export function createAttackSlotPathDistanceCache(): AttackSlotPathDistanceCache {
+  return new Map<string, number>();
+}
 
 export function chooseAttackSlot(
   state: GameState,
@@ -39,18 +52,94 @@ export function chooseAttackSlot(
   attackRange: number,
   options: AttackSlotOptions = {},
 ): Position | null {
-  return (
-    getSortedCombatPositions(
-      state,
-      getAttackSlotPositions(targetPosition, attackRange),
-      attacker,
-      targetPosition,
-      options,
-      options.preferredSlotIndex,
-    ).find((position) =>
-      isReachableCombatPosition(state, attacker, position, options),
-    ) ?? null
+  recordAttackSlotCheck();
+  const cachedAttackSlot = getReusableCachedAttackSlot(
+    state,
+    attacker,
+    targetPosition,
+    attackRange,
+    options,
   );
+
+  if (cachedAttackSlot) {
+    return cachedAttackSlot;
+  }
+
+  const pathDistanceCache =
+    options.pathDistanceCache ?? createAttackSlotPathDistanceCache();
+  const rankedPositions = getRankedCombatPositions(
+    getAttackSlotPositions(targetPosition, attackRange),
+    attacker,
+    targetPosition,
+    options.preferredSlotIndex,
+  ).filter((position) =>
+    isCheaplyReachableCombatPosition(state, attacker, position, options),
+  );
+
+  for (const position of rankedPositions) {
+    if (
+      isReachableCombatPosition(
+        state,
+        attacker,
+        position,
+        options,
+        pathDistanceCache,
+      )
+    ) {
+      return position;
+    }
+  }
+
+  return null;
+}
+
+export function getAttackSlotPathDistanceCacheKey(
+  state: GameState,
+  entity: GameEntity,
+  position: Position,
+  maxDistance: number,
+  options: Pick<AttackSlotOptions, "allowPartyPassThrough"> = {},
+): string {
+  return [
+    getAttackSlotMapCacheKey(state),
+    entity.id,
+    `${entity.position.x},${entity.position.y}`,
+    `${position.x},${position.y}`,
+    maxDistance,
+    options.allowPartyPassThrough ? "party-pass" : "solid-party",
+  ].join(":");
+}
+
+export function rememberAttackSlot(
+  state: GameState,
+  attacker: GameEntity,
+  targetPosition: Position,
+  attackRange: number,
+  attackSlot: Position,
+  options: Pick<
+    AttackSlotOptions,
+    "allowPartyPassThrough" | "nowMs" | "targetId"
+  > = {},
+): GameState {
+  return {
+    ...state,
+    attackSlotCacheByEntityId: {
+      ...(state.attackSlotCacheByEntityId ?? {}),
+      [attacker.id]: {
+        attackRange,
+        attackSlot,
+        createdAtMs: options.nowMs ?? state.simulationTimeMs ?? 0,
+        mapKey: getAttackSlotMapCacheKey(state),
+        targetId: options.targetId,
+        targetPosition,
+        usesPartyPassThrough: Boolean(options.allowPartyPassThrough),
+      },
+    },
+  };
+}
+
+function getAttackSlotMapCacheKey(state: GameState): string {
+  return state.map?.id ?? state.map?.debugName ?? "no-map";
 }
 
 function getAttackSlotPositions(
@@ -63,23 +152,57 @@ function getAttackSlotPositions(
   }));
 }
 
-function getSortedCombatPositions(
+function getReusableCachedAttackSlot(
   state: GameState,
+  attacker: CombatEntity,
+  targetPosition: Position,
+  attackRange: number,
+  options: AttackSlotOptions,
+): Position | null {
+  const cachedSlot = state.attackSlotCacheByEntityId?.[attacker.id];
+
+  if (!cachedSlot) {
+    return null;
+  }
+
+  const nowMs = options.nowMs ?? state.simulationTimeMs ?? 0;
+  const reuseMs = options.attackSlotReuseMs ?? DEFAULT_ATTACK_SLOT_REUSE_MS;
+
+  if (
+    nowMs - cachedSlot.createdAtMs > reuseMs ||
+    cachedSlot.mapKey !== getAttackSlotMapCacheKey(state) ||
+    cachedSlot.targetId !== options.targetId ||
+    cachedSlot.attackRange !== attackRange ||
+    cachedSlot.usesPartyPassThrough !== Boolean(options.allowPartyPassThrough) ||
+    !arePositionsEqual(cachedSlot.targetPosition, targetPosition) ||
+    (state.movementFailureMsByEntityId?.[attacker.id] ?? 0) >= reuseMs
+  ) {
+    return null;
+  }
+
+  return isCheaplyReachableCombatPosition(
+    state,
+    attacker,
+    cachedSlot.attackSlot,
+    options,
+  )
+    ? cachedSlot.attackSlot
+    : null;
+}
+
+function getRankedCombatPositions(
   positions: Position[],
   attacker: CombatEntity,
   targetPosition: Position,
-  options: AttackSlotOptions,
   preferredSlotIndex = 0,
 ): Position[] {
   return [...positions]
     .map((position, index) => ({
       position,
       index,
-      pathDistance: getAttackSlotPathDistance(state, attacker, position, options),
     }))
     .sort(
       (a, b) =>
-        a.pathDistance - b.pathDistance ||
         getGridDistance(a.position, targetPosition) -
           getGridDistance(b.position, targetPosition) ||
         getManhattanDistance(a.position, targetPosition) -
@@ -96,20 +219,52 @@ function getSortedCombatPositions(
     .map(({ position }) => position);
 }
 
-function getAttackSlotPathDistance(
+function isCheaplyReachableCombatPosition(
   state: GameState,
   attacker: CombatEntity,
   position: Position,
   options: AttackSlotOptions,
+): boolean {
+  return (
+    isCombatPositionAvailable(state, attacker, position) &&
+    (arePositionsEqual(attacker.position, position) ||
+      previewMoveTowardPosition(state, attacker, position, {
+        allowPartyPassThrough: options.allowPartyPassThrough,
+      }) !== null)
+  );
+}
+
+function getAttackSlotPathDistance(
+  state: GameState,
+  entity: GameEntity,
+  position: Position,
+  options: AttackSlotOptions,
+  pathDistanceCache: AttackSlotPathDistanceCache,
 ): number {
-  if (arePositionsEqual(attacker.position, position)) {
+  if (arePositionsEqual(entity.position, position)) {
     return 0;
   }
 
   const maxDistance = options.maxPathDistance ?? Number.POSITIVE_INFINITY;
-  const pathDistance = getBoundedPathDistance(state, attacker, position, maxDistance);
+  const cacheKey = getAttackSlotPathDistanceCacheKey(
+    state,
+    entity,
+    position,
+    maxDistance,
+    options,
+  );
+  const cachedDistance = pathDistanceCache.get(cacheKey);
 
-  return pathDistance ?? Number.POSITIVE_INFINITY;
+  if (cachedDistance !== undefined) {
+    return cachedDistance;
+  }
+
+  const pathDistance = getBoundedPathDistance(state, entity, position, maxDistance);
+  const resolvedDistance = pathDistance ?? Number.POSITIVE_INFINITY;
+
+  pathDistanceCache.set(cacheKey, resolvedDistance);
+
+  return resolvedDistance;
 }
 
 function getSlotPreferenceDistance(
@@ -131,11 +286,12 @@ function isReachableCombatPosition(
   attacker: CombatEntity,
   position: Position,
   options: AttackSlotOptions,
+  pathDistanceCache: AttackSlotPathDistanceCache,
 ): boolean {
   return (
     isCombatPositionAvailable(state, attacker, position) &&
-    isWithinAttackerPathLimit(state, attacker, position, options) &&
-    isLeaderSafeAttackSlot(state, position, options) &&
+    isWithinAttackerPathLimit(state, attacker, position, options, pathDistanceCache) &&
+    isLeaderSafeAttackSlot(state, position, options, pathDistanceCache) &&
     (arePositionsEqual(attacker.position, position) ||
       previewMoveTowardPosition(state, attacker, position, {
         allowPartyPassThrough: options.allowPartyPassThrough,
@@ -148,11 +304,12 @@ function isWithinAttackerPathLimit(
   attacker: CombatEntity,
   position: Position,
   options: AttackSlotOptions,
+  pathDistanceCache: AttackSlotPathDistanceCache,
 ): boolean {
   return (
     options.maxPathDistance === undefined ||
-    getBoundedPathDistance(state, attacker, position, options.maxPathDistance) !==
-      null
+    getAttackSlotPathDistance(state, attacker, position, options, pathDistanceCache) !==
+      Number.POSITIVE_INFINITY
   );
 }
 
@@ -160,6 +317,7 @@ function isLeaderSafeAttackSlot(
   state: GameState,
   position: Position,
   options: AttackSlotOptions,
+  pathDistanceCache: AttackSlotPathDistanceCache,
 ): boolean {
   if (!options.leader) {
     return true;
@@ -175,12 +333,16 @@ function isLeaderSafeAttackSlot(
 
   return (
     options.leaderMaxPathDistance !== undefined &&
-    getBoundedPathDistance(
+    getAttackSlotPathDistance(
       state,
       options.leader,
       position,
-      options.leaderMaxPathDistance,
-    ) !== null
+      {
+        ...options,
+        maxPathDistance: options.leaderMaxPathDistance,
+      },
+      pathDistanceCache,
+    ) !== Number.POSITIVE_INFINITY
   );
 }
 

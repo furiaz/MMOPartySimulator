@@ -15,10 +15,6 @@ import {
   getEnemyTargetPreference,
   getEnemyTemperament,
 } from "./enemyArchetypes";
-import {
-  QUEST_GUIDE_ATTRACTION_RANGE_MULTIPLIER,
-  getActiveQuestGuide,
-} from "./questGuideSystem";
 import type {
   AutonomousEntity,
   Enemy,
@@ -55,8 +51,10 @@ export function updateEnemyAISystem(
   },
 ): GameState {
   let nextState = state;
+  const entities = Object.values(state.entities);
+  const partyLeader = getPartyLeader(state);
 
-  for (const entity of Object.values(state.entities)) {
+  for (const entity of entities) {
     if (!isEnemy(entity) || entity.state === "dead") {
       continue;
     }
@@ -112,7 +110,7 @@ export function updateEnemyAISystem(
       continue;
     }
 
-    const { target, reason } = findPreferredTarget(nextState, entity);
+    const { target, reason } = findPreferredTarget(entity, entities, partyLeader);
 
     if (!target) {
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
@@ -182,25 +180,24 @@ function clearEnemyTarget(enemy: Enemy, now = Date.now()): Enemy {
 }
 
 function findPreferredTarget(
-  state: GameState,
   enemy: Enemy,
+  entities: GameEntity[],
+  partyLeader: AutonomousEntity | undefined,
 ): TargetSearchResult {
-  const candidates = getValidTargetCandidates(enemy, Object.values(state.entities));
+  const candidates = getValidTargetCandidates(enemy, entities);
 
   if (candidates.length === 0) {
-    return (
-      getGuideAttractionTarget(state, enemy) ??
-      getNoTargetReason(enemy, Object.values(state.entities))
-    );
+    return getNoTargetReason(enemy, entities);
   }
 
   const preference = getEnemyTargetPreference(enemy);
 
   if (preference === "leader") {
-    const leader = getPartyLeader(state);
-
-    if (leader && candidates.some((candidate) => candidate.id === leader.id)) {
-      return { target: leader, reason: "leader" };
+    if (
+      partyLeader &&
+      candidates.some((candidate) => candidate.id === partyLeader.id)
+    ) {
+      return { target: partyLeader, reason: "leader" };
     }
 
     return {
@@ -220,35 +217,6 @@ function findPreferredTarget(
     target: findClosestCandidate(enemy, candidates),
     reason: "closest",
   };
-}
-
-function getGuideAttractionTarget(
-  state: GameState,
-  enemy: Enemy,
-): TargetSearchResult | null {
-  const guide = getActiveQuestGuide(state);
-
-  if (!guide || guide.state !== "follow" || !isInsideAttackLeash(enemy, guide.position)) {
-    return null;
-  }
-
-  const detectionRange = getEnemyAggroRange(enemy) *
-    QUEST_GUIDE_ATTRACTION_RANGE_MULTIPLIER;
-
-  if (getDistanceSquared(enemy, guide) > detectionRange * detectionRange) {
-    return null;
-  }
-
-  const candidates = Object.values(state.entities).filter(
-    (entity): entity is AutonomousEntity =>
-      isValidEnemyTarget(entity) &&
-      getDistanceSquared(enemy, entity) <= detectionRange * detectionRange &&
-      isInsideAttackLeash(enemy, entity.position),
-  );
-
-  const target = findClosestCandidate(enemy, candidates);
-
-  return target ? { target, reason: "guide_attraction" } : null;
 }
 
 function getValidTargetCandidates(
@@ -293,20 +261,44 @@ function findClosestCandidate(
   enemy: Enemy,
   candidates: AutonomousEntity[],
 ): AutonomousEntity | undefined {
-  return candidates.sort(
-    (a, b) => getDistanceSquared(enemy, a) - getDistanceSquared(enemy, b),
-  )[0];
+  let closestCandidate: AutonomousEntity | undefined;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of candidates) {
+    const distance = getDistanceSquared(enemy, candidate);
+
+    if (distance < closestDistance) {
+      closestCandidate = candidate;
+      closestDistance = distance;
+    }
+  }
+
+  return closestCandidate;
 }
 
 function findLowestHealthCandidate(
   enemy: Enemy,
   candidates: AutonomousEntity[],
 ): AutonomousEntity | undefined {
-  return candidates.sort(
-    (a, b) =>
-      a.health / a.maxHealth - b.health / b.maxHealth ||
-      getDistanceSquared(enemy, a) - getDistanceSquared(enemy, b),
-  )[0];
+  let lowestHealthCandidate: AutonomousEntity | undefined;
+  let lowestHealthRatio = Number.POSITIVE_INFINITY;
+  let lowestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of candidates) {
+    const healthRatio = candidate.health / candidate.maxHealth;
+    const distance = getDistanceSquared(enemy, candidate);
+
+    if (
+      healthRatio < lowestHealthRatio ||
+      (healthRatio === lowestHealthRatio && distance < lowestDistance)
+    ) {
+      lowestHealthCandidate = candidate;
+      lowestHealthRatio = healthRatio;
+      lowestDistance = distance;
+    }
+  }
+
+  return lowestHealthCandidate;
 }
 
 function isValidEnemyTarget(entity: GameEntity): entity is AutonomousEntity {

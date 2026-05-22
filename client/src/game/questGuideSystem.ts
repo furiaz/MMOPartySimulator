@@ -18,7 +18,6 @@ export const QUEST_GUIDE_NPC_ID = "map-1-mossy-guide";
 export const QUEST_GUIDE_START_POSITION: Position = { x: 10, y: 29 };
 export const QUEST_GUIDE_TARGET_POI_ID = "mossy-glade-route-marker";
 export const QUEST_GUIDE_TARGET_POSITION: Position = { x: 101, y: 25 };
-export const QUEST_GUIDE_ATTRACTION_RANGE_MULTIPLIER = 2.5;
 export const QUEST_GUIDE_ESCORT_RANGE = 7;
 export const QUEST_GUIDE_MOVE_SPEED_MULTIPLIER = 0.7;
 export const QUEST_GUIDE_OBJECTIVE_ID = "guide_mossy_glade_surveyor";

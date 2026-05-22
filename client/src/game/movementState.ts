@@ -2,12 +2,23 @@ import { getGridDistance } from "./positionUtils";
 import type { GameState, MovementFailureDetail } from "./state";
 import type { DebugNavigationReason, GameEntity, Position } from "./types";
 
+const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
+
 export function clearFrameMovementPlanning(state: GameState): GameState {
   const movementFailureMsByEntityId = { ...(state.movementFailureMsByEntityId ?? {}) };
+  const movementPathRetryAtMsByEntityId = {
+    ...(state.movementPathRetryAtMsByEntityId ?? {}),
+  };
 
   for (const entityId of Object.keys(movementFailureMsByEntityId)) {
     if (!state.failedMoveByEntityId?.[entityId]) {
       delete movementFailureMsByEntityId[entityId];
+    }
+  }
+
+  for (const [entityId, retryAtMs] of Object.entries(movementPathRetryAtMsByEntityId)) {
+    if (retryAtMs <= (state.simulationTimeMs ?? 0)) {
+      delete movementPathRetryAtMsByEntityId[entityId];
     }
   }
 
@@ -16,6 +27,7 @@ export function clearFrameMovementPlanning(state: GameState): GameState {
     failedMoveByEntityId: {},
     movementFailureMsByEntityId,
     movementFailuresByEntityId: {},
+    movementPathRetryAtMsByEntityId,
     movementDecisionsByEntityId: {},
     moveIntentsByEntityId: {},
     reservedPositionsByEntityId: {},
@@ -32,9 +44,13 @@ export function markMoveSucceeded(
   const failedMoveByEntityId = { ...(state.failedMoveByEntityId ?? {}) };
   const movementFailureMsByEntityId = { ...(state.movementFailureMsByEntityId ?? {}) };
   const movementFailuresByEntityId = { ...(state.movementFailuresByEntityId ?? {}) };
+  const movementPathRetryAtMsByEntityId = {
+    ...(state.movementPathRetryAtMsByEntityId ?? {}),
+  };
   delete failedMoveByEntityId[entityId];
   delete movementFailureMsByEntityId[entityId];
   delete movementFailuresByEntityId[entityId];
+  delete movementPathRetryAtMsByEntityId[entityId];
 
   return {
     ...state,
@@ -45,6 +61,7 @@ export function markMoveSucceeded(
     failedMoveByEntityId,
     movementFailureMsByEntityId,
     movementFailuresByEntityId,
+    movementPathRetryAtMsByEntityId,
   };
 }
 
@@ -69,6 +86,8 @@ export function markMoveFailed(
   reason: DebugNavigationReason = "blocked",
 ): GameState {
   const deltaMs = state.simulationDeltaMs ?? 100;
+  const retryAtMs =
+    (state.simulationTimeMs ?? 0) + MOVEMENT_REPATH_FAILURE_BACKOFF_MS;
 
   return {
     ...state,
@@ -83,6 +102,10 @@ export function markMoveFailed(
     movementFailuresByEntityId: {
       ...(state.movementFailuresByEntityId ?? {}),
       [entityId]: detail,
+    },
+    movementPathRetryAtMsByEntityId: {
+      ...(state.movementPathRetryAtMsByEntityId ?? {}),
+      [entityId]: retryAtMs,
     },
     movementDecisionsByEntityId: {
       ...(state.movementDecisionsByEntityId ?? {}),

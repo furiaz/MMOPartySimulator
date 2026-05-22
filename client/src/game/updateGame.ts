@@ -1,4 +1,5 @@
 import { updateAttackSystem } from "./attackSystem";
+import { createAttackSlotPathDistanceCache } from "./attackSlots";
 import {
   clearExpiredHubDepartureFoodWarning,
   clearExpiredConsumableBuffs,
@@ -68,6 +69,7 @@ export function updateGame(
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = clearExpiredHubDepartureFoodWarning(nextState, timing.nowMs);
   const movedEntityIds = new Set<string>();
+  const attackSlotPathDistanceCache = createAttackSlotPathDistanceCache();
   const mapIdBeforeTeleport = nextState.currentMapId;
   const wasTeleportActive = Boolean(nextState.activeTeleport);
 
@@ -134,14 +136,24 @@ export function updateGame(
     nextState = reserveExploringPartyMemberNextTile(nextState);
   }
 
-  nextState = updateDefendSystem(nextState, movedEntityIds, timing);
+  nextState = updateDefendSystem(
+    nextState,
+    movedEntityIds,
+    timing,
+    attackSlotPathDistanceCache,
+  );
   if (nextState.autoModeEnabled) {
     nextState = updateExplorationSystem(nextState, movedEntityIds);
   }
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState, timing);
-  nextState = updateAttackSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = updateAttackSystem(
+    nextState,
+    movedEntityIds,
+    timing.nowMs,
+    attackSlotPathDistanceCache,
+  );
   nextState = updateFlaskRechargeFromEnemyKills(nextState, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);

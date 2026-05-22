@@ -4,6 +4,7 @@ import {
   HUB_MAP_TILE_SRC,
   INVENTORY_ITEM_ICON_SRC,
   MAP_OBJECT_ICON_SRC,
+  RESOURCE_ICON_SRC,
   SHARED_SKILL_VISUAL_ICON_SRC,
   SKILL_VISUAL_ICON_SRC,
   WILDERNESS_MAP_TILE_SRC,
@@ -94,6 +95,7 @@ type PixiWorldRendererProps = {
   onEnemyClick?: (enemyId: string) => void;
   onFloorClick?: (position: Position) => void;
   onNpcClick?: (npcId: string) => void;
+  onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   onResourceClick?: (resourceId: string) => void;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
   questGiverHasWork?: boolean;
@@ -104,6 +106,21 @@ type PixiWorldRendererProps = {
   skillVisualEvents?: SkillVisualEvent[];
   viewportSize?: ViewportSize;
   visualMovementByEntityId?: Record<string, EntityVisualMovement>;
+};
+
+export type PixiRendererPerformanceSample = {
+  activeFeedbackCount: number;
+  drawCount: number;
+  drawnEntityCount: number;
+  drawnFeedbackCount: number;
+  drawnSprites: number;
+  drawnTexts: number;
+  renderMs: number;
+  spriteCreates: number;
+  spriteReuses: number;
+  textCreates: number;
+  textReuses: number;
+  visibleEntityCount: number;
 };
 
 type EntityVisualMovement = {
@@ -129,7 +146,7 @@ type RenderSize = {
 
 type ClientBounds = Pick<DOMRect, "left" | "top" | "width" | "height">;
 
-type TileBounds = {
+export type TileBounds = {
   minX: number;
   maxX: number;
   minY: number;
@@ -139,6 +156,7 @@ type TileBounds = {
 type PixiRenderLayers = {
   backgroundGraphics: Graphics;
   entityLayer: Container;
+  effectsGraphics: Graphics;
   effectsLayer: Container;
   fallbackGraphics: Graphics;
   floorLayer: Container;
@@ -153,6 +171,28 @@ type TextureCache = {
   pendingSrcs: Set<string>;
   textures: Map<string, Texture>;
 };
+
+type ManagedSpriteEntry = {
+  layer: Container;
+  sprite: Sprite;
+  src: string;
+};
+
+type ManagedTextEntry = {
+  layer: Container;
+  styleKey: string;
+  text: Text;
+};
+
+type ManagedRendererState = {
+  activeSpriteKeys: Set<string>;
+  activeTextKeys: Set<string>;
+  mapId: string | null;
+  sprites: Map<string, ManagedSpriteEntry>;
+  texts: Map<string, ManagedTextEntry>;
+};
+
+type PixiDrawMetrics = PixiRendererPerformanceSample;
 
 type InteractableEntityKind = "enemy" | "resource" | "npc";
 
@@ -183,7 +223,9 @@ type DrawWorldOptions = {
   leaderIntent: LeaderIntent | null;
   layers: PixiRenderLayers;
   map: GameMap;
+  managedState: ManagedRendererState;
   mode: PixiRendererMode;
+  onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   questGiverHasWork: boolean;
   requestRedraw?: () => void;
   renderSize: RenderSize;
@@ -222,8 +264,86 @@ function clearLayers(layers: PixiRenderLayers) {
   clearLayer(layers.entityLayer);
   clearLayer(layers.effectsLayer);
   layers.backgroundGraphics.clear();
+  layers.effectsGraphics.clear();
   layers.fallbackGraphics.clear();
   layers.overlayGraphics.clear();
+}
+
+function createManagedRendererState(): ManagedRendererState {
+  return {
+    activeSpriteKeys: new Set<string>(),
+    activeTextKeys: new Set<string>(),
+    mapId: null,
+    sprites: new Map<string, ManagedSpriteEntry>(),
+    texts: new Map<string, ManagedTextEntry>(),
+  };
+}
+
+function createPixiDrawMetrics(): PixiDrawMetrics {
+  return {
+    activeFeedbackCount: 0,
+    drawCount: 1,
+    drawnEntityCount: 0,
+    drawnFeedbackCount: 0,
+    drawnSprites: 0,
+    drawnTexts: 0,
+    renderMs: 0,
+    spriteCreates: 0,
+    spriteReuses: 0,
+    textCreates: 0,
+    textReuses: 0,
+    visibleEntityCount: 0,
+  };
+}
+
+function destroyManagedRendererState(state: ManagedRendererState) {
+  for (const entry of state.sprites.values()) {
+    entry.sprite.destroy();
+  }
+
+  for (const entry of state.texts.values()) {
+    entry.text.destroy();
+  }
+
+  state.sprites.clear();
+  state.texts.clear();
+  state.activeSpriteKeys.clear();
+  state.activeTextKeys.clear();
+  state.mapId = null;
+}
+
+function resetManagedRendererState(state: ManagedRendererState) {
+  state.sprites.clear();
+  state.texts.clear();
+  state.activeSpriteKeys.clear();
+  state.activeTextKeys.clear();
+  state.mapId = null;
+}
+
+function beginManagedFrame(state: ManagedRendererState, mapId: string) {
+  if (state.mapId !== mapId) {
+    destroyManagedRendererState(state);
+    state.mapId = mapId;
+  }
+
+  state.activeSpriteKeys.clear();
+  state.activeTextKeys.clear();
+}
+
+function endManagedFrame(state: ManagedRendererState) {
+  for (const [key, entry] of state.sprites) {
+    if (!state.activeSpriteKeys.has(key)) {
+      entry.sprite.destroy();
+      state.sprites.delete(key);
+    }
+  }
+
+  for (const [key, entry] of state.texts) {
+    if (!state.activeTextKeys.has(key)) {
+      entry.text.destroy();
+      state.texts.delete(key);
+    }
+  }
 }
 
 function requestTexture(
@@ -257,16 +377,6 @@ function requestTexture(
   return null;
 }
 
-function createSprite(
-  src: string,
-  cache: TextureCache,
-  requestRedraw?: () => void,
-): Sprite | null {
-  const texture = requestTexture(src, cache, requestRedraw);
-
-  return texture ? new Sprite(texture) : null;
-}
-
 function collectAnimationFrames(
   animation:
     | SpriteAnimationAsset
@@ -296,6 +406,109 @@ function preloadSpriteVisualAssetTextures(
   requestRedraw?: () => void,
 ) {
   for (const src of new Set(collectSpriteVisualAssetFrames(visualAsset))) {
+    requestTexture(src, cache, requestRedraw);
+  }
+}
+
+function collectEntityVisualTextureSrcs(entity: GameEntity, map: GameMap): string[] {
+  const visualAsset = getEntityVisualAsset(entity, map.id);
+
+  if (visualAsset.kind === "image") {
+    return [visualAsset.src];
+  }
+
+  if (visualAsset.kind === "sprite") {
+    return collectSpriteVisualAssetFrames(visualAsset);
+  }
+
+  return [];
+}
+
+function collectFullMapFloorTextureSrcs(map: GameMap): string[] {
+  if (!isHubVisualMap(map.id) && !isWildernessVisualMap(map.id)) {
+    return [];
+  }
+
+  const sources = new Set<string>();
+
+  for (let y = 0; y < map.rows; y += floorChunkCellSpan) {
+    for (let x = 0; x < map.columns; x += floorChunkCellSpan) {
+      sources.add(
+        isHubVisualMap(map.id)
+          ? getHubFloorTileSrc({ x, y })
+          : getWildernessFloorTileSrc({ x, y }, map),
+      );
+    }
+  }
+
+  return [...sources];
+}
+
+function collectCurrentMapVisualTextureSrcs(
+  map: GameMap,
+  entities: GameEntity[],
+): string[] {
+  const sources = new Set<string>([
+    ...Object.values(MAP_OBJECT_ICON_SRC),
+    ...Object.values(RESOURCE_ICON_SRC),
+    ...Object.values(SHARED_SKILL_VISUAL_ICON_SRC),
+    ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
+      (src): src is string => Boolean(src),
+    ),
+    blockImpactSrc,
+    criticalHitBackingSrc,
+    damageHitSparkSrc,
+    deathDownedPuffSrc,
+    healSparkleSrc,
+    gatherCompleteSparkleSrc,
+    inventoryFullWarningSrc,
+    missEvadePuffSrc,
+    resourceDepletedPuffSrc,
+    resourceHitHerbSrc,
+    resourceHitOreSrc,
+    resourceHitWoodSrc,
+    shieldInvulnerableGlintSrc,
+    teleportPulseSrc,
+    ...collectFullMapFloorTextureSrcs(map),
+  ]);
+
+  if (isWildernessVisualMap(map.id)) {
+    for (const wall of map.walls) {
+      sources.add(getWildernessWallTileSrc(wall));
+    }
+  }
+
+  for (const entity of entities) {
+    for (const src of collectEntityVisualTextureSrcs(entity, map)) {
+      sources.add(src);
+    }
+  }
+
+  return [...sources].sort();
+}
+
+function getCurrentMapVisualTextureSignature(
+  map: GameMap,
+  entities: GameEntity[],
+): string {
+  return [
+    map.id ?? map.debugName,
+    ...collectCurrentMapVisualTextureSrcs(map, entities),
+  ].join("|");
+}
+
+function preloadCurrentMapVisualTextures({
+  cache,
+  entities,
+  map,
+  requestRedraw,
+}: {
+  cache: TextureCache;
+  entities: GameEntity[];
+  map: GameMap;
+  requestRedraw?: () => void;
+}) {
+  for (const src of collectCurrentMapVisualTextureSrcs(map, entities)) {
     requestTexture(src, cache, requestRedraw);
   }
 }
@@ -362,6 +575,28 @@ function getVisibleTileBounds({
   };
 }
 
+export function getFullVisibleTileBounds({
+  bufferTiles = 4,
+  cameraOffset,
+  cellPixelSize,
+  map,
+  renderSize,
+}: {
+  bufferTiles?: number;
+  cameraOffset: Position;
+  cellPixelSize: number;
+  map: GameMap;
+  renderSize: RenderSize;
+}): TileBounds {
+  return getVisibleTileBounds({
+    bufferTiles,
+    cameraOffset,
+    cellPixelSize,
+    map,
+    renderSize,
+  });
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -382,7 +617,7 @@ function createVisibleFloorChunkPositions(bounds: TileBounds): Position[] {
   return chunks;
 }
 
-function isPositionInTileBounds(position: Position, bounds: TileBounds): boolean {
+export function isPositionInTileBounds(position: Position, bounds: TileBounds): boolean {
   return (
     position.x >= bounds.minX &&
     position.x <= bounds.maxX &&
@@ -857,13 +1092,46 @@ function drawFallbackEntity(
   }
 }
 
-function drawImageSprite({
+function updateSpriteVisualState({
+  alpha,
+  anchorX,
+  anchorY,
+  height,
+  position,
+  rotation,
+  sprite,
+  tint,
+  width,
+}: {
+  alpha: number;
+  anchorX: number;
+  anchorY: number;
+  height: number;
+  position: Position;
+  rotation: number;
+  sprite: Sprite;
+  tint?: number;
+  width: number;
+}) {
+  sprite.anchor.set(anchorX, anchorY);
+  sprite.alpha = alpha;
+  sprite.position.set(position.x, position.y);
+  sprite.rotation = rotation;
+  sprite.tint = tint ?? 0xffffff;
+  sprite.width = width;
+  sprite.height = height;
+}
+
+function drawManagedImageSprite({
   alpha = 1,
   anchorX = 0.5,
   anchorY = 1,
   cache,
   height,
+  key,
   layer,
+  managedState,
+  metrics,
   position,
   requestRedraw,
   rotation = 0,
@@ -876,7 +1144,10 @@ function drawImageSprite({
   anchorY?: number;
   cache: TextureCache;
   height: number;
+  key: string;
   layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   position: Position;
   requestRedraw?: () => void;
   rotation?: number;
@@ -884,22 +1155,77 @@ function drawImageSprite({
   tint?: number;
   width: number;
 }): boolean {
-  const sprite = createSprite(src, cache, requestRedraw);
+  const texture = requestTexture(src, cache, requestRedraw);
+  const existingEntry = managedState.sprites.get(key);
 
-  if (!sprite) {
-    return false;
+  if (!texture) {
+    if (!existingEntry || existingEntry.src !== src) {
+      return false;
+    }
+
+    managedState.activeSpriteKeys.add(key);
+    updateSpriteVisualState({
+      alpha,
+      anchorX,
+      anchorY,
+      height,
+      position,
+      rotation,
+      sprite: existingEntry.sprite,
+      tint,
+      width,
+    });
+    metrics.spriteReuses += 1;
+    metrics.drawnSprites += 1;
+    return true;
   }
 
-  sprite.anchor.set(anchorX, anchorY);
-  sprite.alpha = alpha;
-  sprite.position.set(position.x, position.y);
-  sprite.rotation = rotation;
-  if (tint !== undefined) {
-    sprite.tint = tint;
+  if (existingEntry && existingEntry.src === src) {
+    if (existingEntry.layer !== layer) {
+      existingEntry.layer.removeChild(existingEntry.sprite);
+      layer.addChild(existingEntry.sprite);
+      existingEntry.layer = layer;
+    }
+
+    managedState.activeSpriteKeys.add(key);
+    updateSpriteVisualState({
+      alpha,
+      anchorX,
+      anchorY,
+      height,
+      position,
+      rotation,
+      sprite: existingEntry.sprite,
+      tint,
+      width,
+    });
+    metrics.spriteReuses += 1;
+    metrics.drawnSprites += 1;
+    return true;
   }
-  sprite.width = width;
-  sprite.height = height;
+
+  if (existingEntry) {
+    existingEntry.sprite.destroy();
+    managedState.sprites.delete(key);
+  }
+
+  const sprite = new Sprite(texture);
+  updateSpriteVisualState({
+    alpha,
+    anchorX,
+    anchorY,
+    height,
+    position,
+    rotation,
+    sprite,
+    tint,
+    width,
+  });
   layer.addChild(sprite);
+  managedState.sprites.set(key, { layer, sprite, src });
+  managedState.activeSpriteKeys.add(key);
+  metrics.spriteCreates += 1;
+  metrics.drawnSprites += 1;
 
   return true;
 }
@@ -1128,6 +1454,74 @@ function createFeedbackText({
   return label;
 }
 
+function getFeedbackTextStyleKey(color: number, fontSize: number): string {
+  return `${color}:${fontSize}`;
+}
+
+function drawManagedFeedbackText({
+  alpha = 1,
+  color,
+  fontSize = defaultFeedbackFontSize,
+  key,
+  layer,
+  managedState,
+  metrics,
+  position,
+  rotation = 0,
+  text,
+}: {
+  alpha?: number;
+  color: number;
+  fontSize?: number;
+  key: string;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  position: Position;
+  rotation?: number;
+  text: string;
+}) {
+  const styleKey = getFeedbackTextStyleKey(color, fontSize);
+  const existingEntry = managedState.texts.get(key);
+
+  if (existingEntry && existingEntry.styleKey === styleKey) {
+    if (existingEntry.layer !== layer) {
+      existingEntry.layer.removeChild(existingEntry.text);
+      layer.addChild(existingEntry.text);
+      existingEntry.layer = layer;
+    }
+
+    existingEntry.text.text = text;
+    existingEntry.text.alpha = alpha;
+    existingEntry.text.position.set(position.x, position.y);
+    existingEntry.text.rotation = rotation;
+    existingEntry.text.scale.set(1);
+    managedState.activeTextKeys.add(key);
+    metrics.textReuses += 1;
+    metrics.drawnTexts += 1;
+    return existingEntry.text;
+  }
+
+  if (existingEntry) {
+    existingEntry.text.destroy();
+    managedState.texts.delete(key);
+  }
+
+  const label = createFeedbackText({ color, fontSize, text });
+
+  label.alpha = alpha;
+  label.position.set(position.x, position.y);
+  label.rotation = rotation;
+  label.scale.set(1);
+  layer.addChild(label);
+  managedState.texts.set(key, { layer, styleKey, text: label });
+  managedState.activeTextKeys.add(key);
+  metrics.textCreates += 1;
+  metrics.drawnTexts += 1;
+
+  return label;
+}
+
 function getCombatFeedbackFontSize(event: CombatFeedbackEvent): number {
   if (
     skillFeedbackDisplayNames.has(event.text) ||
@@ -1150,6 +1544,25 @@ function isDamageNumberFeedback(event: CombatFeedbackEvent): boolean {
 
 function isHealingNumberFeedback(event: CombatFeedbackEvent): boolean {
   return event.type === "heal" && /^\+\d+ HP$/.test(event.text);
+}
+
+export function getCombatFeedbackLaneKey(event: CombatFeedbackEvent): string {
+  const feedbackKind = event.feedbackKind ?? event.type;
+
+  if (
+    event.amount !== undefined &&
+    (isDamageNumberFeedback(event) || isHealingNumberFeedback(event))
+  ) {
+    return [
+      "feedback-lane",
+      event.targetEntityId ?? event.entityId,
+      event.sourceEntityId ?? "unknown-source",
+      feedbackKind,
+      event.damageType ?? "none",
+    ].join(":");
+  }
+
+  return ["feedback-event", event.id, event.type].join(":");
 }
 
 function hasPairedCriticalFeedback(
@@ -1346,6 +1759,8 @@ function drawBetweenEntitiesEffect({
   eventPosition,
   height,
   layer,
+  managedState,
+  metrics,
   requestRedraw,
   source,
   src,
@@ -1361,6 +1776,8 @@ function drawBetweenEntitiesEffect({
   eventPosition: Position;
   height: number;
   layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   source?: GameEntity;
   src: string;
@@ -1388,13 +1805,16 @@ function drawBetweenEntitiesEffect({
       )
     : 0;
 
-  drawImageSprite({
+  drawManagedImageSprite({
     alpha: alpha * (1 - progress),
     anchorX: 0.5,
     anchorY: 0.5,
     cache,
     height,
+    key: `feedback-sprite:${event.id}:${src}`,
     layer,
+    managedState,
+    metrics,
     position: effectPosition,
     requestRedraw,
     rotation,
@@ -1412,6 +1832,8 @@ function drawCombatFeedbackSpriteEffect({
   event,
   layer,
   map,
+  managedState,
+  metrics,
   requestRedraw,
   transform,
 }: {
@@ -1423,6 +1845,8 @@ function drawCombatFeedbackSpriteEffect({
   event: CombatFeedbackEvent;
   layer: Container;
   map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   transform: FullTransform;
 }) {
@@ -1441,13 +1865,16 @@ function drawCombatFeedbackSpriteEffect({
     !hasSameMomentFeedback(event, combatFeedbackEvents, "Blocked") &&
     !hasSameMomentFeedback(event, combatFeedbackEvents, "Dodged")
   ) {
-    drawImageSprite({
+    drawManagedImageSprite({
       alpha: 0.92 * (1 - progress),
       anchorX: 0.5,
       anchorY: 0.5,
       cache,
       height: 38,
+      key: `feedback-sprite:${event.id}:${damageHitSparkSrc}`,
       layer,
+      managedState,
+      metrics,
       position,
       requestRedraw,
       src: damageHitSparkSrc,
@@ -1456,13 +1883,16 @@ function drawCombatFeedbackSpriteEffect({
   }
 
   if (event.text === "Dodged" && shouldDrawSkippedFrequentEffect(event)) {
-    drawImageSprite({
+    drawManagedImageSprite({
       alpha: 0.72 * (1 - progress),
       anchorX: 0.5,
       anchorY: 0.5,
       cache,
       height: 26,
+      key: `feedback-sprite:${event.id}:${missEvadePuffSrc}`,
       layer,
+      managedState,
+      metrics,
       position: {
         x: position.x + transform.cellPixelSize * 0.35,
         y: position.y + transform.cellPixelSize * 0.12,
@@ -1492,6 +1922,8 @@ function drawCombatFeedbackSpriteEffect({
       eventPosition: position,
       height: 36,
       layer,
+      managedState,
+      metrics,
       requestRedraw,
       source,
       src: blockImpactSrc,
@@ -1503,13 +1935,16 @@ function drawCombatFeedbackSpriteEffect({
     if (event.type === "attack" && target) {
       const targetPosition = toFullPosition(target.position, transform);
 
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: 0.85 * (1 - progress),
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 34,
+        key: `feedback-sprite:${event.id}:${shieldInvulnerableGlintSrc}`,
         layer,
+        managedState,
+        metrics,
         position: targetPosition,
         requestRedraw,
         src: shieldInvulnerableGlintSrc,
@@ -1519,13 +1954,16 @@ function drawCombatFeedbackSpriteEffect({
   }
 
   if (isHealingNumberFeedback(event)) {
-    drawImageSprite({
+    drawManagedImageSprite({
       alpha: 0.84 * (1 - progress),
       anchorX: 0.5,
       anchorY: 0.5,
       cache,
       height: 36,
+      key: `feedback-sprite:${event.id}:${healSparkleSrc}`,
       layer,
+      managedState,
+      metrics,
       position: {
         x: position.x,
         y: position.y + transform.cellPixelSize * 0.18,
@@ -1539,13 +1977,16 @@ function drawCombatFeedbackSpriteEffect({
   if (event.type === "death") {
     const center = toFullPosition(entity.position, transform);
 
-    drawImageSprite({
+    drawManagedImageSprite({
       alpha: 0.82 * (1 - progress),
       anchorX: 0.5,
       anchorY: 0.5,
       cache,
       height: 42,
+      key: `feedback-sprite:${event.id}:${deathDownedPuffSrc}`,
       layer,
+      managedState,
+      metrics,
       position: center,
       requestRedraw,
       src: deathDownedPuffSrc,
@@ -1562,16 +2003,20 @@ function drawCombatFeedbackSpriteEffect({
     if (resource?.kind === "resource") {
       const resourcePosition = toFullPosition(resource.position, transform);
 
-      drawImageSprite({
+      const resourceHitSrc = getResourceHitEffectSrc(resource);
+      drawManagedImageSprite({
         alpha: 0.82 * (1 - progress),
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 34,
+        key: `feedback-sprite:${event.id}:${resourceHitSrc}`,
         layer,
+        managedState,
+        metrics,
         position: resourcePosition,
         requestRedraw,
-        src: getResourceHitEffectSrc(resource),
+        src: resourceHitSrc,
         width: 34,
       });
     }
@@ -1581,13 +2026,16 @@ function drawCombatFeedbackSpriteEffect({
     const resourcePosition = toFullPosition(entity.position, transform);
 
     if (entity.isDepleted) {
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: 0.78 * (1 - progress),
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 38,
+        key: `feedback-sprite:${event.id}:${resourceDepletedPuffSrc}`,
         layer,
+        managedState,
+        metrics,
         position: resourcePosition,
         requestRedraw,
         src: resourceDepletedPuffSrc,
@@ -1596,13 +2044,16 @@ function drawCombatFeedbackSpriteEffect({
     }
 
     if (event.text === "Inventory Full") {
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: 0.92 * (1 - progress),
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 38,
+        key: `feedback-sprite:${event.id}:${inventoryFullWarningSrc}`,
         layer,
+        managedState,
+        metrics,
         position: {
           x: resourcePosition.x,
           y: resourcePosition.y - transform.cellPixelSize * 0.62,
@@ -1612,13 +2063,16 @@ function drawCombatFeedbackSpriteEffect({
         width: 38,
       });
     } else {
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: 0.86 * (1 - progress),
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 34,
+        key: `feedback-sprite:${event.id}:${gatherCompleteSparkleSrc}`,
         layer,
+        managedState,
+        metrics,
         position: {
           x: resourcePosition.x,
           y: resourcePosition.y - transform.cellPixelSize * 0.4,
@@ -1654,8 +2108,11 @@ function drawFullEffects({
   currentTime,
   dropVisualEvents,
   entities,
+  graphics,
   layer,
   map,
+  managedState,
+  metrics,
   requestRedraw,
   resurrectionProgressByCompanionId,
   skillBindsByEnemyId,
@@ -1663,14 +2120,18 @@ function drawFullEffects({
   skillShieldBlocksById,
   skillVisualEvents,
   transform,
+  visibleTileBounds,
 }: {
   cache: TextureCache;
   combatFeedbackEvents: CombatFeedbackEvent[];
   currentTime: number;
   dropVisualEvents: DropVisualEvent[];
   entities: GameEntity[];
+  graphics: Graphics;
   layer: Container;
   map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   resurrectionProgressByCompanionId: Record<string, ResurrectionProgressState>;
   skillBindsByEnemyId: Record<string, SkillBindState>;
@@ -1678,27 +2139,25 @@ function drawFullEffects({
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
   transform: FullTransform;
+  visibleTileBounds: TileBounds;
 }) {
-  const graphics = new Graphics();
   const entitiesById = getEntityById(entities);
-
-  layer.addChild(graphics);
 
   for (const shield of Object.values(skillShieldBlocksById)) {
     if (shield.expiresAt <= currentTime || shield.id.endsWith("-guard_up")) {
       continue;
     }
 
+    if (!isPositionInTileBounds(shield.position, visibleTileBounds)) {
+      continue;
+    }
+
     const position = toFullPosition(shield.position, transform);
 
-    const shieldGraphic = new Graphics();
-    shieldGraphic
-      .rect(-12, -5, 24, 10)
+    graphics
+      .rect(position.x - 12, position.y - 5, 24, 10)
       .fill({ color: 0x7dd3fc, alpha: 0.34 })
       .stroke({ color: 0x38bdf8, alpha: 0.9, width: 2 });
-    shieldGraphic.position.set(position.x, position.y);
-    shieldGraphic.rotation = shield.rotationRadians;
-    layer.addChild(shieldGraphic);
   }
 
   for (const event of skillVisualEvents) {
@@ -1720,6 +2179,10 @@ function drawFullEffects({
         : event.position ?? source.position;
     const center = toFullPosition(spritePosition, transform);
 
+    if (!isPositionInTileBounds(spritePosition, visibleTileBounds)) {
+      continue;
+    }
+
     if (event.type === "red_flash") {
       graphics
         .circle(center.x, center.y, transform.cellPixelSize * 0.74)
@@ -1733,12 +2196,15 @@ function drawFullEffects({
     }
 
     if (iconSrc) {
-      const didDraw = drawImageSprite({
+      const didDraw = drawManagedImageSprite({
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 50,
+        key: `skill-effect:${event.id}:${iconSrc}`,
         layer,
+        managedState,
+        metrics,
         position: center,
         requestRedraw,
         src: iconSrc,
@@ -1780,6 +2246,10 @@ function drawFullEffects({
       continue;
     }
 
+    if (!isPositionInTileBounds(event.position, visibleTileBounds)) {
+      continue;
+    }
+
     const duration = event.expiresAt - event.createdAt;
     const progress =
       duration > 0
@@ -1803,32 +2273,41 @@ function drawFullEffects({
       .stroke({ color: dropColor, alpha: 1 - progress, width: 2 });
 
     if (iconSrc) {
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: 1 - progress,
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: 22,
+        key: `drop:${event.id}:${iconSrc}`,
         layer,
+        managedState,
+        metrics,
         position,
         requestRedraw,
         src: iconSrc,
         width: 22,
       });
     } else {
-      const label = createFeedbackText({
+      drawManagedFeedbackText({
+        alpha: 1 - progress,
         color: 0x111827,
         fontSize: 13,
+        key: `drop-label:${event.id}`,
+        layer,
+        managedState,
+        metrics,
+        position,
         text: itemDefinition.displayName.charAt(0),
       });
-
-      label.alpha = 1 - progress;
-      label.position.set(position.x, position.y);
-      layer.addChild(label);
     }
   }
 
   for (const entity of entities) {
+    if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
+      continue;
+    }
+
     const center = toFullPosition(entity.position, transform);
 
     if (entity.kind === "enemy" && skillMarksByEnemyId[entity.id]?.expiresAt > currentTime) {
@@ -1846,17 +2325,19 @@ function drawFullEffects({
     }
 
     if (entity.kind === "companion" && entity.state === "idle") {
-      const label = createFeedbackText({
+      drawManagedFeedbackText({
         color: 0x475569,
         fontSize: 10,
+        key: `idle-label:${entity.id}`,
+        layer,
+        managedState,
+        metrics,
+        position: {
+          x: center.x + transform.cellPixelSize * 0.62,
+          y: center.y + transform.cellPixelSize * 0.3,
+        },
         text: "AFK",
       });
-
-      label.position.set(
-        center.x + transform.cellPixelSize * 0.62,
-        center.y + transform.cellPixelSize * 0.3,
-      );
-      layer.addChild(label);
     }
 
     if (entity.kind === "companion") {
@@ -1880,17 +2361,23 @@ function drawFullEffects({
           .roundRect(x + 5, y + 12, (width - 10) * progressRatio, 4, 2)
           .fill(0x16a34a);
 
-        const label = createFeedbackText({
+        drawManagedFeedbackText({
           color: 0x14532d,
           fontSize: 10,
+          key: `resurrection-label:${entity.id}`,
+          layer,
+          managedState,
+          metrics,
+          position: { x: center.x, y: y + 7 },
           text: "Resurrecting",
         });
-
-        label.position.set(center.x, y + 7);
-        layer.addChild(label);
       }
     }
   }
+
+  metrics.activeFeedbackCount = combatFeedbackEvents.filter(
+    (event) => event.expiresAt > currentTime,
+  ).length;
 
   for (const event of combatFeedbackEvents) {
     if (event.expiresAt <= currentTime) {
@@ -1903,6 +2390,10 @@ function drawFullEffects({
       continue;
     }
 
+    if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
+      continue;
+    }
+
     drawCombatFeedbackSpriteEffect({
       cache,
       combatFeedbackEvents,
@@ -1912,6 +2403,8 @@ function drawFullEffects({
       event,
       layer,
       map,
+      managedState,
+      metrics,
       requestRedraw,
       transform,
     });
@@ -1937,13 +2430,16 @@ function drawFullEffects({
       const direction = getDamageNumberDirection(event);
       const backingSize = criticalHitBackingSize * (1 - progress * 0.3);
 
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: 0.88 * (1 - progress),
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
         height: backingSize,
+        key: `critical-backing:${getCombatFeedbackLaneKey(event)}`,
         layer,
+        managedState,
+        metrics,
         position: labelPosition,
         requestRedraw,
         rotation: direction * damageNumberRotationRadians * progress,
@@ -1952,17 +2448,20 @@ function drawFullEffects({
       });
     }
 
-    const label = createFeedbackText({
+    const label = drawManagedFeedbackText({
       color: getCombatFeedbackColor(event, isCriticalDamage),
       fontSize: getCombatFeedbackFontSize(event),
+      key: getCombatFeedbackLaneKey(event),
+      layer,
+      managedState,
+      metrics,
+      position: labelPosition,
       text: event.text,
     });
-
-    label.position.set(labelPosition.x, labelPosition.y);
     if (isDamageNumberFeedback(event)) {
       applyDamageNumberAnimation(label, event, currentTime);
     }
-    layer.addChild(label);
+    metrics.drawnFeedbackCount += 1;
   }
 }
 
@@ -1971,28 +2470,26 @@ function drawFullFloor({
   cache,
   layer,
   map,
-  renderSize,
+  managedState,
+  metrics,
   requestRedraw,
   transform,
+  visibleTileBounds,
 }: {
   backgroundGraphics: Graphics;
   cache: TextureCache;
   layer: Container;
   map: GameMap;
-  renderSize: RenderSize;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   transform: FullTransform;
+  visibleTileBounds: TileBounds;
 }) {
   const mapPixelWidth = map.columns * transform.cellPixelSize;
   const mapPixelHeight = map.rows * transform.cellPixelSize;
   const mapX = -transform.cameraOffset.x;
   const mapY = -transform.cameraOffset.y;
-  const visibleTileBounds = getVisibleTileBounds({
-    cameraOffset: transform.cameraOffset,
-    cellPixelSize: transform.cellPixelSize,
-    map,
-    renderSize,
-  });
   const useImageFloorTiles =
     isHubVisualMap(map.id) || isWildernessVisualMap(map.id);
 
@@ -2013,12 +2510,15 @@ function drawFullFloor({
       y: chunk.y * transform.cellPixelSize - transform.cameraOffset.y,
     };
     const floorSize = transform.cellPixelSize * floorChunkCellSpan;
-    const didDraw = drawImageSprite({
+    const didDraw = drawManagedImageSprite({
       anchorX: 0,
       anchorY: 0,
       cache,
       height: floorSize,
+      key: `floor:${map.id}:${chunk.x}:${chunk.y}:${floorTileSrc}`,
       layer,
+      managedState,
+      metrics,
       position: floorPosition,
       requestRedraw,
       src: floorTileSrc,
@@ -2038,25 +2538,22 @@ function drawFullWalls({
   fallbackGraphics,
   layer,
   map,
-  renderSize,
+  managedState,
+  metrics,
   requestRedraw,
   transform,
+  visibleTileBounds,
 }: {
   cache: TextureCache;
   fallbackGraphics: Graphics;
   layer: Container;
   map: GameMap;
-  renderSize: RenderSize;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   transform: FullTransform;
+  visibleTileBounds: TileBounds;
 }) {
-  const visibleTileBounds = getVisibleTileBounds({
-    cameraOffset: transform.cameraOffset,
-    cellPixelSize: transform.cellPixelSize,
-    map,
-    renderSize,
-  });
-
   for (const wall of map.walls) {
     if (!isPositionInTileBounds(wall, visibleTileBounds)) {
       continue;
@@ -2067,19 +2564,23 @@ function drawFullWalls({
 
     if (isWildernessVisualMap(map.id)) {
       const wallKind = getWildernessWallTileKind(wall);
-      const didDraw = drawImageSprite({
+      const wallSpriteSrc = getWildernessWallTileSrc(wall);
+      const didDraw = drawManagedImageSprite({
         cache,
         height:
           wallKind === "tree"
             ? transform.cellPixelSize * 2.25
             : transform.cellPixelSize * 1.32,
+        key: `wall:${map.id}:${wall.x}:${wall.y}:${wallSpriteSrc}`,
         layer,
+        managedState,
+        metrics,
         position: {
           x: wallX + transform.cellPixelSize / 2,
           y: wallY + transform.cellPixelSize,
         },
         requestRedraw,
-        src: getWildernessWallTileSrc(wall),
+        src: wallSpriteSrc,
         width:
           wallKind === "tree"
             ? transform.cellPixelSize * 2.25
@@ -2102,28 +2603,41 @@ function drawFullMapObjects({
   fallbackGraphics,
   layer,
   map,
+  managedState,
+  metrics,
   requestRedraw,
   transform,
+  visibleTileBounds,
 }: {
   cache: TextureCache;
   fallbackGraphics: Graphics;
   layer: Container;
   map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   transform: FullTransform;
+  visibleTileBounds: TileBounds;
 }) {
   const objectSize = transform.cellPixelSize * 1.55;
 
   for (const teleport of map.teleports) {
+    if (!isPositionInTileBounds(teleport.position, visibleTileBounds)) {
+      continue;
+    }
+
     const teleportPosition = toFullPosition(teleport.position, transform);
     const teleporterSpritePosition = {
       x: teleportPosition.x,
       y: teleportPosition.y + prototypeTeleporterSpriteYOffsetPx,
     };
-    const didDraw = drawImageSprite({
+    const didDraw = drawManagedImageSprite({
       cache,
       height: objectSize,
+      key: `object:${map.id}:teleport:${teleport.targetMapId}:${teleport.position.x}:${teleport.position.y}`,
       layer,
+      managedState,
+      metrics,
       position: teleporterSpritePosition,
       requestRedraw,
       src: MAP_OBJECT_ICON_SRC.teleportPoint,
@@ -2138,11 +2652,18 @@ function drawFullMapObjects({
   }
 
   for (const fountain of map.healingFountains) {
+    if (!isPositionInTileBounds(fountain.position, visibleTileBounds)) {
+      continue;
+    }
+
     const fountainPosition = toFullPosition(fountain.position, transform);
-    const didDraw = drawImageSprite({
+    const didDraw = drawManagedImageSprite({
       cache,
       height: objectSize,
+      key: `object:${map.id}:fountain:${fountain.position.x}:${fountain.position.y}`,
       layer,
+      managedState,
+      metrics,
       position: fountainPosition,
       requestRedraw,
       src: MAP_OBJECT_ICON_SRC.healingFountain,
@@ -2165,9 +2686,12 @@ function drawFullEntities({
   fallbackGraphics,
   layer,
   map,
+  managedState,
+  metrics,
   requestRedraw,
   skillShieldBlocksById,
   transform,
+  visibleTileBounds,
   visualMovementByEntityId,
 }: {
   cache: TextureCache;
@@ -2177,9 +2701,12 @@ function drawFullEntities({
   fallbackGraphics: Graphics;
   layer: Container;
   map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   transform: FullTransform;
+  visibleTileBounds: TileBounds;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }) {
   const sortedByY = [...entities].sort(
@@ -2188,6 +2715,11 @@ function drawFullEntities({
   );
 
   for (const entity of sortedByY) {
+    if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
+      continue;
+    }
+
+    metrics.visibleEntityCount += 1;
     const spriteSrc = getEntitySpriteSrc({
       currentTime,
       entity,
@@ -2215,13 +2747,16 @@ function drawFullEntities({
     };
     let drawnSpriteSrc: string | null = null;
     let didDraw = spriteSrc
-      ? drawImageSprite({
+      ? drawManagedImageSprite({
           alpha,
           anchorX: layout.anchorX,
           anchorY: layout.anchorY,
           cache,
           height: layout.height,
+          key: `entity:${entity.id}`,
           layer,
+          managedState,
+          metrics,
           position: spritePosition,
           requestRedraw,
           src: spriteSrc,
@@ -2238,13 +2773,16 @@ function drawFullEntities({
       const lastSpriteSrc = cache.lastEntitySpriteSrcById.get(entity.id);
 
       if (lastSpriteSrc && lastSpriteSrc !== spriteSrc) {
-        didDraw = drawImageSprite({
+        didDraw = drawManagedImageSprite({
           alpha,
           anchorX: layout.anchorX,
           anchorY: layout.anchorY,
           cache,
           height: layout.height,
+          key: `entity:${entity.id}`,
           layer,
+          managedState,
+          metrics,
           position: spritePosition,
           requestRedraw,
           src: lastSpriteSrc,
@@ -2258,13 +2796,16 @@ function drawFullEntities({
     }
 
     if (!didDraw && idleSpriteSrc && idleSpriteSrc !== spriteSrc) {
-      didDraw = drawImageSprite({
+      didDraw = drawManagedImageSprite({
         alpha,
         anchorX: layout.anchorX,
         anchorY: layout.anchorY,
         cache,
         height: layout.height,
+        key: `entity:${entity.id}`,
         layer,
+        managedState,
+        metrics,
         position: spritePosition,
         requestRedraw,
         src: idleSpriteSrc,
@@ -2278,13 +2819,16 @@ function drawFullEntities({
     }
 
     if (drawnSpriteSrc && tint) {
-      drawImageSprite({
+      drawManagedImageSprite({
         alpha: tint.alpha * alpha,
         anchorX: layout.anchorX,
         anchorY: layout.anchorY,
         cache,
         height: layout.height,
+        key: `entity-tint:${entity.id}`,
         layer,
+        managedState,
+        metrics,
         position: spritePosition,
         requestRedraw,
         src: drawnSpriteSrc,
@@ -2296,13 +2840,19 @@ function drawFullEntities({
     if (!didDraw) {
       drawFallbackEntity(fallbackGraphics, entity, currentTime, transform, tint);
     }
+
+    metrics.drawnEntityCount += 1;
   }
 }
 
 function drawQuestGiverMarker(
+  graphics: Graphics,
   layer: Container,
   entities: GameEntity[],
+  managedState: ManagedRendererState,
+  metrics: PixiDrawMetrics,
   transform: FullTransform,
+  visibleTileBounds: TileBounds,
   questGiverHasWork: boolean,
 ) {
   if (!questGiverHasWork) {
@@ -2317,37 +2867,34 @@ function drawQuestGiverMarker(
     return;
   }
 
+  if (!isPositionInTileBounds(questGiver.position, visibleTileBounds)) {
+    return;
+  }
+
   const position = toFullPosition(questGiver.position, transform);
   const badgeRadius = Math.max(8, transform.cellPixelSize * 0.25);
-  const marker = new Container();
-  const badge = new Graphics();
-  const label = new Text({
-    text: "!",
-    style: {
-      align: "center",
-      fill: 0x451a03,
-      fontFamily: "Arial, sans-serif",
-      fontSize: Math.max(12, transform.cellPixelSize * 0.38),
-      fontWeight: "800",
-      stroke: { color: 0xfef3c7, width: 2 },
-    },
-  });
+  const markerPosition = {
+    x: position.x + transform.cellPixelSize * 0.48,
+    y: position.y - transform.cellPixelSize * 0.58,
+  };
 
-  badge
-    .circle(0, 0, badgeRadius)
+  graphics
+    .circle(markerPosition.x, markerPosition.y, badgeRadius)
     .fill(0xfacc15)
     .stroke({ color: 0x92400e, alpha: 1, width: 1 });
-  badge
-    .circle(0, 0, badgeRadius + 2)
+  graphics
+    .circle(markerPosition.x, markerPosition.y, badgeRadius + 2)
     .stroke({ color: 0xfacc15, alpha: 0.28, width: 4 });
-  label.anchor.set(0.5);
-  label.position.set(0, -1);
-  marker.position.set(
-    position.x + transform.cellPixelSize * 0.48,
-    position.y - transform.cellPixelSize * 0.58,
-  );
-  marker.addChild(badge, label);
-  layer.addChild(marker);
+  drawManagedFeedbackText({
+    color: 0x451a03,
+    fontSize: Math.max(12, transform.cellPixelSize * 0.38),
+    key: "quest-giver-marker-label",
+    layer,
+    managedState,
+    metrics,
+    position: { x: markerPosition.x, y: markerPosition.y - 1 },
+    text: "!",
+  });
 }
 
 function drawPreviewMap(
@@ -2456,6 +3003,8 @@ function drawFullMap({
   leaderIntent,
   layers,
   map,
+  managedState,
+  onPerformanceSample,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -2478,6 +3027,8 @@ function drawFullMap({
   leaderIntent: LeaderIntent | null;
   layers: PixiRenderLayers;
   map: GameMap;
+  managedState: ManagedRendererState;
+  onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   questGiverHasWork: boolean;
   requestRedraw?: () => void;
   renderSize: RenderSize;
@@ -2490,6 +3041,8 @@ function drawFullMap({
   textureCache: TextureCache;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }) {
+  const renderStartedAt = performance.now();
+  const metrics = createPixiDrawMetrics();
   const transform: FullTransform = {
     cameraOffset,
     cellPixelSize,
@@ -2497,34 +3050,52 @@ function drawFullMap({
   const overlayGraphics = layers.overlayGraphics;
   const backgroundGraphics = layers.backgroundGraphics;
   const fallbackGraphics = layers.fallbackGraphics;
+  const effectsGraphics = layers.effectsGraphics;
+  const visibleTileBounds = getFullVisibleTileBounds({
+    cameraOffset,
+    cellPixelSize,
+    map,
+    renderSize,
+  });
 
-  clearLayers(layers);
+  beginManagedFrame(managedState, map.id ?? map.debugName);
+  backgroundGraphics.clear();
+  effectsGraphics.clear();
+  fallbackGraphics.clear();
+  overlayGraphics.clear();
   backgroundGraphics.rect(0, 0, renderSize.width, renderSize.height).fill(0x0f172a);
   drawFullFloor({
     backgroundGraphics,
     cache: textureCache,
     layer: layers.floorLayer,
     map,
-    renderSize,
+    managedState,
+    metrics,
     requestRedraw,
     transform,
+    visibleTileBounds,
   });
   drawFullWalls({
     cache: textureCache,
     fallbackGraphics,
     layer: layers.wallLayer,
     map,
-    renderSize,
+    managedState,
+    metrics,
     requestRedraw,
     transform,
+    visibleTileBounds,
   });
   drawFullMapObjects({
     cache: textureCache,
     fallbackGraphics,
     layer: layers.objectLayer,
     map,
+    managedState,
+    metrics,
     requestRedraw,
     transform,
+    visibleTileBounds,
   });
   drawFullEntities({
     cache: textureCache,
@@ -2534,9 +3105,12 @@ function drawFullMap({
     fallbackGraphics,
     layer: layers.entityLayer,
     map,
+    managedState,
+    metrics,
     requestRedraw,
     skillShieldBlocksById,
     transform,
+    visibleTileBounds,
     visualMovementByEntityId,
   });
   drawFullEffects({
@@ -2545,8 +3119,11 @@ function drawFullMap({
     currentTime,
     dropVisualEvents,
     entities,
+    graphics: effectsGraphics,
     layer: layers.effectsLayer,
     map,
+    managedState,
+    metrics,
     requestRedraw,
     resurrectionProgressByCompanionId,
     skillBindsByEnemyId,
@@ -2554,19 +3131,23 @@ function drawFullMap({
     skillShieldBlocksById,
     skillVisualEvents,
     transform,
+    visibleTileBounds,
   });
-  if (activeTeleport) {
+  if (activeTeleport && isPositionInTileBounds(activeTeleport.position, visibleTileBounds)) {
     const activeTeleportPosition = toFullPosition(activeTeleport.position, transform);
     const pulseProgress = (currentTime % 900) / 900;
     const pulseSize = transform.cellPixelSize * (1.65 + pulseProgress * 0.45);
 
-    drawImageSprite({
+    drawManagedImageSprite({
       alpha: 0.78 * (1 - pulseProgress * 0.55),
       anchorX: 0.5,
       anchorY: 0.5,
       cache: textureCache,
       height: pulseSize,
+      key: `active-teleport:${activeTeleport.id}`,
       layer: layers.effectsLayer,
+      managedState,
+      metrics,
       position: activeTeleportPosition,
       requestRedraw,
       src: teleportPulseSrc,
@@ -2574,9 +3155,13 @@ function drawFullMap({
     });
   }
   drawQuestGiverMarker(
+    effectsGraphics,
     layers.effectsLayer,
     entities,
+    managedState,
+    metrics,
     transform,
+    visibleTileBounds,
     questGiverHasWork,
   );
 
@@ -2593,13 +3178,16 @@ function drawFullMap({
     }
 
     for (const entity of entities) {
-      if (shouldDrawEnemyAggroRange(entity, currentTime, visualMovementByEntityId)) {
+      if (
+        isPositionInTileBounds(entity.position, visibleTileBounds) &&
+        shouldDrawEnemyAggroRange(entity, currentTime, visualMovementByEntityId)
+      ) {
         drawEnemyAggroRange(overlayGraphics, entity, transform);
       }
     }
   }
 
-  if (activeTeleport) {
+  if (activeTeleport && isPositionInTileBounds(activeTeleport.position, visibleTileBounds)) {
     const activeTeleportPosition = toFullPosition(activeTeleport.position, transform);
 
     overlayGraphics
@@ -2612,6 +3200,10 @@ function drawFullMap({
   }
 
   for (const entity of entities) {
+    if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
+      continue;
+    }
+
     drawHealthBar(overlayGraphics, entity, transform);
     drawEnemyAttackWindupBar(overlayGraphics, entity, currentTime, transform);
   }
@@ -2625,6 +3217,10 @@ function drawFullMap({
   } else if (targetEntity) {
     drawPoiRing(overlayGraphics, targetEntity.position, transform, 0xf97316);
   }
+
+  endManagedFrame(managedState);
+  metrics.renderMs = performance.now() - renderStartedAt;
+  onPerformanceSample?.(metrics);
 }
 
 function drawWorld({
@@ -2638,7 +3234,9 @@ function drawWorld({
   leaderIntent,
   layers,
   map,
+  managedState,
   mode,
+  onPerformanceSample,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -2664,6 +3262,8 @@ function drawWorld({
       leaderIntent,
       layers,
       map,
+      managedState,
+      onPerformanceSample,
       questGiverHasWork,
       requestRedraw,
       renderSize,
@@ -2680,6 +3280,7 @@ function drawWorld({
   }
 
   clearLayers(layers);
+  resetManagedRendererState(managedState);
   drawPreviewMap(layers.overlayGraphics, map, entities, {
     cameraOffset,
     cellPixelSize,
@@ -2701,6 +3302,7 @@ export function PixiWorldRenderer({
   onEnemyClick,
   onFloorClick,
   onNpcClick,
+  onPerformanceSample,
   onResourceClick,
   resurrectionProgressByCompanionId = {},
   questGiverHasWork = false,
@@ -2718,6 +3320,8 @@ export function PixiWorldRenderer({
   const appliedRenderSizeRef = useRef<RenderSize | null>(null);
   const requestRedrawRef = useRef<() => void>(() => {});
   const textureCacheRef = useRef(createTextureCache());
+  const managedStateRef = useRef(createManagedRendererState());
+  const preloadedVisualTextureSignatureRef = useRef<string | null>(null);
   const latestCameraOffsetRef = useRef(cameraOffset);
   const latestCellPixelSizeRef = useRef(cellPixelSize);
   const latestCombatFeedbackEventsRef = useRef(combatFeedbackEvents);
@@ -2728,6 +3332,7 @@ export function PixiWorldRenderer({
   const latestEntitiesRef = useRef<GameEntity[]>(entities);
   const latestLeaderIntentRef = useRef<LeaderIntent | null>(leaderIntent);
   const latestModeRef = useRef(mode);
+  const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestQuestGiverHasWorkRef = useRef(questGiverHasWork);
   const latestRenderSizeRef = useRef(getRenderSize(mode, viewportSize));
   const latestViewportSizeRef = useRef(viewportSize);
@@ -2760,6 +3365,7 @@ export function PixiWorldRenderer({
     latestEntitiesRef.current = sortedEntities;
     latestLeaderIntentRef.current = leaderIntent;
     latestModeRef.current = mode;
+    latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestQuestGiverHasWorkRef.current = questGiverHasWork;
     latestRenderSizeRef.current = renderSize;
     latestViewportSizeRef.current = viewportSize;
@@ -2781,6 +3387,7 @@ export function PixiWorldRenderer({
     leaderIntent,
     map,
     mode,
+    onPerformanceSample,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,
@@ -2795,6 +3402,25 @@ export function PixiWorldRenderer({
   ]);
 
   useEffect(() => {
+    const visualTextureSignature = getCurrentMapVisualTextureSignature(
+      map,
+      sortedEntities,
+    );
+
+    if (preloadedVisualTextureSignatureRef.current === visualTextureSignature) {
+      return;
+    }
+
+    preloadedVisualTextureSignatureRef.current = visualTextureSignature;
+    preloadCurrentMapVisualTextures({
+      cache: textureCacheRef.current,
+      entities: sortedEntities,
+      map,
+      requestRedraw: requestRedrawRef.current,
+    });
+  }, [map, sortedEntities]);
+
+  useEffect(() => {
     let isDisposed = false;
     let isInitialized = false;
     let scheduledRedrawFrame: number | null = null;
@@ -2804,6 +3430,7 @@ export function PixiWorldRenderer({
       backgroundGraphics: new Graphics(),
       entityLayer: new Container(),
       effectsLayer: new Container(),
+      effectsGraphics: new Graphics(),
       fallbackGraphics: new Graphics(),
       floorLayer: new Container(),
       objectLayer: new Container(),
@@ -2836,7 +3463,9 @@ export function PixiWorldRenderer({
         layers: layersRef.current,
         leaderIntent: latestLeaderIntentRef.current,
         map: latestMapRef.current,
+        managedState: managedStateRef.current,
         mode: latestModeRef.current,
+        onPerformanceSample: latestOnPerformanceSampleRef.current,
         questGiverHasWork: latestQuestGiverHasWorkRef.current,
         renderSize: latestRenderSizeRef.current,
         requestRedraw: requestRedrawRef.current,
@@ -2894,6 +3523,7 @@ export function PixiWorldRenderer({
       stage.addChild(layers.objectLayer);
       stage.addChild(layers.entityLayer);
       stage.addChild(layers.fallbackGraphics);
+      stage.addChild(layers.effectsGraphics);
       stage.addChild(layers.effectsLayer);
       stage.addChild(layers.overlayGraphics);
       hostRef.current.appendChild(app.canvas);
@@ -2915,6 +3545,7 @@ export function PixiWorldRenderer({
       if (isInitialized) {
         app.destroy(true, { children: true });
       }
+      resetManagedRendererState(managedStateRef.current);
     };
   }, []);
 
@@ -2946,7 +3577,9 @@ export function PixiWorldRenderer({
       layers: layersRef.current,
       leaderIntent,
       map,
+      managedState: managedStateRef.current,
       mode,
+      onPerformanceSample,
       questGiverHasWork,
       requestRedraw: requestRedrawRef.current,
       renderSize,
@@ -2970,6 +3603,7 @@ export function PixiWorldRenderer({
     leaderIntent,
     map,
     mode,
+    onPerformanceSample,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,

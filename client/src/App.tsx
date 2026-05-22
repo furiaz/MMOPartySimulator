@@ -28,7 +28,10 @@ import {
   getQuestTurnInErrorText,
 } from "./questUiHelpers";
 import { QuestTrackerPanel } from "./QuestPanels";
-import { PixiWorldRenderer } from "./worldRenderer/PixiWorldRenderer";
+import {
+  PixiWorldRenderer,
+  type PixiRendererPerformanceSample,
+} from "./worldRenderer/PixiWorldRenderer";
 
 import {
   addEntity,
@@ -135,6 +138,10 @@ import {
   type ResourceEntity,
   type WorldWipeRecoveryChoice,
 } from "./game";
+import {
+  consumeGamePerformanceMetrics,
+  type GamePerformanceMetrics,
+} from "./game/performanceMetrics";
 import { type SpriteDirection } from "./visualAssets";
 
 const debugMap = createDebugMap();
@@ -243,10 +250,17 @@ type BrowserPerformance = Performance & {
 };
 
 type PerformanceOverlayStats = {
+  activeFeedbackCount: number;
+  attackSlotChecksPerSecond: number;
   fps: number;
   frameMs: number;
+  drawnEntityCount: number;
+  drawnFeedbackCount: number;
+  drawnSprites: number;
+  drawnTexts: number;
   slowFrames: number;
   simFramesPerSecond: number;
+  fullDrawsPerSecond: number;
   entityCount: number;
   companionCount: number;
   enemyCount: number;
@@ -257,9 +271,41 @@ type PerformanceOverlayStats = {
   mapCells: number;
   wallCount: number;
   pathCount: number;
+  navigationPathQueriesPerSecond: number;
+  pathDistanceQueriesPerSecond: number;
+  movementFailuresPerSecond: number;
   memoryUsedMb: number | null;
   memoryTotalMb: number | null;
   memoryLimitMb: number | null;
+  renderMs: number;
+  spriteCreatesPerSecond: number;
+  spriteReusesPerSecond: number;
+  textCreatesPerSecond: number;
+  textReusesPerSecond: number;
+  updateMs: number;
+  visibleEntityCount: number;
+};
+
+type RendererPerformanceAccumulator = Omit<
+  PixiRendererPerformanceSample,
+  "drawCount"
+> & {
+  drawCount: number;
+};
+
+type RendererPerformanceSnapshot = {
+  activeFeedbackCount: number;
+  drawCount: number;
+  drawnEntityCount: number;
+  drawnFeedbackCount: number;
+  drawnSprites: number;
+  drawnTexts: number;
+  renderMs: number;
+  spriteCreates: number;
+  spriteReuses: number;
+  textCreates: number;
+  textReuses: number;
+  visibleEntityCount: number;
 };
 
 function isWildernessVisualMap(mapId: string | undefined): boolean {
@@ -362,9 +408,69 @@ function LeaderPoiPanel({
   );
 }
 
+function createRendererPerformanceAccumulator(): RendererPerformanceAccumulator {
+  return {
+    activeFeedbackCount: 0,
+    drawCount: 0,
+    drawnEntityCount: 0,
+    drawnFeedbackCount: 0,
+    drawnSprites: 0,
+    drawnTexts: 0,
+    renderMs: 0,
+    spriteCreates: 0,
+    spriteReuses: 0,
+    textCreates: 0,
+    textReuses: 0,
+    visibleEntityCount: 0,
+  };
+}
+
+function recordRendererPerformanceSample(
+  accumulator: RendererPerformanceAccumulator,
+  sample: PixiRendererPerformanceSample,
+) {
+  accumulator.activeFeedbackCount = sample.activeFeedbackCount;
+  accumulator.drawCount += sample.drawCount;
+  accumulator.drawnEntityCount = sample.drawnEntityCount;
+  accumulator.drawnFeedbackCount = sample.drawnFeedbackCount;
+  accumulator.drawnSprites = sample.drawnSprites;
+  accumulator.drawnTexts = sample.drawnTexts;
+  accumulator.renderMs += sample.renderMs;
+  accumulator.spriteCreates += sample.spriteCreates;
+  accumulator.spriteReuses += sample.spriteReuses;
+  accumulator.textCreates += sample.textCreates;
+  accumulator.textReuses += sample.textReuses;
+  accumulator.visibleEntityCount = sample.visibleEntityCount;
+}
+
+function consumeRendererPerformanceAccumulator(
+  accumulator: RendererPerformanceAccumulator,
+): RendererPerformanceSnapshot {
+  const drawCount = accumulator.drawCount;
+  const snapshot = {
+    activeFeedbackCount: accumulator.activeFeedbackCount,
+    drawCount,
+    drawnEntityCount: accumulator.drawnEntityCount,
+    drawnFeedbackCount: accumulator.drawnFeedbackCount,
+    drawnSprites: accumulator.drawnSprites,
+    drawnTexts: accumulator.drawnTexts,
+    renderMs: drawCount > 0 ? accumulator.renderMs / drawCount : 0,
+    spriteCreates: accumulator.spriteCreates,
+    spriteReuses: accumulator.spriteReuses,
+    textCreates: accumulator.textCreates,
+    textReuses: accumulator.textReuses,
+    visibleEntityCount: accumulator.visibleEntityCount,
+  };
+
+  Object.assign(accumulator, createRendererPerformanceAccumulator());
+
+  return snapshot;
+}
+
 function PerformanceOverlay({
   currentMap,
   gameState,
+  rendererPerformanceRef,
 }: {
   currentMap: {
     columns: number;
@@ -372,14 +478,20 @@ function PerformanceOverlay({
     walls: Position[];
   };
   gameState: GameState;
+  rendererPerformanceRef: { current: RendererPerformanceAccumulator };
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [stats, setStats] = useState<PerformanceOverlayStats>(() =>
     getPerformanceOverlayStats(gameState, currentMap, {
+      gameMetrics: consumeGamePerformanceMetrics(),
       fps: 0,
       frameMs: 0,
+      rendererSnapshot: consumeRendererPerformanceAccumulator(
+        rendererPerformanceRef.current,
+      ),
       slowFrames: 0,
       simFramesPerSecond: 0,
+      elapsedSeconds: 1,
     }),
   );
   const latestGameStateRef = useRef(gameState);
@@ -420,8 +532,13 @@ function PerformanceOverlay({
         const simulationFrameDelta =
           currentSimulationFrame - previousSimulationFrame;
         const timingStats = {
+          elapsedSeconds,
           fps: frameCount / elapsedSeconds,
           frameMs: frameMsTotal / frameCount,
+          gameMetrics: consumeGamePerformanceMetrics(),
+          rendererSnapshot: consumeRendererPerformanceAccumulator(
+            rendererPerformanceRef.current,
+          ),
           slowFrames,
           simFramesPerSecond: simulationFrameDelta / elapsedSeconds,
         };
@@ -466,9 +583,19 @@ function PerformanceOverlay({
         <dl className="performance-overlay-stats">
           <PerformanceStat label="FPS" value={formatStat(stats.fps)} />
           <PerformanceStat label="Frame" value={`${formatStat(stats.frameMs)}ms`} />
+          <PerformanceStat label="Render" value={`${formatStat(stats.renderMs)}ms`} />
           <PerformanceStat label="Slow" value={stats.slowFrames.toString()} />
           <PerformanceStat label="Sim" value={`${formatStat(stats.simFramesPerSecond)}/s`} />
+          <PerformanceStat label="Update" value={`${formatStat(stats.updateMs)}ms`} />
+          <PerformanceStat
+            label="Draws"
+            value={`${formatStat(stats.fullDrawsPerSecond)}/s`}
+          />
           <PerformanceStat label="Entities" value={stats.entityCount.toString()} />
+          <PerformanceStat
+            label="Drawn"
+            value={`${stats.drawnEntityCount}/${stats.visibleEntityCount}`}
+          />
           <PerformanceStat
             label="Party"
             value={stats.companionCount.toString()}
@@ -489,6 +616,34 @@ function PerformanceOverlay({
           <PerformanceStat label="Cells" value={stats.mapCells.toLocaleString()} />
           <PerformanceStat label="Walls" value={stats.wallCount.toLocaleString()} />
           <PerformanceStat label="Paths" value={stats.pathCount.toLocaleString()} />
+          <PerformanceStat
+            label="Nav Path"
+            value={`${formatStat(stats.navigationPathQueriesPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Path Dist"
+            value={`${formatStat(stats.pathDistanceQueriesPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Slot Chk"
+            value={`${formatStat(stats.attackSlotChecksPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Move Fail"
+            value={`${formatStat(stats.movementFailuresPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Sprites"
+            value={`${stats.drawnSprites} (${formatStat(stats.spriteCreatesPerSecond)}/${formatStat(stats.spriteReusesPerSecond)})`}
+          />
+          <PerformanceStat
+            label="Text"
+            value={`${stats.drawnTexts} (${formatStat(stats.textCreatesPerSecond)}/${formatStat(stats.textReusesPerSecond)})`}
+          />
+          <PerformanceStat
+            label="Feedback"
+            value={`${stats.drawnFeedbackCount}/${stats.activeFeedbackCount}`}
+          />
           <PerformanceStat
             label="Heap"
             value={
@@ -528,7 +683,11 @@ function getPerformanceOverlayStats(
   timingStats: Pick<
     PerformanceOverlayStats,
     "fps" | "frameMs" | "slowFrames" | "simFramesPerSecond"
-  >,
+  > & {
+    elapsedSeconds: number;
+    gameMetrics: GamePerformanceMetrics;
+    rendererSnapshot: RendererPerformanceSnapshot;
+  },
 ): PerformanceOverlayStats {
   const entities = Object.values(gameState.entities);
   const companions = entities.filter((entity) => entity.kind === "companion");
@@ -536,9 +695,25 @@ function getPerformanceOverlayStats(
   const resources = entities.filter((entity) => entity.kind === "resource");
   const npcs = entities.filter((entity) => entity.kind === "npc");
   const memorySnapshot = getPerformanceMemorySnapshot();
+  const { elapsedSeconds, gameMetrics, rendererSnapshot } = timingStats;
+  const updateMs =
+    gameMetrics.updateCount > 0
+      ? gameMetrics.updateMsTotal / gameMetrics.updateCount
+      : 0;
 
   return {
-    ...timingStats,
+    fps: timingStats.fps,
+    frameMs: timingStats.frameMs,
+    slowFrames: timingStats.slowFrames,
+    simFramesPerSecond: timingStats.simFramesPerSecond,
+    activeFeedbackCount: rendererSnapshot.activeFeedbackCount,
+    attackSlotChecksPerSecond:
+      gameMetrics.attackSlotChecks / elapsedSeconds,
+    drawnEntityCount: rendererSnapshot.drawnEntityCount,
+    drawnFeedbackCount: rendererSnapshot.drawnFeedbackCount,
+    drawnSprites: rendererSnapshot.drawnSprites,
+    drawnTexts: rendererSnapshot.drawnTexts,
+    fullDrawsPerSecond: rendererSnapshot.drawCount / elapsedSeconds,
     entityCount: entities.length,
     companionCount: companions.length,
     enemyCount: enemies.length,
@@ -551,6 +726,11 @@ function getPerformanceOverlayStats(
     mapCells: currentMap.columns * currentMap.rows,
     wallCount: currentMap.walls.length,
     pathCount: Object.keys(gameState.movementPathsByEntityId ?? {}).length,
+    navigationPathQueriesPerSecond:
+      gameMetrics.navigationPathQueries / elapsedSeconds,
+    pathDistanceQueriesPerSecond:
+      gameMetrics.pathDistanceQueries / elapsedSeconds,
+    movementFailuresPerSecond: gameMetrics.movementFailures / elapsedSeconds,
     memoryUsedMb: memorySnapshot
       ? bytesToMegabytes(memorySnapshot.usedJSHeapSize)
       : null,
@@ -560,6 +740,13 @@ function getPerformanceOverlayStats(
     memoryLimitMb: memorySnapshot
       ? bytesToMegabytes(memorySnapshot.jsHeapSizeLimit)
       : null,
+    renderMs: rendererSnapshot.renderMs,
+    spriteCreatesPerSecond: rendererSnapshot.spriteCreates / elapsedSeconds,
+    spriteReusesPerSecond: rendererSnapshot.spriteReuses / elapsedSeconds,
+    textCreatesPerSecond: rendererSnapshot.textCreates / elapsedSeconds,
+    textReusesPerSecond: rendererSnapshot.textReuses / elapsedSeconds,
+    updateMs,
+    visibleEntityCount: rendererSnapshot.visibleEntityCount,
   };
 }
 
@@ -1322,12 +1509,19 @@ function App() {
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
+  const rendererPerformanceRef = useRef(createRendererPerformanceAccumulator());
   const cameraMapIdRef = useRef<string | undefined>(undefined);
   const previousCameraFocusRef = useRef<Position | null>(null);
   const currentCrownBalance = getCurrencyBalance(gameState.wallet, "crowns");
   const previousCrownBalanceRef = useRef(currentCrownBalance);
   const currentMap = gameState.map ?? debugMap;
   const allEntities = Object.values(gameState.entities);
+  const handleRendererPerformanceSample = useCallback(
+    (sample: PixiRendererPerformanceSample) => {
+      recordRendererPerformanceSample(rendererPerformanceRef.current, sample);
+    },
+    [],
+  );
 
   const partyMembers = companionIds
     .map((id) => gameState.entities[id] as Companion | undefined)
@@ -2559,7 +2753,11 @@ function App() {
               </button>
             </div>
           </div>
-          <PerformanceOverlay currentMap={currentMap} gameState={gameState} />
+          <PerformanceOverlay
+            currentMap={currentMap}
+            gameState={gameState}
+            rendererPerformanceRef={rendererPerformanceRef}
+          />
           <LeaderPoiPanel
             autoModeEnabled={gameState.autoModeEnabled}
             consideredTargets={gameState.lastPoiDecision?.consideredTargets}
@@ -2579,6 +2777,7 @@ function App() {
             onEnemyClick={commandPartyToTargetEnemy}
             onFloorClick={commandPartyToMoveFromFloorPosition}
             onNpcClick={commandPartyToInteractWithNpc}
+            onPerformanceSample={handleRendererPerformanceSample}
             onResourceClick={commandCompanionsToGatherResource}
             questGiverHasWork={questGiverHasWork}
             resurrectionProgressByCompanionId={

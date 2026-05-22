@@ -8,7 +8,11 @@ import {
   type GameState,
 } from "./state";
 import type { SimulationTiming } from "./simulationTiming";
-import { chooseAttackSlot } from "./attackSlots";
+import {
+  chooseAttackSlot,
+  rememberAttackSlot,
+  type AttackSlotPathDistanceCache,
+} from "./attackSlots";
 import { getPartyLeader } from "./partySystem";
 import { attackDefenderTarget } from "./defenderCombat";
 import {
@@ -49,6 +53,7 @@ export function updateDefendSystem(
     deltaSeconds: 0.1,
     frameNumber: state.simulationFrame ?? state.simulationTick ?? 0,
   },
+  pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
   let nextState = state;
   const now = timing.nowMs;
@@ -137,6 +142,7 @@ export function updateDefendSystem(
           shouldWaitForIntercept ||
             (leader && (nextState.defenderWaitMsByLeaderId?.[leader.id] ?? 0) > 0),
         ),
+        pathDistanceCache,
       );
       if (
         didEntityMove(nextState, defender) ||
@@ -434,6 +440,7 @@ function moveDefenderTowardCommittedTarget(
   leader: GameEntity | undefined,
   fallbackPosition: Position,
   useInterceptBoost: boolean,
+  pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
   const blockedMs = state.defenderBlockedMsByEntityId?.[defender.id] ?? 0;
 
@@ -464,6 +471,9 @@ function moveDefenderTowardCommittedTarget(
       leader,
       leaderSafeDistance: DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE,
       leaderMaxPathDistance: DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+      nowMs: state.simulationTimeMs,
+      pathDistanceCache,
+      targetId: target.id,
     },
   );
 
@@ -485,8 +495,19 @@ function moveDefenderTowardCommittedTarget(
       useInterceptBoost,
     ),
   };
+  const slotState = rememberAttackSlot(
+    state,
+    defender,
+    target.position,
+    DEFENDER_ATTACK_RANGE,
+    attackPosition,
+    {
+      nowMs: state.simulationTimeMs,
+      targetId: target.id,
+    },
+  );
   const nextPosition = previewMoveTowardPosition(
-    reservePositionForFrame(state, defender.id, attackPosition),
+    reservePositionForFrame(slotState, defender.id, attackPosition),
     defender,
     attackPosition,
     movementOptions,
@@ -506,7 +527,7 @@ function moveDefenderTowardCommittedTarget(
   }
 
   const nextState = moveEntityTowardPositionIfUnoccupied(
-    reservePositionForFrame(state, defender.id, attackPosition),
+    reservePositionForFrame(slotState, defender.id, attackPosition),
     defender,
     attackPosition,
     movementOptions,

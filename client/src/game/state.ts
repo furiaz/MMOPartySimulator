@@ -20,7 +20,13 @@ import {
   markMovementDecision,
   markMoveSucceeded,
 } from "./movementState";
+import {
+  recordMovementFailure,
+  recordNavigationPathQuery,
+  recordPathDistanceQuery,
+} from "./performanceMetrics";
 import type {
+  CombatDamageType,
   CombatFeedbackEvent,
   CombatFeedbackType,
   ClassId,
@@ -108,6 +114,16 @@ type MovementPath = {
   waypoints: Position[];
 };
 
+type AttackSlotCacheEntry = {
+  attackRange: number;
+  attackSlot: Position;
+  createdAtMs: number;
+  mapKey: string;
+  targetId?: string;
+  targetPosition: Position;
+  usesPartyPassThrough: boolean;
+};
+
 type MoveResolution = {
   position: Position;
   swapWithEntityId?: string;
@@ -162,9 +178,11 @@ export type GameState = {
   failedMoveByEntityId?: Record<string, true>;
   movementFailureMsByEntityId?: Record<string, number>;
   movementFailuresByEntityId?: Record<string, MovementFailureDetail>;
+  movementPathRetryAtMsByEntityId?: Record<string, number>;
   moveIntentsByEntityId?: Record<string, Position>;
   reservedPositionsByEntityId?: Record<string, Position>;
   movementPathsByEntityId?: Record<string, MovementPath>;
+  attackSlotCacheByEntityId?: Record<string, AttackSlotCacheEntry>;
   movementDecisionsByEntityId?: Record<string, DebugNavigationReason>;
   defenderWaitTicksByLeaderId?: Record<string, number>;
   defenderBlockedTicksByEntityId?: Record<string, number>;
@@ -245,8 +263,13 @@ export function updateEntity(state: GameState, entity: GameEntity): GameState {
 export function addCombatFeedback(
   state: GameState,
   event: {
+    amount?: number;
+    damageType?: CombatDamageType;
+    feedbackKind?: string;
     type: CombatFeedbackType;
     entityId: string;
+    sourceEntityId?: string;
+    targetEntityId?: string;
     text: string;
     now: number;
   },
@@ -257,8 +280,13 @@ export function addCombatFeedback(
       ...state.combatFeedbackEvents,
       {
         id: `${event.now}-${event.type}-${event.entityId}-${state.combatFeedbackEvents.length}`,
+        amount: event.amount,
+        damageType: event.damageType,
         type: event.type,
         entityId: event.entityId,
+        feedbackKind: event.feedbackKind,
+        sourceEntityId: event.sourceEntityId,
+        targetEntityId: event.targetEntityId,
         text: event.text,
         createdAt: event.now,
         expiresAt: event.now + COMBAT_FEEDBACK_DURATION_MS,
@@ -602,6 +630,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   );
 
   if (!moveResolution || isSamePosition(moveResolution.position, entity.position)) {
+    recordMovementFailure();
     return markMoveFailed(
       clearMovementPath(nextStateWithIntent, entity.id),
       entity.id,
@@ -623,6 +652,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     );
 
     if (reservedState === decisionState) {
+      recordMovementFailure();
       return markMoveFailed(
         clearMovementPath(decisionState, entity.id),
         entity.id,
@@ -646,6 +676,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
       options,
     )
   ) {
+    recordMovementFailure();
     return markMoveFailed(
       clearMovementPath(nextStateWithIntent, entity.id),
       entity.id,
@@ -667,6 +698,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   );
 
   if (reservedState === decisionState) {
+    recordMovementFailure();
     return markMoveFailed(
       clearMovementPath(decisionState, entity.id),
       entity.id,
@@ -790,6 +822,7 @@ export function getBoundedNavigationDistance(
     options,
   );
 
+  recordPathDistanceQuery();
   return getNavigationDistance(state.map, start, position, maxDistance, {
     isBlocked: (candidate) =>
       ignoredEntityId
@@ -948,6 +981,8 @@ function getPathMoveResolution(
   const waypoints =
     cachedPath?.targetKey === targetKey
       ? pruneReachedWaypoints(cachedPath.waypoints, entity.position)
+      : isFreshPathBackoffActive(state, entity.id)
+        ? []
       : getFreshPathWaypoints(state, entity, target, options);
   const waypoint = waypoints[0];
 
@@ -981,6 +1016,10 @@ function getFreshPathWaypoints(
     return [];
   }
 
+  if (isFreshPathBackoffActive(state, entity.id)) {
+    return [];
+  }
+
   const goals = getPathGoals(state, entity, target, options);
 
   if (goals.length === 0) {
@@ -989,6 +1028,7 @@ function getFreshPathWaypoints(
 
   const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
 
+  recordNavigationPathQuery();
   return findNavigationPath(state.map, entity.position, goals, {
     isBlocked: (position) =>
       isNavigationPositionBlocked(
@@ -1067,6 +1107,12 @@ function clearMovementPath(state: GameState, entityId: string): GameState {
   };
 }
 
+function isFreshPathBackoffActive(state: GameState, entityId: string): boolean {
+  const retryAtMs = state.movementPathRetryAtMsByEntityId?.[entityId];
+
+  return retryAtMs !== undefined && retryAtMs > (state.simulationTimeMs ?? 0);
+}
+
 function isMoveDestinationAvailable(
   state: GameState,
   entity: GameEntity,
@@ -1086,8 +1132,13 @@ function findNextPathPosition(
     return null;
   }
 
+  if (isFreshPathBackoffActive(state, entity.id)) {
+    return null;
+  }
+
   const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
 
+  recordNavigationPathQuery();
   return (
     findNavigationPath(state.map, entity.position, getPathGoals(state, entity, target, options), {
       isBlocked: (position) =>
@@ -1664,6 +1715,7 @@ function swapEntityPositions(
   const secondEntity = state.entities[secondEntityId];
 
   if (!firstEntity || !secondEntity) {
+    recordMovementFailure();
     return markMoveFailed(state, firstEntityId);
   }
 

@@ -5,7 +5,11 @@ import {
   MOVEMENT_STEP_DISTANCE,
   setLastAttackAt,
 } from "./entities";
-import { chooseAttackSlot } from "./attackSlots";
+import {
+  chooseAttackSlot,
+  rememberAttackSlot,
+  type AttackSlotPathDistanceCache,
+} from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import { grantCharacterXpToParty } from "./leveling";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
@@ -59,6 +63,7 @@ export function updateAttackSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
   now = Date.now(),
+  pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
   let nextState = state;
 
@@ -227,7 +232,10 @@ export function updateAttackSystem(
       {
         allowPartyPassThrough: true,
         maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
+        nowMs: now,
+        pathDistanceCache,
         preferredSlotIndex: getAttackSlotPreference(currentAttacker),
+        targetId: target.id,
       },
     );
 
@@ -235,6 +243,18 @@ export function updateAttackSystem(
     const previousPosition = currentAttacker.position;
 
     if (attackSlot) {
+      nextState = rememberAttackSlot(
+        nextState,
+        currentAttacker,
+        target.position,
+        getAttackRange(currentAttacker),
+        attackSlot,
+        {
+          allowPartyPassThrough: true,
+          nowMs: now,
+          targetId: target.id,
+        },
+      );
       nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
       nextState = reservePositionForFrame(nextState, currentAttacker.id, attackSlot, {
         allowPartyPassThrough: true,
