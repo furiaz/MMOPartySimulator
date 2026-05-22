@@ -7,13 +7,36 @@ describe("enemy scaling", () => {
     expect(getScaledEnemyStats(1)).toMatchObject({
       effectiveLevel: 1,
       scalingBand: "starter",
-      maxHealth: 6,
+      maxHealth: 8,
       attack: 2,
       defense: 0,
       magicDefense: 0,
       evasion: 0,
       threat: 1,
     });
+  });
+
+  it("uses explicit early starter HP tuning through level 7", () => {
+    expect(
+      [1, 2, 3, 4, 5, 6, 7].map((level) => ({
+        level,
+        maxHealth: getScaledEnemyStats(level).maxHealth,
+      })),
+    ).toEqual([
+      { level: 1, maxHealth: 8 },
+      { level: 2, maxHealth: 14 },
+      { level: 3, maxHealth: 23 },
+      { level: 4, maxHealth: 30 },
+      { level: 5, maxHealth: 37 },
+      { level: 6, maxHealth: 41 },
+      { level: 7, maxHealth: 45 },
+    ]);
+  });
+
+  it("keeps level 8 and higher starter HP on the existing curve", () => {
+    expect(getScaledEnemyStats(8).maxHealth).toBe(48);
+    expect(getScaledEnemyStats(9).maxHealth).toBe(54);
+    expect(getScaledEnemyStats(10).maxHealth).toBe(60);
   });
 
   it("scales level 10 enemies to the starter upper boundary", () => {
@@ -60,7 +83,7 @@ describe("enemy scaling", () => {
       level: 0,
       effectiveLevel: 1,
       scalingBand: "starter",
-      maxHealth: 6,
+      maxHealth: 8,
     });
     expect(getScaledEnemyStats(99)).toMatchObject({
       level: 99,

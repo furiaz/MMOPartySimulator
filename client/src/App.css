@@ -64,10 +64,7 @@
   display: grid;
   width: clamp(280px, 44vw, 620px);
   gap: 6px;
-  padding: 8px 12px;
   transform: translateX(-50%);
-  border: 1px solid rgba(51, 65, 85, 0.72);
-  background: rgba(255, 255, 255, 0.86);
   color: #1f2937;
   text-align: center;
   pointer-events: none;
@@ -75,8 +72,13 @@
 
 .map-label-content {
   display: grid;
+  justify-self: center;
+  max-width: 100%;
   gap: 2px;
   min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(51, 65, 85, 0.72);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .map-title-row {
@@ -466,8 +468,8 @@
 
 .companion-vitals-main {
   display: grid;
-  grid-template-rows: auto auto auto 7px 1fr;
-  gap: 3px;
+  grid-template-rows: auto auto auto 5px auto 5px 1fr;
+  gap: 2px;
   min-width: 0;
   min-height: 0;
 }
@@ -486,7 +488,7 @@
 
 .companion-vitals-header span,
 .companion-vitals-class span,
-.companion-vitals-health-row span,
+.companion-vitals-meter-row span,
 .companion-vitals-slots span {
   overflow: hidden;
   min-width: 0;
@@ -495,7 +497,7 @@
 }
 
 .companion-vitals-class,
-.companion-vitals-health-row {
+.companion-vitals-meter-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -525,16 +527,40 @@
   background: #22c55e;
 }
 
+.companion-vitals-exp span {
+  background: #38bdf8;
+}
+
+.companion-vitals-exp-max span {
+  background: #facc15;
+}
+
 .companion-vitals-slots {
-  display: grid;
+  display: flex;
   align-content: end;
-  gap: 3px;
+  align-items: end;
+  gap: 8px;
   min-width: 0;
   min-height: 0;
   color: #1f2937;
   font-size: 10px;
   font-weight: 800;
   line-height: 1.1;
+}
+
+.companion-vitals-slots > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1 1 0;
+}
+
+.companion-vitals-slot-icon {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .quest-tracker-panel {
@@ -1577,12 +1603,27 @@
 .party-shortcut-actions,
 .party-submenu-tabs,
 .class-skill-tabs,
-.party-management-sections,
 .role-select-grid,
 .equipment-equipped-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.party-management-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.party-management-sections {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .behavior-settings-list {

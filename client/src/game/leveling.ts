@@ -50,11 +50,11 @@ const TOTAL_XP_ANCHORS: Record<number, number> = {
 };
 
 const SAME_LEVEL_MOB_XP_ANCHORS: Record<number, number> = {
-  1: 2,
-  2: 3,
-  3: 5,
-  4: 7,
-  5: 9,
+  1: 1,
+  2: 2,
+  3: 4,
+  4: 6,
+  5: 8,
   6: 11,
   7: 13,
   8: 16,

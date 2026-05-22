@@ -42,8 +42,8 @@ describe("prototype enemy archetypes", () => {
 
     expect(enemy.aggressionMode).toBe("aggressive");
     expect(enemy.level).toBe(7);
-    expect(enemy.health).toBe(42);
-    expect(enemy.maxHealth).toBe(42);
+    expect(enemy.health).toBe(45);
+    expect(enemy.maxHealth).toBe(45);
     expect(enemy.attack).toBe(6);
     expect(enemy.defense).toBe(4);
     expect(enemy.magicDefense).toBe(4);

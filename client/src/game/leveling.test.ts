@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import {
   getCharacterXpToNextLevel,
+  getSameLevelEnemyXp,
   getLevelGapXpModifier,
   getPartySizeLimit,
   getPartySizeUnlockRequirement,
@@ -65,6 +66,11 @@ describe("character leveling", () => {
     expect(getLevelGapXpModifier(12, 1)).toBe(0.5);
     expect(getLevelGapXpModifier(22, 1)).toBe(0.25);
     expect(getLevelGapXpModifier(32, 1)).toBe(0);
+  });
+
+  it("uses tuned same-level enemy XP rewards for levels 1-5", () => {
+    expect([1, 2, 3, 4, 5].map(getSameLevelEnemyXp)).toEqual([1, 2, 4, 6, 8]);
+    expect(getSameLevelEnemyXp(6)).toBe(11);
   });
 
   it("derives party size limit from total party level", () => {

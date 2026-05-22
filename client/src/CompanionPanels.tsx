@@ -547,21 +547,31 @@ export function PartyManagementPanel({
     <section className="party-management-panel" aria-label="Party Management">
       <h2>Party Management</h2>
       <div className="party-management-detail">
-        <nav
-          className="party-management-sections"
-          aria-label="Party management sections"
-        >
-          {partyManagementSections.map((section) => (
-            <button
-              key={section}
-              className={activeSection === section ? "active" : ""}
-              onClick={() => onSelectSection(section)}
-              type="button"
-            >
-              {partyManagementSectionLabels[section]}
-            </button>
-          ))}
-        </nav>
+        <div className="party-management-section-row">
+          <nav
+            className="party-management-sections"
+            aria-label="Party management sections"
+          >
+            {partyManagementSections.map((section) => (
+              <button
+                key={section}
+                className={activeSection === section ? "active" : ""}
+                onClick={() => onSelectSection(section)}
+                type="button"
+              >
+                {partyManagementSectionLabels[section]}
+              </button>
+            ))}
+          </nav>
+          {selectedMember ? (
+            <LeadershipHeaderAction
+              currentLabel="Is Leader"
+              leaderId={leaderId}
+              member={selectedMember}
+              onChangeLeader={onChangeLeader}
+            />
+          ) : null}
+        </div>
         <CompanionMenuList
           layout="horizontal"
           members={orderedMembers}
@@ -590,10 +600,12 @@ export function PartyManagementPanel({
 }
 
 function LeadershipHeaderAction({
+  currentLabel = "Current Leader",
   leaderId,
   member,
   onChangeLeader,
 }: {
+  currentLabel?: string;
   leaderId: string;
   member: Companion;
   onChangeLeader: (companionId: string) => void;
@@ -601,7 +613,7 @@ function LeadershipHeaderAction({
   if (member.id === leaderId) {
     return (
       <span className="leadership-status leadership-current">
-        Current Leader
+        {currentLabel}
       </span>
     );
   }
@@ -1515,7 +1527,7 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
       {orderedMembers.map((member) => {
         const classDefinition = CLASS_DEFINITIONS[member.classId];
         const classPath = classDefinition.path;
-        const classPathLabel = classPath ? classPathLabels[classPath] : "Beginner";
+        const classPathLabel = classPath ? classPathLabels[classPath] : null;
         const equippedFlaskDefinition = member.consumables.flask
           ? getItemDefinition(member.consumables.flask.itemId)
           : null;
@@ -1527,11 +1539,21 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
           derivedStats.maxHealth > 0
             ? Math.max(0, Math.min(100, (member.health / derivedStats.maxHealth) * 100))
             : 0;
+        const characterXpProgress = getCharacterXpProgress(member);
+        const characterXpText = characterXpProgress.isMaxLevel
+          ? "MAX"
+          : `${characterXpProgress.xp}/${characterXpProgress.xpToNextLevel}`;
         const companionNumber = companionIds.indexOf(member.id) + 1;
         const companionLabel =
           companionNumber > 0 ? `Companion ${companionNumber}` : member.id;
         const portraitSrc = CLASS_PORTRAIT_SRC[member.classId];
         const pathClassName = classPath ?? "beginner";
+        const flaskIconSrc = member.consumables.flask
+          ? INVENTORY_ITEM_ICON_SRC[member.consumables.flask.itemId]
+          : null;
+        const foodIconSrc = member.consumables.foodItemId
+          ? INVENTORY_ITEM_ICON_SRC[member.consumables.foodItemId]
+          : null;
 
         return (
           <article
@@ -1553,9 +1575,9 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
               </div>
               <div className="companion-vitals-class">
                 <span>{classDefinition.displayName}</span>
-                <span>{classPathLabel}</span>
+                {classPathLabel ? <span>{classPathLabel}</span> : null}
               </div>
-              <div className="companion-vitals-health-row">
+              <div className="companion-vitals-meter-row">
                 <span>HP</span>
                 <span>
                   {member.health}/{derivedStats.maxHealth}
@@ -1567,15 +1589,46 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
               >
                 <span style={{ width: `${healthPercent}%` }} />
               </span>
+              <div className="companion-vitals-meter-row">
+                <span>Exp</span>
+                <span>{characterXpText}</span>
+              </div>
+              <span
+                className={`companion-vitals-bar companion-vitals-exp${
+                  characterXpProgress.isMaxLevel ? " companion-vitals-exp-max" : ""
+                }`}
+                title={`Exp ${characterXpText}`}
+              >
+                <span style={{ width: `${characterXpProgress.percent}%` }} />
+              </span>
               <div className="companion-vitals-slots">
                 <span title={equippedFlaskDefinition?.displayName ?? "No flask equipped"}>
                   Flask:{" "}
-                  {equippedFlaskDefinition
-                    ? `${equippedFlaskDefinition.displayName} (${member.consumables.flask?.charges ?? 0})`
-                    : "Empty"}
+                  {flaskIconSrc ? (
+                    <img
+                      alt=""
+                      className="companion-vitals-slot-icon"
+                      draggable={false}
+                      src={flaskIconSrc}
+                    />
+                  ) : null}
+                  <span>
+                    {equippedFlaskDefinition
+                      ? `${equippedFlaskDefinition.displayName} (${member.consumables.flask?.charges ?? 0})`
+                      : "Empty"}
+                  </span>
                 </span>
                 <span title={assignedFoodDefinition?.displayName ?? "No food assigned"}>
-                  Food: {assignedFoodDefinition?.displayName ?? "Empty"}
+                  Food:{" "}
+                  {foodIconSrc ? (
+                    <img
+                      alt=""
+                      className="companion-vitals-slot-icon"
+                      draggable={false}
+                      src={foodIconSrc}
+                    />
+                  ) : null}
+                  <span>{assignedFoodDefinition?.displayName ?? "Empty"}</span>
                 </span>
               </div>
             </div>
