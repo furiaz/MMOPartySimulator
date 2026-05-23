@@ -24,6 +24,7 @@ import {
   recordMovementFailure,
   recordNavigationPathQuery,
   recordPathDistanceQuery,
+  type NavigationPathMetricBucket,
 } from "./performanceMetrics";
 import type {
   CombatDamageType,
@@ -76,6 +77,10 @@ export const ENTITY_COLLISION_DISTANCE = 0.7;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
 const PARTY_LEADER_HANDOFF_MS = 800;
+const COMBAT_PATH_REFRESH_MS = 500;
+const FOLLOW_PATH_REFRESH_MS = 500;
+const MOVEMENT_PATH_BLOCKED_REFRESH_COUNT = 2;
+const MEANINGFUL_TARGET_MOVE_DISTANCE = 1;
 
 type FindAvailablePositionOptions = {
   blockedPositions?: Position[];
@@ -86,7 +91,23 @@ type WalkablePositionOptions = {
   allowPartyPassThrough?: boolean;
 };
 
+export type MovementPathProfile =
+  | "roam"
+  | "home"
+  | "gather"
+  | "poi"
+  | "teleport"
+  | "resurrection"
+  | "explore"
+  | "chase"
+  | "combatSlot"
+  | "follow"
+  | "other";
+
 type MovementOptions = WalkablePositionOptions & {
+  pathProfile?: MovementPathProfile;
+  pathTargetKey?: string;
+  pathTargetPosition?: Position;
   speedMultiplier?: number;
 };
 
@@ -110,6 +131,10 @@ export type PoiPreferences = {
 };
 
 type MovementPath = {
+  blockedCount?: number;
+  lastRequestedAtMs?: number;
+  profile?: MovementPathProfile;
+  targetPosition?: Position;
   targetKey: string;
   waypoints: Position[];
 };
@@ -125,6 +150,7 @@ type AttackSlotCacheEntry = {
 };
 
 type MoveResolution = {
+  movementPath?: MovementPath;
   position: Position;
   swapWithEntityId?: string;
   reason: DebugNavigationReason;
@@ -620,19 +646,28 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   target: GameEntity,
   options: MovementOptions = {},
 ): GameState {
-  const pathState = updateMovementPath(state, entity, target, options);
-  const nextStateWithIntent = recordMoveIntent(pathState, entity, target, options);
+  const pathState = prepareMovementPath(state, entity, target, options);
   const moveResolution = getNextMoveResolution(
-    nextStateWithIntent,
+    pathState,
     entity,
     target,
     options,
+    { allowFreshPath: true },
   );
+  let nextStateWithIntent = recordMoveIntent(pathState, entity.id, moveResolution?.position);
+
+  if (moveResolution?.movementPath) {
+    nextStateWithIntent = setMovementPath(
+      nextStateWithIntent,
+      entity.id,
+      moveResolution.movementPath,
+    );
+  }
 
   if (!moveResolution || isSamePosition(moveResolution.position, entity.position)) {
     recordMovementFailure();
     return markMoveFailed(
-      clearMovementPath(nextStateWithIntent, entity.id),
+      markCompatibleMovementPathBlocked(nextStateWithIntent, entity, target, options),
       entity.id,
       getMovementFailureDetail(nextStateWithIntent, entity, target, moveResolution?.position),
       getFailedMovementReason(nextStateWithIntent, entity.id),
@@ -654,7 +689,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     if (reservedState === decisionState) {
       recordMovementFailure();
       return markMoveFailed(
-        clearMovementPath(decisionState, entity.id),
+        markCompatibleMovementPathBlocked(decisionState, entity, target, options),
         entity.id,
         getMovementFailureDetail(nextStateWithIntent, entity, target, moveResolution.position),
         "blocked",
@@ -678,18 +713,28 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   ) {
     recordMovementFailure();
     return markMoveFailed(
-      clearMovementPath(nextStateWithIntent, entity.id),
+      markCompatibleMovementPathBlocked(nextStateWithIntent, entity, target, options),
       entity.id,
       getMovementFailureDetail(nextStateWithIntent, entity, target, moveResolution.position),
       "blocked",
     );
   }
 
-  const decisionState = markMovementDecision(
+  let decisionState = markMovementDecision(
     nextStateWithIntent,
     entity.id,
     moveResolution.reason,
   );
+
+  if (moveResolution.reason === "path") {
+    decisionState = resetCompatibleMovementPathBlockedCount(
+      decisionState,
+      entity,
+      target,
+      options,
+    );
+  }
+
   const reservedState = reservePositionForFrame(
     decisionState,
     entity.id,
@@ -700,7 +745,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   if (reservedState === decisionState) {
     recordMovementFailure();
     return markMoveFailed(
-      clearMovementPath(decisionState, entity.id),
+      markCompatibleMovementPathBlocked(decisionState, entity, target, options),
       entity.id,
       getMovementFailureDetail(decisionState, entity, target, moveResolution.position),
       "blocked",
@@ -883,7 +928,14 @@ function getNextMoveResolution(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions = {},
+  planningOptions: { allowFreshPath?: boolean } = {},
 ): MoveResolution | null {
+  const cachedPath = getCompatibleMovementPath(state, entity, target, options);
+
+  if (cachedPath && pruneReachedWaypoints(cachedPath.waypoints, entity.position).length > 0) {
+    return getPathMoveResolution(state, entity, target, options);
+  }
+
   const pathMoveResolution = getPathMoveResolution(state, entity, target, options);
 
   if (pathMoveResolution) {
@@ -904,13 +956,17 @@ function getNextMoveResolution(
     return { position: movedEntity.position, reason: "direct_step" };
   }
 
-  const pathPosition = findNextPathPosition(state, entity, target, options);
+  if (planningOptions.allowFreshPath && !isFreshPathBackoffActive(state, entity.id)) {
+    const freshPathResolution = getFreshPathMoveResolution(
+      state,
+      entity,
+      target,
+      options,
+    );
 
-  if (
-    pathPosition &&
-    isMoveDestinationAvailable(state, entity, pathPosition, options)
-  ) {
-    return { position: pathPosition, reason: "path" };
+    if (freshPathResolution) {
+      return freshPathResolution;
+    }
   }
 
   const swapWithEntity = getSwapCandidate(
@@ -930,7 +986,7 @@ function getNextMoveResolution(
   return findAlternativeMovePosition(state, entity, target, options);
 }
 
-function updateMovementPath(
+function prepareMovementPath(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
@@ -941,29 +997,36 @@ function updateMovementPath(
   }
 
   const targetKey = getMovementPathTargetKey(state, entity, target, options);
-  const currentPath = state.movementPathsByEntityId?.[entity.id];
-  const currentWaypoints =
-    currentPath?.targetKey === targetKey
-      ? pruneReachedWaypoints(currentPath.waypoints, entity.position)
-      : [];
+  const currentPath = getCompatibleMovementPath(state, entity, target, options);
 
-  if (currentWaypoints.length > 0) {
-    return setMovementPath(state, entity.id, {
-      targetKey,
-      waypoints: currentWaypoints,
-    });
-  }
-
-  const waypoints = getFreshPathWaypoints(state, entity, target, options);
-
-  if (waypoints.length === 0) {
+  if (!currentPath) {
     return clearMovementPath(state, entity.id);
   }
 
-  return setMovementPath(state, entity.id, {
-    targetKey,
-    waypoints,
-  });
+  const currentWaypoints =
+    pruneReachedWaypoints(currentPath.waypoints, entity.position);
+
+  if (currentWaypoints.length > 0) {
+    const prunedPath = {
+      ...currentPath,
+      targetKey,
+      waypoints: currentWaypoints,
+    };
+
+    if (shouldRefreshMovementPath(state, prunedPath, options)) {
+      const refreshedPath = getFreshMovementPath(state, entity, target, options);
+
+      if (refreshedPath && refreshedPath.waypoints.length > 0) {
+        return setMovementPath(state, entity.id, refreshedPath);
+      }
+    }
+
+    return setMovementPath(state, entity.id, {
+      ...prunedPath,
+    });
+  }
+
+  return clearMovementPath(state, entity.id);
 }
 
 function getPathMoveResolution(
@@ -977,13 +1040,11 @@ function getPathMoveResolution(
   }
 
   const targetKey = getMovementPathTargetKey(state, entity, target, options);
-  const cachedPath = state.movementPathsByEntityId?.[entity.id];
+  const cachedPath = getCompatibleMovementPath(state, entity, target, options);
   const waypoints =
     cachedPath?.targetKey === targetKey
       ? pruneReachedWaypoints(cachedPath.waypoints, entity.position)
-      : isFreshPathBackoffActive(state, entity.id)
-        ? []
-      : getFreshPathWaypoints(state, entity, target, options);
+      : [];
   const waypoint = waypoints[0];
 
   if (!waypoint) {
@@ -1006,30 +1067,63 @@ function getPathMoveResolution(
   return { position: movedEntity.position, reason: "path" };
 }
 
-function getFreshPathWaypoints(
+function getFreshPathMoveResolution(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
-): Position[] {
+): MoveResolution | null {
+  const movementPath = getFreshMovementPath(state, entity, target, options);
+  const waypoint = movementPath?.waypoints[0];
+
+  if (!movementPath || !waypoint) {
+    return null;
+  }
+
+  const movedEntity = moveEntityToward(
+    entity,
+    createPositionTarget(waypoint),
+    getMovementDeltaMs(state, entity, options),
+  );
+
+  if (
+    isSamePosition(movedEntity.position, entity.position) ||
+    !isMoveDestinationAvailable(state, entity, movedEntity.position, options)
+  ) {
+    return null;
+  }
+
+  return {
+    movementPath,
+    position: movedEntity.position,
+    reason: "path",
+  };
+}
+
+function getFreshMovementPath(
+  state: GameState,
+  entity: GameEntity,
+  target: GameEntity,
+  options: MovementOptions,
+): MovementPath | null {
   if (!state.map) {
-    return [];
+    return null;
   }
 
   if (isFreshPathBackoffActive(state, entity.id)) {
-    return [];
+    return null;
   }
 
   const goals = getPathGoals(state, entity, target, options);
 
   if (goals.length === 0) {
-    return [];
+    return null;
   }
 
   const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
 
-  recordNavigationPathQuery();
-  return findNavigationPath(state.map, entity.position, goals, {
+  recordNavigationPathQuery(getNavigationPathMetricBucket(options.pathProfile));
+  const waypoints = findNavigationPath(state.map, entity.position, goals, {
     isBlocked: (position) =>
       isNavigationPositionBlocked(
         state,
@@ -1039,25 +1133,161 @@ function getFreshPathWaypoints(
         blockerLookup,
       ),
   });
+
+  if (waypoints.length === 0) {
+    return null;
+  }
+
+  return {
+    blockedCount: 0,
+    lastRequestedAtMs: state.simulationTimeMs ?? 0,
+    profile: getMovementPathProfile(options),
+    targetKey: getMovementPathTargetKey(state, entity, target, options),
+    targetPosition: getMovementPathTargetPosition(target, options),
+    waypoints,
+  };
 }
 
 function getMovementPathTargetKey(
+  _state: GameState,
+  _entity: GameEntity,
+  target: GameEntity,
+  options: MovementOptions,
+): string {
+  return [
+    getMovementPathProfile(options),
+    target.id,
+    options.pathTargetKey ?? getNavigationPositionKey(target.position),
+    options.allowPartyPassThrough ? "party-pass" : "solid-party",
+  ].join(":");
+}
+
+function getMovementPathProfile(options: MovementOptions): MovementPathProfile {
+  return options.pathProfile ?? "other";
+}
+
+function getMovementPathTargetPosition(
+  target: GameEntity,
+  options: MovementOptions,
+): Position {
+  return options.pathTargetPosition ?? target.position;
+}
+
+function getCompatibleMovementPath(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
-): string {
-  const goals = getPathGoals(state, entity, target, options)
-    .map(getNavigationPositionKey)
-    .sort()
-    .join("|");
+): MovementPath | null {
+  const path = state.movementPathsByEntityId?.[entity.id];
 
-  return [
-    target.id,
-    getNavigationPositionKey(target.position),
-    options.allowPartyPassThrough ? "party-pass" : "solid-party",
-    goals,
-  ].join(":");
+  if (!path || path.targetKey !== getMovementPathTargetKey(state, entity, target, options)) {
+    return null;
+  }
+
+  return path;
+}
+
+function shouldRefreshMovementPath(
+  state: GameState,
+  path: MovementPath,
+  options: MovementOptions,
+): boolean {
+  if ((path.blockedCount ?? 0) >= MOVEMENT_PATH_BLOCKED_REFRESH_COUNT) {
+    return true;
+  }
+
+  const profile = getMovementPathProfile(options);
+  const elapsedMs = (state.simulationTimeMs ?? 0) - (path.lastRequestedAtMs ?? 0);
+
+  if (profile === "chase" || profile === "combatSlot") {
+    return (
+      hasMovementPathTargetMoved(path, options) ||
+      elapsedMs >= COMBAT_PATH_REFRESH_MS
+    );
+  }
+
+  if (profile === "follow") {
+    return (
+      hasMovementPathTargetMoved(path, options) &&
+      elapsedMs >= FOLLOW_PATH_REFRESH_MS
+    );
+  }
+
+  return false;
+}
+
+function hasMovementPathTargetMoved(
+  path: MovementPath,
+  options: MovementOptions,
+): boolean {
+  if (!path.targetPosition || !options.pathTargetPosition) {
+    return false;
+  }
+
+  return getGridDistance(path.targetPosition, options.pathTargetPosition) >=
+    MEANINGFUL_TARGET_MOVE_DISTANCE;
+}
+
+function markCompatibleMovementPathBlocked(
+  state: GameState,
+  entity: GameEntity,
+  target: GameEntity,
+  options: MovementOptions,
+): GameState {
+  const path = getCompatibleMovementPath(state, entity, target, options);
+
+  if (!path || pruneReachedWaypoints(path.waypoints, entity.position).length === 0) {
+    return state;
+  }
+
+  return setMovementPath(state, entity.id, {
+    ...path,
+    blockedCount: (path.blockedCount ?? 0) + 1,
+  });
+}
+
+function resetCompatibleMovementPathBlockedCount(
+  state: GameState,
+  entity: GameEntity,
+  target: GameEntity,
+  options: MovementOptions,
+): GameState {
+  const path = getCompatibleMovementPath(state, entity, target, options);
+
+  if (!path || !path.blockedCount) {
+    return state;
+  }
+
+  return setMovementPath(state, entity.id, {
+    ...path,
+    blockedCount: 0,
+  });
+}
+
+function getNavigationPathMetricBucket(
+  profile: MovementPathProfile | undefined,
+): NavigationPathMetricBucket {
+  switch (profile) {
+    case "roam":
+      return "roam";
+    case "home":
+      return "home";
+    case "gather":
+      return "gather";
+    case "chase":
+    case "combatSlot":
+      return "combat";
+    case "follow":
+      return "follow";
+    case "poi":
+    case "teleport":
+    case "resurrection":
+    case "explore":
+      return "poi";
+    default:
+      return "other";
+  }
 }
 
 function pruneReachedWaypoints(
@@ -1120,37 +1350,6 @@ function isMoveDestinationAvailable(
   options: MovementOptions = {},
 ): boolean {
   return isWalkablePosition(state, position, entity.id, options);
-}
-
-function findNextPathPosition(
-  state: GameState,
-  entity: GameEntity,
-  target: GameEntity,
-  options: MovementOptions = {},
-): Position | null {
-  if (!state.map) {
-    return null;
-  }
-
-  if (isFreshPathBackoffActive(state, entity.id)) {
-    return null;
-  }
-
-  const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
-
-  recordNavigationPathQuery();
-  return (
-    findNavigationPath(state.map, entity.position, getPathGoals(state, entity, target, options), {
-      isBlocked: (position) =>
-        isNavigationPositionBlocked(
-          state,
-          position,
-          entity.id,
-          options,
-          blockerLookup,
-        ),
-    })[0] ?? null
-  );
 }
 
 function getPathGoals(
@@ -1617,12 +1816,9 @@ function reserveSwapPositionsForFrame(
 
 function recordMoveIntent(
   state: GameState,
-  entity: GameEntity,
-  target: GameEntity,
-  options: MovementOptions = {},
+  entityId: string,
+  intendedPosition: Position | null | undefined,
 ): GameState {
-  const intendedPosition = getIntendedMovePosition(state, entity, target, options);
-
   if (!intendedPosition) {
     return state;
   }
@@ -1631,7 +1827,7 @@ function recordMoveIntent(
     ...state,
     moveIntentsByEntityId: {
       ...(state.moveIntentsByEntityId ?? {}),
-      [entity.id]: intendedPosition,
+      [entityId]: intendedPosition,
     },
   };
 }
@@ -1642,7 +1838,9 @@ function getIntendedMovePosition(
   target: GameEntity,
   options: MovementOptions = {},
 ): Position | null {
-  const moveResolution = getNextMoveResolution(state, entity, target, options);
+  const moveResolution = getNextMoveResolution(state, entity, target, options, {
+    allowFreshPath: false,
+  });
 
   return moveResolution?.position ?? null;
 }

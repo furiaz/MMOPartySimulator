@@ -51,16 +51,24 @@ export function updateFollowSystem(
         ? FOLLOW_CATCH_UP_SPEED_MULTIPLIER
         : 1;
 
+    const followPosition = getSoftFollowPosition(
+      nextState,
+      follower,
+      leader,
+      nextState.leaderIntent?.targetPosition,
+    );
+
     nextState = moveEntityTowardPositionIfUnoccupied(
       nextState,
       follower,
-      getSoftFollowPosition(
-        nextState,
-        follower,
-        leader,
-        nextState.leaderIntent?.targetPosition,
-      ),
-      { allowPartyPassThrough: true, speedMultiplier },
+      followPosition,
+      {
+        allowPartyPassThrough: true,
+        pathProfile: "follow",
+        pathTargetKey: `follow:${leader.id}`,
+        pathTargetPosition: followPosition,
+        speedMultiplier,
+      },
     );
 
     const movedFollower = getEntityById(nextState, follower.id);

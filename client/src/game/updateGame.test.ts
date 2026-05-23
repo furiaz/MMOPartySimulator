@@ -1559,6 +1559,135 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("interrupts autonomous non-gatherers from gathering when they are attacked", () => {
+    const resource = createResource("party-resource", { x: 4, y: 4 });
+    const leader = {
+      ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "autonomous" as const,
+    };
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+      attackWindupStartedAt: 1_000,
+      attackWindupDurationMs: 500,
+      attackWindupTargetId: leader.id,
+      lastAttackAt: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, attacker], {
+        autoModeEnabled: true,
+        partyLeaderId: leader.id,
+        leaderIntent: {
+          type: "gather",
+          targetId: resource.id,
+          targetPosition: resource.position,
+          source: "ai",
+        },
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: attacker.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: attacker.id,
+      commandPriority: "autonomous",
+    });
+  });
+
+  it("interrupts autonomous non-gatherers from gathering while an enemy is attacking the party", () => {
+    const resource = createResource("party-resource", { x: 4, y: 4 });
+    const leader = {
+      ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "autonomous" as const,
+    };
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+      attackWindupStartedAt: undefined,
+      attackWindupDurationMs: undefined,
+      attackWindupTargetId: null,
+      lastAttackAt: 1_900,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, resource, attacker], {
+        autoModeEnabled: true,
+        partyLeaderId: leader.id,
+        leaderIntent: {
+          type: "gather",
+          targetId: resource.id,
+          targetPosition: resource.position,
+          source: "ai",
+        },
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: attacker.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: attacker.id,
+      commandPriority: "autonomous",
+    });
+    expect(nextState.entities[resource.id]).toMatchObject({
+      durability: resource.durability,
+      quantity: resource.quantity,
+    });
+  });
+
+  it("keeps autonomous gatherers on their resource when they are attacked", () => {
+    const resource = createResource("gatherer-resource", { x: 4, y: 4 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 4, y: 4 }, "gatherer", "gatherer", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "autonomous" as const,
+    };
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: gatherer.id,
+      attackWindupStartedAt: 1_000,
+      attackWindupDurationMs: 500,
+      attackWindupTargetId: gatherer.id,
+      lastAttackAt: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([gatherer, resource, attacker], {
+        autoModeEnabled: true,
+        partyLeaderId: gatherer.id,
+        leaderIntent: {
+          type: "gather",
+          targetId: resource.id,
+          targetPosition: resource.position,
+          source: "ai",
+        },
+      }),
+      { nowMs: 2_000 },
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "autonomous",
+    });
+  });
+
   it("restores a direct gather command after the interrupting enemy dies", () => {
     const resource = createResource("direct-resource", { x: 8, y: 4 });
     const leader = {

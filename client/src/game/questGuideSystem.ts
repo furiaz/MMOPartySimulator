@@ -107,6 +107,9 @@ export function updateQuestGuideSystem(
       QUEST_GUIDE_TARGET_POSITION,
       {
         allowPartyPassThrough: true,
+        pathProfile: "poi",
+        pathTargetKey: "quest-guide-target",
+        pathTargetPosition: QUEST_GUIDE_TARGET_POSITION,
         speedMultiplier: QUEST_GUIDE_MOVE_SPEED_MULTIPLIER,
       },
     );

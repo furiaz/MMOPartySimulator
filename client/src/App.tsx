@@ -271,6 +271,13 @@ type PerformanceOverlayStats = {
   wallCount: number;
   pathCount: number;
   navigationPathQueriesPerSecond: number;
+  navigationPathCombatPerSecond: number;
+  navigationPathFollowPerSecond: number;
+  navigationPathGatherPerSecond: number;
+  navigationPathHomePerSecond: number;
+  navigationPathOtherPerSecond: number;
+  navigationPathPoiPerSecond: number;
+  navigationPathRoamPerSecond: number;
   pathDistanceQueriesPerSecond: number;
   movementFailuresPerSecond: number;
   memoryUsedMb: number | null;
@@ -620,6 +627,34 @@ function PerformanceOverlay({
             value={`${formatStat(stats.navigationPathQueriesPerSecond)}/s`}
           />
           <PerformanceStat
+            label="Nav Roam"
+            value={`${formatStat(stats.navigationPathRoamPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Nav Home"
+            value={`${formatStat(stats.navigationPathHomePerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Nav Gather"
+            value={`${formatStat(stats.navigationPathGatherPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Nav Combat"
+            value={`${formatStat(stats.navigationPathCombatPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Nav Follow"
+            value={`${formatStat(stats.navigationPathFollowPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Nav POI"
+            value={`${formatStat(stats.navigationPathPoiPerSecond)}/s`}
+          />
+          <PerformanceStat
+            label="Nav Other"
+            value={`${formatStat(stats.navigationPathOtherPerSecond)}/s`}
+          />
+          <PerformanceStat
             label="Path Dist"
             value={`${formatStat(stats.pathDistanceQueriesPerSecond)}/s`}
           />
@@ -727,6 +762,20 @@ function getPerformanceOverlayStats(
     pathCount: Object.keys(gameState.movementPathsByEntityId ?? {}).length,
     navigationPathQueriesPerSecond:
       gameMetrics.navigationPathQueries / elapsedSeconds,
+    navigationPathCombatPerSecond:
+      gameMetrics.navigationPathQueriesByBucket.combat / elapsedSeconds,
+    navigationPathFollowPerSecond:
+      gameMetrics.navigationPathQueriesByBucket.follow / elapsedSeconds,
+    navigationPathGatherPerSecond:
+      gameMetrics.navigationPathQueriesByBucket.gather / elapsedSeconds,
+    navigationPathHomePerSecond:
+      gameMetrics.navigationPathQueriesByBucket.home / elapsedSeconds,
+    navigationPathOtherPerSecond:
+      gameMetrics.navigationPathQueriesByBucket.other / elapsedSeconds,
+    navigationPathPoiPerSecond:
+      gameMetrics.navigationPathQueriesByBucket.poi / elapsedSeconds,
+    navigationPathRoamPerSecond:
+      gameMetrics.navigationPathQueriesByBucket.roam / elapsedSeconds,
     pathDistanceQueriesPerSecond:
       gameMetrics.pathDistanceQueries / elapsedSeconds,
     movementFailuresPerSecond: gameMetrics.movementFailures / elapsedSeconds,

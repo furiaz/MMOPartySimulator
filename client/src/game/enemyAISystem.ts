@@ -352,7 +352,12 @@ function moveEnemyTowardHome(state: GameState, enemy: Enemy, now: number): GameS
     nextState,
     clearedEnemy,
     enemy.homePosition,
-    { speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER },
+    {
+      pathProfile: "home",
+      pathTargetKey: `home:${enemy.id}`,
+      pathTargetPosition: enemy.homePosition,
+      speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
+    },
   );
 }
 
@@ -372,6 +377,9 @@ function moveEnemyTowardRoamTarget(
   }
 
   const movedState = moveEntityTowardPositionIfUnoccupied(state, enemy, roamTarget, {
+    pathProfile: "roam",
+    pathTargetKey: `roam:${enemy.id}:${getPositionPathKey(roamTarget)}`,
+    pathTargetPosition: roamTarget,
     speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
   });
   const movedEnemy = getEntityById(movedState, enemy.id);
@@ -489,4 +497,8 @@ function getDistance(from: Position, to: Position): number {
 
 function isEnemy(entity: GameEntity): entity is Enemy {
   return isEnemyEntity(entity);
+}
+
+function getPositionPathKey(position: Position): string {
+  return `${Math.round(position.x)},${Math.round(position.y)}`;
 }

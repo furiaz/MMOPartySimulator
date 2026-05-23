@@ -226,7 +226,12 @@ function movePartyToTeleport(
       nextState,
       readyMember,
       teleport.position,
-      { allowPartyPassThrough: true },
+      {
+        allowPartyPassThrough: true,
+        pathProfile: "teleport",
+        pathTargetKey: `teleport:${teleport.id}`,
+        pathTargetPosition: teleport.position,
+      },
     );
 
     if (didEntityMove(movedState, readyMember)) {

@@ -487,6 +487,9 @@ function moveDefenderTowardCommittedTarget(
   }
 
   const movementOptions = {
+    pathProfile: "combatSlot" as const,
+    pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
+    pathTargetPosition: attackPosition,
     speedMultiplier: getCommittedTargetSpeedMultiplier(
       state,
       defender,
@@ -673,6 +676,10 @@ function isSamePosition(a: Position, b: Position): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
+function getPositionPathKey(position: Position): string {
+  return `${Math.round(position.x)},${Math.round(position.y)}`;
+}
+
 function updateDefenderBlockedMs(
   state: GameState,
   defenderId: string,
@@ -725,7 +732,12 @@ function moveDefenderTowardPosition(
     state,
     defender,
     targetPosition,
-    { speedMultiplier },
+    {
+      pathProfile: "follow",
+      pathTargetKey: `defender-position:${getPositionPathKey(targetPosition)}`,
+      pathTargetPosition: targetPosition,
+      speedMultiplier,
+    },
   );
 }
 

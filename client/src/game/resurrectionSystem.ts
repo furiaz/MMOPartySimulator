@@ -135,7 +135,12 @@ function moveResurrectionHelpers(
       nextState,
       helper,
       target.position,
-      { allowPartyPassThrough: true },
+      {
+        allowPartyPassThrough: true,
+        pathProfile: "resurrection",
+        pathTargetKey: `resurrection:${target.id}`,
+        pathTargetPosition: target.position,
+      },
     );
 
     const movedHelper = getEntityById(nextState, helper.id);

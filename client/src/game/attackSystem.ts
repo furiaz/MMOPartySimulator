@@ -263,6 +263,11 @@ export function updateAttackSystem(
 
     nextState = moveEntityTowardPositionIfUnoccupied(nextState, currentAttacker, movementTarget, {
       allowPartyPassThrough: true,
+      pathProfile: attackSlot ? "combatSlot" : "chase",
+      pathTargetKey: attackSlot
+        ? `combat-slot:${target.id}:${getPositionPathKey(attackSlot)}`
+        : `chase:${target.id}`,
+      pathTargetPosition: attackSlot ?? target.position,
       speedMultiplier: isEnemy(currentAttacker) ? getEnemyChaseSpeedMultiplier() : 1,
     });
 
@@ -489,6 +494,10 @@ function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
 
 function isEnemy(entity: GameEntity): entity is Enemy {
   return isEnemyEntity(entity);
+}
+
+function getPositionPathKey(position: Position): string {
+  return `${Math.round(position.x)},${Math.round(position.y)}`;
 }
 
 function isPartyCombatEntity(entity: CombatEntity): entity is Companion {

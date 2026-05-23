@@ -290,7 +290,15 @@ function moveLeaderTowardPoi(
     state,
     leader,
     plan.targetPosition,
-    { allowPartyPassThrough: true, speedMultiplier },
+    {
+      allowPartyPassThrough: true,
+      pathProfile: plan.target ? "chase" : "poi",
+      pathTargetKey: plan.target
+        ? `leader-chase:${plan.target.id}`
+        : `leader-poi:${getPositionPathKey(plan.targetPosition)}`,
+      pathTargetPosition: plan.targetPosition,
+      speedMultiplier,
+    },
   );
 
   if (didEntityMove(nextState, leader)) {
@@ -353,6 +361,9 @@ function moveFollowersTowardLeader(
       followPosition,
       {
         allowPartyPassThrough: true,
+        pathProfile: "follow",
+        pathTargetKey: `follow:${leader.id}`,
+        pathTargetPosition: followPosition,
         speedMultiplier: shouldCatchUp ? FOLLOWER_CATCH_UP_SPEED_MULTIPLIER : 1,
       },
     );
@@ -661,4 +672,8 @@ function isTeleportPoi(state: GameState, position: Position): boolean {
       (teleport) => getDistance(position, teleport.position) <= 0,
     ),
   );
+}
+
+function getPositionPathKey(position: Position): string {
+  return `${Math.round(position.x)},${Math.round(position.y)}`;
 }

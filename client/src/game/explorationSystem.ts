@@ -54,6 +54,11 @@ export function updateExplorationSystem(
     nextState,
     explorer,
     targetPosition,
+    {
+      pathProfile: "explore",
+      pathTargetKey: `explore:${getNavigationPositionKey(targetPosition)}`,
+      pathTargetPosition: targetPosition,
+    },
   );
   if (didEntityMove(nextState, explorer)) {
     movedEntityIds.add(explorer.id);

@@ -15,12 +15,16 @@ import {
   ENTITY_COLLISION_DISTANCE,
   getBoundedPathDistance,
   getEntityById,
+  hasDirectPlayerLeaderIntent,
   moveEntityTowardIfUnoccupied,
+  setLeaderIntent,
   updateEntity,
   type GameState,
 } from "./state";
 import { addItemToInventoryState } from "./inventory";
+import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import { getItemDefinitionForResourceType } from "./items";
+import { isPartyMember } from "./partySystem";
 import { recordResourceGatheredForQuests } from "./questSystem";
 import { ROLE_TUNING } from "./roleProfiles";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
@@ -33,6 +37,10 @@ import {
   type GathererResourceReservations,
   type ResourceWorkContext,
 } from "./gathererResourceReservation";
+import {
+  getActiveQuestGuide,
+  QUEST_GUIDE_ESCORT_RANGE,
+} from "./questGuideSystem";
 import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
@@ -72,6 +80,15 @@ export function updateGatherSystem(
 
     if (playerIntentOverride) {
       nextState = updateEntity(nextState, playerIntentOverride);
+      continue;
+    }
+
+    const partyDefenseInterrupt = interruptNonGathererForPartyDefense(
+      nextState,
+      gatherer,
+    );
+    if (partyDefenseInterrupt.interrupted) {
+      nextState = partyDefenseInterrupt.state;
       continue;
     }
 
@@ -135,7 +152,11 @@ export function updateGatherSystem(
         continue;
       }
 
-      nextState = moveEntityTowardIfUnoccupied(nextState, gatherer, resource);
+      nextState = moveEntityTowardIfUnoccupied(nextState, gatherer, resource, {
+        pathProfile: "gather",
+        pathTargetKey: `gather:${resource.id}`,
+        pathTargetPosition: resource.position,
+      });
       if (didEntityMove(nextState, gatherer)) {
         movedEntityIds.add(gatherer.id);
         const movedGatherer = getEntityById(nextState, gatherer.id);
@@ -217,6 +238,42 @@ export function updateGatherSystem(
   }
 
   return nextState;
+}
+
+function interruptNonGathererForPartyDefense(
+  state: GameState,
+  gatherer: AutonomousEntity,
+): { state: GameState; interrupted: boolean } {
+  if (
+    gatherer.kind !== "companion" ||
+    gatherer.role === "gatherer" ||
+    gatherer.commandPriority !== "autonomous" ||
+    hasDirectPlayerLeaderIntent(state)
+  ) {
+    return { state, interrupted: false };
+  }
+
+  const threat = findPartyDefenseThreat(state, gatherer.id);
+
+  if (!threat) {
+    return { state, interrupted: false };
+  }
+
+  const defenseState = setLeaderIntent(captureInterruptedPoiTarget(state, threat), {
+    type: "attack",
+    targetId: threat.id,
+    targetPosition: threat.position,
+  });
+
+  return {
+    state: updateEntity(defenseState, {
+      ...gatherer,
+      state: "attack",
+      currentTargetId: threat.id,
+      commandPriority: "autonomous",
+    }),
+    interrupted: true,
+  };
 }
 
 function interruptGathererForEnemyAggro(
@@ -319,6 +376,52 @@ function findGathererAggroThreat(
   }
 
   return closestThreat;
+}
+
+function findPartyDefenseThreat(
+  state: GameState,
+  preferredTargetId: string,
+): Enemy | null {
+  let fallbackThreat: Enemy | null = null;
+
+  for (const entity of Object.values(state.entities)) {
+    if (
+      !isLiveEnemyAttackingParty(entity, state) ||
+      !isRelevantGuideEscortThreat(state, entity)
+    ) {
+      continue;
+    }
+
+    if (entity.currentTargetId === preferredTargetId) {
+      return entity;
+    }
+
+    fallbackThreat ??= entity;
+  }
+
+  return fallbackThreat;
+}
+
+function isLiveEnemyAttackingParty(
+  entity: GameEntity,
+  state: GameState,
+): entity is Enemy {
+  return (
+    entity.kind === "enemy" &&
+    isCombatEntity(entity) &&
+    entity.state === "attack" &&
+    entity.health > 0 &&
+    Boolean(entity.currentTargetId && isPartyMember(state.entities[entity.currentTargetId]))
+  );
+}
+
+function isRelevantGuideEscortThreat(state: GameState, enemy: Enemy): boolean {
+  const guide = getActiveQuestGuide(state);
+
+  return (
+    !guide ||
+    getDistance(enemy.position, guide.position) <= QUEST_GUIDE_ESCORT_RANGE
+  );
 }
 
 function isLiveAggressiveEnemy(entity: GameEntity): entity is Enemy {
