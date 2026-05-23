@@ -64,6 +64,26 @@ Behavior Alignment Rules:
   - prefer aligning code to those documents
   - do NOT invent new behavior without instruction
 
+
+---
+
+## Terminology Rules
+
+Use precise party behavior terminology:
+
+- `Gatherer` means the assigned Gatherer role only.
+- `gathering` means the current action/state of collecting a resource.
+- `collector` means any companion currently gathering or assigned to gather a resource whose role is not Gatherer.
+
+When describing behavior, bugs, plans, tickets, tests, or code comments:
+
+- Do not call a non-Gatherer-role companion a Gatherer just because they are gathering.
+- Say `collector` for non-Gatherer-role companions gathering resources.
+- Say `Gatherer-role companion` or `Gatherer` only when referring to the actual Gatherer role.
+- If role and current task both matter, state both clearly, such as `Defender collector`, `Fighter collector`, or `Gatherer-role companion gathering`.
+
+`collector` is terminology only. It is not a new role value and must not be implemented as a role unless explicitly requested.
+
 ---
 
 Debugging / Fixing:

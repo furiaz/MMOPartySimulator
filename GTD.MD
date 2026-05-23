@@ -88,6 +88,7 @@ Current game-logic implementation files include:
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
+- `partyThreatSystem.ts`
 - `performanceMetrics.ts`
 - `poiResumeSystem.ts`
 - `poiSystem.ts`
@@ -159,6 +160,19 @@ type EntityState =
 States describe what an entity is currently doing.
 
 Roles describe behavior priorities and should not be confused with states.
+### Gathering Terminology
+
+`Gatherer` means the `role: "gatherer"` party role.
+
+`collector` means a companion whose current behavior is gathering or assigned to gather a resource while their role is not `"gatherer"`.
+
+In technical notes, tickets, tests, telemetry analysis, and comments:
+
+- use `Gatherer` only for the Gatherer role
+- use `collector` for non-Gatherer-role companions in `state: "gather"` or assigned to a resource gather target
+- use explicit wording such as `Defender collector` or `Fighter collector` when the role matters
+
+`collector` is not a `PartyMemberRole`, not an entity kind, and not a new state. It is descriptive terminology for role/state combinations already represented by existing fields.
 
 ---
 

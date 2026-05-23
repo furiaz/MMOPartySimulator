@@ -110,6 +110,25 @@ Fallback actions must never override higher-priority role actions.
 
 Direct commands always override autonomous role behavior unless the target is unable to act.
 
+### Gathering Terminology
+
+`Gatherer` refers only to the assigned Gatherer role.
+
+A `collector` is any non-Gatherer-role companion currently gathering or assigned to gather a resource through party intent, AI intent, quest intent, or player command.
+
+Collector examples:
+
+- a Defender gathering the leader's quest herb target
+- a Fighter gathering a player-commanded resource target
+- a Support gathering because the party has shared gather intent
+- a None / Unassigned companion gathering from shared party intent
+
+Collectors do not gain autonomous Gatherer-role resource search behavior.
+
+Only Gatherer-role companions may independently choose separate valid resource nodes through Gatherer role behavior.
+
+When a collector is actively threatened or attacked, combat/self-defense priority may temporarily interrupt gathering. When the threat is gone, the party may resume the interrupted resource or quest gather objective.
+
 ---
 
 ## Global Priority Hierarchy
