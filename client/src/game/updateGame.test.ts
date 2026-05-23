@@ -102,6 +102,202 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("keeps non-Gatherer-role collectors on the leader's quest resource when safe", () => {
+    const leader = createLeader({ x: 5, y: 5 });
+    const defender = {
+      ...createCompanion("defender", { x: 6, y: 5 }, leader.id, "defender"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const support = {
+      ...createCompanion("support", { x: 5, y: 6 }, leader.id, "support"),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const herb = createResource("quest-herb", { x: 4, y: 6 }, {
+      resourceType: "herb",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, defender, support, herb], {
+        partyLeaderId: leader.id,
+        map: createMossyQuestTestMap(),
+        quests: createPostGuideQuestStates(),
+      }),
+    );
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: herb.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: herb.id,
+    });
+    expect(nextState.entities[defender.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: herb.id,
+    });
+    expect(nextState.entities[support.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: herb.id,
+    });
+  });
+
+  it("keeps collectors attacking Cave Bats while the quest resource POI remains active", () => {
+    const leader = {
+      ...createLeader({ x: 5, y: 5 }),
+      state: "attack" as const,
+      currentTargetId: "cave-bat",
+    };
+    const collector = {
+      ...createCompanion("collector", { x: 6, y: 5 }, leader.id, "defender"),
+      state: "attack" as const,
+      currentTargetId: "cave-bat",
+    };
+    const herb = createResource("quest-herb", { x: 4, y: 6 }, {
+      resourceType: "herb",
+    });
+    const caveBat = {
+      ...createEnemy("cave-bat", { x: 6, y: 4 }, undefined, {
+        archetypeId: "cave_bat",
+        subzoneId: "mossy-glade",
+        maxHealth: 100,
+      }),
+      state: "attack" as const,
+      currentTargetId: collector.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, collector, herb, caveBat], {
+        partyLeaderId: leader.id,
+        map: createMossyQuestTestMap(),
+        simulationTimeMs: 1000,
+        leaderIntent: {
+          type: "gather",
+          targetId: herb.id,
+          targetPosition: herb.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: herb.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: herb.position,
+          targetEntityId: herb.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_mossy_glade_herbs",
+          reason: "active quest gather herb",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 1000,
+          selectedPoiId: herb.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: herb.position,
+          selectedReason: "active quest gather herb",
+          skippedReasons: {},
+        },
+        quests: createPostGuideQuestStates(),
+      }),
+      { nowMs: 1100, deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "resource",
+      targetEntityId: herb.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: caveBat.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: caveBat.id,
+    });
+    expect(nextState.entities[collector.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: caveBat.id,
+    });
+  });
+
+  it("resumes the quest resource POI after Cave Bats stop attacking collectors", () => {
+    const leader = {
+      ...createLeader({ x: 5, y: 5 }),
+      state: "attack" as const,
+      currentTargetId: "cave-bat",
+    };
+    const collector = {
+      ...createCompanion("collector", { x: 6, y: 5 }, leader.id, "fighter"),
+      state: "attack" as const,
+      currentTargetId: "cave-bat",
+    };
+    const herb = createResource("quest-herb", { x: 4, y: 6 }, {
+      resourceType: "herb",
+    });
+    const caveBat = {
+      ...createEnemy("cave-bat", { x: 6, y: 4 }, undefined, {
+        archetypeId: "cave_bat",
+        subzoneId: "mossy-glade",
+      }),
+      state: "dead" as const,
+      health: 0,
+      currentTargetId: null,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, collector, herb, caveBat], {
+        partyLeaderId: leader.id,
+        map: createMossyQuestTestMap(),
+        simulationTimeMs: 1000,
+        leaderIntent: {
+          type: "attack",
+          targetId: caveBat.id,
+          targetPosition: caveBat.position,
+          source: "ai",
+        },
+        localPoiTarget: {
+          poiId: herb.id,
+          category: "resource",
+          mapId: MAP_ONE_ID,
+          position: herb.position,
+          targetEntityId: herb.id,
+          questId: "gather_expedition_supplies",
+          objectiveId: "gather_mossy_glade_herbs",
+          reason: "active quest gather herb",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 1000,
+          selectedPoiId: herb.id,
+          selectedCategory: "resource",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: herb.position,
+          selectedReason: "active quest gather herb",
+          skippedReasons: {},
+        },
+        quests: createPostGuideQuestStates(),
+      }),
+      { nowMs: 1100, deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "resource",
+      targetEntityId: herb.id,
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: herb.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: herb.id,
+    });
+    expect(nextState.entities[collector.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: herb.id,
+    });
+  });
+
   it("completes inspect POIs when the leader reaches the quest target", () => {
     const leader = createLeader({ x: 46, y: 22 });
     const quests = createQuestStates({ clear_the_shore: "active" });

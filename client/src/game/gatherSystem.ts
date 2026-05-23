@@ -6,7 +6,6 @@ import {
 } from "./entities";
 import { isActiveResource } from "./entityGuards";
 import { getEnemyAttackLeashDistance } from "./enemyAISystem";
-import { getEnemyTemperament } from "./enemyArchetypes";
 import {
   addCombatFeedback,
   ENTITY_COLLISION_DISTANCE,
@@ -219,6 +218,14 @@ function findGathererSelfDefenseThreat(
     return null;
   }
 
+  if (
+    gatherer.commandPriority === "direct" &&
+    (state.leaderIntent?.type !== "gather" ||
+      state.leaderIntent.targetId !== gatherer.currentTargetId)
+  ) {
+    return null;
+  }
+
   return findEnemyAttackingGatherer(state, gatherer);
 }
 
@@ -265,7 +272,7 @@ function findEnemyAttackingGatherer(
   let closestDistanceSquared = Number.POSITIVE_INFINITY;
 
   for (const entity of Object.values(state.entities)) {
-    if (!isLiveAggressiveEnemy(entity)) {
+    if (!isLiveEnemy(entity)) {
       continue;
     }
 
@@ -288,13 +295,12 @@ function findEnemyAttackingGatherer(
   return closestThreat;
 }
 
-function isLiveAggressiveEnemy(entity: GameEntity): entity is Enemy {
+function isLiveEnemy(entity: GameEntity): entity is Enemy {
   return (
     entity.kind === "enemy" &&
     isCombatEntity(entity) &&
     entity.state !== "dead" &&
-    entity.health > 0 &&
-    getEnemyTemperament(entity) === "aggressive"
+    entity.health > 0
   );
 }
 

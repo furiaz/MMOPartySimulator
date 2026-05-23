@@ -1,6 +1,4 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { isCombatEntity } from "./entities";
-import { getEnemyTemperament } from "./enemyArchetypes";
 import { isTargetDummyEnemy } from "./entityGuards";
 import {
   debugMapDefinitions,
@@ -22,6 +20,10 @@ import {
   getPartyMembers,
   hasDeadPartyMembers,
 } from "./partySystem";
+import {
+  getPartyMembersRespondingToActiveThreat,
+  isPartyMemberRespondingToActiveThreat,
+} from "./partyThreatSystem";
 import {
   getEntityById,
   getPoiSearchScope,
@@ -55,8 +57,8 @@ import {
 import type { PointOfInterest, PoiCategory, PoiMapType } from "./poiTypes";
 import type {
   DebugMapId,
-  Companion,
   DebugTeleportPoint,
+  Enemy,
   Position,
   ResourceEntity,
   ResourceType,
@@ -1757,6 +1759,15 @@ function applyLocalTargetToLeaderIntent(
   localTarget: LocalPoiTarget,
 ): GameState {
   const leader = getPartyLeader(state);
+  const activeThreatResponder = getPartyMembersRespondingToActiveThreat(state)[0];
+  const activeThreatTarget = activeThreatResponder?.currentTargetId
+    ? getEntityById(state, activeThreatResponder.currentTargetId)
+    : undefined;
+
+  if (localTarget.category === "resource" && activeThreatTarget?.kind === "enemy") {
+    return applyActivePartyThreatToLeaderIntent(state, activeThreatTarget);
+  }
+
   const targetEntity = localTarget.targetEntityId
     ? getEntityById(state, localTarget.targetEntityId)
     : undefined;
@@ -1781,7 +1792,7 @@ function applyLocalTargetToLeaderIntent(
     return nextState;
   }
 
-  if (isGathererSelfDefenseTarget(nextState, currentLeader)) {
+  if (isPartyMemberRespondingToActiveThreat(nextState, currentLeader)) {
     return nextState;
   }
 
@@ -1796,30 +1807,34 @@ function applyLocalTargetToLeaderIntent(
   });
 }
 
-function isGathererSelfDefenseTarget(
+function applyActivePartyThreatToLeaderIntent(
   state: GameState,
-  companion: Companion,
-): boolean {
-  if (
-    companion.role !== "gatherer" ||
-    companion.state !== "attack" ||
-    !companion.currentTargetId
-  ) {
-    return false;
+  activeThreatTarget: Enemy,
+): GameState {
+  const nextState = setLeaderIntent(state, {
+    type: "attack",
+    targetId: activeThreatTarget.id,
+    targetPosition: activeThreatTarget.position,
+    source: "ai",
+  });
+  const leader = getPartyLeader(nextState);
+
+  if (!leader || isPartyMemberRespondingToActiveThreat(nextState, leader)) {
+    return nextState;
   }
 
-  const target = getEntityById(state, companion.currentTargetId);
+  const currentLeader = getEntityById(nextState, leader.id);
 
-  if (!target || target.kind !== "enemy" || !isCombatEntity(target)) {
-    return false;
+  if (currentLeader?.kind !== "companion") {
+    return nextState;
   }
 
-  return (
-    target.state === "attack" &&
-    target.health > 0 &&
-    target.currentTargetId === companion.id &&
-    getEnemyTemperament(target) === "aggressive"
-  );
+  return updateEntity(nextState, {
+    ...currentLeader,
+    state: "attack",
+    currentTargetId: activeThreatTarget.id,
+    commandPriority: "autonomous",
+  });
 }
 
 function getLeaderIntentType(category: PoiCategory): "attack" | "move" | "gather" | "explore" {

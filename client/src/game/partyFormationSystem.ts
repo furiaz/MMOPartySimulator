@@ -1,6 +1,5 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
-import { getEnemyTemperament } from "./enemyArchetypes";
 import { isActiveResource } from "./entityGuards";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
@@ -10,6 +9,7 @@ import {
   isPartyMember,
   type PartyMember,
 } from "./partySystem";
+import { isPartyMemberRespondingToActiveThreat } from "./partyThreatSystem";
 import {
   QUEST_GUIDE_OBJECTIVE_ID,
   isQuestGuideObjectiveRelevant,
@@ -71,10 +71,6 @@ export function updatePartyFormationSystem(
 
   if (gatherIntentClearedState !== state) {
     return gatherIntentClearedState;
-  }
-
-  if (isGathererSelfDefenseTarget(state, leader)) {
-    return state;
   }
 
   const plan = getPartyPlan(state, leader);
@@ -174,7 +170,8 @@ function assignPartyTravelTargets(
   if (
     currentLeader &&
     isPartyMember(currentLeader) &&
-    !isGathererSelfDefenseTarget(nextState, currentLeader)
+    (hasPlayerIntent ||
+      !isPartyMemberRespondingToActiveThreat(nextState, currentLeader))
   ) {
     nextState = updateEntity(nextState, {
       ...currentLeader,
@@ -197,7 +194,8 @@ function assignPartyTravelTargets(
     if (
       member.id === leader.id ||
       member.commandPriority === "direct" ||
-      isGathererSelfDefenseTarget(nextState, member) ||
+      (!hasPlayerIntent &&
+        isPartyMemberRespondingToActiveThreat(nextState, member)) ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
       (!hasPlayerIntent && isGathererBusy(nextState, member))
     ) {
@@ -220,6 +218,7 @@ function assignPartyGatherTarget(
   targetId: string | null,
 ): GameState {
   let nextState = state;
+  const hasPlayerIntent = hasDirectPlayerLeaderIntent(state);
 
   if (!targetId) {
     return nextState;
@@ -228,7 +227,8 @@ function assignPartyGatherTarget(
   for (const member of getPartyMembers(nextState)) {
     if (
       member.commandPriority === "direct" ||
-      isGathererSelfDefenseTarget(nextState, member) ||
+      (!hasPlayerIntent &&
+        isPartyMemberRespondingToActiveThreat(nextState, member)) ||
       isCompanionResurrectionChanneling(nextState, member.id)
     ) {
       continue;
@@ -243,32 +243,6 @@ function assignPartyGatherTarget(
   }
 
   return nextState;
-}
-
-function isGathererSelfDefenseTarget(
-  state: GameState,
-  partyMember: PartyMember,
-): boolean {
-  if (
-    partyMember.role !== "gatherer" ||
-    partyMember.state !== "attack" ||
-    !partyMember.currentTargetId
-  ) {
-    return false;
-  }
-
-  const target = getEntityById(state, partyMember.currentTargetId);
-
-  if (!target || target.kind !== "enemy" || !isCombatEntity(target)) {
-    return false;
-  }
-
-  return (
-    target.state === "attack" &&
-    target.health > 0 &&
-    target.currentTargetId === partyMember.id &&
-    getEnemyTemperament(target) === "aggressive"
-  );
 }
 
 function clearStaleGatherLeaderIntent(
@@ -321,6 +295,8 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
     if (
       member.commandPriority === "direct" ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
+      (!hasPlayerIntent &&
+        isPartyMemberRespondingToActiveThreat(nextState, member)) ||
       (!hasPlayerIntent && isGathererBusy(nextState, member))
     ) {
       continue;
@@ -397,7 +373,7 @@ function moveFollowersTowardLeader(
       member.id === leader.id ||
       member.commandPriority === "direct" ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
-      isGathererSelfDefenseTarget(nextState, member) ||
+      isPartyMemberRespondingToActiveThreat(nextState, member) ||
       isGathererBusy(nextState, member) ||
       movedEntityIds.has(member.id)
     ) {
@@ -563,7 +539,7 @@ function isRequiredForTravelCohesion(
   if (
     member.commandPriority === "direct" ||
     isCompanionResurrectionChanneling(state, member.id) ||
-    isGathererSelfDefenseTarget(state, member)
+    isPartyMemberRespondingToActiveThreat(state, member)
   ) {
     return false;
   }
