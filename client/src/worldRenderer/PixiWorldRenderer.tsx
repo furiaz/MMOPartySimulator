@@ -58,7 +58,6 @@ const entityFeedbackTintDurationMs = 260;
 const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
-const damageHitSparkSrc = `${prototypeVfxSpritePath}/damage-hit-spark.png`;
 const deathDownedPuffSrc = `${prototypeVfxSpritePath}/death-downed-puff.png`;
 const healSparkleSrc = `${prototypeVfxSpritePath}/heal-sparkle.png`;
 const gatherCompleteSparkleSrc = `${prototypeVfxSpritePath}/gather-complete-sparkle.png`;
@@ -458,7 +457,6 @@ function collectCurrentMapVisualTextureSrcs(
     ),
     blockImpactSrc,
     criticalHitBackingSrc,
-    damageHitSparkSrc,
     deathDownedPuffSrc,
     healSparkleSrc,
     gatherCompleteSparkleSrc,
@@ -1586,19 +1584,6 @@ function hasPairedCriticalFeedback(
   );
 }
 
-function hasSameMomentFeedback(
-  event: CombatFeedbackEvent,
-  combatFeedbackEvents: CombatFeedbackEvent[],
-  text: string,
-): boolean {
-  return combatFeedbackEvents.some(
-    (candidate) =>
-      candidate.entityId === event.entityId &&
-      candidate.createdAt === event.createdAt &&
-      candidate.text === text,
-  );
-}
-
 function shouldDrawSkippedFrequentEffect(event: CombatFeedbackEvent): boolean {
   const hash = Array.from(event.id).reduce(
     (total, character) => total + character.charCodeAt(0),
@@ -1863,29 +1848,6 @@ function drawCombatFeedbackSpriteEffect({
     transform,
   );
   const progress = getDamageNumberProgress(event, currentTime);
-
-  if (
-    isDamageNumberFeedback(event) &&
-    !hasPairedCriticalFeedback(event, combatFeedbackEvents) &&
-    !hasSameMomentFeedback(event, combatFeedbackEvents, "Blocked") &&
-    !hasSameMomentFeedback(event, combatFeedbackEvents, "Dodged")
-  ) {
-    drawManagedImageSprite({
-      alpha: 0.92 * (1 - progress),
-      anchorX: 0.5,
-      anchorY: 0.5,
-      cache,
-      height: 38,
-      key: `feedback-sprite:${event.id}:${damageHitSparkSrc}`,
-      layer,
-      managedState,
-      metrics,
-      position,
-      requestRedraw,
-      src: damageHitSparkSrc,
-      width: 38,
-    });
-  }
 
   if (event.text === "Dodged" && shouldDrawSkippedFrequentEffect(event)) {
     drawManagedImageSprite({
@@ -2438,7 +2400,7 @@ function drawFullEffects({
       drawManagedImageSprite({
         alpha: 0.88 * (1 - progress),
         anchorX: 0.5,
-        anchorY: 0.5,
+        anchorY: 0.6,
         cache,
         height: backingSize,
         key: `critical-backing:${getCombatFeedbackLaneKey(event)}`,
