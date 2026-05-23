@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createResource, getMovementStepDistance } from "./entities";
+import {
+  createCompanion,
+  createEnemy,
+  createResource,
+  getMovementStepDistance,
+} from "./entities";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { createTestGameState } from "./testState";
 
@@ -245,6 +250,91 @@ describe("party formation real-time cohesion", () => {
 
     expect(nextState.entities[leader.id].position.x).toBeGreaterThan(0);
     expect(nextState.leaderHandoffRemainingMs).toBe(0);
+  });
+
+  it("interrupts autonomous POI travel to fight close party threats", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const follower = createCompanion(
+      "follower",
+      { x: -1, y: 0 },
+      leader.id,
+      "support",
+    );
+    const closeThreat = {
+      ...createEnemy("close-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [follower.id]: follower,
+        [closeThreat.id]: closeThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "move",
+        targetId: null,
+        targetPosition: { x: 10, y: 0 },
+        source: "ai",
+      },
+      simulationDeltaMs: 100,
+    });
+
+    const nextState = updatePartyFormationSystem(state);
+
+    expect(nextState.partyFormation).toMatchObject({
+      phase: "combat",
+      targetId: closeThreat.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: closeThreat.id,
+    });
+    expect(nextState.entities[follower.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: closeThreat.id,
+    });
+  });
+
+  it("keeps direct companion commands from being overwritten by close party threats", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const directFollower = {
+      ...createCompanion("follower", { x: -1, y: 0 }, leader.id, "support"),
+      commandPriority: "direct" as const,
+      currentTargetId: null,
+    };
+    const closeThreat = {
+      ...createEnemy("close-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [directFollower.id]: directFollower,
+        [closeThreat.id]: closeThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "move",
+        targetId: null,
+        targetPosition: { x: 10, y: 0 },
+        source: "ai",
+      },
+      simulationDeltaMs: 100,
+    });
+
+    const nextState = updatePartyFormationSystem(state);
+
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: closeThreat.id,
+    });
+    expect(nextState.entities[directFollower.id]).toMatchObject({
+      commandPriority: "direct",
+      currentTargetId: null,
+    });
   });
 
   it("clears stale gather intent instead of reassigning a depleted resource", () => {

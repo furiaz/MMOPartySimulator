@@ -21,6 +21,7 @@ export function createTestGameState(
     simulationTimeMs: 0,
     simulationDeltaMs: 100,
     partyLeaderId: "",
+    partyIntent: null,
     leaderIntent: null,
     quests: createInitialQuestStates(),
     globalPoiIntent: null,

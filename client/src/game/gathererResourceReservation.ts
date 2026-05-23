@@ -2,7 +2,12 @@ import { getNavigationPositionKey } from "./navigation";
 import { getPartyLeader, getPartyMembers, type PartyMember } from "./partySystem";
 import { getEuclideanDistance, getGridDistance } from "./positionUtils";
 import { ROLE_TUNING } from "./roleProfiles";
-import { getEntityById, getPoiSearchScope, type GameState } from "./state";
+import {
+  getEntityById,
+  getPartyExecutionIntent,
+  getPoiSearchScope,
+  type GameState,
+} from "./state";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
 import { isResourceTargetInRange } from "./targetSelection";
 import type { Position, ResourceEntity, ZoneSubzone } from "./types";
@@ -62,11 +67,13 @@ export function createResourceWorkContext(state: GameState): ResourceWorkContext
 export function getCurrentPartyGatherResourceTargetId(
   state: GameState,
 ): string | null {
-  if (state.leaderIntent?.type !== "gather" || !state.leaderIntent.targetId) {
+  const executionIntent = getPartyExecutionIntent(state);
+
+  if (executionIntent?.type !== "gather" || !executionIntent.targetId) {
     return null;
   }
 
-  const target = getEntityById(state, state.leaderIntent.targetId);
+  const target = getEntityById(state, executionIntent.targetId);
 
   if (
     target?.kind !== "resource" ||

@@ -8,7 +8,7 @@ import {
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
   reservePositionForFrame,
-  setLeaderIntent,
+  setPartyExecutionIntent,
   type GameState,
 } from "./state";
 import {
@@ -42,13 +42,14 @@ export function updateExplorationSystem(
   );
 
   if (!targetPosition) {
-    return setLeaderIntent(nextState, null);
+    return setPartyExecutionIntent(nextState, null);
   }
 
-  nextState = setLeaderIntent(nextState, {
+  nextState = setPartyExecutionIntent(nextState, {
     type: "explore",
     targetId: null,
     targetPosition,
+    source: "ai",
   });
   nextState = moveEntityTowardPositionIfUnoccupied(
     nextState,

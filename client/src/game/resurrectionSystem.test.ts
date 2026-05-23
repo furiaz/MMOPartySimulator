@@ -9,12 +9,49 @@ import {
   isCompanionResurrectionChanneling,
   updateResurrectionSystem,
 } from "./resurrectionSystem";
-import { addEntity } from "./state";
+import { addEntity, setPartyIntent } from "./state";
 import { createTestGameState } from "./testState";
 import type { GameState } from "./state";
 import type { Companion, GameEntity } from "./types";
 
 describe("resurrection system", () => {
+  it("does not start resurrection without Manager recovery intent", () => {
+    const helper = createCompanion("helper", { x: 0, y: 0 }, "helper");
+    const deadCompanion = createDeadCompanion("dead", { x: 1, y: 0 }, helper.id);
+    const state = createState([helper, deadCompanion], helper.id, {
+      recoveryTargetId: null,
+    });
+
+    const nextState = updateResurrectionSystem(state, new Set(), 1_000, 1_000);
+
+    expect(nextState.entities[deadCompanion.id]).toMatchObject({
+      state: "dead",
+      health: 0,
+    });
+    expect(nextState.resurrectionProgressByCompanionId?.[deadCompanion.id]).toBeUndefined();
+    expect(nextState.resurrectionChannelsByHelperId?.[helper.id]).toBeUndefined();
+  });
+
+  it("uses the Manager recovery target instead of choosing the nearest dead companion", () => {
+    const helper = createCompanion("helper", { x: 0, y: 0 }, "helper");
+    const nearbyDeadCompanion = createDeadCompanion("near-dead", { x: 1, y: 0 }, helper.id);
+    const managerTarget = createDeadCompanion("manager-target", { x: 4, y: 0 }, helper.id);
+    const state = createState(
+      [helper, nearbyDeadCompanion, managerTarget],
+      helper.id,
+      { recoveryTargetId: managerTarget.id },
+    );
+
+    const nextState = updateResurrectionSystem(state, new Set(), 1_000, 1_000);
+
+    expect(nextState.resurrectionChannelsByHelperId?.[helper.id]).toMatchObject({
+      targetId: managerTarget.id,
+    });
+    expect(
+      nextState.resurrectionProgressByCompanionId?.[nearbyDeadCompanion.id],
+    ).toBeUndefined();
+  });
+
   it("revives a dead companion at 1 HP after one helper channels for 10 seconds", () => {
     const helper = createCompanion("helper", { x: 0, y: 0 }, "helper");
     const deadCompanion = createDeadCompanion("dead", { x: 1, y: 0 }, helper.id);
@@ -199,6 +236,38 @@ function createDeadCompanion(
   };
 }
 
-function createState(entities: GameEntity[], partyLeaderId: string): GameState {
-  return entities.reduce(addEntity, createTestGameState({ partyLeaderId }));
+type CreateStateOptions = {
+  recoveryTargetId?: string | null;
+};
+
+function createState(
+  entities: GameEntity[],
+  partyLeaderId: string,
+  options: CreateStateOptions = {},
+): GameState {
+  const state = entities.reduce(addEntity, createTestGameState({ partyLeaderId }));
+  const recoveryTargetId =
+    options.recoveryTargetId === undefined
+      ? entities.find((entity) => entity.kind === "companion" && entity.state === "dead")
+          ?.id ?? null
+      : options.recoveryTargetId;
+
+  if (!recoveryTargetId) {
+    return state;
+  }
+
+  return setPartyIntent(state, {
+    mode: "resurrect",
+    source: "ai",
+    executionIntent: null,
+    globalPoiIntent: null,
+    localPoiTarget: null,
+    worldTravelTargetMapId: state.worldTravelTargetMapId,
+    queuedIntent: null,
+    recoveryIntent: {
+      action: "resurrect",
+      deadCompanionId: recoveryTargetId,
+      threatEnemyIds: [],
+    },
+  });
 }

@@ -18,8 +18,8 @@ import { attackDefenderTarget } from "./defenderCombat";
 import {
   getDefenderAnchorPosition,
   getLeaderEnemyTarget,
-  getLeaderIntentPosition,
   getLeaderMovementDirection,
+  getPartyExecutionIntentPosition,
 } from "./roleSystem";
 import {
   getActiveQuestGuide,
@@ -728,9 +728,9 @@ function isBehindLeader(
     return false;
   }
 
-  const leaderIntent = getLeaderIntentPosition(state, leader);
-  const offsetFromIntentX = defender.position.x - leaderIntent.x;
-  const offsetFromIntentY = defender.position.y - leaderIntent.y;
+  const partyIntentPosition = getPartyExecutionIntentPosition(state, leader);
+  const offsetFromIntentX = defender.position.x - partyIntentPosition.x;
+  const offsetFromIntentY = defender.position.y - partyIntentPosition.y;
 
   return (
     offsetFromIntentX * movementDirection.x +

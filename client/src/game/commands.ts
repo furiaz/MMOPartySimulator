@@ -3,7 +3,8 @@ import { isActiveResource } from "./entityGuards";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
-  setLeaderIntent,
+  setPartyExecutionIntent,
+  setPartyIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -12,7 +13,7 @@ import type {
   AutonomousEntity,
   CommandPriority,
   EntityState,
-  LeaderIntent,
+  PartyExecutionIntent,
   Position,
 } from "./types";
 
@@ -106,7 +107,7 @@ export function issueEntityCommand(
     const nextState = updateEntity(commandState, updatedEntity);
 
     return entity.id === state.partyLeaderId
-      ? setLeaderIntent(nextState, null)
+      ? setPartyExecutionIntent(nextState, null)
       : nextState;
   }
 
@@ -123,7 +124,10 @@ export function issueEntityCommand(
   const nextState = updateEntity(commandState, updatedEntity);
 
   return entity.id === state.partyLeaderId
-    ? setLeaderIntent(nextState, getLeaderIntentFromCommand(state, command))
+    ? setPartyExecutionIntent(
+        nextState,
+        getPartyExecutionIntentFromCommand(state, command),
+      )
     : nextState;
 }
 
@@ -190,7 +194,15 @@ export function issuePartyOrder(
     }
   }
 
-  let nextState = setLeaderIntent(state, getPlayerLeaderIntent(state, order));
+  const playerIntent = getPlayerPartyExecutionIntent(state, order);
+  let nextState = setPartyIntent(state, {
+    mode: playerIntent.type === "attack" ? "engage" : "travel",
+    source: "player",
+    executionIntent: playerIntent,
+    globalPoiIntent: null,
+    localPoiTarget: null,
+    worldTravelTargetMapId: null,
+  });
 
   for (const member of getPartyMembers(nextState)) {
     if (member.state === "dead") {
@@ -214,24 +226,24 @@ function canApplyCommand(
   return commandPriority === "direct" || entity.commandPriority !== "direct";
 }
 
-function getLeaderIntentFromCommand(
+function getPartyExecutionIntentFromCommand(
   state: GameState,
   command: Extract<EntityCommand, { targetId: string }>,
-): LeaderIntent {
+): PartyExecutionIntent {
   const targetPosition = getEntityById(state, command.targetId)?.position ?? null;
 
   return {
-    type: getLeaderIntentType(command.type),
+    type: getPartyExecutionIntentType(command.type),
     targetId: command.targetId,
     targetPosition,
     source: command.priority === "autonomous" ? "ai" : "player",
   };
 }
 
-function getPlayerLeaderIntent(
+function getPlayerPartyExecutionIntent(
   state: GameState,
   order: PartyOrder,
-): LeaderIntent {
+): PartyExecutionIntent {
   if (order.type === "move") {
     return {
       type: "move",
@@ -267,9 +279,9 @@ function getPartyOrderEntityState(
   };
 }
 
-function getLeaderIntentType(
+function getPartyExecutionIntentType(
   commandType: Exclude<EntityState, "idle" | "dead">,
-): LeaderIntent["type"] {
+): PartyExecutionIntent["type"] {
   if (commandType === "attack") {
     return "attack";
   }

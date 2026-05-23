@@ -215,6 +215,7 @@ function resetStateToRescueHub(
     currentMapId: choice.mapId,
     map: targetMap,
     activeTeleport: null,
+    partyIntent: null,
     leaderIntent: null,
     globalPoiIntent: null,
     localPoiTarget: null,

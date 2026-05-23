@@ -2,6 +2,7 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
+import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getPartyLeader,
   getPartyMembers,
@@ -17,12 +18,14 @@ import {
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import {
   getEntityById,
-  hasDirectPlayerLeaderIntent,
+  getPartyExecutionIntent,
+  hasDirectPlayerPartyIntent,
   moveEntityTowardPositionIfUnoccupied,
-  setLeaderIntent,
+  setPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
+import { isActivePartyThreat } from "./partyThreatSystem";
 import type {
   Enemy,
   FormationPhase,
@@ -67,7 +70,7 @@ export function updatePartyFormationSystem(
     return clearFormation(state);
   }
 
-  const gatherIntentClearedState = clearStaleGatherLeaderIntent(state, leader);
+  const gatherIntentClearedState = clearStaleGatherPartyIntent(state, leader);
 
   if (gatherIntentClearedState !== state) {
     return gatherIntentClearedState;
@@ -112,7 +115,9 @@ export function updatePartyFormationSystem(
 }
 
 function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
-  if (hasDirectPlayerLeaderIntent(state)) {
+  const executionIntent = getPartyExecutionIntent(state);
+
+  if (hasDirectPlayerPartyIntent(state)) {
     const intentTarget = getIntentEnemyTarget(state);
 
     return {
@@ -124,20 +129,21 @@ function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
       target: intentTarget,
       targetPosition:
         intentTarget?.position ??
-        state.leaderIntent?.targetPosition ??
+        executionIntent?.targetPosition ??
         null,
     };
   }
 
+  const nearbyThreatTarget = getNearbyPartyThreatTarget(state);
   const intentTarget = getIntentEnemyTarget(state);
   const leaderTarget = getLeaderEnemyTarget(state, leader);
-  const target = intentTarget ?? leaderTarget;
+  const target = nearbyThreatTarget ?? intentTarget ?? leaderTarget;
   const targetPosition =
     target?.position ??
-    state.leaderIntent?.targetPosition ??
+    executionIntent?.targetPosition ??
     null;
   const phase =
-    target && getDistance(leader.position, target.position) <= COMBAT_BREAK_DISTANCE
+    target && isWithinPartyCombatDistance(state, leader, target)
       ? "combat"
       : "traveling";
 
@@ -153,16 +159,17 @@ function assignPartyTravelTargets(
   leader: PartyMember,
   plan: PartyPlan,
 ): GameState {
-  const hasPlayerIntent = hasDirectPlayerLeaderIntent(state);
+  const hasPlayerIntent = hasDirectPlayerPartyIntent(state);
+  const executionIntent = getPartyExecutionIntent(state);
   const isGatherIntent =
     !plan.target &&
-    state.leaderIntent?.type === "gather" &&
-    Boolean(state.leaderIntent.targetId);
-  let nextState = setLeaderIntent(state, {
-    type: plan.target ? "attack" : (state.leaderIntent?.type ?? "move"),
-    targetId: plan.target?.id ?? state.leaderIntent?.targetId ?? null,
+    executionIntent?.type === "gather" &&
+    Boolean(executionIntent.targetId);
+  let nextState = setPartyExecutionIntent(state, {
+    type: plan.target ? "attack" : (executionIntent?.type ?? "move"),
+    targetId: plan.target?.id ?? executionIntent?.targetId ?? null,
     targetPosition: plan.targetPosition,
-    source: state.leaderIntent?.source,
+    source: executionIntent?.source,
   });
 
   const currentLeader = getEntityById(nextState, leader.id);
@@ -178,7 +185,7 @@ function assignPartyTravelTargets(
       state: isGatherIntent ? "gather" : "follow",
       currentTargetId:
         plan.target?.id ??
-        (isGatherIntent ? state.leaderIntent?.targetId ?? null : null),
+        (isGatherIntent ? executionIntent?.targetId ?? null : null),
       commandPriority: "autonomous",
     });
   }
@@ -186,7 +193,7 @@ function assignPartyTravelTargets(
   if (isGatherIntent) {
     return assignPartyGatherTarget(
       nextState,
-      state.leaderIntent?.targetId ?? null,
+      executionIntent?.targetId ?? null,
     );
   }
 
@@ -218,7 +225,7 @@ function assignPartyGatherTarget(
   targetId: string | null,
 ): GameState {
   let nextState = state;
-  const hasPlayerIntent = hasDirectPlayerLeaderIntent(state);
+  const hasPlayerIntent = hasDirectPlayerPartyIntent(state);
 
   if (!targetId) {
     return nextState;
@@ -245,21 +252,23 @@ function assignPartyGatherTarget(
   return nextState;
 }
 
-function clearStaleGatherLeaderIntent(
+function clearStaleGatherPartyIntent(
   state: GameState,
   leader: PartyMember,
 ): GameState {
-  if (state.leaderIntent?.type !== "gather" || !state.leaderIntent.targetId) {
+  const executionIntent = getPartyExecutionIntent(state);
+
+  if (executionIntent?.type !== "gather" || !executionIntent.targetId) {
     return state;
   }
 
-  const targetId = state.leaderIntent.targetId;
+  const targetId = executionIntent.targetId;
 
   if (isActiveResource(getEntityById(state, targetId))) {
     return state;
   }
 
-  let nextState = setLeaderIntent(clearFormation(state), null);
+  let nextState = setPartyExecutionIntent(clearFormation(state), null);
 
   for (const member of getPartyMembers(nextState)) {
     if (
@@ -283,12 +292,18 @@ function clearStaleGatherLeaderIntent(
 }
 
 function assignPartyCombatTarget(state: GameState, targetId: string): GameState {
-  const hasPlayerIntent = hasDirectPlayerLeaderIntent(state);
-  let nextState = setLeaderIntent(state, {
+  const hasPlayerIntent = hasDirectPlayerPartyIntent(state);
+  const executionIntent = getPartyExecutionIntent(state);
+  const target = getEntityById(state, targetId);
+  const baseState =
+    executionIntent?.type !== "attack" && isLiveEnemy(target)
+      ? captureInterruptedPoiTarget(state, target)
+      : state;
+  let nextState = setPartyExecutionIntent(baseState, {
     type: "attack",
     targetId,
-    targetPosition: getEntityById(state, targetId)?.position ?? null,
-    source: state.leaderIntent?.source,
+    targetPosition: target?.position ?? null,
+    source: executionIntent?.source,
   });
 
   for (const member of getPartyMembers(nextState)) {
@@ -450,7 +465,9 @@ function maybeFinishReachedPoi(
     return state;
   }
 
-  if (state.leaderIntent?.type === "gather" && state.leaderIntent.targetId) {
+  const executionIntent = getPartyExecutionIntent(state);
+
+  if (executionIntent?.type === "gather" && executionIntent.targetId) {
     return state;
   }
 
@@ -458,7 +475,7 @@ function maybeFinishReachedPoi(
     return state;
   }
 
-  return setLeaderIntent(clearFormationTarget(state), null);
+  return setPartyExecutionIntent(clearFormationTarget(state), null);
 }
 
 function isActiveGuidePoi(state: GameState): boolean {
@@ -495,7 +512,7 @@ function clearFinishedCombat(state: GameState): GameState {
     });
   }
 
-  return setLeaderIntent(nextState, null);
+  return setPartyExecutionIntent(nextState, null);
 }
 
 function getPartyTravelCohesion(
@@ -647,8 +664,9 @@ function createIdleFormation(): PartyFormationState {
 }
 
 function getIntentEnemyTarget(state: GameState): Enemy | null {
-  const target = state.leaderIntent?.targetId
-    ? state.entities[state.leaderIntent.targetId]
+  const executionIntent = getPartyExecutionIntent(state);
+  const target = executionIntent?.targetId
+    ? state.entities[executionIntent.targetId]
     : undefined;
 
   return isLiveEnemy(target) ? target : null;
@@ -663,6 +681,46 @@ function getLeaderEnemyTarget(
     : undefined;
 
   return isLiveEnemy(target) ? target : null;
+}
+
+function getNearbyPartyThreatTarget(state: GameState): Enemy | null {
+  return (
+    Object.values(state.entities)
+      .filter((entity): entity is Enemy => isActivePartyThreat(state, entity))
+      .filter((enemy) =>
+        getPartyMembers(state).some(
+          (member) =>
+            member.commandPriority !== "direct" &&
+            getDistance(member.position, enemy.position) <= COMBAT_BREAK_DISTANCE,
+        ),
+      )
+      .sort(
+        (first, second) =>
+          getNearestPartyDistance(state, first) -
+            getNearestPartyDistance(state, second) ||
+          first.id.localeCompare(second.id),
+      )[0] ?? null
+  );
+}
+
+function isWithinPartyCombatDistance(
+  state: GameState,
+  leader: PartyMember,
+  target: Enemy,
+): boolean {
+  if (getDistance(leader.position, target.position) <= COMBAT_BREAK_DISTANCE) {
+    return true;
+  }
+
+  return getNearestPartyDistance(state, target) <= COMBAT_BREAK_DISTANCE;
+}
+
+function getNearestPartyDistance(state: GameState, target: Enemy): number {
+  const distances = getPartyMembers(state)
+    .filter((member) => member.commandPriority !== "direct")
+    .map((member) => getDistance(member.position, target.position));
+
+  return distances.length > 0 ? Math.min(...distances) : Number.POSITIVE_INFINITY;
 }
 
 function isLiveEnemy(entity: GameEntity | undefined): entity is Enemy {

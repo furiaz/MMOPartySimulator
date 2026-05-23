@@ -11,6 +11,7 @@ import {
   ENTITY_COLLISION_DISTANCE,
   getBoundedPathDistance,
   getEntityById,
+  getPartyExecutionIntent,
   moveEntityTowardIfUnoccupied,
   updateEntity,
   type GameState,
@@ -214,14 +215,16 @@ function findGathererSelfDefenseThreat(
   state: GameState,
   gatherer: AutonomousEntity,
 ): Enemy | null {
+  const executionIntent = getPartyExecutionIntent(state);
+
   if (gatherer.kind !== "companion") {
     return null;
   }
 
   if (
     gatherer.commandPriority === "direct" &&
-    (state.leaderIntent?.type !== "gather" ||
-      state.leaderIntent.targetId !== gatherer.currentTargetId)
+    (executionIntent?.type !== "gather" ||
+      executionIntent.targetId !== gatherer.currentTargetId)
   ) {
     return null;
   }
@@ -233,30 +236,32 @@ function getPlayerIntentOverride(
   gatherer: AutonomousEntity,
   state: GameState,
 ): AutonomousEntity | null {
+  const executionIntent = getPartyExecutionIntent(state);
+
   if (
     gatherer.kind !== "companion" ||
     gatherer.commandPriority !== "autonomous" ||
-    state.leaderIntent?.source !== "player"
+    executionIntent?.source !== "player"
   ) {
     return null;
   }
 
   if (
-    state.leaderIntent.type === "gather" &&
-    state.leaderIntent.targetId === gatherer.currentTargetId
+    executionIntent.type === "gather" &&
+    executionIntent.targetId === gatherer.currentTargetId
   ) {
     return null;
   }
 
   if (
-    (state.leaderIntent.type === "attack" ||
-      state.leaderIntent.type === "gather") &&
-    state.leaderIntent.targetId
+    (executionIntent.type === "attack" ||
+      executionIntent.type === "gather") &&
+    executionIntent.targetId
   ) {
     return {
       ...gatherer,
-      state: state.leaderIntent.type,
-      currentTargetId: state.leaderIntent.targetId,
+      state: executionIntent.type,
+      currentTargetId: executionIntent.targetId,
       commandPriority: "autonomous",
     };
   }

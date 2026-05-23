@@ -5,8 +5,9 @@ import {
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
 import {
-  hasDirectPlayerLeaderIntent,
-  setLeaderIntent,
+  getPartyExecutionIntent,
+  hasDirectPlayerPartyIntent,
+  setPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -27,13 +28,13 @@ export function protectPartyMember(
     return state;
   }
 
-  if (hasDirectPlayerLeaderIntent(state)) {
+  if (hasDirectPlayerPartyIntent(state)) {
     return canSelfDefendDuringInteraction(state, attackedMember)
       ? updateSelfDefenseTarget(state, attackedMember, attacker)
       : state;
   }
 
-  let nextState = setLeaderIntent(captureInterruptedPoiTarget(state, attacker), {
+  let nextState = setPartyExecutionIntent(captureInterruptedPoiTarget(state, attacker), {
     type: "attack",
     targetId: attacker.id,
     targetPosition: attacker.position,
@@ -62,9 +63,13 @@ function isRelevantGuideEscortAttack(
   attackedMember: AutonomousEntity,
   attacker: Enemy,
 ): boolean {
+  if (isPartyMember(attackedMember)) {
+    return true;
+  }
+
   const guide = getActiveQuestGuide(state);
 
-  if (!guide || !isPartyMember(attackedMember)) {
+  if (!guide) {
     return true;
   }
 
@@ -90,14 +95,16 @@ function canSelfDefendDuringInteraction(
 }
 
 function isPlayerGatherIntent(state: GameState): boolean {
+  const executionIntent = getPartyExecutionIntent(state);
+
   return (
-    state.leaderIntent?.source === "player" &&
-    state.leaderIntent.type === "gather"
+    executionIntent?.source === "player" &&
+    executionIntent.type === "gather"
   );
 }
 
 function isPlayerNpcInteractionIntent(state: GameState): boolean {
-  const intent = state.leaderIntent;
+  const intent = getPartyExecutionIntent(state);
 
   if (
     intent?.source !== "player" ||
@@ -135,7 +142,7 @@ function updateSelfDefenseTarget(
   attackedMember: AutonomousEntity,
   attacker: Enemy,
 ): GameState {
-  const defenseState = setLeaderIntent(captureInterruptedPoiTarget(state, attacker), {
+  const defenseState = setPartyExecutionIntent(captureInterruptedPoiTarget(state, attacker), {
     type: "attack",
     targetId: attacker.id,
     targetPosition: attacker.position,

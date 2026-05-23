@@ -29,11 +29,14 @@ import {
 } from "./questGuideSystem";
 import {
   addEntity,
+  getPartyExecutionIntent,
   getPoiSearchScope,
   setPoiSearchScope,
   setStayInMapEnabled,
+  setWorldTravelTargetMapId,
   type GameState,
 } from "./state";
+import { setMapTeleportPoi } from "./teleportSystem";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";
 import { RESURRECTION_REQUIRED_MS } from "./resurrectionSystem";
@@ -66,6 +69,14 @@ describe("game update intent priority", () => {
 
     expect(nextState.leaderIntent?.type).toBe("gather");
     expect(nextState.leaderIntent?.targetId).toBe(wood.id);
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "ai",
+      executionIntent: {
+        type: "gather",
+        targetId: wood.id,
+      },
+    });
   });
 
   it("sends the party to gather a reached resource POI", () => {
@@ -92,6 +103,17 @@ describe("game update intent priority", () => {
 
     expect(nextState.leaderIntent?.type).toBe("gather");
     expect(nextState.leaderIntent?.targetId).toBe(wood.id);
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "ai",
+      localPoiTarget: {
+        targetEntityId: wood.id,
+      },
+      executionIntent: {
+        type: "gather",
+        targetId: wood.id,
+      },
+    });
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "gather",
       currentTargetId: wood.id,
@@ -678,7 +700,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("waits for enemies near the guide escort area to land a hit before fighting", () => {
+  it("fights close party threats while traveling toward the guide", () => {
     const leader = createLeader({ x: 13, y: 29 });
     const guide = {
       ...createQuestGuideNpc(),
@@ -701,12 +723,16 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.leaderIntent).toMatchObject({
-      type: "move",
-      targetId: null,
+      type: "attack",
+      targetId: escortThreat.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: escortThreat.id,
     });
   });
 
-  it("does not let party protection override escort for enemies outside Surveyor range", () => {
+  it("protects companions from close attackers outside Surveyor range", () => {
     const leader = createLeader({ x: 20, y: 29 });
     const guide = {
       ...createQuestGuideNpc(),
@@ -736,8 +762,11 @@ describe("game update intent priority", () => {
       category: "npc",
       targetEntityId: QUEST_GUIDE_NPC_ID,
     });
-    expect(nextState.leaderIntent?.type).not.toBe("attack");
-    expect(nextState.entities[leader.id]).not.toMatchObject({
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: outsideThreat.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: outsideThreat.id,
     });
@@ -1467,6 +1496,46 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("orders living companions to clear enemies near the dead leader before resurrection", () => {
+    const deadLeader = {
+      ...createLeader({ x: 4, y: 4 }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const fighter = {
+      ...createCompanion("fighter", { x: 5, y: 4 }, deadLeader.id, "fighter"),
+      state: "follow" as const,
+      currentTargetId: deadLeader.id,
+    };
+    const nearbyEnemy = createEnemy("nearby-enemy", { x: 6, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([deadLeader, fighter, nearbyEnemy], {
+        partyLeaderId: deadLeader.id,
+        map: createOpenTestMap(),
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "engage",
+      recoveryIntent: {
+        action: "fight_near_dead_leader",
+        deadCompanionId: deadLeader.id,
+        threatEnemyIds: [nearbyEnemy.id],
+      },
+      executionIntent: {
+        type: "attack",
+        targetId: nearbyEnemy.id,
+      },
+    });
+    expect(nextState.resurrectionChannelsByHelperId?.[fighter.id]).toBeUndefined();
+    expect(nextState.entities[fighter.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: nearbyEnemy.id,
+    });
+  });
+
   it("keeps direct gather commands from being taken over by resurrection", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const deadCompanion = {
@@ -1619,7 +1688,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("does not switch to attack intent while an enemy is only chasing the party", () => {
+  it("switches to attack intent when a close enemy is chasing the party", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const wood = createResource("quest-herb", { x: 8, y: 4 }, {
       resourceType: "herb",
@@ -1641,8 +1710,14 @@ describe("game update intent priority", () => {
       ),
     );
 
-    expect(nextState.leaderIntent?.type).toBe("gather");
-    expect(nextState.leaderIntent?.targetId).toBe(wood.id);
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: attacker.id,
+    });
+    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
+      type: "gather",
+      targetId: wood.id,
+    });
   });
 
   it("keeps direct player move intent from being replaced by combat aggro", () => {
@@ -1844,7 +1919,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("does not make autonomous non-gatherers attack while an enemy is only chasing the party", () => {
+  it("makes autonomous non-gatherers attack when a close enemy is chasing the party", () => {
     const resource = createResource("party-resource", { x: 4, y: 4 });
     const leader = {
       ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
@@ -1876,8 +1951,11 @@ describe("game update intent priority", () => {
       { nowMs: 2_000 },
     );
 
-    expect(nextState.leaderIntent?.type).not.toBe("attack");
-    expect(nextState.entities[leader.id]).not.toMatchObject({
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: attacker.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: attacker.id,
     });
@@ -3951,6 +4029,54 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget?.poiId).toBe("hub-to-map-1");
     expect(nextState.localPoiTarget?.reason).toBe("world route toward map-4");
     expect(nextState.leaderIntent?.type).toBe("move");
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "ai",
+      worldTravelTargetMapId: MAP_FOUR_ID,
+      executionIntent: {
+        type: "move",
+        targetPosition: hubTeleporterPosition,
+      },
+    });
+  });
+
+  it("stores player World Travel selection in Manager intent before route execution", () => {
+    const leader = createLeader({ x: 22, y: 13 });
+
+    const nextState = setWorldTravelTargetMapId(
+      createHubState([leader, ...createHubNpcs()], {
+        partyLeaderId: leader.id,
+      }),
+      MAP_FOUR_ID,
+    );
+
+    expect(nextState.worldTravelTargetMapId).toBe(MAP_FOUR_ID);
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "player",
+      worldTravelTargetMapId: MAP_FOUR_ID,
+      executionIntent: null,
+    });
+  });
+
+  it("writes teleport rally objectives through Manager execution intent", () => {
+    const leader = createLeader({ x: 22, y: 13 });
+
+    const nextState = setMapTeleportPoi(
+      createHubState([leader, ...createHubNpcs()], {
+        partyLeaderId: leader.id,
+      }),
+      "hub-to-map-1",
+      "player",
+    );
+
+    expect(getPartyExecutionIntent(nextState)).toMatchObject({
+      type: "move",
+      targetId: null,
+      targetPosition: hubTeleporterPosition,
+      source: "player",
+    });
+    expect(nextState.leaderIntent).toEqual(getPartyExecutionIntent(nextState));
   });
 
   it("routes world travel from map 1 toward map 2 directly", () => {
@@ -4219,6 +4345,16 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget).toBeNull();
     expect(nextState.globalPoiIntent).toBeNull();
     expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "resurrect",
+      recoveryIntent: {
+        action: "resurrect",
+        deadCompanionId: deadCompanion.id,
+      },
+      queuedIntent: {
+        worldTravelTargetMapId: MAP_TWO_ID,
+      },
+    });
     expect(nextState.activeTeleport).toBeNull();
     expect(nextState.resurrectionChannelsByHelperId?.[leader.id]).toMatchObject({
       targetId: deadCompanion.id,
@@ -4261,6 +4397,15 @@ describe("game update intent priority", () => {
     ).toBeGreaterThan(0);
     expect(revivedState.worldTravelTargetMapId).toBe(MAP_TWO_ID);
     expect(revivedState.localPoiTarget?.poiId).toBe(teleport.id);
+    expect(revivedState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "ai",
+      worldTravelTargetMapId: MAP_TWO_ID,
+      executionIntent: {
+        type: "move",
+        targetPosition: teleport.position,
+      },
+    });
     expect(revivedState.leaderIntent).toMatchObject({
       type: "move",
       targetPosition: teleport.position,

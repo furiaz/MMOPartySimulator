@@ -26,8 +26,11 @@ import {
 } from "./partyThreatSystem";
 import {
   getEntityById,
+  getPartyExecutionIntent,
   getPoiSearchScope,
-  setLeaderIntent,
+  setPartyExecutionIntent,
+  setPartyIntent,
+  setWorldTravelTargetMapId,
   updateEntity,
   type GameState,
   type PoiSearchScope,
@@ -122,7 +125,7 @@ export function updatePoiSystem(
     return clearPoiSelection(state);
   }
 
-  if (state.leaderIntent?.source === "player") {
+  if (getPartyExecutionIntent(state)?.source === "player") {
     return clearPoiSelection(state);
   }
 
@@ -147,7 +150,7 @@ export function updatePoiSystem(
 
   if (canReuseWildPoiSelection(state, leader, gathererReservations)) {
     const localPoiTarget = refreshLocalPoiTarget(state, state.localPoiTarget);
-    return applyLocalTargetToLeaderIntent(
+    return applyLocalTargetToPartyIntent(
       {
         ...state,
         localPoiTarget,
@@ -184,15 +187,15 @@ export function updatePoiSystem(
 
   if (selection.localTarget) {
     nextState = recordPoiSelected(nextState, selection.localTarget);
-    nextState = applyLocalTargetToLeaderIntent(nextState, selection.localTarget);
+    nextState = applyLocalTargetToPartyIntent(nextState, selection.localTarget);
   } else if (
-    nextState.leaderIntent?.type === "gather" &&
-    nextState.leaderIntent.source !== "player" &&
+    getPartyExecutionIntent(nextState)?.type === "gather" &&
+    getPartyExecutionIntent(nextState)?.source !== "player" &&
     !getCurrentPartyGatherResourceTargetId(nextState)
   ) {
-    nextState = setLeaderIntent(nextState, null);
+    nextState = setPartyExecutionIntent(nextState, null);
   } else if (globalPoiIntent.type === "idle") {
-    nextState = setLeaderIntent(nextState, null);
+    nextState = setPartyExecutionIntent(nextState, null);
   }
 
   return recordSkippedPois(nextState, selection.skippedReasons);
@@ -406,10 +409,7 @@ function clearReachedWorldTravelTarget(state: GameState): GameState {
     return state;
   }
 
-  return {
-    ...state,
-    worldTravelTargetMapId: null,
-  };
+  return setWorldTravelTargetMapId(state, null);
 }
 
 function updateReachedPoiInteractions(state: GameState): GameState {
@@ -1754,7 +1754,7 @@ function toLocalTarget(
   };
 }
 
-function applyLocalTargetToLeaderIntent(
+function applyLocalTargetToPartyIntent(
   state: GameState,
   localTarget: LocalPoiTarget,
 ): GameState {
@@ -1765,14 +1765,14 @@ function applyLocalTargetToLeaderIntent(
     : undefined;
 
   if (localTarget.category === "resource" && activeThreatTarget?.kind === "enemy") {
-    return applyActivePartyThreatToLeaderIntent(state, activeThreatTarget);
+    return applyActivePartyThreatToPartyIntent(state, activeThreatTarget);
   }
 
   const targetEntity = localTarget.targetEntityId
     ? getEntityById(state, localTarget.targetEntityId)
     : undefined;
-  const leaderIntent = {
-    type: getLeaderIntentType(localTarget.category),
+  const executionIntent = {
+    type: getPoiExecutionIntentType(localTarget.category),
     targetId:
       localTarget.category === "combat" || localTarget.category === "resource"
         ? localTarget.targetEntityId ?? null
@@ -1780,7 +1780,17 @@ function applyLocalTargetToLeaderIntent(
     targetPosition: targetEntity?.position ?? localTarget.position,
     source: "ai" as const,
   };
-  const nextState = setLeaderIntent(state, leaderIntent);
+  const nextState = setPartyIntent(state, {
+    mode: executionIntent.type === "attack" ? "engage" : "travel",
+    source: "ai",
+    executionIntent,
+    globalPoiIntent: state.globalPoiIntent,
+    localPoiTarget: localTarget,
+    worldTravelTargetMapId: state.worldTravelTargetMapId,
+    lastPoiDecision: state.lastPoiDecision,
+    queuedIntent: state.partyIntent?.queuedIntent ?? null,
+    recoveryIntent: state.partyIntent?.recoveryIntent ?? null,
+  });
 
   if (!leader) {
     return nextState;
@@ -1807,15 +1817,26 @@ function applyLocalTargetToLeaderIntent(
   });
 }
 
-function applyActivePartyThreatToLeaderIntent(
+function applyActivePartyThreatToPartyIntent(
   state: GameState,
   activeThreatTarget: Enemy,
 ): GameState {
-  const nextState = setLeaderIntent(state, {
+  const executionIntent = {
     type: "attack",
     targetId: activeThreatTarget.id,
     targetPosition: activeThreatTarget.position,
     source: "ai",
+  } as const;
+  const nextState = setPartyIntent(state, {
+    mode: "engage",
+    source: "ai",
+    executionIntent,
+    globalPoiIntent: state.globalPoiIntent,
+    localPoiTarget: state.localPoiTarget,
+    worldTravelTargetMapId: state.worldTravelTargetMapId,
+    lastPoiDecision: state.lastPoiDecision,
+    queuedIntent: state.partyIntent?.queuedIntent ?? null,
+    recoveryIntent: state.partyIntent?.recoveryIntent ?? null,
   });
   const leader = getPartyLeader(nextState);
 
@@ -1837,7 +1858,9 @@ function applyActivePartyThreatToLeaderIntent(
   });
 }
 
-function getLeaderIntentType(category: PoiCategory): "attack" | "move" | "gather" | "explore" {
+function getPoiExecutionIntentType(
+  category: PoiCategory,
+): "attack" | "move" | "gather" | "explore" {
   if (category === "combat") {
     return "attack";
   }
@@ -1946,12 +1969,27 @@ function recordSkippedPois(
 }
 
 function clearPoiSelection(state: GameState): GameState {
-  if (!state.globalPoiIntent && !state.localPoiTarget && !state.lastPoiDecision) {
+  if (
+    !state.globalPoiIntent &&
+    !state.localPoiTarget &&
+    !state.lastPoiDecision &&
+    !state.partyIntent?.globalPoiIntent &&
+    !state.partyIntent?.localPoiTarget &&
+    !state.partyIntent?.lastPoiDecision
+  ) {
     return state;
   }
 
   return {
     ...state,
+    partyIntent: state.partyIntent
+      ? {
+          ...state.partyIntent,
+          globalPoiIntent: null,
+          localPoiTarget: null,
+          lastPoiDecision: undefined,
+        }
+      : null,
     globalPoiIntent: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,
@@ -1965,7 +2003,7 @@ function clearAiPoiSelectionForResurrection(state: GameState): GameState {
     return clearedState;
   }
 
-  return setLeaderIntent(clearedState, null);
+  return setPartyExecutionIntent(clearedState, null);
 }
 
 function getDistance(first: Position, second: Position): number {

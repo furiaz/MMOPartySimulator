@@ -4,12 +4,16 @@ import type {
   GameState,
   InterruptedPoiTarget,
 } from "./state";
+import {
+  getPartyExecutionIntent,
+  setPartyIntent,
+} from "./state";
 import type {
   CommandPriority,
   Enemy,
   EntityState,
   GameEntity,
-  LeaderIntent,
+  PartyExecutionIntent,
   Position,
 } from "./types";
 import type { LocalPoiTarget, PoiDecisionState } from "./questTypes";
@@ -18,12 +22,13 @@ export function captureInterruptedPoiTarget(
   state: GameState,
   interruptingEnemy: Enemy,
 ): GameState {
-  const fallbackLeaderIntent = getInterruptedDirectGatherIntent(state);
+  const fallbackExecutionIntent = getInterruptedDirectGatherIntent(state);
+  const executionIntent = getPartyExecutionIntent(state);
 
   if (
     state.interruptedPoiTarget ||
-    isSameAttackIntent(state.leaderIntent, interruptingEnemy.id) ||
-    (!state.leaderIntent && !state.globalPoiIntent && !state.localPoiTarget && !fallbackLeaderIntent)
+    isSameAttackIntent(executionIntent, interruptingEnemy.id) ||
+    (!executionIntent && !state.globalPoiIntent && !state.localPoiTarget && !fallbackExecutionIntent)
   ) {
     return state;
   }
@@ -33,7 +38,7 @@ export function captureInterruptedPoiTarget(
     interruptedPoiTarget: {
       interruptedByEnemyId: interruptingEnemy.id,
       mapId: state.currentMapId,
-      leaderIntent: cloneLeaderIntent(state.leaderIntent ?? fallbackLeaderIntent),
+      leaderIntent: clonePartyExecutionIntent(executionIntent ?? fallbackExecutionIntent),
       globalPoiIntent: state.globalPoiIntent ? { ...state.globalPoiIntent } : null,
       localPoiTarget: cloneLocalPoiTarget(state.localPoiTarget),
       lastPoiDecision: clonePoiDecision(state.lastPoiDecision),
@@ -60,14 +65,22 @@ export function restoreInterruptedPoiTarget(state: GameState): GameState {
     return state;
   }
 
-  return {
-    ...state,
-    leaderIntent: cloneLeaderIntent(interruptedTarget.leaderIntent),
+  const restoredState = setPartyIntent(state, {
+    mode: getPartyBehaviorModeForIntent(interruptedTarget.leaderIntent),
+    source: interruptedTarget.leaderIntent?.source ?? "ai",
+    executionIntent: clonePartyExecutionIntent(interruptedTarget.leaderIntent),
     globalPoiIntent: interruptedTarget.globalPoiIntent
       ? { ...interruptedTarget.globalPoiIntent }
       : null,
     localPoiTarget: cloneLocalPoiTarget(interruptedTarget.localPoiTarget),
+    worldTravelTargetMapId: state.worldTravelTargetMapId,
     lastPoiDecision: clonePoiDecision(interruptedTarget.lastPoiDecision),
+    queuedIntent: state.partyIntent?.queuedIntent ?? null,
+    recoveryIntent: state.partyIntent?.recoveryIntent ?? null,
+  });
+
+  return {
+    ...restoredState,
     interruptedPoiTarget: null,
   };
 }
@@ -83,7 +96,9 @@ export function clearInterruptedPoiTarget(state: GameState): GameState {
   };
 }
 
-function getInterruptedDirectGatherIntent(state: GameState): LeaderIntent | null {
+function getInterruptedDirectGatherIntent(
+  state: GameState,
+): PartyExecutionIntent | null {
   const directGatherer = getPartyMembers(state).find((member) => {
     if (member.commandPriority !== "direct" || member.state !== "gather" || !member.currentTargetId) {
       return false;
@@ -111,30 +126,30 @@ function isInterruptedTargetValid(
   interruptedTarget: InterruptedPoiTarget,
 ): boolean {
   return (
-    isLeaderIntentValid(state, interruptedTarget.leaderIntent) &&
+    isExecutionIntentValid(state, interruptedTarget.leaderIntent) &&
     isLocalPoiTargetValid(state, interruptedTarget.localPoiTarget)
   );
 }
 
-function isLeaderIntentValid(
+function isExecutionIntentValid(
   state: GameState,
-  leaderIntent: LeaderIntent | null,
+  executionIntent: PartyExecutionIntent | null,
 ): boolean {
-  if (!leaderIntent) {
+  if (!executionIntent) {
     return true;
   }
 
-  if (!leaderIntent.targetId) {
-    return Boolean(leaderIntent.targetPosition);
+  if (!executionIntent.targetId) {
+    return Boolean(executionIntent.targetPosition);
   }
 
-  const target = state.entities[leaderIntent.targetId];
+  const target = state.entities[executionIntent.targetId];
 
-  if (leaderIntent.type === "attack") {
+  if (executionIntent.type === "attack") {
     return isLiveEnemy(target);
   }
 
-  if (leaderIntent.type === "gather") {
+  if (executionIntent.type === "gather") {
     return isAvailableResource(target);
   }
 
@@ -208,24 +223,34 @@ function isDirectCommandCompatibleWithInterruptedTarget(
   state: EntityState,
   currentTargetId: string | null,
   commandPriority: CommandPriority,
-  interruptedLeaderIntent: LeaderIntent | null,
+  interruptedExecutionIntent: PartyExecutionIntent | null,
 ): boolean {
-  if (commandPriority !== "direct" || !interruptedLeaderIntent) {
+  if (commandPriority !== "direct" || !interruptedExecutionIntent) {
     return false;
   }
 
-  if (interruptedLeaderIntent.type !== "gather") {
+  if (interruptedExecutionIntent.type !== "gather") {
     return false;
   }
 
-  return state === "gather" && currentTargetId === interruptedLeaderIntent.targetId;
+  return state === "gather" && currentTargetId === interruptedExecutionIntent.targetId;
 }
 
 function isSameAttackIntent(
-  leaderIntent: LeaderIntent | null,
+  executionIntent: PartyExecutionIntent | null,
   interruptingEnemyId: string,
 ): boolean {
-  return leaderIntent?.type === "attack" && leaderIntent.targetId === interruptingEnemyId;
+  return executionIntent?.type === "attack" && executionIntent.targetId === interruptingEnemyId;
+}
+
+function getPartyBehaviorModeForIntent(
+  executionIntent: PartyExecutionIntent | null,
+): "idle" | "travel" | "engage" {
+  if (!executionIntent) {
+    return "idle";
+  }
+
+  return executionIntent.type === "attack" ? "engage" : "travel";
 }
 
 function isLiveEnemy(entity: GameEntity | undefined): entity is Enemy {
@@ -245,11 +270,13 @@ function isAvailableResource(entity: GameEntity | undefined): boolean {
   );
 }
 
-function cloneLeaderIntent(leaderIntent: LeaderIntent | null): LeaderIntent | null {
-  return leaderIntent
+function clonePartyExecutionIntent(
+  executionIntent: PartyExecutionIntent | null,
+): PartyExecutionIntent | null {
+  return executionIntent
     ? {
-        ...leaderIntent,
-        targetPosition: clonePosition(leaderIntent.targetPosition),
+        ...executionIntent,
+        targetPosition: clonePosition(executionIntent.targetPosition),
       }
     : null;
 }

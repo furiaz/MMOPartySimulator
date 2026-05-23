@@ -24,6 +24,10 @@ import {
   updateTargetDummyHealthRegen,
 } from "./healthSystem";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
+import {
+  updatePartyIntentRecoverySystem,
+  updatePartyIntentSelfDefenseSystem,
+} from "./partyIntentSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
 import { updateQuestGuideSystem } from "./questGuideSystem";
@@ -46,6 +50,7 @@ import {
   clearExpiredCombatFeedback,
   clearExpiredSkillRuntimeState,
   clearFrameMovementPlanning,
+  getPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -92,12 +97,16 @@ export function updateGame(
     );
   }
 
+  nextState = updatePartyIntentRecoverySystem(nextState);
+
   nextState = updateResurrectionSystem(
     nextState,
     movedEntityIds,
     timing.nowMs,
     timing.deltaMs,
   );
+
+  nextState = updatePartyIntentRecoverySystem(nextState);
 
   nextState = updateTeleportSystem(nextState, movedEntityIds);
 
@@ -120,7 +129,7 @@ export function updateGame(
   resourceWorkContext = createResourceWorkContext(nextState);
 
   const shouldMovePartyTowardPoi =
-    Boolean(nextState.leaderIntent) ||
+    Boolean(getPartyExecutionIntent(nextState)) ||
     nextState.autoModeEnabled ||
     isMapTeleportPoiActive(nextState);
 
@@ -149,6 +158,7 @@ export function updateGame(
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds);
   nextState = updateEnemyAISystem(nextState, timing);
+  nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateAttackSystem(
     nextState,
     movedEntityIds,
@@ -193,7 +203,7 @@ function getUpdateTiming(
 }
 
 function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
-  if (state.leaderIntent || state.activeTeleport) {
+  if (getPartyExecutionIntent(state) || state.activeTeleport) {
     return state;
   }
 

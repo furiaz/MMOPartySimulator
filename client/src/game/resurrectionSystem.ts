@@ -1,5 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCompanionEntity, isLivingCompanion, isLivingEnemy } from "./entityGuards";
+import { getPartyResurrectionRecoveryTargetId } from "./partyIntentSystem";
 import { getGridDistance } from "./positionUtils";
 import {
   getEntityById,
@@ -24,13 +25,21 @@ export function updateResurrectionSystem(
   now: number,
   deltaMs: number,
 ): GameState {
-  let nextState = clearInvalidResurrectionChannels(state, now);
-
-  nextState = assignAvailableResurrectionHelpers(
-    nextState,
+  const recoveryTargetId = getPartyResurrectionRecoveryTargetId(state);
+  let nextState = clearInvalidResurrectionChannels(
+    state,
     now,
-    isPartyInCombat(nextState),
+    recoveryTargetId,
   );
+
+  if (recoveryTargetId) {
+    nextState = assignAvailableResurrectionHelpers(
+      nextState,
+      now,
+      isPartyInCombat(nextState),
+      recoveryTargetId,
+    );
+  }
 
   nextState = moveResurrectionHelpers(nextState, movedEntityIds);
   nextState = progressResurrectionChannels(nextState, now, deltaMs);
@@ -64,11 +73,12 @@ function assignAvailableResurrectionHelpers(
   state: GameState,
   now: number,
   partyInCombat: boolean,
+  recoveryTargetId: string,
 ): GameState {
   let nextState = state;
-  const deadCompanions = getDeadCompanions(nextState);
+  const target = getEntityById(nextState, recoveryTargetId);
 
-  if (deadCompanions.length === 0) {
+  if (!isDeadCompanion(target)) {
     return nextState;
   }
 
@@ -78,12 +88,6 @@ function assignAvailableResurrectionHelpers(
       isCompanionResurrectionChanneling(nextState, helper.id) ||
       (partyInCombat && isCompanionTargetedByEnemy(nextState, helper.id))
     ) {
-      continue;
-    }
-
-    const target = getNearestDeadCompanion(helper, deadCompanions);
-
-    if (!target) {
       continue;
     }
 
@@ -278,6 +282,7 @@ function completeResurrection(
 function clearInvalidResurrectionChannels(
   state: GameState,
   now: number,
+  recoveryTargetId: string | null,
 ): GameState {
   let nextState = state;
 
@@ -288,6 +293,8 @@ function clearInvalidResurrectionChannels(
     if (
       !isLivingCompanion(helper) ||
       helper.commandPriority === "direct" ||
+      !recoveryTargetId ||
+      channel.targetId !== recoveryTargetId ||
       !isDeadCompanion(target)
     ) {
       nextState = removeResurrectionChannel(
@@ -420,22 +427,6 @@ function isPartyInCombat(state: GameState): boolean {
 
 function getLivingCompanions(state: GameState): Companion[] {
   return Object.values(state.entities).filter(isLivingCompanion);
-}
-
-function getDeadCompanions(state: GameState): Companion[] {
-  return Object.values(state.entities).filter(isDeadCompanion);
-}
-
-function getNearestDeadCompanion(
-  helper: Companion,
-  deadCompanions: Companion[],
-): Companion | undefined {
-  return [...deadCompanions].sort(
-    (first, second) =>
-      getGridDistance(helper.position, first.position) -
-        getGridDistance(helper.position, second.position) ||
-      first.id.localeCompare(second.id),
-  )[0];
 }
 
 function isDeadCompanion(entity: GameEntity | undefined): entity is Companion {

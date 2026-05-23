@@ -24,6 +24,14 @@ describe("party orders", () => {
       targetId: resource.id,
       source: "player",
     });
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "player",
+      executionIntent: {
+        type: "gather",
+        targetId: resource.id,
+      },
+    });
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "gather",
       currentTargetId: resource.id,
@@ -91,6 +99,14 @@ describe("party orders", () => {
       targetPosition: { x: 8, y: 0 },
       source: "player",
     });
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "player",
+      executionIntent: {
+        type: "move",
+        targetPosition: { x: 8, y: 0 },
+      },
+    });
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "follow",
       currentTargetId: null,
@@ -127,6 +143,14 @@ describe("party orders", () => {
       },
     );
 
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "engage",
+      source: "player",
+      executionIntent: {
+        type: "attack",
+        targetId: enemy.id,
+      },
+    });
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: enemy.id,

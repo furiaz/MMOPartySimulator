@@ -1064,6 +1064,7 @@ function createInitialState(): GameState {
     simulationTimeMs: 0,
     simulationDeltaMs: 100,
     partyLeaderId: leader.id,
+    partyIntent: null,
     leaderIntent: null,
     quests: createInitialQuestStates(),
     globalPoiIntent: null,

@@ -545,6 +545,45 @@ export type LeaderIntent = {
   source?: "player" | "ai";
 };
 
+export type PartyExecutionIntentType = LeaderIntentType;
+
+export type PartyExecutionIntent = LeaderIntent;
+
+export type PartyBehaviorMode =
+  | "idle"
+  | "travel"
+  | "engage"
+  | "defend"
+  | "regroup"
+  | "resurrect";
+
+export type PartyIntentSource = "player" | "ai";
+
+export type PartyRecoveryAction =
+  | "fight_near_dead_leader"
+  | "resurrect";
+
+export type PartyRecoveryIntent = {
+  action: PartyRecoveryAction;
+  deadCompanionId: string;
+  threatEnemyIds: string[];
+};
+
+export type PartyIntentSnapshot = {
+  executionIntent: PartyExecutionIntent | null;
+  globalPoiIntent: GlobalPoiIntent | null;
+  localPoiTarget: LocalPoiTarget | null;
+  worldTravelTargetMapId: DebugMapId | null;
+  lastPoiDecision?: PoiDecisionState;
+};
+
+export type PartyIntent = PartyIntentSnapshot & {
+  mode: PartyBehaviorMode;
+  source: PartyIntentSource;
+  queuedIntent?: PartyIntentSnapshot | null;
+  recoveryIntent?: PartyRecoveryIntent | null;
+};
+
 export type CombatFeedbackType =
   | "attack"
   | "damage"

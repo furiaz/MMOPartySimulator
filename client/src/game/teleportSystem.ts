@@ -31,8 +31,9 @@ import {
 } from "./debugMap";
 import { hasDeadPartyMembers } from "./partySystem";
 import {
+  getPartyExecutionIntent,
   moveEntityTowardPositionIfUnoccupied,
-  setLeaderIntent,
+  setPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -60,7 +61,7 @@ export function triggerMapTeleport(
     return appendTeleportSkippedEvent(state, "teleport_not_found", teleportId);
   }
 
-  const nextState = setTeleportMoveIntent(state, teleport);
+  const nextState = setTeleportMoveIntent(state, teleport, triggeredBy);
 
   return appendDebugTelemetryEvent(
     {
@@ -91,6 +92,7 @@ export function triggerMapTeleport(
 export function setMapTeleportPoi(
   state: GameState,
   teleportId?: string,
+  triggeredBy: "ai" | "player" = "player",
 ): GameState {
   if (state.activeTeleport) {
     return state;
@@ -98,7 +100,7 @@ export function setMapTeleportPoi(
 
   const teleport = getTeleportForCurrentMap(state, teleportId);
 
-  return teleport ? setTeleportMoveIntent(state, teleport) : state;
+  return teleport ? setTeleportMoveIntent(state, teleport, triggeredBy) : state;
 }
 
 export function updateTeleportSystem(
@@ -110,7 +112,7 @@ export function updateTeleportSystem(
   }
 
   const autoTeleport = getAutoTeleport(state);
-  const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id) : state;
+  const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id, "ai") : state;
   const activatedState = getActivatedTeleportState(poiState);
 
   if (!activatedState.activeTeleport) {
@@ -179,7 +181,7 @@ function shouldPartyMemberTriggerTeleport(
 }
 
 function getTeleportTriggerSource(state: GameState): "ai" | "player" {
-  return state.leaderIntent?.source !== "player" &&
+  return getPartyExecutionIntent(state)?.source !== "player" &&
     state.autoModeEnabled &&
     getLivingEnemies(state).length === 0
     ? "ai"
@@ -188,7 +190,7 @@ function getTeleportTriggerSource(state: GameState): "ai" | "player" {
 
 function isAiTeleportIntent(state: GameState): boolean {
   return (
-    state.leaderIntent?.source !== "player" &&
+    getPartyExecutionIntent(state)?.source !== "player" &&
     state.autoModeEnabled &&
     getLivingEnemies(state).length === 0
   );
@@ -202,17 +204,19 @@ function isAiTeleportPausedForResurrection(state: GameState): boolean {
 }
 
 function getTeleportPoi(state: GameState): DebugTeleportPoint | null {
+  const executionIntent = getPartyExecutionIntent(state);
+
   if (
-    state.leaderIntent?.type !== "move" ||
-    state.leaderIntent.targetId !== null ||
-    !state.leaderIntent.targetPosition
+    executionIntent?.type !== "move" ||
+    executionIntent.targetId !== null ||
+    !executionIntent.targetPosition
   ) {
     return null;
   }
 
   return getCurrentTeleports(state).find(
     (teleport) =>
-      getDistance(state.leaderIntent?.targetPosition ?? teleport.position, teleport.position) <=
+      getDistance(executionIntent.targetPosition ?? teleport.position, teleport.position) <=
       0.001,
   ) ?? null;
 }
@@ -304,6 +308,7 @@ function completeTeleport(state: GameState): GameState {
     map: targetMap,
     hubDepartureFoodWarning,
     activeTeleport: null,
+    partyIntent: null,
     leaderIntent: null,
     interruptedPoiTarget: null,
     localPoiTarget: null,
@@ -476,11 +481,13 @@ function getPreservedCompanions(state: GameState): Record<string, GameEntity> {
 function setTeleportMoveIntent(
   state: GameState,
   teleport: Pick<ActiveTeleport, "position"> | DebugTeleportPoint,
+  source: "ai" | "player" = "ai",
 ): GameState {
-  return setLeaderIntent(state, {
+  return setPartyExecutionIntent(state, {
     type: "move",
     targetId: null,
     targetPosition: teleport.position,
+    source,
   });
 }
 

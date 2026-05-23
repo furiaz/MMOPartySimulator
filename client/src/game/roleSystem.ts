@@ -3,6 +3,7 @@ import { isWithinFollowLeash } from "./followSystem";
 import {
   getFollowTrailPosition,
   getEntityById,
+  getPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -224,7 +225,7 @@ export function getDefenderAnchorPosition(
   const followTarget = getPartyLeader(state) ?? state.entities[companion.followTargetId];
 
   if (followTarget && isPartyMember(followTarget)) {
-    return getLeaderIntentAnchorPosition(state, companion, followTarget);
+    return getPartyExecutionIntentAnchorPosition(state, companion, followTarget);
   }
 
   return (
@@ -256,7 +257,7 @@ export function getLeaderEnemyTarget(
     return undefined;
   }
 
-  const targetId = state.leaderIntent?.targetId;
+  const targetId = getPartyExecutionIntent(state)?.targetId;
 
   if (!targetId) {
     return undefined;
@@ -352,14 +353,17 @@ function isPartyEntityForLeader(entity: GameEntity, leaderId: string): boolean {
   return isPartyMember(entity) && (entity.id === leaderId || entity.state !== "dead");
 }
 
-function getLeaderIntentAnchorPosition(
+function getPartyExecutionIntentAnchorPosition(
   state: GameState,
   companion: Companion,
   leader: PartyMember,
 ): Position {
-  const leaderIntent = getLeaderIntentPosition(state, leader);
+  const partyIntentPosition = getPartyExecutionIntentPosition(state, leader);
   const movementDirection = getLeaderMovementDirection(state, leader);
-  const targetPosition = getResolvedLeaderIntentTargetPosition(state, leader);
+  const targetPosition = getResolvedPartyExecutionIntentTargetPosition(
+    state,
+    leader,
+  );
   const defenderOffset = getDefenderSideOffset(
     state,
     companion,
@@ -368,12 +372,12 @@ function getLeaderIntentAnchorPosition(
   );
 
   return {
-    x: leaderIntent.x + defenderOffset.x,
-    y: leaderIntent.y + defenderOffset.y,
+    x: partyIntentPosition.x + defenderOffset.x,
+    y: partyIntentPosition.y + defenderOffset.y,
   };
 }
 
-export function getLeaderIntentPosition(
+export function getPartyExecutionIntentPosition(
   state: GameState,
   leader: PartyMember,
 ): Position {
@@ -389,7 +393,10 @@ export function getLeaderMovementDirection(
   state: GameState,
   leader: PartyMember,
 ): Position {
-  const targetPosition = getResolvedLeaderIntentTargetPosition(state, leader);
+  const targetPosition = getResolvedPartyExecutionIntentTargetPosition(
+    state,
+    leader,
+  );
 
   if (targetPosition) {
     const xDirection = Math.sign(targetPosition.x - leader.position.x);
@@ -418,7 +425,7 @@ export function getLeaderMovementDirection(
   };
 }
 
-export function getResolvedLeaderIntentTargetPosition(
+export function getResolvedPartyExecutionIntentTargetPosition(
   state: GameState,
   leader?: PartyMember,
 ): Position | null {
@@ -430,21 +437,21 @@ export function getResolvedLeaderIntentTargetPosition(
     return currentTarget.position;
   }
 
-  const leaderIntent = state.leaderIntent;
+  const executionIntent = getPartyExecutionIntent(state);
 
-  if (!leaderIntent) {
+  if (!executionIntent) {
     return null;
   }
 
-  const target = leaderIntent.targetId
-    ? state.entities[leaderIntent.targetId]
+  const target = executionIntent.targetId
+    ? state.entities[executionIntent.targetId]
     : undefined;
 
   if (target && target.state !== "dead") {
     return target.position;
   }
 
-  return leaderIntent.targetPosition;
+  return executionIntent.targetPosition;
 }
 
 function getDefenderSideOffset(
