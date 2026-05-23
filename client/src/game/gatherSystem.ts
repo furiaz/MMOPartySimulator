@@ -2,45 +2,30 @@ import {
   gatherResource,
   isAutonomousEntity,
   isCombatEntity,
-  isResourceEntity,
   setLastGatherAt,
 } from "./entities";
-import {
-  getEnemyAggroRange,
-  getEnemyAttackLeashDistance,
-} from "./enemyAISystem";
+import { isActiveResource } from "./entityGuards";
+import { getEnemyAttackLeashDistance } from "./enemyAISystem";
 import { getEnemyTemperament } from "./enemyArchetypes";
 import {
   addCombatFeedback,
   ENTITY_COLLISION_DISTANCE,
   getBoundedPathDistance,
   getEntityById,
-  hasDirectPlayerLeaderIntent,
   moveEntityTowardIfUnoccupied,
-  setLeaderIntent,
   updateEntity,
   type GameState,
 } from "./state";
 import { addItemToInventoryState } from "./inventory";
-import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import { getItemDefinitionForResourceType } from "./items";
-import { isPartyMember } from "./partySystem";
 import { recordResourceGatheredForQuests } from "./questSystem";
 import { ROLE_TUNING } from "./roleProfiles";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import {
-  createGathererResourceReservations,
-  findAllowedGathererResourceTarget,
   isWithinGathererLeaderBoundary,
-  type GathererResourceReservations,
-  type ResourceWorkContext,
 } from "./gathererResourceReservation";
-import {
-  getActiveQuestGuide,
-  QUEST_GUIDE_ESCORT_RANGE,
-} from "./questGuideSystem";
 import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
@@ -51,14 +36,9 @@ export function updateGatherSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
   now = Date.now(),
-  resourceWorkContext?: ResourceWorkContext,
 ): GameState {
   let nextState = state;
   const allowedGathererIdsByResource = getAllowedGathererIdsByResource(state);
-  const gathererReservations = createGathererResourceReservations(
-    state,
-    resourceWorkContext,
-  );
 
   for (const entity of Object.values(state.entities)) {
     const gatherer = getEntityById(nextState, entity.id);
@@ -83,18 +63,9 @@ export function updateGatherSystem(
       continue;
     }
 
-    const partyDefenseInterrupt = interruptNonGathererForPartyDefense(
-      nextState,
-      gatherer,
-    );
-    if (partyDefenseInterrupt.interrupted) {
-      nextState = partyDefenseInterrupt.state;
-      continue;
-    }
-
     const resource = getEntityById(nextState, gatherer.currentTargetId);
 
-    if (!isResourceEntity(resource) || resource.isDepleted) {
+    if (!isActiveResource(resource)) {
       nextState = updateEntity(nextState, switchToFollow(gatherer));
       continue;
     }
@@ -130,20 +101,15 @@ export function updateGatherSystem(
       continue;
     }
 
-    const shouldStayFocusedOnResource = shouldAutonomousGathererStayFocusedOnResource(
-      nextState,
-      gatherer,
-      resource,
-      gathererReservations,
-      resourceWorkContext,
-    );
-    const preGatherAggro = interruptGathererForEnemyAggro(
-      nextState,
-      gatherer,
-      shouldStayFocusedOnResource,
-    );
-    if (preGatherAggro.interrupted) {
-      nextState = preGatherAggro.state;
+    const selfDefenseThreat = findGathererSelfDefenseThreat(nextState, gatherer);
+
+    if (selfDefenseThreat) {
+      nextState = updateEntity(nextState, {
+        ...gatherer,
+        state: "attack",
+        currentTargetId: selfDefenseThreat.id,
+        commandPriority: "autonomous",
+      });
       continue;
     }
 
@@ -162,13 +128,18 @@ export function updateGatherSystem(
         const movedGatherer = getEntityById(nextState, gatherer.id);
 
         if (movedGatherer && isGatheringEntity(movedGatherer)) {
-          const postMoveAggro = interruptGathererForEnemyAggro(
+          const postMoveThreat = findGathererSelfDefenseThreat(
             nextState,
             movedGatherer,
-            shouldStayFocusedOnResource,
           );
-          if (postMoveAggro.interrupted) {
-            nextState = postMoveAggro.state;
+
+          if (postMoveThreat) {
+            nextState = updateEntity(nextState, {
+              ...movedGatherer,
+              state: "attack",
+              currentTargetId: postMoveThreat.id,
+              commandPriority: "autonomous",
+            });
           }
         }
       }
@@ -240,75 +211,15 @@ export function updateGatherSystem(
   return nextState;
 }
 
-function interruptNonGathererForPartyDefense(
+function findGathererSelfDefenseThreat(
   state: GameState,
   gatherer: AutonomousEntity,
-): { state: GameState; interrupted: boolean } {
-  if (
-    gatherer.kind !== "companion" ||
-    gatherer.role === "gatherer" ||
-    gatherer.commandPriority !== "autonomous" ||
-    hasDirectPlayerLeaderIntent(state)
-  ) {
-    return { state, interrupted: false };
-  }
-
-  const threat = findPartyDefenseThreat(state, gatherer.id);
-
-  if (!threat) {
-    return { state, interrupted: false };
-  }
-
-  const defenseState = setLeaderIntent(captureInterruptedPoiTarget(state, threat), {
-    type: "attack",
-    targetId: threat.id,
-    targetPosition: threat.position,
-  });
-
-  return {
-    state: updateEntity(defenseState, {
-      ...gatherer,
-      state: "attack",
-      currentTargetId: threat.id,
-      commandPriority: "autonomous",
-    }),
-    interrupted: true,
-  };
-}
-
-function interruptGathererForEnemyAggro(
-  state: GameState,
-  gatherer: AutonomousEntity,
-  shouldStayFocusedOnResource = false,
-): { state: GameState; interrupted: boolean } {
+): Enemy | null {
   if (gatherer.kind !== "companion") {
-    return { state, interrupted: false };
+    return null;
   }
 
-  if (shouldStayFocusedOnResource) {
-    return { state, interrupted: false };
-  }
-
-  const threat = findGathererAggroThreat(state, gatherer);
-
-  if (!threat) {
-    return { state, interrupted: false };
-  }
-
-  const attackingEnemy: Enemy = {
-    ...threat,
-    state: "attack",
-    currentTargetId: gatherer.id,
-    targetDecisionReason: "closest",
-    roamTargetPosition: null,
-    roamMoveUntil: undefined,
-  };
-  const aggroState = updateEntity(state, attackingEnemy);
-
-  return {
-    state: aggroState,
-    interrupted: false,
-  };
+  return findEnemyAttackingGatherer(state, gatherer);
 }
 
 function getPlayerIntentOverride(
@@ -346,7 +257,7 @@ function getPlayerIntentOverride(
   return switchToFollow(gatherer);
 }
 
-function findGathererAggroThreat(
+function findEnemyAttackingGatherer(
   state: GameState,
   gatherer: AutonomousEntity,
 ): Enemy | null {
@@ -358,10 +269,9 @@ function findGathererAggroThreat(
       continue;
     }
 
-    const detectionRange = getEnemyAggroRange(entity);
-
     if (
-      getDistanceSquared(entity.position, gatherer.position) > detectionRange * detectionRange ||
+      entity.state !== "attack" ||
+      entity.currentTargetId !== gatherer.id ||
       getDistance(entity.homePosition, gatherer.position) > getEnemyAttackLeashDistance()
     ) {
       continue;
@@ -376,52 +286,6 @@ function findGathererAggroThreat(
   }
 
   return closestThreat;
-}
-
-function findPartyDefenseThreat(
-  state: GameState,
-  preferredTargetId: string,
-): Enemy | null {
-  let fallbackThreat: Enemy | null = null;
-
-  for (const entity of Object.values(state.entities)) {
-    if (
-      !isLiveEnemyAttackingParty(entity, state) ||
-      !isRelevantGuideEscortThreat(state, entity)
-    ) {
-      continue;
-    }
-
-    if (entity.currentTargetId === preferredTargetId) {
-      return entity;
-    }
-
-    fallbackThreat ??= entity;
-  }
-
-  return fallbackThreat;
-}
-
-function isLiveEnemyAttackingParty(
-  entity: GameEntity,
-  state: GameState,
-): entity is Enemy {
-  return (
-    entity.kind === "enemy" &&
-    isCombatEntity(entity) &&
-    entity.state === "attack" &&
-    entity.health > 0 &&
-    Boolean(entity.currentTargetId && isPartyMember(state.entities[entity.currentTargetId]))
-  );
-}
-
-function isRelevantGuideEscortThreat(state: GameState, enemy: Enemy): boolean {
-  const guide = getActiveQuestGuide(state);
-
-  return (
-    !guide ||
-    getDistance(enemy.position, guide.position) <= QUEST_GUIDE_ESCORT_RANGE
-  );
 }
 
 function isLiveAggressiveEnemy(entity: GameEntity): entity is Enemy {
@@ -470,29 +334,6 @@ function isCommittedGatherer(entity: AutonomousEntity): boolean {
   );
 }
 
-function shouldAutonomousGathererStayFocusedOnResource(
-  state: GameState,
-  gatherer: AutonomousEntity,
-  resource: ResourceEntity,
-  gathererReservations: GathererResourceReservations,
-  resourceWorkContext?: ResourceWorkContext,
-): boolean {
-  if (
-    gatherer.kind !== "companion" ||
-    gatherer.role !== "gatherer" ||
-    gatherer.commandPriority !== "autonomous" ||
-    gatherer.currentTargetId !== resource.id
-  ) {
-    return false;
-  }
-
-  return (
-    gathererReservations.resourceIdByGathererId.get(gatherer.id) === resource.id ||
-    findAllowedGathererResourceTarget(state, gatherer, resourceWorkContext)?.id ===
-      resource.id
-  );
-}
-
 function getAllowedGathererIdsByResource(
   state: GameState,
 ): Map<string, Set<string>> {
@@ -506,7 +347,7 @@ function getAllowedGathererIdsByResource(
 
     const resource = getEntityById(state, entity.currentTargetId);
 
-    if (!isResourceEntity(resource) || resource.isDepleted) {
+    if (!isActiveResource(resource)) {
       continue;
     }
 

@@ -1,5 +1,5 @@
-import { isCombatEntity, isResourceEntity } from "./entities";
-import { isTargetDummyEnemy } from "./entityGuards";
+import { isCombatEntity } from "./entities";
+import { isActiveResource, isTargetDummyEnemy } from "./entityGuards";
 import { getBoundedNavigationDistance, type GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
@@ -96,7 +96,7 @@ function isValidEnemyTarget(entity: GameEntity): entity is Enemy {
 }
 
 function isValidResourceTarget(entity: GameEntity): entity is ResourceEntity {
-  return isResourceEntity(entity) && !entity.isDepleted && entity.quantity > 0;
+  return isActiveResource(entity);
 }
 
 function isEnemyEngagedWithParty(state: GameState, enemy: Enemy): boolean {

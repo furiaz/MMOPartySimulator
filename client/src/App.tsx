@@ -88,6 +88,7 @@ import {
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
   issuePartyOrder,
+  isActiveResource,
   isMerchantUnlockedForQuests,
   isMerchantNpc,
   quickExchangeParts,
@@ -1599,7 +1600,7 @@ function App() {
       : activeQuestIds[0] ?? null;
   const questGiverHasWork = hasQuestGiverWork(gameState);
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
-  const targetResource = resources.find((resource) => !resource.isDepleted);
+  const targetResource = resources.find(isActiveResource);
   const inventory = gameState.inventory;
   const activeTeleport = gameState.activeTeleport;
   const activeMerchant =

@@ -1,5 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
+import { getEnemyTemperament } from "./enemyArchetypes";
+import { isActiveResource } from "./entityGuards";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
   getPartyLeader,
@@ -8,10 +10,7 @@ import {
   isPartyMember,
   type PartyMember,
 } from "./partySystem";
-import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
-  getActiveQuestGuide,
-  QUEST_GUIDE_ESCORT_RANGE,
   QUEST_GUIDE_OBJECTIVE_ID,
   isQuestGuideObjectiveRelevant,
 } from "./questGuideSystem";
@@ -46,7 +45,6 @@ type PartyPlan = {
   phase: FormationPhase;
   target: Enemy | null;
   targetPosition: Position | null;
-  isAggroInterruption: boolean;
 };
 
 type PartyTravelCohesion = {
@@ -69,15 +67,23 @@ export function updatePartyFormationSystem(
     return clearFormation(state);
   }
 
+  const gatherIntentClearedState = clearStaleGatherLeaderIntent(state, leader);
+
+  if (gatherIntentClearedState !== state) {
+    return gatherIntentClearedState;
+  }
+
+  if (isGathererSelfDefenseTarget(state, leader)) {
+    return state;
+  }
+
   const plan = getPartyPlan(state, leader);
 
   if (!plan.targetPosition) {
     return clearFinishedCombat(clearFormation(state));
   }
 
-  let nextState = plan.isAggroInterruption && plan.target
-    ? captureInterruptedPoiTarget(state, plan.target)
-    : state;
+  let nextState = state;
 
   nextState = setFormationState(nextState, plan);
 
@@ -124,14 +130,12 @@ function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
         intentTarget?.position ??
         state.leaderIntent?.targetPosition ??
         null,
-      isAggroInterruption: false,
     };
   }
 
-  const aggroTarget = getPartyAggroTarget(state);
   const intentTarget = getIntentEnemyTarget(state);
   const leaderTarget = getLeaderEnemyTarget(state, leader);
-  const target = aggroTarget ?? intentTarget ?? leaderTarget;
+  const target = intentTarget ?? leaderTarget;
   const targetPosition =
     target?.position ??
     state.leaderIntent?.targetPosition ??
@@ -145,7 +149,6 @@ function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
     phase,
     target,
     targetPosition,
-    isAggroInterruption: Boolean(aggroTarget),
   };
 }
 
@@ -168,7 +171,11 @@ function assignPartyTravelTargets(
 
   const currentLeader = getEntityById(nextState, leader.id);
 
-  if (currentLeader && isPartyMember(currentLeader)) {
+  if (
+    currentLeader &&
+    isPartyMember(currentLeader) &&
+    !isGathererSelfDefenseTarget(nextState, currentLeader)
+  ) {
     nextState = updateEntity(nextState, {
       ...currentLeader,
       state: isGatherIntent ? "gather" : "follow",
@@ -190,6 +197,7 @@ function assignPartyTravelTargets(
     if (
       member.id === leader.id ||
       member.commandPriority === "direct" ||
+      isGathererSelfDefenseTarget(nextState, member) ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
       (!hasPlayerIntent && isGathererBusy(nextState, member))
     ) {
@@ -220,6 +228,7 @@ function assignPartyGatherTarget(
   for (const member of getPartyMembers(nextState)) {
     if (
       member.commandPriority === "direct" ||
+      isGathererSelfDefenseTarget(nextState, member) ||
       isCompanionResurrectionChanneling(nextState, member.id)
     ) {
       continue;
@@ -229,6 +238,69 @@ function assignPartyGatherTarget(
       ...member,
       state: "gather",
       currentTargetId: targetId,
+      commandPriority: "autonomous",
+    });
+  }
+
+  return nextState;
+}
+
+function isGathererSelfDefenseTarget(
+  state: GameState,
+  partyMember: PartyMember,
+): boolean {
+  if (
+    partyMember.role !== "gatherer" ||
+    partyMember.state !== "attack" ||
+    !partyMember.currentTargetId
+  ) {
+    return false;
+  }
+
+  const target = getEntityById(state, partyMember.currentTargetId);
+
+  if (!target || target.kind !== "enemy" || !isCombatEntity(target)) {
+    return false;
+  }
+
+  return (
+    target.state === "attack" &&
+    target.health > 0 &&
+    target.currentTargetId === partyMember.id &&
+    getEnemyTemperament(target) === "aggressive"
+  );
+}
+
+function clearStaleGatherLeaderIntent(
+  state: GameState,
+  leader: PartyMember,
+): GameState {
+  if (state.leaderIntent?.type !== "gather" || !state.leaderIntent.targetId) {
+    return state;
+  }
+
+  const targetId = state.leaderIntent.targetId;
+
+  if (isActiveResource(getEntityById(state, targetId))) {
+    return state;
+  }
+
+  let nextState = setLeaderIntent(clearFormation(state), null);
+
+  for (const member of getPartyMembers(nextState)) {
+    if (
+      member.commandPriority === "direct" ||
+      isCompanionResurrectionChanneling(nextState, member.id) ||
+      member.state !== "gather" ||
+      member.currentTargetId !== targetId
+    ) {
+      continue;
+    }
+
+    nextState = updateEntity(nextState, {
+      ...member,
+      state: "follow",
+      currentTargetId: member.id === leader.id ? null : leader.id,
       commandPriority: "autonomous",
     });
   }
@@ -325,6 +397,7 @@ function moveFollowersTowardLeader(
       member.id === leader.id ||
       member.commandPriority === "direct" ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
+      isGathererSelfDefenseTarget(nextState, member) ||
       isGathererBusy(nextState, member) ||
       movedEntityIds.has(member.id)
     ) {
@@ -489,7 +562,8 @@ function isRequiredForTravelCohesion(
 ): boolean {
   if (
     member.commandPriority === "direct" ||
-    isCompanionResurrectionChanneling(state, member.id)
+    isCompanionResurrectionChanneling(state, member.id) ||
+    isGathererSelfDefenseTarget(state, member)
   ) {
     return false;
   }
@@ -594,34 +668,6 @@ function createIdleFormation(): PartyFormationState {
     slotReasonsByEntityId: {},
     skippedTargetIds: [],
   };
-}
-
-function getPartyAggroTarget(state: GameState): Enemy | null {
-  const guide = getActiveQuestGuide(state);
-
-  for (const enemy of Object.values(state.entities)) {
-    if (!isLiveEnemy(enemy) || enemy.state !== "attack" || !enemy.currentTargetId) {
-      continue;
-    }
-
-    const target = state.entities[enemy.currentTargetId];
-
-    if (
-      isPartyMember(target) &&
-      (!guide || isRelevantGuideEscortThreat(enemy, guide.position))
-    ) {
-      return enemy;
-    }
-  }
-
-  return null;
-}
-
-function isRelevantGuideEscortThreat(
-  enemy: Enemy,
-  guidePosition: Position,
-): boolean {
-  return getDistance(enemy.position, guidePosition) <= QUEST_GUIDE_ESCORT_RANGE;
 }
 
 function getIntentEnemyTarget(state: GameState): Enemy | null {

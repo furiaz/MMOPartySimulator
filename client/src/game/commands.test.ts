@@ -36,6 +36,32 @@ describe("party orders", () => {
     });
   });
 
+  it.each([
+    [
+      "depleted",
+      createResource("depleted-wood", { x: 4, y: 0 }, { quantity: 0 }),
+    ],
+    [
+      "stale zero-quantity",
+      {
+        ...createResource("stale-wood", { x: 4, y: 0 }, { quantity: 0 }),
+        isDepleted: false,
+      },
+    ],
+  ])("ignores party gather orders for %s resources", (_label, resource) => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader");
+    const fighter = createCompanion("fighter", { x: 1, y: 0 }, leader.id, "fighter");
+    const state = createState([leader, fighter, resource], leader.id);
+
+    const nextState = issuePartyOrder(state, {
+      type: "gather",
+      targetId: resource.id,
+    });
+
+    expect(nextState).toBe(state);
+    expect(nextState.leaderIntent).toBeNull();
+  });
+
   it("lets a later party move reclaim companions from a previous party gather", () => {
     const leader = {
       ...createCompanion("leader", { x: 0, y: 0 }, "leader"),

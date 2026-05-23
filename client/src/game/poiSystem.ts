@@ -1,4 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { isCombatEntity } from "./entities";
+import { getEnemyTemperament } from "./enemyArchetypes";
 import { isTargetDummyEnemy } from "./entityGuards";
 import {
   debugMapDefinitions,
@@ -49,6 +51,7 @@ import {
 import type { PointOfInterest, PoiCategory, PoiMapType } from "./poiTypes";
 import type {
   DebugMapId,
+  Companion,
   DebugTeleportPoint,
   Position,
   ResourceEntity,
@@ -1770,6 +1773,10 @@ function applyLocalTargetToLeaderIntent(
     return nextState;
   }
 
+  if (isGathererSelfDefenseTarget(nextState, currentLeader)) {
+    return nextState;
+  }
+
   return updateEntity(nextState, {
     ...currentLeader,
     state: localTarget.category === "combat" ? "attack" : "follow",
@@ -1779,6 +1786,32 @@ function applyLocalTargetToLeaderIntent(
         : null,
     commandPriority: "autonomous",
   });
+}
+
+function isGathererSelfDefenseTarget(
+  state: GameState,
+  companion: Companion,
+): boolean {
+  if (
+    companion.role !== "gatherer" ||
+    companion.state !== "attack" ||
+    !companion.currentTargetId
+  ) {
+    return false;
+  }
+
+  const target = getEntityById(state, companion.currentTargetId);
+
+  if (!target || target.kind !== "enemy" || !isCombatEntity(target)) {
+    return false;
+  }
+
+  return (
+    target.state === "attack" &&
+    target.health > 0 &&
+    target.currentTargetId === companion.id &&
+    getEnemyTemperament(target) === "aggressive"
+  );
 }
 
 function getLeaderIntentType(category: PoiCategory): "attack" | "move" | "gather" | "explore" {

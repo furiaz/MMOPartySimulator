@@ -184,6 +184,10 @@ export function createResource(
     resourceType = DEFAULT_RESOURCE_TYPE,
     tier = 1,
   } = options;
+  const resourceQuantity = Math.max(0, quantity);
+  const resourceMaxDurability = Math.max(0, maxDurability);
+  const resourceDurability =
+    resourceQuantity <= 0 ? 0 : Math.max(0, durability);
 
   return {
     id,
@@ -192,11 +196,11 @@ export function createResource(
     tier,
     position,
     state: "idle",
-    durability,
-    maxDurability,
-    quantity,
+    durability: resourceDurability,
+    maxDurability: resourceMaxDurability,
+    quantity: resourceQuantity,
     maxGatherers,
-    isDepleted: false,
+    isDepleted: resourceQuantity <= 0,
   };
 }
 
@@ -275,20 +279,33 @@ export function gatherResource(
   resource: ResourceEntity,
   gatherAmount: number,
 ): ResourceEntity {
-  const durability = Math.max(0, resource.durability - gatherAmount);
+  const currentQuantity = Math.max(0, resource.quantity);
+
+  if (currentQuantity <= 0 || resource.isDepleted) {
+    return {
+      ...resource,
+      durability: 0,
+      quantity: 0,
+      isDepleted: true,
+    };
+  }
+
+  const durability = Math.max(0, resource.durability - Math.max(0, gatherAmount));
 
   if (durability > 0) {
     return {
       ...resource,
       durability,
+      quantity: currentQuantity,
+      isDepleted: false,
     };
   }
 
-  const quantity = Math.max(0, resource.quantity - 1);
+  const quantity = Math.max(0, currentQuantity - 1);
 
   return {
     ...resource,
-    durability: quantity > 0 ? resource.maxDurability : 0,
+    durability: quantity > 0 ? Math.max(0, resource.maxDurability) : 0,
     quantity,
     isDepleted: quantity <= 0,
   };

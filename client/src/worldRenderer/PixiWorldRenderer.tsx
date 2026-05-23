@@ -26,6 +26,7 @@ import type {
 import {
   getEnemyAggroRange,
   getItemDefinition,
+  isActiveResource,
   QUEST_GIVER_POI_ID,
   SKILL_DEFINITIONS,
 } from "../game";
@@ -823,10 +824,14 @@ function isInteractableEntity(entity: GameEntity): entity is InteractableEntity 
   }
 
   if (entity.kind === "resource") {
-    return !entity.isDepleted;
+    return isActiveResource(entity);
   }
 
   return entity.kind === "npc";
+}
+
+function shouldRenderEntity(entity: GameEntity): boolean {
+  return entity.kind !== "resource" || isActiveResource(entity);
 }
 
 function getNearestInteractableEntity({
@@ -2715,7 +2720,10 @@ function drawFullEntities({
   );
 
   for (const entity of sortedByY) {
-    if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
+    if (
+      !shouldRenderEntity(entity) ||
+      !isPositionInTileBounds(entity.position, visibleTileBounds)
+    ) {
       continue;
     }
 
@@ -2954,6 +2962,10 @@ function drawPreviewMap(
   }
 
   for (const entity of entities) {
+    if (!shouldRenderEntity(entity)) {
+      continue;
+    }
+
     const entityPosition = toPreviewPosition(entity.position, transform);
 
     graphics

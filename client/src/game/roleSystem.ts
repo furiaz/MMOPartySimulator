@@ -1,4 +1,5 @@
 import { isCombatEntity } from "./entities";
+import { getEnemyTemperament } from "./enemyArchetypes";
 import { isWithinFollowLeash } from "./followSystem";
 import {
   getFollowTrailPosition,
@@ -134,6 +135,10 @@ function getRoleTarget(
   }
 
   if (partyMember.role === "gatherer") {
+    if (isGathererSelfDefenseTarget(state, partyMember)) {
+      return null;
+    }
+
     if (leader && !isWithinGathererLeaderBoundary(state, partyMember, leader)) {
       return getFollowTarget(partyMember, leader);
     }
@@ -206,6 +211,24 @@ function getFollowTarget(
     state: "follow",
     targetId: partyMember.id === leader.id ? null : leader.id,
   };
+}
+
+function isGathererSelfDefenseTarget(
+  state: GameState,
+  partyMember: PartyMember,
+): boolean {
+  if (partyMember.state !== "attack" || !partyMember.currentTargetId) {
+    return false;
+  }
+
+  const target = state.entities[partyMember.currentTargetId];
+
+  return (
+    isValidEnemyTarget(target) &&
+    target.state === "attack" &&
+    target.currentTargetId === partyMember.id &&
+    getEnemyTemperament(target) === "aggressive"
+  );
 }
 
 export function getDefenderAnchorPosition(

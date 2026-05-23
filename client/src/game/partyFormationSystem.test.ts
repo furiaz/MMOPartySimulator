@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, getMovementStepDistance } from "./entities";
+import { createCompanion, createResource, getMovementStepDistance } from "./entities";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { createTestGameState } from "./testState";
 
@@ -245,5 +245,49 @@ describe("party formation real-time cohesion", () => {
 
     expect(nextState.entities[leader.id].position.x).toBeGreaterThan(0);
     expect(nextState.leaderHandoffRemainingMs).toBe(0);
+  });
+
+  it("clears stale gather intent instead of reassigning a depleted resource", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter"),
+      state: "gather" as const,
+      currentTargetId: "stale-resource",
+    };
+    const follower = {
+      ...createCompanion("follower", { x: 1, y: 0 }, leader.id, "support"),
+      state: "gather" as const,
+      currentTargetId: "stale-resource",
+    };
+    const staleResource = {
+      ...createResource("stale-resource", { x: 4, y: 0 }, { quantity: 0 }),
+      isDepleted: false,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [follower.id]: follower,
+        [staleResource.id]: staleResource,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "gather",
+        targetId: staleResource.id,
+        targetPosition: staleResource.position,
+        source: "player",
+      },
+      simulationDeltaMs: 100,
+    });
+
+    const nextState = updatePartyFormationSystem(state);
+
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: null,
+    });
+    expect(nextState.entities[follower.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
   });
 });

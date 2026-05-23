@@ -26,13 +26,11 @@ import {
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
-import { isTargetDummyEnemy } from "./entityGuards";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
 const DEFENDER_CATCH_UP_SPEED_MULTIPLIER = 2;
 const DEFENDER_ATTACK_RANGE = 1;
-const DEFENDER_GUARD_RADIUS = 3;
 const DEFENDER_MAX_LEADER_DISTANCE = 4;
 const DEFENDER_INTERCEPT_READY_DISTANCE = 1;
 const DEFENDER_LEADER_WAIT_MS = 300;
@@ -85,10 +83,8 @@ export function updateDefendSystem(
           preferredDefendPosition,
         )
       : null;
-    const targetAnchorPosition =
-      defendPosition ?? leader?.position ?? defender.position;
     const target = leader
-      ? getDefenderTarget(nextState, defender, leader, targetAnchorPosition)
+      ? getDefenderTarget(nextState, leader)
       : undefined;
     const shouldWaitForIntercept =
       target &&
@@ -293,9 +289,7 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
 
 function getDefenderTarget(
   state: GameState,
-  defender: Companion,
   leader: GameEntity,
-  defendPosition: Position,
 ): Enemy | undefined {
   const leaderTarget = getLeaderEnemyTarget(state, leader);
 
@@ -303,26 +297,7 @@ function getDefenderTarget(
     return leaderTarget;
   }
 
-  const enemyAttackingLeader = Object.values(state.entities).find(
-    (entity): entity is Enemy =>
-      isLiveEnemy(entity) &&
-      isRelevantGuideEscortThreat(state, entity) &&
-      entity.state === "attack" &&
-      entity.currentTargetId === leader.id &&
-      getGridDistance(entity.position, leader.position) <=
-        DEFENDER_MAX_LEADER_DISTANCE,
-  );
-
-  if (enemyAttackingLeader) {
-    return enemyAttackingLeader;
-  }
-
-  return Object.values(state.entities).find(
-    (entity): entity is Enemy =>
-      isLiveEnemy(entity) &&
-      isRelevantGuideEscortThreat(state, entity) &&
-      isEnemyRelevantToGuard(defender, leader, defendPosition, entity),
-  );
+  return undefined;
 }
 
 function isRelevantGuideEscortThreat(
@@ -334,30 +309,6 @@ function isRelevantGuideEscortThreat(
   return (
     !guide ||
     getGridDistance(enemy.position, guide.position) <= QUEST_GUIDE_ESCORT_RANGE
-  );
-}
-
-function isEnemyRelevantToGuard(
-  defender: Companion,
-  leader: GameEntity,
-  defendPosition: Position,
-  enemy: Enemy,
-): boolean {
-  return (
-    getGridDistance(enemy.position, defender.position) <=
-      DEFENDER_GUARD_RADIUS ||
-    getGridDistance(enemy.position, leader.position) <=
-      DEFENDER_GUARD_RADIUS ||
-    getGridDistance(enemy.position, defendPosition) <= DEFENDER_GUARD_RADIUS
-  );
-}
-
-function isLiveEnemy(entity: GameEntity | undefined): entity is Enemy {
-  return (
-    entity?.kind === "enemy" &&
-    !isTargetDummyEnemy(entity) &&
-    entity.state !== "dead" &&
-    entity.health > 0
   );
 }
 

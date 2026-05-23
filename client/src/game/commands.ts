@@ -1,4 +1,5 @@
 import { isAutonomousEntity } from "./entities";
+import { isActiveResource } from "./entityGuards";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
@@ -181,8 +182,12 @@ export function issuePartyOrder(
     return state;
   }
 
-  if (order.type !== "move" && !getEntityById(state, order.targetId)) {
-    return state;
+  if (order.type !== "move") {
+    const target = getEntityById(state, order.targetId);
+
+    if (!target || (order.type === "gather" && !isActiveResource(target))) {
+      return state;
+    }
   }
 
   let nextState = setLeaderIntent(state, getPlayerLeaderIntent(state, order));

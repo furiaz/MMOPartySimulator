@@ -164,7 +164,6 @@ export function updateGame(
     nextState,
     movedEntityIds,
     timing.nowMs,
-    resourceWorkContext,
   );
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);

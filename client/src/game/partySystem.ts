@@ -1,10 +1,10 @@
 import { getEntityById, updateEntity, type GameState } from "./state";
 import { getRolePriority } from "./roleProfiles";
+import { isActiveResource } from "./entityGuards";
 import type {
   Companion,
   GameEntity,
   PartyMemberRole,
-  ResourceEntity,
 } from "./types";
 
 export type PartyMember = Companion;
@@ -121,12 +121,3 @@ function comparePartyMembers(a: PartyMember, b: PartyMember): number {
   );
 }
 
-function isActiveResource(
-  entity: GameEntity | undefined,
-): entity is ResourceEntity {
-  return (
-    entity?.kind === "resource" &&
-    !entity.isDepleted &&
-    entity.quantity > 0
-  );
-}

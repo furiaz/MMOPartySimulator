@@ -10,7 +10,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
+import { isGathererBusy, isPartyMember } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
 
@@ -28,7 +28,9 @@ export function protectPartyMember(
   }
 
   if (hasDirectPlayerLeaderIntent(state)) {
-    return state;
+    return canSelfDefendDuringInteraction(state, attackedMember)
+      ? updateSelfDefenseTarget(state, attackedMember, attacker)
+      : state;
   }
 
   let nextState = setLeaderIntent(captureInterruptedPoiTarget(state, attacker), {
@@ -38,7 +40,7 @@ export function protectPartyMember(
   });
 
   for (const entity of Object.values(state.entities)) {
-    if (!canProtectPartyMember(state, entity, attackedMember, attacker)) {
+    if (!canProtectPartyMember(state, entity, attackedMember)) {
       continue;
     }
 
@@ -72,17 +74,94 @@ function isRelevantGuideEscortAttack(
   );
 }
 
+function canSelfDefendDuringInteraction(
+  state: GameState,
+  attackedMember: AutonomousEntity,
+): boolean {
+  if (!isPartyMember(attackedMember)) {
+    return false;
+  }
+
+  return (
+    isPlayerGatherIntent(state) ||
+    isPlayerNpcInteractionIntent(state) ||
+    isResourceInteraction(state, attackedMember)
+  );
+}
+
+function isPlayerGatherIntent(state: GameState): boolean {
+  return (
+    state.leaderIntent?.source === "player" &&
+    state.leaderIntent.type === "gather"
+  );
+}
+
+function isPlayerNpcInteractionIntent(state: GameState): boolean {
+  const intent = state.leaderIntent;
+
+  if (
+    intent?.source !== "player" ||
+    intent.type !== "move" ||
+    !intent.targetPosition
+  ) {
+    return false;
+  }
+
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.kind === "npc" &&
+      getGridDistance(entity.position, intent.targetPosition ?? entity.position) <=
+        getNpcInteractionRange(entity),
+  );
+}
+
+function getNpcInteractionRange(entity: GameEntity): number {
+  return entity.kind === "npc" && entity.npcRole === "quest_giver" ? 2 : 1.5;
+}
+
+function isResourceInteraction(
+  state: GameState,
+  attackedMember: AutonomousEntity,
+): boolean {
+  if (attackedMember.state !== "gather" || !attackedMember.currentTargetId) {
+    return false;
+  }
+
+  return state.entities[attackedMember.currentTargetId]?.kind === "resource";
+}
+
+function updateSelfDefenseTarget(
+  state: GameState,
+  attackedMember: AutonomousEntity,
+  attacker: Enemy,
+): GameState {
+  const defenseState = setLeaderIntent(captureInterruptedPoiTarget(state, attacker), {
+    type: "attack",
+    targetId: attacker.id,
+    targetPosition: attacker.position,
+  });
+
+  return updateEntity(defenseState, {
+    ...attackedMember,
+    state: "attack",
+    currentTargetId: attacker.id,
+    commandPriority: "autonomous",
+  });
+}
+
 function canProtectPartyMember(
   state: GameState,
   entity: GameEntity,
   attackedMember: AutonomousEntity,
-  attacker: Enemy,
 ): entity is AutonomousEntity {
   if (entity.kind !== "companion") {
     return false;
   }
 
-  if (entity.commandPriority === "direct") {
+  if (
+    entity.commandPriority === "direct" &&
+    !(entity.id === attackedMember.id && canSelfDefendDuringInteraction(state, attackedMember))
+  ) {
     return false;
   }
 
@@ -91,11 +170,7 @@ function canProtectPartyMember(
     entity.id !== attackedMember.id &&
     isGathererBusy(state, entity)
   ) {
-    const leader = getPartyLeader(state);
-
-    if (leader && !isWithinFollowLeash(state, attacker, leader)) {
-      return false;
-    }
+    return false;
   }
 
   if (!isPartyMember(attackedMember)) {
@@ -103,13 +178,6 @@ function canProtectPartyMember(
   }
 
   if (entity.id !== attackedMember.id && !isWithinFollowLeash(state, entity, attackedMember)) {
-    return false;
-  }
-
-  if (
-    entity.id === attackedMember.id &&
-    isGathererBusy(state, entity)
-  ) {
     return false;
   }
 

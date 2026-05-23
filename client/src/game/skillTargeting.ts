@@ -1,6 +1,7 @@
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import { getLeaderEnemyTarget } from "./roleSystem";
 import {
+  isActiveResource,
   isLivingCompanion,
   isLivingEnemy,
   isTargetDummyEnemy,
@@ -156,14 +157,13 @@ function hasResourceContext(state: GameState, caster: Companion): boolean {
     ? getEntityById(state, caster.currentTargetId)
     : undefined;
 
-  if (currentTarget?.kind === "resource" && !currentTarget.isDepleted) {
+  if (isActiveResource(currentTarget)) {
     return true;
   }
 
   return Object.values(state.entities).some(
     (entity) =>
-      entity.kind === "resource" &&
-      !entity.isDepleted &&
+      isActiveResource(entity) &&
       getGridDistance(caster.position, entity.position) <= DEFAULT_ENEMY_CONTEXT_RANGE,
   );
 }
