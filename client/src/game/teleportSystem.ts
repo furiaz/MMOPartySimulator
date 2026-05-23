@@ -29,6 +29,7 @@ import {
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
+import { hasDeadPartyMembers } from "./partySystem";
 import {
   moveEntityTowardPositionIfUnoccupied,
   setLeaderIntent,
@@ -104,6 +105,10 @@ export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
 ): GameState {
+  if (isAiTeleportPausedForResurrection(state)) {
+    return state;
+  }
+
   const autoTeleport = getAutoTeleport(state);
   const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id) : state;
   const activatedState = getActivatedTeleportState(poiState);
@@ -128,7 +133,12 @@ export function isMapTeleportPoiActive(state: GameState): boolean {
 }
 
 function getAutoTeleport(state: GameState): DebugTeleportPoint | null {
-  if (!state.autoModeEnabled || state.activeTeleport || getTeleportPoi(state)) {
+  if (
+    !state.autoModeEnabled ||
+    state.activeTeleport ||
+    getTeleportPoi(state) ||
+    hasDeadPartyMembers(state)
+  ) {
     return null;
   }
 
@@ -148,6 +158,10 @@ function getAutoTeleport(state: GameState): DebugTeleportPoint | null {
 function getActivatedTeleportState(state: GameState): GameState {
   const teleport = getTeleportPoi(state);
 
+  if (teleport && hasDeadPartyMembers(state) && isAiTeleportIntent(state)) {
+    return state;
+  }
+
   if (teleport && shouldPartyMemberTriggerTeleport(state, teleport)) {
     return triggerMapTeleport(state, getTeleportTriggerSource(state), teleport.id);
   }
@@ -165,9 +179,26 @@ function shouldPartyMemberTriggerTeleport(
 }
 
 function getTeleportTriggerSource(state: GameState): "ai" | "player" {
-  return state.autoModeEnabled && getLivingEnemies(state).length === 0
+  return state.leaderIntent?.source !== "player" &&
+    state.autoModeEnabled &&
+    getLivingEnemies(state).length === 0
     ? "ai"
     : "player";
+}
+
+function isAiTeleportIntent(state: GameState): boolean {
+  return (
+    state.leaderIntent?.source !== "player" &&
+    state.autoModeEnabled &&
+    getLivingEnemies(state).length === 0
+  );
+}
+
+function isAiTeleportPausedForResurrection(state: GameState): boolean {
+  return (
+    hasDeadPartyMembers(state) &&
+    Boolean(state.activeTeleport && state.activeTeleport.triggeredBy === "ai")
+  );
 }
 
 function getTeleportPoi(state: GameState): DebugTeleportPoint | null {

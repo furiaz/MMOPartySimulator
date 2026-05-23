@@ -92,6 +92,13 @@ export function updateGame(
     );
   }
 
+  nextState = updateResurrectionSystem(
+    nextState,
+    movedEntityIds,
+    timing.nowMs,
+    timing.deltaMs,
+  );
+
   nextState = updateTeleportSystem(nextState, movedEntityIds);
 
   if (
@@ -110,12 +117,6 @@ export function updateGame(
 
   nextState = updatePoiSystem(nextState, resourceWorkContext);
   nextState = updateHealingFountainSystem(nextState);
-  nextState = updateResurrectionSystem(
-    nextState,
-    movedEntityIds,
-    timing.nowMs,
-    timing.deltaMs,
-  );
   resourceWorkContext = createResourceWorkContext(nextState);
 
   const shouldMovePartyTowardPoi =

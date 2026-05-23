@@ -22,6 +22,13 @@ export function getPartyMembers(state: GameState): PartyMember[] {
   );
 }
 
+export function hasDeadPartyMembers(state: GameState): boolean {
+  return Object.values(state.entities).some(
+    (entity) =>
+      isPartyMember(entity) && (entity.state === "dead" || entity.health <= 0),
+  );
+}
+
 export function getPartyLeader(state: GameState): PartyMember | undefined {
   const leader = getEntityById(state, state.partyLeaderId);
 

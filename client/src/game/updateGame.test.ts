@@ -36,6 +36,7 @@ import {
 } from "./state";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";
+import { RESURRECTION_REQUIRED_MS } from "./resurrectionSystem";
 import type { GameEntity, GameMap, Position, ZoneSubzone } from "./types";
 import type { QuestId, QuestStatus } from "./questTypes";
 
@@ -3924,6 +3925,185 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget?.poiId).toBe("hub-to-map-1");
     expect(nextState.leaderIntent?.type).toBe("move");
   });
+
+  it("prioritizes resurrection over active AI teleport completion", () => {
+    const teleport = getForwardMapOneTeleport();
+    const leader = createLeader(teleport.position);
+    const deadCompanion = {
+      ...createCompanion(
+        "dead-companion",
+        { x: teleport.position.x + 1, y: teleport.position.y },
+        leader.id,
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion], {
+        partyLeaderId: leader.id,
+        activeTeleport: {
+          id: teleport.id,
+          position: teleport.position,
+          range: teleport.range,
+          sourceMapId: teleport.sourceMapId,
+          targetMapId: teleport.targetMapId,
+          triggeredBy: "ai",
+        },
+        quests: createQuestStates(),
+      }),
+      { nowMs: 1_000, deltaMs: 1_000 },
+    );
+
+    expect(nextState.currentMapId).toBe(MAP_ONE_ID);
+    expect(nextState.activeTeleport).toMatchObject({
+      id: teleport.id,
+      triggeredBy: "ai",
+    });
+    expect(nextState.resurrectionChannelsByHelperId?.[leader.id]).toMatchObject({
+      helperId: leader.id,
+      targetId: deadCompanion.id,
+    });
+    expect(
+      nextState.resurrectionProgressByCompanionId?.[deadCompanion.id]?.progressMs,
+    ).toBe(100);
+  });
+
+  it("does not auto-start cleared-map teleports while resurrection is pending", () => {
+    const teleport = getForwardMapOneTeleport();
+    const leader = createLeader(teleport.position);
+    const deadCompanion = {
+      ...createCompanion(
+        "dead-companion",
+        { x: teleport.position.x + 1, y: teleport.position.y },
+        leader.id,
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion], {
+        partyLeaderId: leader.id,
+        quests: createQuestStates(),
+      }),
+      { nowMs: 1_000, deltaMs: 1_000 },
+    );
+
+    expect(nextState.currentMapId).toBe(MAP_ONE_ID);
+    expect(nextState.activeTeleport).toBeNull();
+    expect(nextState.resurrectionChannelsByHelperId?.[leader.id]).toMatchObject({
+      targetId: deadCompanion.id,
+    });
+  });
+
+  it("keeps queued World Travel idle while resurrection is pending", () => {
+    const teleport = getForwardMapOneTeleport();
+    const leader = createLeader(teleport.position);
+    const deadCompanion = {
+      ...createCompanion(
+        "dead-companion",
+        { x: teleport.position.x + 1, y: teleport.position.y },
+        leader.id,
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_TWO_ID,
+        quests: createQuestStates(),
+      }),
+      { nowMs: 1_000, deltaMs: 1_000 },
+    );
+
+    expect(nextState.worldTravelTargetMapId).toBe(MAP_TWO_ID);
+    expect(nextState.localPoiTarget).toBeNull();
+    expect(nextState.globalPoiIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.activeTeleport).toBeNull();
+    expect(nextState.resurrectionChannelsByHelperId?.[leader.id]).toMatchObject({
+      targetId: deadCompanion.id,
+    });
+  });
+
+  it("resumes queued World Travel after resurrection completes", () => {
+    const teleport = getForwardMapOneTeleport();
+    const leader = createLeader({
+      x: teleport.position.x - 20,
+      y: teleport.position.y,
+    });
+    const deadCompanion = {
+      ...createCompanion(
+        "dead-companion",
+        { x: leader.position.x + 1, y: leader.position.y },
+        leader.id,
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+    const pendingState = createMapOneState([leader, deadCompanion], {
+      partyLeaderId: leader.id,
+      worldTravelTargetMapId: MAP_TWO_ID,
+      quests: createQuestStates(),
+    });
+    const revivedState = advanceGameTicks(
+      pendingState,
+      RESURRECTION_REQUIRED_MS / 100,
+    );
+
+    const revivedCompanion = revivedState.entities[deadCompanion.id];
+
+    expect(revivedCompanion).toMatchObject({
+      state: "follow",
+    });
+    expect(revivedCompanion?.kind).toBe("companion");
+    expect(
+      revivedCompanion?.kind === "companion" ? revivedCompanion.health : 0,
+    ).toBeGreaterThan(0);
+    expect(revivedState.worldTravelTargetMapId).toBe(MAP_TWO_ID);
+    expect(revivedState.localPoiTarget?.poiId).toBe(teleport.id);
+    expect(revivedState.leaderIntent).toMatchObject({
+      type: "move",
+      targetPosition: teleport.position,
+      source: "ai",
+    });
+  });
+
+  it("keeps player-triggered teleport completion unchanged with a dead companion", () => {
+    const teleport = getForwardMapOneTeleport();
+    const leader = createLeader(teleport.position);
+    const deadCompanion = {
+      ...createCompanion(
+        "dead-companion",
+        { x: teleport.position.x + 1, y: teleport.position.y },
+        leader.id,
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, deadCompanion], {
+        partyLeaderId: leader.id,
+        activeTeleport: {
+          id: teleport.id,
+          position: teleport.position,
+          range: teleport.range,
+          sourceMapId: teleport.sourceMapId,
+          targetMapId: teleport.targetMapId,
+          triggeredBy: "player",
+        },
+        quests: createQuestStates(),
+      }),
+      { nowMs: 1_000, deltaMs: 1_000 },
+    );
+
+    expect(nextState.currentMapId).toBe(MAP_TWO_ID);
+    expect(nextState.activeTeleport).toBeNull();
+  });
 });
 
 function createLeader(position: { x: number; y: number }) {
@@ -3932,6 +4112,31 @@ function createLeader(position: { x: number; y: number }) {
     state: "idle" as const,
     currentTargetId: null,
   };
+}
+
+function getForwardMapOneTeleport() {
+  const teleport = createDebugMap(MAP_ONE_ID).teleports.find(
+    (candidate) => candidate.targetMapId === MAP_TWO_ID,
+  );
+
+  if (!teleport) {
+    throw new Error("Expected map-1 to map-2 test teleport");
+  }
+
+  return teleport;
+}
+
+function advanceGameTicks(state: GameState, tickCount: number): GameState {
+  let nextState = state;
+
+  for (let tick = 1; tick <= tickCount; tick += 1) {
+    nextState = updateGame(nextState, {
+      nowMs: tick * 100,
+      deltaMs: 100,
+    });
+  }
+
+  return nextState;
 }
 
 function defeatedEnemy(id: string, position: Position) {

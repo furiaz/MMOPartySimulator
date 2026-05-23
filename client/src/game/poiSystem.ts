@@ -17,7 +17,11 @@ import {
   getNavigationPositionKey,
   toNavigationNode,
 } from "./navigation";
-import { getPartyLeader, getPartyMembers } from "./partySystem";
+import {
+  getPartyLeader,
+  getPartyMembers,
+  hasDeadPartyMembers,
+} from "./partySystem";
 import {
   getEntityById,
   getPoiSearchScope,
@@ -118,6 +122,10 @@ export function updatePoiSystem(
 
   if (state.leaderIntent?.source === "player") {
     return clearPoiSelection(state);
+  }
+
+  if (hasDeadPartyMembers(state)) {
+    return clearAiPoiSelectionForResurrection(state);
   }
 
   const leader = getPartyLeader(state);
@@ -1933,6 +1941,16 @@ function clearPoiSelection(state: GameState): GameState {
     localPoiTarget: null,
     lastPoiDecision: undefined,
   };
+}
+
+function clearAiPoiSelectionForResurrection(state: GameState): GameState {
+  const clearedState = clearPoiSelection(state);
+
+  if (clearedState.leaderIntent?.source === "player") {
+    return clearedState;
+  }
+
+  return setLeaderIntent(clearedState, null);
 }
 
 function getDistance(first: Position, second: Position): number {
