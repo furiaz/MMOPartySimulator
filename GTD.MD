@@ -4,13 +4,15 @@
 
 This document defines the current technical structure of the game.
 
+Design intent is defined in `GDD.md`. This document describes how that intent is represented in code.
+
 The project follows a simulation-first architecture:
 
-- Game logic runs independently of the UI
+- game logic runs independently of the UI
 - UI reads and displays game state
-- Systems update the world over time for idle/AFK play
-
-Design intent is defined in `GDD.md`. This document defines how that intent is represented technically.
+- UI issues commands into game logic
+- systems update the world over time for idle/AFK play
+- renderer code displays world state but does not own simulation behavior
 
 ---
 
@@ -25,7 +27,14 @@ The game is divided into:
 
 Game logic must not depend on React or PixiJS.
 
-React may display game state, issue commands into game logic, start/stop the simulation loop for development, expose temporary debug controls, host the PixiJS world renderer, and render temporary UI overlays from game state.
+React may:
+
+- display game state
+- issue commands into game logic
+- start and stop the simulation loop for development
+- expose temporary debug controls
+- host the PixiJS world renderer
+- render temporary UI overlays from game state
 
 PixiJS may render world visuals from game state, but must not own simulation behavior.
 
@@ -35,7 +44,7 @@ React and PixiJS must not contain core simulation rules.
 
 ## Folder Structure
 
-Current files include:
+Current game-logic implementation files include:
 
 - `attackSlots.ts`
 - `attackSystem.ts`
@@ -43,6 +52,7 @@ Current files include:
 - `commands.ts`
 - `combatResolver.ts`
 - `companionCombat.ts`
+- `consumables.ts`
 - `debugMap.ts`
 - `debugTelemetry.ts`
 - `debugTools.ts`
@@ -73,10 +83,12 @@ Current files include:
 - `merchant.ts`
 - `movementState.ts`
 - `navigation.ts`
+- `navigationClick.ts`
 - `partyFormationSystem.ts`
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
+- `performanceMetrics.ts`
 - `poiResumeSystem.ts`
 - `poiSystem.ts`
 - `poiTypes.ts`
@@ -104,10 +116,11 @@ Current files include:
 - `wallet.ts`
 - `worldWipeRecovery.ts`
 
+Current tests live beside game-logic files as `*.test.ts`.
 
 Do not restructure the project unless explicitly requested.
 
-New helper modules may be added when they keep responsibilities clear.
+New helper modules may be added when they keep responsibilities clear and preserve the simulation-first boundary.
 
 ---
 
@@ -121,10 +134,15 @@ Current entity kinds:
 type EntityKind = "companion" | "enemy" | "resource" | "npc";
 ```
 
-NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior. Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, and the temporary quest guide escort NPC. NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
+The player is not represented as a world entity.
 
+The player is the manager/controller issuing intent and commands to party members.
 
-The player is not represented as a world entity. The player is the manager/controller issuing intent and commands to party members.
+NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior.
+
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, and the temporary quest guide escort NPC.
+
+NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
 
 Current execution states:
 
@@ -154,7 +172,18 @@ Entities move toward target positions by a fixed step amount.
 
 Current movement step constants live in `entities.ts`.
 
-Current movement model supports bounds checks, wall checks, collision checks, movement reservations, simple pathing, fallback movement, party pass-through in specific party movement cases, and party swaps in specific movement edge cases.
+Current movement model supports:
+
+- bounds checks
+- wall checks
+- collision checks
+- movement reservations
+- simple pathing
+- path retry/backoff data
+- fallback movement
+- party pass-through in specific party movement cases
+- party swaps in specific movement edge cases
+- navigation and path performance metrics
 
 ---
 
@@ -268,18 +297,18 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
-
-
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
 - `failedMoveByEntityId`
 - `movementFailureMsByEntityId`
 - `movementFailuresByEntityId`
+- `movementPathRetryAtMsByEntityId`
 - `moveIntentsByEntityId`
 - `reservedPositionsByEntityId`
 - `movementPathsByEntityId`
+- `attackSlotCacheByEntityId`
 - `movementDecisionsByEntityId`
 - `lastPositionsByEntityId`
 
@@ -291,11 +320,15 @@ Current POI and travel fields include:
 - `lastPoiDecision`
 - `interruptedPoiTarget`
 - `poiPreferences`
+
 Current POI preferences include:
 
 - `stayInMap`
+- `searchScope`
 
-`stayInMap` currently represents the Stay in Subzone prototype control. When enabled, POI and autonomous gatherer selection use the leader's current subzone as a local boundary where supported.
+`stayInMap` currently represents the Stay in Subzone prototype control.
+
+When enabled, POI and autonomous gatherer selection use the leader's current subzone as a local boundary where supported.
 
 Current prototype consumable runtime fields include:
 
@@ -331,7 +364,9 @@ Current debug option fields include:
 - `superExpEnabled`
 - `deepNavigationTelemetryEnabled`
 
-State helpers should remain low-level and safe. Systems should own behavior decisions.
+State helpers should remain low-level and safe.
+
+Systems should own behavior decisions.
 
 ---
 
@@ -348,11 +383,7 @@ Class definitions live in `classes.ts`.
 Current class path type:
 
 ```ts
-type ClassPath =
-  | "honor"
-  | "primal"
-  | "arcane"
-  | "holy";
+type ClassPath = "honor" | "primal" | "arcane" | "holy";
 ```
 
 Current class id type:
@@ -388,10 +419,13 @@ classId: ClassId;
 
 Classes may have restrictive prototype weapon and offhand permissions.
 
-Weapons are gameplay-facing stat/data modifiers, not sprite identity. Equipment rules must not require React rendering logic, sprite swaps, weapon anchoring, or visible attachment systems.
+Weapons are gameplay-facing stat/data modifiers, not sprite identity.
 
+Equipment rules must not require React rendering logic, sprite swaps, weapon anchoring, or visible attachment systems.
 
-Current class implementation is still lightweight and structural, but classes now provide prototype skills through `skills.ts`.
+Current class implementation is lightweight and structural.
+
+Classes currently provide prototype skills through `skills.ts`.
 
 Subclass progression is not implemented.
 
@@ -416,7 +450,9 @@ level: number;
 xpReward?: number;
 ```
 
-`xpReward` is stored on individual enemy entities only as an explicit spawn-level override. It is not part of `EnemyArchetypeDefinition`.
+`xpReward` is stored on individual enemy entities only as an explicit spawn-level override.
+
+`xpReward` is not part of `EnemyArchetypeDefinition`.
 
 Current leveling constants:
 
@@ -434,6 +470,8 @@ Current leveling behavior:
 - same-level enemy XP uses anchored progression values with interpolation
 - companion XP rolls over through multiple level-ups if enough XP is gained
 - max-level companions have `characterXp` reset to 0
+- level-ups may apply automatic natural-stat growth
+- level-ups may grant unspent stat points after base class progression begins
 - debug telemetry records XP awarded, XP reduced, XP skipped, and level-up events
 
 Current level-gap XP modifier:
@@ -455,7 +493,9 @@ Beginner class eligibility is currently:
 - companion class is `beginner`
 - companion level is at least 10
 
-Leveling is a prototype progression system. It should remain simple unless expanded intentionally.
+Leveling is a prototype progression system.
+
+It should remain simple unless expanded intentionally.
 
 ---
 
@@ -470,10 +510,13 @@ Skill selection and execution live in:
 - `skillSystem.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
+- `skillTargeting.ts`
 
-Current skill runtime is prototype-only. It is not a full ability framework.
+Current skill runtime is prototype-only.
 
-Current skill ids should include Beginner prototype skills and base class prototype skills:
+It is not a full ability framework.
+
+Current skill ids include Beginner prototype skills and base class prototype skills:
 
 ```ts
 type SkillId =
@@ -551,6 +594,8 @@ Do not expand this into a full ability framework unless explicitly requested.
 
 Do not add mana, casting, advanced targeting, equipment requirements, complex cooldown systems, skill trees, hotbars, or player-triggered active skill input unless explicitly requested.
 
+---
+
 ## Prototype Companion Stats
 
 Prototype companion stats are implemented in `stats.ts`.
@@ -618,15 +663,21 @@ Allocated stats represent player-assigned stat points.
 
 Unspent stat points represent available allocation points.
 
-Equipment may provide primary stat modifiers and derived stat modifiers. Primary stat modifiers are included when calculating actual companion stats, and derived stat modifiers are included when calculating derived combat stats.
+Equipment and consumable buffs may provide primary stat modifiers or derived stat modifiers.
+
+Primary stat modifiers are included when calculating actual companion stats.
+
+Derived stat modifiers are included when calculating derived combat stats.
 
 Derived max health is synchronized onto companions when relevant state changes occur.
 
-Stat allocation is game logic, not React-only state. React may call supported allocation helpers and display allocation results, but must not define stat formulas.
+Stat allocation is game logic, not React-only state.
+
+React may call supported allocation helpers and display allocation results, but must not define stat formulas.
 
 Do not add final balance formulas, respec systems, advanced scaling, secondary class history, or backend persistence unless explicitly requested.
 
-
+---
 
 ## Combat Resolution
 
@@ -653,7 +704,9 @@ Current derived stat combat behavior may include:
 
 Auto attacks, defender attacks, prototype damage skills, splash damage, magic damage, healing skills, fountain healing, debug health restore, and UI health displays should use derived stat data where that behavior is implemented.
 
-Combat formulas are prototype rules. They should stay simple and centralized in game logic.
+Combat formulas are prototype rules.
+
+Combat formulas should stay simple and centralized in game logic.
 
 React must not define combat formulas, stat formulas, hit rules, block rules, crit rules, healing rules, or regeneration rules.
 
@@ -691,10 +744,9 @@ type LeaderIntent = {
   targetPosition: Position | null;
   source?: "player" | "ai";
 };
-
 ```
 
-Leader intent is used by party movement, role behavior, combat targeting, exploration, defender positioning, and teleport point movement.
+Leader intent is used by party movement, role behavior, combat targeting, exploration, defender positioning, POI targeting, and teleport point movement.
 
 Leader intent may be cleared when a point of interest is reached, combat ends, or a map transition completes.
 
@@ -704,18 +756,43 @@ Prototype quest definitions live in `questSystem.ts` and quest types live in `qu
 
 Quest guide escort behavior lives in `questGuideSystem.ts`.
 
-Quest state is stored on `GameState` as `quests: Record<QuestId, QuestState>`.
+Quest state is stored on `GameState` as:
 
-Current quest ids are `clear_the_shore`, `gather_expedition_supplies`, `scout_the_northern_road`, and `threat_beyond_the_pass`.
+```ts
+quests: Record<QuestId, QuestState>;
+```
+
+Current quest ids are:
+
+- `clear_the_shore`
+- `outfit_the_expedition`
+- `gather_expedition_supplies`
+- `scout_the_northern_road`
+- `threat_beyond_the_pass`
 
 Current quest display names are:
 
 - `clear_the_shore`: Secure the Landing
+- `outfit_the_expedition`: Outfit the Expedition
 - `gather_expedition_supplies`: Mark the Glade Route
 - `scout_the_northern_road`: Cut the Web Line
 - `threat_beyond_the_pass`: Threat Beyond the Pass
 
-Current quest statuses are `locked`, `available`, `active`, `ready_to_turn_in`, and `completed`.
+Current quest order is:
+
+1. `clear_the_shore`
+2. `outfit_the_expedition`
+3. `gather_expedition_supplies`
+4. `scout_the_northern_road`
+5. `threat_beyond_the_pass`
+
+Current quest statuses are:
+
+- `locked`
+- `available`
+- `active`
+- `ready_to_turn_in`
+- `completed`
 
 Current quest objective types are:
 
@@ -725,16 +802,32 @@ type QuestObjectiveType =
   | "reach_poi"
   | "defeat_enemy_count"
   | "gather_item_count"
+  | "equip_item"
+  | "equip_flask"
+  | "buy_merchant_equipment"
   | "inspect_poi"
   | "guide_npc_to_poi"
   | "return_to_poi";
 ```
 
-Current quest reward source types are `npc`, `mapTrigger`, and `objectTrigger`.
+Current quest reward source types are:
 
-Only NPC quest acceptance and turn-in are implemented. Map trigger and object trigger sources are future-facing type support only.
+- `npc`
+- `mapTrigger`
+- `objectTrigger`
 
-Current implemented quest objective behavior includes defeat counts, gather counts, inspect POIs, and guide NPC escort objectives.
+Only NPC quest acceptance and turn-in are implemented.
+
+Map trigger and object trigger sources are future-facing type support only.
+
+Current implemented quest objective behavior includes defeat counts, gather counts, inspect POIs, guide NPC escort objectives, equipment equip checks, flask equip checks, and Merchant Buy equipment checks.
+
+Current prototype quest chain:
+
+- `clear_the_shore` unlocks `outfit_the_expedition`
+- `outfit_the_expedition` unlocks `gather_expedition_supplies`
+- `gather_expedition_supplies` unlocks `scout_the_northern_road`
+- `scout_the_northern_road` unlocks `threat_beyond_the_pass`
 
 Current quest rewards may include:
 
@@ -759,6 +852,10 @@ Quest reward claim behavior:
 - Non-repeatable quests cannot grant rewards more than once.
 - Inventory-full failures leave the quest `ready_to_turn_in`.
 
+Merchant interaction is gated by quest progress where implemented.
+
+Merchant Buy can be locked until the equipment tutorial flow allows it.
+
 `questGuideSystem.ts` currently owns the Glade Surveyor escort objective for Mark the Glade Route.
 
 Current quest guide behavior:
@@ -773,11 +870,22 @@ Current quest guide behavior:
 - completes the quest objective when it reaches the target position
 - is protected by nearby party behavior and escort-aware threat checks
 
-The quest guide is a prototype escort system. It must not become a general follower, recruitment, companion NPC, or production escort framework unless explicitly requested.
+The quest guide is a prototype escort system.
+
+It must not become a general follower, recruitment, companion NPC, or production escort framework unless explicitly requested.
 
 POI selection types live in `poiTypes.ts`.
 
-Current POI categories are `npc`, `quest`, `combat`, `resource`, `teleport`, `exploration`, `idle`, and `event`.
+Current POI categories are:
+
+- `npc`
+- `quest`
+- `combat`
+- `resource`
+- `teleport`
+- `exploration`
+- `idle`
+- `event`
 
 `poiSystem.ts` selects global quest intent and local map targets for auto-mode behavior.
 
@@ -800,13 +908,17 @@ POI selection should skip targets that are invalid, unreachable, depleted, dead,
 
 POI selection may score candidates by priority, path distance, fallback score, nearby-resource bonus, progressive fallback, local target preference, and stable-target switching rules.
 
-Wild POI selection may reuse a valid target briefly before reevaluating. Active quest resource POIs may use a longer short commitment window than generic wild fallback POIs.
+Wild POI selection may reuse a valid target briefly before reevaluating.
+
+Active quest resource POIs may use a longer short commitment window than generic wild fallback POIs.
 
 POI selection should record debug telemetry for selected POIs and skipped POIs where useful.
 
 The POI system may set leader intent toward quest givers, combat targets, resources, exploration points, inspect points, escort targets, idle hub points, or prototype teleports.
 
-`poiResumeSystem.ts` can capture an interrupted POI target when combat interrupts travel, gathering, or world-route intent. It may restore that target after combat ends if the map still matches, the target is still valid, no live party aggro remains, and no blocking direct party command exists.
+`poiResumeSystem.ts` can capture an interrupted POI target when combat interrupts travel, gathering, or world-route intent.
+
+It may restore that target after combat ends if the map still matches, the target is still valid, no live party aggro remains, and no blocking direct party command exists.
 
 The POI system must remain a prototype debug-map guidance layer and must not become the final world-routing, dialogue, or quest content pipeline unless explicitly requested.
 
@@ -825,7 +937,10 @@ Current responsibilities include:
 - keeping gatherer work within the leader's subzone when Stay in Subzone is enabled
 - allowing gatherers to work within their leader leash when not restricted to the leader's subzone
 
-This is prototype gatherer coordination. It must not become a full job scheduler, worker assignment system, logistics system, or production resource economy unless explicitly requested.
+This is prototype gatherer coordination.
+
+It must not become a full job scheduler, worker assignment system, logistics system, or production resource economy unless explicitly requested.
+
 ---
 
 ## Systems
@@ -857,12 +972,13 @@ Current systems include:
 - World Wipe Recovery
 - Debug Telemetry
 
-
 Each system reads `GameState`, updates entities through state helpers, runs during simulation ticks, and keeps behavior focused and simple.
 
 Systems must avoid conflicting movement updates.
 
-Each entity should perform only one movement behavior per tick. Catch-up and special movement should use speed multipliers or delta-scaled movement instead of repeated movement bursts unless explicitly documented.
+Each entity should perform only one movement behavior per tick.
+
+Catch-up and special movement should use speed multipliers or delta-scaled movement instead of repeated movement bursts unless explicitly documented.
 
 ---
 
@@ -907,9 +1023,7 @@ Current high-level order:
 33. Idle autonomous party members when no POI or leader intent is active
 34. Record debug telemetry
 
-
-
-Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, and reserved positions.
+Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
 
 ---
 
@@ -928,12 +1042,16 @@ Movement rules:
 - movement reservations prevent conflicts
 - swap handling exists for party movement edge cases
 - failed movement is tracked per tick
+- path retry/backoff data may delay repeated failed path attempts
 - pathfinding is used when map data exists and direct movement is blocked or unsuitable
 - fallback movement is attempted when direct/path movement fails
+- navigation/path metrics may be recorded for performance inspection
 
 Movement helpers live primarily in `state.ts`.
 
 Navigation helpers live in `navigation.ts`.
+
+Navigation click helpers live in `navigationClick.ts`.
 
 If movement logic grows significantly, pathing and collision helpers may be moved to dedicated modules, but no restructure is required now.
 
@@ -945,7 +1063,12 @@ Navigation is implemented in `navigation.ts`.
 
 Current navigation supports baking a navigation grid from map walls, walkable cell checks, wall-adjacent movement cost, A-style path search to one of several goals, bounded navigation distance checks, nearest reachable navigation position search, and conversion from continuous positions to rounded navigation nodes.
 
-Current navigation uses four-direction neighbors: east, west, south, and north.
+Current navigation uses four-direction neighbors:
+
+- east
+- west
+- south
+- north
 
 Navigation is used by movement, targeting, exploration, and slot selection helpers.
 
@@ -982,6 +1105,8 @@ Gatherers are excluded from cohesion while actively gathering a valid resource.
 A gatherer rejoins normal cohesion when not actively gathering and close enough to rejoin party behavior.
 
 Direct-commanded members are excluded from autonomous cohesion behavior.
+
+Resurrection-channeling members are excluded from autonomous cohesion behavior where supported.
 
 ---
 
@@ -1072,6 +1197,10 @@ Aegis shield-block skill behavior is handled by the prototype skill system, not 
 
 `attackSystem.ts` owns combat execution.
 
+`attackSlots.ts` supports selecting attack slots around a target.
+
+`companionCombat.ts` and `defenderCombat.ts` provide companion-facing combat helpers.
+
 Current attack behavior:
 
 - attackers require a valid combat target
@@ -1092,7 +1221,6 @@ Current attack behavior:
 - party members gain XP when enemies are defeated by party attacks
 - enemy defeats can progress prototype quests
 - enemy defeats can trigger prototype drop rolls
-
 
 Current basic attack constants and helpers:
 
@@ -1136,11 +1264,11 @@ Current enemy archetype data may define:
 - detection range
 - attack range
 
+Enemy archetypes are prototype tuning records.
 
-Enemy archetypes are prototype tuning records. They are not final bestiary content, faction design, encounter design, or production AI behavior trees.
+They are not final bestiary content, faction design, encounter design, or production AI behavior trees.
 
-
-
+---
 
 ## Enemy AI System
 
@@ -1152,7 +1280,8 @@ Current enemy behavior:
 - passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
 - enemy archetypes can define setup data such as level, max health, attack cooldown, detection range, attack range, temperament, combat style, and target preference
-- enemy archetypes do not define XP rewards; enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`
+- enemy archetypes do not define XP rewards
+- enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`
 - target preferences currently support closest, leader, and lowest-health party member
 - enemies with valid targets enter or remain in attack state
 - enemies clear invalid targets
@@ -1163,7 +1292,7 @@ Current enemy behavior:
 
 Current enemy detection range:
 
-- `ENEMY_DETECTION_RANGE = 5`
+- `ENEMY_DETECTION_RANGE = 10`
 
 ---
 
@@ -1193,14 +1322,17 @@ Current enemy respawn behavior:
 - records a defeated timestamp for dead enemies
 - respawns dead wild-map enemies after the respawn delay
 - restores respawned enemies to home position, idle state, full health, and no target
-- clears temporary mark and bind runtime state for the respawned enemy
+- clears temporary target, roam, mark, and bind runtime state for the respawned enemy
 
 Current enemy respawn constant:
 
-- `ENEMY_RESPAWN_DELAY_MS = 5000`
+- `ENEMY_RESPAWN_DELAY_MS = 10_000`
 
-Enemy respawn is prototype wild-map behavior. It should not become production spawn scheduling, encounter reset design, persistent world spawning, or final difficulty pacing unless explicitly requested.
+Enemy respawn is prototype wild-map behavior.
 
+It should not become production spawn scheduling, encounter reset design, persistent world spawning, or final difficulty pacing unless explicitly requested.
+
+---
 
 ## Party Protection
 
@@ -1235,9 +1367,9 @@ Current gathering behavior:
 
 Current gathering constants:
 
-- `GATHER_RANGE = 1`
+- `GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2`
 - `GATHER_COOLDOWN_MS = 1000`
-- `GATHERER_PARTY_RETURN_DISTANCE = 15`
+- `GATHER_APPROACH_BUFFER = 0.15`
 
 Gatherers with autonomous gatherer behavior may stay committed to a resource task unless it becomes invalid or unsafe by current checks.
 
@@ -1311,7 +1443,11 @@ type ResourceItemId =
   | "redleaf_herb";
 ```
 
-The base `wood`, `ore`, and `herb` item ids are legacy compatibility material ids. Current resource yields should use tiered material ids.
+The base `wood`, `ore`, and `herb` item ids are legacy compatibility material ids.
+
+Current resource yields should use tiered material ids.
+
+---
 
 ## Prototype Inventory, Wallet, Consumables, Drops, and Merchant
 
@@ -1373,7 +1509,9 @@ Enemy drop logic lives in:
 - `dropTables.ts`
 - `dropSystem.ts`
 
-Drops roll by enemy family and loot tier, create short-lived drop visual events, and route completed drops into shared inventory. Drops do not create persistent ground loot.
+Drops roll by enemy family and loot tier, create short-lived drop visual events, and route completed drops into shared inventory.
+
+Drops do not create persistent ground loot.
 
 Current enemy family ids:
 
@@ -1397,7 +1535,9 @@ Current enemy type aliases enemy family id:
 type EnemyType = EnemyFamilyId;
 ```
 
-Current drop tables are keyed by enemy family and loot tier. Loot tier is currently derived from enemy level.
+Current drop tables are keyed by enemy family and loot tier.
+
+Loot tier is currently derived from enemy level.
 
 Current loot tier behavior:
 
@@ -1436,8 +1576,8 @@ type JunkItemId =
   | "goblin_tooth_t2"
   | "wisp_ash_t2"
   | "wisp_ember_t2"
-  | "orc_tusk"
-  | "orc_hide";
+  | "orc_hide"
+  | "orc_tusk";
 ```
 
 Merchant logic lives in `merchant.ts`.
@@ -1445,17 +1585,32 @@ Merchant logic lives in `merchant.ts`.
 Current merchant behavior:
 
 - identifies Merchant NPCs by `npcRole: "merchant"`
+- can be gated by quest progress where implemented
 - finds eligible junk items with positive sell value for quick exchange
 - removes eligible quick-exchange junk items from shared inventory
 - adds Crowns to the shared wallet
 - exposes fixed prototype Merchant Buy stock
 - supports buying selected equipment and consumables for Crowns
-- validates merchant identity, stock membership, item category, price, wallet balance, and inventory capacity
+- validates merchant identity, stock membership, item category, price, wallet balance, inventory capacity, and quest gating
 - adds purchased items to shared inventory
 - supports stock filtering by group and party equipment compatibility
-- records merchant buy, quick exchange, inventory, and wallet telemetry
+- records merchant buy, quick exchange, inventory, wallet, and quest-gating telemetry
 
-The Merchant Sell panel is currently a UI placeholder only. Full selling rules, dynamic shop inventory, shop restocking, price simulation, and a full shop economy are not implemented.
+Current Merchant Buy stock groups are:
+
+- `flasks`
+- `food`
+- `weapons`
+- `offhands`
+- `cloth`
+- `leather`
+- `mail`
+- `plate`
+- `accessories`
+
+The Merchant Sell panel is currently a UI placeholder only.
+
+Full selling rules, dynamic shop inventory, shop restocking, price simulation, and a full shop economy are not implemented.
 
 This prototype inventory/wallet/consumable/drop/merchant layer does not include bank storage, persistent ground loot, full selling, dynamic shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
 
@@ -1471,7 +1626,13 @@ Current equipment modules include:
 - `equipmentRules.ts`
 - `equipmentSystem.ts`
 
-Companion equipment is stored on the companion entity as `equipment`.
+Equipment item definitions live in `items.ts`.
+
+Companion equipment is stored on the companion entity as:
+
+```ts
+equipment: CompanionEquipment;
+```
 
 Current equipment slots are:
 
@@ -1542,11 +1703,21 @@ Current accessory type is:
 type AccessoryType = "accessory";
 ```
 
-Equipment rules validate slot, class permission, level requirement, both-hands occupancy, inventory removal, inventory return on unequip, and telemetry results.
+Equipment rules validate:
+
+- slot compatibility
+- class permission
+- level requirement
+- both-hands occupancy
+- inventory removal
+- inventory return on unequip
+- telemetry results
 
 Armor and accessories currently ignore class restrictions when level requirements are met.
 
-Equipment remains gameplay-facing data only. It must not require sprite swaps, weapon anchoring, paper-doll rendering, or visible attachment systems.
+Equipment remains gameplay-facing data only.
+
+Equipment must not require sprite swaps, weapon anchoring, paper-doll rendering, or visible attachment systems.
 
 Current prototype class-restricted weapon and offhand items include:
 
@@ -1582,6 +1753,12 @@ Current shared prototype accessory items include:
 
 - Plain Charm
 
+Current quest equipment rewards may include:
+
+- Acolyte Hood
+- Scout Boots
+- Bulwark Cuirass
+
 Current archetype-specific prototype equipment drops may include:
 
 - Holy Lantern from Goblin Shaman
@@ -1610,6 +1787,10 @@ Current prototype equipment derived stat modifiers may include:
 - healthRegen
 
 Short Bow and Claw Gauntlets currently occupy both hands as prototype exceptions.
+
+Equipment is a prototype foundation, not a full equipment economy.
+
+Do not add generalized dual wield, arbitrary two-handed combinations, subclass equipment expansion, equipment visuals, gear recycling, rarity, affixes, upgrades, durability, sockets, set bonuses, item comparison, or a full equipment economy unless explicitly requested.
 
 
 
@@ -1661,7 +1842,11 @@ Current prototype map dimensions:
 - `map-3`: 160 columns by 30 rows
 - `map-4`: 160 columns by 30 rows
 
-The current row count reflects prototype debug-map presentation space. It is not final world scale or final zone design.
+The current row count reflects prototype debug-map presentation space.
+
+It is not final world scale or final zone design.
+
+---
 
 ## Subzone System
 
@@ -1676,7 +1861,9 @@ Current wilderness maps are authored with three prototype subzones each.
 
 Subzones are used by current map organization, floor texture selection, Stay in Subzone behavior, encounter area placement, resource location placement, and UI-facing subzone labels.
 
-Subzones are prototype map-organization data. They are not final zones, final region content, persistent zone state, or the production world model.
+Subzones are prototype map-organization data.
+
+Subzones are not final zones, final region content, persistent zone state, or the production world model.
 
 ---
 
@@ -1697,7 +1884,6 @@ Current prototype/debug routes:
 - `map-3` -> `map-4`
 - `map-4` -> `map-3`
 
-
 Current teleport behavior:
 
 - uses a small debug map teleport table
@@ -1708,8 +1894,8 @@ Current teleport behavior:
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
-- map-local enemies, resources, hub placeholders, hub target dummy, explored tiles, movement planning, formation state, combat feedback, skill visuals, drop visuals, and follow trails are reset or rebuilt for the new map
-- companion progression, class, role, level, XP, health, party identity, and party order are preserved
+- map-local enemies, resources, hub placeholders, hub target dummy, explored tiles, movement planning, formation state, combat feedback, skill visuals, drop visuals, resurrection state, and follow trails are reset or rebuilt for the new map
+- companion progression, class, role, level, XP, health, party identity, equipment, consumables, wallet, inventory, quests, and party order are preserved
 
 Current active teleport state:
 
@@ -1724,9 +1910,13 @@ type ActiveTeleport = {
 };
 ```
 
-World Travel should use current route and map data. It must not require final zone ids, persistent zone state, final world streaming, map discovery, travel costs, or a production teleport network.
+World Travel should use current route and map data.
+
+World Travel must not require final zone ids, persistent zone state, final world streaming, map discovery, travel costs, or a production teleport network.
 
 Do not expand this into full zones, persistent world streaming, or a final teleport network unless explicitly requested.
+
+---
 
 ## Resurrection and World-Wipe Recovery
 
@@ -1767,7 +1957,9 @@ Current world-wipe recovery constants:
 - rescue base fee is 5 Crowns
 - rescue fee adds 10 Crowns per map hop
 
-This is a prototype safety system. It is not the final death penalty, checkpoint, revive economy, or recovery design unless explicitly requested.
+This is a prototype safety system.
+
+It is not the final death penalty, checkpoint, revive economy, or recovery design unless explicitly requested.
 
 ---
 
@@ -1786,12 +1978,11 @@ type CombatFeedbackType =
   | "heal";
 ```
 
-
 Feedback events expire automatically.
 
 Current feedback duration:
 
-- `COMBAT_FEEDBACK_DURATION_MS = 900`
+- `COMBAT_FEEDBACK_DURATION_MS = 1000`
 
 Combat feedback may be used by attacks, gathering, skill effects, and temporary UI feedback.
 
@@ -1835,7 +2026,7 @@ Current world renderer behavior:
 - PixiJS renders the main world view.
 - React hosts the renderer and passes game state and command callbacks.
 - The renderer supports preview and full modes.
-- The renderer may draw floor chunks, walls, obstacles, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, drop visuals, resurrection feedback, and camera-follow presentation.
+- The renderer may draw floor chunks, walls, obstacles, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, drop visuals, resurrection feedback, world-wipe feedback, and camera-follow presentation.
 - PixiJS rendering must not own simulation rules, targeting rules, movement rules, combat rules, quest rules, or map data generation.
 
 Current companion visuals:
@@ -1879,12 +2070,13 @@ Current generated terrain asset direction may include:
 - 128x128 floor assets for the active floor-chunk render experiment
 - hub castle wall assets
 
-The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement. Floor chunk size and terrain asset size must not change simulation coordinates, movement, collision, pathing, map geometry, entity placement, teleports, gameplay ranges, or game logic.
+The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement.
+
+Floor chunk size and terrain asset size must not change simulation coordinates, movement, collision, pathing, map geometry, entity placement, teleports, gameplay ranges, or game logic.
 
 Visual asset registry responsibilities include defining sprite frame lists, frame duration, entity visual mapping, sprite animation selection, image icon mappings, terrain image mappings, and placeholder class names.
 
 Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or terrain image dimensions.
-
 
 ---
 
@@ -1892,13 +2084,11 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, companion resurrection, flask fountain refills, flask recharge progress, and flask charge gains.
-
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, companion resurrection, flask fountain refills, flask recharge progress, and flask charge gains.
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 
 Teleport/map transition telemetry may include previous map id, next map id, previous/next map display names, active teleport id, teleport source map, teleport target map, trigger source, entity positions before transition, entity positions after transition, and skip reason when available.
-
 
 Prototype inventory telemetry may include:
 
@@ -1912,9 +2102,6 @@ Prototype inventory telemetry may include:
 - `inventory_capacity_checked`
 
 Inventory telemetry should remain development-only and may include tick, item id, item category, requested quantity, added quantity, removed quantity, overflow quantity, slot index, stack quantity before, stack quantity after, used slots, capacity, and source.
-
-
-Debug telemetry should remain development-only.
 
 Prototype equipment telemetry may include:
 
@@ -1930,6 +2117,7 @@ Prototype equipment telemetry may include:
 
 Equipment telemetry should remain development-only and may include tick, companion id, companion class id, item id, item display name, item category, target slot, equipment type, previous item id, result, reason, used inventory slots, and inventory capacity.
 
+Debug telemetry should remain development-only.
 
 ---
 
@@ -1958,7 +2146,7 @@ Debug/testing helpers may exist for development:
 - interrupted POI restore testing
 - quest guide escort testing
 - PixiJS world renderer inspection
-
+- movement and navigation performance inspection
 
 These should remain isolated from core systems and must not define final gameplay behavior.
 
@@ -1966,10 +2154,11 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummy, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, and debug telemetry export.
-
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummy, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
+
+---
 
 ## Menu UI Technical Structure
 
@@ -1998,7 +2187,6 @@ React may:
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
 - display placeholder sections for future systems
 
-
 React must not:
 
 - define core simulation behavior
@@ -2007,7 +2195,6 @@ React must not:
 - define stat formulas, derived combat formulas, equipment rules, skills, formation, behavior settings, quest rules, POI selection rules, teleport rules, merchant rules, wallet rules, or advanced inventory rules inside React components
 - implement equipment UI beyond displaying game state and issuing commands to existing game logic unless explicitly requested
 - implement final zone routing, map discovery, travel costs, or production world-map behavior inside React components
-
 
 Current intended main menu views:
 
@@ -2034,7 +2221,6 @@ Current intended Party Management sections and controls:
 - Formation placeholder for UI only; automatic formation behavior lives in `partyFormationSystem.ts`
 - Behavior Settings for supported prototype auto-flask controls
 
-
 Role Select must use the existing `PartyMemberRole` values:
 
 ```ts
@@ -2050,14 +2236,21 @@ The Quests view may display prototype quest state and objective progress from ga
 
 The Inventory view may display wallet balance, but wallet and inventory rules must remain in game logic.
 
-The World Travel view may display the current map and known prototype region destinations. Selecting a destination may set `worldTravelTargetMapId`; the POI system then guides the party toward the next valid teleport step along the current prototype route.
+The World Travel view may display the current map and known prototype region destinations.
 
-Merchant UI may call existing merchant helper functions, but must not define exchange, buy, pricing, stock, inventory, or wallet rules inside React. Merchant Buy may display and purchase from fixed prototype stock through game logic. Merchant Sell may exist as a placeholder only until a real selling system is explicitly requested.
+Selecting a destination may set `worldTravelTargetMapId`; the POI system then guides the party toward the next valid teleport step along the current prototype route.
 
+Merchant UI may call existing merchant helper functions, but must not define exchange, buy, pricing, stock, inventory, or wallet rules inside React.
+
+Merchant Buy may display and purchase from fixed prototype stock through game logic.
+
+Merchant Sell may exist as a placeholder only until a real selling system is explicitly requested.
+
+---
 
 ## World Structure Future Work
 
-The final world is expected to be divided into zones/fields.
+The final world is expected to be divided into zones or fields.
 
 Future world systems may include:
 
@@ -2083,7 +2276,7 @@ Do not implement unless requested:
 - networking/server authority
 - full inventory/equipment economy beyond the current prototype shared party inventory
 - full equipment economy beyond the current prototype equipment foundation
-- equipment visuals, weapon anchoring, paper-doll rendering, or visible weapon swaps
+- equipment visuals, weapon anchoring, paper-doll rendering, paper-doll equipment, or visible weapon swaps
 - subclass progression
 - full ability framework
 - mana/resource cost system
@@ -2100,3 +2293,5 @@ Do not implement unless requested:
 - final death penalty, checkpoint, resurrection economy, or recovery system beyond prototype resurrection and world-wipe recovery
 - production enemy respawn, encounter reset, or spawn scheduling beyond current prototype wild-map respawn behavior
 - final POI/world-routing framework beyond debug-map POI guidance
+- production escort, follower, recruitment, or companion NPC systems beyond the current quest guide prototype
+- full town systems, interiors, crafting, smithing, recruitment, or NPC relationship systems
