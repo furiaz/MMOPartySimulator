@@ -21,7 +21,6 @@ import {
 } from "./state";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
-import { protectPartyMember } from "./partyProtectionSystem";
 import { recordResourceGatheredForQuests } from "./questSystem";
 import { ROLE_TUNING } from "./roleProfiles";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
@@ -66,6 +65,13 @@ export function updateGatherSystem(
     }
 
     if (!gatherer.currentTargetId) {
+      continue;
+    }
+
+    const playerIntentOverride = getPlayerIntentOverride(gatherer, nextState);
+
+    if (playerIntentOverride) {
+      nextState = updateEntity(nextState, playerIntentOverride);
       continue;
     }
 
@@ -243,9 +249,44 @@ function interruptGathererForEnemyAggro(
   const aggroState = updateEntity(state, attackingEnemy);
 
   return {
-    state: protectPartyMember(aggroState, gatherer, attackingEnemy),
-    interrupted: true,
+    state: aggroState,
+    interrupted: false,
   };
+}
+
+function getPlayerIntentOverride(
+  gatherer: AutonomousEntity,
+  state: GameState,
+): AutonomousEntity | null {
+  if (
+    gatherer.kind !== "companion" ||
+    gatherer.commandPriority !== "autonomous" ||
+    state.leaderIntent?.source !== "player"
+  ) {
+    return null;
+  }
+
+  if (
+    state.leaderIntent.type === "gather" &&
+    state.leaderIntent.targetId === gatherer.currentTargetId
+  ) {
+    return null;
+  }
+
+  if (
+    (state.leaderIntent.type === "attack" ||
+      state.leaderIntent.type === "gather") &&
+    state.leaderIntent.targetId
+  ) {
+    return {
+      ...gatherer,
+      state: state.leaderIntent.type,
+      currentTargetId: state.leaderIntent.targetId,
+      commandPriority: "autonomous",
+    };
+  }
+
+  return switchToFollow(gatherer);
 }
 
 function findGathererAggroThreat(

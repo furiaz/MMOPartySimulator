@@ -30,6 +30,27 @@ describe("enemy AI aggro and roaming", () => {
     });
   });
 
+  it("does not make companions target the enemy when aggro only acquires a chase target", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 0 });
+    const ally = createIdleCompanion("ally", { x: 4, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
+
+    const nextState = updateEnemyAISystem(createState([leader, ally, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+    });
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+    expect(nextState.entities[ally.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+  });
+
   it("uses doubled prototype leash and aggro tuning values", () => {
     expect(getEnemyHomeLeashDistance()).toBe(8);
     expect(getEnemyAttackLeashDistance()).toBe(16);

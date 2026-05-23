@@ -87,7 +87,7 @@ import {
   getPoiSearchScope,
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
-  issueCompanionCommands,
+  issuePartyOrder,
   isMerchantUnlockedForQuests,
   isMerchantNpc,
   quickExchangeParts,
@@ -99,7 +99,6 @@ import {
   resolveNavigationClickTarget,
   resolveWorldWipeRecoveryChoice,
   setAutoModeEnabled,
-  setLeaderIntent,
   setPartyLeader,
   setPartyMemberRole,
   setPartyOrder,
@@ -1531,7 +1530,6 @@ function App() {
   )
     ? selectedCompanionId
     : partyMembers[0]?.id ?? null;
-  const activePartyMemberIds = partyMembers.map((companion) => companion.id);
   const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
   const leader = getPartyLeader(gameState);
   const hasPartyLeader = Boolean(leader);
@@ -2037,37 +2035,21 @@ function App() {
       return;
     }
 
-    setGameState((state) => {
-      const target = state.entities[targetEnemyId];
-      const leader = getPartyLeader(state);
-
-      if (!leader) {
-        return state;
-      }
-
-      const leaderIntentState = setLeaderIntent(state, {
+    setGameState((state) =>
+      issuePartyOrder(state, {
         type: "attack",
         targetId: targetEnemyId,
-        targetPosition: target?.position ?? null,
-        source: "player",
-      });
-
-      return updateEntity(leaderIntentState, {
-        ...leader,
-        state: "follow",
-        currentTargetId: targetEnemyId,
-        commandPriority: "autonomous",
-      });
-    });
+      }),
+    );
   }
 
   function commandCompanionsToGatherResource(targetResourceId = targetResource?.id) {
-    if (activePartyMemberIds.length === 0 || !targetResourceId) {
+    if (!targetResourceId) {
       return;
     }
 
     setGameState((state) =>
-      issueCompanionCommands(state, activePartyMemberIds, {
+      issuePartyOrder(state, {
         type: "gather",
         targetId: targetResourceId,
       }),
@@ -2463,27 +2445,12 @@ function App() {
   }
 
   function commandPartyToMoveToPosition(targetPosition: Position) {
-    setGameState((state) => {
-      const leader = getPartyLeader(state);
-
-      if (!leader) {
-        return state;
-      }
-
-      const leaderIntentState = setLeaderIntent(state, {
+    setGameState((state) =>
+      issuePartyOrder(state, {
         type: "move",
-        targetId: null,
         targetPosition: { ...targetPosition },
-        source: "player",
-      });
-
-      return updateEntity(leaderIntentState, {
-        ...leader,
-        state: "follow",
-        currentTargetId: null,
-        commandPriority: "autonomous",
-      });
-    });
+      }),
+    );
   }
 
   function commandPartyToMoveFromFloorPosition(targetPosition: Position) {
@@ -2497,24 +2464,14 @@ function App() {
   function commandPartyToMoveFromMinimapPosition(clickedPosition: Position) {
     setGameState((state) => {
       const resolvedPosition = resolveNavigationClickTarget(state, clickedPosition);
-      const leader = getPartyLeader(state);
 
-      if (!resolvedPosition || !leader) {
+      if (!resolvedPosition) {
         return state;
       }
 
-      const leaderIntentState = setLeaderIntent(state, {
+      return issuePartyOrder(state, {
         type: "move",
-        targetId: null,
         targetPosition: resolvedPosition,
-        source: "player",
-      });
-
-      return updateEntity(leaderIntentState, {
-        ...leader,
-        state: "follow",
-        currentTargetId: null,
-        commandPriority: "autonomous",
       });
     });
   }

@@ -1,5 +1,4 @@
 import { getMovementStepDistance, isAutonomousEntity } from "./entities";
-import { protectPartyMember } from "./partyProtectionSystem";
 import {
   getEntityById,
   moveEntityTowardPositionIfUnoccupied,
@@ -74,10 +73,6 @@ export function updateEnemyAISystem(
       canKeepCurrentTarget(entity, currentTarget)
     ) {
       if (entity.state === "attack") {
-        if (isAutonomousEntity(currentTarget)) {
-          nextState = protectPartyMember(nextState, currentTarget, entity);
-        }
-
         continue;
       }
 
@@ -87,9 +82,6 @@ export function updateEnemyAISystem(
       };
 
       nextState = updateEntity(nextState, updatedEnemy);
-      if (isAutonomousEntity(currentTarget)) {
-        nextState = protectPartyMember(nextState, currentTarget, updatedEnemy);
-      }
       continue;
     }
 
@@ -127,9 +119,6 @@ export function updateEnemyAISystem(
     };
 
     nextState = updateEntity(nextState, updatedEnemy);
-    if (isAutonomousEntity(target)) {
-      nextState = protectPartyMember(nextState, target, updatedEnemy);
-    }
   }
 
   return nextState;

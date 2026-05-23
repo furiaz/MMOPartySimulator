@@ -358,9 +358,11 @@ export {
   issueEntityCommand,
   issueCompanionCommand,
   issueCompanionCommands,
+  issuePartyOrder,
   type CompanionCommand,
   type CompanionGroupCommand,
   type EntityCommand,
+  type PartyOrder,
 } from "./commands";
 export { updateGame } from "./updateGame";
 export {

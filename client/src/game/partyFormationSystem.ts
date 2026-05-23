@@ -154,6 +154,7 @@ function assignPartyTravelTargets(
   leader: PartyMember,
   plan: PartyPlan,
 ): GameState {
+  const hasPlayerIntent = hasDirectPlayerLeaderIntent(state);
   const isGatherIntent =
     !plan.target &&
     state.leaderIntent?.type === "gather" &&
@@ -190,7 +191,7 @@ function assignPartyTravelTargets(
       member.id === leader.id ||
       member.commandPriority === "direct" ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
-      isGathererBusy(nextState, member)
+      (!hasPlayerIntent && isGathererBusy(nextState, member))
     ) {
       continue;
     }
@@ -236,6 +237,7 @@ function assignPartyGatherTarget(
 }
 
 function assignPartyCombatTarget(state: GameState, targetId: string): GameState {
+  const hasPlayerIntent = hasDirectPlayerLeaderIntent(state);
   let nextState = setLeaderIntent(state, {
     type: "attack",
     targetId,
@@ -247,7 +249,7 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
     if (
       member.commandPriority === "direct" ||
       isCompanionResurrectionChanneling(nextState, member.id) ||
-      isGathererBusy(nextState, member)
+      (!hasPlayerIntent && isGathererBusy(nextState, member))
     ) {
       continue;
     }

@@ -1,4 +1,5 @@
 import { isAutonomousEntity } from "./entities";
+import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
   setLeaderIntent,
@@ -11,6 +12,7 @@ import type {
   CommandPriority,
   EntityState,
   LeaderIntent,
+  Position,
 } from "./types";
 
 type TargetedEntityCommandType = Exclude<EntityState, "idle" | "dead">;
@@ -50,6 +52,16 @@ export type CompanionGroupCommand =
       type: TargetedEntityCommandType;
       targetId: string;
       priority?: CommandPriority;
+    };
+
+export type PartyOrder =
+  | {
+      type: "move";
+      targetPosition: Position;
+    }
+  | {
+      type: "attack" | "gather";
+      targetId: string;
     };
 
 export function issueEntityCommand(
@@ -159,6 +171,37 @@ export function issueCompanionCommands(
   }, state);
 }
 
+export function issuePartyOrder(
+  state: GameState,
+  order: PartyOrder,
+): GameState {
+  const leader = getPartyLeader(state);
+
+  if (!leader) {
+    return state;
+  }
+
+  if (order.type !== "move" && !getEntityById(state, order.targetId)) {
+    return state;
+  }
+
+  let nextState = setLeaderIntent(state, getPlayerLeaderIntent(state, order));
+
+  for (const member of getPartyMembers(nextState)) {
+    if (member.state === "dead") {
+      continue;
+    }
+
+    nextState = updateEntity(nextState, {
+      ...member,
+      ...getPartyOrderEntityState(member.id, leader.id, order),
+      commandPriority: "autonomous",
+    });
+  }
+
+  return nextState;
+}
+
 function canApplyCommand(
   entity: AutonomousEntity,
   commandPriority: CommandPriority,
@@ -176,6 +219,46 @@ function getLeaderIntentFromCommand(
     type: getLeaderIntentType(command.type),
     targetId: command.targetId,
     targetPosition,
+    source: command.priority === "autonomous" ? "ai" : "player",
+  };
+}
+
+function getPlayerLeaderIntent(
+  state: GameState,
+  order: PartyOrder,
+): LeaderIntent {
+  if (order.type === "move") {
+    return {
+      type: "move",
+      targetId: null,
+      targetPosition: { ...order.targetPosition },
+      source: "player",
+    };
+  }
+
+  return {
+    type: order.type,
+    targetId: order.targetId,
+    targetPosition: getEntityById(state, order.targetId)?.position ?? null,
+    source: "player",
+  };
+}
+
+function getPartyOrderEntityState(
+  memberId: string,
+  leaderId: string,
+  order: PartyOrder,
+): Pick<AutonomousEntity, "state" | "currentTargetId"> {
+  if (order.type === "move") {
+    return {
+      state: "follow",
+      currentTargetId: memberId === leaderId ? null : leaderId,
+    };
+  }
+
+  return {
+    state: order.type,
+    currentTargetId: order.targetId,
   };
 }
 

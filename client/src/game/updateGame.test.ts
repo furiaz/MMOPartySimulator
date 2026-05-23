@@ -1376,7 +1376,7 @@ describe("game update intent priority", () => {
       commandPriority: "direct",
     });
     expect(nextState.entities[resource.id]).toMatchObject({
-      durability: resource.durability,
+      durability: 3,
       quantity: resource.quantity,
     });
   });
@@ -1526,7 +1526,7 @@ describe("game update intent priority", () => {
     expect(nextState.interruptedPoiTarget?.localPoiTarget?.targetEntityId).toBe(wood.id);
   });
 
-  it("remembers a direct gather command when aggro interrupts without a POI", () => {
+  it("does not interrupt direct gather commands when enemy aggro only starts chasing", () => {
     const resource = createResource("direct-resource", { x: 8, y: 4 });
     const leader = {
       ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
@@ -1550,11 +1550,12 @@ describe("game update intent priority", () => {
       }),
     );
 
-    expect(nextState.leaderIntent?.targetId).toBe(attacker.id);
-    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
-      type: "gather",
-      targetId: resource.id,
-      source: "player",
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.interruptedPoiTarget).toBeUndefined();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
     });
   });
 
@@ -2197,7 +2198,7 @@ describe("game update intent priority", () => {
           type: "move",
           targetId: null,
           targetPosition: { x: 20, y: 2 },
-          source: "player",
+          source: "ai",
         },
         quests: createQuestStates(),
       }),
@@ -2227,7 +2228,7 @@ describe("game update intent priority", () => {
           type: "move",
           targetId: null,
           targetPosition: { x: 20, y: 2 },
-          source: "player",
+          source: "ai",
         },
         quests: createQuestStates(),
       }),
@@ -2236,6 +2237,40 @@ describe("game update intent priority", () => {
     expect(nextState.entities[gatherer.id]).toMatchObject({
       state: "gather",
       currentTargetId: resource.id,
+    });
+  });
+
+  it("reclaims autonomous gatherers when the player gives a move order", () => {
+    const leader = createLeader({ x: 2, y: 2 });
+    const gatherer = {
+      ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: "gatherer-resource",
+      commandPriority: "autonomous" as const,
+    };
+    const resource = createResource("gatherer-resource", { x: 6, y: 2 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gatherer, resource], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        leaderIntent: {
+          type: "move",
+          targetId: null,
+          targetPosition: { x: 20, y: 2 },
+          source: "player",
+        },
+        quests: createQuestStates(),
+      }),
+    );
+
+    expect(nextState.entities[gatherer.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+    expect(nextState.entities[resource.id]).toMatchObject({
+      durability: resource.durability,
+      quantity: resource.quantity,
     });
   });
 
@@ -2542,7 +2577,7 @@ describe("game update intent priority", () => {
           type: "move",
           targetId: null,
           targetPosition: { x: 15, y: 2 },
-          source: "player",
+          source: "ai",
         },
         quests: createQuestStates(),
       }),
@@ -2788,7 +2823,7 @@ describe("game update intent priority", () => {
           type: "move",
           targetId: null,
           targetPosition: { x: 18, y: 10 },
-          source: "player",
+          source: "ai",
         },
         quests: createQuestStates(),
       }),
@@ -2820,7 +2855,7 @@ describe("game update intent priority", () => {
           type: "move",
           targetId: null,
           targetPosition: { x: 18, y: 10 },
-          source: "player",
+          source: "ai",
         },
         quests: createQuestStates(),
       }),
@@ -2853,7 +2888,7 @@ describe("game update intent priority", () => {
           type: "move",
           targetId: null,
           targetPosition: { x: 18, y: 10 },
-          source: "player",
+          source: "ai",
         },
         quests: createQuestStates(),
       }),
@@ -3034,7 +3069,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("clears auto POI during player move while gatherers still choose nearby resources", () => {
+  it("clears auto POI during player move and keeps gatherers on the player order", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const gatherer = {
       ...createCompanion("gatherer", { x: 5, y: 2 }, leader.id, "gatherer"),
@@ -3076,8 +3111,8 @@ describe("game update intent priority", () => {
       source: "player",
     });
     expect(nextState.entities[gatherer.id]).toMatchObject({
-      state: "gather",
-      currentTargetId: resource.id,
+      state: "follow",
+      currentTargetId: leader.id,
     });
   });
 
