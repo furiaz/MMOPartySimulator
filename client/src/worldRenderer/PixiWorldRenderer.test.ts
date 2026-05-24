@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CombatFeedbackEvent, GameMap } from "../game";
+import { createEnemy, createTargetDummy } from "../game";
 import {
   getCombatFeedbackLaneKey,
+  getEnemyNameplateColor,
+  getEnemyNameplateText,
   getFullVisibleTileBounds,
   getPreviewMapPosition,
   isPositionInTileBounds,
@@ -177,5 +180,27 @@ describe("getCombatFeedbackLaneKey", () => {
         type: "attack",
       }),
     ).toBe("feedback-event:blocked-1:attack");
+  });
+});
+
+describe("enemy nameplates", () => {
+  it("uses enemy type display name with level", () => {
+    const enemy = createEnemy("bat", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "cave_bat",
+    });
+
+    expect(getEnemyNameplateText(enemy)).toBe("Cave Bat Lv 2");
+  });
+
+  it("uses red text for aggressive enemies", () => {
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
+
+    expect(getEnemyNameplateColor(enemy)).toBe(0xdc2626);
+  });
+
+  it("uses target dummy display text when no enemy type is set", () => {
+    const dummy = createTargetDummy("dummy", { x: 0, y: 0 });
+
+    expect(getEnemyNameplateText(dummy)).toBe("Target Dummy Lv 1");
   });
 });

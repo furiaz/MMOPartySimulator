@@ -26,6 +26,8 @@ import type {
 } from "../game";
 import {
   getEnemyAggroRange,
+  getEnemyArchetype,
+  getEnemyType,
   getEntityCollisionShape,
   getItemDefinition,
   isActiveResource,
@@ -57,6 +59,9 @@ const damageNumberRotationRadians = 0.32;
 const criticalHitBackingSize = 128;
 const deadEnemyFadeDurationMs = 2500;
 const entityFeedbackTintDurationMs = 260;
+const enemyNameplateFontSize = 10;
+const aggressiveEnemyNameplateColor = 0xdc2626;
+const passiveEnemyNameplateColor = 0x1f2937;
 const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
@@ -1194,6 +1199,61 @@ function drawHealthBar(
 
   graphics.rect(x, y, width, height).fill({ color: 0x0f172a, alpha: 0.9 });
   graphics.rect(x, y, width * healthPercent, height).fill(healthColor);
+}
+
+export function getEnemyNameplateText(
+  enemy: Extract<GameEntity, { kind: "enemy" }>,
+): string {
+  const enemyType = getEnemyType(enemy.enemyTypeId);
+  const archetype = getEnemyArchetype(enemy.archetypeId);
+  const displayName =
+    enemyType?.displayName ??
+    archetype?.displayName ??
+    (enemy.isTargetDummy ? "Target Dummy" : "Enemy");
+
+  return `${displayName} Lv ${enemy.level}`;
+}
+
+export function getEnemyNameplateColor(
+  enemy: Extract<GameEntity, { kind: "enemy" }>,
+): number {
+  return enemy.aggressionMode === "aggressive"
+    ? aggressiveEnemyNameplateColor
+    : passiveEnemyNameplateColor;
+}
+
+function drawEnemyNameplate({
+  enemy,
+  layer,
+  managedState,
+  metrics,
+  transform,
+}: {
+  enemy: Extract<GameEntity, { kind: "enemy" }>;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  transform: FullTransform;
+}) {
+  if (enemy.state === "dead" || enemy.health <= 0) {
+    return;
+  }
+
+  const center = toFullPosition(enemy.position, transform);
+
+  drawManagedFeedbackText({
+    color: getEnemyNameplateColor(enemy),
+    fontSize: enemyNameplateFontSize,
+    key: `enemy-nameplate:${enemy.id}`,
+    layer,
+    managedState,
+    metrics,
+    position: {
+      x: center.x,
+      y: center.y - transform.cellPixelSize * 0.92,
+    },
+    text: getEnemyNameplateText(enemy),
+  });
 }
 
 function drawEnemyAttackWindupBar(
@@ -3360,6 +3420,16 @@ function drawFullMap({
 
     drawHealthBar(overlayGraphics, entity, transform);
     drawEnemyAttackWindupBar(overlayGraphics, entity, currentTime, transform);
+
+    if (entity.kind === "enemy") {
+      drawEnemyNameplate({
+        enemy: entity,
+        layer: layers.effectsLayer,
+        managedState,
+        metrics,
+        transform,
+      });
+    }
   }
 
   const targetEntity = leaderIntent?.targetId
