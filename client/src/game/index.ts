@@ -390,6 +390,7 @@ export {
   getAttackCooldownMs,
   updateAttackSystem,
 } from "./attackSystem";
+export { getDefenseReductionPercent } from "./combatResolver";
 export {
   DEFAULT_COMPANION_ATTACK_RANGE,
   getCompanionAttackRange,

@@ -1616,6 +1616,60 @@
   font-weight: 900;
 }
 
+.entity-hover-tooltip {
+  position: fixed;
+  z-index: 80;
+  width: fit-content;
+  min-width: 132px;
+  max-width: min(260px, calc(100vw - 24px));
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.3);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(10px);
+  color: #e6f0f2;
+  pointer-events: none;
+}
+
+.entity-hover-tooltip strong {
+  display: block;
+  min-width: 0;
+  margin-bottom: 7px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.entity-hover-tooltip dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.entity-hover-tooltip div {
+  display: grid;
+  grid-template-columns: max-content minmax(0, max-content);
+  gap: 8px;
+  min-width: 0;
+}
+
+.entity-hover-tooltip dt,
+.entity-hover-tooltip dd {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.entity-hover-tooltip dt {
+  color: rgba(230, 240, 242, 0.62);
+  text-transform: uppercase;
+}
+
+.entity-hover-tooltip dd {
+  color: #ffffff;
+}
+
 .placeholder-box {
   padding: 10px;
   border: 1px dashed rgba(122, 166, 173, 0.76);

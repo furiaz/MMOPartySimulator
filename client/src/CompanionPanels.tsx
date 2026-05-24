@@ -16,6 +16,7 @@ import {
   getCompanionEquipmentStatModifiers,
   getCompanionActualStats,
   getCompanionDerivedStats,
+  getDefenseReductionPercent,
   getItemDefinition,
   isFlaskItemDefinition,
   isFoodItemDefinition,
@@ -126,6 +127,36 @@ const primaryStatIds: PrimaryStatId[] = [
   "intelligence",
   "wisdom",
 ];
+
+const primaryStatDescriptions: Record<PrimaryStatId, string> = {
+  strength: "Increases physical attack and block.",
+  dexterity: "Increases accuracy, evasion, and helps attack.",
+  constitution: "Increases max HP, defense, block, and health regen.",
+  intelligence: "Increases magic power and helps healing and magic defense.",
+  wisdom: "Increases healing power, magic defense, and helps magic power, accuracy, and defense.",
+};
+
+type DerivedStatId =
+  | "health"
+  | keyof ReturnType<typeof getCompanionDerivedStats>
+  | "gatherSpeed";
+
+const derivedStatDescriptions: Record<DerivedStatId, string> = {
+  health: "Increases survivability; based mainly on Constitution and level.",
+  attack: "Affects physical damage; based mainly on Strength, then Dexterity.",
+  defense: "Mitigates physical damage; based mainly on Constitution, then Wisdom.",
+  maxHealth: "Increases survivability; based mainly on Constitution and level.",
+  evasion: "Helps avoid incoming attacks; based on Dexterity.",
+  block: "Can reduce physical hits; based mainly on Constitution, then Strength.",
+  magicPower: "Affects magic damage; based mainly on Intelligence, then Wisdom.",
+  healingPower: "Affects healing output; based mainly on Wisdom, then Intelligence.",
+  magicDefense: "Mitigates magic damage; based mainly on Wisdom, then Intelligence.",
+  accuracy: "Helps attacks connect; based mainly on Dexterity, then Wisdom.",
+  criticalChance: "Chance for stronger hits; currently base and equipment driven.",
+  criticalDamage: "Strength of critical hits; currently base and equipment driven.",
+  healthRegen: "Passive recovery; based mainly on Constitution.",
+  gatherSpeed: "Affects gathering progress; based on companion gather speed and effects.",
+};
 
 function getCharacterXpText(member: Companion): string {
   const progress = getCharacterXpProgress(member);
@@ -1374,7 +1405,7 @@ function StatsSection({
         <span className="equipment-section-label">Base Stats</span>
         <dl className="base-stat-grid">
           {primaryStatIds.map((statId) => (
-            <div key={statId}>
+            <div key={statId} title={primaryStatDescriptions[statId]}>
               <dt>{primaryStatLabels[statId]}</dt>
               <dd>{actualStats[statId]}</dd>
               <button
@@ -1382,7 +1413,7 @@ function StatsSection({
                 onClick={() => onAllocateStatPoint(member.id, statId)}
                 title={
                   member.unspentStatPoints > 0
-                    ? `Allocate 1 point to ${primaryStatLabels[statId]}`
+                    ? `Allocate 1 point to ${primaryStatLabels[statId]}. ${primaryStatDescriptions[statId]}`
                     : "No stat points available"
                 }
                 type="button"
@@ -1422,57 +1453,60 @@ function StatsSection({
       </dl>
       <span className="equipment-section-label">Derived Stats</span>
       <dl className="full-stat-grid">
-        <div>
+        <div title={derivedStatDescriptions.health}>
           <dt>Health</dt>
           <dd>
             {member.health}/{derivedStats.maxHealth}
           </dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.attack}>
           <dt>Attack</dt>
           <dd>{derivedStats.attack}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.defense}>
           <dt>Defense</dt>
-          <dd>{derivedStats.defense}</dd>
+          <dd>
+            {derivedStats.defense} (
+            {getDefenseReductionPercent(derivedStats.defense)}%)
+          </dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.magicDefense}>
           <dt>Magic Defense</dt>
           <dd>{derivedStats.magicDefense}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.accuracy}>
           <dt>Accuracy</dt>
           <dd>{derivedStats.accuracy}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.block}>
           <dt>Block</dt>
           <dd>{derivedStats.block}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.evasion}>
           <dt>Evasion</dt>
           <dd>{derivedStats.evasion}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.magicPower}>
           <dt>Magic Power</dt>
           <dd>{derivedStats.magicPower}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.healingPower}>
           <dt>Healing Power</dt>
           <dd>{derivedStats.healingPower}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.criticalChance}>
           <dt>Critical Chance</dt>
           <dd>{Math.round(derivedStats.criticalChance * 100)}%</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.criticalDamage}>
           <dt>Critical Damage</dt>
           <dd>{Math.round(derivedStats.criticalDamage * 100)}%</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.healthRegen}>
           <dt>Health Regen</dt>
           <dd>{derivedStats.healthRegen}</dd>
         </div>
-        <div>
+        <div title={derivedStatDescriptions.gatherSpeed}>
           <dt>Gather Speed</dt>
           <dd>{member.gatherSpeed}</dd>
         </div>

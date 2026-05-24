@@ -67,6 +67,9 @@ import {
   formatCurrencyDisplay,
   getAvailableInventorySlots,
   getCurrencyBalance,
+  getCompanionDerivedStats,
+  getEnemyArchetype,
+  getEnemyType,
   getFilteredMerchantBuyStock,
   getItemDefinition,
   getMerchantBuyStock,
@@ -121,6 +124,7 @@ import {
   type Enemy,
   type EquipmentSlot,
   type EquipmentStatModifiers,
+  type GameEntity,
   type GameState,
   type ItemDefinition,
   type ItemId,
@@ -188,6 +192,11 @@ type NpcInteractionKind = "merchant" | "quest_giver";
 
 type MerchantBuyFilter = "all" | MerchantStockGroup;
 
+type EntityHoverTooltipState = {
+  entityId: string;
+  position: Position;
+};
+
 const merchantBuyFilterLabels: Record<MerchantBuyFilter, string> = {
   all: "All",
   flasks: "Flasks",
@@ -221,6 +230,49 @@ const primaryStatLabels: Record<PrimaryStatId, string> = {
   intelligence: "Intelligence",
   wisdom: "Wisdom",
 };
+
+const partyMemberRoleLabels: Record<PartyMemberRole, string> = {
+  defender: "Defender",
+  fighter: "Fighter",
+  support: "Support",
+  gatherer: "Gatherer",
+  none: "None / Unassigned",
+};
+
+const entityStateLabels: Record<GameEntity["state"], string> = {
+  idle: "Idle",
+  follow: "Following",
+  attack: "Attacking",
+  gather: "Gathering",
+  defend: "Defending",
+  dead: "Dead",
+};
+
+const resourceTypeLabels: Record<ResourceEntity["resourceType"], string> = {
+  wood: "Wood",
+  ore: "Ore",
+  herb: "Herb",
+};
+
+const npcRoleLabels: Record<NpcEntity["npcRole"], string> = {
+  merchant: "Merchant",
+  quest_giver: "Quest Giver",
+  smith: "Smith",
+  dog: "Dog",
+  test_blade: "Test Blade",
+  quest_guide: "Quest Guide",
+};
+
+const enemyTemperamentLabels: Record<Enemy["aggressionMode"], string> = {
+  passive: "Passive",
+  aggressive: "Aggressive",
+};
+
+const enemyTargetPreferenceLabels = {
+  closest: "Closest party member",
+  leader: "Current leader",
+  lowestHealth: "Lowest-health party member",
+} as const;
 
 const merchantBuyFailureMessages: Record<MerchantBuyFailureReason, string> = {
   invalid_merchant: "Merchant unavailable",
@@ -1495,10 +1547,117 @@ function formatMerchantModifier(value: number): string {
   return `${value > 0 ? "+" : ""}${value}`;
 }
 
+function EntityHoverTooltip({
+  entity,
+  position,
+  viewportSize,
+}: {
+  entity: GameEntity;
+  position: Position;
+  viewportSize: ViewportSize;
+}) {
+  const tooltipWidth = 260;
+  const x = Math.min(position.x + 16, viewportSize.width - tooltipWidth - 12);
+  const y = Math.min(position.y + 16, viewportSize.height - 140);
+  const tooltipPosition = {
+    left: Math.max(12, x),
+    top: Math.max(12, y),
+  };
+  const details = getEntityHoverDetails(entity);
+
+  return (
+    <aside
+      className="entity-hover-tooltip"
+      style={tooltipPosition}
+      aria-label={`${details.title} details`}
+    >
+      <strong>{details.title}</strong>
+      <dl>
+        {details.rows.map((row) => (
+          <div key={row.label}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </aside>
+  );
+}
+
+function getEntityHoverDetails(entity: GameEntity): {
+  title: string;
+  rows: Array<{ label: string; value: string }>;
+} {
+  if (entity.kind === "companion") {
+    const derivedStats = getCompanionDerivedStats(entity);
+
+    return {
+      title: getCompanionDisplayName(entity),
+      rows: [
+        { label: "Class", value: CLASS_DEFINITIONS[entity.classId].displayName },
+        { label: "Role", value: partyMemberRoleLabels[entity.role] },
+        { label: "HP", value: `${entity.health}/${derivedStats.maxHealth}` },
+        { label: "State", value: entityStateLabels[entity.state] },
+      ],
+    };
+  }
+
+  if (entity.kind === "enemy") {
+    const enemyType = getEnemyType(entity.enemyTypeId);
+    const archetype = getEnemyArchetype(entity.archetypeId);
+    const targetStyle =
+      enemyType?.targetPreference &&
+      enemyTargetPreferenceLabels[enemyType.targetPreference];
+
+    return {
+      title: enemyType?.displayName ?? archetype?.displayName ?? "Enemy",
+      rows: [
+        { label: "Level", value: entity.level.toString() },
+        { label: "HP", value: `${entity.health}/${entity.maxHealth}` },
+        {
+          label: "Temperament",
+          value: enemyTemperamentLabels[entity.aggressionMode],
+        },
+        { label: "Target Style", value: targetStyle ?? "Closest party member" },
+      ],
+    };
+  }
+
+  if (entity.kind === "resource") {
+    return {
+      title: resourceTypeLabels[entity.resourceType],
+      rows: [
+        { label: "Type", value: resourceTypeLabels[entity.resourceType] },
+        { label: "Tier", value: entity.tier.toString() },
+        {
+          label: "Durability",
+          value: `${entity.durability}/${entity.maxDurability}`,
+        },
+      ],
+    };
+  }
+
+  return {
+    title: entity.displayName,
+    rows: [
+      { label: "Name", value: entity.displayName },
+      { label: "Role", value: npcRoleLabels[entity.npcRole] },
+    ],
+  };
+}
+
+function getCompanionDisplayName(member: Companion): string {
+  const index = companionIds.indexOf(member.id);
+
+  return index >= 0 ? `Companion ${index + 1}` : member.id;
+}
+
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(false);
+  const [entityHoverTooltip, setEntityHoverTooltip] =
+    useState<EntityHoverTooltipState | null>(null);
   const [showDebugTools, setShowDebugTools] = useState(false);
   const [isGameMenuOpen, setIsGameMenuOpen] = useState(false);
   const [activeGameMenuTab, setActiveGameMenuTab] =
@@ -2215,6 +2374,30 @@ function App() {
     setShowEntityInfo((isVisible) => !isVisible);
   }
 
+  const updateEntityHoverTooltip = useCallback(
+    (entityId: string | null, pointerPosition?: Position) => {
+      setEntityHoverTooltip((currentTooltip) => {
+        if (!entityId || !pointerPosition) {
+          return currentTooltip === null ? currentTooltip : null;
+        }
+
+        if (
+          currentTooltip?.entityId === entityId &&
+          currentTooltip.position.x === pointerPosition.x &&
+          currentTooltip.position.y === pointerPosition.y
+        ) {
+          return currentTooltip;
+        }
+
+        return {
+          entityId,
+          position: pointerPosition,
+        };
+      });
+    },
+    [],
+  );
+
   function toggleDebugTools() {
     setShowDebugTools((isVisible) => !isVisible);
   }
@@ -2600,6 +2783,9 @@ function App() {
   const useHubVisuals = isHubVisualMap(currentMap.id);
   const mapPixelWidth = currentMap.columns * mapConstructionCellPixelSize;
   const mapPixelHeight = currentMap.rows * mapConstructionCellPixelSize;
+  const hoveredEntity = entityHoverTooltip
+    ? gameState.entities[entityHoverTooltip.entityId]
+    : null;
   const leaderCameraPosition = leader?.position ?? { x: 0, y: 0 };
   const leaderCameraFocusPosition = {
     x: leaderCameraPosition.x * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
@@ -2783,6 +2969,7 @@ function App() {
             map={currentMap}
             mode="full"
             onEnemyClick={commandPartyToTargetEnemy}
+            onEntityHover={updateEntityHoverTooltip}
             onFloorClick={commandPartyToMoveFromFloorPosition}
             onNpcClick={commandPartyToInteractWithNpc}
             onPerformanceSample={handleRendererPerformanceSample}
@@ -2799,6 +2986,13 @@ function App() {
             viewportSize={viewportSize}
             visualMovementByEntityId={visualMovementByEntityId}
           />
+          {hoveredEntity && entityHoverTooltip ? (
+            <EntityHoverTooltip
+              entity={hoveredEntity}
+              position={entityHoverTooltip.position}
+              viewportSize={viewportSize}
+            />
+          ) : null}
           <PixiWorldRenderer
             activeTeleport={activeTeleport}
             cameraOffset={terrainCameraOffset}

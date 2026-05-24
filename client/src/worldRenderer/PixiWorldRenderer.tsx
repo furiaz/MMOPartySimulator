@@ -95,6 +95,10 @@ type PixiWorldRendererProps = {
   map: GameMap;
   mode?: PixiRendererMode;
   onEnemyClick?: (enemyId: string) => void;
+  onEntityHover?: (
+    entityId: string | null,
+    pointerPosition?: Position,
+  ) => void;
   onFloorClick?: (position: Position) => void;
   onNpcClick?: (npcId: string) => void;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
@@ -855,36 +859,24 @@ function getNearestInteractableEntity({
         (entity): entity is InteractableEntity =>
           entity.kind === kind && isInteractableEntity(entity),
       )
-      .filter((entity) => {
-        if (isInsideImageContentBounds(entity, map, mapPosition, cellPixelSize)) {
-          return true;
-        }
-
-        return !hasImageContentBounds(entity, map);
-      })
       .map((entity) => {
-        const isContentBoundsHit = isInsideImageContentBounds(
+        const hit = getEntityPointerHit({
+          cellPixelSize,
           entity,
           map,
           mapPosition,
-          cellPixelSize,
-        );
-        const anchorXDistance = mapPosition.x - entity.position.x;
-        const anchorYDistance = mapPosition.y - entity.position.y;
-        const centerXDistance = mapPosition.x - (entity.position.x + 0.5);
-        const centerYDistance = mapPosition.y - (entity.position.y + 0.5);
-        const anchorDistanceSquared =
-          anchorXDistance * anchorXDistance + anchorYDistance * anchorYDistance;
-        const centerDistanceSquared =
-          centerXDistance * centerXDistance + centerYDistance * centerYDistance;
+        });
 
-        return {
-          distanceSquared: isContentBoundsHit
-            ? 0
-            : Math.min(anchorDistanceSquared, centerDistanceSquared),
-          entity,
-        };
+        return hit ? { ...hit, entity } : null;
       })
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          distanceSquared: number;
+          entity: InteractableEntity;
+        } => Boolean(candidate),
+      )
       .filter((candidate) => candidate.distanceSquared <= maximumDistanceSquared)
       .sort(
         (first, second) =>
@@ -898,6 +890,100 @@ function getNearestInteractableEntity({
   }
 
   return null;
+}
+
+function getNearestHoverEntity({
+  cellPixelSize,
+  entities,
+  map,
+  mapPosition,
+}: {
+  cellPixelSize: number;
+  entities: GameEntity[];
+  map: GameMap;
+  mapPosition: Position;
+}): GameEntity | null {
+  const priorities: Array<GameEntity["kind"]> = [
+    "companion",
+    "npc",
+    "resource",
+    "enemy",
+  ];
+  const maximumDistanceSquared =
+    fullModeInteractionRadius * fullModeInteractionRadius;
+
+  for (const kind of priorities) {
+    const nearest = entities
+      .filter((entity) => entity.kind === kind && shouldRenderEntity(entity))
+      .map((entity) => {
+        const hit = getEntityPointerHit({
+          cellPixelSize,
+          entity,
+          map,
+          mapPosition,
+        });
+
+        return hit ? { ...hit, entity } : null;
+      })
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          distanceSquared: number;
+          entity: GameEntity;
+        } => Boolean(candidate),
+      )
+      .filter((candidate) => candidate.distanceSquared <= maximumDistanceSquared)
+      .sort(
+        (first, second) =>
+          first.distanceSquared - second.distanceSquared ||
+          first.entity.id.localeCompare(second.entity.id),
+      )[0]?.entity;
+
+    if (nearest) {
+      return nearest;
+    }
+  }
+
+  return null;
+}
+
+function getEntityPointerHit({
+  cellPixelSize,
+  entity,
+  map,
+  mapPosition,
+}: {
+  cellPixelSize: number;
+  entity: GameEntity;
+  map: GameMap;
+  mapPosition: Position;
+}): { distanceSquared: number } | null {
+  const isContentBoundsHit = isInsideImageContentBounds(
+    entity,
+    map,
+    mapPosition,
+    cellPixelSize,
+  );
+
+  if (!isContentBoundsHit && hasImageContentBounds(entity, map)) {
+    return null;
+  }
+
+  const anchorXDistance = mapPosition.x - entity.position.x;
+  const anchorYDistance = mapPosition.y - entity.position.y;
+  const centerXDistance = mapPosition.x - (entity.position.x + 0.5);
+  const centerYDistance = mapPosition.y - (entity.position.y + 0.5);
+  const anchorDistanceSquared =
+    anchorXDistance * anchorXDistance + anchorYDistance * anchorYDistance;
+  const centerDistanceSquared =
+    centerXDistance * centerXDistance + centerYDistance * centerYDistance;
+
+  return {
+    distanceSquared: isContentBoundsHit
+      ? 0
+      : Math.min(anchorDistanceSquared, centerDistanceSquared),
+  };
 }
 
 function hasImageContentBounds(entity: GameEntity, map: GameMap): boolean {
@@ -3368,6 +3454,7 @@ export function PixiWorldRenderer({
   map,
   mode = "preview",
   onEnemyClick,
+  onEntityHover,
   onFloorClick,
   onNpcClick,
   onPerformanceSample,
@@ -3748,11 +3835,44 @@ export function PixiWorldRenderer({
     onFloorClick?.(getFloorPosition(mapPosition));
   }
 
+  function handleRendererMouseMove(event: MouseEvent<HTMLDivElement>) {
+    if (mode !== "full" || !onEntityHover) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const mapPosition = getFullMapPosition(
+      { x: event.clientX, y: event.clientY },
+      bounds,
+      {
+        cameraOffset,
+        cellPixelSize,
+      },
+    );
+    const entity = getNearestHoverEntity({
+      cellPixelSize,
+      entities: sortedEntities,
+      map,
+      mapPosition,
+    });
+
+    onEntityHover(
+      entity?.id ?? null,
+      entity ? { x: event.clientX, y: event.clientY } : undefined,
+    );
+  }
+
+  function handleRendererMouseLeave() {
+    onEntityHover?.(null);
+  }
+
   return (
     <div
       ref={hostRef}
       className={`pixi-world-renderer pixi-world-renderer-${mode}`}
       onClick={handleRendererClick}
+      onMouseLeave={handleRendererMouseLeave}
+      onMouseMove={handleRendererMouseMove}
       aria-label={
         mode === "full"
           ? "PixiJS full world renderer"

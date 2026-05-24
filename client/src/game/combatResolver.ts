@@ -273,6 +273,10 @@ function getDefenseReduction(defense: number): number {
   return DEFENSE_REDUCTION_FACTOR * defense / (defense + DEFENSE_SOFTNESS);
 }
 
+export function getDefenseReductionPercent(defense: number): number {
+  return Math.round(getDefenseReduction(defense) * 100);
+}
+
 function getEvasionChance(evasion: number, attackerAccuracy: number): number {
   return EVASION_FACTOR * evasion / (evasion + attackerAccuracy + EVASION_SOFTNESS);
 }

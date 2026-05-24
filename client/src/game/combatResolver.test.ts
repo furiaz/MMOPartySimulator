@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { resolveAndApplyCombatDamage } from "./combatResolver";
+import {
+  getDefenseReductionPercent,
+  resolveAndApplyCombatDamage,
+} from "./combatResolver";
 import { createCompanion, createEnemy } from "./entities";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 import type { CompanionPrimaryStats, GameEntity } from "./types";
 
 describe("combat resolver", () => {
+  it("exposes defense mitigation as a rounded display percent", () => {
+    expect(getDefenseReductionPercent(0)).toBe(0);
+    expect(getDefenseReductionPercent(50)).toBe(30);
+  });
+
   it("applies physical companion attack power through the shared resolver", () => {
     const attacker = withStats(
       createCompanion("attacker", { x: 0, y: 0 }, "attacker"),
