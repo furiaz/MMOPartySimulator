@@ -1,11 +1,16 @@
-import { getFollowTrailPosition, type GameState } from "./state";
+import {
+  ENTITY_COLLISION_DISTANCE,
+  getFollowTrailPosition,
+  type GameState,
+} from "./state";
 import { getOrderedPartyMembers, type PartyMember } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
-import type { Position } from "./types";
+import type { GameEntity, Position } from "./types";
 
 const SOFT_SIDE_SPACING = 0.9;
 const SOFT_BACK_SPACING = 0.45;
 const STACK_DISTANCE = 0.45;
+export const COMBAT_PARTY_SPACING_DISTANCE = ENTITY_COLLISION_DISTANCE;
 
 export function getSoftFollowPosition(
   state: GameState,
@@ -41,6 +46,36 @@ export function isStackedWithPartyMember(
       otherMember.id !== member.id &&
       getEuclideanDistance(member.position, otherMember.position) < STACK_DISTANCE,
   );
+}
+
+export function isCombatPositionSpacedFromParty(
+  state: GameState,
+  attacker: GameEntity,
+  position: Position,
+): boolean {
+  if (attacker.kind !== "companion") {
+    return true;
+  }
+
+  return getOrderedPartyMembers(state).every((member) => {
+    if (
+      member.id === attacker.id ||
+      member.state === "dead" ||
+      member.health <= 0
+    ) {
+      return true;
+    }
+
+    const reservedPosition = state.reservedPositionsByEntityId?.[member.id];
+
+    return (
+      getEuclideanDistance(position, member.position) >=
+        COMBAT_PARTY_SPACING_DISTANCE &&
+      (!reservedPosition ||
+        getEuclideanDistance(position, reservedPosition) >=
+          COMBAT_PARTY_SPACING_DISTANCE)
+    );
+  });
 }
 
 function getLeaderDirection(

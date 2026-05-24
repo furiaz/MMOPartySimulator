@@ -129,6 +129,69 @@ describe("enemy attack leash movement", () => {
       health: companion.health - enemy.attack,
     });
   });
+
+  it("moves attacking companions toward distinct combat positions around the same target", () => {
+    const first = createAttackingCompanion("first", { x: 3, y: 5 }, 0);
+    const second = createAttackingCompanion("second", { x: 3, y: 5.2 }, 1);
+    const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
+      maxHealth: 50,
+    });
+    let state = createState([first, second, enemy]);
+
+    for (let tick = 0; tick < 3; tick += 1) {
+      state = updateAttackSystem(
+        {
+          ...state,
+          simulationDeltaMs: 100,
+          simulationTimeMs: tick * 100,
+        },
+        new Set(),
+        1000 + tick * 100,
+      );
+    }
+
+    const movedFirst = state.entities[first.id];
+    const movedSecond = state.entities[second.id];
+    const distance = Math.hypot(
+      movedFirst.position.x - movedSecond.position.x,
+      movedFirst.position.y - movedSecond.position.y,
+    );
+
+    expect(distance).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("repositions an in-range stacked companion before attacking when a spaced slot exists", () => {
+    const attacker = createAttackingCompanion("attacker", { x: 4, y: 5 }, 0);
+    const blocker = createIdleCompanion("blocker", { x: 4.2, y: 5 });
+    const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
+      maxHealth: 10,
+    });
+    const state = createState([attacker, blocker, enemy]);
+
+    const nextState = updateAttackSystem(state, new Set(), 1000);
+    const movedAttacker = nextState.entities[attacker.id];
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBe(enemy.health);
+    expect(movedAttacker.position).not.toEqual(attacker.position);
+  });
+
+  it("still attacks from an unspaced position when no spaced combat slot exists", () => {
+    const attacker = createAttackingCompanion("attacker", { x: 4, y: 5 }, 0);
+    const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
+      maxHealth: 20,
+    });
+    const state = createState([
+      attacker,
+      enemy,
+      ...createSpacingBlockers(enemy.position),
+    ]);
+
+    const nextState = updateAttackSystem(state, new Set(), 1000);
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBeLessThan(enemy.health);
+  });
 });
 
 function createState(entities: GameEntity[]) {
@@ -146,4 +209,37 @@ function createIdleCompanion(id: string, position: Position) {
     state: "idle" as const,
     currentTargetId: null,
   };
+}
+
+function createAttackingCompanion(
+  id: string,
+  position: Position,
+  partyOrder: number,
+) {
+  return {
+    ...createCompanion(id, position, id, "fighter", partyOrder),
+    state: "attack" as const,
+    currentTargetId: "enemy",
+    lastAttackAt: 0,
+  };
+}
+
+function createSpacingBlockers(targetPosition: Position): GameEntity[] {
+  const blockerPositions = [
+    { x: targetPosition.x, y: targetPosition.y - 1 },
+    { x: targetPosition.x, y: targetPosition.y + 1 },
+    { x: targetPosition.x + 1, y: targetPosition.y },
+    { x: targetPosition.x - 1, y: targetPosition.y },
+    { x: targetPosition.x + 1, y: targetPosition.y - 1 },
+    { x: targetPosition.x - 1, y: targetPosition.y - 1 },
+    { x: targetPosition.x + 1, y: targetPosition.y + 1 },
+    { x: targetPosition.x - 1, y: targetPosition.y + 1 },
+  ];
+
+  return blockerPositions.map((position, index) =>
+    createIdleCompanion(`blocker-${index}`, {
+      x: position.x + 0.2,
+      y: position.y,
+    }),
+  );
 }

@@ -11,6 +11,7 @@ import {
   getGridDistance,
   getManhattanDistance,
 } from "./positionUtils";
+import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import type { CombatEntity, GameEntity, Position } from "./types";
 
 const ATTACK_SLOT_DIRECTIONS: Position[] = [
@@ -32,12 +33,16 @@ type AttackSlotOptions = {
   leaderMaxPathDistance?: number;
   preferredSlotIndex?: number;
   allowPartyPassThrough?: boolean;
+  partySpacingMode?: "off" | "prefer" | "required";
   nowMs?: number;
   pathDistanceCache?: AttackSlotPathDistanceCache;
   targetId?: string;
 };
 
 export type AttackSlotPathDistanceCache = Map<string, number>;
+export type AttackSlotPartySpacingMode = NonNullable<
+  AttackSlotOptions["partySpacingMode"]
+>;
 
 const DEFAULT_ATTACK_SLOT_REUSE_MS = 250;
 
@@ -53,6 +58,7 @@ export function chooseAttackSlot(
   options: AttackSlotOptions = {},
 ): Position | null {
   recordAttackSlotCheck();
+  const partySpacingMode = options.partySpacingMode ?? "off";
   const cachedAttackSlot = getReusableCachedAttackSlot(
     state,
     attacker,
@@ -61,7 +67,11 @@ export function chooseAttackSlot(
     options,
   );
 
-  if (cachedAttackSlot) {
+  if (
+    cachedAttackSlot &&
+    (partySpacingMode === "off" ||
+      isCombatPositionSpacedFromParty(state, attacker, cachedAttackSlot))
+  ) {
     return cachedAttackSlot;
   }
 
@@ -75,8 +85,14 @@ export function chooseAttackSlot(
   ).filter((position) =>
     isCheaplyReachableCombatPosition(state, attacker, position, options),
   );
+  const preferredPositions =
+    partySpacingMode === "off"
+      ? rankedPositions
+      : rankedPositions.filter((position) =>
+          isCombatPositionSpacedFromParty(state, attacker, position),
+        );
 
-  for (const position of rankedPositions) {
+  for (const position of preferredPositions) {
     if (
       isReachableCombatPosition(
         state,
@@ -87,6 +103,30 @@ export function chooseAttackSlot(
       )
     ) {
       return position;
+    }
+  }
+
+  if (partySpacingMode === "required") {
+    return null;
+  }
+
+  if (cachedAttackSlot) {
+    return cachedAttackSlot;
+  }
+
+  if (partySpacingMode === "prefer") {
+    for (const position of rankedPositions) {
+      if (
+        isReachableCombatPosition(
+          state,
+          attacker,
+          position,
+          options,
+          pathDistanceCache,
+        )
+      ) {
+        return position;
+      }
     }
   }
 

@@ -26,6 +26,7 @@ import {
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
@@ -121,6 +122,27 @@ export function updateDefendSystem(
       target &&
       isInAttackRange(syncedDefender, target)
     ) {
+      if (
+        !isCombatPositionSpacedFromParty(
+          nextState,
+          syncedDefender,
+          syncedDefender.position,
+        )
+      ) {
+        const spacedSlotState = moveDefenderTowardRequiredSpacedAttackSlot(
+          nextState,
+          syncedDefender,
+          target,
+          pathDistanceCache,
+        );
+
+        if (spacedSlotState !== nextState) {
+          nextState = updateDefenderBlockedMs(spacedSlotState, syncedDefender.id, false);
+          movedEntityIds.add(syncedDefender.id);
+          continue;
+        }
+      }
+
       nextState = attackDefenderTarget(nextState, syncedDefender, target, now);
       nextState = updateDefenderBlockedMs(nextState, syncedDefender.id, false);
       continue;
@@ -424,6 +446,7 @@ function moveDefenderTowardCommittedTarget(
       leaderMaxPathDistance: DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE,
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
+      partySpacingMode: "prefer",
       targetId: target.id,
     },
   );
@@ -494,6 +517,56 @@ function moveDefenderTowardCommittedTarget(
   }
 
   return updateDefenderBlockedMs(nextState, defender.id, false);
+}
+
+function moveDefenderTowardRequiredSpacedAttackSlot(
+  state: GameState,
+  defender: Companion,
+  target: Enemy,
+  pathDistanceCache?: AttackSlotPathDistanceCache,
+): GameState {
+  const attackPosition = chooseAttackSlot(
+    state,
+    defender,
+    target.position,
+    DEFENDER_ATTACK_RANGE,
+    {
+      maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
+      nowMs: state.simulationTimeMs,
+      pathDistanceCache,
+      partySpacingMode: "required",
+      targetId: target.id,
+    },
+  );
+
+  if (!attackPosition || isSamePosition(defender.position, attackPosition)) {
+    return state;
+  }
+
+  const movementOptions = {
+    pathProfile: "combatSlot" as const,
+    pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
+    pathTargetPosition: attackPosition,
+  };
+  const slotState = rememberAttackSlot(
+    state,
+    defender,
+    target.position,
+    DEFENDER_ATTACK_RANGE,
+    attackPosition,
+    {
+      nowMs: state.simulationTimeMs,
+      targetId: target.id,
+    },
+  );
+  const nextState = moveEntityTowardPositionIfUnoccupied(
+    reservePositionForFrame(slotState, defender.id, attackPosition),
+    defender,
+    attackPosition,
+    movementOptions,
+  );
+
+  return didEntityMove(nextState, defender) ? nextState : state;
 }
 
 function getCommittedTargetSpeedMultiplier(

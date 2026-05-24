@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, getMovementStepDistance } from "./entities";
 import { updateDefendSystem } from "./defendSystem";
 import { createTestGameState } from "./testState";
+import type { Enemy } from "./types";
 
 describe("defender real-time movement", () => {
   it("uses delta-scaled catch-up speed instead of multi-step bursts", () => {
@@ -45,5 +46,49 @@ describe("defender real-time movement", () => {
     );
 
     expect(distanceMoved).toBeCloseTo(getMovementStepDistance(defender, 50) * 2);
+  });
+
+  it("repositions an in-range stacked defender before attacking when a spaced slot exists", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 2, y: 0 }, "leader", "fighter"),
+      currentTargetId: "target",
+    };
+    const defender = {
+      ...createCompanion("defender", { x: 3, y: 0 }, leader.id, "defender"),
+      state: "defend" as const,
+      currentTargetId: "target",
+      defendPosition: { x: 3, y: 0 },
+    };
+    const blocker = createCompanion("blocker", { x: 3.2, y: 0 }, leader.id);
+    const target = createEnemy("target", { x: 4, y: 0 }, undefined, {
+      maxHealth: 10,
+    });
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [defender.id]: defender,
+        [blocker.id]: blocker,
+        [target.id]: target,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: target.id,
+        targetPosition: target.position,
+      },
+      simulationDeltaMs: 100,
+    });
+
+    const nextState = updateDefendSystem(state, new Set(), {
+      nowMs: 1000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+    const movedDefender = nextState.entities[defender.id];
+    const nextTarget = nextState.entities[target.id] as Enemy;
+
+    expect(nextTarget.health).toBe(target.health);
+    expect(movedDefender.position).not.toEqual(defender.position);
   });
 });
