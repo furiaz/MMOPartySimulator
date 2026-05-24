@@ -184,6 +184,11 @@ export {
   setStayInMapEnabled,
   setWorldTravelTargetMapId,
   updateEntity,
+  BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
+  ENTITY_COLLISION_DISTANCE,
+  getEntityCollisionShape,
+  isPositionInsideEntityCollisionShape,
+  type EntityCollisionShape,
   type PoiSearchScope,
 } from "./state";
 export {

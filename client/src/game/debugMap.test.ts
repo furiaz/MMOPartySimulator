@@ -100,7 +100,7 @@ describe("debug maps", () => {
   it("keeps wilderness enemies and resources on reachable open floor", () => {
     for (const wildernessMap of wildernessMaps) {
       if (wildernessMap.mapId === MAP_ONE_ID) {
-        expect(wildernessMap.enemyPositions).toHaveLength(72);
+        expect(wildernessMap.enemyPositions).toHaveLength(48);
         expect(wildernessMap.resources).toHaveLength(9);
       } else {
         expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
@@ -253,7 +253,7 @@ describe("debug maps", () => {
     }
   });
 
-  it("lays out map one as three taller subzones with expanded enemy density", () => {
+  it("lays out map one as three taller subzones with tuned enemy density", () => {
     const mapOneDefinition = debugMapDefinitions[MAP_ONE_ID];
     const hubEntry = mapOneDefinition.teleports.find(
       (teleport) => teleport.targetMapId === HUB_MAP_ID,
@@ -292,9 +292,9 @@ describe("debug maps", () => {
         (enemy) => enemy.subzoneId === subzone.id,
       );
 
-      expect(subzoneEnemies).toHaveLength(24);
+      expect(subzoneEnemies).toHaveLength(16);
       expect(subzoneEnemies.map((enemy) => enemy.archetypeId)).toEqual(
-        Array.from({ length: 24 }, () => expectedArchetype),
+        Array.from({ length: 16 }, () => expectedArchetype),
       );
     }
 
@@ -305,6 +305,18 @@ describe("debug maps", () => {
     expect(getSubzone(mapTwoSubzones, "south-center").levelRange.min).toBeGreaterThanOrEqual(3);
     expect(getSubzone(mapTwoSubzones, "south-east").levelRange.min).toBeGreaterThanOrEqual(4);
     expect(getSubzone(mapTwoSubzones, "north-east").levelRange.min).toBeGreaterThanOrEqual(5);
+  });
+
+  it("keeps one map one enemy near each resource node", () => {
+    const maxResourceGuardDistance = 12;
+
+    for (const resource of mapOneResourceStartData) {
+      const nearbyEnemy = mapOneEnemyStartData
+        .filter((enemy) => enemy.subzoneId === resource.subzoneId)
+        .some((enemy) => getDistance(enemy.position, resource.position) <= maxResourceGuardDistance);
+
+      expect(nearbyEnemy).toBe(true);
+    }
   });
 
   it("bakes navigation grids for all debug maps", () => {

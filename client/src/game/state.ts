@@ -78,6 +78,9 @@ const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const COMBAT_FEEDBACK_DURATION_MS = 1000;
 const POSITION_EPSILON = 0.001;
 export const ENTITY_COLLISION_DISTANCE = 0.7;
+export const BEGINNER_COLLISION_CAPSULE_WIDTH_MULTIPLIER = 0.8;
+export const BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER = 1.6;
+export const BEGINNER_COLLISION_CAPSULE_ANCHOR_Y = 0.3;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
 const PARTY_LEADER_HANDOFF_MS = 800;
@@ -107,6 +110,52 @@ export type MovementPathProfile =
   | "combatSlot"
   | "follow"
   | "other";
+
+export type EntityCollisionShape =
+  | {
+      kind: "circle";
+      radius: number;
+    }
+  | {
+      kind: "verticalCapsule";
+      radius: number;
+      height: number;
+      anchorY: number;
+    };
+
+export function getEntityCollisionShape(
+  entity: GameEntity,
+): EntityCollisionShape {
+  if (entity.kind === "companion" && entity.classId === "beginner") {
+    return {
+      kind: "verticalCapsule",
+      radius:
+        ENTITY_COLLISION_DISTANCE *
+        BEGINNER_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
+      height:
+        ENTITY_COLLISION_DISTANCE *
+        2 *
+        BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
+      anchorY: BEGINNER_COLLISION_CAPSULE_ANCHOR_Y,
+    };
+  }
+
+  return {
+    kind: "circle",
+    radius: ENTITY_COLLISION_DISTANCE,
+  };
+}
+
+export function isPositionInsideEntityCollisionShape(
+  entity: GameEntity,
+  position: Position,
+): boolean {
+  return isPositionInsideCollisionShape(
+    position,
+    entity.position,
+    getEntityCollisionShape(entity),
+  );
+}
 
 type MovementOptions = WalkablePositionOptions & {
   pathProfile?: MovementPathProfile;
@@ -1747,11 +1796,7 @@ function createNavigationBlockerLookup(
       entity.state !== "dead" &&
       !canPassThroughPartyEntity(movingEntity, entity, options)
     ) {
-      addCollisionPositionKeys(
-        lookup.blockingEntityKeys,
-        entity.position,
-        ENTITY_COLLISION_DISTANCE,
-      );
+      addEntityCollisionPositionKeys(lookup.blockingEntityKeys, entity);
     }
   }
 
@@ -1775,17 +1820,88 @@ function addCollisionPositionKeys(
   position: Position,
   collisionDistance: number,
 ): void {
-  const center = toNavigationNode(position);
+  addCollisionShapePositionKeys(keys, position, {
+    kind: "circle",
+    radius: collisionDistance,
+  });
+}
 
-  for (let y = center.y - 1; y <= center.y + 1; y += 1) {
-    for (let x = center.x - 1; x <= center.x + 1; x += 1) {
+function addEntityCollisionPositionKeys(
+  keys: Set<string>,
+  entity: GameEntity,
+): void {
+  addCollisionShapePositionKeys(
+    keys,
+    entity.position,
+    getEntityCollisionShape(entity),
+  );
+}
+
+function addCollisionShapePositionKeys(
+  keys: Set<string>,
+  position: Position,
+  shape: EntityCollisionShape,
+): void {
+  const bounds = getCollisionShapeBounds(position, shape);
+
+  for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
+    for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
       const candidate = { x, y };
 
-      if (getEuclideanDistance(candidate, position) < collisionDistance) {
+      if (isPositionInsideCollisionShape(candidate, position, shape)) {
         keys.add(getNavigationPositionKey(candidate));
       }
     }
   }
+}
+
+function getCollisionShapeBounds(
+  position: Position,
+  shape: EntityCollisionShape,
+): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+} {
+  const top =
+    shape.kind === "verticalCapsule"
+      ? position.y - shape.height * shape.anchorY
+      : position.y - shape.radius;
+  const bottom =
+    shape.kind === "verticalCapsule"
+      ? top + shape.height
+      : position.y + shape.radius;
+
+  return {
+    minX: Math.floor(position.x - shape.radius),
+    maxX: Math.ceil(position.x + shape.radius),
+    minY: Math.floor(top),
+    maxY: Math.ceil(bottom),
+  };
+}
+
+function isPositionInsideCollisionShape(
+  position: Position,
+  origin: Position,
+  shape: EntityCollisionShape,
+): boolean {
+  if (shape.kind === "circle") {
+    return getEuclideanDistance(position, origin) < shape.radius;
+  }
+
+  const top = origin.y - shape.height * shape.anchorY;
+  const bottom = top + shape.height;
+  const segmentStartY = top + shape.radius;
+  const segmentEndY = bottom - shape.radius;
+  const closestY = Math.min(
+    Math.max(position.y, segmentStartY),
+    segmentEndY,
+  );
+
+  return (
+    getEuclideanDistance(position, { x: origin.x, y: closestY }) < shape.radius
+  );
 }
 
 function isNavigationPositionBlocked(
@@ -1897,7 +2013,7 @@ function isPositionOccupiedByEntity(
   return Object.values(state.entities).some(
     (entity) =>
       entity.id !== ignoredEntityId &&
-      getEuclideanDistance(entity.position, position) < ENTITY_COLLISION_DISTANCE,
+      isPositionInsideEntityCollisionShape(entity, position),
   );
 }
 
@@ -1924,7 +2040,7 @@ function isPositionOccupiedByBlockingEntity(
       entity.kind !== "resource" &&
       entity.state !== "dead" &&
       !canPassThroughPartyEntity(movingEntity, entity, options) &&
-      getEuclideanDistance(entity.position, position) < ENTITY_COLLISION_DISTANCE,
+      isPositionInsideEntityCollisionShape(entity, position),
   );
 }
 
@@ -2087,7 +2203,7 @@ function getPositionBlocker(
       candidate.id !== ignoredEntityId &&
       candidate.kind !== "resource" &&
       candidate.state !== "dead" &&
-      getEuclideanDistance(candidate.position, position) < ENTITY_COLLISION_DISTANCE,
+      isPositionInsideEntityCollisionShape(candidate, position),
   );
 
   return entity ? { id: entity.id, kind: entity.kind } : { kind: "unknown" };

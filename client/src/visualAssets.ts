@@ -22,7 +22,16 @@ export type SpriteVisualAsset = {
     idle: SpriteAnimationAsset | Partial<Record<SpriteDirection, SpriteAnimationAsset>>;
     run: Partial<Record<SpriteDirection, SpriteAnimationAsset>>;
   };
+  naturalSize?: {
+    width: number;
+    height: number;
+  };
 };
+
+type CardinalSpriteDirection = Extract<
+  SpriteDirection,
+  "north" | "east" | "south" | "west"
+>;
 
 export type PlaceholderVisualAsset = {
   kind: "placeholder";
@@ -55,6 +64,7 @@ export type MapTileVisualAsset = {
 };
 
 const testCharacterBasePath = "/Asserts/Characters/Test-Character";
+const beginnerCharacterBasePath = "/Asserts/Characters/Beginner";
 const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
 const testEnemyTwoBasePath = "/Asserts/Characters/Test-Enemy2";
 const prototypeEnemyBasePath = "/Asserts/Characters/Prototype-Enemies";
@@ -82,6 +92,54 @@ function createSingleFrame(src: string): SpriteAnimationAsset {
   };
 }
 
+function createBeginnerDirectionalFrames(): Record<
+  CardinalSpriteDirection,
+  SpriteAnimationAsset
+> {
+  const northFrames = createFrames(
+    beginnerCharacterBasePath,
+    "Walk",
+    "BeginnerWalkingNorth",
+    7,
+  );
+  const southFrames = createFrames(
+    beginnerCharacterBasePath,
+    "Walk",
+    "BeginnerWalkingSouth",
+    7,
+  );
+  const westFrames = createFrames(
+    beginnerCharacterBasePath,
+    "Walk",
+    "BeginnerWalkingWest",
+    7,
+  );
+  const eastFrames = createFrames(
+    beginnerCharacterBasePath,
+    "Walk",
+    "BeginnerWalkingEast",
+    7,
+  );
+
+  return {
+    north: { frames: northFrames, frameDurationMs: defaultFrameDurationMs },
+    east: { frames: eastFrames, frameDurationMs: defaultFrameDurationMs },
+    south: { frames: southFrames, frameDurationMs: defaultFrameDurationMs },
+    west: { frames: westFrames, frameDurationMs: defaultFrameDurationMs },
+  };
+}
+
+function createDirectionalIdleFrames(
+  directionalFrames: Record<CardinalSpriteDirection, SpriteAnimationAsset>,
+): Record<CardinalSpriteDirection, SpriteAnimationAsset> {
+  return Object.fromEntries(
+    Object.entries(directionalFrames).map(([direction, animation]) => [
+      direction,
+      createSingleFrame(animation.frames[0] ?? ""),
+    ]),
+  ) as Record<CardinalSpriteDirection, SpriteAnimationAsset>;
+}
+
 function createEnemyTwoDirectionalFrames() {
   return {
     north: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_North.png`),
@@ -96,6 +154,8 @@ function createEnemyTwoDirectionalFrames() {
 }
 
 const enemyTwoDirectionalFrames = createEnemyTwoDirectionalFrames();
+const beginnerDirectionalFrames = createBeginnerDirectionalFrames();
+const beginnerIdleFrames = createDirectionalIdleFrames(beginnerDirectionalFrames);
 
 function createStaticEnemySprite(src: string): SpriteVisualAsset {
   const frame = createSingleFrame(src);
@@ -141,6 +201,17 @@ export const CLASS_PORTRAIT_SRC: Record<ClassId, string> = {
 };
 
 export const entityVisualAssets = {
+  beginnerCharacter: {
+    kind: "sprite",
+    animations: {
+      idle: beginnerIdleFrames,
+      run: beginnerDirectionalFrames,
+    },
+    naturalSize: {
+      width: 172,
+      height: 172,
+    },
+  },
   testCharacter: {
     kind: "sprite",
     animations: {
@@ -253,6 +324,7 @@ export const entityVisualAssets = {
     },
   },
 } satisfies {
+  beginnerCharacter: SpriteVisualAsset;
   testCharacter: SpriteVisualAsset;
   enemy: SpriteVisualAsset;
   enemy2: SpriteVisualAsset;
@@ -279,6 +351,10 @@ export function getEntityVisualAsset(
   currentMapId?: DebugMapId,
 ): EntityVisualAsset {
   if (entity.kind === "companion") {
+    if (entity.classId === "beginner") {
+      return entityVisualAssets.beginnerCharacter;
+    }
+
     return entityVisualAssets.testCharacter;
   }
 

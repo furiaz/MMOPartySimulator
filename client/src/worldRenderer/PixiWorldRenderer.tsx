@@ -13,6 +13,7 @@ import type {
   ActiveTeleport,
   CombatFeedbackEvent,
   DropVisualEvent,
+  EntityCollisionShape,
   GameEntity,
   GameMap,
   LeaderIntent,
@@ -25,6 +26,7 @@ import type {
 } from "../game";
 import {
   getEnemyAggroRange,
+  getEntityCollisionShape,
   getItemDefinition,
   isActiveResource,
   QUEST_GIVER_POI_ID,
@@ -1006,6 +1008,71 @@ function drawEnemyAggroRange(
     .stroke({ color: 0xef4444, alpha: 0.2, width: 2 });
 }
 
+function drawBeginnerDebugHitbox(
+  graphics: Graphics,
+  entity: GameEntity,
+  map: GameMap,
+  transform: FullTransform,
+) {
+  if (entity.kind !== "companion" || entity.classId !== "beginner") {
+    return;
+  }
+
+  const visualAsset = getEntityVisualAsset(entity, map.id);
+  const layout = getEntitySpriteLayout(
+    entity,
+    transform.cellPixelSize,
+    visualAsset,
+  );
+  const center = toFullPosition(entity.position, transform);
+  const spritePosition = {
+    x: center.x,
+    y: center.y + transform.cellPixelSize / 2,
+  };
+  const spriteLeft = spritePosition.x - layout.width * layout.anchorX;
+  const spriteTop = spritePosition.y - layout.height * layout.anchorY;
+  const collisionShape = getEntityCollisionShape(entity);
+
+  graphics
+    .rect(spriteLeft, spriteTop, layout.width, layout.height)
+    .stroke({ color: 0xf472b6, alpha: 0.9, width: 2 });
+  drawDebugCollisionShape(graphics, center, collisionShape, transform);
+  graphics
+    .circle(center.x, center.y, 4)
+    .fill({ color: 0xfacc15, alpha: 0.95 });
+}
+
+function drawDebugCollisionShape(
+  graphics: Graphics,
+  center: Position,
+  shape: EntityCollisionShape,
+  transform: FullTransform,
+) {
+  const radius = shape.radius * transform.cellPixelSize;
+
+  if (shape.kind === "circle") {
+    graphics.circle(center.x, center.y, radius).fill({
+      color: 0x06b6d4,
+      alpha: 0.12,
+    });
+    graphics
+      .circle(center.x, center.y, radius)
+      .stroke({ color: 0x06b6d4, alpha: 0.85, width: 2 });
+    return;
+  }
+
+  const width = radius * 2;
+  const height = shape.height * transform.cellPixelSize;
+  const top = center.y - height * shape.anchorY;
+
+  graphics
+    .roundRect(center.x - width / 2, top, width, height, radius)
+    .fill({ color: 0x06b6d4, alpha: 0.12 });
+  graphics
+    .roundRect(center.x - width / 2, top, width, height, radius)
+    .stroke({ color: 0x06b6d4, alpha: 0.85, width: 2 });
+}
+
 function drawHealthBar(
   graphics: Graphics,
   entity: GameEntity,
@@ -1299,6 +1366,15 @@ function getEntitySpriteLayout(
     return {
       anchorX: getImageContentAnchorX(visualAsset),
       anchorY: getImageContentAnchorY(visualAsset),
+      width: visualAsset.naturalSize.width,
+      height: visualAsset.naturalSize.height,
+    };
+  }
+
+  if (visualAsset.kind === "sprite" && visualAsset.naturalSize) {
+    return {
+      anchorX: 0.5,
+      anchorY: 0.5,
       width: visualAsset.naturalSize.width,
       height: visualAsset.naturalSize.height,
     };
@@ -3158,6 +3234,10 @@ function drawFullMap({
       ) {
         drawEnemyAggroRange(overlayGraphics, entity, transform);
       }
+
+      if (isPositionInTileBounds(entity.position, visibleTileBounds)) {
+        drawBeginnerDebugHitbox(overlayGraphics, entity, map, transform);
+      }
     }
   }
 
@@ -3468,6 +3548,11 @@ export function PixiWorldRenderer({
     }
 
     requestRedrawRef.current = scheduleRedraw;
+    preloadSpriteVisualAssetTextures(
+      entityVisualAssets.beginnerCharacter,
+      textureCacheRef.current,
+      requestRedrawRef.current,
+    );
     preloadSpriteVisualAssetTextures(
       entityVisualAssets.testCharacter,
       textureCacheRef.current,
