@@ -30,9 +30,9 @@ export type {
   Enemy,
   EnemyAggressionMode,
   EnemyArchetypeId,
-  EnemyFamilyId,
+  EnemyTypeDefinition,
   EnemyScalingBand,
-  EnemyType,
+  EnemyTypeId,
   EncounterArea,
   EntityKind,
   EntityState,
@@ -396,10 +396,10 @@ export {
 } from "./companionCombat";
 export {
   ENEMY_DROP_TABLES,
-  ENEMY_ARCHETYPE_DROP_TABLES,
+  ENEMY_TYPE_DROP_TABLES,
   SUPPORTED_LOOT_TIERS,
-  getEnemyArchetypeDropTable,
   getEnemyDropTable,
+  getEnemyTypeDropTable,
   getLootTierForLevel,
   rollEnemyDropTable,
   type DropGroup,
@@ -414,7 +414,13 @@ export {
   updateDropSystem,
 } from "./dropSystem";
 export { updateDefendSystem } from "./defendSystem";
-export { getEnemyArchetype } from "./enemyArchetypes";
+export {
+  ENEMY_ARCHETYPES,
+  ENEMY_TYPES,
+  getEnemyArchetype,
+  getEnemyDropArchetypeId,
+  getEnemyType,
+} from "./enemyArchetypes";
 export {
   MAX_ENEMY_SCALING_LEVEL,
   MIN_ENEMY_SCALING_LEVEL,

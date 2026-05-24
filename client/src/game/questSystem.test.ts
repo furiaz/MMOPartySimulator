@@ -394,7 +394,7 @@ describe("prototype quest system", () => {
 
     state = recordEnemyDefeatedForQuests(
       state,
-      createDefeatedEnemy("wrong-shore-bat", "cave_bat", "shore-fringe"),
+      createDefeatedEnemy("wrong-shore-bat", "bat", "shore-fringe"),
       MAP_ONE_ID,
     );
     state = recordEnemyDefeatedForQuests(
@@ -404,12 +404,12 @@ describe("prototype quest system", () => {
     );
     state = recordEnemyDefeatedForQuests(
       state,
-      createDefeatedEnemy("glade-bat", "cave_bat", "mossy-glade"),
+      createDefeatedEnemy("glade-bat", "bat", "mossy-glade"),
       MAP_ONE_ID,
     );
     state = recordEnemyDefeatedForQuests(
       state,
-      createDefeatedEnemy("lower-spider", "forest_spider", "lower-shore"),
+      createDefeatedEnemy("lower-spider", "spider", "lower-shore"),
       MAP_ONE_ID,
     );
 
@@ -471,7 +471,7 @@ describe("prototype quest system", () => {
     });
     const defeatedBat = createDefeatedEnemy(
       "glade-bat",
-      "cave_bat",
+      "bat",
       "mossy-glade",
     );
 

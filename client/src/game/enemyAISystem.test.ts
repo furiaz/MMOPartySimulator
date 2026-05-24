@@ -7,7 +7,7 @@ import {
   getEnemyHomeLeashDistance,
   updateEnemyAISystem,
 } from "./enemyAISystem";
-import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
+import { ENEMY_TYPES } from "./enemyArchetypes";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
@@ -58,14 +58,14 @@ describe("enemy AI aggro and roaming", () => {
     expect(
       getEnemyAggroRange(
         createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-          archetypeId: "forest_spider",
+          enemyTypeId: "forest_spider",
         }),
       ),
     ).toBe(8);
     expect(
       getEnemyAggroRange(
         createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-          archetypeId: "goblin_scout",
+          enemyTypeId: "goblin_scout",
         }),
       ),
     ).toBe(12);
@@ -101,7 +101,7 @@ describe("enemy AI aggro and roaming", () => {
   it("keeps starter slime archetypes from acquiring nearby targets", () => {
     const leader = createIdleCompanion("leader", { x: 1, y: 0 });
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      archetypeId: "slime",
+      enemyTypeId: "slime",
     });
 
     const nextState = updateEnemyAISystem(createState([leader, enemy]));
@@ -119,7 +119,7 @@ describe("enemy AI aggro and roaming", () => {
       health: 2,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      archetypeId: "wolf",
+      enemyTypeId: "wolf",
     });
 
     const nextState = updateEnemyAISystem(createState([leader, injured, enemy]));
@@ -131,15 +131,15 @@ describe("enemy AI aggro and roaming", () => {
     });
   });
 
-  it("uses leader targeting when an archetype prefers the party leader", () => {
-    const previousPreference = ENEMY_ARCHETYPES.wolf.targetPreference;
-    ENEMY_ARCHETYPES.wolf.targetPreference = "leader";
+  it("uses leader targeting when an enemy type prefers the party leader", () => {
+    const previousPreference = ENEMY_TYPES.wolf.targetPreference;
+    ENEMY_TYPES.wolf.targetPreference = "leader";
 
     try {
       const leader = createIdleCompanion("leader", { x: 4, y: 0 });
       const closerCompanion = createIdleCompanion("closer", { x: 2, y: 0 });
       const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-        archetypeId: "wolf",
+        enemyTypeId: "wolf",
       });
 
       const nextState = updateEnemyAISystem(
@@ -152,19 +152,19 @@ describe("enemy AI aggro and roaming", () => {
         targetDecisionReason: "leader",
       });
     } finally {
-      ENEMY_ARCHETYPES.wolf.targetPreference = previousPreference;
+      ENEMY_TYPES.wolf.targetPreference = previousPreference;
     }
   });
 
   it("falls back from leader targeting when the leader is not valid", () => {
-    const previousPreference = ENEMY_ARCHETYPES.wolf.targetPreference;
-    ENEMY_ARCHETYPES.wolf.targetPreference = "leader";
+    const previousPreference = ENEMY_TYPES.wolf.targetPreference;
+    ENEMY_TYPES.wolf.targetPreference = "leader";
 
     try {
       const distantLeader = createIdleCompanion("leader", { x: 13, y: 0 });
       const closerCompanion = createIdleCompanion("closer", { x: 2, y: 0 });
       const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-        archetypeId: "wolf",
+        enemyTypeId: "wolf",
       });
 
       const nextState = updateEnemyAISystem(
@@ -177,7 +177,7 @@ describe("enemy AI aggro and roaming", () => {
         targetDecisionReason: "closest",
       });
     } finally {
-      ENEMY_ARCHETYPES.wolf.targetPreference = previousPreference;
+      ENEMY_TYPES.wolf.targetPreference = previousPreference;
     }
   });
 
@@ -185,7 +185,7 @@ describe("enemy AI aggro and roaming", () => {
     const leader = createIdleCompanion("leader", { x: 17, y: 0 });
     const enemy = {
       ...createEnemy("enemy", { x: 15, y: 0 }, undefined, {
-        archetypeId: "goblin_thrower",
+        enemyTypeId: "goblin_thrower",
       }),
       state: "attack" as const,
       currentTargetId: leader.id,

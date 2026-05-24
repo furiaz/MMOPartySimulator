@@ -28,7 +28,7 @@ describe("hub target dummy", () => {
       state: "idle",
     });
     expect(dummy.archetypeId).toBeUndefined();
-    expect(dummy.enemyType).toBeUndefined();
+    expect(dummy.enemyTypeId).toBeUndefined();
   });
 
   it("does not select target dummies as automatic POIs", () => {

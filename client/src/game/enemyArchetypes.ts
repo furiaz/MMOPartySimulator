@@ -3,9 +3,10 @@ import type {
   EnemyArchetypeDefinition,
   EnemyArchetypeId,
   EnemyCombatStyle,
-  EnemyFamilyId,
   EnemyTargetPreference,
   EnemyTemperament,
+  EnemyTypeDefinition,
+  EnemyTypeId,
 } from "./types";
 
 const DEFAULT_ENEMY_ATTACK_RANGE = 1;
@@ -14,59 +15,124 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   slime: {
     id: "slime",
     displayName: "Slime",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "passive",
+  },
+  bat: {
+    id: "bat",
+    displayName: "Bat",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+  spider: {
+    id: "spider",
+    displayName: "Spider",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+  goblin: {
+    id: "goblin",
+    displayName: "Goblin",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+  imp: {
+    id: "imp",
+    displayName: "Imp",
+    defaultCombatStyle: "ranged",
+    defaultAttackRange: 3,
+    defaultTemperament: "aggressive",
+  },
+  wolf: {
+    id: "wolf",
+    displayName: "Wolf",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+  crawler: {
+    id: "crawler",
+    displayName: "Crawler",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+  mossling: {
+    id: "mossling",
+    displayName: "Mossling",
+    defaultCombatStyle: "support",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+  wisp: {
+    id: "wisp",
+    displayName: "Wisp",
+    defaultCombatStyle: "ranged",
+    defaultAttackRange: 4,
+    defaultTemperament: "aggressive",
+  },
+  orc: {
+    id: "orc",
+    displayName: "Orc",
+    defaultCombatStyle: "melee",
+    defaultAttackRange: 1,
+    defaultTemperament: "aggressive",
+  },
+};
+
+export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
+  slime: {
+    id: "slime",
+    displayName: "Slime",
+    archetypeId: "slime",
     temperament: "passive",
-    combatStyle: "melee",
     targetPreference: "closest",
     level: 1,
-    maxHealth: 2,
     attackCooldownMs: 1200,
     detectionRange: 10,
-    attackRange: 1,
   },
   cave_bat: {
     id: "cave_bat",
     displayName: "Cave Bat",
+    archetypeId: "bat",
     temperament: "aggressive",
-    combatStyle: "melee",
     targetPreference: "closest",
     level: 2,
-    maxHealth: 2,
     attackCooldownMs: 900,
     detectionRange: 10,
-    attackRange: 1,
   },
   forest_spider: {
     id: "forest_spider",
     displayName: "Forest Spider",
+    archetypeId: "spider",
     temperament: "aggressive",
-    combatStyle: "melee",
     targetPreference: "closest",
     level: 3,
-    maxHealth: 3,
     attackCooldownMs: 1200,
     detectionRange: 8,
-    attackRange: 1,
   },
   goblin_scout: {
     id: "goblin_scout",
     displayName: "Goblin Scout",
+    archetypeId: "goblin",
     temperament: "aggressive",
-    combatStyle: "melee",
     targetPreference: "leader",
     level: 4,
-    maxHealth: 3,
     attackCooldownMs: 1000,
     detectionRange: 12,
-    attackRange: 1,
   },
   goblin_thrower: {
     id: "goblin_thrower",
     displayName: "Goblin Thrower",
+    archetypeId: "goblin",
     temperament: "aggressive",
     combatStyle: "ranged",
     targetPreference: "lowestHealth",
     level: 7,
-    maxHealth: 3,
     attackCooldownMs: 1300,
     detectionRange: 10,
     attackRange: 4,
@@ -74,35 +140,31 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   bog_imp: {
     id: "bog_imp",
     displayName: "Bog Imp",
+    archetypeId: "imp",
     temperament: "aggressive",
-    combatStyle: "ranged",
     targetPreference: "closest",
     level: 5,
-    maxHealth: 3,
     attackCooldownMs: 1300,
     detectionRange: 10,
-    attackRange: 3,
   },
   stone_crawler: {
     id: "stone_crawler",
     displayName: "Stone Crawler",
+    archetypeId: "crawler",
     temperament: "aggressive",
-    combatStyle: "melee",
     targetPreference: "leader",
     level: 8,
-    maxHealth: 5,
     attackCooldownMs: 1500,
     detectionRange: 8,
-    attackRange: 1,
   },
   goblin_shaman: {
     id: "goblin_shaman",
     displayName: "Goblin Shaman",
+    archetypeId: "goblin",
     temperament: "aggressive",
     combatStyle: "support",
     targetPreference: "lowestHealth",
     level: 10,
-    maxHealth: 3,
     attackCooldownMs: 1500,
     detectionRange: 10,
     attackRange: 3,
@@ -110,50 +172,42 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
   ash_wisp: {
     id: "ash_wisp",
     displayName: "Ash Wisp",
+    archetypeId: "wisp",
     temperament: "aggressive",
-    combatStyle: "ranged",
     targetPreference: "leader",
     level: 11,
-    maxHealth: 3,
     attackCooldownMs: 1200,
     detectionRange: 12,
-    attackRange: 4,
   },
   mossling: {
     id: "mossling",
     displayName: "Mossling",
+    archetypeId: "mossling",
     temperament: "aggressive",
-    combatStyle: "support",
     targetPreference: "closest",
     level: 9,
-    maxHealth: 2,
     attackCooldownMs: 1400,
     detectionRange: 8,
-    attackRange: 1,
   },
   wolf: {
     id: "wolf",
     displayName: "Wolf",
+    archetypeId: "wolf",
     temperament: "aggressive",
-    combatStyle: "melee",
     targetPreference: "lowestHealth",
     level: 6,
-    maxHealth: 3,
     attackCooldownMs: 1000,
     detectionRange: 10,
-    attackRange: 1,
   },
   orc: {
     id: "orc",
     displayName: "Orc",
+    archetypeId: "orc",
     temperament: "aggressive",
-    combatStyle: "melee",
     targetPreference: "leader",
     level: 12,
-    maxHealth: 6,
     attackCooldownMs: 1330,
     detectionRange: 10,
-    attackRange: 1,
   },
 };
 
@@ -163,62 +217,60 @@ export function getEnemyArchetype(
   return archetypeId ? ENEMY_ARCHETYPES[archetypeId] : undefined;
 }
 
-export function getEnemyFamilyId(enemy: Enemy): EnemyFamilyId | undefined {
-  if (enemy.enemyType) {
-    return enemy.enemyType;
-  }
+export function getEnemyType(
+  enemyTypeId: EnemyTypeId | undefined,
+): EnemyTypeDefinition | undefined {
+  return enemyTypeId ? ENEMY_TYPES[enemyTypeId] : undefined;
+}
 
-  switch (enemy.archetypeId) {
-    case "slime":
-      return "slime";
-    case "cave_bat":
-      return "bat";
-    case "forest_spider":
-      return "spider";
-    case "goblin_scout":
-    case "goblin_thrower":
-    case "goblin_shaman":
-      return "goblin";
-    case "bog_imp":
-      return "imp";
-    case "wolf":
-      return "wolf";
-    case "stone_crawler":
-      return "crawler";
-    case "mossling":
-      return "mossling";
-    case "ash_wisp":
-      return "wisp";
-    case "orc":
-      return "orc";
-    default:
-      return undefined;
-  }
+export function getEnemyDropArchetypeId(
+  enemy: Enemy,
+): EnemyArchetypeId | undefined {
+  return enemy.archetypeId ?? getEnemyType(enemy.enemyTypeId)?.archetypeId;
+}
+
+function getEnemyTypeDefinition(enemy: Enemy): EnemyTypeDefinition | undefined {
+  return getEnemyType(enemy.enemyTypeId);
+}
+
+function getEnemyArchetypeDefinition(
+  enemy: Enemy,
+): EnemyArchetypeDefinition | undefined {
+  return getEnemyArchetype(getEnemyDropArchetypeId(enemy));
 }
 
 export function getEnemyTemperament(enemy: Enemy): EnemyTemperament {
-  return getEnemyArchetype(enemy.archetypeId)?.temperament ?? enemy.aggressionMode;
+  return (
+    getEnemyTypeDefinition(enemy)?.temperament ??
+    getEnemyArchetypeDefinition(enemy)?.defaultTemperament ??
+    enemy.aggressionMode
+  );
 }
 
 export function getEnemyCombatStyle(enemy: Enemy): EnemyCombatStyle {
-  return getEnemyArchetype(enemy.archetypeId)?.combatStyle ?? "melee";
+  return (
+    getEnemyTypeDefinition(enemy)?.combatStyle ??
+    getEnemyArchetypeDefinition(enemy)?.defaultCombatStyle ??
+    "melee"
+  );
 }
 
 export function getEnemyTargetPreference(enemy: Enemy): EnemyTargetPreference {
-  return getEnemyArchetype(enemy.archetypeId)?.targetPreference ?? "closest";
+  return getEnemyTypeDefinition(enemy)?.targetPreference ?? "closest";
 }
 
 export function getEnemyDetectionRange(
   enemy: Enemy,
   fallbackRange: number,
 ): number {
-  return getEnemyArchetype(enemy.archetypeId)?.detectionRange ?? fallbackRange;
+  return getEnemyTypeDefinition(enemy)?.detectionRange ?? fallbackRange;
 }
 
 export function getEnemyAttackRange(enemy: Enemy): number {
   return (
     enemy.attackRange ??
-    getEnemyArchetype(enemy.archetypeId)?.attackRange ??
+    getEnemyTypeDefinition(enemy)?.attackRange ??
+    getEnemyArchetypeDefinition(enemy)?.defaultAttackRange ??
     DEFAULT_ENEMY_ATTACK_RANGE
   );
 }

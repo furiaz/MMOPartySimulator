@@ -163,6 +163,7 @@ export function resolveAndApplyCombatDamage(
     entityId: attacker.id,
     targetId: target.id,
     archetypeId: attacker.kind === "enemy" ? attacker.archetypeId : undefined,
+    enemyTypeId: attacker.kind === "enemy" ? attacker.enemyTypeId : undefined,
     enemyLevel: attacker.kind === "enemy" ? attacker.level : undefined,
     enemyEffectiveScalingLevel:
       attacker.kind === "enemy" ? attacker.effectiveScalingLevel : undefined,

@@ -182,7 +182,7 @@ describe("game update intent priority", () => {
     });
     const caveBat = {
       ...createEnemy("cave-bat", { x: 6, y: 4 }, undefined, {
-        archetypeId: "cave_bat",
+        enemyTypeId: "cave_bat",
         subzoneId: "mossy-glade",
         maxHealth: 100,
       }),
@@ -259,7 +259,7 @@ describe("game update intent priority", () => {
     });
     const caveBat = {
       ...createEnemy("cave-bat", { x: 6, y: 4 }, undefined, {
-        archetypeId: "cave_bat",
+        enemyTypeId: "cave_bat",
         subzoneId: "mossy-glade",
       }),
       state: "dead" as const,
@@ -358,7 +358,7 @@ describe("game update intent priority", () => {
       resourceType: "herb",
     });
     const nearbyBat = createEnemy("nearby-bat", { x: 9, y: 29 }, undefined, {
-      archetypeId: "cave_bat",
+      enemyTypeId: "cave_bat",
       subzoneId: "mossy-glade",
     });
     const quests = createActiveGuideQuestStates();
@@ -642,7 +642,7 @@ describe("game update intent priority", () => {
       state: "follow" as const,
     };
     const enemy = createEnemy("glade-bat", { x: 76, y: 28 }, undefined, {
-      archetypeId: "cave_bat",
+      enemyTypeId: "cave_bat",
       subzoneId: "mossy-glade",
     });
 
@@ -672,7 +672,7 @@ describe("game update intent priority", () => {
     };
     const distantEnemy = {
       ...createEnemy("distant-escort-aggro", { x: 25, y: 29 }, "aggressive", {
-        archetypeId: "cave_bat",
+        enemyTypeId: "cave_bat",
         subzoneId: "mossy-glade",
       }),
       state: "attack" as const,
@@ -708,7 +708,7 @@ describe("game update intent priority", () => {
     };
     const escortThreat = {
       ...createEnemy("near-guide-aggro", { x: 14, y: 29 }, "aggressive", {
-        archetypeId: "cave_bat",
+        enemyTypeId: "cave_bat",
         subzoneId: "mossy-glade",
       }),
       state: "attack" as const,
@@ -740,7 +740,7 @@ describe("game update intent priority", () => {
     };
     const outsideThreat = {
       ...createEnemy("outside-threat", { x: 18, y: 29 }, "aggressive", {
-        archetypeId: "cave_bat",
+        enemyTypeId: "cave_bat",
         subzoneId: "mossy-glade",
         attackCooldownMs: 0,
         attackRange: 3,
@@ -784,7 +784,7 @@ describe("game update intent priority", () => {
       state: "follow" as const,
     };
     const outsideThreat = createEnemy("outside-defender-threat", { x: 18, y: 29 }, "aggressive", {
-      archetypeId: "cave_bat",
+      enemyTypeId: "cave_bat",
       subzoneId: "mossy-glade",
     });
 
@@ -859,7 +859,7 @@ describe("game update intent priority", () => {
       resourceType: "herb",
     });
     const gladeBat = createEnemy("glade-bat", { x: 59, y: 29 }, undefined, {
-      archetypeId: "cave_bat",
+      enemyTypeId: "cave_bat",
       subzoneId: "mossy-glade",
     });
 
@@ -889,7 +889,7 @@ describe("game update intent priority", () => {
       { x: 6, y: 4 },
       undefined,
       {
-        archetypeId: "cave_bat",
+        enemyTypeId: "cave_bat",
         subzoneId: "mossy-glade",
       },
     );
@@ -1007,7 +1007,7 @@ describe("game update intent priority", () => {
       resourceType: "herb",
     });
     const gladeBat = createEnemy("glade-bat", { x: 63, y: 29 }, undefined, {
-      archetypeId: "cave_bat",
+      enemyTypeId: "cave_bat",
       subzoneId: "mossy-glade",
     });
     const quests = createPostGuideQuestStates();
@@ -2532,7 +2532,7 @@ describe("game update intent priority", () => {
   it("keeps combat quest targeting under POI control", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const questEnemy = createEnemy("quest-enemy", { x: 5, y: 4 }, undefined, {
-      archetypeId: "slime",
+      enemyTypeId: "slime",
       subzoneId: "shore-fringe",
     });
 
@@ -3958,7 +3958,7 @@ describe("game update intent priority", () => {
   it("Stay in Subzone still allows same-subzone active quest objectives", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const questEnemy = createEnemy("quest-enemy", { x: 4, y: 2 }, undefined, {
-      archetypeId: "slime",
+      enemyTypeId: "slime",
       subzoneId: "shore-fringe",
     });
 
@@ -4714,7 +4714,7 @@ function createTestSubzone(
       min: 1,
       max: 1,
     },
-    enemyArchetypeIds: [],
+    enemyTypeIds: [],
     encounterAreas: [],
     resourceLocations: [],
     passages: [],

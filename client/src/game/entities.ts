@@ -6,7 +6,7 @@ import type {
   Enemy,
   EnemyAggressionMode,
   EnemyArchetypeId,
-  EnemyType,
+  EnemyTypeId,
   EntityState,
   GameEntity,
   LootTier,
@@ -23,7 +23,7 @@ import {
   createEmptyCompanionConsumables,
   createDefaultCompanionConsumableBehavior,
 } from "./consumables";
-import { getEnemyArchetype } from "./enemyArchetypes";
+import { getEnemyArchetype, getEnemyType } from "./enemyArchetypes";
 import { getScaledEnemyStats } from "./enemyScaling";
 import {
   createDefaultNaturalCompanionStats,
@@ -64,6 +64,7 @@ type CreateResourceOptions = {
 type CreateEnemyOptions = {
   isTargetDummy?: true;
   archetypeId?: EnemyArchetypeId;
+  enemyTypeId?: EnemyTypeId;
   level?: number;
   xpReward?: number;
   maxHealth?: number;
@@ -73,7 +74,6 @@ type CreateEnemyOptions = {
   evasion?: number;
   attackCooldownMs?: number;
   attackRange?: number;
-  enemyType?: EnemyType;
   subzoneId?: string;
   encounterAreaId?: string;
 };
@@ -84,9 +84,11 @@ export function createEnemy(
   aggressionMode?: EnemyAggressionMode,
   options: CreateEnemyOptions = {},
 ): Enemy {
-  const archetype = getEnemyArchetype(options.archetypeId);
-  const level = options.level ?? archetype?.level ?? STARTING_ENEMY_LEVEL;
-  const scaledStats = getScaledEnemyStats(level, options.archetypeId);
+  const enemyType = getEnemyType(options.enemyTypeId);
+  const archetypeId = options.archetypeId ?? enemyType?.archetypeId;
+  const archetype = getEnemyArchetype(archetypeId);
+  const level = options.level ?? enemyType?.level ?? STARTING_ENEMY_LEVEL;
+  const scaledStats = getScaledEnemyStats(level, archetypeId);
   const maxHealth = options.maxHealth ?? scaledStats.maxHealth;
   const scalingOverrides = getEnemyScalingOverrides(options);
 
@@ -99,10 +101,14 @@ export function createEnemy(
     maxHealth,
     lastAttackAt: 0,
     currentTargetId: null,
-    aggressionMode: aggressionMode ?? archetype?.temperament ?? "passive",
+    aggressionMode:
+      aggressionMode ??
+      enemyType?.temperament ??
+      archetype?.defaultTemperament ??
+      "passive",
     isTargetDummy: options.isTargetDummy,
-    archetypeId: options.archetypeId,
-    enemyType: options.enemyType,
+    archetypeId,
+    enemyTypeId: options.enemyTypeId,
     homePosition: position,
     subzoneId: options.subzoneId,
     encounterAreaId: options.encounterAreaId,
@@ -116,8 +122,11 @@ export function createEnemy(
     scalingBand: scaledStats.scalingBand,
     threat: scaledStats.threat,
     scalingOverrides,
-    attackCooldownMs: options.attackCooldownMs ?? archetype?.attackCooldownMs,
-    attackRange: options.attackRange ?? archetype?.attackRange,
+    attackCooldownMs: options.attackCooldownMs ?? enemyType?.attackCooldownMs,
+    attackRange:
+      options.attackRange ??
+      enemyType?.attackRange ??
+      archetype?.defaultAttackRange,
   };
 }
 

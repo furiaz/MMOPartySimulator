@@ -744,6 +744,7 @@ function countEnemyDefeatForFlaskRecharge(
     type: "flask_recharge_kill_progress",
     entityId: enemy.id,
     archetypeId: enemy.archetypeId,
+    enemyTypeId: enemy.enemyTypeId,
     enemyLevel: enemy.level,
     flaskRechargeKillCounter: killCounter,
     flaskRechargeKillThreshold: FLASK_RECHARGE_KILLS_PER_CHARGE,

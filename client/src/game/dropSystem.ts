@@ -1,6 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getLootTierForLevel, rollEnemyDropTable } from "./dropTables";
-import { getEnemyFamilyId } from "./enemyArchetypes";
+import { getEnemyDropArchetypeId } from "./enemyArchetypes";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
 import {
@@ -11,7 +11,6 @@ import type {
   DebugTelemetryEvent,
   DropVisualEvent,
   Enemy,
-  EnemyType,
   InventoryAddResult,
 } from "./types";
 
@@ -24,13 +23,13 @@ export function handleEnemyDefeatedDrops(
   now = Date.now(),
   random = Math.random,
 ): GameState {
-  const familyId = getEnemyFamilyId(enemy);
+  const enemyArchetypeId = getEnemyDropArchetypeId(enemy);
 
-  if (!familyId) {
+  if (!enemyArchetypeId) {
     return appendDropTelemetry(state, enemy, {
       type: "enemy_drop_none",
       entityId: enemy.id,
-      reason: "missing_enemy_family",
+      reason: "missing_enemy_archetype",
       targetId: defeatedByEntityId,
     });
   }
@@ -40,13 +39,14 @@ export function handleEnemyDefeatedDrops(
     type: "enemy_drop_roll_started",
     entityId: enemy.id,
     targetId: defeatedByEntityId,
-    enemyType: familyId,
+    enemyTypeId: enemy.enemyTypeId,
+    enemyArchetypeId,
   });
   const rolls = rollEnemyDropTable(
-    familyId,
+    enemyArchetypeId,
     lootTier,
     random,
-    enemy.archetypeId,
+    enemy.enemyTypeId,
   );
   const droppedRolls = rolls.filter((roll) => roll.didDrop && roll.entry);
 
@@ -55,7 +55,8 @@ export function handleEnemyDefeatedDrops(
       type: roll.didDrop ? "enemy_drop_rolled" : "enemy_drop_none",
       entityId: enemy.id,
       targetId: defeatedByEntityId,
-      enemyType: familyId,
+      enemyTypeId: enemy.enemyTypeId,
+      enemyArchetypeId,
       itemId: roll.entry?.itemId,
       tableId: roll.tableId,
       dropChance: roll.chance,
@@ -72,7 +73,7 @@ export function handleEnemyDefeatedDrops(
     const event = createDropVisualEvent(
       nextState,
       enemy,
-      familyId,
+      enemyArchetypeId,
       roll.entry.itemId,
       roll.entry.quantity,
       roll.tableId,
@@ -86,7 +87,8 @@ export function handleEnemyDefeatedDrops(
     nextState = appendDropTelemetry(nextState, enemy, {
       type: "enemy_drop_visual_started",
       entityId: enemy.id,
-      enemyType: familyId,
+      enemyTypeId: enemy.enemyTypeId,
+      enemyArchetypeId,
       itemId: event.itemId,
       tableId: event.tableId,
       dropChance: event.dropChance,
@@ -170,7 +172,7 @@ function completeDropVisualEvent(
 function createDropVisualEvent(
   state: GameState,
   enemy: Enemy,
-  enemyType: EnemyType,
+  enemyArchetypeId: DropVisualEvent["enemyArchetypeId"],
   itemId: DropVisualEvent["itemId"],
   quantity: number,
   tableId: string,
@@ -180,7 +182,8 @@ function createDropVisualEvent(
   return {
     id: `${now}-drop-${enemy.id}-${itemId}-${state.dropVisualEvents?.length ?? 0}`,
     enemyId: enemy.id,
-    enemyType,
+    enemyTypeId: enemy.enemyTypeId,
+    enemyArchetypeId,
     itemId,
     quantity,
     position: enemy.position,
@@ -236,7 +239,8 @@ function appendDropVisualTelemetry(
     currentMapId: state.currentMapId,
     currentMapDisplayName: state.map?.displayName,
     currentMapDebugName: state.map?.debugName,
-    enemyType: event.enemyType,
+    enemyTypeId: event.enemyTypeId,
+    enemyArchetypeId: event.enemyArchetypeId,
     enemyPosition: event.position,
     itemId: event.itemId,
     itemDisplayName: itemDefinition.displayName,
@@ -263,7 +267,9 @@ function appendDropTelemetry(
     currentMapId: state.currentMapId,
     currentMapDisplayName: state.map?.displayName,
     currentMapDebugName: state.map?.debugName,
-    enemyType: telemetry.enemyType ?? enemy.enemyType,
+    enemyTypeId: telemetry.enemyTypeId ?? enemy.enemyTypeId,
+    enemyArchetypeId:
+      telemetry.enemyArchetypeId ?? getEnemyDropArchetypeId(enemy),
     enemyPosition: enemy.position,
     itemDisplayName: itemDefinition?.displayName,
     itemCategory: itemDefinition?.category,

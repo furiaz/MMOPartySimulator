@@ -143,7 +143,7 @@ describe("enemy respawn system", () => {
   it("allows drop processing to observe a dead enemy before respawn", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 8, y: 7 }, undefined, {
-        archetypeId: "slime",
+        enemyTypeId: "slime",
       }),
       state: "dead" as const,
       health: 0,
@@ -157,7 +157,8 @@ describe("enemy respawn system", () => {
         {
           id: "drop-1",
           enemyId: enemy.id,
-          enemyType: "slime",
+          enemyTypeId: "slime",
+          enemyArchetypeId: "slime",
           itemId: "slime_gel_t1",
           quantity: 1,
           position: enemy.position,

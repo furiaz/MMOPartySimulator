@@ -33,7 +33,7 @@ import {
   mapTwoResourceStartData,
   mapTwoSubzones,
 } from "./debugMap";
-import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
+import { ENEMY_TYPES } from "./enemyArchetypes";
 import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
 import { QUEST_DEFINITIONS } from "./questSystem";
 import type { DebugMapId, GameMap, Position, ZoneSubzone } from "./types";
@@ -190,9 +190,9 @@ describe("debug maps", () => {
     for (const wildernessMap of wildernessMaps) {
       for (const enemy of wildernessMap.enemies) {
         const expectedTemperament =
-          enemy.archetypeId === "slime" ? "passive" : "aggressive";
+          enemy.enemyTypeId === "slime" ? "passive" : "aggressive";
 
-        expect(ENEMY_ARCHETYPES[enemy.archetypeId].temperament).toBe(
+        expect(ENEMY_TYPES[enemy.enemyTypeId].temperament).toBe(
           expectedTemperament,
         );
       }
@@ -281,23 +281,23 @@ describe("debug maps", () => {
       expect(isInsideSubzone(lowerShore, arrivalPosition)).toBe(true);
     }
 
-    const expectedSubzoneArchetypes = new Map([
+    const expectedSubzoneEnemyTypes = new Map([
       ["shore-fringe", "slime"],
       ["mossy-glade", "cave_bat"],
       ["lower-shore", "forest_spider"],
     ]);
 
     for (const subzone of mapOneSubzones) {
-      const expectedArchetype = expectedSubzoneArchetypes.get(subzone.id);
+      const expectedEnemyType = expectedSubzoneEnemyTypes.get(subzone.id);
 
-      expect(subzone.enemyArchetypeIds).toEqual([expectedArchetype]);
+      expect(subzone.enemyTypeIds).toEqual([expectedEnemyType]);
       const subzoneEnemies = mapOneEnemyStartData.filter(
         (enemy) => enemy.subzoneId === subzone.id,
       );
 
       expect(subzoneEnemies).toHaveLength(16);
-      expect(subzoneEnemies.map((enemy) => enemy.archetypeId)).toEqual(
-        Array.from({ length: 16 }, () => expectedArchetype),
+      expect(subzoneEnemies.map((enemy) => enemy.enemyTypeId)).toEqual(
+        Array.from({ length: 16 }, () => expectedEnemyType),
       );
     }
 
@@ -337,23 +337,23 @@ describe("debug maps", () => {
       expect(isNavigationCellWalkable(mapTwo, { x: dividerX, y: 15 })).toBe(true);
     }
 
-    const expectedSubzoneArchetypes = new Map([
+    const expectedSubzoneEnemyTypes = new Map([
       ["south-center", ["forest_spider", "goblin_scout"]],
       ["south-east", ["goblin_scout", "bog_imp"]],
       ["north-east", ["bog_imp", "wolf", "goblin_thrower"]],
     ]);
 
     for (const subzone of mapTwoSubzones) {
-      const expectedArchetypes = expectedSubzoneArchetypes.get(subzone.id);
+      const expectedEnemyTypes = expectedSubzoneEnemyTypes.get(subzone.id);
       const subzoneEnemies = mapTwoEnemyStartData.filter(
         (enemy) => enemy.subzoneId === subzone.id,
       );
 
-      expect(subzone.enemyArchetypeIds).toEqual(expectedArchetypes);
+      expect(subzone.enemyTypeIds).toEqual(expectedEnemyTypes);
       expect(subzoneEnemies).toHaveLength(16);
       expect(
         subzoneEnemies.every((enemy) =>
-          expectedArchetypes?.includes(enemy.archetypeId),
+          expectedEnemyTypes?.includes(enemy.enemyTypeId),
         ),
       ).toBe(true);
     }

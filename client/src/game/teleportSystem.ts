@@ -443,7 +443,7 @@ function getMapEntities(
 
   for (const enemyStart of enemyStartData) {
     entities[enemyStart.id] = createEnemy(enemyStart.id, enemyStart.position, undefined, {
-      archetypeId: enemyStart.archetypeId,
+      enemyTypeId: enemyStart.enemyTypeId,
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
     });

@@ -1362,6 +1362,20 @@ function getEntitySpriteLayout(
   cellPixelSize: number,
   visualAsset: ReturnType<typeof getEntityVisualAsset>,
 ): EntitySpriteLayout {
+  if (entity.kind === "enemy") {
+    const naturalSize =
+      visualAsset.kind === "image" || visualAsset.kind === "sprite"
+        ? visualAsset.naturalSize
+        : undefined;
+
+    return {
+      anchorX: 0.5,
+      anchorY: 0.7,
+      width: naturalSize?.width ?? cellPixelSize * 2.25,
+      height: naturalSize?.height ?? cellPixelSize * 2.25,
+    };
+  }
+
   if (visualAsset.kind === "image" && visualAsset.naturalSize) {
     return {
       anchorX: getImageContentAnchorX(visualAsset),

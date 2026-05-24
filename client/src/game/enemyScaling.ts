@@ -72,7 +72,7 @@ const STANDARD_ENEMY_CURVES: Record<
   },
 };
 
-const STARTER_MAX_HEALTH_OVERRIDES: Partial<Record<number, number>> = {
+const STARTER_LEVEL_MAX_HEALTH_OVERRIDES: Partial<Record<number, number>> = {
   1: 8,
   2: 14,
   3: 23,
@@ -163,7 +163,7 @@ function getScaledMaxHealth(
   effectiveLevel: number,
 ): number {
   return (
-    STARTER_MAX_HEALTH_OVERRIDES[effectiveLevel] ??
+    STARTER_LEVEL_MAX_HEALTH_OVERRIDES[effectiveLevel] ??
     interpolateStat(minValue, maxValue, progress)
   );
 }

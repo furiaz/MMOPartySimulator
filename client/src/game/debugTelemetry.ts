@@ -275,6 +275,7 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.targetId ?? "",
     event.previousTargetId ?? "",
     event.archetypeId ?? "",
+    event.enemyTypeId ?? "",
     event.enemyCombatStyle ?? "",
     event.enemyTargetPreference ?? "",
     event.enemyLevel ?? "",
@@ -377,6 +378,7 @@ function getEntitySnapshot(
     position: { ...entity.position },
     currentTargetId: getCurrentTargetId(entity),
     archetypeId: getArchetypeId(entity),
+    enemyTypeId: getEnemyTypeId(entity),
     enemyCombatStyle: getEnemyCombatStyleSnapshot(entity),
     enemyTargetPreference: getEnemyTargetPreferenceSnapshot(entity),
     enemyLevel: getEnemyLevel(entity),
@@ -614,6 +616,7 @@ function addTargetEvents(
     targetId,
     previousTargetId,
     archetypeId: getArchetypeId(entity),
+    enemyTypeId: getEnemyTypeId(entity),
     enemyCombatStyle: getEnemyCombatStyleSnapshot(entity),
     enemyTargetPreference: getEnemyTargetPreferenceSnapshot(entity),
     attackRange: getAttackRangeSnapshot(entity),
@@ -835,6 +838,10 @@ function getCurrentTargetId(entity: GameEntity): string | null | undefined {
 
 function getArchetypeId(entity: GameEntity) {
   return entity.kind === "enemy" ? entity.archetypeId : undefined;
+}
+
+function getEnemyTypeId(entity: GameEntity) {
+  return entity.kind === "enemy" ? entity.enemyTypeId : undefined;
 }
 
 function getEnemyCombatStyleSnapshot(entity: GameEntity) {

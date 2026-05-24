@@ -15,7 +15,7 @@ describe("enemy drop system", () => {
     const now = 1000;
     const enemy = {
       ...createEnemy("wolf", { x: 5, y: 5 }, "aggressive", {
-        archetypeId: "wolf",
+        enemyTypeId: "wolf",
       }),
       state: "dead" as const,
       health: 0,
@@ -110,7 +110,8 @@ function createDropVisualEvent({
   return {
     id: `${enemyId}-${itemId}`,
     enemyId,
-    enemyType: "wolf",
+    enemyTypeId: "wolf",
+    enemyArchetypeId: "wolf",
     itemId,
     quantity: 1,
     position: { x: 1, y: 1 },

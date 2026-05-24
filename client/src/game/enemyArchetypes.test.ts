@@ -1,45 +1,57 @@
 import { describe, expect, it } from "vitest";
-import { ENEMY_ARCHETYPES } from "./enemyArchetypes";
+import { ENEMY_ARCHETYPES, ENEMY_TYPES } from "./enemyArchetypes";
 import { createEnemy } from "./entities";
 
-describe("prototype enemy archetypes", () => {
-  it("defines twelve lightweight prototype enemy archetypes", () => {
-    expect(Object.keys(ENEMY_ARCHETYPES)).toHaveLength(12);
+describe("prototype enemy identity definitions", () => {
+  it("defines broad archetypes and specific spawnable enemy types separately", () => {
+    expect(Object.keys(ENEMY_ARCHETYPES)).toHaveLength(10);
+    expect(Object.keys(ENEMY_TYPES)).toHaveLength(12);
     expect(ENEMY_ARCHETYPES).toHaveProperty("wolf");
     expect(ENEMY_ARCHETYPES).toHaveProperty("orc");
-    expect(ENEMY_ARCHETYPES).toHaveProperty("goblin_shaman");
+    expect(ENEMY_ARCHETYPES).toHaveProperty("goblin");
+    expect(ENEMY_TYPES).toHaveProperty("goblin_shaman");
   });
 
-  it("keeps archetype ranges numeric and prototype-safe", () => {
+  it("keeps archetype default attack ranges numeric and prototype-safe", () => {
     for (const archetype of Object.values(ENEMY_ARCHETYPES)) {
-      expect(archetype.detectionRange).toBeGreaterThan(0);
-      expect(archetype.attackRange).toBeGreaterThan(0);
-      expect(archetype.level).toBeGreaterThan(0);
-      expect(archetype.maxHealth).toBeGreaterThan(0);
-      expect(archetype.attackCooldownMs).toBeGreaterThan(0);
-      expect(Number.isFinite(archetype.detectionRange)).toBe(true);
-      expect(Number.isFinite(archetype.attackRange)).toBe(true);
-      expect(Number.isFinite(archetype.level)).toBe(true);
-      expect(Number.isFinite(archetype.maxHealth)).toBe(true);
-      expect(Number.isFinite(archetype.attackCooldownMs)).toBe(true);
+      expect(archetype.defaultAttackRange).toBeGreaterThan(0);
+      expect(Number.isFinite(archetype.defaultAttackRange)).toBe(true);
+    }
+
+    for (const enemyType of Object.values(ENEMY_TYPES)) {
+      expect(enemyType.detectionRange).toBeGreaterThan(0);
+      expect(enemyType.level).toBeGreaterThan(0);
+      expect(enemyType.attackCooldownMs).toBeGreaterThan(0);
+      expect(Number.isFinite(enemyType.detectionRange)).toBe(true);
+      expect(Number.isFinite(enemyType.level)).toBe(true);
+      expect(Number.isFinite(enemyType.attackCooldownMs)).toBe(true);
     }
   });
 
-  it("keeps starter slimes passive and later prototype monster archetypes aggressive", () => {
-    for (const archetype of Object.values(ENEMY_ARCHETYPES)) {
-      if (archetype.id === "slime") {
-        expect(archetype.temperament).toBe("passive");
+  it("keeps starter slimes passive and later prototype enemy types aggressive", () => {
+    for (const enemyType of Object.values(ENEMY_TYPES)) {
+      if (enemyType.id === "slime") {
+        expect(enemyType.temperament).toBe("passive");
       } else {
-        expect(archetype.temperament).toBe("aggressive");
+        expect(enemyType.temperament).toBe("aggressive");
       }
     }
   });
 
-  it("applies supported archetype setup values when enemies are created", () => {
+  it("maps specific enemy types to the correct broad archetypes", () => {
+    expect(ENEMY_TYPES.cave_bat.archetypeId).toBe("bat");
+    expect(ENEMY_TYPES.forest_spider.archetypeId).toBe("spider");
+    expect(ENEMY_TYPES.goblin_thrower.archetypeId).toBe("goblin");
+    expect(ENEMY_TYPES.ash_wisp.archetypeId).toBe("wisp");
+  });
+
+  it("applies supported enemy type setup values when enemies are created", () => {
     const enemy = createEnemy("thrower", { x: 0, y: 0 }, undefined, {
-      archetypeId: "goblin_thrower",
+      enemyTypeId: "goblin_thrower",
     });
 
+    expect(enemy.enemyTypeId).toBe("goblin_thrower");
+    expect(enemy.archetypeId).toBe("goblin");
     expect(enemy.aggressionMode).toBe("aggressive");
     expect(enemy.level).toBe(7);
     expect(enemy.health).toBe(45);
@@ -55,7 +67,7 @@ describe("prototype enemy archetypes", () => {
 
   it("creates slime archetypes as passive starter enemies", () => {
     const enemy = createEnemy("starter-slime", { x: 0, y: 0 }, undefined, {
-      archetypeId: "slime",
+      enemyTypeId: "slime",
     });
 
     expect(enemy.aggressionMode).toBe("passive");
@@ -64,7 +76,7 @@ describe("prototype enemy archetypes", () => {
 
   it("lets explicit enemy setup options override archetype defaults", () => {
     const enemy = createEnemy("custom-slime", { x: 0, y: 0 }, undefined, {
-      archetypeId: "slime",
+      enemyTypeId: "slime",
       level: 5,
       maxHealth: 9,
       attack: 4,

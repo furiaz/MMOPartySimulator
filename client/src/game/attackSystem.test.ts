@@ -56,7 +56,7 @@ describe("enemy attack leash movement", () => {
       currentTargetId: "enemy",
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      archetypeId: "slime",
+      enemyTypeId: "slime",
       maxHealth: 3,
     });
 
@@ -91,7 +91,7 @@ describe("enemy attack leash movement", () => {
     const companion = createIdleCompanion("leader", { x: 4, y: 0 });
     const enemy = {
       ...createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-        archetypeId: "goblin_thrower",
+        enemyTypeId: "goblin_thrower",
       }),
       state: "attack" as const,
       currentTargetId: companion.id,

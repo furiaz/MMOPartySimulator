@@ -1,4 +1,4 @@
-import type { ClassId, DebugMapId, EnemyArchetypeId, GameEntity } from "./game";
+import type { ClassId, DebugMapId, EnemyTypeId, GameEntity } from "./game";
 import { NPC_ICON_SRC, RESOURCE_ICON_SRC } from "./assetIcons";
 
 export type SpriteAnimationAsset = {
@@ -175,7 +175,7 @@ function createStaticEnemySprite(src: string): SpriteVisualAsset {
   };
 }
 
-const prototypeEnemyVisualAssets: Partial<Record<EnemyArchetypeId, SpriteVisualAsset>> = {
+const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>> = {
   slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
   cave_bat: createStaticEnemySprite(`${prototypeEnemyBasePath}/cave-bat-se.png`),
   forest_spider: createStaticEnemySprite(`${prototypeEnemyBasePath}/forest-spider-se.png`),
@@ -385,19 +385,19 @@ export function getEntityVisualAsset(
     return entityVisualAssets.testHunter;
   }
 
-  const prototypeEnemyVisual = entity.archetypeId
-    ? prototypeEnemyVisualAssets[entity.archetypeId]
+  const prototypeEnemyVisual = entity.enemyTypeId
+    ? prototypeEnemyVisualAssets[entity.enemyTypeId]
     : undefined;
 
   if (prototypeEnemyVisual) {
     return prototypeEnemyVisual;
   }
 
-  if (entity.archetypeId === "wolf") {
+  if (entity.enemyTypeId === "wolf") {
     return entityVisualAssets.enemy;
   }
 
-  if (entity.archetypeId === "orc") {
+  if (entity.enemyTypeId === "orc") {
     return entityVisualAssets.enemy2;
   }
 

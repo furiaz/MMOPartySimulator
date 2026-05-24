@@ -179,11 +179,11 @@ function formatQuestEnemyName(
     return "Slimes";
   }
 
-  if (enemyArchetypeId === "cave_bat") {
+  if (enemyArchetypeId === "bat") {
     return "Cave Bats";
   }
 
-  if (enemyArchetypeId === "forest_spider") {
+  if (enemyArchetypeId === "spider") {
     return "Forest Spiders";
   }
 

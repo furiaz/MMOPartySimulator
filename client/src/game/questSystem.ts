@@ -153,7 +153,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         type: "defeat_enemy_count",
         enemyMapId: MAP_ONE_ID,
         targetSubzoneId: "mossy-glade",
-        enemyArchetypeId: "cave_bat",
+        enemyArchetypeId: "bat",
         requiredCount: 20,
       },
     ],
@@ -175,7 +175,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         type: "defeat_enemy_count",
         enemyMapId: MAP_ONE_ID,
         targetSubzoneId: "lower-shore",
-        enemyArchetypeId: "forest_spider",
+        enemyArchetypeId: "spider",
         requiredCount: 20,
       },
       {

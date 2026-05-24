@@ -27,6 +27,18 @@ export type EnemyTargetPreference = "closest" | "leader" | "lowestHealth";
 
 export type EnemyArchetypeId =
   | "slime"
+  | "bat"
+  | "spider"
+  | "goblin"
+  | "imp"
+  | "wolf"
+  | "crawler"
+  | "mossling"
+  | "wisp"
+  | "orc";
+
+export type EnemyTypeId =
+  | "slime"
   | "cave_bat"
   | "forest_spider"
   | "goblin_scout"
@@ -42,14 +54,22 @@ export type EnemyArchetypeId =
 export type EnemyArchetypeDefinition = {
   id: EnemyArchetypeId;
   displayName: string;
+  defaultCombatStyle: EnemyCombatStyle;
+  defaultAttackRange: number;
+  defaultTemperament?: EnemyTemperament;
+};
+
+export type EnemyTypeDefinition = {
+  id: EnemyTypeId;
+  displayName: string;
+  archetypeId: EnemyArchetypeId;
   temperament: EnemyTemperament;
-  combatStyle: EnemyCombatStyle;
+  combatStyle?: EnemyCombatStyle;
   targetPreference: EnemyTargetPreference;
   level: number;
-  maxHealth: number;
   attackCooldownMs: number;
   detectionRange: number;
-  attackRange: number;
+  attackRange?: number;
 };
 
 export type EnemyScalingBand = "starter" | "early";
@@ -64,20 +84,6 @@ export type EnemyTargetDecisionReason =
   | "no_valid_target";
 
 export type LootTier = 1 | 2;
-
-export type EnemyFamilyId =
-  | "slime"
-  | "bat"
-  | "spider"
-  | "goblin"
-  | "imp"
-  | "wolf"
-  | "crawler"
-  | "mossling"
-  | "wisp"
-  | "orc";
-
-export type EnemyType = EnemyFamilyId;
 
 export type CommandPriority = "autonomous" | "direct";
 
@@ -156,7 +162,7 @@ export type ZoneSubzone = {
     min: number;
     max: number;
   };
-  enemyArchetypeIds: EnemyArchetypeId[];
+  enemyTypeIds: EnemyTypeId[];
   encounterAreas: EncounterArea[];
   resourceLocations: ResourceLocation[];
   passages: ZoneSubzonePassage[];
@@ -752,7 +758,8 @@ export type SkillVisualEvent = {
 export type DropVisualEvent = {
   id: string;
   enemyId: string;
-  enemyType?: EnemyType;
+  enemyTypeId?: EnemyTypeId;
+  enemyArchetypeId?: EnemyArchetypeId;
   itemId: ItemId;
   quantity: number;
   position: Position;
@@ -963,6 +970,7 @@ export type DebugTelemetryEntitySnapshot = {
   position: Position;
   currentTargetId?: string | null;
   archetypeId?: EnemyArchetypeId;
+  enemyTypeId?: EnemyTypeId;
   enemyCombatStyle?: EnemyCombatStyle;
   enemyTargetPreference?: EnemyTargetPreference;
   enemyLevel?: number;
@@ -1015,6 +1023,7 @@ export type DebugTelemetryEvent = {
   targetId?: string | null;
   previousTargetId?: string | null;
   archetypeId?: EnemyArchetypeId;
+  enemyTypeId?: EnemyTypeId;
   enemyCombatStyle?: EnemyCombatStyle;
   enemyTargetPreference?: EnemyTargetPreference;
   enemyLevel?: number;
@@ -1104,7 +1113,7 @@ export type DebugTelemetryEvent = {
   flaskRechargeSource?: "hub_fountain" | "enemy_kills";
   targetSlot?: EquipmentSlot;
   equipmentType?: EquipmentType;
-  enemyType?: EnemyType;
+  enemyArchetypeId?: EnemyArchetypeId;
   enemyPosition?: Position;
   tableId?: string;
   dropChance?: number;
@@ -1284,7 +1293,7 @@ export type Enemy = LivingEntity & {
   aggressionMode: EnemyAggressionMode;
   isTargetDummy?: true;
   archetypeId?: EnemyArchetypeId;
-  enemyType?: EnemyType;
+  enemyTypeId?: EnemyTypeId;
   homePosition: Position;
   subzoneId?: string;
   encounterAreaId?: string;
