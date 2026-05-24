@@ -102,6 +102,9 @@ describe("debug maps", () => {
       if (wildernessMap.mapId === MAP_ONE_ID) {
         expect(wildernessMap.enemyPositions).toHaveLength(48);
         expect(wildernessMap.resources).toHaveLength(9);
+      } else if (wildernessMap.mapId === MAP_TWO_ID) {
+        expect(wildernessMap.enemyPositions).toHaveLength(48);
+        expect(wildernessMap.resources).toHaveLength(8);
       } else {
         expect(wildernessMap.enemyPositions.length).toBeGreaterThanOrEqual(18);
         expect(wildernessMap.enemyPositions.length).toBeLessThanOrEqual(22);
@@ -305,6 +308,55 @@ describe("debug maps", () => {
     expect(getSubzone(mapTwoSubzones, "south-center").levelRange.min).toBeGreaterThanOrEqual(3);
     expect(getSubzone(mapTwoSubzones, "south-east").levelRange.min).toBeGreaterThanOrEqual(4);
     expect(getSubzone(mapTwoSubzones, "north-east").levelRange.min).toBeGreaterThanOrEqual(5);
+  });
+
+  it("lays out map two with full-height subzone barriers and tuned enemy density", () => {
+    const mapTwoDefinition = debugMapDefinitions[MAP_TWO_ID];
+    const mapTwo = createDebugMap(MAP_TWO_ID);
+    const returnEntry = mapTwoDefinition.teleports.find(
+      (teleport) => teleport.targetMapId === MAP_ONE_ID,
+    );
+    const forwardEntry = mapTwoDefinition.teleports.find(
+      (teleport) => teleport.targetMapId === MAP_THREE_ID,
+    );
+    const scoutRise = getSubzone(mapTwoSubzones, "south-center");
+    const wolfCauseway = getSubzone(mapTwoSubzones, "north-east");
+
+    expect(mapTwoDefinition.rows).toBe(WILDERNESS_MAP_ROWS);
+    expect(returnEntry && isInsideSubzone(scoutRise, returnEntry.position)).toBe(true);
+    expect(forwardEntry && isInsideSubzone(wolfCauseway, forwardEntry.position)).toBe(true);
+    expect(mapTwoSubzones.map((subzone) => subzone.bounds)).toEqual([
+      { x: 1, y: 1, width: 51, height: 28 },
+      { x: 53, y: 1, width: 52, height: 28 },
+      { x: 106, y: 1, width: 53, height: 28 },
+    ]);
+
+    for (const dividerX of [52, 105]) {
+      expect(mapTwo.walls).toContainEqual({ x: dividerX, y: 0 });
+      expect(mapTwo.walls).toContainEqual({ x: dividerX, y: WILDERNESS_MAP_ROWS - 1 });
+      expect(isNavigationCellWalkable(mapTwo, { x: dividerX, y: 15 })).toBe(true);
+    }
+
+    const expectedSubzoneArchetypes = new Map([
+      ["south-center", ["forest_spider", "goblin_scout"]],
+      ["south-east", ["goblin_scout", "bog_imp"]],
+      ["north-east", ["bog_imp", "wolf", "goblin_thrower"]],
+    ]);
+
+    for (const subzone of mapTwoSubzones) {
+      const expectedArchetypes = expectedSubzoneArchetypes.get(subzone.id);
+      const subzoneEnemies = mapTwoEnemyStartData.filter(
+        (enemy) => enemy.subzoneId === subzone.id,
+      );
+
+      expect(subzone.enemyArchetypeIds).toEqual(expectedArchetypes);
+      expect(subzoneEnemies).toHaveLength(16);
+      expect(
+        subzoneEnemies.every((enemy) =>
+          expectedArchetypes?.includes(enemy.archetypeId),
+        ),
+      ).toBe(true);
+    }
   });
 
   it("keeps one map one enemy near each resource node", () => {

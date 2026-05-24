@@ -214,16 +214,16 @@ const MAP_ONE_PASSAGES: ZoneSubzonePassage[] = [
 
 const MAP_TWO_PASSAGES: ZoneSubzonePassage[] = [
   {
-    id: "south-center-to-south-east",
+    id: "scout-rise-to-old-grove",
     fromSubzoneId: "south-center",
     toSubzoneId: "south-east",
-    position: { x: 105, y: 36 },
+    position: { x: 52, y: 15 },
   },
   {
-    id: "south-east-to-north-east",
+    id: "old-grove-to-wolf-causeway",
     fromSubzoneId: "south-east",
     toSubzoneId: "north-east",
-    position: { x: 132, y: 24 },
+    position: { x: 105, y: 15 },
   },
 ];
 
@@ -259,16 +259,16 @@ const MAP_FOUR_PASSAGES: ZoneSubzonePassage[] = [
 
 const MAP_TWO_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
   {
-    id: "south-center-to-south-east",
+    id: "scout-rise-to-old-grove",
     fromSubzoneId: "south-center",
     toSubzoneId: "south-east",
-    position: { x: 52, y: 12 },
+    position: { x: 52, y: 15 },
   },
   {
-    id: "south-east-to-north-east",
+    id: "old-grove-to-wolf-causeway",
     fromSubzoneId: "south-east",
     toSubzoneId: "north-east",
-    position: { x: 105, y: 12 },
+    position: { x: 105, y: 15 },
   },
 ];
 
@@ -360,41 +360,41 @@ const mapTwoSourceSubzones: ZoneSubzone[] = [
   {
     id: "south-center",
     displayName: "Scout Rise",
-    bounds: { x: 53, y: 25, width: 52, height: 22 },
+    bounds: { x: 1, y: 1, width: 51, height: 28 },
     levelRange: { min: 3, max: 4 },
     enemyArchetypeIds: ["forest_spider", "goblin_scout"],
-    encounterAreas: [{ id: "scout-rise-camp", subzoneId: "south-center", center: { x: 80, y: 36 }, radius: 17, leashRadius: 19 }],
+    encounterAreas: [{ id: "scout-rise-camp", subzoneId: "south-center", center: { x: 27, y: 15 }, radius: 20, leashRadius: 22 }],
     resourceLocations: [
-      { id: resourceIds[3], subzoneId: "south-center", position: { x: 56, y: 43 }, resourceType: "wood" },
-      { id: resourceIds[13], subzoneId: "south-center", position: { x: 102, y: 28 }, resourceType: "ore" },
+      { id: resourceIds[3], subzoneId: "south-center", position: { x: 7, y: 25 }, resourceType: "wood" },
+      { id: resourceIds[13], subzoneId: "south-center", position: { x: 47, y: 4 }, resourceType: "ore" },
     ],
     passages: getPassagesForSubzone("south-center", MAP_TWO_PASSAGES),
   },
   {
     id: "south-east",
     displayName: "Old Grove",
-    bounds: { x: 106, y: 25, width: 53, height: 22 },
+    bounds: { x: 53, y: 1, width: 52, height: 28 },
     levelRange: { min: 4, max: 5 },
     enemyArchetypeIds: ["goblin_scout", "bog_imp"],
-    encounterAreas: [{ id: "old-grove-ring", subzoneId: "south-east", center: { x: 133, y: 37 }, radius: 19, leashRadius: 21 }],
+    encounterAreas: [{ id: "old-grove-ring", subzoneId: "south-east", center: { x: 79, y: 15 }, radius: 21, leashRadius: 23 }],
     resourceLocations: [
-      { id: resourceIds[6], subzoneId: "south-east", position: { x: 109, y: 43 }, resourceType: "wood" },
-      { id: resourceIds[7], subzoneId: "south-east", position: { x: 155, y: 43 }, resourceType: "ore" },
-      { id: resourceIds[14], subzoneId: "south-east", position: { x: 154, y: 28 }, resourceType: "herb" },
+      { id: resourceIds[6], subzoneId: "south-east", position: { x: 58, y: 25 }, resourceType: "wood" },
+      { id: resourceIds[7], subzoneId: "south-east", position: { x: 100, y: 25 }, resourceType: "ore" },
+      { id: resourceIds[14], subzoneId: "south-east", position: { x: 101, y: 4 }, resourceType: "herb" },
     ],
     passages: getPassagesForSubzone("south-east", MAP_TWO_PASSAGES),
   },
   {
     id: "north-east",
     displayName: "Wolf Causeway",
-    bounds: { x: 106, y: 1, width: 53, height: 23 },
+    bounds: { x: 106, y: 1, width: 53, height: 28 },
     levelRange: { min: 5, max: 7 },
     enemyArchetypeIds: ["bog_imp", "wolf", "goblin_thrower"],
-    encounterAreas: [{ id: "wolf-causeway-pack", subzoneId: "north-east", center: { x: 135, y: 13 }, radius: 20, leashRadius: 22 }],
+    encounterAreas: [{ id: "wolf-causeway-pack", subzoneId: "north-east", center: { x: 132, y: 15 }, radius: 22, leashRadius: 24 }],
     resourceLocations: [
-      { id: resourceIds[8], subzoneId: "north-east", position: { x: 109, y: 20 }, resourceType: "herb" },
-      { id: resourceIds[9], subzoneId: "north-east", position: { x: 156, y: 21 }, resourceType: "wood" },
-      { id: resourceIds[15], subzoneId: "north-east", position: { x: 109, y: 4 }, resourceType: "ore" },
+      { id: resourceIds[8], subzoneId: "north-east", position: { x: 110, y: 25 }, resourceType: "herb" },
+      { id: resourceIds[9], subzoneId: "north-east", position: { x: 155, y: 25 }, resourceType: "wood" },
+      { id: resourceIds[15], subzoneId: "north-east", position: { x: 110, y: 4 }, resourceType: "ore" },
     ],
     passages: getPassagesForSubzone("north-east", MAP_TWO_PASSAGES),
   },
@@ -489,8 +489,6 @@ const mapFourSourceSubzones: ZoneSubzone[] = [
 ];
 
 const MAP_TWO_COMPACT_OFFSETS: Record<string, Position> = {
-  "south-center": { x: -52, y: -24 },
-  "south-east": { x: -52, y: -24 },
 };
 
 const MAP_THREE_COMPACT_OFFSETS: Record<string, Position> = {
@@ -535,11 +533,11 @@ const mapOneSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
 ];
 
 const mapTwoSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-2-scout-rise-entry-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 80, y: 39 } },
-  { id: "map-2-scout-rise-old-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 100, y: 36 } },
-  { id: "map-2-old-grove-scout-label", subzoneId: "south-east", text: "Old Grove", position: { x: 110, y: 36 } },
-  { id: "map-2-old-grove-wolf-label", subzoneId: "south-east", text: "Old Grove", position: { x: 132, y: 27 } },
-  { id: "map-2-wolf-causeway-old-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 132, y: 21 } },
+  { id: "map-2-scout-rise-entry-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 10, y: 15 } },
+  { id: "map-2-scout-rise-old-label", subzoneId: "south-center", text: "Scout Rise", position: { x: 45, y: 15 } },
+  { id: "map-2-old-grove-scout-label", subzoneId: "south-east", text: "Old Grove", position: { x: 59, y: 15 } },
+  { id: "map-2-old-grove-wolf-label", subzoneId: "south-east", text: "Old Grove", position: { x: 99, y: 15 } },
+  { id: "map-2-wolf-causeway-old-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 112, y: 15 } },
   { id: "map-2-wolf-causeway-exit-label", subzoneId: "north-east", text: "Wolf Causeway", position: { x: 151, y: 12 } },
 ];
 
@@ -629,49 +627,6 @@ const mapOneStressEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[47], position: { x: 153, y: 39 }, archetypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
 ];
 
-const mapOneProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 10, y: 9 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
-  { id: enemyIds[1], position: { x: 20, y: 14 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
-  { id: enemyIds[2], position: { x: 33, y: 8 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
-  { id: enemyIds[3], position: { x: 16, y: 19 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
-  { id: enemyIds[4], position: { x: 29, y: 16 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
-  { id: enemyIds[5], position: { x: 43, y: 13 }, archetypeId: "slime", subzoneId: "north-west", encounterAreaId: "shore-fringe-den" },
-  { id: enemyIds[6], position: { x: 65, y: 10 }, archetypeId: "slime", subzoneId: "north-center", encounterAreaId: "mossy-glade-nest" },
-  { id: enemyIds[7], position: { x: 73, y: 16 }, archetypeId: "cave_bat", subzoneId: "north-center", encounterAreaId: "mossy-glade-nest" },
-  { id: enemyIds[8], position: { x: 88, y: 12 }, archetypeId: "slime", subzoneId: "north-center", encounterAreaId: "mossy-glade-nest" },
-  { id: enemyIds[9], position: { x: 67, y: 20 }, archetypeId: "slime", subzoneId: "north-center", encounterAreaId: "mossy-glade-nest" },
-  { id: enemyIds[10], position: { x: 95, y: 8 }, archetypeId: "cave_bat", subzoneId: "north-center", encounterAreaId: "mossy-glade-nest" },
-  { id: enemyIds[11], position: { x: 98, y: 17 }, archetypeId: "slime", subzoneId: "north-center", encounterAreaId: "mossy-glade-nest" },
-  { id: enemyIds[12], position: { x: 11, y: 34 }, archetypeId: "cave_bat", subzoneId: "south-west", encounterAreaId: "lower-shore-roost" },
-  { id: enemyIds[13], position: { x: 22, y: 42 }, archetypeId: "forest_spider", subzoneId: "south-west", encounterAreaId: "lower-shore-roost" },
-  { id: enemyIds[14], position: { x: 34, y: 33 }, archetypeId: "cave_bat", subzoneId: "south-west", encounterAreaId: "lower-shore-roost" },
-  { id: enemyIds[15], position: { x: 14, y: 44 }, archetypeId: "cave_bat", subzoneId: "south-west", encounterAreaId: "lower-shore-roost" },
-  { id: enemyIds[16], position: { x: 38, y: 32 }, archetypeId: "forest_spider", subzoneId: "south-west", encounterAreaId: "lower-shore-roost" },
-  { id: enemyIds[17], position: { x: 43, y: 43 }, archetypeId: "cave_bat", subzoneId: "south-west", encounterAreaId: "lower-shore-roost" },
-  { id: enemyIds[18], position: { x: 64, y: 32 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
-  { id: enemyIds[19], position: { x: 80, y: 39 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
-  { id: enemyIds[20], position: { x: 96, y: 32 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
-  { id: enemyIds[21], position: { x: 68, y: 40 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
-  { id: enemyIds[22], position: { x: 84, y: 31 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
-  { id: enemyIds[23], position: { x: 96, y: 40 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
-  { id: enemyIds[24], position: { x: 116, y: 32 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[25], position: { x: 133, y: 38 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[26], position: { x: 151, y: 33 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[27], position: { x: 124, y: 43 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[28], position: { x: 118, y: 41 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[29], position: { x: 127, y: 31 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[30], position: { x: 141, y: 32 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[31], position: { x: 150, y: 40 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
-  { id: enemyIds[32], position: { x: 116, y: 9 }, archetypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[33], position: { x: 133, y: 14 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[34], position: { x: 150, y: 9 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[35], position: { x: 142, y: 20 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[36], position: { x: 118, y: 17 }, archetypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[37], position: { x: 126, y: 6 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[38], position: { x: 144, y: 7 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-  { id: enemyIds[39], position: { x: 154, y: 16 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
-];
-
 export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapOneSubzones,
   mapOneStressEnemyStartData,
@@ -679,7 +634,56 @@ export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(
 
 export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapTwoSubzones,
-  compactEnemyStartData(mapOneProgressionEnemyStartData, MAP_TWO_COMPACT_OFFSETS),
+  [
+    { id: enemyIds[0], position: { x: 10, y: 8 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[1], position: { x: 20, y: 6 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[2], position: { x: 32, y: 7 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[3], position: { x: 43, y: 11 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[4], position: { x: 14, y: 14 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[5], position: { x: 25, y: 13 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[6], position: { x: 37, y: 15 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[7], position: { x: 46, y: 18 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[8], position: { x: 11, y: 21 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[9], position: { x: 21, y: 22 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[10], position: { x: 31, y: 20 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[11], position: { x: 42, y: 23 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[12], position: { x: 18, y: 17 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[13], position: { x: 28, y: 18 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[14], position: { x: 36, y: 10 }, archetypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[15], position: { x: 23, y: 24 }, archetypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-camp" },
+    { id: enemyIds[16], position: { x: 61, y: 8 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[17], position: { x: 72, y: 6 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[18], position: { x: 84, y: 7 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[19], position: { x: 96, y: 11 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[20], position: { x: 63, y: 14 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[21], position: { x: 75, y: 13 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[22], position: { x: 88, y: 15 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[23], position: { x: 99, y: 18 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[24], position: { x: 62, y: 21 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[25], position: { x: 73, y: 22 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[26], position: { x: 84, y: 20 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[27], position: { x: 96, y: 24 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[28], position: { x: 69, y: 17 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[29], position: { x: 80, y: 18 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[30], position: { x: 90, y: 10 }, archetypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[31], position: { x: 78, y: 24 }, archetypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-ring" },
+    { id: enemyIds[32], position: { x: 113, y: 8 }, archetypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[33], position: { x: 125, y: 6 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[34], position: { x: 138, y: 7 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[35], position: { x: 151, y: 10 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[36], position: { x: 114, y: 15 }, archetypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[37], position: { x: 126, y: 13 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[38], position: { x: 140, y: 14 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[39], position: { x: 153, y: 17 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[40], position: { x: 113, y: 22 }, archetypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[41], position: { x: 125, y: 24 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[42], position: { x: 138, y: 22 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[43], position: { x: 151, y: 22 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[44], position: { x: 120, y: 18 }, archetypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[45], position: { x: 132, y: 19 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[46], position: { x: 144, y: 11 }, archetypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+    { id: enemyIds[47], position: { x: 132, y: 25 }, archetypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-pack" },
+  ],
 );
 
 const mapTwoProgressionEnemyStartData: EnemyStartData[] = [
@@ -815,6 +819,18 @@ const MAP_ONE_WALLS = dedupeWalls([
 
 const MAP_TWO_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
+  ...createVerticalWall(52, 0, WILDERNESS_MAP_ROWS - 1, [[10, 17]]),
+  ...createVerticalWall(105, 0, WILDERNESS_MAP_ROWS - 1, [[10, 17]]),
+  ...createWallBlock(12, 22, 10, 11),
+  ...createWallBlock(34, 43, 20, 21),
+  ...createWallBlock(64, 69, 5, 11),
+  ...createWallBlock(88, 99, 21, 22),
+  ...createWallBlock(116, 126, 9, 10),
+  ...createWallBlock(142, 151, 19, 20),
+]);
+
+const MAP_THREE_WALLS = dedupeWalls([
+  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
   ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
   ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
 ]);
@@ -925,7 +941,7 @@ export const debugMapDefinitions: Record<
     debugName: "map-3",
     columns: WILDERNESS_MAP_COLUMNS,
     rows: WILDERNESS_MAP_ROWS,
-    walls: MAP_TWO_WALLS,
+    walls: MAP_THREE_WALLS,
     healingFountains: [],
     subzones: mapThreeSubzones,
     subzoneNameLabels: mapThreeSubzoneNameLabels,
