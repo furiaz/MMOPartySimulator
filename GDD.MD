@@ -395,7 +395,7 @@ Current prototype enemies may be passive or aggressive by archetype or setup.
 
 Aggressive enemies may be introduced by enemy archetype, enemy type, zone, event, or explicit debug scenario.
 
-If any party member is attacked, the party may temporarily prioritize that attacker.
+If any party member is attacked, blocked by a nearby enemy while moving, or stuck near a threat during active party intent, the party may temporarily switch to self-defense and preserve the interrupted POI or travel intent for later restoration.
 
 ---
 
@@ -412,10 +412,15 @@ Dead party members:
 
 Current prototype resurrection behavior:
 
-- living autonomous companions may move to dead companions after combat ends
+- resurrection is driven by party recovery intent when a companion is dead
+- the recovery intent may temporarily pause POI, World Travel, teleport, gathering, or combat intent
+- living autonomous companions may move to the selected dead companion
 - resurrection requires close range
-- resurrection channels over time
-- resurrection can be canceled if the helper becomes invalid, receives a direct command, enters combat, or the target is revived
+- resurrection channels over time and multiple helpers may contribute progress to the same target
+- direct-commanded helpers do not start or continue resurrection
+- helpers targeted by active enemies may avoid starting a new resurrection channel during combat
+- if the dead leader has nearby threats, living companions may first clear those threats before resurrection
+- when recovery ends, queued party intent may resume if still valid
 - revived companions return with minimal health and resume party behavior
 
 If all party members are defeated outside the hub, prototype world-wipe recovery may rescue the party to an unlocked rescue hub.
@@ -1800,7 +1805,7 @@ The game uses a top-down readable presentation.
 
 Current world rendering uses a PixiJS renderer for the main map view.
 
-Current visuals may use prototype sprites, generated terrain tiles, generated icons, and placeholders.
+Current visuals may use prototype sprites, generated terrain tiles, generated icons, class portraits, feedback VFX sprites, and placeholders.
 
 Visual priorities:
 
@@ -1878,7 +1883,7 @@ Temporary debug tools may include:
 - inspect healing fountain health restoration and flask refill behavior
 - inspect enemy archetype, combat style, target preference, attack range, and target decision behavior
 - inspect enemy scaling, respawn, subzone, and encounter area behavior
-- inspect resurrection and world-wipe recovery behavior
+- inspect party intent, self-defense recovery, resurrection, and world-wipe recovery behavior
 - inspect interrupted POI restore behavior
 - inspect quest guide escort behavior
 - inspect PixiJS world rendering behavior

@@ -85,6 +85,7 @@ Current game-logic implementation files include:
 - `navigation.ts`
 - `navigationClick.ts`
 - `partyFormationSystem.ts`
+- `partyIntentSystem.ts`
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
@@ -199,6 +200,13 @@ Current movement model supports:
 - party swaps in specific movement edge cases
 - navigation and path performance metrics
 
+Current collision behavior:
+
+- most entities use a simple circular collision shape
+- Beginner companions use a vertical capsule collision shape to better match their taller sprite
+- collision shape data supports movement, interaction targeting, and debug overlay readability
+- collision shapes must not define class balance, combat reach, or final sprite scale
+
 ---
 
 ## Party Members
@@ -311,7 +319,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, leader intent, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -326,14 +334,20 @@ Current movement planning fields include:
 - `movementDecisionsByEntityId`
 - `lastPositionsByEntityId`
 
-Current POI and travel fields include:
+Current party intent, POI, and travel fields include:
 
+- `partyIntent`
+- `leaderIntent`
 - `worldTravelTargetMapId`
 - `globalPoiIntent`
 - `localPoiTarget`
 - `lastPoiDecision`
 - `interruptedPoiTarget`
 - `poiPreferences`
+
+`partyIntent` is the current centralized party behavior intent model.
+
+`leaderIntent`, `globalPoiIntent`, `localPoiTarget`, `worldTravelTargetMapId`, and `lastPoiDecision` remain synchronized compatibility fields for systems and UI that still read those values directly.
 
 Current POI preferences include:
 
@@ -735,7 +749,8 @@ Rules:
 - direct commands override autonomous behavior for the targeted entity
 - direct commands should not automatically change other entities
 - direct commands are absolute for this phase
-- commands update leader intent only when issued by or for the current leader
+- direct leader commands update party execution intent through the party intent helpers
+- party orders update party intent and assign autonomous member states from that shared intent
 
 Current command priority values:
 
@@ -747,9 +762,9 @@ Current command types use entity states except `dead`.
 
 ---
 
-## Leader Intent
+## Party Intent and Leader Intent
 
-Leader intent is stored as:
+Party execution intent uses the same shape as leader intent:
 
 ```ts
 type LeaderIntent = {
@@ -758,11 +773,56 @@ type LeaderIntent = {
   targetPosition: Position | null;
   source?: "player" | "ai";
 };
+
+type PartyExecutionIntent = LeaderIntent;
 ```
 
-Leader intent is used by party movement, role behavior, combat targeting, exploration, defender positioning, POI targeting, and teleport point movement.
+Current party intent is stored as:
 
-Leader intent may be cleared when a point of interest is reached, combat ends, or a map transition completes.
+```ts
+type PartyBehaviorMode =
+  | "idle"
+  | "travel"
+  | "engage"
+  | "defend"
+  | "regroup"
+  | "resurrect";
+
+type PartyIntentSource = "player" | "ai";
+
+type PartyRecoveryAction =
+  | "fight_near_dead_leader"
+  | "resurrect";
+
+type PartyRecoveryIntent = {
+  action: PartyRecoveryAction;
+  deadCompanionId: string;
+  threatEnemyIds: string[];
+};
+
+type PartyIntentSnapshot = {
+  executionIntent: PartyExecutionIntent | null;
+  globalPoiIntent: GlobalPoiIntent | null;
+  localPoiTarget: LocalPoiTarget | null;
+  worldTravelTargetMapId: DebugMapId | null;
+  lastPoiDecision?: PoiDecisionState;
+};
+
+type PartyIntent = PartyIntentSnapshot & {
+  mode: PartyBehaviorMode;
+  source: PartyIntentSource;
+  queuedIntent?: PartyIntentSnapshot | null;
+  recoveryIntent?: PartyRecoveryIntent | null;
+};
+```
+
+`partyIntent` is used by party movement, role behavior, combat targeting, exploration, defender positioning, POI targeting, teleport movement, resurrection recovery, and self-defense recovery.
+
+`leaderIntent` remains synchronized from `partyIntent.executionIntent` for compatibility with existing systems and UI.
+
+Party intent may be cleared when a point of interest is reached, combat ends, map transition completes, teleport completes, or recovery intent finishes.
+
+`partyIntentSystem.ts` owns current recovery and self-defense intent behavior. It can queue existing party intent, switch to resurrection or nearby-threat combat, and restore queued intent when recovery ends.
 
 ## Prototype Quests and POIs
 
@@ -2025,10 +2085,13 @@ Current generated asset groups referenced by UI include:
 - `Asserts/Generated/hub-floors`
 - `Asserts/Generated/hub-floors/New/128`
 - `Asserts/Generated/beginner-skill-effects-50/sprites`
+- `Asserts/Generated/prototype-vfx/sprites`
+- `Asserts/Generated/class-portraits`
 - `Asserts/Generated/hub-castle-walls`
 
 Current sprite asset groups include:
 
+- `Asserts/Characters/Beginner`
 - `Asserts/Characters/Test-Character`
 - `Asserts/Characters/Test-Enemy`
 - `Asserts/Characters/Test-Enemy2`
@@ -2045,9 +2108,11 @@ Current world renderer behavior:
 
 Current companion visuals:
 
-- companions use the test character sprite
-- idle uses a single idle frame
-- run uses directional frame sequences for north, south, west, and east
+- Beginner companions use the generated Beginner walking sprite set
+- non-Beginner companions currently use the test character sprite
+- idle may use a single idle frame or directional first-frame idle fallback depending on the sprite set
+- run uses directional frame sequences for north, south, west, and east where available
+- class portraits are UI-facing images and do not define simulation behavior
 
 Current enemy visuals:
 
@@ -2098,7 +2163,7 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest reward validation, quest reward validation failure, quest reward claim start, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, companion resurrection, flask fountain refills, flask recharge progress, and flask charge gains.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 
