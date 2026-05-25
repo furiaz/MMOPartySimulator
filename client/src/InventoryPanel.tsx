@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
+import { INVENTORY_ITEM_ICON_SRC, NPC_ICON_SRC } from "./assetIcons";
 import {
   ARMOR_FAMILY_LABELS,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   getItemDefinition,
+  getQuestItemInventoryEntries,
   formatCurrencyDisplay,
   getUsedInventorySlots,
   ITEM_DEFINITIONS,
@@ -14,6 +15,7 @@ import {
   type PartyInventory,
   type PartyWallet,
   type PrimaryStatId,
+  type GameState,
 } from "./game";
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
@@ -46,24 +48,27 @@ function formatCategoryLabel(category: ItemCategory): string {
 
 export function InventoryPanel({
   inventory,
+  quests,
   wallet,
   onOpenEquipmentManagement,
 }: {
   inventory: PartyInventory;
+  quests: GameState["quests"];
   wallet: PartyWallet;
   onOpenEquipmentManagement: () => void;
 }) {
-  const [activeCategory, setActiveCategory] = useState<ItemCategory | "all">(
-    "all",
-  );
+  const [activeCategory, setActiveCategory] = useState<
+    ItemCategory | "all" | "questItems"
+  >("all");
   const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null);
+  const questItemEntries = getQuestItemInventoryEntries(quests);
   const availableCategories = Array.from(
     new Set(
       Object.values(ITEM_DEFINITIONS).map((itemDefinition) =>
         itemDefinition.category
       ),
     ),
-  );
+  ).filter((category) => category !== "quest");
   const visibleSlots = inventory.slots.filter((slot) => {
     if (activeCategory === "all") {
       return true;
@@ -85,13 +90,19 @@ export function InventoryPanel({
   const selectedItemDefinition = selectedSlot
     ? getItemDefinition(selectedSlot.itemId)
     : null;
+  const selectedQuestItem =
+    activeCategory === "questItems"
+      ? questItemEntries.find((entry) => selectedItemKey === entry.key) ?? null
+      : null;
 
   return (
     <section className="inventory-panel" aria-label="Inventory">
       <div className="inventory-header">
         <h2>Inventory</h2>
         <span>
-          {getUsedInventorySlots(inventory)}/{inventory.capacity}
+          {activeCategory === "questItems"
+            ? `${questItemEntries.length} Quest Items`
+            : `${getUsedInventorySlots(inventory)}/${inventory.capacity}`}
         </span>
       </div>
       <div className="inventory-wallet-row" title="Shared party wallet">
@@ -103,7 +114,10 @@ export function InventoryPanel({
       <div className="inventory-category-tabs" aria-label="Inventory categories">
         <button
           className={activeCategory === "all" ? "active" : ""}
-          onClick={() => setActiveCategory("all")}
+          onClick={() => {
+            setActiveCategory("all");
+            setSelectedItemKey(null);
+          }}
           type="button"
         >
           All
@@ -121,8 +135,28 @@ export function InventoryPanel({
             {formatCategoryLabel(category)}
           </button>
         ))}
+        <button
+          className={activeCategory === "questItems" ? "active" : ""}
+          onClick={() => {
+            setActiveCategory("questItems");
+            setSelectedItemKey(null);
+          }}
+          type="button"
+        >
+          Quest Items
+        </button>
       </div>
-      {selectedSlot && selectedItemDefinition ? (
+      {selectedQuestItem ? (
+        <div className="inventory-item-action-panel">
+          <div>
+            <strong>{selectedQuestItem.displayName}</strong>
+            <span>Quest {selectedQuestItem.questDisplayName}</span>
+            <span>
+              Progress {selectedQuestItem.quantity}/{selectedQuestItem.requiredCount}
+            </span>
+          </div>
+        </div>
+      ) : selectedSlot && selectedItemDefinition ? (
         <div className="inventory-item-action-panel">
           <div>
             <strong>{selectedItemDefinition.displayName}</strong>
@@ -137,7 +171,46 @@ export function InventoryPanel({
         </div>
       ) : null}
       <div className="inventory-slot-grid">
-        {slots.map(({ index, slot }) => {
+        {activeCategory === "questItems" ? (
+          questItemEntries.length > 0 ? (
+            questItemEntries.map((entry, index) => {
+              const isSelected = selectedItemKey === entry.key;
+
+              return (
+                <div
+                  key={entry.key}
+                  className={`inventory-slot filled quest-item${isSelected ? " selected" : ""}`}
+                  onClick={() =>
+                    setSelectedItemKey(isSelected ? null : entry.key)
+                  }
+                  title={[
+                    entry.displayName,
+                    `Quest ${entry.questDisplayName}`,
+                    `Progress ${entry.quantity}/${entry.requiredCount}`,
+                  ].join("\n")}
+                >
+                  <span className="inventory-slot-index">{index + 1}</span>
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="inventory-item-icon"
+                    src={NPC_ICON_SRC.quest_giver}
+                  />
+                  <span className="inventory-slot-name">
+                    {entry.displayName}
+                  </span>
+                  <span className="inventory-slot-quantity">
+                    {entry.quantity}/{entry.requiredCount}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <div className="inventory-slot empty inventory-quest-empty">
+              <span className="inventory-slot-name">No quest items</span>
+            </div>
+          )
+        ) : slots.map(({ index, slot }) => {
           if (!slot) {
             return (
               <div

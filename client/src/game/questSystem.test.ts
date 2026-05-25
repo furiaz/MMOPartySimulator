@@ -1,23 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createNpc, createResource } from "./entities";
 import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debugTelemetry";
-import { createDebugMap, MAP_ONE_ID } from "./debugMap";
+import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
+import {
+  createDebugMap,
+  MAP_ONE_ID,
+  MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
+  TELEPORTER_ID,
+} from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import { buyMerchantItem } from "./merchant";
 import { addEntity } from "./state";
 import { equipFlaskToCompanion } from "./consumables";
 import {
   acceptQuestFromQuestGiver,
+  completeQuestObjective,
   createInitialQuestStates,
   finishReadyQuestsForQuestGiver,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
+  getQuestItemInventoryEntries,
   isMerchantUnlockedForQuests,
+  isRouteTeleportUnlockedForQuests,
   QUEST_GIVER_POI_ID,
   recordEquippedItemObjectivesForQuests,
   recordEnemyDefeatedForQuests,
   recordQuestPoiReachedForQuests,
+  recordQuestRepairProgress,
   recordResourceGatheredForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
@@ -70,8 +80,8 @@ describe("prototype quest system", () => {
     state = updateQuestGiverInteraction(state);
     expect(state.quests.clear_the_shore.status).toBe("completed");
     expect(state.quests.outfit_the_expedition.status).toBe("available");
-    expect(state.quests.gather_expedition_supplies.status).toBe("locked");
-    expect(state.quests.scout_the_northern_road.status).toBe("locked");
+    expect(state.quests.stolen_field_supplies.status).toBe("locked");
+    expect(state.quests.break_lower_shore_blockage.status).toBe("locked");
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(50);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
@@ -84,6 +94,24 @@ describe("prototype quest system", () => {
     expect(getCompanion(state, "companion-2").characterLevel).toBe(2);
     expect(getCompanion(state, "companion-2").characterXp).toBe(2);
     expect(getCompanion(state, "companion-2").lastCharacterXpGained).toBe(8);
+  });
+
+  it("initializes the early quest chain in serial order", () => {
+    const quests = createInitialQuestStates();
+
+    expect(Object.keys(quests)).toEqual([
+      "clear_the_shore",
+      "outfit_the_expedition",
+      "stolen_field_supplies",
+      "break_lower_shore_blockage",
+      "scout_rise_samples",
+      "rescue_the_grove_runner",
+      "hold_the_field_cache",
+      "open_wolf_causeway",
+    ]);
+    expect(quests.clear_the_shore.status).toBe("available");
+    expect(quests.outfit_the_expedition.status).toBe("locked");
+    expect(quests.open_wolf_causeway.status).toBe("locked");
   });
 
   it("completes equipment tutorial objectives from current equipment state", () => {
@@ -275,27 +303,27 @@ describe("prototype quest system", () => {
     let state = createStateWithParty({
       quests: createQuestStates({
         clear_the_shore: "available",
-        gather_expedition_supplies: "available",
+        stolen_field_supplies: "available",
       }),
     });
 
     state = acceptQuestFromQuestGiver(
       state,
       QUEST_GIVER_POI_ID,
-      "gather_expedition_supplies",
+      "stolen_field_supplies",
     );
 
     expect(state.quests.clear_the_shore.status).toBe("available");
-    expect(state.quests.gather_expedition_supplies.status).toBe("active");
+    expect(state.quests.stolen_field_supplies.status).toBe("active");
   });
 
   it("lists quest giver quests by menu status", () => {
     const state = createStateWithParty({
       quests: createQuestStates({
         clear_the_shore: "available",
-        gather_expedition_supplies: "active",
-        scout_the_northern_road: "ready_to_turn_in",
-        threat_beyond_the_pass: "completed",
+        stolen_field_supplies: "active",
+        break_lower_shore_blockage: "ready_to_turn_in",
+        scout_rise_samples: "completed",
       }),
     });
 
@@ -308,19 +336,19 @@ describe("prototype quest system", () => {
       getQuestGiverCurrentQuests(state, QUEST_GIVER_POI_ID).map(
         (quest) => quest.questId,
       ),
-    ).toEqual(["gather_expedition_supplies"]);
+    ).toEqual(["stolen_field_supplies"]);
     expect(
       getQuestGiverReadyQuests(state, QUEST_GIVER_POI_ID).map(
         (quest) => quest.questId,
       ),
-    ).toEqual(["scout_the_northern_road"]);
+    ).toEqual(["break_lower_shore_blockage"]);
   });
 
   it("leaves state unchanged when finishing with no ready quests", () => {
     const state = createStateWithParty({
       quests: createQuestStates({
         clear_the_shore: "available",
-        gather_expedition_supplies: "active",
+        stolen_field_supplies: "active",
       }),
     });
 
@@ -331,22 +359,22 @@ describe("prototype quest system", () => {
     let state = createStateWithParty({
       quests: createQuestStates({
         clear_the_shore: "ready_to_turn_in",
-        gather_expedition_supplies: "ready_to_turn_in",
+        stolen_field_supplies: "ready_to_turn_in",
       }),
     });
 
     state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
 
     expect(state.quests.clear_the_shore.status).toBe("completed");
-    expect(state.quests.gather_expedition_supplies.status).toBe("completed");
-    expect(state.wallet.balancesByCurrencyId.crowns).toBe(70);
+    expect(state.quests.stolen_field_supplies.status).toBe("completed");
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(85);
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
       { itemId: "acolyte_hood", quantity: 1 },
-      { itemId: "field_herb", quantity: 3 },
+      { itemId: "hearty_trail_rations", quantity: 1 },
     ]);
-    expect(getCompanion(state, "companion-1").lastCharacterXpGained).toBe(6);
+    expect(getCompanion(state, "companion-1").lastCharacterXpGained).toBe(12);
   });
 
   it("does not partially finish ready quests when combined rewards cannot fit", () => {
@@ -357,23 +385,23 @@ describe("prototype quest system", () => {
       },
       quests: createQuestStates({
         clear_the_shore: "ready_to_turn_in",
-        gather_expedition_supplies: "ready_to_turn_in",
-        scout_the_northern_road: "ready_to_turn_in",
+        stolen_field_supplies: "ready_to_turn_in",
+        break_lower_shore_blockage: "ready_to_turn_in",
       }),
     });
 
     state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
 
     expect(state.quests.clear_the_shore.status).toBe("ready_to_turn_in");
-    expect(state.quests.gather_expedition_supplies.status).toBe(
+    expect(state.quests.stolen_field_supplies.status).toBe(
       "ready_to_turn_in",
     );
-    expect(state.quests.scout_the_northern_road.status).toBe("ready_to_turn_in");
+    expect(state.quests.break_lower_shore_blockage.status).toBe("ready_to_turn_in");
     expect(state.quests.clear_the_shore.lastTurnInError).toBe("inventory_full");
-    expect(state.quests.gather_expedition_supplies.lastTurnInError).toBe(
+    expect(state.quests.stolen_field_supplies.lastTurnInError).toBe(
       "inventory_full",
     );
-    expect(state.quests.scout_the_northern_road.lastTurnInError).toBe(
+    expect(state.quests.break_lower_shore_blockage.lastTurnInError).toBe(
       "inventory_full",
     );
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(0);
@@ -387,8 +415,8 @@ describe("prototype quest system", () => {
       map: createDebugMap(MAP_ONE_ID),
       quests: createQuestStates({
         clear_the_shore: "active",
-        gather_expedition_supplies: "active",
-        scout_the_northern_road: "active",
+        stolen_field_supplies: "active",
+        break_lower_shore_blockage: "active",
       }),
     });
 
@@ -406,6 +434,7 @@ describe("prototype quest system", () => {
       state,
       createDefeatedEnemy("glade-bat", "bat", "mossy-glade"),
       MAP_ONE_ID,
+      () => 0,
     );
     state = recordEnemyDefeatedForQuests(
       state,
@@ -418,13 +447,158 @@ describe("prototype quest system", () => {
         .currentCount,
     ).toBe(1);
     expect(
-      state.quests.gather_expedition_supplies.objectiveProgress
-        .defeat_mossy_glade_bats.currentCount,
+      state.quests.stolen_field_supplies.objectiveProgress
+        .collect_mossy_glade_supplies.currentCount,
     ).toBe(1);
     expect(
-      state.quests.scout_the_northern_road.objectiveProgress
+      state.quests.break_lower_shore_blockage.objectiveProgress
         .defeat_lower_shore_spiders.currentCount,
     ).toBe(1);
+  });
+
+  it("uses chance and pity for special enemy quest drops without overflowing", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      quests: createQuestStates({
+        stolen_field_supplies: "active",
+      }),
+    });
+    const defeatedBat = createDefeatedEnemy("glade-bat", "bat", "mossy-glade");
+
+    state = recordEnemyDefeatedForQuests(state, defeatedBat, MAP_ONE_ID, () => 0.99);
+    expect(
+      state.quests.stolen_field_supplies.objectiveProgress
+        .collect_mossy_glade_supplies.currentCount,
+    ).toBe(0);
+
+    state = recordEnemyDefeatedForQuests(state, defeatedBat, MAP_ONE_ID, () => 0.99);
+    expect(
+      state.quests.stolen_field_supplies.objectiveProgress
+        .collect_mossy_glade_supplies.currentCount,
+    ).toBe(1);
+
+    for (let count = 0; count < 20; count += 1) {
+      state = recordEnemyDefeatedForQuests(state, defeatedBat, MAP_ONE_ID, () => 0);
+    }
+
+    expect(
+      state.quests.stolen_field_supplies.objectiveProgress
+        .collect_mossy_glade_supplies,
+    ).toMatchObject({
+      currentCount: 10,
+      completed: true,
+    });
+    expect(state.quests.stolen_field_supplies.status).toBe("ready_to_turn_in");
+  });
+
+  it("queues visual feedback and virtual inventory entries for special enemy quest drops", () => {
+    const now = 5000;
+    let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      quests: createQuestStates({
+        stolen_field_supplies: "active",
+      }),
+    });
+    const defeatedBat = createDefeatedEnemy("glade-bat", "bat", "mossy-glade");
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      defeatedBat,
+      MAP_ONE_ID,
+      () => 0,
+      now,
+    );
+
+    expect(state.inventory.slots).toEqual([]);
+    expect(state.dropVisualEvents).toHaveLength(1);
+    expect(state.dropVisualEvents?.[0]).toMatchObject({
+      kind: "quest_item",
+      displayName: "Stolen Supply Bundle",
+      iconRole: "quest_giver",
+      questId: "stolen_field_supplies",
+      objectiveId: "collect_mossy_glade_supplies",
+    });
+    expect(getQuestItemInventoryEntries(state.quests)).toEqual([
+      {
+        key: "stolen_field_supplies:collect_mossy_glade_supplies",
+        questId: "stolen_field_supplies",
+        questDisplayName: "Stolen Field Supplies",
+        objectiveId: "collect_mossy_glade_supplies",
+        displayName: "Stolen Supply Bundle",
+        quantity: 1,
+        requiredCount: 10,
+      },
+    ]);
+
+    const afterVisual = updateDropSystem(state, now + DROP_VISUAL_DURATION_MS);
+
+    expect(afterVisual.inventory.slots).toEqual([]);
+    expect(afterVisual.dropVisualEvents).toEqual([]);
+    expect(afterVisual.combatFeedbackEvents.at(-1)?.text).toBe(
+      "Stolen Supply Bundle",
+    );
+  });
+
+  it("tracks repair progress and route unlock objectives", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        rescue_the_grove_runner: "active",
+      }),
+    });
+
+    state = completeQuestObjective(
+      state,
+      "rescue_the_grove_runner",
+      "reach_grove_runner",
+    );
+    state = completeQuestObjective(
+      state,
+      "rescue_the_grove_runner",
+      "rescue_grove_runner",
+    );
+    state = recordQuestRepairProgress(
+      state,
+      "rescue_the_grove_runner",
+      "repair_old_grove_cache",
+      3000,
+    );
+
+    expect(
+      state.quests.rescue_the_grove_runner.runtime?.repairProgressMsByObjectiveId
+        ?.repair_old_grove_cache,
+    ).toBe(3000);
+    expect(
+      state.quests.rescue_the_grove_runner.objectiveProgress.repair_old_grove_cache
+        .completed,
+    ).toBe(false);
+
+    state = recordQuestRepairProgress(
+      state,
+      "rescue_the_grove_runner",
+      "repair_old_grove_cache",
+      6000,
+    );
+
+    expect(
+      state.quests.rescue_the_grove_runner.objectiveProgress.repair_old_grove_cache,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(state.quests.rescue_the_grove_runner.status).toBe("ready_to_turn_in");
+
+    expect(isRouteTeleportUnlockedForQuests(state, TELEPORTER_ID)).toBe(false);
+    state = completeQuestObjective(
+      state,
+      "break_lower_shore_blockage",
+      "unlock_map_two_route",
+    );
+    expect(isRouteTeleportUnlockedForQuests(state, TELEPORTER_ID)).toBe(true);
+    expect(
+      isRouteTeleportUnlockedForQuests(state, MAP_TWO_TO_MAP_THREE_TELEPORTER_ID),
+    ).toBe(false);
   });
 
   it("filters Map 1 gathering quest progress by resource type and subzone", () => {
@@ -432,7 +606,7 @@ describe("prototype quest system", () => {
       currentMapId: MAP_ONE_ID,
       map: createDebugMap(MAP_ONE_ID),
       quests: createQuestStates({
-        gather_expedition_supplies: "active",
+        clear_the_shore: "active",
       }),
     });
     const shoreHerb = createResource("shore-herb", { x: 47, y: 25 }, {
@@ -441,17 +615,16 @@ describe("prototype quest system", () => {
     const gladeWood = createResource("glade-wood", { x: 101, y: 8 }, {
       resourceType: "wood",
     });
-    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
-      resourceType: "herb",
+    const shoreWood = createResource("shore-wood", { x: 47, y: 25 }, {
+      resourceType: "wood",
     });
 
     state = recordResourceGatheredForQuests(state, shoreHerb, MAP_ONE_ID, 1);
     state = recordResourceGatheredForQuests(state, gladeWood, MAP_ONE_ID, 1);
-    state = recordResourceGatheredForQuests(state, gladeHerb, MAP_ONE_ID, 3);
+    state = recordResourceGatheredForQuests(state, shoreWood, MAP_ONE_ID, 3);
 
     expect(
-      state.quests.gather_expedition_supplies.objectiveProgress
-        .gather_mossy_glade_herbs,
+      state.quests.clear_the_shore.objectiveProgress.gather_shore_fringe_wood,
     ).toMatchObject({
       currentCount: 3,
       completed: true,
@@ -463,46 +636,45 @@ describe("prototype quest system", () => {
       currentMapId: MAP_ONE_ID,
       map: createDebugMap(MAP_ONE_ID),
       quests: createQuestStates({
-        gather_expedition_supplies: "active",
+        clear_the_shore: "active",
       }),
     });
-    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
-      resourceType: "herb",
+    const shoreWood = createResource("shore-wood", { x: 47, y: 25 }, {
+      resourceType: "wood",
     });
-    const defeatedBat = createDefeatedEnemy(
-      "glade-bat",
-      "bat",
-      "mossy-glade",
+    const defeatedSlime = createDefeatedEnemy(
+      "shore-slime",
+      "slime",
+      "shore-fringe",
     );
 
-    state = recordResourceGatheredForQuests(state, gladeHerb, MAP_ONE_ID, 3);
-    expect(state.quests.gather_expedition_supplies.status).toBe("active");
+    state = recordResourceGatheredForQuests(state, shoreWood, MAP_ONE_ID, 3);
+    expect(state.quests.clear_the_shore.status).toBe("active");
     expect(
-      state.quests.gather_expedition_supplies.objectiveProgress
-        .gather_mossy_glade_herbs.completed,
-    ).toBe(true);
-
-    for (let count = 0; count < 20; count += 1) {
-      state = recordEnemyDefeatedForQuests(state, defeatedBat, MAP_ONE_ID);
-    }
-
-    expect(state.quests.gather_expedition_supplies.status).toBe("active");
-    expect(
-      state.quests.gather_expedition_supplies.objectiveProgress
-        .defeat_mossy_glade_bats.completed,
+      state.quests.clear_the_shore.objectiveProgress
+        .gather_shore_fringe_wood.completed,
     ).toBe(true);
 
     state = recordQuestPoiReachedForQuests(
       state,
-      "mossy-glade-route-marker",
+      "shore-fringe-supply-marker",
       MAP_ONE_ID,
     );
 
     expect(
-      state.quests.gather_expedition_supplies.objectiveProgress
-        .guide_mossy_glade_surveyor.completed,
+      state.quests.clear_the_shore.objectiveProgress
+        .inspect_shore_fringe_marker.completed,
     ).toBe(true);
-    expect(state.quests.gather_expedition_supplies.status).toBe(
+
+    for (let count = 0; count < 10; count += 1) {
+      state = recordEnemyDefeatedForQuests(state, defeatedSlime, MAP_ONE_ID);
+    }
+
+    expect(
+      state.quests.clear_the_shore.objectiveProgress
+        .defeat_shore_fringe_slimes.completed,
+    ).toBe(true);
+    expect(state.quests.clear_the_shore.status).toBe(
       "ready_to_turn_in",
     );
   });
@@ -511,19 +683,21 @@ describe("prototype quest system", () => {
     let state = createStateWithParty({
       inventory: {
         capacity: 1,
-        slots: [{ itemId: "field_herb", quantity: 1 }],
+        slots: [{ itemId: "hearty_trail_rations", quantity: 1 }],
       },
       quests: createQuestStates({
         clear_the_shore: "completed",
-        gather_expedition_supplies: "ready_to_turn_in",
+        stolen_field_supplies: "ready_to_turn_in",
       }),
     });
 
     state = updateQuestGiverInteraction(state);
 
-    expect(state.quests.gather_expedition_supplies.status).toBe("completed");
-    expect(state.inventory.slots).toEqual([{ itemId: "field_herb", quantity: 4 }]);
-    expect(state.wallet.balancesByCurrencyId.crowns).toBe(20);
+    expect(state.quests.stolen_field_supplies.status).toBe("completed");
+    expect(state.inventory.slots).toEqual([
+      { itemId: "hearty_trail_rations", quantity: 2 },
+    ]);
+    expect(state.wallet.balancesByCurrencyId.crowns).toBe(35);
   });
 
   it("does not grant quest xp to dead party members or reduce xp by level gap", () => {

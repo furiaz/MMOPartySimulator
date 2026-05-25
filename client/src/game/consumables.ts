@@ -69,6 +69,17 @@ export type ConsumableMutationResult = {
 
 export type ConsumableBehaviorUpdate = Partial<CompanionConsumableBehavior>;
 
+export type CompanionFlaskDisplayState = {
+  itemId: ConsumableItemId;
+  displayName: string;
+  charges: number;
+  maxCharges: number;
+  usesLeft: number;
+  cooldownRemainingMs: number;
+  cooldownMs: number;
+  cooldownPercent: number;
+};
+
 export function createEmptyCompanionConsumables(): CompanionConsumables {
   return {
     flask: null,
@@ -687,6 +698,41 @@ export function getConsumableCooldownRemainingMs(
   const cooldownMs = definition.cooldownMs ?? 0;
 
   return Math.max(0, flask.lastUsedAt + cooldownMs - now);
+}
+
+export function getCompanionFlaskDisplayState(
+  companion: Companion,
+  now: number,
+): CompanionFlaskDisplayState | null {
+  const flask = companion.consumables.flask;
+
+  if (!flask) {
+    return null;
+  }
+
+  const definition = getItemDefinition(flask.itemId);
+
+  if (!isFlaskItemDefinition(definition)) {
+    return null;
+  }
+
+  const chargeCost = Math.max(1, definition.chargeCost ?? 1);
+  const cooldownMs = Math.max(0, definition.cooldownMs ?? 0);
+  const cooldownRemainingMs = getConsumableCooldownRemainingMs(companion, now);
+
+  return {
+    itemId: definition.id,
+    displayName: definition.displayName,
+    charges: flask.charges,
+    maxCharges: definition.maxCharges ?? flask.charges,
+    usesLeft: Math.floor(flask.charges / chargeCost),
+    cooldownRemainingMs,
+    cooldownMs,
+    cooldownPercent:
+      cooldownMs > 0
+        ? Math.min(100, Math.max(0, (cooldownRemainingMs / cooldownMs) * 100))
+        : 0,
+  };
 }
 
 function completeConsumableUse(

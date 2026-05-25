@@ -763,17 +763,22 @@ export type SkillVisualEvent = {
 
 export type DropVisualEvent = {
   id: string;
+  kind?: "inventory_item" | "quest_item";
   enemyId: string;
   enemyTypeId?: EnemyTypeId;
   enemyArchetypeId?: EnemyArchetypeId;
-  itemId: ItemId;
+  itemId?: ItemId;
+  displayName?: string;
+  iconRole?: "quest_giver";
+  questId?: QuestId;
+  objectiveId?: string;
   quantity: number;
   position: Position;
   createdAt: number;
   expiresAt: number;
   currentMapId?: DebugMapId;
-  tableId: string;
-  dropChance: number;
+  tableId?: string;
+  dropChance?: number;
 };
 
 export type WorldWipeRecoveryChoice = {
@@ -913,6 +918,8 @@ export type DebugTelemetryEventType =
   | "enemy_drop_inventory_failed"
   | "enemy_drop_inventory_partial"
   | "enemy_drop_overflow"
+  | "quest_drop_visual_started"
+  | "quest_drop_visual_completed"
   | "currency_add_attempt"
   | "currency_added"
   | "currency_remove_attempt"
@@ -1323,6 +1330,13 @@ export type Enemy = LivingEntity & {
   attackWindupDurationMs?: number;
   attackWindupTargetId?: string | null;
   targetDecisionReason?: EnemyTargetDecisionReason;
+  questSpawn?: {
+    questId: QuestId;
+    objectiveId: string;
+    targetPosition?: Position;
+    isElite?: true;
+    suppressNormalDrops?: true;
+  };
 };
 
 export type Companion = LivingEntity & {

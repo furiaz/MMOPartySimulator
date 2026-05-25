@@ -14,7 +14,11 @@ export function updateEnemyRespawnSystem(
   let nextState = state;
 
   for (const entity of Object.values(nextState.entities)) {
-    if (entity.kind !== "enemy" || entity.state !== "dead") {
+    if (
+      entity.kind !== "enemy" ||
+      entity.state !== "dead" ||
+      entity.questSpawn
+    ) {
       continue;
     }
 

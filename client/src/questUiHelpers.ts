@@ -100,6 +100,67 @@ export function getQuestTurnInErrorText(quest: QuestState): string | null {
   return null;
 }
 
+export type QuestRuntimeProgressDisplay = {
+  objectiveId: string;
+  label: string;
+  currentMs: number;
+  requiredMs: number;
+  percent: number;
+  statusText: string;
+};
+
+export function getQuestRuntimeProgressDisplay(
+  quest: QuestState | null,
+): QuestRuntimeProgressDisplay | null {
+  if (!quest || quest.status !== "active") {
+    return null;
+  }
+
+  const definition = QUEST_DEFINITIONS[quest.questId];
+
+  for (const objective of definition.objectives) {
+    if (objective.type !== "repair_poi" && objective.type !== "defend_area") {
+      continue;
+    }
+
+    const progress = quest.objectiveProgress[objective.id];
+
+    if (!progress || progress.completed) {
+      continue;
+    }
+
+    const currentMs =
+      quest.runtime?.repairProgressMsByObjectiveId?.[objective.id] ?? 0;
+    const hasStartedDefense = Boolean(
+      quest.runtime?.defenseStartedObjectiveIds?.[objective.id],
+    );
+
+    if (currentMs <= 0 && !hasStartedDefense) {
+      continue;
+    }
+
+    const requiredMs = Math.max(
+      1,
+      objective.repairDurationMs ?? objective.defenseDurationMs ?? 1,
+    );
+    const percent = Math.min(100, Math.max(0, (currentMs / requiredMs) * 100));
+    const label =
+      objective.type === "defend_area" ? "Defending Area" : "Repairing Objective";
+    const roundedPercent = Math.round(percent);
+
+    return {
+      objectiveId: objective.id,
+      label,
+      currentMs,
+      requiredMs,
+      percent,
+      statusText: `${label} ${roundedPercent}%`,
+    };
+  }
+
+  return null;
+}
+
 function getObjectiveProgressText(
   quest: QuestState,
   objective: QuestObjectiveDefinition,
@@ -127,6 +188,10 @@ export function getObjectiveLabel(
     return `Kill ${requiredCount} ${formatQuestEnemyName(
       objective.enemyArchetypeId,
     )}`;
+  }
+
+  if (objective.type === "collect_enemy_quest_drop_count") {
+    return `Recover ${requiredCount} ${objective.questItemDisplayName ?? "Quest Drops"}`;
   }
 
   if (objective.type === "gather_item_count") {
@@ -157,8 +222,28 @@ export function getObjectiveLabel(
     return "Inspect Marker";
   }
 
+  if (objective.type === "repair_poi") {
+    return "Repair Objective";
+  }
+
+  if (objective.type === "defend_area") {
+    return "Defend Area";
+  }
+
+  if (objective.type === "rescue_npc") {
+    return "Rescue NPC";
+  }
+
   if (objective.type === "guide_npc_to_poi") {
-    return "Guide Surveyor";
+    return "Escort NPC";
+  }
+
+  if (objective.type === "unlock_route") {
+    return "Open Route";
+  }
+
+  if (objective.type === "defeat_elite") {
+    return "Defeat Elite";
   }
 
   if (objective.type === "return_to_poi") {
@@ -185,6 +270,18 @@ function formatQuestEnemyName(
 
   if (enemyArchetypeId === "spider") {
     return "Forest Spiders";
+  }
+
+  if (enemyArchetypeId === "goblin") {
+    return "Goblins";
+  }
+
+  if (enemyArchetypeId === "imp") {
+    return "Bog Imps";
+  }
+
+  if (enemyArchetypeId === "wolf") {
+    return "Wolves";
   }
 
   return "Enemies";

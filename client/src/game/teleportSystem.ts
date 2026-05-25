@@ -7,11 +7,11 @@ import {
 } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { addHubDepartureFoodWarningIfNeeded } from "./consumables";
-import { recordMapReachedForQuests } from "./questSystem";
 import {
-  createQuestGuideNpc,
-  shouldSpawnQuestGuide,
-} from "./questGuideSystem";
+  isRouteTeleportUnlockedForQuests,
+  recordMapReachedForQuests,
+} from "./questSystem";
+import { createActiveQuestGuideNpc } from "./questGuideSystem";
 import {
   companionIds,
   createDebugMap,
@@ -61,6 +61,10 @@ export function triggerMapTeleport(
     return appendTeleportSkippedEvent(state, "teleport_not_found", teleportId);
   }
 
+  if (!isRouteTeleportUnlockedForQuests(state, teleport.id)) {
+    return appendTeleportSkippedEvent(state, "teleport_route_locked", teleport.id);
+  }
+
   const nextState = setTeleportMoveIntent(state, teleport, triggeredBy);
 
   return appendDebugTelemetryEvent(
@@ -100,7 +104,9 @@ export function setMapTeleportPoi(
 
   const teleport = getTeleportForCurrentMap(state, teleportId);
 
-  return teleport ? setTeleportMoveIntent(state, teleport, triggeredBy) : state;
+  return teleport && isRouteTeleportUnlockedForQuests(state, teleport.id)
+    ? setTeleportMoveIntent(state, teleport, triggeredBy)
+    : state;
 }
 
 export function updateTeleportSystem(
@@ -153,7 +159,9 @@ function getAutoTeleport(state: GameState): DebugTeleportPoint | null {
   }
 
   return getCurrentTeleports(state).find(
-    (teleport) => teleport.autoSelectAfterEnemiesCleared,
+    (teleport) =>
+      teleport.autoSelectAfterEnemiesCleared &&
+      isRouteTeleportUnlockedForQuests(state, teleport.id),
   ) ?? null;
 }
 
@@ -456,8 +464,8 @@ function getMapEntities(
     });
   }
 
-  if (shouldSpawnQuestGuide(state, mapId)) {
-    const guide = createQuestGuideNpc();
+  const guide = createActiveQuestGuideNpc(state, mapId);
+  if (guide) {
     entities[guide.id] = guide;
   }
 

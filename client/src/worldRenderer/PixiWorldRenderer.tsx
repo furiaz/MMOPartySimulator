@@ -4,6 +4,7 @@ import {
   HUB_MAP_TILE_SRC,
   INVENTORY_ITEM_ICON_SRC,
   MAP_OBJECT_ICON_SRC,
+  NPC_ICON_SRC,
   RESOURCE_ICON_SRC,
   SHARED_SKILL_VISUAL_ICON_SRC,
   SKILL_VISUAL_ICON_SRC,
@@ -2465,10 +2466,20 @@ function drawFullEffects({
       },
       transform,
     );
-    const itemDefinition = getItemDefinition(event.itemId);
-    const iconSrc = INVENTORY_ITEM_ICON_SRC[event.itemId];
+    const itemDefinition = event.itemId ? getItemDefinition(event.itemId) : null;
+    const displayName = event.displayName ?? itemDefinition?.displayName ?? "Quest Item";
+    const iconSrc =
+      event.iconRole === "quest_giver"
+        ? NPC_ICON_SRC.quest_giver
+        : event.itemId
+          ? INVENTORY_ITEM_ICON_SRC[event.itemId]
+          : undefined;
     const dropColor =
-      itemDefinition.category === "equipment" ? 0x7c3aed : 0x047857;
+      event.kind === "quest_item"
+        ? 0xfacc15
+        : itemDefinition?.category === "equipment"
+          ? 0x7c3aed
+          : 0x047857;
 
     graphics
       .roundRect(position.x - 13, position.y - 13, 26, 26, 6)
@@ -2501,7 +2512,7 @@ function drawFullEffects({
         managedState,
         metrics,
         position,
-        text: itemDefinition.displayName.charAt(0),
+        text: displayName.charAt(0),
       });
     }
   }

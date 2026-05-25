@@ -11,6 +11,7 @@ import {
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
   getConsumableCooldownRemainingMs,
+  getCompanionFlaskDisplayState,
   getCharacterXpProgress,
   getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
@@ -1188,6 +1189,19 @@ function getActiveFoodBuffText(member: Companion, currentTime: number): string {
   return `${Math.ceil((foodBuff.expiresAt - currentTime) / 1000)}s food buff`;
 }
 
+function getActiveFoodRemainingSeconds(
+  member: Companion,
+  currentTime: number,
+): number | null {
+  const foodBuff = member.consumableBuffs.food;
+
+  if (!foodBuff || foodBuff.expiresAt <= currentTime) {
+    return null;
+  }
+
+  return Math.ceil((foodBuff.expiresAt - currentTime) / 1000);
+}
+
 function getTargetSlotsForItem(itemDefinition: ItemDefinition): EquipmentSlot[] {
   if (itemDefinition.equipmentKind === "accessory") {
     return ["accessory1", "accessory2"];
@@ -1551,7 +1565,13 @@ function PlaceholderSection({
   );
 }
 
-export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
+export function CompanionVitalsPanel({
+  currentTime,
+  members,
+}: {
+  currentTime: number;
+  members: Companion[];
+}) {
   if (members.length === 0) {
     return null;
   }
@@ -1566,12 +1586,17 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
         const classDefinition = CLASS_DEFINITIONS[member.classId];
         const classPath = classDefinition.path;
         const classPathLabel = classPath ? classPathLabels[classPath] : null;
-        const equippedFlaskDefinition = member.consumables.flask
-          ? getItemDefinition(member.consumables.flask.itemId)
-          : null;
         const assignedFoodDefinition = member.consumables.foodItemId
           ? getItemDefinition(member.consumables.foodItemId)
           : null;
+        const activeFoodRemainingSeconds = getActiveFoodRemainingSeconds(
+          member,
+          currentTime,
+        );
+        const activeFoodDefinition =
+          activeFoodRemainingSeconds !== null && member.consumableBuffs.food
+            ? getItemDefinition(member.consumableBuffs.food.itemId)
+            : null;
         const derivedStats = getCompanionDerivedStats(member);
         const healthPercent =
           derivedStats.maxHealth > 0
@@ -1589,9 +1614,16 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
         const flaskIconSrc = member.consumables.flask
           ? INVENTORY_ITEM_ICON_SRC[member.consumables.flask.itemId]
           : null;
-        const foodIconSrc = member.consumables.foodItemId
-          ? INVENTORY_ITEM_ICON_SRC[member.consumables.foodItemId]
-          : null;
+        const flaskDisplayState = getCompanionFlaskDisplayState(
+          member,
+          currentTime,
+        );
+        const displayedFoodDefinition =
+          activeFoodDefinition ?? assignedFoodDefinition;
+        const displayedFoodIconSrc =
+          displayedFoodDefinition
+            ? INVENTORY_ITEM_ICON_SRC[displayedFoodDefinition.id]
+            : null;
 
         return (
           <article
@@ -1640,33 +1672,68 @@ export function CompanionVitalsPanel({ members }: { members: Companion[] }) {
                 <span style={{ width: `${characterXpProgress.percent}%` }} />
               </span>
               <div className="companion-vitals-slots">
-                <span title={equippedFlaskDefinition?.displayName ?? "No flask equipped"}>
-                  Flask:{" "}
-                  {flaskIconSrc ? (
-                    <img
-                      alt=""
-                      className="companion-vitals-slot-icon"
-                      draggable={false}
-                      src={flaskIconSrc}
+                <span
+                  className="companion-vitals-consumable"
+                  title={
+                    flaskDisplayState
+                      ? `${flaskDisplayState.displayName}: ${flaskDisplayState.usesLeft} uses left${flaskDisplayState.cooldownRemainingMs > 0 ? `, ${Math.ceil(flaskDisplayState.cooldownRemainingMs / 1000)}s cooldown` : ", ready"}`
+                      : "No flask equipped"
+                  }
+                >
+                  {flaskDisplayState?.cooldownRemainingMs ? (
+                    <span
+                      className="companion-vitals-cooldown-fill"
+                      style={{
+                        width: `${flaskDisplayState.cooldownPercent}%`,
+                      }}
                     />
                   ) : null}
+                  <span className="companion-vitals-slot-label">Flask</span>
+                  <span className="companion-vitals-icon-frame">
+                    {flaskIconSrc ? (
+                      <img
+                        alt=""
+                        className="companion-vitals-slot-icon"
+                        draggable={false}
+                        src={flaskIconSrc}
+                      />
+                    ) : null}
+                    {flaskDisplayState ? (
+                      <span className="companion-vitals-uses-badge">
+                        {flaskDisplayState.usesLeft}
+                      </span>
+                    ) : null}
+                  </span>
                   <span>
-                    {equippedFlaskDefinition
-                      ? `${equippedFlaskDefinition.displayName} (${member.consumables.flask?.charges ?? 0})`
+                    {flaskDisplayState
+                      ? `${flaskDisplayState.displayName}`
                       : "Empty"}
                   </span>
                 </span>
-                <span title={assignedFoodDefinition?.displayName ?? "No food assigned"}>
-                  Food:{" "}
-                  {foodIconSrc ? (
-                    <img
-                      alt=""
-                      className="companion-vitals-slot-icon"
-                      draggable={false}
-                      src={foodIconSrc}
-                    />
-                  ) : null}
-                  <span>{assignedFoodDefinition?.displayName ?? "Empty"}</span>
+                <span
+                  className="companion-vitals-consumable"
+                  title={
+                    activeFoodRemainingSeconds !== null && displayedFoodDefinition
+                      ? `${displayedFoodDefinition.displayName}: ${activeFoodRemainingSeconds}s remaining`
+                      : assignedFoodDefinition?.displayName ?? "No food assigned"
+                  }
+                >
+                  <span className="companion-vitals-slot-label">Food:</span>
+                  <span className="companion-vitals-icon-frame">
+                    {displayedFoodIconSrc ? (
+                      <img
+                        alt=""
+                        className="companion-vitals-slot-icon"
+                        draggable={false}
+                        src={displayedFoodIconSrc}
+                      />
+                    ) : null}
+                  </span>
+                  <span>
+                    {activeFoodRemainingSeconds !== null
+                      ? `${activeFoodRemainingSeconds}s`
+                      : assignedFoodDefinition?.displayName ?? "Empty"}
+                  </span>
                 </span>
               </div>
             </div>

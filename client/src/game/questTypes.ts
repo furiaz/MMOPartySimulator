@@ -1,6 +1,7 @@
 import type {
   DebugMapId,
   EnemyArchetypeId,
+  EnemyTypeId,
   EquipmentSlot,
   ItemId,
   Position,
@@ -11,9 +12,12 @@ import type { PoiCategory } from "./poiTypes";
 export type QuestId =
   | "clear_the_shore"
   | "outfit_the_expedition"
-  | "gather_expedition_supplies"
-  | "scout_the_northern_road"
-  | "threat_beyond_the_pass";
+  | "stolen_field_supplies"
+  | "break_lower_shore_blockage"
+  | "scout_rise_samples"
+  | "rescue_the_grove_runner"
+  | "hold_the_field_cache"
+  | "open_wolf_causeway";
 
 export type QuestStatus =
   | "locked"
@@ -26,13 +30,26 @@ export type QuestObjectiveType =
   | "talk_to_poi"
   | "reach_poi"
   | "defeat_enemy_count"
+  | "collect_enemy_quest_drop_count"
   | "gather_item_count"
   | "equip_item"
   | "equip_flask"
   | "buy_merchant_equipment"
   | "inspect_poi"
+  | "repair_poi"
+  | "defend_area"
+  | "rescue_npc"
   | "guide_npc_to_poi"
+  | "unlock_route"
+  | "defeat_elite"
   | "return_to_poi";
+
+export type QuestSpawnEnemyDefinition = {
+  enemyTypeId?: EnemyTypeId;
+  enemyArchetypeId?: EnemyArchetypeId;
+  level?: number;
+  count?: number;
+};
 
 export type QuestObjectiveDefinition = {
   id: string;
@@ -42,16 +59,30 @@ export type QuestObjectiveDefinition = {
   targetPoiId?: string;
   targetPosition?: Position;
   guideNpcId?: string;
+  npcDisplayName?: string;
   guideStartPosition?: Position;
+  guideTargetPosition?: Position;
   enemyMapId?: DebugMapId;
   enemyArchetypeId?: EnemyArchetypeId;
   resourceType?: ResourceType;
   itemId?: ItemId;
   targetSlot?: EquipmentSlot;
   requiredCount?: number;
+  questItemDisplayName?: string;
+  dropChance?: number;
+  pityKillCount?: number;
+  repairDurationMs?: number;
+  defenseRadius?: number;
+  defenseDurationMs?: number;
+  waveProgressPercents?: number[];
+  questSpawnEnemies?: QuestSpawnEnemyDefinition[];
+  routeTeleportId?: string;
+  eliteSpawnPosition?: Position;
+  eliteEnemy?: QuestSpawnEnemyDefinition;
 };
 
 export type QuestSourceType = "npc" | "mapTrigger" | "objectTrigger";
+export type QuestObjectiveFlow = "parallel" | "sequential";
 
 export type QuestRewardItem = {
   itemId: ItemId;
@@ -69,6 +100,7 @@ export type QuestDefinition = {
   id: QuestId;
   displayName: string;
   sourceType?: QuestSourceType;
+  objectiveFlow?: QuestObjectiveFlow;
   questGiverPoiId: string;
   objectives: QuestObjectiveDefinition[];
   rewards?: QuestReward;
@@ -83,6 +115,15 @@ export type QuestObjectiveProgress = {
   completed: boolean;
 };
 
+export type QuestRuntimeState = {
+  questDropMissCountsByObjectiveId?: Record<string, number>;
+  repairProgressMsByObjectiveId?: Record<string, number>;
+  defenseStartedObjectiveIds?: Record<string, true>;
+  defenseSpawnedWaveKeys?: Record<string, true>;
+  questSpawnedEnemyIdsByObjectiveId?: Record<string, string[]>;
+  despawnedSubzoneEnemyIdsByObjectiveId?: Record<string, string[]>;
+};
+
 export type QuestState = {
   questId: QuestId;
   status: QuestStatus;
@@ -90,6 +131,7 @@ export type QuestState = {
   completedCycle: number;
   rewardClaimedCycle: number | null;
   lastTurnInError?: "inventory_full" | "invalid_reward";
+  runtime?: QuestRuntimeState;
 };
 
 export type GlobalPoiIntent = {

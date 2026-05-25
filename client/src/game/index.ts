@@ -261,6 +261,7 @@ export {
   createEmptyCompanionConsumableBuffs,
   createEmptyCompanionConsumables,
   equipFlaskToCompanion,
+  getCompanionFlaskDisplayState,
   getCompanionConsumablePrimaryStatModifiers,
   getCompanionConsumableStatModifiers,
   getConsumableCooldownRemainingMs,
@@ -274,6 +275,7 @@ export {
   updateCompanionConsumableBehavior,
   updateConsumableBehaviorSystem,
   updateConsumableSystem,
+  type CompanionFlaskDisplayState,
   type ConsumableBehaviorUpdate,
   type ConsumableMutationResult,
   type ConsumableMutationStatus,
@@ -478,6 +480,8 @@ export {
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
   getQuestDefinition,
+  getQuestDropItemDisplayName,
+  getQuestItemInventoryEntries,
   getQuestTargetMapId,
   hasQuestGiverWork,
   isMerchantUnlockedForQuests,
@@ -488,6 +492,7 @@ export {
   recordMapReachedForQuests,
   recordResourceGatheredForQuests,
   updateQuestGiverInteraction,
+  type QuestItemInventoryEntry,
 } from "./questSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
 export {

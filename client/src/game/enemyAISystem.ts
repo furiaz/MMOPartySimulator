@@ -90,7 +90,10 @@ export function updateEnemyAISystem(
       continue;
     }
 
-    if (getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
+    if (
+      !entity.questSpawn &&
+      getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE
+    ) {
       nextState = moveEnemyTowardHome(nextState, entity, timing.nowMs);
       continue;
     }
@@ -107,6 +110,21 @@ export function updateEnemyAISystem(
     if (!target) {
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
       nextState = updateEntity(nextState, reasonedEnemy);
+      if (reasonedEnemy.questSpawn?.targetPosition) {
+        nextState = moveEntityTowardPositionIfUnoccupied(
+          nextState,
+          reasonedEnemy,
+          reasonedEnemy.questSpawn.targetPosition,
+          {
+            allowPartyPassThrough: false,
+            pathProfile: "chase",
+            pathTargetKey: `quest:${reasonedEnemy.questSpawn.questId}:${reasonedEnemy.questSpawn.objectiveId}`,
+            pathTargetPosition: reasonedEnemy.questSpawn.targetPosition,
+            speedMultiplier: ENEMY_CHASE_SPEED_MULTIPLIER,
+          },
+        );
+        continue;
+      }
       nextState = updateEnemyWander(nextState, reasonedEnemy, timing);
       continue;
     }
@@ -469,6 +487,10 @@ function isInsideRoamLeash(enemy: Enemy, position: Position): boolean {
 }
 
 function isInsideAttackLeash(enemy: Enemy, position: Position): boolean {
+  if (enemy.questSpawn) {
+    return true;
+  }
+
   return getDistance(enemy.homePosition, position) <= ENEMY_ATTACK_LEASH_DISTANCE;
 }
 

@@ -1,5 +1,13 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { HUB_MAP_ID, MAP_ONE_ID, MAP_TWO_ID, npcIds } from "./debugMap";
+import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
+import {
+  HUB_MAP_ID,
+  MAP_ONE_ID,
+  MAP_TWO_ID,
+  MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
+  TELEPORTER_ID,
+  npcIds,
+} from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
 import {
@@ -36,9 +44,12 @@ export const EQUIPMENT_TUTORIAL_QUEST_ID: QuestId = "outfit_the_expedition";
 export const QUEST_ORDER: QuestId[] = [
   "clear_the_shore",
   EQUIPMENT_TUTORIAL_QUEST_ID,
-  "gather_expedition_supplies",
-  "scout_the_northern_road",
-  "threat_beyond_the_pass",
+  "stolen_field_supplies",
+  "break_lower_shore_blockage",
+  "scout_rise_samples",
+  "rescue_the_grove_runner",
+  "hold_the_field_cache",
+  "open_wolf_causeway",
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -117,75 +128,44 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         requiredCount: 1,
       },
     ],
-    unlocksQuestIds: ["gather_expedition_supplies"],
+    unlocksQuestIds: ["stolen_field_supplies"],
     rewards: {
       crowns: 10,
       characterXp: 4,
     },
   },
-  gather_expedition_supplies: {
-    id: "gather_expedition_supplies",
-    displayName: "Mark the Glade Route",
+  stolen_field_supplies: {
+    id: "stolen_field_supplies",
+    displayName: "Stolen Field Supplies",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
     objectives: [
       {
-        id: "guide_mossy_glade_surveyor",
-        type: "guide_npc_to_poi",
-        targetMapId: MAP_ONE_ID,
-        targetSubzoneId: "mossy-glade",
-        targetPoiId: "mossy-glade-route-marker",
-        targetPosition: { x: 101, y: 25 },
-        guideNpcId: "map-1-mossy-guide",
-        guideStartPosition: { x: 10, y: 29 },
-        requiredCount: 1,
-      },
-      {
-        id: "gather_mossy_glade_herbs",
-        type: "gather_item_count",
-        targetMapId: MAP_ONE_ID,
-        targetSubzoneId: "mossy-glade",
-        resourceType: "herb",
-        requiredCount: 3,
-      },
-      {
-        id: "defeat_mossy_glade_bats",
-        type: "defeat_enemy_count",
+        id: "collect_mossy_glade_supplies",
+        type: "collect_enemy_quest_drop_count",
         enemyMapId: MAP_ONE_ID,
         targetSubzoneId: "mossy-glade",
         enemyArchetypeId: "bat",
-        requiredCount: 20,
+        requiredCount: 10,
+        questItemDisplayName: "Stolen Supply Bundle",
+        dropChance: 0.55,
+        pityKillCount: 2,
       },
     ],
-    unlocksQuestIds: ["scout_the_northern_road"],
+    unlocksQuestIds: ["break_lower_shore_blockage"],
     rewards: {
-      crowns: 20,
-      characterXp: 6,
-      items: [{ itemId: "field_herb", quantity: 3 }],
+      crowns: 35,
+      characterXp: 12,
+      items: [{ itemId: "hearty_trail_rations", quantity: 1 }],
     },
   },
-  scout_the_northern_road: {
-    id: "scout_the_northern_road",
-    displayName: "Cut the Web Line",
+  break_lower_shore_blockage: {
+    id: "break_lower_shore_blockage",
+    displayName: "Break the Lower Shore Blockage",
     sourceType: "npc",
+    objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
     objectives: [
-      {
-        id: "defeat_lower_shore_spiders",
-        type: "defeat_enemy_count",
-        enemyMapId: MAP_ONE_ID,
-        targetSubzoneId: "lower-shore",
-        enemyArchetypeId: "spider",
-        requiredCount: 20,
-      },
-      {
-        id: "gather_lower_shore_ore",
-        type: "gather_item_count",
-        targetMapId: MAP_ONE_ID,
-        targetSubzoneId: "lower-shore",
-        resourceType: "ore",
-        requiredCount: 3,
-      },
       {
         id: "inspect_lower_shore_wreckage",
         type: "inspect_poi",
@@ -195,35 +175,232 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         targetPosition: { x: 150, y: 28 },
         requiredCount: 1,
       },
+      {
+        id: "defeat_lower_shore_spiders",
+        type: "defeat_enemy_count",
+        enemyMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        enemyArchetypeId: "spider",
+        requiredCount: 20,
+      },
+      {
+        id: "escort_lower_shore_worker",
+        type: "guide_npc_to_poi",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        targetPoiId: "lower-shore-route-blockage",
+        targetPosition: { x: 154, y: 29 },
+        guideNpcId: "map-1-route-worker",
+        npcDisplayName: "Route Worker",
+        guideStartPosition: { x: 110, y: 29 },
+        guideTargetPosition: { x: 153, y: 29 },
+        requiredCount: 1,
+      },
+      {
+        id: "repair_lower_shore_blockage",
+        type: "repair_poi",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        targetPoiId: "lower-shore-route-blockage",
+        targetPosition: { x: 153, y: 29 },
+        repairDurationMs: 8000,
+        requiredCount: 1,
+      },
+      {
+        id: "unlock_map_two_route",
+        type: "unlock_route",
+        targetMapId: MAP_ONE_ID,
+        targetSubzoneId: "lower-shore",
+        targetPoiId: TELEPORTER_ID,
+        targetPosition: { x: 154, y: 29 },
+        routeTeleportId: TELEPORTER_ID,
+        requiredCount: 1,
+      },
     ],
-    unlocksQuestIds: ["threat_beyond_the_pass"],
+    unlocksQuestIds: ["scout_rise_samples"],
     rewards: {
-      crowns: 30,
-      characterXp: 10,
+      crowns: 60,
+      characterXp: 18,
       equipment: [{ itemId: "scout_boots", quantity: 1 }],
     },
   },
-  threat_beyond_the_pass: {
-    id: "threat_beyond_the_pass",
-    displayName: "Threat Beyond the Pass",
+  scout_rise_samples: {
+    id: "scout_rise_samples",
+    displayName: "Scout Rise Samples",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
-    requiresCompletedQuestIds: ["scout_the_northern_road"],
     objectives: [
       {
-        id: "clear_map_2_enemies",
-        type: "defeat_enemy_count",
+        id: "collect_scout_rise_samples",
+        type: "collect_enemy_quest_drop_count",
         enemyMapId: MAP_TWO_ID,
-        requiredCount: 5,
+        targetSubzoneId: "south-center",
+        requiredCount: 12,
+        questItemDisplayName: "Scout Report Sample",
+        dropChance: 0.5,
+        pityKillCount: 2,
+      },
+    ],
+    unlocksQuestIds: ["rescue_the_grove_runner"],
+    rewards: {
+      crowns: 45,
+      characterXp: 18,
+      items: [{ itemId: "minor_recovery_flask", quantity: 1 }],
+    },
+  },
+  rescue_the_grove_runner: {
+    id: "rescue_the_grove_runner",
+    displayName: "Rescue the Grove Runner",
+    sourceType: "npc",
+    objectiveFlow: "sequential",
+    questGiverPoiId: QUEST_GIVER_POI_ID,
+    objectives: [
+      {
+        id: "reach_grove_runner",
+        type: "reach_poi",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "south-east",
+        targetPoiId: "old-grove-runner",
+        targetPosition: { x: 78, y: 25 },
+        requiredCount: 1,
+      },
+      {
+        id: "rescue_grove_runner",
+        type: "rescue_npc",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "south-east",
+        targetPoiId: "old-grove-runner",
+        targetPosition: { x: 78, y: 25 },
+        guideNpcId: "map-2-grove-runner",
+        npcDisplayName: "Grove Runner",
+        guideStartPosition: { x: 78, y: 25 },
+        requiredCount: 1,
+      },
+      {
+        id: "repair_old_grove_cache",
+        type: "repair_poi",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "south-east",
+        targetPoiId: "old-grove-field-cache",
+        targetPosition: { x: 100, y: 25 },
+        repairDurationMs: 6000,
+        requiredCount: 1,
+      },
+    ],
+    unlocksQuestIds: ["hold_the_field_cache"],
+    rewards: {
+      crowns: 55,
+      characterXp: 22,
+      items: [{ itemId: "skirmisher_rations", quantity: 1 }],
+    },
+  },
+  hold_the_field_cache: {
+    id: "hold_the_field_cache",
+    displayName: "Hold the Field Cache",
+    sourceType: "npc",
+    questGiverPoiId: QUEST_GIVER_POI_ID,
+    objectives: [
+      {
+        id: "defend_old_grove_cache",
+        type: "defend_area",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "south-east",
+        targetPoiId: "old-grove-field-cache",
+        targetPosition: { x: 100, y: 25 },
+        repairDurationMs: 12000,
+        defenseRadius: 14,
+        waveProgressPercents: [0, 25, 50, 75],
+        questSpawnEnemies: [
+          { enemyTypeId: "goblin_scout", level: 5, count: 2 },
+          { enemyTypeId: "bog_imp", level: 5, count: 1 },
+        ],
+        requiredCount: 1,
+      },
+    ],
+    unlocksQuestIds: ["open_wolf_causeway"],
+    rewards: {
+      crowns: 75,
+      characterXp: 28,
+      items: [{ itemId: "soldiers_recovery_flask", quantity: 1 }],
+    },
+  },
+  open_wolf_causeway: {
+    id: "open_wolf_causeway",
+    displayName: "Open the Wolf Causeway",
+    sourceType: "npc",
+    objectiveFlow: "sequential",
+    questGiverPoiId: QUEST_GIVER_POI_ID,
+    objectives: [
+      {
+        id: "escort_causeway_worker",
+        type: "guide_npc_to_poi",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "north-east",
+        targetPoiId: "wolf-causeway-blockage",
+        targetPosition: { x: 154, y: 29 },
+        guideNpcId: "map-2-causeway-worker",
+        npcDisplayName: "Causeway Worker",
+        guideStartPosition: { x: 8, y: 29 },
+        guideTargetPosition: { x: 153, y: 29 },
+        requiredCount: 1,
+      },
+      {
+        id: "defend_wolf_causeway",
+        type: "defend_area",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "north-east",
+        targetPoiId: "wolf-causeway-blockage",
+        targetPosition: { x: 153, y: 29 },
+        repairDurationMs: 10000,
+        defenseRadius: 14,
+        waveProgressPercents: [0, 50],
+        questSpawnEnemies: [
+          { enemyTypeId: "wolf", level: 7, count: 2 },
+          { enemyTypeId: "goblin_thrower", level: 7, count: 1 },
+        ],
+        requiredCount: 1,
+      },
+      {
+        id: "defeat_causeway_elite",
+        type: "defeat_elite",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "north-east",
+        targetPoiId: "wolf-causeway-elite",
+        targetPosition: { x: 145, y: 22 },
+        eliteSpawnPosition: { x: 145, y: 22 },
+        eliteEnemy: { enemyTypeId: "wolf", level: 8, count: 1 },
+        requiredCount: 1,
+      },
+      {
+        id: "unlock_map_three_route",
+        type: "unlock_route",
+        targetMapId: MAP_TWO_ID,
+        targetSubzoneId: "north-east",
+        targetPoiId: MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
+        targetPosition: { x: 154, y: 29 },
+        routeTeleportId: MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
+        requiredCount: 1,
       },
     ],
     rewards: {
-      crowns: 75,
-      characterXp: 20,
-      items: [{ itemId: "orc_tusk", quantity: 2 }],
-      equipment: [{ itemId: "bulwark_cuirass", quantity: 1 }],
+      crowns: 100,
+      characterXp: 40,
+      equipment: [
+        { itemId: "bulwark_cuirass", quantity: 1 },
+        { itemId: "plain_charm", quantity: 1 },
+      ],
     },
   },
+};
+
+export type QuestItemInventoryEntry = {
+  key: string;
+  questId: QuestId;
+  questDisplayName: string;
+  objectiveId: string;
+  displayName: string;
+  quantity: number;
+  requiredCount: number;
 };
 
 type QuestRewardValidationResult =
@@ -279,6 +456,50 @@ export function getActiveQuest(state: GameState): QuestState | null {
   return getQuestByStatuses(state, ["ready_to_turn_in", "active"]);
 }
 
+export function getQuestItemInventoryEntries(
+  quests: GameState["quests"],
+): QuestItemInventoryEntry[] {
+  const entries: QuestItemInventoryEntry[] = [];
+
+  for (const questId of QUEST_ORDER) {
+    const quest = quests[questId];
+
+    if (
+      quest.status !== "active" &&
+      quest.status !== "ready_to_turn_in"
+    ) {
+      continue;
+    }
+
+    const definition = QUEST_DEFINITIONS[questId];
+
+    for (const objective of definition.objectives) {
+      if (objective.type !== "collect_enemy_quest_drop_count") {
+        continue;
+      }
+
+      const progress = quest.objectiveProgress[objective.id];
+      const quantity = progress?.currentCount ?? 0;
+
+      if (quantity <= 0) {
+        continue;
+      }
+
+      entries.push({
+        key: `${questId}:${objective.id}`,
+        questId,
+        questDisplayName: definition.displayName,
+        objectiveId: objective.id,
+        displayName: getQuestDropItemDisplayName(definition, objective),
+        quantity,
+        requiredCount: objective.requiredCount ?? 1,
+      });
+    }
+  }
+
+  return entries;
+}
+
 export function getAvailableQuest(state: GameState): QuestState | null {
   return getQuestByStatuses(state, ["available"]);
 }
@@ -308,6 +529,13 @@ export function getQuestGiverReadyQuests(
 
 export function getQuestDefinition(questId: QuestId): QuestDefinition {
   return QUEST_DEFINITIONS[questId];
+}
+
+export function getQuestDropItemDisplayName(
+  questDefinition: QuestDefinition,
+  objective: QuestObjectiveDefinition,
+): string {
+  return objective.questItemDisplayName ?? `${questDefinition.displayName} Quest Item`;
 }
 
 export function getFirstIncompleteObjective(
@@ -491,12 +719,14 @@ export function recordEnemyDefeatedForQuests(
   state: GameState,
   defeatedEnemy: Enemy,
   mapId?: DebugMapId,
+  random = Math.random,
+  now = Date.now(),
 ): GameState {
   if (!mapId || defeatedEnemy.state !== "dead") {
     return state;
   }
 
-  return updateMatchingQuestObjectives(
+  let nextState = updateMatchingQuestObjectives(
     state,
     (objective) =>
       objective.type === "defeat_enemy_count" &&
@@ -505,6 +735,27 @@ export function recordEnemyDefeatedForQuests(
       matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId),
     1,
   );
+
+  nextState = recordEnemyQuestDropObjectives(
+    nextState,
+    defeatedEnemy,
+    mapId,
+    random,
+    now,
+  );
+
+  if (defeatedEnemy.questSpawn?.isElite) {
+    nextState = updateMatchingQuestObjectives(
+      nextState,
+      (objective) =>
+        objective.type === "defeat_elite" &&
+        objective.targetMapId === mapId &&
+        objective.id === defeatedEnemy.questSpawn?.objectiveId,
+      1,
+    );
+  }
+
+  return nextState;
 }
 
 export function recordResourceGatheredForQuests(
@@ -543,7 +794,9 @@ export function recordMapReachedForQuests(
     state,
     (objective) =>
       objective.type === "reach_poi" &&
-      objective.targetMapId === mapId,
+      objective.targetMapId === mapId &&
+      !objective.targetPoiId &&
+      !objective.targetPosition,
     1,
   );
 }
@@ -561,11 +814,90 @@ export function recordQuestPoiReachedForQuests(
     state,
     (objective) =>
       (objective.type === "inspect_poi" ||
-        objective.type === "guide_npc_to_poi") &&
+        objective.type === "guide_npc_to_poi" ||
+        objective.type === "rescue_npc" ||
+        objective.type === "reach_poi") &&
       objective.targetMapId === mapId &&
       objective.targetPoiId === poiId,
     1,
   );
+}
+
+export function recordQuestRepairProgress(
+  state: GameState,
+  questId: QuestId,
+  objectiveId: string,
+  progressMs: number,
+): GameState {
+  const objective = QUEST_DEFINITIONS[questId].objectives.find(
+    (candidate) => candidate.id === objectiveId,
+  );
+
+  if (
+    !objective ||
+    (objective.type !== "repair_poi" && objective.type !== "defend_area")
+  ) {
+    return state;
+  }
+
+  const durationMs = objective.repairDurationMs ?? 1;
+  const clampedProgressMs = Math.min(durationMs, Math.max(0, progressMs));
+  const quest = state.quests[questId];
+  const nextState: GameState = {
+    ...state,
+    quests: {
+      ...state.quests,
+      [questId]: {
+        ...quest,
+        runtime: {
+          ...quest.runtime,
+          repairProgressMsByObjectiveId: {
+            ...quest.runtime?.repairProgressMsByObjectiveId,
+            [objectiveId]: clampedProgressMs,
+          },
+        },
+      },
+    },
+  };
+
+  return clampedProgressMs >= durationMs
+    ? updateObjectiveProgress(nextState, questId, objective, 1)
+    : nextState;
+}
+
+export function completeQuestObjective(
+  state: GameState,
+  questId: QuestId,
+  objectiveId: string,
+): GameState {
+  const objective = QUEST_DEFINITIONS[questId].objectives.find(
+    (candidate) => candidate.id === objectiveId,
+  );
+
+  return objective ? updateObjectiveProgress(state, questId, objective, 1) : state;
+}
+
+export function isRouteTeleportUnlockedForQuests(
+  state: GameState,
+  teleportId: string,
+): boolean {
+  if (teleportId === TELEPORTER_ID) {
+    return isObjectiveCompleted(state, "break_lower_shore_blockage", "unlock_map_two_route");
+  }
+
+  if (teleportId === MAP_TWO_TO_MAP_THREE_TELEPORTER_ID) {
+    return isObjectiveCompleted(state, "open_wolf_causeway", "unlock_map_three_route");
+  }
+
+  return true;
+}
+
+export function isObjectiveCompleted(
+  state: GameState,
+  questId: QuestId,
+  objectiveId: string,
+): boolean {
+  return Boolean(state.quests[questId]?.objectiveProgress[objectiveId]?.completed);
 }
 
 export function recordEquippedItemObjectivesForQuests(
@@ -1279,6 +1611,130 @@ function updateMatchingQuestObjectives(
   }
 
   return nextState;
+}
+
+function recordEnemyQuestDropObjectives(
+  state: GameState,
+  defeatedEnemy: Enemy,
+  mapId: DebugMapId,
+  random: () => number,
+  now: number,
+): GameState {
+  let nextState = state;
+
+  for (const questId of QUEST_ORDER) {
+    const quest = nextState.quests[questId];
+
+    if (quest?.status !== "active") {
+      continue;
+    }
+
+    for (const objective of QUEST_DEFINITIONS[questId].objectives) {
+      if (
+        objective.type !== "collect_enemy_quest_drop_count" ||
+        objective.enemyMapId !== mapId ||
+        !matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) ||
+        !matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId)
+      ) {
+        continue;
+      }
+
+      const progress = quest.objectiveProgress[objective.id];
+
+      if (!progress || progress.completed) {
+        continue;
+      }
+
+      const missCounts = quest.runtime?.questDropMissCountsByObjectiveId ?? {};
+      const missCount = missCounts[objective.id] ?? 0;
+      const pityKillCount = Math.max(1, objective.pityKillCount ?? 1);
+      const didDrop =
+        random() <= (objective.dropChance ?? 1) || missCount + 1 >= pityKillCount;
+      const nextMissCount = didDrop ? 0 : missCount + 1;
+
+      nextState = {
+        ...nextState,
+        quests: {
+          ...nextState.quests,
+          [questId]: {
+            ...nextState.quests[questId],
+            runtime: {
+              ...nextState.quests[questId].runtime,
+              questDropMissCountsByObjectiveId: {
+                ...nextState.quests[questId].runtime
+                  ?.questDropMissCountsByObjectiveId,
+                [objective.id]: nextMissCount,
+              },
+            },
+          },
+        },
+      };
+
+      if (didDrop) {
+        nextState = queueQuestDropVisualEvent(
+          nextState,
+          defeatedEnemy,
+          questId,
+          objective,
+          now,
+        );
+        nextState = updateObjectiveProgress(nextState, questId, objective, 1);
+      }
+    }
+  }
+
+  return nextState;
+}
+
+function queueQuestDropVisualEvent(
+  state: GameState,
+  defeatedEnemy: Enemy,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+  now: number,
+): GameState {
+  const definition = QUEST_DEFINITIONS[questId];
+  const displayName = getQuestDropItemDisplayName(definition, objective);
+  const event = {
+    id: `${now}-quest-drop-${defeatedEnemy.id}-${questId}-${objective.id}-${state.dropVisualEvents?.length ?? 0}`,
+    kind: "quest_item" as const,
+    enemyId: defeatedEnemy.id,
+    enemyTypeId: defeatedEnemy.enemyTypeId,
+    enemyArchetypeId: defeatedEnemy.archetypeId,
+    displayName,
+    iconRole: "quest_giver" as const,
+    questId,
+    objectiveId: objective.id,
+    quantity: 1,
+    position: defeatedEnemy.position,
+    createdAt: now,
+    expiresAt: now + DROP_VISUAL_DURATION_MS,
+    currentMapId: state.currentMapId,
+    dropChance: objective.dropChance,
+  };
+
+  return appendDebugTelemetryEvent(
+    {
+      ...state,
+      dropVisualEvents: [...(state.dropVisualEvents ?? []), event],
+    },
+    {
+      type: "quest_drop_visual_started",
+      entityId: defeatedEnemy.id,
+      currentMapId: state.currentMapId,
+      currentMapDisplayName: state.map?.displayName,
+      currentMapDebugName: state.map?.debugName,
+      enemyTypeId: defeatedEnemy.enemyTypeId,
+      enemyArchetypeId: defeatedEnemy.archetypeId,
+      enemyPosition: defeatedEnemy.position,
+      itemDisplayName: displayName,
+      itemCategory: "quest",
+      requestedQuantity: 1,
+      dropChance: objective.dropChance,
+      questId,
+      objectiveId: objective.id,
+    },
+  );
 }
 
 function updateObjectiveProgress(

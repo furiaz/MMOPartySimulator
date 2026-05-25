@@ -1,6 +1,8 @@
 import { setLastAttackAt } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { handleEnemyDefeatedDrops } from "./dropSystem";
 import { grantCharacterXpToParty } from "./leveling";
+import { recordEnemyDefeatedForQuests } from "./questSystem";
 import { getSkillRoleScore } from "./skillRolePreferences";
 import {
   getHealingAmount,
@@ -1149,6 +1151,16 @@ function damageEnemy(
 
   if (damagedTarget.kind === "enemy" && damagedTarget.state === "dead") {
     nextState = grantCharacterXpToParty(nextState, damagedTarget, caster.id);
+    nextState = recordEnemyDefeatedForQuests(
+      nextState,
+      damagedTarget,
+      nextState.currentMapId,
+      Math.random,
+      now,
+    );
+    if (!damagedTarget.questSpawn?.suppressNormalDrops) {
+      nextState = handleEnemyDefeatedDrops(nextState, damagedTarget, caster.id, now);
+    }
   }
 
   if (damagedTarget.kind === "enemy" && damagedTarget.state !== "dead") {

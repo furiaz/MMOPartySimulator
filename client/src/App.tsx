@@ -3282,7 +3282,7 @@ function App() {
           onUnequipFlask={unequipFlask}
           onMovePartyOrder={movePartyMemberOrder}
         />
-        <CompanionVitalsPanel members={partyMembers} />
+        <CompanionVitalsPanel currentTime={currentTime} members={partyMembers} />
         <QuestTrackerPanel
           isHidden={isQuestTrackerHidden}
           onShow={() => setIsQuestTrackerHidden(false)}

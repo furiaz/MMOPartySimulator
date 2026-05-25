@@ -76,6 +76,7 @@ type CreateEnemyOptions = {
   attackRange?: number;
   subzoneId?: string;
   encounterAreaId?: string;
+  questSpawn?: Enemy["questSpawn"];
 };
 
 export function createEnemy(
@@ -127,6 +128,7 @@ export function createEnemy(
       options.attackRange ??
       enemyType?.attackRange ??
       archetype?.defaultAttackRange,
+    questSpawn: options.questSpawn,
   };
 }
 

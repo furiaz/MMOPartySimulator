@@ -179,6 +179,7 @@ export function GameMenu({
               ) : activeTab === "inventory" ? (
                 <InventoryPanel
                   inventory={inventory}
+                  quests={quests}
                   wallet={wallet}
                   onOpenEquipmentManagement={onOpenEquipmentManagement}
                 />

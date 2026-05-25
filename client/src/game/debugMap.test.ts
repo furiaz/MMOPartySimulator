@@ -221,23 +221,23 @@ describe("debug maps", () => {
           )?.targetPosition,
       },
       {
-        subzoneId: "shore-fringe",
+        subzoneId: "lower-shore",
         position:
-          QUEST_DEFINITIONS.gather_expedition_supplies.objectives.find(
-            (objective) => objective.id === "guide_mossy_glade_surveyor",
+          QUEST_DEFINITIONS.break_lower_shore_blockage.objectives.find(
+            (objective) => objective.id === "escort_lower_shore_worker",
           )?.guideStartPosition,
       },
       {
-        subzoneId: "mossy-glade",
+        subzoneId: "lower-shore",
         position:
-          QUEST_DEFINITIONS.gather_expedition_supplies.objectives.find(
-            (objective) => objective.id === "guide_mossy_glade_surveyor",
+          QUEST_DEFINITIONS.break_lower_shore_blockage.objectives.find(
+            (objective) => objective.id === "escort_lower_shore_worker",
           )?.targetPosition,
       },
       {
         subzoneId: "lower-shore",
         position:
-          QUEST_DEFINITIONS.scout_the_northern_road.objectives.find(
+          QUEST_DEFINITIONS.break_lower_shore_blockage.objectives.find(
             (objective) => objective.id === "inspect_lower_shore_wreckage",
           )?.targetPosition,
       },

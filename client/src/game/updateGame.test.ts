@@ -52,7 +52,7 @@ describe("game update intent priority", () => {
       currentTargetId: null,
     };
     const wood = createResource("quest-herb", { x: 8, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const reachableEnemy = createEnemy("nearby-passive-enemy", { x: 6, y: 4 });
 
@@ -87,7 +87,7 @@ describe("game update intent priority", () => {
       currentTargetId: null,
     };
     const wood = createResource("quest-herb", { x: 4, y: 6 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
 
     const nextState = updateGame(
@@ -137,7 +137,7 @@ describe("game update intent priority", () => {
       currentTargetId: leader.id,
     };
     const herb = createResource("quest-herb", { x: 4, y: 6 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
 
     const nextState = updateGame(
@@ -178,7 +178,7 @@ describe("game update intent priority", () => {
       currentTargetId: "cave-bat",
     };
     const herb = createResource("quest-herb", { x: 4, y: 6 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const caveBat = {
       ...createEnemy("cave-bat", { x: 6, y: 4 }, undefined, {
@@ -207,9 +207,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: herb.position,
           targetEntityId: herb.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 1000,
@@ -217,7 +217,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: herb.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -255,7 +255,7 @@ describe("game update intent priority", () => {
       currentTargetId: "cave-bat",
     };
     const herb = createResource("quest-herb", { x: 4, y: 6 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const caveBat = {
       ...createEnemy("cave-bat", { x: 6, y: 4 }, undefined, {
@@ -284,9 +284,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: herb.position,
           targetEntityId: herb.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 1000,
@@ -294,7 +294,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: herb.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -355,7 +355,7 @@ describe("game update intent priority", () => {
   it("routes guide objectives to the guide first and guards the moving guide after contact", () => {
     const leader = createLeader({ x: 7, y: 29 });
     const nearbyHerb = createResource("nearby-herb", { x: 8, y: 29 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const nearbyBat = createEnemy("nearby-bat", { x: 9, y: 29 }, undefined, {
       enemyTypeId: "cave_bat",
@@ -412,7 +412,7 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget).toMatchObject({
       category: "npc",
       targetEntityId: QUEST_GUIDE_NPC_ID,
-      objectiveId: "guide_mossy_glade_surveyor",
+      objectiveId: "escort_lower_shore_worker",
     });
     expect(nextState.leaderIntent).toMatchObject({
       type: "move",
@@ -427,7 +427,7 @@ describe("game update intent priority", () => {
     expect(reusedState.localPoiTarget).toMatchObject({
       category: "npc",
       targetEntityId: QUEST_GUIDE_NPC_ID,
-      objectiveId: "guide_mossy_glade_surveyor",
+      objectiveId: "escort_lower_shore_worker",
       position: guideAfterFirstTick?.position,
     });
     expect(reusedState.leaderIntent).toMatchObject({
@@ -441,9 +441,7 @@ describe("game update intent priority", () => {
     const earlyState = updateGame(
       createMapOneState([leader], {
         partyLeaderId: leader.id,
-        quests: createQuestStates({
-          gather_expedition_supplies: "active",
-        }),
+        quests: createActiveGuideQuestStates(),
       }),
     );
 
@@ -475,9 +473,7 @@ describe("game update intent priority", () => {
     const nextState = updateGame(
       createHubState([leader, ...createHubNpcs()], {
         partyLeaderId: leader.id,
-        quests: createQuestStates({
-          gather_expedition_supplies: "active",
-        }),
+        quests: createActiveGuideQuestStates(),
         activeTeleport: {
           id: "hub-to-map-1",
           position: hubTeleporterPosition,
@@ -499,7 +495,7 @@ describe("game update intent priority", () => {
   });
 
   it("moves the active guide toward the route marker and respects super speed", () => {
-    const leader = createLeader({ x: 8, y: 29 });
+    const leader = createLeader({ x: 111, y: 29 });
     const guide = {
       ...createQuestGuideNpc(),
       state: "follow" as const,
@@ -540,7 +536,7 @@ describe("game update intent priority", () => {
     expect(superSpeedGuide?.position.x).toBeCloseTo(
       QUEST_GUIDE_START_POSITION.x + normalGuideStep * 5,
     );
-    expect(superSpeedGuide?.position.x).toBeLessThan(60);
+    expect(superSpeedGuide?.position.x).toBeGreaterThan(normalGuide?.position.x ?? 0);
   });
 
   it("pauses the guide when all companions are outside escort range", () => {
@@ -609,8 +605,8 @@ describe("game update intent priority", () => {
     );
 
     expect(
-      incompleteState.quests.gather_expedition_supplies.objectiveProgress
-        .guide_mossy_glade_surveyor.completed,
+      incompleteState.quests.break_lower_shore_blockage.objectiveProgress
+        .escort_lower_shore_worker.completed,
     ).toBe(false);
 
     const guideAtTarget = {
@@ -626,12 +622,10 @@ describe("game update intent priority", () => {
     );
 
     expect(
-      completeState.quests.gather_expedition_supplies.objectiveProgress
-        .guide_mossy_glade_surveyor.completed,
+      completeState.quests.break_lower_shore_blockage.objectiveProgress
+        .escort_lower_shore_worker.completed,
     ).toBe(true);
-    expect(completeState.quests.gather_expedition_supplies.status).toBe(
-      "ready_to_turn_in",
-    );
+    expect(completeState.quests.break_lower_shore_blockage.status).toBe("active");
   });
 
   it("does not let the guide attract enemies outside normal aggro range", () => {
@@ -804,14 +798,17 @@ describe("game update intent priority", () => {
 
   it("routes the second Map 1 quest to Mossy Glade passage before the far herb", () => {
     const leader = createLeader({ x: 4, y: 29 });
-    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
-      resourceType: "herb",
+    const gladeBat = createEnemy("glade-bat", { x: 101, y: 29 }, undefined, {
+      enemyTypeId: "cave_bat",
+      subzoneId: "mossy-glade",
     });
 
     const nextState = updateGame(
-      createMapOneState([leader, gladeHerb], {
+      createMapOneState([leader, gladeBat], {
         partyLeaderId: leader.id,
-        quests: createPostGuideQuestStates(),
+        quests: createQuestStates({
+          stolen_field_supplies: "active",
+        }),
       }),
     );
 
@@ -819,8 +816,8 @@ describe("game update intent priority", () => {
       category: "exploration",
       position: { x: 53, y: 29 },
       reason: "route to quest subzone",
-      questId: "gather_expedition_supplies",
-      objectiveId: "gather_mossy_glade_herbs",
+      questId: "stolen_field_supplies",
+      objectiveId: "collect_mossy_glade_supplies",
     });
     expect(nextState.localPoiTarget?.targetEntityId).toBeUndefined();
     expect(nextState.leaderIntent).toMatchObject({
@@ -831,42 +828,17 @@ describe("game update intent priority", () => {
 
   it("selects the second Map 1 quest target directly once inside Mossy Glade", () => {
     const leader = createLeader({ x: 58, y: 29 });
-    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
-      resourceType: "herb",
-    });
-
-    const nextState = updateGame(
-      createMapOneState([leader, gladeHerb], {
-        partyLeaderId: leader.id,
-        quests: createPostGuideQuestStates(),
-      }),
-    );
-
-    expect(nextState.localPoiTarget).toMatchObject({
-      category: "resource",
-      targetEntityId: gladeHerb.id,
-      reason: "active quest gather herb",
-    });
-    expect(nextState.leaderIntent).toMatchObject({
-      type: "gather",
-      targetId: gladeHerb.id,
-    });
-  });
-
-  it("selects nearest incomplete kill or gather quest objective after the guide is complete", () => {
-    const leader = createLeader({ x: 58, y: 29 });
-    const gladeHerb = createResource("glade-herb", { x: 101, y: 51 }, {
-      resourceType: "herb",
-    });
     const gladeBat = createEnemy("glade-bat", { x: 59, y: 29 }, undefined, {
       enemyTypeId: "cave_bat",
       subzoneId: "mossy-glade",
     });
 
     const nextState = updateGame(
-      createMapOneState([leader, gladeHerb, gladeBat], {
+      createMapOneState([leader, gladeBat], {
         partyLeaderId: leader.id,
-        quests: createPostGuideQuestStates(),
+        quests: createQuestStates({
+          stolen_field_supplies: "active",
+        }),
       }),
     );
 
@@ -874,7 +846,35 @@ describe("game update intent priority", () => {
       category: "combat",
       targetEntityId: gladeBat.id,
       reason: "active quest combat objective",
-      objectiveId: "defeat_mossy_glade_bats",
+      objectiveId: "collect_mossy_glade_supplies",
+    });
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: gladeBat.id,
+    });
+  });
+
+  it("selects nearest incomplete kill or gather quest objective after the guide is complete", () => {
+    const leader = createLeader({ x: 58, y: 29 });
+    const gladeBat = createEnemy("glade-bat", { x: 59, y: 29 }, undefined, {
+      enemyTypeId: "cave_bat",
+      subzoneId: "mossy-glade",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, gladeBat], {
+        partyLeaderId: leader.id,
+        quests: createQuestStates({
+          stolen_field_supplies: "active",
+        }),
+      }),
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "combat",
+      targetEntityId: gladeBat.id,
+      reason: "active quest combat objective",
+      objectiveId: "collect_mossy_glade_supplies",
     });
     expect(nextState.leaderIntent).toMatchObject({
       type: "attack",
@@ -893,15 +893,17 @@ describe("game update intent priority", () => {
         subzoneId: "mossy-glade",
       },
     );
+    completedObjectiveBat.state = "dead";
+    completedObjectiveBat.health = 0;
     const fallbackOre = createResource("fallback-ore", { x: 7, y: 4 }, {
       resourceType: "ore",
     });
     const quests = createPostGuideQuestStates();
     markObjectiveCompleted(
       quests,
-      "gather_expedition_supplies",
-      "defeat_mossy_glade_bats",
-      20,
+      "clear_the_shore",
+      "defeat_shore_fringe_slimes",
+      10,
     );
 
     const nextState = updateGame(
@@ -936,7 +938,7 @@ describe("game update intent priority", () => {
       createMapOneState([shoreLeader], {
         partyLeaderId: shoreLeader.id,
         quests: createQuestStates({
-          scout_the_northern_road: "active",
+          break_lower_shore_blockage: "active",
         }),
       }),
     );
@@ -944,7 +946,7 @@ describe("game update intent priority", () => {
     expect(shoreState.localPoiTarget).toMatchObject({
       position: { x: 53, y: 29 },
       reason: "route to quest subzone",
-      objectiveId: "defeat_lower_shore_spiders",
+      objectiveId: "inspect_lower_shore_wreckage",
     });
 
     const gladeLeader = createLeader({ x: 58, y: 29 });
@@ -952,7 +954,7 @@ describe("game update intent priority", () => {
       createMapOneState([gladeLeader], {
         partyLeaderId: gladeLeader.id,
         quests: createQuestStates({
-          scout_the_northern_road: "active",
+          break_lower_shore_blockage: "active",
         }),
       }),
     );
@@ -960,8 +962,120 @@ describe("game update intent priority", () => {
     expect(gladeState.localPoiTarget).toMatchObject({
       position: { x: 106, y: 29 },
       reason: "route to quest subzone",
+      objectiveId: "inspect_lower_shore_wreckage",
+    });
+  });
+
+  it("targets Quest 4 objectives sequentially in Lower Shore", () => {
+    const leader = createLeader({ x: 145, y: 28 });
+    const spider = createEnemy("lower-shore-spider", { x: 146, y: 28 }, undefined, {
+      enemyTypeId: "forest_spider",
+      subzoneId: "lower-shore",
+    });
+    const initialState = updateGame(
+      createMapOneState([leader, spider], {
+        partyLeaderId: leader.id,
+        quests: createQuestStates({
+          break_lower_shore_blockage: "active",
+        }),
+      }),
+    );
+
+    expect(initialState.localPoiTarget).toMatchObject({
+      position: { x: 150, y: 28 },
+      reason: "active quest inspect objective",
+      objectiveId: "inspect_lower_shore_wreckage",
+    });
+    expect(initialState.lastPoiDecision?.consideredTargets).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          objectiveId: "escort_lower_shore_worker",
+        }),
+      ]),
+    );
+
+    const postInspectQuests = createQuestStates({
+      break_lower_shore_blockage: "active",
+    });
+    markObjectiveCompleted(
+      postInspectQuests,
+      "break_lower_shore_blockage",
+      "inspect_lower_shore_wreckage",
+      1,
+    );
+    const postInspectState = updateGame(
+      createMapOneState([leader, spider], {
+        partyLeaderId: leader.id,
+        quests: postInspectQuests,
+      }),
+    );
+
+    expect(postInspectState.localPoiTarget).toMatchObject({
+      category: "combat",
+      targetEntityId: spider.id,
+      reason: "active quest combat objective",
       objectiveId: "defeat_lower_shore_spiders",
     });
+    expect(postInspectState.lastPoiDecision?.consideredTargets).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          objectiveId: "escort_lower_shore_worker",
+        }),
+      ]),
+    );
+
+    markObjectiveCompleted(
+      postInspectQuests,
+      "break_lower_shore_blockage",
+      "defeat_lower_shore_spiders",
+      20,
+    );
+    const postSpiderState = updateGame(
+      createMapOneState([leader, spider], {
+        partyLeaderId: leader.id,
+        quests: postInspectQuests,
+      }),
+    );
+
+    expect(postSpiderState.localPoiTarget).toMatchObject({
+      position: QUEST_GUIDE_START_POSITION,
+      reason: "active quest guide objective",
+      objectiveId: "escort_lower_shore_worker",
+    });
+  });
+
+  it("keeps Quest 1 objective targeting parallel", () => {
+    const leader = createLeader({ x: 40, y: 22 });
+    const shoreWood = createResource("shore-wood", { x: 42, y: 22 }, {
+      resourceType: "wood",
+    });
+    const shoreSlime = createEnemy("shore-slime", { x: 43, y: 22 }, undefined, {
+      enemyTypeId: "slime",
+      subzoneId: "shore-fringe",
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader, shoreWood, shoreSlime], {
+        partyLeaderId: leader.id,
+        quests: createQuestStates({
+          clear_the_shore: "active",
+        }),
+      }),
+    );
+
+    expect(nextState.lastPoiDecision?.consideredTargets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          objectiveId: "defeat_shore_fringe_slimes",
+        }),
+        expect.objectContaining({
+          objectiveId: "gather_shore_fringe_wood",
+        }),
+        expect.objectContaining({
+          objectiveId: "inspect_shore_fringe_marker",
+        }),
+      ]),
+    );
   });
 
   it("reuses valid subzone route POIs while traveling toward the passage", () => {
@@ -971,8 +1085,8 @@ describe("game update intent priority", () => {
       category: "exploration" as const,
       mapId: MAP_ONE_ID,
       position: { x: 53, y: 29 },
-      questId: "gather_expedition_supplies" as const,
-      objectiveId: "gather_mossy_glade_herbs",
+      questId: "clear_the_shore" as const,
+      objectiveId: "gather_shore_fringe_wood",
       reason: "route to quest subzone",
     };
 
@@ -1002,34 +1116,43 @@ describe("game update intent priority", () => {
   });
 
   it("invalidates reused quest POIs when their objective is complete", () => {
-    const leader = createLeader({ x: 58, y: 29 });
-    const gladeHerb = createResource("glade-herb", { x: 59, y: 29 }, {
-      resourceType: "herb",
+    const leader = createLeader({ x: 5, y: 5 });
+    const gladeHerb = createResource("glade-herb", { x: 6, y: 5 }, {
+      resourceType: "wood",
     });
-    const gladeBat = createEnemy("glade-bat", { x: 63, y: 29 }, undefined, {
-      enemyTypeId: "cave_bat",
-      subzoneId: "mossy-glade",
+    const gladeBat = createEnemy("glade-bat", { x: 7, y: 5 }, undefined, {
+      enemyTypeId: "slime",
+      subzoneId: "shore-fringe",
     });
-    const quests = createPostGuideQuestStates();
+    const quests = createQuestStates({
+      clear_the_shore: "active",
+    });
     markObjectiveCompleted(
       quests,
-      "gather_expedition_supplies",
-      "gather_mossy_glade_herbs",
+      "clear_the_shore",
+      "inspect_shore_fringe_marker",
+      1,
+    );
+    markObjectiveCompleted(
+      quests,
+      "clear_the_shore",
+      "gather_shore_fringe_wood",
       3,
     );
 
     const nextState = updateGame(
       createMapOneState([leader, gladeHerb, gladeBat], {
         partyLeaderId: leader.id,
+        map: createMossyQuestTestMap(),
         localPoiTarget: {
           poiId: gladeHerb.id,
           category: "resource",
           mapId: MAP_ONE_ID,
           position: gladeHerb.position,
           targetEntityId: gladeHerb.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 0,
@@ -1037,7 +1160,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: gladeHerb.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         simulationTimeMs: 1000,
@@ -1048,7 +1171,7 @@ describe("game update intent priority", () => {
     expect(nextState.localPoiTarget).toMatchObject({
       category: "combat",
       targetEntityId: gladeBat.id,
-      objectiveId: "defeat_mossy_glade_bats",
+      objectiveId: "defeat_shore_fringe_slimes",
     });
     expect(nextState.leaderIntent).toMatchObject({
       type: "attack",
@@ -1064,7 +1187,7 @@ describe("game update intent priority", () => {
       currentTargetId: leader.id,
     };
     const wood = createResource("quest-herb", { x: 6, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const enemy = createEnemy("fallback-enemy", { x: 8, y: 4 });
 
@@ -1085,9 +1208,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: wood.position,
           targetEntityId: wood.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 0,
@@ -1095,7 +1218,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: wood.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -1129,10 +1252,10 @@ describe("game update intent priority", () => {
       currentTargetId: "quest-herb",
     };
     const currentWood = createResource("quest-herb", { x: 6, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const closerWood = createResource("closer-quest-herb", { x: 20, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
 
     const nextState = updateGame(
@@ -1152,9 +1275,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: currentWood.position,
           targetEntityId: currentWood.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 0,
@@ -1162,7 +1285,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: currentWood.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -1172,7 +1295,7 @@ describe("game update intent priority", () => {
 
     expect(nextState.localPoiTarget).toMatchObject({
       targetEntityId: currentWood.id,
-      reason: "active quest gather herb",
+      reason: "active quest gather wood",
     });
     expect(nextState.leaderIntent).toMatchObject({
       type: "gather",
@@ -1188,7 +1311,7 @@ describe("game update intent priority", () => {
       currentTargetId: "quest-herb",
     };
     const currentWood = createResource("quest-herb", { x: 6, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
 
     const nextState = updateGame(
@@ -1208,9 +1331,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: currentWood.position,
           targetEntityId: currentWood.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 0,
@@ -1218,7 +1341,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: currentWood.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -1244,10 +1367,10 @@ describe("game update intent priority", () => {
       currentTargetId: "distant-quest-herb",
     };
     const distantWood = createResource("distant-quest-herb", { x: 6, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const closerWood = createResource("closer-quest-herb", { x: 20, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
 
     const nextState = updateGame(
@@ -1267,9 +1390,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: distantWood.position,
           targetEntityId: distantWood.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 0,
@@ -1277,7 +1400,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: distantWood.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -1287,7 +1410,7 @@ describe("game update intent priority", () => {
 
     expect(nextState.localPoiTarget).toMatchObject({
       targetEntityId: distantWood.id,
-      reason: "active quest gather herb",
+      reason: "active quest gather wood",
     });
     expect(nextState.localPoiTarget?.targetEntityId).not.toBe(closerWood.id);
     expect(nextState.leaderIntent).toMatchObject({
@@ -1305,13 +1428,13 @@ describe("game update intent priority", () => {
     };
     const depletedWood = {
       ...createResource("depleted-quest-herb", { x: 6, y: 4 }, {
-        resourceType: "herb",
+        resourceType: "wood",
         quantity: 0,
       }),
       isDepleted: true,
     };
     const validWood = createResource("valid-quest-herb", { x: 20, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
 
     const nextState = updateGame(
@@ -1331,9 +1454,9 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: depletedWood.position,
           targetEntityId: depletedWood.id,
-          questId: "gather_expedition_supplies",
-          objectiveId: "gather_mossy_glade_herbs",
-          reason: "active quest gather herb",
+          questId: "clear_the_shore",
+          objectiveId: "gather_shore_fringe_wood",
+          reason: "active quest gather wood",
         },
         lastPoiDecision: {
           evaluatedAtMs: 0,
@@ -1341,7 +1464,7 @@ describe("game update intent priority", () => {
           selectedCategory: "resource",
           selectedMapId: MAP_ONE_ID,
           selectedPosition: depletedWood.position,
-          selectedReason: "active quest gather herb",
+          selectedReason: "active quest gather wood",
           skippedReasons: {},
         },
         quests: createPostGuideQuestStates(),
@@ -1691,7 +1814,7 @@ describe("game update intent priority", () => {
   it("switches to attack intent when a close enemy is chasing the party", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const wood = createResource("quest-herb", { x: 8, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const attacker = {
       ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
@@ -1812,7 +1935,7 @@ describe("game update intent priority", () => {
   it("remembers the interrupted POI when enemy damage pulls the party into combat", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const wood = createResource("quest-herb", { x: 8, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const attacker = {
       ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
@@ -2247,7 +2370,7 @@ describe("game update intent priority", () => {
   it("makes quest herb gatherers self-defend when attacked", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const herb = createResource("quest-herb", { x: 8, y: 4 }, {
-      resourceType: "herb",
+      resourceType: "wood",
     });
     const gatherer = {
       ...createCompanion("gatherer", { x: 8, y: 4 }, leader.id, "gatherer"),
@@ -2279,7 +2402,7 @@ describe("game update intent priority", () => {
           mapId: MAP_ONE_ID,
           position: herb.position,
           targetEntityId: herb.id,
-          reason: "active quest gather herb",
+          reason: "active quest gather wood",
         },
       }),
       { nowMs: 2_000 },
@@ -3922,13 +4045,13 @@ describe("game update intent priority", () => {
         partyLeaderId: leader.id,
         quests: createQuestStates({
           clear_the_shore: "ready_to_turn_in",
-          gather_expedition_supplies: "available",
+          stolen_field_supplies: "available",
         }),
       }),
     );
 
     expect(nextState.quests.clear_the_shore.status).toBe("completed");
-    expect(nextState.quests.gather_expedition_supplies.status).toBe("available");
+    expect(nextState.quests.stolen_field_supplies.status).toBe("available");
   });
 
   it("maps legacy Stay in Subzone preferences to the new POI search scope", () => {
@@ -4073,6 +4196,7 @@ describe("game update intent priority", () => {
       createHubState([leader, ...createHubNpcs()], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_FOUR_ID,
+        quests: createUnlockedRouteQuestStates(),
       }),
     );
 
@@ -4137,6 +4261,7 @@ describe("game update intent priority", () => {
       createMapOneState([leader], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_TWO_ID,
+        quests: createUnlockedRouteQuestStates(),
       }),
     );
 
@@ -4151,6 +4276,7 @@ describe("game update intent priority", () => {
       createMapOneState([leader], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_FOUR_ID,
+        quests: createUnlockedRouteQuestStates(),
       }),
     );
 
@@ -4165,6 +4291,7 @@ describe("game update intent priority", () => {
       createMapTwoState([leader], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_FOUR_ID,
+        quests: createUnlockedRouteQuestStates(),
       }),
     );
 
@@ -4292,6 +4419,7 @@ describe("game update intent priority", () => {
           stayInMap: true,
         },
         worldTravelTargetMapId: MAP_FOUR_ID,
+        quests: createUnlockedRouteQuestStates(),
       }),
     );
 
@@ -4430,7 +4558,7 @@ describe("game update intent priority", () => {
     const pendingState = createMapOneState([leader, deadCompanion], {
       partyLeaderId: leader.id,
       worldTravelTargetMapId: MAP_TWO_ID,
-      quests: createQuestStates(),
+      quests: createUnlockedRouteQuestStates(),
     });
     const revivedState = advanceGameTicks(
       pendingState,
@@ -4667,7 +4795,7 @@ function createMossyQuestTestMap(): GameMap {
   return {
     ...createOpenTestMap(),
     subzones: [
-      createTestSubzone("mossy-glade", "Mossy Glade", {
+      createTestSubzone("shore-fringe", "Shore Fringe", {
         x: 0,
         y: 0,
         width: 40,
@@ -4789,19 +4917,19 @@ function createQuestStates(
 
 function createActiveGuideQuestStates() {
   const quests = createQuestStates({
-    gather_expedition_supplies: "active",
+    break_lower_shore_blockage: "active",
   });
 
   markObjectiveCompleted(
     quests,
-    "gather_expedition_supplies",
-    "gather_mossy_glade_herbs",
-    3,
+    "break_lower_shore_blockage",
+    "inspect_lower_shore_wreckage",
+    1,
   );
   markObjectiveCompleted(
     quests,
-    "gather_expedition_supplies",
-    "defeat_mossy_glade_bats",
+    "break_lower_shore_blockage",
+    "defeat_lower_shore_spiders",
     20,
   );
 
@@ -4810,13 +4938,38 @@ function createActiveGuideQuestStates() {
 
 function createPostGuideQuestStates() {
   const quests = createQuestStates({
-    gather_expedition_supplies: "active",
+    clear_the_shore: "active",
   });
 
   markObjectiveCompleted(
     quests,
-    "gather_expedition_supplies",
-    "guide_mossy_glade_surveyor",
+    "clear_the_shore",
+    "defeat_shore_fringe_slimes",
+    10,
+  );
+  markObjectiveCompleted(
+    quests,
+    "clear_the_shore",
+    "inspect_shore_fringe_marker",
+    1,
+  );
+
+  return quests;
+}
+
+function createUnlockedRouteQuestStates() {
+  const quests = createQuestStates();
+
+  markObjectiveCompleted(
+    quests,
+    "break_lower_shore_blockage",
+    "unlock_map_two_route",
+    1,
+  );
+  markObjectiveCompleted(
+    quests,
+    "open_wolf_causeway",
+    "unlock_map_three_route",
     1,
   );
 

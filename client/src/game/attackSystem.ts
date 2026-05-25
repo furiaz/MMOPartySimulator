@@ -210,13 +210,17 @@ export function updateAttackSystem(
           nextState,
           updatedTarget,
           nextState.currentMapId,
-        );
-        nextState = handleEnemyDefeatedDrops(
-          nextState,
-          updatedTarget,
-          windupReadyAttacker.id,
+          Math.random,
           now,
         );
+        if (!updatedTarget.questSpawn?.suppressNormalDrops) {
+          nextState = handleEnemyDefeatedDrops(
+            nextState,
+            updatedTarget,
+            windupReadyAttacker.id,
+            now,
+          );
+        }
       }
 
       if (isEnemy(windupReadyAttacker) && isPartyCombatEntity(updatedTarget)) {

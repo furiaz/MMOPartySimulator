@@ -128,9 +128,13 @@ function completeDropVisualEvent(
   now: number,
 ): GameState {
   const enemy = state.entities[event.enemyId];
-  const itemDefinition = getItemDefinition(event.itemId);
+  const itemDefinition = event.itemId ? getItemDefinition(event.itemId) : null;
+  const displayName = event.displayName ?? itemDefinition?.displayName ?? "Quest Item";
+  const isQuestItemDrop = event.kind === "quest_item";
   let nextState = appendDropVisualTelemetry(state, event, {
-    type: "enemy_drop_visual_completed",
+    type: isQuestItemDrop
+      ? "quest_drop_visual_completed"
+      : "enemy_drop_visual_completed",
     entityId: event.enemyId,
   });
 
@@ -140,6 +144,19 @@ function completeDropVisualEvent(
       entityId: event.enemyId,
       reason: "map_changed",
     });
+  }
+
+  if (isQuestItemDrop) {
+    return addCombatFeedback(nextState, {
+      type: "gather",
+      entityId: enemy?.id ?? event.enemyId,
+      text: displayName,
+      now,
+    });
+  }
+
+  if (!event.itemId || !itemDefinition) {
+    return nextState;
   }
 
   nextState = appendDropVisualTelemetry(nextState, event, {
@@ -232,7 +249,7 @@ function appendDropVisualTelemetry(
   event: DropVisualEvent,
   telemetry: Omit<DebugTelemetryEvent, "tick">,
 ): GameState {
-  const itemDefinition = getItemDefinition(event.itemId);
+  const itemDefinition = event.itemId ? getItemDefinition(event.itemId) : null;
 
   return appendDebugTelemetryEvent(state, {
     ...telemetry,
@@ -243,13 +260,15 @@ function appendDropVisualTelemetry(
     enemyArchetypeId: event.enemyArchetypeId,
     enemyPosition: event.position,
     itemId: event.itemId,
-    itemDisplayName: itemDefinition.displayName,
-    itemCategory: itemDefinition.category,
-    targetSlot: itemDefinition.equipmentSlot,
-    equipmentType: itemDefinition.equipmentType,
+    itemDisplayName: event.displayName ?? itemDefinition?.displayName,
+    itemCategory: itemDefinition?.category ?? (event.kind === "quest_item" ? "quest" : undefined),
+    targetSlot: itemDefinition?.equipmentSlot,
+    equipmentType: itemDefinition?.equipmentType,
     tableId: event.tableId,
     dropChance: event.dropChance,
     requestedQuantity: telemetry.requestedQuantity ?? event.quantity,
+    questId: event.questId,
+    objectiveId: event.objectiveId,
   });
 }
 

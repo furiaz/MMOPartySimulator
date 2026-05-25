@@ -1,4 +1,11 @@
 .game-page {
+  --main-menu-panel-background: rgba(26, 42, 47, 0.3);
+  --main-menu-panel-border: #3a5a60;
+  --main-menu-panel-text: #e6f0f2;
+  --main-menu-panel-muted-text: #b9cdd1;
+  --main-menu-panel-accent-text: #f3df93;
+  --main-menu-panel-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+
   width: 100vw;
   height: 100vh;
   padding: 0;
@@ -65,7 +72,7 @@
   width: clamp(280px, 44vw, 620px);
   gap: 6px;
   transform: translateX(-50%);
-  color: #1f2937;
+  color: var(--main-menu-panel-text);
   text-align: center;
   pointer-events: none;
 }
@@ -77,8 +84,10 @@
   gap: 2px;
   min-width: 0;
   padding: 8px 12px;
-  border: 1px solid rgba(51, 65, 85, 0.72);
-  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--main-menu-panel-border);
+  background: var(--main-menu-panel-background);
+  box-shadow: var(--main-menu-panel-shadow);
+  backdrop-filter: blur(10px);
 }
 
 .map-title-row {
@@ -112,7 +121,7 @@
   font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
-  color: #475569;
+  color: var(--main-menu-panel-accent-text);
 }
 
 .map-label-overlay strong {
@@ -210,10 +219,11 @@
   box-sizing: border-box;
   padding: 7px;
   overflow: hidden;
-  border: 1px solid rgba(51, 65, 85, 0.72);
-  background: rgba(248, 250, 252, 0.82);
-  color: #1f2937;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--main-menu-panel-border);
+  background: var(--main-menu-panel-background);
+  color: var(--main-menu-panel-text);
+  box-shadow: var(--main-menu-panel-shadow);
+  backdrop-filter: blur(10px);
   pointer-events: auto;
 }
 
@@ -231,7 +241,7 @@
 
 .performance-overlay-header h2 {
   margin: 0;
-  color: #1f2937;
+  color: inherit;
   font-size: 12px;
   line-height: 1.2;
 }
@@ -426,32 +436,22 @@
   gap: 8px;
   padding: clamp(7px, 1vh, 12px);
   overflow: hidden;
-  border: 1px solid rgba(51, 65, 85, 0.62);
+  border: 1px solid var(--main-menu-panel-border);
   border-bottom: 0;
   border-left: 0;
-  background: rgba(220, 252, 231, 0.84);
-  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.14);
+  background: var(--main-menu-panel-background);
+  color: var(--main-menu-panel-text);
+  box-shadow: var(--main-menu-panel-shadow);
+  backdrop-filter: blur(10px);
   pointer-events: auto;
 }
 
-.companion-vitals-card-beginner {
-  background: rgba(187, 247, 208, 0.88);
-}
-
-.companion-vitals-card-honor {
-  background: rgba(254, 215, 170, 0.9);
-}
-
-.companion-vitals-card-primal {
-  background: rgba(134, 239, 172, 0.9);
-}
-
-.companion-vitals-card-arcane {
-  background: rgba(191, 219, 254, 0.9);
-}
-
+.companion-vitals-card-beginner,
+.companion-vitals-card-honor,
+.companion-vitals-card-primal,
+.companion-vitals-card-arcane,
 .companion-vitals-card-holy {
-  background: rgba(254, 249, 195, 0.92);
+  background: var(--main-menu-panel-background);
 }
 
 .companion-vitals-portrait-frame {
@@ -484,7 +484,7 @@
   justify-content: space-between;
   gap: 8px;
   overflow: hidden;
-  color: #1f2937;
+  color: var(--main-menu-panel-text);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -508,7 +508,7 @@
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  color: #334155;
+  color: var(--main-menu-panel-muted-text);
   font-size: 10px;
   font-weight: 800;
   line-height: 1.1;
@@ -547,7 +547,7 @@
   gap: 8px;
   min-width: 0;
   min-height: 0;
-  color: #1f2937;
+  color: var(--main-menu-panel-text);
   font-size: 10px;
   font-weight: 800;
   line-height: 1.1;
@@ -555,9 +555,27 @@
 
 .companion-vitals-slots > span {
   display: inline-flex;
+  position: relative;
   align-items: center;
   gap: 3px;
   flex: 1 1 0;
+  overflow: hidden;
+}
+
+.companion-vitals-slot-label {
+  flex: 0 0 auto;
+}
+
+.companion-vitals-icon-frame {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(31, 41, 55, 0.58);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .companion-vitals-slot-icon {
@@ -566,6 +584,37 @@
   height: 13px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+.companion-vitals-cooldown-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  background: rgba(15, 23, 42, 0.58);
+  pointer-events: none;
+}
+
+.companion-vitals-consumable > span:not(.companion-vitals-cooldown-fill) {
+  position: relative;
+  z-index: 1;
+}
+
+.companion-vitals-uses-badge {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  z-index: 3;
+  min-width: 10px;
+  padding: 0 2px;
+  border: 1px solid rgba(31, 41, 55, 0.7);
+  background: rgba(255, 255, 255, 0.9);
+  color: #111827;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 10px;
+  text-align: center;
 }
 
 .quest-tracker-panel {
@@ -577,10 +626,11 @@
   width: 220px;
   gap: 8px;
   padding: 10px;
-  border: 1px solid rgba(51, 65, 85, 0.62);
-  background: rgba(191, 219, 254, 0.7);
-  color: #1f2937;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--main-menu-panel-border);
+  background: var(--main-menu-panel-background);
+  color: var(--main-menu-panel-text);
+  box-shadow: var(--main-menu-panel-shadow);
+  backdrop-filter: blur(10px);
   opacity: 1;
 }
 
@@ -601,12 +651,12 @@
 }
 
 .quest-tracker-header {
-  color: #1f2937;
+  color: var(--main-menu-panel-text);
 }
 
 .quest-tracker-header h2 {
   margin: 0;
-  color: #1f2937;
+  color: inherit;
   font-size: 12px;
   line-height: 1.2;
 }
@@ -641,10 +691,54 @@
 }
 
 .quest-tracker-title span {
-  color: #475569;
+  color: var(--main-menu-panel-muted-text);
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.quest-runtime-progress {
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid rgba(51, 65, 85, 0.46);
+  background: rgba(15, 23, 42, 0.12);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.quest-runtime-progress div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quest-runtime-progress span,
+.quest-runtime-progress strong {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quest-runtime-progress-bar {
+  display: block;
+  overflow: hidden;
+  height: 8px;
+  border: 1px solid rgba(51, 65, 85, 0.72);
+  background: rgba(226, 232, 240, 0.72);
+}
+
+.quest-runtime-progress-bar span {
+  display: block;
+  height: 100%;
+  background: #f59e0b;
+}
+
+.quest-runtime-progress-detail {
+  color: #e6f0f2;
+  background: rgba(9, 18, 21, 0.28);
 }
 
 .quest-tracker-objectives {
@@ -759,10 +853,10 @@
   width: min(700px, calc(100vw - 32px));
   max-height: calc(100vh - 88px);
   overflow: hidden;
-  border: 1px solid #3a5a60;
-  background: rgba(26, 42, 47, 0.3);
-  color: #e6f0f2;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+  border: 1px solid var(--main-menu-panel-border);
+  background: var(--main-menu-panel-background);
+  color: var(--main-menu-panel-text);
+  box-shadow: var(--main-menu-panel-shadow);
   backdrop-filter: blur(10px);
 }
 
@@ -2124,6 +2218,16 @@
   z-index: 2;
   border-color: #7aa6ad;
   background: rgba(58, 90, 96, 0.7);
+}
+
+.inventory-slot.quest-item {
+  border-color: rgba(250, 204, 21, 0.58);
+}
+
+.inventory-quest-empty {
+  aspect-ratio: auto;
+  grid-column: 1 / -1;
+  min-height: 68px;
 }
 
 .inventory-slot-index {

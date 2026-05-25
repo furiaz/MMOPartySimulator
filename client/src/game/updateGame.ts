@@ -156,7 +156,7 @@ export function updateGame(
     nextState = updateExplorationSystem(nextState, movedEntityIds);
   }
   nextState = updateFollowSystem(nextState, movedEntityIds);
-  nextState = updateQuestGuideSystem(nextState, movedEntityIds);
+  nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateAttackSystem(

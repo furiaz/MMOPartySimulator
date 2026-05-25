@@ -4,6 +4,7 @@ import {
   assignFoodToCompanion,
   equipFlaskToCompanion,
   FLASK_RECHARGE_KILLS_PER_CHARGE,
+  getCompanionFlaskDisplayState,
   getHubDepartureFoodWarningCompanionIds,
   startPartyConsumableUse,
   updateCompanionConsumableBehavior,
@@ -120,6 +121,38 @@ describe("prototype consumables", () => {
       charges: 0,
     });
     expect(countInventoryItem(equipped.state.inventory, "minor_recovery_flask")).toBe(0);
+  });
+
+  it("reports flask cooldown progress and uses left for the companion UI", () => {
+    const { state, companion } = createConsumableState(["minor_recovery_flask"]);
+    const equipped = equipFlaskToCompanion(
+      state,
+      companion.id,
+      "minor_recovery_flask",
+    ).state;
+    const charged = updateEntity(equipped, {
+      ...(equipped.entities[companion.id] as Companion),
+      consumables: {
+        ...(equipped.entities[companion.id] as Companion).consumables,
+        flask: {
+          itemId: "minor_recovery_flask",
+          charges: 2,
+          lastUsedAt: 1000,
+        },
+      },
+    });
+    const chargedCompanion = charged.entities[companion.id] as Companion;
+
+    expect(getCompanionFlaskDisplayState(chargedCompanion, 11000)).toMatchObject({
+      itemId: "minor_recovery_flask",
+      displayName: "Minor Recovery Flask",
+      charges: 2,
+      maxCharges: 100,
+      usesLeft: 2,
+      cooldownRemainingMs: 10000,
+      cooldownMs: 20000,
+      cooldownPercent: 50,
+    });
   });
 
   it("applies flask healing and charge spend only on completion", () => {

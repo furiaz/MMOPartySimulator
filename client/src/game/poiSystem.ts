@@ -45,6 +45,7 @@ import {
   getQuestTargetMapId,
   hasQuestGiverWork,
   isMerchantUnlockedForQuests,
+  isRouteTeleportUnlockedForQuests,
   matchesObjectiveSubzoneAtPosition,
   recordMerchantLockedForQuest,
   recordQuestPoiReachedForQuests,
@@ -465,7 +466,11 @@ function updateReachedQuestInspectInteraction(state: GameState): GameState {
 
   const objective = getQuestObjective(target.questId, target.objectiveId);
 
-  if (objective?.type !== "inspect_poi" || !objective.targetPoiId) {
+  if (
+    !objective ||
+    (objective.type !== "inspect_poi" && objective.type !== "reach_poi") ||
+    !objective.targetPoiId
+  ) {
     return state;
   }
 
@@ -746,6 +751,25 @@ function isQuestCombatPoi(
   );
 }
 
+function isQuestElitePoi(
+  state: GameState,
+  poi: PointOfInterest,
+  objective: QuestObjectiveDefinition,
+): boolean {
+  if (poi.category !== "combat" || !poi.targetEntityId) {
+    return false;
+  }
+
+  const entity = state.entities[poi.targetEntityId];
+
+  return (
+    entity?.kind === "enemy" &&
+    entity.state !== "dead" &&
+    entity.questSpawn?.isElite === true &&
+    entity.questSpawn.objectiveId === objective.id
+  );
+}
+
 function getHubMerchantOptions(
   state: GameState,
   candidates: PointOfInterest[],
@@ -983,7 +1007,7 @@ function getQuestTargetOptions(
       : [];
   }
 
-  return getIncompleteObjectives(state, questId).flatMap((objective) =>
+  return getTargetableQuestObjectives(state, questId).flatMap((objective) =>
     getQuestObjectiveTargetOptions(
       state,
       questId,
@@ -992,6 +1016,17 @@ function getQuestTargetOptions(
       gathererReservations,
     ),
   );
+}
+
+function getTargetableQuestObjectives(
+  state: GameState,
+  questId: QuestId,
+): QuestObjectiveDefinition[] {
+  const incompleteObjectives = getIncompleteObjectives(state, questId);
+
+  return QUEST_DEFINITIONS[questId].objectiveFlow === "sequential"
+    ? incompleteObjectives.slice(0, 1)
+    : incompleteObjectives;
 }
 
 function getQuestObjectiveTargetOptions(
@@ -1027,7 +1062,10 @@ function getQuestObjectiveTargetOptions(
     ];
   }
 
-  if (objective.type === "defeat_enemy_count") {
+  if (
+    objective.type === "defeat_enemy_count" ||
+    objective.type === "collect_enemy_quest_drop_count"
+  ) {
     return candidates
       .filter((poi) => isQuestCombatPoi(state, poi, objective))
       .map((poi) => ({
@@ -1073,10 +1111,66 @@ function getQuestObjectiveTargetOptions(
     ];
   }
 
+  if (
+    objective.type === "repair_poi" ||
+    objective.type === "defend_area" ||
+    objective.type === "rescue_npc" ||
+    objective.type === "unlock_route"
+  ) {
+    return [
+      {
+        poi: createObjectivePositionPoi(
+          state,
+          questId,
+          objective,
+          objective.targetPoiId ?? `${questId}-${objective.id}-objective`,
+        ),
+        priority: 10,
+        reason: `active quest ${objective.type} objective`,
+        questId,
+        objectiveId: objective.id,
+      },
+    ];
+  }
+
+  if (objective.type === "defeat_elite") {
+    const eliteOptions = candidates
+      .filter((poi) => isQuestElitePoi(state, poi, objective))
+      .map((poi) => ({
+        poi,
+        priority: 10,
+        reason: "active quest elite objective",
+        questId,
+        objectiveId: objective.id,
+      }));
+
+    return eliteOptions.length > 0
+      ? eliteOptions
+      : [
+          {
+            poi: createObjectivePositionPoi(
+              state,
+              questId,
+              objective,
+              objective.targetPoiId ?? `${questId}-${objective.id}-elite`,
+            ),
+            priority: 10,
+            reason: "active quest elite spawn objective",
+            questId,
+            objectiveId: objective.id,
+          },
+        ];
+  }
+
   if (objective.type === "reach_poi") {
     return [
       {
-        poi: createExplorationPoi(state, questId, objective.id),
+        poi: createObjectivePositionPoi(
+          state,
+          questId,
+          objective,
+          objective.targetPoiId ?? `${questId}-${objective.id}-reach`,
+        ),
         priority: 10,
         reason: "active quest reach objective",
         questId,
@@ -1490,7 +1584,9 @@ function getTeleportPois(state: GameState): PointOfInterest[] {
     id: teleport.id,
     category: "teleport",
     mapId: teleport.sourceMapId,
-    displayName: teleport.id,
+    displayName: isRouteTeleportUnlockedForQuests(state, teleport.id)
+      ? teleport.id
+      : `${teleport.id} (Blocked)`,
     position: teleport.position,
     interactionRange: teleport.range,
     targetEntityId: teleport.id,
@@ -1560,6 +1656,7 @@ function getTeleportPoiTowardMap(
   targetMapId: DebugMapId,
 ): PointOfInterest | null {
   const teleport = getNextTeleportTowardMap(
+    state,
     state.currentMapId,
     targetMapId,
     state.map?.teleports ?? [],
@@ -1579,19 +1676,25 @@ function getTeleportPoiTowardMap(
 }
 
 function getNextTeleportTowardMap(
+  state: GameState,
   currentMapId: DebugMapId | undefined,
   targetMapId: DebugMapId,
   teleports: DebugTeleportPoint[],
 ): DebugTeleportPoint | null {
-  const nextMapId = getNextMapRouteStep(currentMapId, targetMapId);
+  const nextMapId = getNextMapRouteStep(state, currentMapId, targetMapId);
 
   return (
-    teleports.find((teleport) => teleport.targetMapId === nextMapId) ??
+    teleports.find(
+      (teleport) =>
+        teleport.targetMapId === nextMapId &&
+        isRouteTeleportUnlockedForQuests(state, teleport.id),
+    ) ??
     null
   );
 }
 
 function getNextMapRouteStep(
+  state: GameState,
   currentMapId: DebugMapId | undefined,
   targetMapId: DebugMapId,
 ): DebugMapId | null {
@@ -1614,6 +1717,10 @@ function getNextMapRouteStep(
     }
 
     for (const teleport of debugMapDefinitions[current.mapId].teleports) {
+      if (!isRouteTeleportUnlockedForQuests(state, teleport.id)) {
+        continue;
+      }
+
       if (visited.has(teleport.targetMapId)) {
         continue;
       }
@@ -1639,24 +1746,6 @@ function createIdlePoi(mapId: DebugMapId): PointOfInterest {
     mapId,
     displayName: "City Square",
     position: IDLE_CITY_POINT,
-  };
-}
-
-function createExplorationPoi(
-  state: GameState,
-  questId: QuestId,
-  objectiveId: string,
-): PointOfInterest {
-  const mapId = state.currentMapId ?? MAP_ONE_ID;
-
-  return {
-    id: `${questId}-${objectiveId}-exploration`,
-    category: "exploration",
-    mapId,
-    displayName: QUEST_DEFINITIONS[questId].displayName,
-    position: getMapExplorationTarget(mapId),
-    linkedQuestId: questId,
-    linkedObjectiveId: objectiveId,
   };
 }
 

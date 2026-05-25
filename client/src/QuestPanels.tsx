@@ -10,6 +10,7 @@ import {
   getQuestLogQuests,
   getQuestProgressTotals,
   getQuestRewardText,
+  getQuestRuntimeProgressDisplay,
   getQuestTurnInErrorText,
 } from "./questUiHelpers";
 
@@ -32,6 +33,7 @@ export function QuestTrackerPanel({
   }
 
   const definition = quest ? QUEST_DEFINITIONS[quest.questId] : null;
+  const runtimeProgress = getQuestRuntimeProgressDisplay(quest);
 
   return (
     <section
@@ -50,6 +52,20 @@ export function QuestTrackerPanel({
             <strong>{definition.displayName}</strong>
             <span>{formatQuestStatus(quest.status)}</span>
           </div>
+          {runtimeProgress ? (
+            <div
+              className="quest-runtime-progress"
+              title={`${runtimeProgress.label}: ${Math.round(runtimeProgress.currentMs / 1000)}s / ${Math.round(runtimeProgress.requiredMs / 1000)}s`}
+            >
+              <div>
+                <span>{runtimeProgress.label}</span>
+                <strong>{Math.round(runtimeProgress.percent)}%</strong>
+              </div>
+              <span className="quest-runtime-progress-bar">
+                <span style={{ width: `${runtimeProgress.percent}%` }} />
+              </span>
+            </div>
+          ) : null}
           <div className="quest-tracker-objectives">
             {definition.objectives.map((objective) => {
               const progress = quest.objectiveProgress[objective.id];
@@ -139,6 +155,7 @@ export function QuestsPanel({
 function QuestDetailPanel({ quest }: { quest: QuestState }) {
   const definition = QUEST_DEFINITIONS[quest.questId];
   const turnInErrorText = getQuestTurnInErrorText(quest);
+  const runtimeProgress = getQuestRuntimeProgressDisplay(quest);
 
   return (
     <div className="quest-detail-panel">
@@ -166,6 +183,20 @@ function QuestDetailPanel({ quest }: { quest: QuestState }) {
           );
         })}
       </div>
+      {runtimeProgress ? (
+        <div className="quest-runtime-progress quest-runtime-progress-detail">
+          <div>
+            <span>{runtimeProgress.statusText}</span>
+            <strong>
+              {Math.round(runtimeProgress.currentMs / 1000)}s/
+              {Math.round(runtimeProgress.requiredMs / 1000)}s
+            </strong>
+          </div>
+          <span className="quest-runtime-progress-bar">
+            <span style={{ width: `${runtimeProgress.percent}%` }} />
+          </span>
+        </div>
+      ) : null}
       <div className="placeholder-box">
         Rewards: {getQuestRewardText(definition.rewards)}
       </div>
