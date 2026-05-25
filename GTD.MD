@@ -102,6 +102,7 @@ Current game-logic implementation files include:
 - `roleProfiles.ts`
 - `roleSystem.ts`
 - `simulationTiming.ts`
+- `skillMovement.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
 - `skillSystem.ts`
@@ -142,7 +143,7 @@ The player is the manager/controller issuing intent and commands to party member
 
 NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, and the temporary quest guide escort NPC.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, and prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives.
 
 NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
 
@@ -539,6 +540,7 @@ Skill selection and execution live in:
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
 - `skillTargeting.ts`
+- `skillMovement.ts`
 
 Current skill runtime is prototype-only.
 
@@ -588,7 +590,7 @@ Current base class prototype skills:
 - Lightbearer: Light Mend
 - Penitent: Penitent's Gift
 
-Current skill effects may include direct damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, gathering speed buff, quick-step movement, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
+Current skill effects may include direct damage, lunge damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, gathering speed buff, quick-step movement, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
 
 Current skill rules:
 
@@ -596,6 +598,7 @@ Current skill rules:
 - roles determine preferred skill usage
 - skill tags affect role scoring
 - skill selection must validate target, range, cooldown, companion state, and current context
+- skill movement helpers must validate map bounds, walls, active resources, and blocking entity collision before moving companions
 - direct-commanded companions do not use autonomous prototype skills
 - dead companions do not use skills
 - skills have a shared prototype cooldown
@@ -828,7 +831,7 @@ Party intent may be cleared when a point of interest is reached, combat ends, ma
 
 Prototype quest definitions live in `questSystem.ts` and quest types live in `questTypes.ts`.
 
-Quest guide escort behavior lives in `questGuideSystem.ts`.
+Quest NPC, escort, rescue, repair, defend, route unlock, and elite-spawn objective helper behavior lives in `questGuideSystem.ts`.
 
 Quest state is stored on `GameState` as:
 
@@ -840,33 +843,23 @@ Current quest ids are:
 
 - `clear_the_shore`
 - `outfit_the_expedition`
-- `gather_expedition_supplies`
-- `scout_the_northern_road`
-- `threat_beyond_the_pass`
+- `stolen_field_supplies`
+- `break_lower_shore_blockage`
+- `scout_rise_samples`
+- `rescue_the_grove_runner`
+- `hold_the_field_cache`
+- `open_wolf_causeway`
 
 Current quest display names are:
 
 - `clear_the_shore`: Secure the Landing
 - `outfit_the_expedition`: Outfit the Expedition
-- `gather_expedition_supplies`: Mark the Glade Route
-- `scout_the_northern_road`: Cut the Web Line
-- `threat_beyond_the_pass`: Threat Beyond the Pass
-
-Current quest order is:
-
-1. `clear_the_shore`
-2. `outfit_the_expedition`
-3. `gather_expedition_supplies`
-4. `scout_the_northern_road`
-5. `threat_beyond_the_pass`
-
-Current quest statuses are:
-
-- `locked`
-- `available`
-- `active`
-- `ready_to_turn_in`
-- `completed`
+- `stolen_field_supplies`: Stolen Field Supplies
+- `break_lower_shore_blockage`: Break the Lower Shore Blockage
+- `scout_rise_samples`: Scout Rise Samples
+- `rescue_the_grove_runner`: Rescue the Grove Runner
+- `hold_the_field_cache`: Hold the Field Cache
+- `open_wolf_causeway`: Open the Wolf Causeway
 
 Current quest objective types are:
 
@@ -875,33 +868,32 @@ type QuestObjectiveType =
   | "talk_to_poi"
   | "reach_poi"
   | "defeat_enemy_count"
+  | "collect_enemy_quest_drop_count"
   | "gather_item_count"
   | "equip_item"
   | "equip_flask"
   | "buy_merchant_equipment"
   | "inspect_poi"
+  | "repair_poi"
+  | "defend_area"
+  | "rescue_npc"
   | "guide_npc_to_poi"
+  | "unlock_route"
+  | "defeat_elite"
   | "return_to_poi";
 ```
 
-Current quest reward source types are:
-
-- `npc`
-- `mapTrigger`
-- `objectTrigger`
-
-Only NPC quest acceptance and turn-in are implemented.
-
-Map trigger and object trigger sources are future-facing type support only.
-
-Current implemented quest objective behavior includes defeat counts, gather counts, inspect POIs, guide NPC escort objectives, equipment equip checks, flask equip checks, and Merchant Buy equipment checks.
+Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, equipment equip checks, flask equip checks, and Merchant Buy equipment checks.
 
 Current prototype quest chain:
 
 - `clear_the_shore` unlocks `outfit_the_expedition`
-- `outfit_the_expedition` unlocks `gather_expedition_supplies`
-- `gather_expedition_supplies` unlocks `scout_the_northern_road`
-- `scout_the_northern_road` unlocks `threat_beyond_the_pass`
+- `outfit_the_expedition` unlocks `stolen_field_supplies`
+- `stolen_field_supplies` unlocks `break_lower_shore_blockage`
+- `break_lower_shore_blockage` unlocks `scout_rise_samples`
+- `scout_rise_samples` unlocks `rescue_the_grove_runner`
+- `rescue_the_grove_runner` unlocks `hold_the_field_cache`
+- `hold_the_field_cache` unlocks `open_wolf_causeway`
 
 Current quest rewards may include:
 
@@ -910,44 +902,28 @@ Current quest rewards may include:
 - inventory item rewards
 - equipment item rewards
 
-Current quest state also tracks reward claim safety through:
-
-- `completedCycle`
-- `rewardClaimedCycle`
-- `lastTurnInError`
-
-Quest reward claim behavior:
-
-- Quest Giver turn-in validates the full reward package before mutating state.
-- If validation fails, no Crowns, XP, items, equipment, or completion state are applied.
-- If validation succeeds, all rewards are granted and the quest is marked completed.
-- Equipment rewards are added to shared party inventory.
-- Quest XP is awarded to living current party members only and does not use enemy level-gap reduction.
-- Non-repeatable quests cannot grant rewards more than once.
-- Inventory-full failures leave the quest `ready_to_turn_in`.
-
 Merchant interaction is gated by quest progress where implemented.
 
 Merchant Buy can be locked until the equipment tutorial flow allows it.
 
-`questGuideSystem.ts` currently owns the Glade Surveyor escort objective for Mark the Glade Route.
+`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, and elite-spawn objective helpers.
 
-Current quest guide behavior:
+Current quest objective helper behavior:
 
-- uses NPC id `map-1-mossy-guide`
-- spawns only on `map-1` while the guide objective is active and incomplete
-- starts at `{ x: 10, y: 29 }`
-- waits until the leader reaches contact range
-- moves toward the Mossy Glade route marker at `{ x: 101, y: 25 }`
-- moves only while at least one companion is within escort range
-- uses a slower guide movement speed multiplier
-- completes the quest objective when it reaches the target position
-- is protected by nearby party behavior and escort-aware threat checks
+- active quest NPCs are created from quest objective data
+- guide and rescue NPCs use objective-provided ids, display names, start positions, and target positions
+- guide and rescue NPCs spawn only on the target map while their objective is active and incomplete
+- guide NPC escort movement starts after leader contact
+- guide NPCs pause when no companion is within escort range or nearby living enemies are present
+- rescue objectives complete when the leader reaches the NPC after nearby enemies are cleared
+- repair objectives progress while a party member or quest guide NPC is near the target and not targeted by an enemy
+- defend objectives start from a nearby repair actor, spawn quest enemy waves, and use repair progress as the defense timer
+- defeat elite objectives ensure the configured elite quest enemy is spawned
+- unlock route objectives complete the current route objective when active
 
-The quest guide is a prototype escort system.
+The quest guide and related quest objective helpers are prototype systems.
 
-It must not become a general follower, recruitment, companion NPC, or production escort framework unless explicitly requested.
-
+They must not become a general follower, recruitment, companion NPC, production escort, final event scripting, or final quest framework unless explicitly requested.
 POI selection types live in `poiTypes.ts`.
 
 Current POI categories are:
@@ -1301,7 +1277,7 @@ Current basic attack constants and helpers:
 - `DEFAULT_COMPANION_ATTACK_RANGE = 1`
 - `ATTACK_COOLDOWN_MS = 1000`
 - `TARGET_SWITCH_DISTANCE = 6`
-- enemy attack range may come from enemy entity data, enemy archetype data, or the default enemy attack range
+- enemy attack range may come from enemy entity data, enemy type data, enemy archetype defaults, or the default enemy attack range
 
 Combat movement order uses role priority for party members.
 
@@ -1309,36 +1285,62 @@ Combat movement order uses role priority for party members.
 
 ## Enemy Archetypes
 
-`enemyArchetypes.ts` owns lightweight prototype enemy tuning data.
+`enemyArchetypes.ts` owns lightweight prototype enemy archetype defaults and enemy type setup data.
 
-Current enemy archetype ids:
+Current enemy archetype ids are:
 
-- `slime`
-- `cave_bat`
-- `forest_spider`
-- `goblin_scout`
-- `goblin_thrower`
-- `bog_imp`
-- `stone_crawler`
-- `goblin_shaman`
-- `ash_wisp`
-- `mossling`
-- `wolf`
-- `orc`
+```ts
+type EnemyArchetypeId =
+  | "slime"
+  | "bat"
+  | "spider"
+  | "goblin"
+  | "imp"
+  | "wolf"
+  | "crawler"
+  | "mossling"
+  | "wisp"
+  | "orc";
+```
+
+Current enemy type ids are:
+
+```ts
+type EnemyTypeId =
+  | "slime"
+  | "cave_bat"
+  | "forest_spider"
+  | "goblin_scout"
+  | "goblin_thrower"
+  | "bog_imp"
+  | "stone_crawler"
+  | "goblin_shaman"
+  | "ash_wisp"
+  | "mossling"
+  | "wolf"
+  | "orc";
+```
 
 Current enemy archetype data may define:
 
 - display name
+- default combat style
+- default attack range
+- default temperament
+
+Current enemy type data may define:
+
+- display name
+- archetype id
 - temperament
-- combat style
+- combat style override
 - target preference
 - level
-- max health
 - attack cooldown
 - detection range
-- attack range
+- attack range override
 
-Enemy archetypes are prototype tuning records.
+Enemy archetypes and enemy types are prototype tuning records.
 
 They are not final bestiary content, faction design, encounter design, or production AI behavior trees.
 
@@ -1353,7 +1355,7 @@ Current enemy behavior:
 - passive enemies do not seek combat targets on their own
 - passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
-- enemy archetypes can define setup data such as level, max health, attack cooldown, detection range, attack range, temperament, combat style, and target preference
+- enemy types define setup data such as level, attack cooldown, detection range, attack range override, temperament, combat style override, and target preference
 - enemy archetypes do not define XP rewards
 - enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`
 - target preferences currently support closest, leader, and lowest-health party member
@@ -1886,6 +1888,7 @@ type GameMap = {
   healingFountains: HealingFountain[];
   subzones?: ZoneSubzone[];
   subzoneNameLabels?: ZoneSubzoneNameLabel[];
+  visualObjects?: MapVisualObject[];
   navigationGrid?: NavigationGrid;
 };
 ```
@@ -1904,15 +1907,15 @@ Current readable map names:
 - `map-3`: Third Wild Zone
 - `map-4`: Fourth Wild Zone
 
-Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, display/debug names, prototype teleport points, optional subzones, optional subzone labels, encounter areas, encounter leashes, and resource locations.
+Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, decorative map visual objects, display/debug names, prototype teleport points, optional subzones, optional subzone labels, encounter areas, encounter leashes, and resource locations.
 
 Map data is still development/prototype data and should not define final world content.
 
 Current prototype map dimensions:
 
-- `hub`: 50 columns by 30 rows
+- `hub`: 110 columns by 60 rows
 - `map-1`: 160 columns by 57 rows
-- `map-2`: 160 columns by 30 rows
+- `map-2`: 160 columns by 57 rows
 - `map-3`: 160 columns by 30 rows
 - `map-4`: 160 columns by 30 rows
 
@@ -2088,6 +2091,7 @@ Current generated asset groups referenced by UI include:
 - `Asserts/Generated/prototype-vfx/sprites`
 - `Asserts/Generated/class-portraits`
 - `Asserts/Generated/hub-castle-walls`
+- `Asserts/Generated/hub-structures/256`
 
 Current sprite asset groups include:
 
@@ -2103,7 +2107,7 @@ Current world renderer behavior:
 - PixiJS renders the main world view.
 - React hosts the renderer and passes game state and command callbacks.
 - The renderer supports preview and full modes.
-- The renderer may draw floor chunks, walls, obstacles, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, drop visuals, resurrection feedback, world-wipe feedback, and camera-follow presentation.
+- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, drop visuals, resurrection feedback, world-wipe feedback, and camera-follow presentation.
 - PixiJS rendering must not own simulation rules, targeting rules, movement rules, combat rules, quest rules, or map data generation.
 
 Current companion visuals:
@@ -2138,7 +2142,7 @@ Current map tile visuals:
 - hub floor chunks currently use 128px generated hub floor assets
 - wilderness floor tile selection may use the subzone containing the floor chunk center so each subsection has stable floor texture selection
 - wilderness maps may use generated grass, tree, and bush image tiles
-- the hub may use generated stone, outside-grass, and castle-wall imagery
+- the hub may use generated stone, outside-grass, castle-wall, and decorative structure imagery
 - fallback floor and wall visuals use placeholder classes or renderer fallback drawing
 
 Current generated terrain asset direction may include:
@@ -2148,6 +2152,7 @@ Current generated terrain asset direction may include:
 - 64x64 floor assets for visual testing
 - 128x128 floor assets for the active floor-chunk render experiment
 - hub castle wall assets
+- 256px decorative hub structure assets
 
 The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement.
 

@@ -383,7 +383,7 @@ Combat flow:
 
 Current basic party attacks are mostly melee.
 
-Prototype combat supports numeric skill ranges and enemy attack ranges. Some prototype enemy archetypes may attack from range.
+Prototype combat supports numeric skill ranges and enemy attack ranges. Some prototype enemy archetypes and enemy types may attack from range.
 
 Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, and passive health regeneration.
 
@@ -452,7 +452,7 @@ Aggressive enemies:
 
 - may detect nearby party members
 - may attack without being attacked first
-- may choose targets by enemy archetype preference
+- may choose targets by enemy type target preference
 - should respect their intended encounter area or leash behavior
 
 Current prototype enemy combat styles:
@@ -469,7 +469,7 @@ Current prototype enemy target preferences:
 
 Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, subzone ids, encounter area ids, lightweight roaming behavior, and defeated timestamps.
 
-Enemy XP rewards currently come from the enemy level XP table by default. Monster-specific XP adjustments, Superior monster reward modifiers, and special named Elite monster rewards are future-facing and should not be treated as part of the current archetype setup data.
+Enemy XP rewards currently come from the enemy level XP table by default. Monster-specific XP adjustments, Superior monster reward modifiers, and special named Elite monster rewards are future-facing and should not be treated as part of the current enemy archetype or enemy type setup data.
 
 Current prototype enemy scaling:
 
@@ -485,7 +485,20 @@ Current prototype enemy respawn behavior:
 - respawn restores health and clears temporary target, roam, mark, and bind state
 - enemy respawn does not run in the hub
 
-Current prototype enemy archetypes:
+Current prototype enemy archetype/family ids:
+
+- Slime
+- Bat
+- Spider
+- Goblin
+- Imp
+- Wolf
+- Crawler
+- Mossling
+- Wisp
+- Orc
+
+Current prototype enemy types:
 
 - Slime
 - Cave Bat
@@ -500,10 +513,11 @@ Current prototype enemy archetypes:
 - Wolf
 - Orc
 
-Prototype enemy archetypes are lightweight tuning data for current supported setup values such as level, health, attack cooldown, detection range, attack range, temperament, combat style, and target preference.
+Prototype enemy archetypes/families provide lightweight defaults such as display name, default combat style, default attack range, default temperament, and drop-family identity.
 
-Prototype enemy archetypes are not final bestiary content, final encounter design, faction design, AI behavior trees, production combat roles, or XP reward tables.
+Prototype enemy types provide current setup values such as level, attack cooldown, detection range, attack range override, temperament, combat style override, and target preference.
 
+Prototype enemy archetypes and enemy types are not final bestiary content, final encounter design, faction design, AI behavior trees, production combat roles, or XP reward tables.
 ---
 
 ## Gathering
@@ -1076,24 +1090,37 @@ Supported prototype quest objective type definitions:
 - reach POI
 - inspect POI
 - guide NPC to POI
+- rescue NPC
+- repair POI
+- defend area
 - defeat enemy count
+- defeat elite
+- collect enemy quest drop count
 - gather item count
 - equip item
 - equip flask
 - buy merchant equipment
+- unlock route
 - return to POI
 
 Current prototype quest content currently uses:
 
+- reach POI
 - inspect POI
 - guide NPC to POI
+- rescue NPC
+- repair POI
+- defend area
 - defeat enemy count
+- defeat elite
+- collect enemy quest drop count
 - gather item count
 - equip item
 - equip flask
 - buy merchant equipment
+- unlock route
 
-Talk-to-POI, reach-POI, and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
+Talk-to-POI and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
 
 Current prototype quests:
 
@@ -1107,43 +1134,65 @@ Current prototype quests:
   - Quest id: outfit_the_expedition
   - Objectives: equip a Training Sword, equip an Acolyte Hood, equip a Minor Recovery Flask, and buy 1 merchant equipment item
   - Rewards: 10 Crowns, 4 character XP
-  - Unlocks: Mark the Glade Route
+  - Unlocks: Stolen Field Supplies
 
-- Mark the Glade Route
-  - Quest id: gather_expedition_supplies
-  - Objectives: guide the Glade Surveyor to the Mossy Glade route marker, gather 3 Herbs in Mossy Glade, and defeat 20 Cave Bats in Mossy Glade
-  - Rewards: 20 Crowns, 6 character XP, 3 Field Herb
-  - Unlocks: Cut the Web Line
+- Stolen Field Supplies
+  - Quest id: stolen_field_supplies
+  - Objectives: collect 10 Stolen Supply Bundle quest drops from Cave Bat-family enemies in Mossy Glade
+  - Rewards: 35 Crowns, 12 character XP, 1 Hearty Trail Rations
+  - Unlocks: Break the Lower Shore Blockage
 
-- Cut the Web Line
-  - Quest id: scout_the_northern_road
-  - Objectives: defeat 20 Forest Spiders in Lower Shore, gather 3 Ore in Lower Shore, and inspect the Lower Shore webbed wreckage
-  - Rewards: 30 Crowns, 10 character XP, 1 Scout Boots
-  - Unlocks: Threat Beyond the Pass
+- Break the Lower Shore Blockage
+  - Quest id: break_lower_shore_blockage
+  - Objectives: inspect the Lower Shore webbed wreckage, defeat 20 Forest Spiders in Lower Shore, escort the Route Worker to the blockage, repair the blockage, and unlock the map-2 route
+  - Rewards: 60 Crowns, 18 character XP, 1 Scout Boots
+  - Unlocks: Scout Rise Samples
 
-- Threat Beyond the Pass
-  - Quest id: threat_beyond_the_pass
-  - Requirements: Cut the Web Line completed
-  - Objective: defeat 5 enemies on Second Wild Zone
-  - Rewards: 75 Crowns, 20 character XP, 2 Tier 2 Orc Tusk, 1 Bulwark Cuirass
+- Scout Rise Samples
+  - Quest id: scout_rise_samples
+  - Objectives: collect 12 Scout Report Sample quest drops in Scout Rise
+  - Rewards: 45 Crowns, 18 character XP, 1 Minor Recovery Flask
+  - Unlocks: Rescue the Grove Runner
+
+- Rescue the Grove Runner
+  - Quest id: rescue_the_grove_runner
+  - Objectives: reach the Grove Runner, rescue the Grove Runner, and repair the Old Grove field cache
+  - Rewards: 55 Crowns, 22 character XP, 1 Skirmisher Rations
+  - Unlocks: Hold the Field Cache
+
+- Hold the Field Cache
+  - Quest id: hold_the_field_cache
+  - Objectives: defend the Old Grove field cache while quest-spawned enemies attack
+  - Rewards: 75 Crowns, 28 character XP, 1 Soldier's Recovery Flask
+  - Unlocks: Open the Wolf Causeway
+
+- Open the Wolf Causeway
+  - Quest id: open_wolf_causeway
+  - Objectives: escort the Causeway Worker, defend the Wolf Causeway blockage, defeat the causeway elite, and unlock the map-3 route
+  - Rewards: 100 Crowns, 40 character XP, 1 Bulwark Cuirass, 1 Plain Charm
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches interaction range.
 
 Current prototype quest guide behavior:
 
-- the Glade Surveyor is a temporary guide NPC for Mark the Glade Route
-- the guide appears only while the guide objective is active and incomplete
-- the guide waits near the First Wild Zone entry area until contacted
-- the guide moves toward the Mossy Glade route marker after contact
-- the guide moves at a slower prototype escort speed
-- the guide pauses if no companion is within escort range
-- the objective completes when the guide reaches the route marker
-- party protection and enemy targeting should account for nearby escort threats without pulling the party away to unrelated distant enemies
+- temporary quest guide NPCs may be spawned for active guide or rescue objectives
+- quest guide id, display name, start position, and target position come from the active quest objective
+- quest guide NPCs appear only on the target map while their objective is active and incomplete
+- guide NPCs for escort objectives wait until the leader reaches contact range
+- escort guide NPCs move toward their objective target after contact
+- escort guide NPCs move at a slower prototype escort speed
+- escort guide NPCs pause if no companion is within escort range
+- escort guide NPCs pause if living enemies are nearby
+- rescue objectives complete when the leader reaches the NPC and nearby enemies are cleared
+- repair objectives can be progressed by a nearby party member or quest guide NPC
+- repair progress pauses if the repair actor is targeted by an enemy
+- defend objectives can spawn quest enemies during repair progress
+- defeat elite objectives can spawn an aggressive quest enemy
+- unlock route objectives complete the associated route step
 
-The quest guide is a prototype escort objective.
+Quest guide, rescue, repair, defend, route unlock, and elite behaviors are prototype quest-objective helpers.
 
-The quest guide is not a full follower, recruitment, dialogue, companion, town NPC, or production escort system.
-
+They are not full follower, recruitment, dialogue, companion, town NPC, production escort, event scripting, or final quest framework systems.
 Current prototype quest reward behavior:
 
 - ready quests can grant rewards through Quest Giver turn-in
@@ -1510,6 +1559,7 @@ Current prototype skills may include:
 - healing
 - self-cost healing
 - mobility
+- lunge movement and damage
 - gathering support
 - beginner fallback combat or survival tools
 
@@ -1538,7 +1588,7 @@ Current intended Beginner prototype skill identities:
 
 Throw Rock is a simple ranged taunt tool.
 
-Kick is a simple melee fallback attack.
+Kick is a simple opening lunge and melee fallback attack.
 
 Guard Up is a simple defensive survival skill.
 
@@ -1686,13 +1736,13 @@ The player arrives by boat.
 
 A central port town acts as the main hub.
 
-The current prototype hub is Harbor Union Bastion, a small safe port/peninsula settlement with placeholder town entities only.
+The current prototype hub is Harbor Union Bastion, a small safe port/peninsula settlement with placeholder town entities and decorative non-simulation structure visuals.
 
 Current prototype hub:
 
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
-- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, and a clear exit to the first wild zone.
+- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, decorative house/cabin/tent/dock-shore structure visuals, and a clear exit to the first wild zone.
 - Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and a hub target dummy.
 - The Quest Giver supports the lightweight prototype quest chain only.
 - The Merchant supports prototype quick exchange of eligible junk items for Crowns and a fixed prototype buy stock for selected equipment and consumables.
@@ -1805,7 +1855,7 @@ The game uses a top-down readable presentation.
 
 Current world rendering uses a PixiJS renderer for the main map view.
 
-Current visuals may use prototype sprites, generated terrain tiles, generated icons, class portraits, feedback VFX sprites, and placeholders.
+Current visuals may use prototype sprites, generated terrain tiles, generated icons, class portraits, feedback VFX sprites, decorative map visual objects, and placeholders.
 
 Visual priorities:
 
@@ -1823,7 +1873,7 @@ Name labels must not define simulation behavior, targeting rules, NPC behavior, 
 
 Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, labels, effects, camera math, and input targeting while rendering larger floor chunks as background terrain.
 
-Current generated terrain asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, and generated skill or feedback sprites.
+Current generated terrain and map visual asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, hub castle wall assets, decorative hub structure assets, and generated skill or feedback sprites.
 
 Terrain asset size and render scale are UI-facing presentation choices.
 

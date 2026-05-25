@@ -1586,6 +1586,19 @@ function getEntitySpriteLayout(
     };
   }
 
+  if (
+    entity.kind === "npc" &&
+    visualAsset.kind === "sprite" &&
+    visualAsset.naturalSize
+  ) {
+    return {
+      anchorX: 0.5,
+      anchorY: 1,
+      width: visualAsset.naturalSize.width,
+      height: visualAsset.naturalSize.height,
+    };
+  }
+
   if (visualAsset.kind === "sprite" && visualAsset.naturalSize) {
     return {
       anchorX: 0.5,

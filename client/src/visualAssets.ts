@@ -200,6 +200,34 @@ export const CLASS_PORTRAIT_SRC: Record<ClassId, string> = {
   penitent: `${classPortraitBasePath}/penitent.png`,
 };
 
+const testCharacterVisualAsset = {
+  kind: "sprite",
+  animations: {
+    idle: {
+      frames: [`${testCharacterBasePath}/Idle/Idle_000.png`],
+      frameDurationMs: defaultFrameDurationMs,
+    },
+    run: {
+      north: {
+        frames: createFrames(testCharacterBasePath, "Run", "Honor_North", 8),
+        frameDurationMs: defaultFrameDurationMs,
+      },
+      south: {
+        frames: createFrames(testCharacterBasePath, "Run", "Honor_South", 8),
+        frameDurationMs: defaultFrameDurationMs,
+      },
+      west: {
+        frames: createFrames(testCharacterBasePath, "Run", "Honor_West", 8),
+        frameDurationMs: defaultFrameDurationMs,
+      },
+      east: {
+        frames: createFrames(testCharacterBasePath, "Run", "Honor_East", 8),
+        frameDurationMs: defaultFrameDurationMs,
+      },
+    },
+  },
+} satisfies SpriteVisualAsset;
+
 export const entityVisualAssets = {
   beginnerCharacter: {
     kind: "sprite",
@@ -212,31 +240,12 @@ export const entityVisualAssets = {
       height: 172,
     },
   },
-  testCharacter: {
-    kind: "sprite",
-    animations: {
-      idle: {
-        frames: [`${testCharacterBasePath}/Idle/Idle_000.png`],
-        frameDurationMs: defaultFrameDurationMs,
-      },
-      run: {
-        north: {
-          frames: createFrames(testCharacterBasePath, "Run", "Honor_North", 8),
-          frameDurationMs: defaultFrameDurationMs,
-        },
-        south: {
-          frames: createFrames(testCharacterBasePath, "Run", "Honor_South", 8),
-          frameDurationMs: defaultFrameDurationMs,
-        },
-        west: {
-          frames: createFrames(testCharacterBasePath, "Run", "Honor_West", 8),
-          frameDurationMs: defaultFrameDurationMs,
-        },
-        east: {
-          frames: createFrames(testCharacterBasePath, "Run", "Honor_East", 8),
-          frameDurationMs: defaultFrameDurationMs,
-        },
-      },
+  testCharacter: testCharacterVisualAsset,
+  questGuideCharacter: {
+    ...testCharacterVisualAsset,
+    naturalSize: {
+      width: 92,
+      height: 92,
     },
   },
   enemy: {
@@ -326,6 +335,7 @@ export const entityVisualAssets = {
 } satisfies {
   beginnerCharacter: SpriteVisualAsset;
   testCharacter: SpriteVisualAsset;
+  questGuideCharacter: SpriteVisualAsset;
   enemy: SpriteVisualAsset;
   enemy2: SpriteVisualAsset;
   resource: Record<string, ImageVisualAsset>;
@@ -377,7 +387,7 @@ export function getEntityVisualAsset(
     }
 
     if (entity.npcRole === "quest_guide") {
-      return entityVisualAssets.testCharacter;
+      return entityVisualAssets.questGuideCharacter;
     }
 
     return entity.npcRole === "dog"

@@ -7,7 +7,7 @@ import {
 } from "./visualAssets";
 
 describe("entity visual assets", () => {
-  it("uses Test-Character Idle and Run art for quest guide NPCs", () => {
+  it("uses real-size Test-Character Idle and Run art for quest guide NPCs", () => {
     const questGuide = createNpc(
       "guide",
       { x: 0, y: 0 },
@@ -16,11 +16,13 @@ describe("entity visual assets", () => {
     );
     const visualAsset = getEntityVisualAsset(questGuide);
 
-    expect(visualAsset).toBe(entityVisualAssets.testCharacter);
+    expect(visualAsset).toBe(entityVisualAssets.questGuideCharacter);
 
     if (visualAsset.kind !== "sprite") {
       throw new Error("Quest guide visual should be a sprite asset.");
     }
+
+    expect(visualAsset.naturalSize).toEqual({ width: 92, height: 92 });
 
     const idleAnimation = getSpriteAnimation(visualAsset, false);
     const eastRunAnimation = getSpriteAnimation(visualAsset, true, "east");
