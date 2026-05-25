@@ -55,7 +55,12 @@ describe("hub target dummy", () => {
   });
 
   it("ignores target dummies for ambient skill targeting", () => {
-    const leader = createCompanion("leader", { x: 31, y: 15 }, "leader", "fighter");
+    const leader = createCompanion(
+      "leader",
+      { x: targetDummyPosition.x - 1, y: targetDummyPosition.y },
+      "leader",
+      "fighter",
+    );
     const dummy = createTargetDummy("dummy", targetDummyPosition);
     const state = [leader, dummy].reduce(
       addEntity,
@@ -104,7 +109,12 @@ describe("hub target dummy", () => {
   });
 
   it("allows player-selected target dummies for party targeting", () => {
-    const leader = createCompanion("leader", { x: 31, y: 15 }, "leader", "fighter");
+    const leader = createCompanion(
+      "leader",
+      { x: targetDummyPosition.x - 1, y: targetDummyPosition.y },
+      "leader",
+      "fighter",
+    );
     const dummy = createTargetDummy("dummy", targetDummyPosition);
     const state = setLeaderIntent(
       [leader, dummy].reduce(

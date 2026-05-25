@@ -1,8 +1,17 @@
-import type { EquipmentSlot, ItemId, NpcEntity, ResourceType, SkillId } from "./game";
+import type {
+  EquipmentSlot,
+  ItemId,
+  MapVisualObjectId,
+  NpcEntity,
+  ResourceType,
+  SkillId,
+} from "./game";
 
 const nowAssetPackPath = "/Asserts/Generated/now-pack";
 const wildernessMapAssetPath = "/Asserts/Generated/map-wilderness";
 const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
+const hubCastleWallAssetPath = "/Asserts/Generated/hub-castle-walls";
+const hubStructureAssetPath = "/Asserts/Generated/hub-structures/256";
 const beginnerSkillEffectsPath = "/Asserts/Generated/beginner-skill-effects-50/sprites";
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
@@ -80,6 +89,20 @@ export const HUB_MAP_TILE_SRC = {
   grass128: `${hubFloor128AssetPath}/hub-outside-grass-floor-atlas-128.png`,
   stone128: `${hubFloor128AssetPath}/hub-stone-floor-atlas-128.png`,
 } as const;
+
+export const HUB_WALL_TILE_SRC = {
+  north: `${hubCastleWallAssetPath}/castle-wall-north.png`,
+  east: `${hubCastleWallAssetPath}/castle-wall-east.png`,
+  south: `${hubCastleWallAssetPath}/castle-wall-south.png`,
+  west: `${hubCastleWallAssetPath}/castle-wall-west.png`,
+} as const;
+
+export const MAP_VISUAL_OBJECT_SRC: Record<MapVisualObjectId, string> = {
+  hub_house: `${hubStructureAssetPath}/hub_house.png`,
+  hub_cabin: `${hubStructureAssetPath}/hub_cabin.png`,
+  hub_tent: `${hubStructureAssetPath}/hub_tent.png`,
+  hub_dock_shore_connector: `${hubStructureAssetPath}/hub_dock_shore_connector.png`,
+};
 
 export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   throw_rock: `${beginnerSkillEffectsPath}/throw_rock.png`,

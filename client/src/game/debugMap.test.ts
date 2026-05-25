@@ -13,6 +13,9 @@ import {
   WILDERNESS_MAP_ROWS,
   createDebugMap,
   debugMapDefinitions,
+  hubCompanionStartPositions,
+  hubHealingFountains,
+  hubNpcStartData,
   mapFourEnemyStartPositions,
   mapFourEnemyStartData,
   mapFourSubzoneNameLabels,
@@ -33,6 +36,7 @@ import {
   mapTwoSubzoneNameLabels,
   mapTwoResourceStartData,
   mapTwoSubzones,
+  targetDummyPosition,
 } from "./debugMap";
 import { ENEMY_TYPES } from "./enemyArchetypes";
 import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
@@ -75,7 +79,7 @@ const wildernessMaps = [
 ] as const;
 
 describe("debug maps", () => {
-  it("keeps the hub compact and expands wilderness maps", () => {
+  it("remakes the hub as a larger port base while preserving wilderness map sizes", () => {
     expect(createDebugMap(HUB_MAP_ID)).toMatchObject({
       columns: DEBUG_MAP_COLUMNS,
       rows: DEBUG_MAP_ROWS,
@@ -96,6 +100,39 @@ describe("debug maps", () => {
       columns: WILDERNESS_MAP_COLUMNS,
       rows: WILDERNESS_MAP_ROWS,
     });
+  });
+
+  it("places the remade hub dock, base, NPCs, fountain, and teleport on reachable floor", () => {
+    const hub = createDebugMap(HUB_MAP_ID);
+    const hubTeleport = debugMapDefinitions[HUB_MAP_ID].teleports[0];
+
+    expect(hub.columns).toBe(110);
+    expect(hub.rows).toBe(60);
+    expect(hubTeleport.position).toMatchObject({ x: 102, y: 30 });
+    expect(hub.visualObjects?.map((visualObject) => visualObject.visualId)).toEqual([
+      "hub_dock_shore_connector",
+      "hub_house",
+      "hub_cabin",
+      "hub_tent",
+    ]);
+    expect(
+      hub.visualObjects?.find(
+        (visualObject) => visualObject.visualId === "hub_dock_shore_connector",
+      )?.position,
+    ).toEqual({ x: 13, y: 59 });
+    expect(hub.walls).toContainEqual({ x: 30, y: 12 });
+    expect(hub.walls).toContainEqual({ x: 80, y: 47 });
+    expect(isNavigationCellWalkable(hub, { x: 80, y: 31 })).toBe(true);
+    expect(isNavigationCellWalkable(hub, { x: 55, y: 47 })).toBe(true);
+
+    assertMapPlacements(HUB_MAP_ID, [
+      ...hubCompanionStartPositions,
+      ...hubNpcStartData.map((npc) => npc.position),
+      ...hubHealingFountains.map((fountain) => fountain.position),
+      targetDummyPosition,
+      hubTeleport.position,
+      ...hubTeleport.arrivalPositions,
+    ]);
   });
 
   it("keeps wilderness enemies and resources on reachable open floor", () => {

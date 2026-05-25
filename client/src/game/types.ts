@@ -1230,6 +1230,22 @@ export type HealingFountain = {
   range: number;
 };
 
+export type MapVisualObjectId =
+  | "hub_house"
+  | "hub_cabin"
+  | "hub_tent"
+  | "hub_dock_shore_connector";
+
+export type MapVisualObject = {
+  id: string;
+  visualId: MapVisualObjectId;
+  position: Position;
+  widthCells: number;
+  heightCells: number;
+  anchorX?: number;
+  anchorY?: number;
+};
+
 export type GameMap = {
   id?: DebugMapId;
   displayName: string;
@@ -1241,6 +1257,7 @@ export type GameMap = {
   healingFountains: HealingFountain[];
   subzones?: ZoneSubzone[];
   subzoneNameLabels?: ZoneSubzoneNameLabel[];
+  visualObjects?: MapVisualObject[];
   navigationGrid?: NavigationGrid;
 };
 

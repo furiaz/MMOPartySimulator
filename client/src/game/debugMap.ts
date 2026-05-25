@@ -5,6 +5,7 @@ import type {
   GameMap,
   HealingFountain,
   LootTier,
+  MapVisualObject,
   Position,
   ResourceType,
   ZoneSubzone,
@@ -13,8 +14,8 @@ import type {
 } from "./types";
 import { bakeNavigationGrid } from "./navigation";
 
-export const DEBUG_MAP_COLUMNS = 50;
-export const DEBUG_MAP_ROWS = 30;
+export const DEBUG_MAP_COLUMNS = 110;
+export const DEBUG_MAP_ROWS = 60;
 export const WILDERNESS_MAP_COLUMNS = 160;
 export const WILDERNESS_MAP_ROWS = 30;
 export const MAP_ONE_ROWS = 57;
@@ -77,10 +78,10 @@ export const companionStartPositions: Position[] = [
 ];
 
 export const hubCompanionStartPositions: Position[] = [
-  { x: 7, y: 20 },
-  { x: 8, y: 20 },
-  { x: 7, y: 21 },
-  { x: 8, y: 21 },
+  { x: 12, y: 51 },
+  { x: 13, y: 51 },
+  { x: 12, y: 52 },
+  { x: 13, y: 52 },
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
@@ -93,7 +94,7 @@ export const mapTwoCompanionStartPositions: Position[] = [
 export const teleporterPosition: Position = { x: 154, y: 29 };
 export const mapTwoForwardTeleporterPosition: Position = { x: 154, y: 29 };
 export const mapThreeForwardTeleporterPosition: Position = { x: 154, y: 12 };
-export const hubTeleporterPosition: Position = { x: 22, y: 20 };
+export const hubTeleporterPosition: Position = { x: 102, y: 30 };
 export const mapOneHubTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 12 };
@@ -102,18 +103,18 @@ export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
   {
     id: "hub-healing-fountain",
-    position: { x: 22, y: 16 },
+    position: { x: 55, y: 32 },
     range: HUB_HEALING_FOUNTAIN_RANGE,
   },
 ];
 export const targetDummyId = "hub-target-dummy";
-export const targetDummyPosition: Position = { x: 32, y: 15 };
+export const targetDummyPosition: Position = { x: 77, y: 42 };
 
 const hubArrivalPositions: Position[] = [
-  { x: 22, y: 21 },
-  { x: 23, y: 21 },
-  { x: 21, y: 21 },
-  { x: 22, y: 22 },
+  { x: 99, y: 30 },
+  { x: 100, y: 30 },
+  { x: 99, y: 31 },
+  { x: 100, y: 31 },
 ];
 
 const mapOneHubArrivalPositions: Position[] = [
@@ -168,31 +169,31 @@ const mapFourMapThreeArrivalPositions: Position[] = [
 export const hubNpcStartData = [
   {
     id: npcIds[0],
-    position: { x: 22, y: 13 },
+    position: { x: 43, y: 28 },
     displayName: "Quest Giver",
     npcRole: "quest_giver",
   },
   {
     id: npcIds[1],
-    position: { x: 18, y: 15 },
+    position: { x: 42, y: 45 },
     displayName: "Merchant",
     npcRole: "merchant",
   },
   {
     id: npcIds[2],
-    position: { x: 26, y: 15 },
+    position: { x: 67, y: 28 },
     displayName: "Smith",
     npcRole: "smith",
   },
   {
     id: npcIds[3],
-    position: { x: 20, y: 17 },
+    position: { x: 58, y: 33 },
     displayName: "Dog",
     npcRole: "dog",
   },
   {
     id: npcIds[4],
-    position: { x: 30, y: 13 },
+    position: { x: 73, y: 42 },
     displayName: "Test Blade",
     npcRole: "test_blade",
   },
@@ -793,26 +794,47 @@ export type EnemyStartData = {
   encounterAreaId: string;
 };
 
+const HUB_VISUAL_OBJECTS: MapVisualObject[] = [
+  {
+    id: "hub-dock-shore-connector",
+    visualId: "hub_dock_shore_connector",
+    position: { x: 13, y: 59 },
+    widthCells: 8,
+    heightCells: 8,
+    anchorY: 1,
+  },
+  {
+    id: "hub-house",
+    visualId: "hub_house",
+    position: { x: 43, y: 26 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-cabin",
+    visualId: "hub_cabin",
+    position: { x: 67, y: 26 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-tent",
+    visualId: "hub_tent",
+    position: { x: 42, y: 43 },
+    widthCells: 9,
+    heightCells: 9,
+    anchorY: 1,
+  },
+];
+
 const HUB_WALLS = dedupeWalls([
   ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
-  ...createHorizontalWall(6, 12, 35, [
-    [21, 24],
-  ]),
-  ...createHorizontalWall(19, 12, 35, [
-    [20, 24],
-  ]),
-  ...createVerticalWall(12, 6, 19, [
-    [11, 14],
-  ]),
-  ...createVerticalWall(35, 6, 19, [
-    [11, 14],
-  ]),
-  ...createHorizontalWall(22, 2, 12, [
-    [5, 9],
-  ]),
-  ...createVerticalWall(13, 19, 23, [
-    [20, 22],
-  ]),
+  ...createHorizontalWall(12, 30, 80, []),
+  ...createHorizontalWall(47, 30, 80, [[51, 59]]),
+  ...createVerticalWall(30, 12, 47, [[34, 39]]),
+  ...createVerticalWall(80, 12, 47, [[28, 34]]),
 ]);
 
 const MAP_ONE_WALLS = dedupeWalls([
@@ -862,6 +884,7 @@ export const debugMapDefinitions: Record<
     walls: Position[];
     teleports: DebugTeleportPoint[];
     healingFountains: HealingFountain[];
+    visualObjects?: MapVisualObject[];
     subzones?: ZoneSubzone[];
     subzoneNameLabels?: ZoneSubzoneNameLabel[];
   }
@@ -874,6 +897,7 @@ export const debugMapDefinitions: Record<
     rows: DEBUG_MAP_ROWS,
     walls: HUB_WALLS,
     healingFountains: hubHealingFountains,
+    visualObjects: HUB_VISUAL_OBJECTS,
     teleports: [
       {
         id: "hub-to-map-1",
@@ -1010,6 +1034,7 @@ export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
     walls: definition.walls,
     teleports: definition.teleports,
     healingFountains: definition.healingFountains,
+    visualObjects: definition.visualObjects,
     subzones: definition.subzones,
     subzoneNameLabels: definition.subzoneNameLabels,
   };

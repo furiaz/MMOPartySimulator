@@ -75,6 +75,8 @@ export type {
   ItemRarity,
   JunkItemId,
   LootTier,
+  MapVisualObject,
+  MapVisualObjectId,
   OffhandType,
   PartyMemberRole,
   PartyIntent,

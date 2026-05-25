@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import {
   HUB_MAP_TILE_SRC,
+  HUB_WALL_TILE_SRC,
   INVENTORY_ITEM_ICON_SRC,
   MAP_OBJECT_ICON_SRC,
+  MAP_VISUAL_OBJECT_SRC,
   NPC_ICON_SRC,
   RESOURCE_ICON_SRC,
   SHARED_SKILL_VISUAL_ICON_SRC,
@@ -18,6 +20,7 @@ import type {
   GameEntity,
   GameMap,
   LeaderIntent,
+  MapVisualObject,
   Position,
   ResurrectionProgressState,
   SkillBindState,
@@ -489,6 +492,16 @@ function collectCurrentMapVisualTextureSrcs(
     }
   }
 
+  if (isHubVisualMap(map.id)) {
+    for (const src of Object.values(HUB_WALL_TILE_SRC)) {
+      sources.add(src);
+    }
+  }
+
+  for (const visualObject of map.visualObjects ?? []) {
+    sources.add(MAP_VISUAL_OBJECT_SRC[visualObject.visualId]);
+  }
+
   for (const entity of entities) {
     for (const src of collectEntityVisualTextureSrcs(entity, map)) {
       sources.add(src);
@@ -678,10 +691,10 @@ function getWildernessFloorTileSrc(chunk: Position, map: GameMap): string {
 
 function getHubFloorTileSrc(chunk: Position): string {
   const isCityFloorChunk =
-    chunk.x >= 12 &&
-    chunk.x <= 34 &&
-    chunk.y >= 6 &&
-    chunk.y <= 18;
+    chunk.x >= 28 &&
+    chunk.x <= 80 &&
+    chunk.y >= 12 &&
+    chunk.y <= 48;
 
   return isCityFloorChunk ? HUB_MAP_TILE_SRC.stone128 : HUB_MAP_TILE_SRC.grass128;
 }
@@ -692,6 +705,47 @@ function getWildernessWallTileKind(position: Position): "tree" | "bush" {
 
 function getWildernessWallTileSrc(position: Position): string {
   return WILDERNESS_MAP_TILE_SRC[getWildernessWallTileKind(position)];
+}
+
+function createHubWallKeySet(walls: Position[]): Set<string> {
+  return new Set(walls.map(getHubWallKey));
+}
+
+function getHubWallKey(position: Position): string {
+  return `${position.x},${position.y}`;
+}
+
+function getHubWallTileSrc(
+  position: Position,
+  map: GameMap,
+  wallKeys: Set<string>,
+): string {
+  const hasLeft = wallKeys.has(`${position.x - 1},${position.y}`);
+  const hasRight = wallKeys.has(`${position.x + 1},${position.y}`);
+  const hasUp = wallKeys.has(`${position.x},${position.y - 1}`);
+  const hasDown = wallKeys.has(`${position.x},${position.y + 1}`);
+
+  if ((hasLeft || hasRight) && !(hasUp || hasDown)) {
+    return position.y < map.rows / 2
+      ? HUB_WALL_TILE_SRC.north
+      : HUB_WALL_TILE_SRC.south;
+  }
+
+  if ((hasUp || hasDown) && !(hasLeft || hasRight)) {
+    return position.x < map.columns / 2
+      ? HUB_WALL_TILE_SRC.west
+      : HUB_WALL_TILE_SRC.east;
+  }
+
+  if (hasLeft || hasRight) {
+    return position.y < map.rows / 2
+      ? HUB_WALL_TILE_SRC.north
+      : HUB_WALL_TILE_SRC.south;
+  }
+
+  return position.x < map.columns / 2
+    ? HUB_WALL_TILE_SRC.west
+    : HUB_WALL_TILE_SRC.east;
 }
 
 function getRenderSize(
@@ -2768,6 +2822,8 @@ function drawFullWalls({
   transform: FullTransform;
   visibleTileBounds: TileBounds;
 }) {
+  const hubWallKeys = isHubVisualMap(map.id) ? createHubWallKeySet(map.walls) : null;
+
   for (const wall of map.walls) {
     if (!isPositionInTileBounds(wall, visibleTileBounds)) {
       continue;
@@ -2799,6 +2855,31 @@ function drawFullWalls({
           wallKind === "tree"
             ? transform.cellPixelSize * 2.25
             : transform.cellPixelSize * 1.32,
+      });
+
+      if (didDraw) {
+        continue;
+      }
+    }
+
+    if (hubWallKeys) {
+      const wallSpriteSrc = getHubWallTileSrc(wall, map, hubWallKeys);
+      const didDraw = drawManagedImageSprite({
+        anchorX: 0,
+        anchorY: 0,
+        cache,
+        height: transform.cellPixelSize,
+        key: `wall:${map.id}:${wall.x}:${wall.y}:${wallSpriteSrc}`,
+        layer,
+        managedState,
+        metrics,
+        position: {
+          x: wallX,
+          y: wallY,
+        },
+        requestRedraw,
+        src: wallSpriteSrc,
+        width: transform.cellPixelSize,
       });
 
       if (didDraw) {
@@ -2890,6 +2971,70 @@ function drawFullMapObjects({
         .fill(0x38bdf8);
     }
   }
+}
+
+function drawFullMapVisualObjects({
+  cache,
+  layer,
+  map,
+  managedState,
+  metrics,
+  requestRedraw,
+  transform,
+  visibleTileBounds,
+}: {
+  cache: TextureCache;
+  layer: Container;
+  map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  requestRedraw?: () => void;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  const visualObjects = [...(map.visualObjects ?? [])].sort(
+    (first, second) =>
+      first.position.y - second.position.y || first.id.localeCompare(second.id),
+  );
+
+  for (const visualObject of visualObjects) {
+    if (!isMapVisualObjectInTileBounds(visualObject, visibleTileBounds)) {
+      continue;
+    }
+
+    const objectPosition = toFullPosition(visualObject.position, transform);
+    drawManagedImageSprite({
+      anchorX: visualObject.anchorX ?? 0.5,
+      anchorY: visualObject.anchorY ?? 1,
+      cache,
+      height: visualObject.heightCells * transform.cellPixelSize,
+      key: `map-visual-object:${map.id}:${visualObject.id}`,
+      layer,
+      managedState,
+      metrics,
+      position: {
+        x: objectPosition.x,
+        y: objectPosition.y + transform.cellPixelSize / 2,
+      },
+      requestRedraw,
+      src: MAP_VISUAL_OBJECT_SRC[visualObject.visualId],
+      width: visualObject.widthCells * transform.cellPixelSize,
+    });
+  }
+}
+
+function isMapVisualObjectInTileBounds(
+  visualObject: MapVisualObject,
+  bounds: TileBounds,
+): boolean {
+  const halfWidth = visualObject.widthCells / 2;
+
+  return (
+    visualObject.position.x + halfWidth >= bounds.minX &&
+    visualObject.position.x - halfWidth <= bounds.maxX &&
+    visualObject.position.y >= bounds.minY &&
+    visualObject.position.y - visualObject.heightCells <= bounds.maxY
+  );
 }
 
 function drawFullEntities({
@@ -3300,6 +3445,16 @@ function drawFullMap({
     cache: textureCache,
     fallbackGraphics,
     layer: layers.wallLayer,
+    map,
+    managedState,
+    metrics,
+    requestRedraw,
+    transform,
+    visibleTileBounds,
+  });
+  drawFullMapVisualObjects({
+    cache: textureCache,
+    layer: layers.objectLayer,
     map,
     managedState,
     metrics,
