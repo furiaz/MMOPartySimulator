@@ -1746,6 +1746,10 @@ function App() {
   const enemies = Object.values(gameState.entities).filter(
     (entity): entity is Enemy => entity.kind === "enemy",
   );
+  const questGuideNpcs = allEntities.filter(
+    (entity): entity is NpcEntity =>
+      entity.kind === "npc" && entity.npcRole === "quest_guide",
+  );
   const resources = resourceIds
     .map((id) => gameState.entities[id] as ResourceEntity | undefined)
     .filter((resource): resource is ResourceEntity => Boolean(resource));
@@ -2111,13 +2115,17 @@ function App() {
   }, []);
 
   useEffect(() => {
-    latestAnimatedEntityPositionsRef.current = [...partyMembers, ...enemies]
+    latestAnimatedEntityPositionsRef.current = [
+      ...partyMembers,
+      ...enemies,
+      ...questGuideNpcs,
+    ]
       .filter((entity) => entity.state !== "dead")
       .reduce<Record<string, Position>>((positionsById, entity) => {
         positionsById[entity.id] = entity.position;
         return positionsById;
       }, {});
-  }, [enemies, partyMembers]);
+  }, [enemies, partyMembers, questGuideNpcs]);
 
   useEffect(() => {
     function handleConsumableShortcut(event: KeyboardEvent) {

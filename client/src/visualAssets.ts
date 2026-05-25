@@ -376,6 +376,10 @@ export function getEntityVisualAsset(
       return entityVisualAssets.testBlade;
     }
 
+    if (entity.npcRole === "quest_guide") {
+      return entityVisualAssets.testCharacter;
+    }
+
     return entity.npcRole === "dog"
       ? entityVisualAssets.dog
       : entityVisualAssets.npc;
