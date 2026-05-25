@@ -52,7 +52,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
   },
   none: {
     primary: [],
-    secondary: ["Safety"],
+    secondary: ["Safety", "Mobility"],
     fallback: ["Damage", "Single Target"],
     avoid: ["Self Cost - HP"],
   },

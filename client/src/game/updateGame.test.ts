@@ -1965,6 +1965,57 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("uses Kick during AI attack approach before normal combat distance", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const enemy = createEnemy("approach-enemy", { x: 9, y: 4 });
+    const nextState = updateGame(
+      createMapOneState([leader, enemy], {
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        localPoiTarget: {
+          poiId: "approach-enemy-poi",
+          category: "combat",
+          mapId: MAP_ONE_ID,
+          position: enemy.position,
+          targetEntityId: enemy.id,
+          reason: "test combat approach",
+        },
+        lastPoiDecision: {
+          evaluatedAtMs: 900,
+          selectedPoiId: "approach-enemy-poi",
+          selectedCategory: "combat",
+          selectedMapId: MAP_ONE_ID,
+          selectedPosition: enemy.position,
+          selectedReason: "test combat approach",
+          skippedReasons: {},
+        },
+      }),
+      { nowMs: 1_000, deltaMs: 100 },
+    );
+    const currentEnemy = nextState.entities[enemy.id];
+
+    if (currentEnemy.kind !== "enemy") {
+      throw new Error("Expected approach enemy in opening Kick test");
+    }
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "attack",
+      targetId: enemy.id,
+      source: "ai",
+    });
+    expect(nextState.skillCooldownsByCompanionId?.leader?.skillId).toBe(
+      "kick",
+    );
+    expect(nextState.entities.leader.position.x).toBeGreaterThan(
+      leader.position.x,
+    );
+    expect(currentEnemy).toMatchObject({
+      state: "attack",
+      currentTargetId: leader.id,
+    });
+    expect(currentEnemy.health).toBeLessThan(enemy.health);
+  });
+
   it("lets player gather intent self-defend after damage and restores the resource intent later", () => {
     const resource = createResource("player-resource", { x: 4, y: 4 });
     const leader = {

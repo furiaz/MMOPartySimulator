@@ -11,7 +11,6 @@ import { getSkillsForClass } from "./skills";
 import {
   addCombatFeedback,
   addSkillVisualEvent,
-  findClosestAvailablePosition,
   updateEntity,
   type GameState,
 } from "./state";
@@ -21,6 +20,13 @@ import {
   isLivingEnemy,
   isTargetDummyEnemy,
 } from "./entityGuards";
+import { getCompanionAttackRange } from "./companionCombat";
+import {
+  getClearLungePosition,
+  getDirectionAwayFrom,
+  getDirectionToward,
+  getSkillDashPosition,
+} from "./skillMovement";
 import { findEnemyTarget, getSkillTarget } from "./skillTargeting";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
@@ -38,11 +44,15 @@ const LOW_HEALTH_BUFFER = 1;
 const VISUAL_DURATION_MS = 600;
 const SHIELD_OFFSET_DISTANCE = 1;
 const DEFAULT_SHIELD_DIRECTION: Position = { x: 0, y: -1 };
+const OPENING_LUNGE_SCORE_BONUS = 10;
+const NORMAL_SKILL_SELECTION_PRIORITY = 0;
+const EMERGENCY_SKILL_SELECTION_PRIORITY = 1;
 
 type SkillUse = {
   skill: SkillDefinition;
   target?: Enemy | Companion;
   score: number;
+  selectionPriority: number;
 };
 
 export function updateSkillSystem(state: GameState, now = Date.now()): GameState {
@@ -194,23 +204,33 @@ function chooseSkillUse(
         return null;
       }
 
-      const score = getSkillRoleScore(caster.role, skill.tags);
+      const roleScore = getSkillRoleScore(caster.role, skill.tags);
 
-      if (score <= 0) {
+      if (roleScore <= 0) {
         nextState = recordSkillTelemetry(nextState, caster, {
           type: "skill_skipped",
           skill,
-          score,
+          score: roleScore,
           reason: "non_positive_role_score",
         });
         return null;
       }
 
-      return { skill, target, score };
+      return {
+        skill,
+        target,
+        score: getSkillSelectionScore(caster, skill, target, roleScore),
+        selectionPriority: getSkillSelectionPriority(skill),
+      };
     })
     .filter((skillUse): skillUse is SkillUse => Boolean(skillUse));
 
-  const skillUse = skillUses.sort((a, b) => b.score - a.score)[0] ?? null;
+  const skillUse =
+    skillUses.sort(
+      (a, b) =>
+        b.selectionPriority - a.selectionPriority ||
+        b.score - a.score,
+    )[0] ?? null;
 
   return {
     state: skillUse
@@ -223,6 +243,44 @@ function chooseSkillUse(
       : nextState,
     skillUse,
   };
+}
+
+function getSkillSelectionScore(
+  caster: Companion,
+  skill: SkillDefinition,
+  target: Enemy | Companion | undefined,
+  roleScore: number,
+): number {
+  return isOpeningLungeSkillUse(caster, skill, target)
+    ? roleScore + OPENING_LUNGE_SCORE_BONUS
+    : roleScore;
+}
+
+function getSkillSelectionPriority(skill: SkillDefinition): number {
+  return isEmergencySkill(skill)
+    ? EMERGENCY_SKILL_SELECTION_PRIORITY
+    : NORMAL_SKILL_SELECTION_PRIORITY;
+}
+
+function isEmergencySkill(skill: SkillDefinition): boolean {
+  return (
+    skill.effect.type === "heal" ||
+    skill.effect.type === "selfCostHeal" ||
+    skill.effect.type === "shieldBlock"
+  );
+}
+
+function isOpeningLungeSkillUse(
+  caster: Companion,
+  skill: SkillDefinition,
+  target: Enemy | Companion | undefined,
+): target is Enemy {
+  return (
+    skill.effect.type === "lungeDamage" &&
+    isLivingEnemy(target) &&
+    getGridDistance(caster.position, target.position) >
+      getCompanionAttackRange(caster)
+  );
 }
 
 function applySkill(
@@ -243,6 +301,20 @@ function applySkill(
     return startSkillCooldown(
       recordSkillApplied(
         applyDamageSkill(nextState, caster, target, skill, now),
+        caster,
+        skillUse,
+        target.id,
+      ),
+      caster,
+      skill,
+      now,
+    );
+  }
+
+  if (skill.effect.type === "lungeDamage" && isLivingEnemy(target)) {
+    return startSkillCooldown(
+      recordSkillApplied(
+        applyLungeDamageSkill(nextState, caster, target, skill, now),
         caster,
         skillUse,
         target.id,
@@ -338,17 +410,16 @@ function applySkill(
   }
 
   if (skill.effect.type === "quickStep") {
-    return startSkillCooldown(
-      recordSkillApplied(
-        applyQuickStep(nextState, caster, skill, now),
-        caster,
-        skillUse,
-        caster.id,
-      ),
-      caster,
-      skill,
-      now,
-    );
+    const appliedState = applyQuickStep(nextState, caster, target, skill, now);
+
+    return appliedState
+      ? startSkillCooldown(
+          recordSkillApplied(appliedState, caster, skillUse, caster.id),
+          caster,
+          skill,
+          now,
+        )
+      : nextState;
   }
 
   if (skill.effect.type === "shieldBlock") {
@@ -511,6 +582,62 @@ function applyDamageSkill(
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return updateCasterLastAttackAt(nextState, caster.id, now);
+}
+
+function applyLungeDamageSkill(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "lungeDamage") {
+    return state;
+  }
+
+  const lungePosition = getClearLungePosition(
+    state,
+    caster,
+    target,
+    skill.effect.lungeDistance,
+  );
+
+  if (!lungePosition) {
+    return state;
+  }
+
+  const lungedCaster = {
+    ...caster,
+    position: lungePosition,
+  };
+  let nextState = updateEntity(state, lungedCaster);
+
+  const currentTarget = nextState.entities[target.id];
+
+  if (isLivingEnemy(currentTarget)) {
+    nextState = damageEnemy(
+      nextState,
+      lungedCaster,
+      currentTarget,
+      skill.displayName,
+      now,
+      skill.effect.damageType,
+      skill.effect.powerMultiplier,
+      skill.effect.damageType === "physical",
+    );
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "slash",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position: lungePosition,
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -799,30 +926,30 @@ function applyGatherBuff(
 function applyQuickStep(
   state: GameState,
   caster: Companion,
+  target: Enemy | Companion | undefined,
   skill: SkillDefinition,
   now: number,
-): GameState {
-  if (skill.effect.type !== "quickStep") {
-    return state;
+): GameState | null {
+  if (skill.effect.type !== "quickStep" || !isLivingEnemy(target)) {
+    return null;
   }
 
-  const enemy = findEnemyTarget(state, caster, 6);
-  const direction = getUnitDirection(
-    enemy
-      ? {
-          x: caster.position.x - enemy.position.x,
-          y: caster.position.y - enemy.position.y,
-        }
-      : getLeaderMovementDirection(state, caster),
-    DEFAULT_SHIELD_DIRECTION,
+  const direction =
+    caster.role === "defender" || caster.role === "fighter"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
   );
-  const intendedPosition = {
-    x: caster.position.x + direction.x * skill.effect.distance,
-    y: caster.position.y + direction.y * skill.effect.distance,
-  };
-  const position = findClosestAvailablePosition(state, intendedPosition, {
-    ignoredEntityId: caster.id,
-  });
+
+  if (!position) {
+    return null;
+  }
+
   let nextState = updateEntity(state, {
     ...caster,
     position,

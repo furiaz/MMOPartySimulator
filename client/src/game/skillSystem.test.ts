@@ -5,12 +5,12 @@ import { updateGatherSystem } from "./gatherSystem";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { updateSkillSystem } from "./skillSystem";
-import type { Companion, GameEntity } from "./types";
+import type { Companion, GameEntity, GameMap, Position } from "./types";
 
 describe("beginner skill system", () => {
   it("uses Throw Rock to pull enemy attention to the caster", () => {
     const defender = createBeginner("defender", "defender", { x: 0, y: 0 });
-    const enemy = createEnemy("enemy", { x: 3, y: 0 });
+    const enemy = createEnemy("enemy", { x: 1, y: 0 });
     const nextState = updateSkillSystem(createSkillState([defender, enemy]), 1000);
 
     expect(nextState.entities.enemy).toMatchObject({
@@ -69,7 +69,7 @@ describe("beginner skill system", () => {
 
   it("records skill selection, use, and effect telemetry while recording is active", () => {
     const fighter = createBeginner("fighter", "fighter", { x: 0, y: 0 });
-    const enemy = createEnemy("enemy", { x: 1, y: 0 });
+    const enemy = createEnemy("enemy", { x: 5, y: 0 });
     const state = startDebugTelemetryRecording(createSkillState([fighter, enemy]));
 
     const nextState = updateSkillSystem(state, 1000);
@@ -129,7 +129,7 @@ describe("beginner skill system", () => {
         skillId: "kick",
         entities: [
           createBeginner("fighter", "fighter", { x: 0, y: 0 }),
-          createEnemy("enemy", { x: 1, y: 0 }),
+          createEnemy("enemy", { x: 5, y: 0 }),
         ],
       },
       {
@@ -158,8 +158,11 @@ describe("beginner skill system", () => {
         skillId: "deep_breath",
         entities: [
           createBeginner("fighter", "fighter", { x: 0, y: 0 }),
-          createEnemy("enemy", { x: 3, y: 0 }),
+          createEnemy("enemy", { x: 5, y: 0 }),
         ],
+        overrides: {
+          map: createSkillMap([{ x: 3, y: 0 }]),
+        },
       },
       {
         skillId: "rally_call",
@@ -224,6 +227,277 @@ describe("beginner skill system", () => {
       ).toBe(true);
     }
   });
+
+  it("skips Kick when a wall blocks the direct lunge path", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
+    const enemy = createEnemy("enemy", { x: 6, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([fighter, enemy], {
+        map: createSkillMap([{ x: 3, y: 1 }]),
+        ...createActiveSelfBuff(fighter.id),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_used" && event.skillId === "kick",
+      ),
+    ).toBe(false);
+    expect(nextState.entities.enemy).toMatchObject({
+      health: enemy.health,
+    });
+  });
+
+  it("uses Kick as a clear-path lunge and damage skill", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
+    const enemy = createEnemy("enemy", { x: 6, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([fighter, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(fighter.id),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+    const currentFighter = nextState.entities.fighter;
+    const currentEnemy = nextState.entities.enemy;
+
+    if (currentEnemy.kind !== "enemy") {
+      throw new Error("Expected current enemy in Kick lunge test");
+    }
+
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_used" && event.skillId === "kick",
+      ),
+    ).toBe(true);
+    expect(currentFighter.position.x).toBeGreaterThan(fighter.position.x);
+    expect(currentFighter.position.x).toBeLessThan(enemy.position.x);
+    expect(currentEnemy).toMatchObject({
+      state: "attack",
+      currentTargetId: fighter.id,
+    });
+    expect(currentEnemy.health).toBeLessThan(enemy.health);
+  });
+
+  it("does not use Kick when the target is already in normal attack range", () => {
+    const defender = createBeginner("defender", "defender", { x: 1, y: 1 });
+    const enemy = createEnemy("enemy", { x: 2, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([defender, enemy], {
+        map: createSkillMap(),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+      "throw_rock",
+    );
+    expect(nextState.entities.defender.position).toEqual(defender.position);
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_used" && event.skillId === "kick",
+      ),
+    ).toBe(false);
+  });
+
+  it("prefers opening Kick over Defender Throw Rock outside melee range", () => {
+    const defender = createBeginner("defender", "defender", { x: 1, y: 1 });
+    const enemy = createEnemy("enemy", { x: 5, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([defender, enemy], {
+        map: createSkillMap(),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+      "kick",
+    );
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_used" && event.skillId === "kick",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps Guard Up ahead of opening Kick when party danger is present", () => {
+    const defender = createBeginner("defender", "defender", { x: 1, y: 1 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const state = startDebugTelemetryRecording(
+      createSkillState([defender, enemy], {
+        map: createSkillMap(),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+      "guard_up",
+    );
+    expect(nextState.entities.defender.position).toEqual(defender.position);
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_used" && event.skillId === "kick",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps First Aid ahead of opening Kick when an ally needs healing", () => {
+    const support = createBeginner("support", "support", { x: 1, y: 1 });
+    const ally = {
+      ...createBeginner("ally", "fighter", { x: 1, y: 2 }),
+      health: 2,
+      maxHealth: 3,
+    };
+    const enemy = createEnemy("enemy", { x: 6, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([support, ally, enemy], {
+        map: createSkillMap(),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.support?.skillId).toBe(
+      "first_aid",
+    );
+    expect(nextState.entities.support.position).toEqual(support.position);
+    expect(nextState.entities.enemy).toMatchObject({
+      health: enemy.health,
+    });
+  });
+
+  it("does not use Kick through active resources", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
+    const enemy = createEnemy("enemy", { x: 6, y: 1 });
+    const wood = createResource("wood", { x: 3, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([fighter, enemy, wood], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(fighter.id),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_used" && event.skillId === "kick",
+      ),
+    ).toBe(false);
+    expect(nextState.entities.enemy).toMatchObject({
+      health: enemy.health,
+    });
+  });
+
+  it("moves Fighter Quick Step toward a valid enemy", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 3 });
+    const enemy = createEnemy("enemy", { x: 7, y: 3 });
+    const nextState = updateSkillSystem(
+      createSkillState([fighter, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(fighter.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.fighter.position.x).toBeGreaterThan(
+      fighter.position.x,
+    );
+    expect(nextState.skillCooldownsByCompanionId?.fighter?.skillId).toBe(
+      "quick_step",
+    );
+  });
+
+  it.each<Companion["role"]>(["support", "gatherer", "none"])(
+    "moves %s Quick Step away from an attacking enemy",
+    (role) => {
+      const companion = createBeginner("companion", role, { x: 3, y: 3 });
+      const enemy = {
+        ...createEnemy("enemy", { x: 4, y: 3 }),
+        state: "attack" as const,
+        currentTargetId: companion.id,
+      };
+      const nextState = updateSkillSystem(
+        createSkillState([companion, enemy], {
+          map: createSkillMap(),
+          ...createActiveSelfBuff(companion.id),
+          ...createActiveShield(companion.id),
+        }),
+        1000,
+      );
+
+      expect(nextState.entities.companion.position.x).toBeLessThan(
+        companion.position.x,
+      );
+      expect(nextState.skillCooldownsByCompanionId?.companion?.skillId).toBe(
+        "quick_step",
+      );
+    },
+  );
+
+  it("tries angled Quick Step alternatives when the direct destination is blocked", () => {
+    const support = createBeginner("support", "support", { x: 3, y: 3 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 4, y: 3 }),
+      state: "attack" as const,
+      currentTargetId: support.id,
+    };
+    const nextState = updateSkillSystem(
+      createSkillState([support, enemy], {
+        map: createSkillMap([{ x: 2, y: 3 }]),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.support.position.x).toBeLessThan(
+      support.position.x,
+    );
+    expect(nextState.entities.support.position.y).not.toBe(support.position.y);
+    expect(nextState.skillCooldownsByCompanionId?.support?.skillId).toBe(
+      "quick_step",
+    );
+  });
+
+  it("does not start Quick Step cooldown when all candidate destinations are blocked", () => {
+    const support = createBeginner("support", "support", { x: 3, y: 3 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 9, y: 3 }),
+      state: "attack" as const,
+      currentTargetId: support.id,
+    };
+    const nextState = updateSkillSystem(
+      createSkillState([support, enemy], {
+        map: createSkillMap(
+          [
+            { x: 2, y: 3 },
+            { x: 2, y: 2 },
+            { x: 2, y: 4 },
+            { x: 3, y: 2 },
+            { x: 3, y: 4 },
+          ],
+          12,
+        ),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.support.position).toEqual(support.position);
+    expect(nextState.skillCooldownsByCompanionId?.support).toBeUndefined();
+  });
 });
 
 function createBeginner(
@@ -249,4 +523,43 @@ function createSkillState(
       ...overrides,
     }),
   );
+}
+
+function createSkillMap(walls: Position[] = [], columns = 8): GameMap {
+  return {
+    displayName: "Skill Test Map",
+    debugName: "skill-test-map",
+    columns,
+    rows: 8,
+    walls,
+    teleports: [],
+    healingFountains: [],
+  };
+}
+
+function createActiveSelfBuff(companionId: string): Partial<GameState> {
+  return {
+    skillSelfBuffsByCompanionId: {
+      [companionId]: {
+        companionId,
+        bonusDamage: 1,
+        expiresAt: 5000,
+      },
+    },
+  };
+}
+
+function createActiveShield(companionId: string): Partial<GameState> {
+  return {
+    skillShieldBlocksById: {
+      [`${companionId}-guard_up`]: {
+        id: `${companionId}-guard_up`,
+        ownerId: companionId,
+        position: { x: 0, y: -1 },
+        rotationRadians: 0,
+        expiresAt: 5000,
+        remainingBlocks: 1,
+      },
+    },
+  };
 }

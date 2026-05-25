@@ -6,8 +6,15 @@ import {
   isLivingEnemy,
   isTargetDummyEnemy,
 } from "./entityGuards";
+import {
+  getClearLungePosition,
+  getDirectionAwayFrom,
+  getDirectionToward,
+  getSkillDashPosition,
+} from "./skillMovement";
+import { getCompanionAttackRange } from "./companionCombat";
 import { getGridDistance } from "./positionUtils";
-import { getEntityById, type GameState } from "./state";
+import { getEntityById, getPartyExecutionIntent, type GameState } from "./state";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
 const LOW_HEALTH_BUFFER = 1;
@@ -52,9 +59,7 @@ export function getSkillTarget(
   }
 
   if (skill.effect.type === "quickStep") {
-    return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster)
-      ? caster
-      : undefined;
+    return findQuickStepTarget(state, caster, skill.effect.distance);
   }
 
   if (skill.effect.type === "shieldBlock") {
@@ -67,6 +72,19 @@ export function getSkillTarget(
 
   if (!enemy) {
     return undefined;
+  }
+
+  if (skill.effect.type === "lungeDamage") {
+    return hasLungeDamageContext(state, caster, enemy) &&
+      !isEnemyInNormalAttackRange(caster, enemy) &&
+      getClearLungePosition(
+        state,
+        caster,
+        enemy,
+        skill.effect.lungeDistance,
+      )
+      ? enemy
+      : undefined;
   }
 
   if (skill.effect.type === "mark" && state.skillMarksByEnemyId?.[enemy.id]) {
@@ -152,6 +170,85 @@ function hasValidEnemyContext(state: GameState, caster: Companion): boolean {
   return Boolean(findEnemyTarget(state, caster, DEFAULT_ENEMY_CONTEXT_RANGE));
 }
 
+function hasLungeDamageContext(
+  state: GameState,
+  caster: Companion,
+  enemy: Enemy,
+): boolean {
+  const currentTarget = caster.currentTargetId
+    ? getEntityById(state, caster.currentTargetId)
+    : undefined;
+  const leader = getPartyLeader(state);
+  const leaderTarget = leader ? getLeaderEnemyTarget(state, leader) : undefined;
+  const partyExecutionIntent = getPartyExecutionIntent(state);
+
+  return (
+    currentTarget?.id === enemy.id ||
+    leaderTarget?.id === enemy.id ||
+    partyExecutionIntent?.type === "attack" ||
+    !partyExecutionIntent
+  );
+}
+
+function findQuickStepTarget(
+  state: GameState,
+  caster: Companion,
+  distance: number,
+): Enemy | undefined {
+  if (isFrontlineQuickStepRole(caster)) {
+    const enemy = findEnemyTarget(state, caster, 6);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
+function isFrontlineQuickStepRole(caster: Companion): boolean {
+  return caster.role === "defender" || caster.role === "fighter";
+}
+
+function findQuickStepThreat(
+  state: GameState,
+  caster: Companion,
+): Enemy | undefined {
+  return Object.values(state.entities)
+    .filter(
+      (entity): entity is Enemy =>
+        isLivingEnemy(entity) &&
+        entity.state === "attack" &&
+        Boolean(entity.currentTargetId) &&
+        getGridDistance(entity.position, caster.position) <= PARTY_DANGER_RANGE,
+    )
+    .sort(
+      (a, b) =>
+        (b.currentTargetId === caster.id ? 1 : 0) -
+          (a.currentTargetId === caster.id ? 1 : 0) ||
+        getGridDistance(caster.position, a.position) -
+          getGridDistance(caster.position, b.position),
+    )[0];
+}
+
 function hasResourceContext(state: GameState, caster: Companion): boolean {
   const currentTarget = caster.currentTargetId
     ? getEntityById(state, caster.currentTargetId)
@@ -198,4 +295,14 @@ function isEnemyInRange(
   range: number,
 ): boolean {
   return getGridDistance(caster.position, enemy.position) <= range;
+}
+
+function isEnemyInNormalAttackRange(
+  caster: Companion,
+  enemy: Enemy,
+): boolean {
+  return (
+    getGridDistance(caster.position, enemy.position) <=
+    getCompanionAttackRange(caster)
+  );
 }

@@ -16,8 +16,13 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     displayName: "Kick",
     tags: ["Offensive", "Damage", "Single Target"],
     type: "active",
-    range: 1,
-    effect: { type: "damage", damageType: "physical", powerMultiplier: 1 },
+    range: 5,
+    effect: {
+      type: "lungeDamage",
+      damageType: "physical",
+      powerMultiplier: 1,
+      lungeDistance: 5,
+    },
   },
   guard_up: {
     id: "guard_up",

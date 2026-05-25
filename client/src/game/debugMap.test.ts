@@ -8,6 +8,7 @@ import {
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_TWO_ID,
+  MAP_TWO_ROWS,
   WILDERNESS_MAP_COLUMNS,
   WILDERNESS_MAP_ROWS,
   createDebugMap,
@@ -85,7 +86,7 @@ describe("debug maps", () => {
     });
     expect(createDebugMap(MAP_TWO_ID)).toMatchObject({
       columns: WILDERNESS_MAP_COLUMNS,
-      rows: WILDERNESS_MAP_ROWS,
+      rows: MAP_TWO_ROWS,
     });
     expect(createDebugMap(MAP_THREE_ID)).toMatchObject({
       columns: WILDERNESS_MAP_COLUMNS,
@@ -322,19 +323,20 @@ describe("debug maps", () => {
     const scoutRise = getSubzone(mapTwoSubzones, "south-center");
     const wolfCauseway = getSubzone(mapTwoSubzones, "north-east");
 
-    expect(mapTwoDefinition.rows).toBe(WILDERNESS_MAP_ROWS);
+    expect(mapTwoDefinition.rows).toBe(MAP_TWO_ROWS);
+    expect(MAP_TWO_ROWS).toBe(MAP_ONE_ROWS);
     expect(returnEntry && isInsideSubzone(scoutRise, returnEntry.position)).toBe(true);
     expect(forwardEntry && isInsideSubzone(wolfCauseway, forwardEntry.position)).toBe(true);
     expect(mapTwoSubzones.map((subzone) => subzone.bounds)).toEqual([
-      { x: 1, y: 1, width: 51, height: 28 },
-      { x: 53, y: 1, width: 52, height: 28 },
-      { x: 106, y: 1, width: 53, height: 28 },
+      { x: 1, y: 1, width: 51, height: 55 },
+      { x: 53, y: 1, width: 52, height: 55 },
+      { x: 106, y: 1, width: 53, height: 55 },
     ]);
 
     for (const dividerX of [52, 105]) {
       expect(mapTwo.walls).toContainEqual({ x: dividerX, y: 0 });
-      expect(mapTwo.walls).toContainEqual({ x: dividerX, y: WILDERNESS_MAP_ROWS - 1 });
-      expect(isNavigationCellWalkable(mapTwo, { x: dividerX, y: 15 })).toBe(true);
+      expect(mapTwo.walls).toContainEqual({ x: dividerX, y: MAP_TWO_ROWS - 1 });
+      expect(isNavigationCellWalkable(mapTwo, { x: dividerX, y: 29 })).toBe(true);
     }
 
     const expectedSubzoneEnemyTypes = new Map([

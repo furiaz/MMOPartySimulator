@@ -674,6 +674,12 @@ export type SkillDefinition = {
   effect:
     | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
     | {
+        type: "lungeDamage";
+        damageType: CombatDamageType;
+        powerMultiplier: number;
+        lungeDistance: number;
+      }
+    | {
         type: "sweepingDamage";
         damageType: CombatDamageType;
         mainPowerMultiplier: number;

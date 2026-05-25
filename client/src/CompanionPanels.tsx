@@ -387,6 +387,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
   }
 
+  if (effect.type === "lungeDamage") {
+    return `Lunges ${effect.lungeDistance} spaces and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
+  }
+
   if (effect.type === "sweepingDamage") {
     return `Deals ${Math.round(effect.mainPowerMultiplier * 100)}% ${effect.damageType} damage and ${Math.round(effect.splashPowerMultiplier * 100)}% splash damage.`;
   }
