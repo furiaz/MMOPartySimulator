@@ -25,6 +25,8 @@ export type EnemyCombatStyle = "melee" | "ranged" | "support";
 
 export type EnemyTargetPreference = "closest" | "leader" | "lowestHealth";
 
+export type EnemyVariant = "superior";
+
 export type EnemyArchetypeId =
   | "slime"
   | "bat"
@@ -767,6 +769,7 @@ export type DropVisualEvent = {
   enemyId: string;
   enemyTypeId?: EnemyTypeId;
   enemyArchetypeId?: EnemyArchetypeId;
+  enemyVariant?: EnemyVariant;
   itemId?: ItemId;
   displayName?: string;
   iconRole?: "quest_giver";
@@ -854,6 +857,7 @@ export type DebugTelemetryEventType =
   | "health_regen"
   | "max_health_synced"
   | "entity_died"
+  | "superior_enemy_spawned"
   | "gather_started"
   | "resource_depleted"
   | "class_changed"
@@ -986,6 +990,7 @@ export type DebugTelemetryEntitySnapshot = {
   enemyTypeId?: EnemyTypeId;
   enemyCombatStyle?: EnemyCombatStyle;
   enemyTargetPreference?: EnemyTargetPreference;
+  enemyVariant?: EnemyVariant;
   enemyLevel?: number;
   enemyEffectiveScalingLevel?: number;
   enemyScalingBand?: EnemyScalingBand;
@@ -1039,6 +1044,7 @@ export type DebugTelemetryEvent = {
   enemyTypeId?: EnemyTypeId;
   enemyCombatStyle?: EnemyCombatStyle;
   enemyTargetPreference?: EnemyTargetPreference;
+  enemyVariant?: EnemyVariant;
   enemyLevel?: number;
   enemyEffectiveScalingLevel?: number;
   enemyScalingBand?: EnemyScalingBand;
@@ -1321,6 +1327,7 @@ export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  variant?: EnemyVariant;
   isTargetDummy?: true;
   archetypeId?: EnemyArchetypeId;
   enemyTypeId?: EnemyTypeId;

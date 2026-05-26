@@ -8,6 +8,7 @@ import { updateDropSystem } from "./dropSystem";
 import { createTestGameState } from "./testState";
 import { createDebugMap, MAP_ONE_ID, HUB_MAP_ID } from "./debugMap";
 import { countInventoryItem } from "./inventory";
+import { startDebugTelemetryRecording } from "./debugTelemetry";
 
 describe("enemy respawn system", () => {
   it("records defeat time without respawning immediately", () => {
@@ -181,6 +182,73 @@ describe("enemy respawn system", () => {
     expect(afterRespawn.entities[enemy.id]).toMatchObject({
       state: "idle",
       health: enemy.maxHealth,
+    });
+  });
+
+  it("rerolls Superior status when enemies respawn", () => {
+    const enemy = {
+      ...createEnemy("enemy", { x: 8, y: 7 }, undefined, {
+        enemyTypeId: "slime",
+        subzoneId: "shore-fringe",
+        variant: "superior",
+      }),
+      state: "dead" as const,
+      health: 0,
+      defeatedAtMs: 0,
+    };
+    const state = createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      entities: { [enemy.id]: enemy },
+    });
+
+    const nextState = updateEnemyRespawnSystem(
+      state,
+      ENEMY_RESPAWN_DELAY_MS,
+      () => 0.99,
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      variant: undefined,
+      maxHealth: 8,
+      health: 8,
+    });
+  });
+
+  it("can respawn an eligible enemy as Superior and records telemetry", () => {
+    const enemy = {
+      ...createEnemy("enemy", { x: 8, y: 7 }, undefined, {
+        enemyTypeId: "slime",
+        subzoneId: "shore-fringe",
+      }),
+      state: "dead" as const,
+      health: 0,
+      defeatedAtMs: 0,
+    };
+    const state = startDebugTelemetryRecording(createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      entities: { [enemy.id]: enemy },
+    }));
+
+    const nextState = updateEnemyRespawnSystem(
+      state,
+      ENEMY_RESPAWN_DELAY_MS,
+      () => 0,
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      variant: "superior",
+      maxHealth: 20,
+      health: 20,
+    });
+    expect(nextState.debugTelemetry?.events.at(-1)).toMatchObject({
+      type: "superior_enemy_spawned",
+      entityId: enemy.id,
+      enemyVariant: "superior",
+      reason: "respawn",
     });
   });
 });

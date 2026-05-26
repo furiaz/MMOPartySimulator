@@ -2,6 +2,7 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { updateEntity, type GameState } from "./state";
 import type { Companion, Enemy } from "./types";
 import { applyCompanionLevelUpStatGrowth } from "./stats";
+import { SUPERIOR_ENEMY_XP_MULTIPLIER, isSuperiorEnemy } from "./enemyVariants";
 
 export const MAX_CHARACTER_LEVEL = 200;
 export const BEGINNER_CLASS_UNLOCK_LEVEL = 10;
@@ -115,7 +116,12 @@ export function getSameLevelEnemyXp(level: number): number {
 }
 
 export function getEnemyXpReward(enemy: Enemy): number {
-  return Math.max(0, Math.floor(enemy.xpReward ?? getSameLevelEnemyXp(enemy.level)));
+  const baseXp = enemy.xpReward ?? getSameLevelEnemyXp(enemy.level);
+  const variantMultiplier = isSuperiorEnemy(enemy)
+    ? SUPERIOR_ENEMY_XP_MULTIPLIER
+    : 1;
+
+  return Math.max(0, Math.floor(baseXp * variantMultiplier));
 }
 
 export function getLevelGapXpModifier(

@@ -2,6 +2,7 @@ import type {
   DebugMapId,
   EnemyArchetypeId,
   EnemyTypeId,
+  EnemyVariant,
   EquipmentSlot,
   ItemId,
   Position,
@@ -64,6 +65,7 @@ export type QuestObjectiveDefinition = {
   guideTargetPosition?: Position;
   enemyMapId?: DebugMapId;
   enemyArchetypeId?: EnemyArchetypeId;
+  enemyVariant?: EnemyVariant;
   resourceType?: ResourceType;
   itemId?: ItemId;
   targetSlot?: EquipmentSlot;

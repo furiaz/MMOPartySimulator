@@ -381,6 +381,7 @@ function getEntitySnapshot(
     enemyTypeId: getEnemyTypeId(entity),
     enemyCombatStyle: getEnemyCombatStyleSnapshot(entity),
     enemyTargetPreference: getEnemyTargetPreferenceSnapshot(entity),
+    enemyVariant: getEnemyVariant(entity),
     enemyLevel: getEnemyLevel(entity),
     enemyEffectiveScalingLevel: getEnemyEffectiveScalingLevel(entity),
     enemyScalingBand: getEnemyScalingBand(entity),
@@ -850,6 +851,10 @@ function getEnemyCombatStyleSnapshot(entity: GameEntity) {
 
 function getEnemyTargetPreferenceSnapshot(entity: GameEntity) {
   return entity.kind === "enemy" ? getEnemyTargetPreference(entity) : undefined;
+}
+
+function getEnemyVariant(entity: GameEntity) {
+  return entity.kind === "enemy" ? entity.variant : undefined;
 }
 
 function getEnemyLevel(entity: GameEntity): number | undefined {

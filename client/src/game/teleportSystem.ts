@@ -7,6 +7,7 @@ import {
 } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { addHubDepartureFoodWarningIfNeeded } from "./consumables";
+import { rollEnemyVariantForSpawn, isSuperiorEnemy } from "./enemyVariants";
 import {
   isRouteTeleportUnlockedForQuests,
   recordMapReachedForQuests,
@@ -43,6 +44,7 @@ import type {
   DebugMapId,
   DebugTeleportPoint,
   GameEntity,
+  GameMap,
   Position,
 } from "./types";
 
@@ -307,8 +309,8 @@ function completeTeleport(state: GameState): GameState {
       ? addHubDepartureFoodWarningIfNeeded(state, Date.now()).hubDepartureFoodWarning
       : state.hubDepartureFoodWarning;
   const positionsBeforeTransition = getEntityPositions(state.entities);
-  const entities = getMapEntities(state, teleport.targetMapId);
   const targetMap = createDebugMap(teleport.targetMapId);
+  const entities = getMapEntities(state, targetMap);
   let nextState: GameState = {
     ...state,
     entities,
@@ -380,6 +382,7 @@ function completeTeleport(state: GameState): GameState {
       : {},
   };
   nextState = recordMapReachedForQuests(nextState, teleport.targetMapId);
+  nextState = appendSuperiorEnemySpawnEvents(nextState, "map_spawn");
 
   nextState = appendDebugTelemetryEvent(nextState, {
     type: "teleport_completed",
@@ -414,9 +417,10 @@ function completeTeleport(state: GameState): GameState {
 
 function getMapEntities(
   state: GameState,
-  mapId: DebugMapId,
+  map: GameMap,
 ): Record<string, GameEntity> {
   const entities = getPreservedCompanions(state);
+  const mapId = map.id ?? HUB_MAP_ID;
 
   if (mapId === HUB_MAP_ID) {
     for (const npc of hubNpcStartData) {
@@ -450,10 +454,19 @@ function getMapEntities(
   const resourceStartData = resourceStartDataByMapId[mapId];
 
   for (const enemyStart of enemyStartData) {
+    const variant = rollEnemyVariantForSpawn({
+      currentMapId: mapId,
+      map,
+      position: enemyStart.position,
+      subzoneId: enemyStart.subzoneId,
+      existingEntities: entities,
+    });
+
     entities[enemyStart.id] = createEnemy(enemyStart.id, enemyStart.position, undefined, {
       enemyTypeId: enemyStart.enemyTypeId,
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
+      variant,
     });
   }
 
@@ -470,6 +483,35 @@ function getMapEntities(
   }
 
   return entities;
+}
+
+function appendSuperiorEnemySpawnEvents(
+  state: GameState,
+  source: "map_spawn" | "respawn",
+): GameState {
+  let nextState = state;
+
+  for (const entity of Object.values(nextState.entities)) {
+    if (entity.kind !== "enemy" || !isSuperiorEnemy(entity)) {
+      continue;
+    }
+
+    nextState = appendDebugTelemetryEvent(nextState, {
+      type: "superior_enemy_spawned",
+      entityId: entity.id,
+      currentMapId: nextState.currentMapId,
+      currentMapDisplayName: nextState.map?.displayName,
+      currentMapDebugName: nextState.map?.debugName,
+      enemyTypeId: entity.enemyTypeId,
+      enemyArchetypeId: entity.archetypeId,
+      enemyVariant: entity.variant,
+      enemyPosition: entity.position,
+      enemyLevel: entity.level,
+      reason: source,
+    });
+  }
+
+  return nextState;
 }
 
 function getPreservedCompanions(state: GameState): Record<string, GameEntity> {

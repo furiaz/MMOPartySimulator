@@ -192,6 +192,15 @@ describe("enemy nameplates", () => {
     expect(getEnemyNameplateText(enemy)).toBe("Cave Bat Lv 2");
   });
 
+  it("prefixes Superior enemies", () => {
+    const enemy = createEnemy("slime", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      variant: "superior",
+    });
+
+    expect(getEnemyNameplateText(enemy)).toBe("Superior Slime Lv 1");
+  });
+
   it("uses red text for aggressive enemies", () => {
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
 

@@ -23,6 +23,7 @@ import {
   getQuestItemInventoryEntries,
   isMerchantUnlockedForQuests,
   isRouteTeleportUnlockedForQuests,
+  QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
   recordEquippedItemObjectivesForQuests,
   recordEnemyDefeatedForQuests,
@@ -454,6 +455,45 @@ describe("prototype quest system", () => {
       state.quests.break_lower_shore_blockage.objectiveProgress
         .defeat_lower_shore_spiders.currentCount,
     ).toBe(1);
+  });
+
+  it("can require Superior enemy variants for future quest objectives", () => {
+    const objective = QUEST_DEFINITIONS.clear_the_shore.objectives.find(
+      (currentObjective) => currentObjective.id === "defeat_shore_fringe_slimes",
+    );
+    expect(objective).toBeDefined();
+    objective!.enemyVariant = "superior";
+
+    try {
+      let state = createStateWithParty({
+        currentMapId: MAP_ONE_ID,
+        map: createDebugMap(MAP_ONE_ID),
+        quests: createQuestStates({
+          clear_the_shore: "active",
+        }),
+      });
+
+      state = recordEnemyDefeatedForQuests(
+        state,
+        createDefeatedEnemy("normal-slime", "slime", "shore-fringe"),
+        MAP_ONE_ID,
+      );
+      state = recordEnemyDefeatedForQuests(
+        state,
+        {
+          ...createDefeatedEnemy("superior-slime", "slime", "shore-fringe"),
+          variant: "superior",
+        },
+        MAP_ONE_ID,
+      );
+
+      expect(
+        state.quests.clear_the_shore.objectiveProgress
+          .defeat_shore_fringe_slimes.currentCount,
+      ).toBe(1);
+    } finally {
+      delete objective!.enemyVariant;
+    }
   });
 
   it("uses chance and pity for special enemy quest drops without overflowing", () => {

@@ -1,6 +1,11 @@
 import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
 import { PROTOTYPE_CONSUMABLE_ITEM_IDS } from "./consumables";
+import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { applyEnemyVariantStats, isSuperiorEnemy } from "./enemyVariants";
+import { getPartyLeader } from "./partySystem";
+import { getEuclideanDistance } from "./positionUtils";
 import { syncCompanionDerivedMaxHealth } from "./stats";
+import { getSubzoneAtPosition } from "./subzoneSystem";
 import { addItemToInventoryState } from "./inventory";
 import {
   addCurrencyToWalletState,
@@ -256,6 +261,65 @@ export function debugKillOneCompanion(state: GameState): GameState {
   });
 }
 
+export function debugForceSuperiorEnemyInCurrentSubzone(
+  state: GameState,
+): GameState {
+  if (!state.currentMapId || state.currentMapId === "hub") {
+    return state;
+  }
+
+  const leader = getPartyLeader(state);
+  const subzoneId = getSubzoneAtPosition(state.map, leader?.position)?.id;
+
+  if (!leader || !subzoneId || hasLivingSuperiorInSubzone(state, subzoneId)) {
+    return state;
+  }
+
+  const target = Object.values(state.entities)
+    .filter(
+      (entity): entity is Enemy =>
+        entity.kind === "enemy" &&
+        entity.state !== "dead" &&
+        entity.health > 0 &&
+        entity.subzoneId === subzoneId &&
+        !entity.isTargetDummy &&
+        !entity.questSpawn &&
+        !isSuperiorEnemy(entity),
+    )
+    .sort(
+      (first, second) =>
+        getEuclideanDistance(first.position, leader.position) -
+        getEuclideanDistance(second.position, leader.position),
+    )[0];
+
+  if (!target) {
+    return state;
+  }
+
+  const superiorEnemy = applyEnemyVariantStats({
+    ...target,
+    variant: "superior",
+    scalingOverrides: target.scalingOverrides.includes("superior")
+      ? target.scalingOverrides
+      : [...target.scalingOverrides, "superior"],
+  });
+  const nextState = updateEntity(state, superiorEnemy);
+
+  return appendDebugTelemetryEvent(nextState, {
+    type: "superior_enemy_spawned",
+    entityId: superiorEnemy.id,
+    currentMapId: nextState.currentMapId,
+    currentMapDisplayName: nextState.map?.displayName,
+    currentMapDebugName: nextState.map?.debugName,
+    enemyTypeId: superiorEnemy.enemyTypeId,
+    enemyArchetypeId: superiorEnemy.archetypeId,
+    enemyVariant: superiorEnemy.variant,
+    enemyPosition: superiorEnemy.position,
+    enemyLevel: superiorEnemy.level,
+    reason: "debug_force",
+  });
+}
+
 export function debugAddTestWoodToInventory(state: GameState): GameState {
   return addItemToInventoryState(
     state,
@@ -398,6 +462,20 @@ function ensurePartyLeader(state: GameState): GameState {
     ...state,
     partyLeaderId: getFallbackLeaderId(state.entities),
   };
+}
+
+function hasLivingSuperiorInSubzone(
+  state: GameState,
+  subzoneId: string,
+): boolean {
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.kind === "enemy" &&
+      entity.state !== "dead" &&
+      entity.health > 0 &&
+      entity.subzoneId === subzoneId &&
+      isSuperiorEnemy(entity),
+  );
 }
 
 function getRandomOpenPosition(

@@ -594,7 +594,7 @@ export function recordMerchantLockedForQuest(
 }
 
 export function updateQuestGiverInteraction(state: GameState): GameState {
-  let nextState = appendDebugTelemetryEvent(state, {
+  const nextState = appendDebugTelemetryEvent(state, {
     type: "quest_dialog_opened",
     entityId: QUEST_GIVER_POI_ID,
     currentMapId: state.currentMapId,
@@ -732,7 +732,8 @@ export function recordEnemyDefeatedForQuests(
       objective.type === "defeat_enemy_count" &&
       objective.enemyMapId === mapId &&
       matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) &&
-      matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId),
+      matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId) &&
+      matchesOptionalEnemyVariant(objective, defeatedEnemy),
     1,
   );
 
@@ -1561,6 +1562,13 @@ function matchesOptionalEnemyArchetype(
   return !objective.enemyArchetypeId || objective.enemyArchetypeId === archetypeId;
 }
 
+function matchesOptionalEnemyVariant(
+  objective: QuestObjectiveDefinition,
+  enemy: Enemy,
+): boolean {
+  return !objective.enemyVariant || objective.enemyVariant === enemy.variant;
+}
+
 function isItemEquippedByAnyCompanion(
   state: GameState,
   itemId: ItemId,
@@ -1634,7 +1642,8 @@ function recordEnemyQuestDropObjectives(
         objective.type !== "collect_enemy_quest_drop_count" ||
         objective.enemyMapId !== mapId ||
         !matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) ||
-        !matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId)
+        !matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId) ||
+        !matchesOptionalEnemyVariant(objective, defeatedEnemy)
       ) {
         continue;
       }
@@ -1701,6 +1710,7 @@ function queueQuestDropVisualEvent(
     enemyId: defeatedEnemy.id,
     enemyTypeId: defeatedEnemy.enemyTypeId,
     enemyArchetypeId: defeatedEnemy.archetypeId,
+    enemyVariant: defeatedEnemy.variant,
     displayName,
     iconRole: "quest_giver" as const,
     questId,
@@ -1726,6 +1736,7 @@ function queueQuestDropVisualEvent(
       currentMapDebugName: state.map?.debugName,
       enemyTypeId: defeatedEnemy.enemyTypeId,
       enemyArchetypeId: defeatedEnemy.archetypeId,
+      enemyVariant: defeatedEnemy.variant,
       enemyPosition: defeatedEnemy.position,
       itemDisplayName: displayName,
       itemCategory: "quest",

@@ -39,6 +39,10 @@ import {
   SKILL_DEFINITIONS,
 } from "../game";
 import {
+  SUPERIOR_ENEMY_RENDER_SCALE,
+  isSuperiorEnemy,
+} from "../game/enemyVariants";
+import {
   entityVisualAssets,
   getEntityVisualAsset,
   getSpriteAnimation,
@@ -66,6 +70,7 @@ const entityFeedbackTintDurationMs = 260;
 const enemyNameplateFontSize = 10;
 const aggressiveEnemyNameplateColor = 0xdc2626;
 const passiveEnemyNameplateColor = 0x1f2937;
+const superiorEnemyAuraColor = 0xef4444;
 const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
@@ -1265,8 +1270,9 @@ export function getEnemyNameplateText(
     enemyType?.displayName ??
     archetype?.displayName ??
     (enemy.isTargetDummy ? "Target Dummy" : "Enemy");
+  const variantPrefix = isSuperiorEnemy(enemy) ? "Superior " : "";
 
-  return `${displayName} Lv ${enemy.level}`;
+  return `${variantPrefix}${displayName} Lv ${enemy.level}`;
 }
 
 export function getEnemyNameplateColor(
@@ -1568,12 +1574,15 @@ function getEntitySpriteLayout(
       visualAsset.kind === "image" || visualAsset.kind === "sprite"
         ? visualAsset.naturalSize
         : undefined;
+    const variantScale = isSuperiorEnemy(entity)
+      ? SUPERIOR_ENEMY_RENDER_SCALE
+      : 1;
 
     return {
       anchorX: 0.5,
       anchorY: 0.7,
-      width: naturalSize?.width ?? cellPixelSize * 2.25,
-      height: naturalSize?.height ?? cellPixelSize * 2.25,
+      width: (naturalSize?.width ?? cellPixelSize * 2.25) * variantScale,
+      height: (naturalSize?.height ?? cellPixelSize * 2.25) * variantScale,
     };
   }
 
@@ -3120,6 +3129,11 @@ function drawFullEntities({
       x: entityPosition.x,
       y: entityPosition.y + transform.cellPixelSize / 2,
     };
+
+    if (entity.kind === "enemy" && isSuperiorEnemy(entity)) {
+      drawSuperiorEnemyAura(fallbackGraphics, spritePosition, layout);
+    }
+
     let drawnSpriteSrc: string | null = null;
     let didDraw = spriteSrc
       ? drawManagedImageSprite({
@@ -3218,6 +3232,21 @@ function drawFullEntities({
 
     metrics.drawnEntityCount += 1;
   }
+}
+
+function drawSuperiorEnemyAura(
+  graphics: Graphics,
+  position: Position,
+  layout: EntitySpriteLayout,
+) {
+  const radius = Math.max(layout.width, layout.height) * 0.38;
+
+  graphics
+    .circle(position.x, position.y - layout.height * 0.18, radius)
+    .fill({ color: superiorEnemyAuraColor, alpha: 0.12 });
+  graphics
+    .circle(position.x, position.y - layout.height * 0.18, radius)
+    .stroke({ color: superiorEnemyAuraColor, alpha: 0.92, width: 3 });
 }
 
 function drawQuestGiverMarker(

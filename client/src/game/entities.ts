@@ -7,6 +7,7 @@ import type {
   EnemyAggressionMode,
   EnemyArchetypeId,
   EnemyTypeId,
+  EnemyVariant,
   EntityState,
   GameEntity,
   LootTier,
@@ -25,6 +26,7 @@ import {
 } from "./consumables";
 import { getEnemyArchetype, getEnemyType } from "./enemyArchetypes";
 import { getScaledEnemyStats } from "./enemyScaling";
+import { applyEnemyVariantStats } from "./enemyVariants";
 import {
   createDefaultNaturalCompanionStats,
   createEmptyAllocatedCompanionStats,
@@ -72,6 +74,7 @@ type CreateEnemyOptions = {
   defense?: number;
   magicDefense?: number;
   evasion?: number;
+  variant?: EnemyVariant;
   attackCooldownMs?: number;
   attackRange?: number;
   subzoneId?: string;
@@ -93,7 +96,7 @@ export function createEnemy(
   const maxHealth = options.maxHealth ?? scaledStats.maxHealth;
   const scalingOverrides = getEnemyScalingOverrides(options);
 
-  return {
+  return applyEnemyVariantStats({
     id,
     kind: "enemy",
     position,
@@ -107,6 +110,7 @@ export function createEnemy(
       enemyType?.temperament ??
       archetype?.defaultTemperament ??
       "passive",
+    variant: options.variant,
     isTargetDummy: options.isTargetDummy,
     archetypeId,
     enemyTypeId: options.enemyTypeId,
@@ -129,7 +133,7 @@ export function createEnemy(
       enemyType?.attackRange ??
       archetype?.defaultAttackRange,
     questSpawn: options.questSpawn,
-  };
+  });
 }
 
 export function createTargetDummy(id: string, position: Position): Enemy {
@@ -436,6 +440,10 @@ function getEnemyScalingOverrides(options: CreateEnemyOptions): string[] {
 
   if (options.evasion !== undefined) {
     overrides.push("evasion");
+  }
+
+  if (options.variant === "superior") {
+    overrides.push("superior");
   }
 
   return overrides;

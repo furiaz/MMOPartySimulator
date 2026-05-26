@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ENEMY_DROP_TABLES,
+  SUPERIOR_ENEMY_DROP_TABLES,
   getLootTierForLevel,
   rollEnemyDropTable,
 } from "./dropTables";
@@ -72,8 +73,68 @@ describe("enemy drop tables", () => {
     ]);
     expect(getItemDefinition("holy_lantern").category).toBe("equipment");
   });
+
+  it("uses explicit Superior drop tables for Superior enemies", () => {
+    expect(SUPERIOR_ENEMY_DROP_TABLES.slime?.[1]?.groups.map((group) => ({
+      id: group.id,
+      chance: group.chance,
+      itemId: group.entries[0]?.itemId,
+    }))).toEqual([
+      { id: "slime_superior_common", chance: 1.5, itemId: "slime_gel_t1" },
+      { id: "slime_superior_rare", chance: 0.8, itemId: "slime_core_t1" },
+    ]);
+    expect(SUPERIOR_ENEMY_DROP_TABLES.crawler?.[1]?.groups[1]?.chance).toBe(0.6);
+    expect(SUPERIOR_ENEMY_DROP_TABLES.orc?.[2]?.groups[1]?.chance).toBe(0.55);
+  });
+
+  it("treats drop chances over one hundred percent as guaranteed quantity plus fractional bonus", () => {
+    const guaranteedOnlyRolls = rollEnemyDropTable(
+      "slime",
+      1,
+      createNeverDropRandom(),
+      undefined,
+      "superior",
+    );
+    const bonusRolls = rollEnemyDropTable(
+      "slime",
+      1,
+      createAlwaysDropRandom(),
+      undefined,
+      "superior",
+    );
+
+    expect(guaranteedOnlyRolls[0]?.entry).toMatchObject({
+      itemId: "slime_gel_t1",
+      quantity: 1,
+    });
+    expect(bonusRolls[0]?.entry).toMatchObject({
+      itemId: "slime_gel_t1",
+      quantity: 2,
+    });
+  });
+
+  it("selects Superior type-specific drops for Superior Goblin Shaman", () => {
+    const rolls = rollEnemyDropTable(
+      "goblin",
+      2,
+      createAlwaysDropRandom(),
+      "goblin_shaman",
+      "superior",
+    );
+
+    expect(rolls.map((roll) => roll.entry?.itemId)).toEqual([
+      "goblin_ear_t2",
+      "goblin_tooth_t2",
+      "holy_lantern",
+    ]);
+    expect(rolls[2]?.chance).toBe(0.2);
+  });
 });
 
 function createAlwaysDropRandom() {
   return () => 0;
+}
+
+function createNeverDropRandom() {
+  return () => 0.99;
 }

@@ -51,6 +51,7 @@ import {
   clearDebugTelemetry,
   debugAddCompanionToParty,
   debugAddPrototypeConsumablesToInventory,
+  debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
@@ -2316,6 +2317,10 @@ function App() {
     setGameState(debugKillOneCompanion);
   }
 
+  function forceSuperiorEnemy() {
+    setGameState(debugForceSuperiorEnemyInCurrentSubzone);
+  }
+
   function equipEquipment(
     companionId: string,
     itemId: ItemId,
@@ -3330,6 +3335,9 @@ function App() {
                     Add Prototype Consumables
                   </button>
                   <button onClick={killOneCompanion}>Kill One Companion</button>
+                  <button onClick={forceSuperiorEnemy}>
+                    Force Superior Enemy
+                  </button>
                   <button onClick={refreshGatherPoints}>
                     Refresh Gather Points
                   </button>

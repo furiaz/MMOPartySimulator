@@ -1,3 +1,6 @@
+import { createEnemy } from "./entities";
+import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { isSuperiorEnemy, rollEnemyVariantForSpawn } from "./enemyVariants";
 import { updateEntity, type GameState } from "./state";
 import type { Enemy } from "./types";
 
@@ -6,6 +9,7 @@ export const ENEMY_RESPAWN_DELAY_MS = 10_000;
 export function updateEnemyRespawnSystem(
   state: GameState,
   nowMs = Date.now(),
+  random = Math.random,
 ): GameState {
   if (!state.currentMapId || state.currentMapId === "hub") {
     return state;
@@ -34,31 +38,64 @@ export function updateEnemyRespawnSystem(
       continue;
     }
 
-    nextState = respawnEnemy(nextState, entity);
+    nextState = respawnEnemy(nextState, entity, random);
   }
 
   return nextState;
 }
 
-function respawnEnemy(state: GameState, enemy: Enemy): GameState {
-  let nextState = updateEntity(state, {
-    ...enemy,
+function respawnEnemy(
+  state: GameState,
+  enemy: Enemy,
+  random: () => number,
+): GameState {
+  const variant = rollEnemyVariantForSpawn({
+    currentMapId: state.currentMapId,
+    map: state.map,
     position: enemy.homePosition,
-    state: "idle",
-    health: enemy.maxHealth,
-    currentTargetId: null,
-    attackWindupStartedAt: undefined,
-    attackWindupDurationMs: undefined,
-    attackWindupTargetId: null,
-    defeatedAtMs: undefined,
+    subzoneId: enemy.subzoneId,
+    existingEntities: state.entities,
+    random,
+  });
+  const respawnedEnemy = createEnemy(
+    enemy.id,
+    enemy.homePosition,
+    enemy.aggressionMode,
+    {
+      archetypeId: enemy.archetypeId,
+      enemyTypeId: enemy.enemyTypeId,
+      level: enemy.level,
+      xpReward: enemy.xpReward,
+      attackCooldownMs: enemy.attackCooldownMs,
+      attackRange: enemy.attackRange,
+      subzoneId: enemy.subzoneId,
+      encounterAreaId: enemy.encounterAreaId,
+      variant,
+    },
+  );
+  let nextState = updateEntity(state, {
+    ...respawnedEnemy,
     roamTargetPosition: null,
-    roamMoveUntil: undefined,
-    targetDecisionReason: undefined,
+    nextRoamAt: enemy.nextRoamAt,
   });
 
   nextState = clearEnemyRuntimeState(nextState, enemy.id);
 
-  return nextState;
+  return isSuperiorEnemy(respawnedEnemy)
+    ? appendDebugTelemetryEvent(nextState, {
+        type: "superior_enemy_spawned",
+        entityId: respawnedEnemy.id,
+        currentMapId: nextState.currentMapId,
+        currentMapDisplayName: nextState.map?.displayName,
+        currentMapDebugName: nextState.map?.debugName,
+        enemyTypeId: respawnedEnemy.enemyTypeId,
+        enemyArchetypeId: respawnedEnemy.archetypeId,
+        enemyVariant: respawnedEnemy.variant,
+        enemyPosition: respawnedEnemy.position,
+        enemyLevel: respawnedEnemy.level,
+        reason: "respawn",
+      })
+    : nextState;
 }
 
 function clearEnemyRuntimeState(state: GameState, enemyId: string): GameState {

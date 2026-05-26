@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import {
   getCharacterXpToNextLevel,
+  getEnemyXpReward,
   getSameLevelEnemyXp,
   getLevelGapXpModifier,
   getPartySizeLimit,
@@ -136,5 +137,14 @@ describe("character leveling", () => {
       characterXp: 4,
       lastCharacterXpGained: 10,
     });
+  });
+
+  it("applies the Superior enemy XP multiplier to normal enemy XP", () => {
+    const enemy = createEnemy("slime", { x: 1, y: 0 }, "aggressive", {
+      enemyTypeId: "slime",
+      variant: "superior",
+    });
+
+    expect(getEnemyXpReward(enemy)).toBe(2);
   });
 });
