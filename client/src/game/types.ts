@@ -673,6 +673,7 @@ export type SkillDefinition = {
   tags: SkillTag[];
   type: "active";
   range: number;
+  cooldownMs?: number;
   effect:
     | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
     | {

@@ -512,10 +512,14 @@ function startSkillCooldown(
       [caster.id]: {
         companionId: caster.id,
         skillId: skill.id,
-        expiresAt: now + SKILL_COOLDOWN_MS,
+        expiresAt: now + getSkillCooldownMs(skill),
       },
     },
   };
+}
+
+function getSkillCooldownMs(skill: SkillDefinition): number {
+  return skill.cooldownMs ?? SKILL_COOLDOWN_MS;
 }
 
 function recordSkillApplied(

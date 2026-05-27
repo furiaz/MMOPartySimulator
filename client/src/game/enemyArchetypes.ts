@@ -92,7 +92,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "passive",
     targetPreference: "closest",
     level: 1,
-    attackCooldownMs: 1200,
+    attackCooldownMs: 2400,
     detectionRange: 10,
   },
   cave_bat: {
@@ -102,7 +102,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "closest",
     level: 2,
-    attackCooldownMs: 900,
+    attackCooldownMs: 1800,
     detectionRange: 10,
   },
   forest_spider: {
@@ -112,7 +112,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "closest",
     level: 3,
-    attackCooldownMs: 1200,
+    attackCooldownMs: 2400,
     detectionRange: 8,
   },
   goblin_scout: {
@@ -122,7 +122,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "leader",
     level: 4,
-    attackCooldownMs: 1000,
+    attackCooldownMs: 2000,
     detectionRange: 12,
   },
   goblin_thrower: {
@@ -133,7 +133,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     combatStyle: "ranged",
     targetPreference: "lowestHealth",
     level: 7,
-    attackCooldownMs: 1300,
+    attackCooldownMs: 2600,
     detectionRange: 10,
     attackRange: 4,
   },
@@ -144,7 +144,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "closest",
     level: 5,
-    attackCooldownMs: 1300,
+    attackCooldownMs: 2600,
     detectionRange: 10,
   },
   stone_crawler: {
@@ -154,7 +154,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "leader",
     level: 8,
-    attackCooldownMs: 1500,
+    attackCooldownMs: 3000,
     detectionRange: 8,
   },
   goblin_shaman: {
@@ -165,7 +165,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     combatStyle: "support",
     targetPreference: "lowestHealth",
     level: 10,
-    attackCooldownMs: 1500,
+    attackCooldownMs: 3000,
     detectionRange: 10,
     attackRange: 3,
   },
@@ -176,7 +176,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "leader",
     level: 11,
-    attackCooldownMs: 1200,
+    attackCooldownMs: 2400,
     detectionRange: 12,
   },
   mossling: {
@@ -186,7 +186,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "closest",
     level: 9,
-    attackCooldownMs: 1400,
+    attackCooldownMs: 2800,
     detectionRange: 8,
   },
   wolf: {
@@ -196,7 +196,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "lowestHealth",
     level: 6,
-    attackCooldownMs: 1000,
+    attackCooldownMs: 2000,
     detectionRange: 10,
   },
   orc: {
@@ -206,7 +206,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     temperament: "aggressive",
     targetPreference: "leader",
     level: 12,
-    attackCooldownMs: 1330,
+    attackCooldownMs: 2660,
     detectionRange: 10,
   },
 };

@@ -1,5 +1,8 @@
 import type { ClassId, SkillDefinition } from "./types";
 
+const BEGINNER_SKILL_COOLDOWN_MS = 10000;
+const BEGINNER_BUFF_DURATION_MS = 9000;
+
 export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> = {
   throw_rock: {
     id: "throw_rock",
@@ -8,6 +11,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Single Target", "Taunt"],
     type: "active",
     range: 4,
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: { type: "taunt" },
   },
   kick: {
@@ -17,6 +21,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Damage", "Single Target"],
     type: "active",
     range: 5,
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: {
       type: "lungeDamage",
       damageType: "physical",
@@ -31,6 +36,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Defensive", "Shield", "Safety"],
     type: "active",
     range: 0,
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: {
       type: "shieldBlock",
       durationMs: 3000,
@@ -45,6 +51,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Heal", "Safety"],
     type: "active",
     range: 3,
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: { type: "heal", powerMultiplier: 1 },
   },
   deep_breath: {
@@ -54,7 +61,13 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Buff", "Self Buff", "Safety"],
     type: "active",
     range: 0,
-    effect: { type: "selfBuff", bonusDamage: 1, durationMs: 3000, hpCost: 0 },
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
+    effect: {
+      type: "selfBuff",
+      bonusDamage: 1,
+      durationMs: BEGINNER_BUFF_DURATION_MS,
+      hpCost: 0,
+    },
   },
   rally_call: {
     id: "rally_call",
@@ -63,7 +76,12 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Buff", "Safety"],
     type: "active",
     range: 4,
-    effect: { type: "allyBuff", bonusDamage: 1, durationMs: 3000 },
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
+    effect: {
+      type: "allyBuff",
+      bonusDamage: 1,
+      durationMs: BEGINNER_BUFF_DURATION_MS,
+    },
   },
   field_hands: {
     id: "field_hands",
@@ -72,7 +90,12 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Gathering", "Resource Buff", "Tool Buff"],
     type: "active",
     range: 0,
-    effect: { type: "gatherBuff", bonusGatherSpeed: 1, durationMs: 3000 },
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
+    effect: {
+      type: "gatherBuff",
+      bonusGatherSpeed: 1,
+      durationMs: BEGINNER_BUFF_DURATION_MS,
+    },
   },
   quick_step: {
     id: "quick_step",
@@ -81,6 +104,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Mobility", "Dash", "Escape"],
     type: "active",
     range: 0,
+    cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: { type: "quickStep", distance: 1 },
   },
   sweeping_strike: {

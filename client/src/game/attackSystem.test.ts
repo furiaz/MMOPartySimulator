@@ -95,7 +95,7 @@ describe("enemy attack leash movement", () => {
       }),
       state: "attack" as const,
       currentTargetId: companion.id,
-      lastAttackAt: -1000,
+      lastAttackAt: -2000,
     };
 
     const windupState = updateAttackSystem(
@@ -168,7 +168,7 @@ describe("enemy attack leash movement", () => {
     });
     const state = createState([attacker, blocker, enemy]);
 
-    const nextState = updateAttackSystem(state, new Set(), 1000);
+    const nextState = updateAttackSystem(state, new Set(), 2000);
     const movedAttacker = nextState.entities[attacker.id];
     const nextEnemy = nextState.entities[enemy.id] as Enemy;
 
@@ -187,7 +187,7 @@ describe("enemy attack leash movement", () => {
       ...createSpacingBlockers(enemy.position),
     ]);
 
-    const nextState = updateAttackSystem(state, new Set(), 1000);
+    const nextState = updateAttackSystem(state, new Set(), 2000);
     const nextEnemy = nextState.entities[enemy.id] as Enemy;
 
     expect(nextEnemy.health).toBeLessThan(enemy.health);

@@ -54,7 +54,7 @@ import type {
   Position,
 } from "./types";
 
-export const ATTACK_COOLDOWN_MS = 1000;
+export const ATTACK_COOLDOWN_MS = 2000;
 export const ENEMY_ATTACK_WINDUP_MS = 500;
 const TARGET_SWITCH_DISTANCE = 6;
 const MAX_ATTACK_SLOT_PATH_DISTANCE = 6;

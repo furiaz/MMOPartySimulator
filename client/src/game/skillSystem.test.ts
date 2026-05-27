@@ -39,6 +39,11 @@ describe("beginner skill system", () => {
     const gatheredState = updateGatherSystem(buffedState, new Set(), 2000);
 
     expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.bonusGatherSpeed).toBe(1);
+    expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.expiresAt).toBe(10000);
+    expect(buffedState.skillCooldownsByCompanionId?.[gatherer.id]).toMatchObject({
+      skillId: "field_hands",
+      expiresAt: 11000,
+    });
     expect(buffedState.skillVisualEvents?.at(-1)).toMatchObject({
       skillId: "field_hands",
     });
@@ -296,6 +301,9 @@ describe("beginner skill system", () => {
     expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
       "throw_rock",
     );
+    expect(nextState.skillCooldownsByCompanionId?.defender?.expiresAt).toBe(
+      11000,
+    );
     expect(nextState.entities.defender.position).toEqual(defender.position);
     expect(
       nextState.debugTelemetry?.events.some(
@@ -317,6 +325,9 @@ describe("beginner skill system", () => {
 
     expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
       "kick",
+    );
+    expect(nextState.skillCooldownsByCompanionId?.defender?.expiresAt).toBe(
+      11000,
     );
     expect(
       nextState.debugTelemetry?.events.some(
@@ -343,6 +354,12 @@ describe("beginner skill system", () => {
     expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
       "guard_up",
     );
+    expect(nextState.skillCooldownsByCompanionId?.defender?.expiresAt).toBe(
+      11000,
+    );
+    expect(
+      nextState.skillShieldBlocksById?.["defender-guard_up"]?.expiresAt,
+    ).toBe(4000);
     expect(nextState.entities.defender.position).toEqual(defender.position);
     expect(
       nextState.debugTelemetry?.events.some(
@@ -369,6 +386,9 @@ describe("beginner skill system", () => {
 
     expect(nextState.skillCooldownsByCompanionId?.support?.skillId).toBe(
       "first_aid",
+    );
+    expect(nextState.skillCooldownsByCompanionId?.support?.expiresAt).toBe(
+      11000,
     );
     expect(nextState.entities.support.position).toEqual(support.position);
     expect(nextState.entities.enemy).toMatchObject({
@@ -416,6 +436,65 @@ describe("beginner skill system", () => {
     expect(nextState.skillCooldownsByCompanionId?.fighter?.skillId).toBe(
       "quick_step",
     );
+    expect(nextState.skillCooldownsByCompanionId?.fighter?.expiresAt).toBe(
+      11000,
+    );
+  });
+
+  it("keeps non-Beginner skills on the shared prototype cooldown fallback", () => {
+    const blade = {
+      ...createCompanion("blade", { x: 0, y: 0 }, "leader", "fighter", 1, "blade"),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const enemy = createEnemy("enemy", { x: 1, y: 0 });
+
+    const nextState = updateSkillSystem(createSkillState([blade, enemy]), 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.blade).toMatchObject({
+      skillId: "sweeping_strike",
+      expiresAt: 6000,
+    });
+  });
+
+  it("sets Beginner non-block buff durations to 9 seconds", () => {
+    const deepBreathCaster = createBeginner("fighter", "fighter", { x: 1, y: 1 });
+    const deepBreathEnemy = createEnemy("deep-breath-enemy", { x: 6, y: 1 });
+    const deepBreathState = updateSkillSystem(
+      createSkillState([deepBreathCaster, deepBreathEnemy], {
+        map: createSkillMap([{ x: 3, y: 1 }]),
+      }),
+      1000,
+    );
+
+    const rallyCaster = createBeginner("support", "support", { x: 0, y: 0 });
+    const rallyAlly = createBeginner("ally", "fighter", { x: 1, y: 0 });
+    const rallyEnemy = createEnemy("rally-enemy", { x: 3, y: 0 });
+    const rallyState = updateSkillSystem(
+      createSkillState([rallyCaster, rallyAlly, rallyEnemy], {
+        skillSelfBuffsByCompanionId: {
+          support: {
+            companionId: "support",
+            bonusDamage: 1,
+            expiresAt: 5000,
+          },
+        },
+      }),
+      1000,
+    );
+
+    expect(deepBreathState.skillCooldownsByCompanionId?.fighter).toMatchObject({
+      skillId: "deep_breath",
+      expiresAt: 11000,
+    });
+    expect(deepBreathState.skillSelfBuffsByCompanionId?.fighter?.expiresAt).toBe(
+      10000,
+    );
+    expect(rallyState.skillCooldownsByCompanionId?.support).toMatchObject({
+      skillId: "rally_call",
+      expiresAt: 11000,
+    });
+    expect(rallyState.skillSelfBuffsByCompanionId?.ally?.expiresAt).toBe(10000);
   });
 
   it.each<Companion["role"]>(["support", "gatherer", "none"])(

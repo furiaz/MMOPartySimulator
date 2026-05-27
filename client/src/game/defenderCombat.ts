@@ -1,10 +1,9 @@
 import { setLastAttackAt } from "./entities";
+import { ATTACK_COOLDOWN_MS } from "./attackSystem";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { grantCharacterXpToParty } from "./leveling";
 import { updateEntity, type GameState } from "./state";
 import type { Companion, Enemy } from "./types";
-
-const DEFENDER_ATTACK_COOLDOWN_MS = 1000;
 
 export function attackDefenderTarget(
   state: GameState,
@@ -12,7 +11,7 @@ export function attackDefenderTarget(
   target: Enemy,
   now: number,
 ): GameState {
-  if (now - defender.lastAttackAt < DEFENDER_ATTACK_COOLDOWN_MS) {
+  if (now - defender.lastAttackAt < ATTACK_COOLDOWN_MS) {
     return updateEntity(state, {
       ...defender,
       currentTargetId: target.id,

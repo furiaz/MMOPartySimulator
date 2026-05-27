@@ -61,7 +61,7 @@ describe("prototype enemy identity definitions", () => {
     expect(enemy.magicDefense).toBe(4);
     expect(enemy.evasion).toBe(2);
     expect(enemy.scalingBand).toBe("starter");
-    expect(enemy.attackCooldownMs).toBe(1300);
+    expect(enemy.attackCooldownMs).toBe(2600);
     expect(enemy.attackRange).toBe(4);
   });
 
