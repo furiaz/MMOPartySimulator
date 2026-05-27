@@ -9,8 +9,13 @@ import {
   getNearestHoverEntity,
   getNearestInteractableEntity,
   getPreviewMapPosition,
+  getTeleportIconSrc,
   isPositionInTileBounds,
+  TELEPORT_OBJECT_SPRITE_ANCHOR_X,
+  TELEPORT_OBJECT_SPRITE_ANCHOR_Y,
+  TELEPORT_OBJECT_SPRITE_SIZE_PX,
 } from "./PixiWorldRenderer";
+import { MAP_OBJECT_ICON_SRC } from "../assetIcons";
 
 const previewCanvasBounds = {
   left: 100,
@@ -77,6 +82,25 @@ describe("getPreviewMapPosition", () => {
         map,
       ),
     ).toEqual({ x: 12, y: 4 });
+  });
+});
+
+describe("teleport object art", () => {
+  it("uses the good teleport asset for working teleports", () => {
+    expect(getTeleportIconSrc(true)).toBe(MAP_OBJECT_ICON_SRC.teleportGood);
+  });
+
+  it("uses the broken teleport asset for non-working teleports", () => {
+    expect(getTeleportIconSrc(false)).toBe(MAP_OBJECT_ICON_SRC.teleportBroken);
+  });
+
+  it("renders the generated teleporter art at its authored size", () => {
+    expect(TELEPORT_OBJECT_SPRITE_SIZE_PX).toBe(250);
+  });
+
+  it("anchors the generated teleporter art from its center", () => {
+    expect(TELEPORT_OBJECT_SPRITE_ANCHOR_X).toBe(0.5);
+    expect(TELEPORT_OBJECT_SPRITE_ANCHOR_Y).toBe(0.5);
   });
 });
 

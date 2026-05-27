@@ -8,6 +8,7 @@ import {
   getPartyExecutionIntent,
   setPartyIntent,
 } from "./state";
+import { isTeleportWorking } from "./teleportState";
 import type {
   CommandPriority,
   Enemy,
@@ -174,7 +175,11 @@ function isLocalPoiTargetValid(
 
   if (localPoiTarget.category === "teleport") {
     return Boolean(
-      state.map?.teleports.some((teleport) => teleport.id === localPoiTarget.targetEntityId),
+      state.map?.teleports.some(
+        (teleport) =>
+          teleport.id === localPoiTarget.targetEntityId &&
+          isTeleportWorking(state, teleport.id),
+      ),
     );
   }
 

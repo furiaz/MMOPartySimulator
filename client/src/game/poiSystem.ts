@@ -45,12 +45,12 @@ import {
   getQuestTargetMapId,
   hasQuestGiverWork,
   isMerchantUnlockedForQuests,
-  isRouteTeleportUnlockedForQuests,
   matchesObjectiveSubzoneAtPosition,
   recordMerchantLockedForQuest,
   recordQuestPoiReachedForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
+import { isTeleportWorking } from "./teleportState";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
 import {
   createGathererResourceReservations,
@@ -1584,9 +1584,9 @@ function getTeleportPois(state: GameState): PointOfInterest[] {
     id: teleport.id,
     category: "teleport",
     mapId: teleport.sourceMapId,
-    displayName: isRouteTeleportUnlockedForQuests(state, teleport.id)
+    displayName: isTeleportWorking(state, teleport.id)
       ? teleport.id
-      : `${teleport.id} (Blocked)`,
+      : `${teleport.id} (Broken)`,
     position: teleport.position,
     interactionRange: teleport.range,
     targetEntityId: teleport.id,
@@ -1687,7 +1687,7 @@ function getNextTeleportTowardMap(
     teleports.find(
       (teleport) =>
         teleport.targetMapId === nextMapId &&
-        isRouteTeleportUnlockedForQuests(state, teleport.id),
+        isTeleportWorking(state, teleport.id),
     ) ??
     null
   );
@@ -1717,7 +1717,7 @@ function getNextMapRouteStep(
     }
 
     for (const teleport of debugMapDefinitions[current.mapId].teleports) {
-      if (!isRouteTeleportUnlockedForQuests(state, teleport.id)) {
+      if (!isTeleportWorking(state, teleport.id)) {
         continue;
       }
 

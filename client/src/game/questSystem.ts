@@ -18,6 +18,7 @@ import {
 import { getPartyMembers } from "./partySystem";
 import { updateEntity, type GameState } from "./state";
 import { getSubzoneAtPosition } from "./subzoneSystem";
+import { setTeleportWorking } from "./teleportState";
 import { addCurrencyToWalletState } from "./wallet";
 import type {
   DebugMapId,
@@ -204,6 +205,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         targetPoiId: "lower-shore-route-blockage",
         targetPosition: { x: 153, y: 29 },
         repairDurationMs: 8000,
+        routeTeleportId: TELEPORTER_ID,
         requiredCount: 1,
       },
       {
@@ -876,21 +878,6 @@ export function completeQuestObjective(
   );
 
   return objective ? updateObjectiveProgress(state, questId, objective, 1) : state;
-}
-
-export function isRouteTeleportUnlockedForQuests(
-  state: GameState,
-  teleportId: string,
-): boolean {
-  if (teleportId === TELEPORTER_ID) {
-    return isObjectiveCompleted(state, "break_lower_shore_blockage", "unlock_map_two_route");
-  }
-
-  if (teleportId === MAP_TWO_TO_MAP_THREE_TELEPORTER_ID) {
-    return isObjectiveCompleted(state, "open_wolf_causeway", "unlock_map_three_route");
-  }
-
-  return true;
 }
 
 export function isObjectiveCompleted(
@@ -1807,6 +1794,10 @@ function updateObjectiveProgress(
       currentMapDisplayName: nextState.map?.displayName,
       currentMapDebugName: nextState.map?.debugName,
     });
+
+    if (objective.routeTeleportId) {
+      nextState = setTeleportWorking(nextState, objective.routeTeleportId, true);
+    }
   }
 
   return maybeMarkQuestReadyToTurnIn(nextState, questId);

@@ -11,6 +11,7 @@ import {
   type PartyMember,
 } from "./partySystem";
 import { isPartyMemberRespondingToActiveThreat } from "./partyThreatSystem";
+import { isTeleportWorking } from "./teleportState";
 import {
   QUEST_GUIDE_OBJECTIVE_ID,
   isQuestGuideObjectiveRelevant,
@@ -749,7 +750,9 @@ function getDistance(from: Position, to: Position): number {
 function isTeleportPoi(state: GameState, position: Position): boolean {
   return Boolean(
     state.map?.teleports.some(
-      (teleport) => getDistance(position, teleport.position) <= 0,
+      (teleport) =>
+        isTeleportWorking(state, teleport.id) &&
+        getDistance(position, teleport.position) <= 0,
     ),
   );
 }

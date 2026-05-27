@@ -13,6 +13,8 @@ import {
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_TWO_ID,
+  MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
+  TELEPORTER_ID,
   hubTeleporterPosition,
   npcIds,
 } from "./debugMap";
@@ -32,6 +34,7 @@ import {
   getPartyExecutionIntent,
   getPoiSearchScope,
   setPoiSearchScope,
+  setPartyExecutionIntent,
   setStayInMapEnabled,
   setWorldTravelTargetMapId,
   type GameState,
@@ -2471,6 +2474,9 @@ describe("game update intent priority", () => {
       createMapOneState([leader, attacker], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_TWO_ID,
+        teleportStatesById: {
+          [TELEPORTER_ID]: { isWorking: true },
+        },
         leaderIntent: {
           type: "attack",
           targetId: attacker.id,
@@ -4197,6 +4203,7 @@ describe("game update intent priority", () => {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_FOUR_ID,
         quests: createUnlockedRouteQuestStates(),
+        teleportStatesById: createUnlockedRouteTeleportStates(),
       }),
     );
 
@@ -4262,11 +4269,49 @@ describe("game update intent priority", () => {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_TWO_ID,
         quests: createUnlockedRouteQuestStates(),
+        teleportStatesById: createUnlockedRouteTeleportStates(),
       }),
     );
 
     expect(nextState.localPoiTarget?.poiId).toBe("map-1-to-map-2");
     expect(nextState.leaderIntent?.type).toBe("move");
+  });
+
+  it("does not route world travel through a non-working forward teleport", () => {
+    const leader = createLeader({ x: 70, y: 12 });
+
+    const nextState = updateGame(
+      createMapOneState([leader], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_TWO_ID,
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).not.toBe("map-1-to-map-2");
+    expect(nextState.leaderIntent?.type).not.toBe("move");
+  });
+
+  it("finishes a player move POI when the clicked teleporter is not working", () => {
+    const teleport = getForwardMapOneTeleport();
+    const leader = createLeader(teleport.position);
+    const pendingState = setPartyExecutionIntent(
+      createMapOneState([leader], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+      }),
+      {
+        type: "move",
+        targetId: null,
+        targetPosition: teleport.position,
+        source: "player",
+      },
+    );
+
+    const nextState = updateGame(pendingState);
+
+    expect(nextState.activeTeleport).toBeNull();
+    expect(getPartyExecutionIntent(nextState)).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
   });
 
   it("routes world travel from map 1 toward map 4 through map 2", () => {
@@ -4277,6 +4322,7 @@ describe("game update intent priority", () => {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_FOUR_ID,
         quests: createUnlockedRouteQuestStates(),
+        teleportStatesById: createUnlockedRouteTeleportStates(),
       }),
     );
 
@@ -4292,6 +4338,7 @@ describe("game update intent priority", () => {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_FOUR_ID,
         quests: createUnlockedRouteQuestStates(),
+        teleportStatesById: createUnlockedRouteTeleportStates(),
       }),
     );
 
@@ -4420,6 +4467,7 @@ describe("game update intent priority", () => {
         },
         worldTravelTargetMapId: MAP_FOUR_ID,
         quests: createUnlockedRouteQuestStates(),
+        teleportStatesById: createUnlockedRouteTeleportStates(),
       }),
     );
 
@@ -4559,6 +4607,7 @@ describe("game update intent priority", () => {
       partyLeaderId: leader.id,
       worldTravelTargetMapId: MAP_TWO_ID,
       quests: createUnlockedRouteQuestStates(),
+      teleportStatesById: createUnlockedRouteTeleportStates(),
     });
     const revivedState = advanceGameTicks(
       pendingState,
@@ -4974,6 +5023,13 @@ function createUnlockedRouteQuestStates() {
   );
 
   return quests;
+}
+
+function createUnlockedRouteTeleportStates() {
+  return {
+    [TELEPORTER_ID]: { isWorking: true },
+    [MAP_TWO_TO_MAP_THREE_TELEPORTER_ID]: { isWorking: true },
+  };
 }
 
 function markObjectiveCompleted(

@@ -22,7 +22,6 @@ import {
   getQuestGiverReadyQuests,
   getQuestItemInventoryEntries,
   isMerchantUnlockedForQuests,
-  isRouteTeleportUnlockedForQuests,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
   recordEquippedItemObjectivesForQuests,
@@ -32,6 +31,7 @@ import {
   recordResourceGatheredForQuests,
   updateQuestGiverInteraction,
 } from "./questSystem";
+import { isTeleportWorking } from "./teleportState";
 import { equipItemToCompanion } from "./equipmentSystem";
 import { createTestGameState } from "./testState";
 import type { EnemyArchetypeId } from "./types";
@@ -629,16 +629,42 @@ describe("prototype quest system", () => {
     });
     expect(state.quests.rescue_the_grove_runner.status).toBe("ready_to_turn_in");
 
-    expect(isRouteTeleportUnlockedForQuests(state, TELEPORTER_ID)).toBe(false);
+    expect(isTeleportWorking(state, TELEPORTER_ID)).toBe(false);
     state = completeQuestObjective(
       state,
       "break_lower_shore_blockage",
       "unlock_map_two_route",
     );
-    expect(isRouteTeleportUnlockedForQuests(state, TELEPORTER_ID)).toBe(true);
+    expect(isTeleportWorking(state, TELEPORTER_ID)).toBe(true);
+    expect(isTeleportWorking(state, MAP_TWO_TO_MAP_THREE_TELEPORTER_ID)).toBe(
+      false,
+    );
+  });
+
+  it("turns the Lower Shore route teleport working when repair completes", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        break_lower_shore_blockage: "active",
+      }),
+    });
+
+    expect(isTeleportWorking(state, TELEPORTER_ID)).toBe(false);
+
+    state = recordQuestRepairProgress(
+      state,
+      "break_lower_shore_blockage",
+      "repair_lower_shore_blockage",
+      8000,
+    );
+
     expect(
-      isRouteTeleportUnlockedForQuests(state, MAP_TWO_TO_MAP_THREE_TELEPORTER_ID),
-    ).toBe(false);
+      state.quests.break_lower_shore_blockage.objectiveProgress
+        .repair_lower_shore_blockage,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(isTeleportWorking(state, TELEPORTER_ID)).toBe(true);
   });
 
   it("filters Map 1 gathering quest progress by resource type and subzone", () => {

@@ -8,11 +8,9 @@ import {
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { addHubDepartureFoodWarningIfNeeded } from "./consumables";
 import { rollEnemyVariantForSpawn, isSuperiorEnemy } from "./enemyVariants";
-import {
-  isRouteTeleportUnlockedForQuests,
-  recordMapReachedForQuests,
-} from "./questSystem";
+import { recordMapReachedForQuests } from "./questSystem";
 import { createActiveQuestGuideNpc } from "./questGuideSystem";
+import { isTeleportWorking } from "./teleportState";
 import {
   companionIds,
   createDebugMap,
@@ -63,8 +61,8 @@ export function triggerMapTeleport(
     return appendTeleportSkippedEvent(state, "teleport_not_found", teleportId);
   }
 
-  if (!isRouteTeleportUnlockedForQuests(state, teleport.id)) {
-    return appendTeleportSkippedEvent(state, "teleport_route_locked", teleport.id);
+  if (!isTeleportWorking(state, teleport.id)) {
+    return appendTeleportSkippedEvent(state, "teleport_not_working", teleport.id);
   }
 
   const nextState = setTeleportMoveIntent(state, teleport, triggeredBy);
@@ -106,7 +104,7 @@ export function setMapTeleportPoi(
 
   const teleport = getTeleportForCurrentMap(state, teleportId);
 
-  return teleport && isRouteTeleportUnlockedForQuests(state, teleport.id)
+  return teleport && isTeleportWorking(state, teleport.id)
     ? setTeleportMoveIntent(state, teleport, triggeredBy)
     : state;
 }
@@ -163,7 +161,7 @@ function getAutoTeleport(state: GameState): DebugTeleportPoint | null {
   return getCurrentTeleports(state).find(
     (teleport) =>
       teleport.autoSelectAfterEnemiesCleared &&
-      isRouteTeleportUnlockedForQuests(state, teleport.id),
+      isTeleportWorking(state, teleport.id),
   ) ?? null;
 }
 
@@ -226,6 +224,7 @@ function getTeleportPoi(state: GameState): DebugTeleportPoint | null {
 
   return getCurrentTeleports(state).find(
     (teleport) =>
+      isTeleportWorking(state, teleport.id) &&
       getDistance(executionIntent.targetPosition ?? teleport.position, teleport.position) <=
       0.001,
   ) ?? null;

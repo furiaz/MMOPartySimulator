@@ -85,7 +85,9 @@ const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png`;
 const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
 const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
 const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
-const prototypeTeleporterSpriteYOffsetPx = 30;
+export const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
+export const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
+export const TELEPORT_OBJECT_SPRITE_ANCHOR_Y = 0.5;
 const skillFeedbackDisplayNames = new Set(
   Object.values(SKILL_DEFINITIONS).map((skill) => skill.displayName),
 );
@@ -124,6 +126,7 @@ type PixiWorldRendererProps = {
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillVisualEvents?: SkillVisualEvent[];
+  teleportWorkingById?: Record<string, boolean>;
   viewportSize?: ViewportSize;
   visualMovementByEntityId?: Record<string, EntityVisualMovement>;
 };
@@ -232,6 +235,12 @@ type EntityTint = {
   color: number;
 };
 
+export function getTeleportIconSrc(isWorking = true): string {
+  return isWorking
+    ? MAP_OBJECT_ICON_SRC.teleportGood
+    : MAP_OBJECT_ICON_SRC.teleportBroken;
+}
+
 type DrawWorldOptions = {
   activeTeleport: ActiveTeleport | null;
   cameraOffset: Position;
@@ -255,6 +264,7 @@ type DrawWorldOptions = {
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
   viewportSize?: ViewportSize;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
@@ -2923,6 +2933,7 @@ function drawFullMapObjects({
   managedState,
   metrics,
   requestRedraw,
+  teleportWorkingById,
   transform,
   visibleTileBounds,
 }: {
@@ -2933,6 +2944,7 @@ function drawFullMapObjects({
   managedState: ManagedRendererState;
   metrics: PixiDrawMetrics;
   requestRedraw?: () => void;
+  teleportWorkingById: Record<string, boolean>;
   transform: FullTransform;
   visibleTileBounds: TileBounds;
 }) {
@@ -2946,19 +2958,21 @@ function drawFullMapObjects({
     const teleportPosition = toFullPosition(teleport.position, transform);
     const teleporterSpritePosition = {
       x: teleportPosition.x,
-      y: teleportPosition.y + prototypeTeleporterSpriteYOffsetPx,
+      y: teleportPosition.y,
     };
     const didDraw = drawManagedImageSprite({
+      anchorX: TELEPORT_OBJECT_SPRITE_ANCHOR_X,
+      anchorY: TELEPORT_OBJECT_SPRITE_ANCHOR_Y,
       cache,
-      height: objectSize,
+      height: TELEPORT_OBJECT_SPRITE_SIZE_PX,
       key: `object:${map.id}:teleport:${teleport.targetMapId}:${teleport.position.x}:${teleport.position.y}`,
       layer,
       managedState,
       metrics,
       position: teleporterSpritePosition,
       requestRedraw,
-      src: MAP_OBJECT_ICON_SRC.teleportPoint,
-      width: objectSize,
+      src: getTeleportIconSrc(teleportWorkingById[teleport.id] ?? true),
+      width: TELEPORT_OBJECT_SPRITE_SIZE_PX,
     });
 
     if (!didDraw) {
@@ -3422,6 +3436,7 @@ function drawFullMap({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  teleportWorkingById,
   textureCache,
   visualMovementByEntityId,
 }: {
@@ -3446,6 +3461,7 @@ function drawFullMap({
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }) {
@@ -3512,6 +3528,7 @@ function drawFullMap({
     managedState,
     metrics,
     requestRedraw,
+    teleportWorkingById,
     transform,
     visibleTileBounds,
   });
@@ -3678,6 +3695,7 @@ function drawWorld({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  teleportWorkingById,
   textureCache,
   viewportSize,
   visualMovementByEntityId,
@@ -3705,6 +3723,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      teleportWorkingById,
       textureCache,
       visualMovementByEntityId,
     });
@@ -3744,6 +3763,7 @@ export function PixiWorldRenderer({
   skillMarksByEnemyId = {},
   skillShieldBlocksById = {},
   skillVisualEvents = [],
+  teleportWorkingById = {},
   viewportSize,
   visualMovementByEntityId = {},
 }: PixiWorldRendererProps) {
@@ -3777,6 +3797,7 @@ export function PixiWorldRenderer({
   const latestSkillMarksByEnemyIdRef = useRef(skillMarksByEnemyId);
   const latestSkillShieldBlocksByIdRef = useRef(skillShieldBlocksById);
   const latestSkillVisualEventsRef = useRef(skillVisualEvents);
+  const latestTeleportWorkingByIdRef = useRef(teleportWorkingById);
   const latestVisualMovementByEntityIdRef = useRef(visualMovementByEntityId);
   const renderSize = useMemo(
     () => getRenderSize(mode, viewportSize),
@@ -3809,6 +3830,7 @@ export function PixiWorldRenderer({
     latestSkillMarksByEnemyIdRef.current = skillMarksByEnemyId;
     latestSkillShieldBlocksByIdRef.current = skillShieldBlocksById;
     latestSkillVisualEventsRef.current = skillVisualEvents;
+    latestTeleportWorkingByIdRef.current = teleportWorkingById;
     latestVisualMovementByEntityIdRef.current = visualMovementByEntityId;
   }, [
     activeTeleport,
@@ -3829,6 +3851,7 @@ export function PixiWorldRenderer({
     skillMarksByEnemyId,
     skillShieldBlocksById,
     skillVisualEvents,
+    teleportWorkingById,
     sortedEntities,
     viewportSize,
     visualMovementByEntityId,
@@ -3909,6 +3932,7 @@ export function PixiWorldRenderer({
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
         skillVisualEvents: latestSkillVisualEventsRef.current,
+        teleportWorkingById: latestTeleportWorkingByIdRef.current,
         textureCache: textureCacheRef.current,
         viewportSize: latestViewportSizeRef.current,
         visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
@@ -4027,6 +4051,7 @@ export function PixiWorldRenderer({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      teleportWorkingById,
       textureCache: textureCacheRef.current,
       viewportSize,
       visualMovementByEntityId,
@@ -4050,6 +4075,7 @@ export function PixiWorldRenderer({
     skillMarksByEnemyId,
     skillShieldBlocksById,
     skillVisualEvents,
+    teleportWorkingById,
     sortedEntities,
     viewportSize,
     visualMovementByEntityId,

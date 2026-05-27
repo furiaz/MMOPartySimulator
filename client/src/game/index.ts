@@ -453,6 +453,11 @@ export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
 export { updateSkillSystem } from "./skillSystem";
 export {
+  getTeleportWorkingStateById,
+  isTeleportWorking,
+  setTeleportWorking,
+} from "./teleportState";
+export {
   isMapTeleportPoiActive,
   isTeleportRallyActive,
   setMapTeleportPoi,

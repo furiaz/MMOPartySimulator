@@ -89,6 +89,7 @@ import {
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
   getPoiSearchScope,
+  getTeleportWorkingStateById,
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
   issuePartyOrder,
@@ -1106,6 +1107,7 @@ function createInitialState(): GameState {
     map: debugMap,
     currentMapId: HUB_MAP_ID,
     activeTeleport: null,
+    teleportStatesById: {},
     autoModeEnabled: false,
     worldTravelTargetMapId: null,
     poiPreferences: {
@@ -1768,6 +1770,7 @@ function App() {
   const targetResource = resources.find(isActiveResource);
   const inventory = gameState.inventory;
   const activeTeleport = gameState.activeTeleport;
+  const teleportWorkingById = getTeleportWorkingStateById(gameState);
   const activeMerchant =
     activeMerchantNpcId && isMerchantNpc(gameState.entities[activeMerchantNpcId])
       ? gameState.entities[activeMerchantNpcId]
@@ -2996,6 +2999,7 @@ function App() {
             skillMarksByEnemyId={gameState.skillMarksByEnemyId ?? {}}
             skillShieldBlocksById={gameState.skillShieldBlocksById ?? {}}
             skillVisualEvents={gameState.skillVisualEvents ?? []}
+            teleportWorkingById={teleportWorkingById}
             viewportSize={viewportSize}
             visualMovementByEntityId={visualMovementByEntityId}
           />
@@ -3016,6 +3020,7 @@ function App() {
             map={currentMap}
             mode="preview"
             onFloorClick={commandPartyToMoveFromMinimapPosition}
+            teleportWorkingById={teleportWorkingById}
             viewportSize={viewportSize}
             visualMovementByEntityId={visualMovementByEntityId}
           />

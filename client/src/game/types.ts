@@ -1229,6 +1229,11 @@ export type DebugTeleportPoint = {
   targetMapId: DebugMapId;
   arrivalPositions: Position[];
   autoSelectAfterEnemiesCleared?: boolean;
+  startsWorking?: boolean;
+};
+
+export type TeleportRuntimeState = {
+  isWorking: boolean;
 };
 
 export type HealingFountain = {

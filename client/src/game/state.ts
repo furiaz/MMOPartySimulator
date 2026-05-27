@@ -60,6 +60,7 @@ import type {
   SkillSelfBuffState,
   SkillShieldBlockState,
   SkillVisualEvent,
+  TeleportRuntimeState,
   WorldWipeRecoveryState,
 } from "./types";
 import type {
@@ -235,6 +236,7 @@ export type GameState = {
   currentMapId?: DebugMapId;
   map?: GameMap;
   activeTeleport?: ActiveTeleport | null;
+  teleportStatesById?: Record<string, TeleportRuntimeState>;
   autoModeEnabled: boolean;
   worldTravelTargetMapId: DebugMapId | null;
   poiPreferences: PoiPreferences;

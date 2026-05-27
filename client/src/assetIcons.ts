@@ -12,6 +12,7 @@ const wildernessMapAssetPath = "/Asserts/Generated/map-wilderness";
 const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
 const hubCastleWallAssetPath = "/Asserts/Generated/hub-castle-walls";
 const hubStructureAssetPath = "/Asserts/Generated/hub-structures/256";
+const teleportAssetPath = "/Asserts/Generated/teleports";
 const beginnerSkillEffectsPath = "/Asserts/Generated/beginner-skill-effects-50/sprites";
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
@@ -124,5 +125,6 @@ export const SHARED_SKILL_VISUAL_ICON_SRC = {
 
 export const MAP_OBJECT_ICON_SRC = {
   healingFountain: `${beginnerSkillEffectsPath}/hub_healing_fountain.png`,
-  teleportPoint: `${beginnerSkillEffectsPath}/teleport_point.png`,
+  teleportBroken: `${teleportAssetPath}/TeleportBroken.png`,
+  teleportGood: `${teleportAssetPath}/TeleportGood.png`,
 } as const;
