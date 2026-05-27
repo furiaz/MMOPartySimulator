@@ -903,7 +903,7 @@ function shouldRenderEntity(entity: GameEntity): boolean {
   return entity.kind !== "resource" || isActiveResource(entity);
 }
 
-function getNearestInteractableEntity({
+export function getNearestInteractableEntity({
   cellPixelSize,
   entities,
   map,
@@ -957,7 +957,7 @@ function getNearestInteractableEntity({
   return null;
 }
 
-function getNearestHoverEntity({
+export function getNearestHoverEntity({
   cellPixelSize,
   entities,
   map,
@@ -969,8 +969,8 @@ function getNearestHoverEntity({
   mapPosition: Position;
 }): GameEntity | null {
   const priorities: Array<GameEntity["kind"]> = [
-    "companion",
     "npc",
+    "companion",
     "resource",
     "enemy",
   ];

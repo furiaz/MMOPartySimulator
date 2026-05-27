@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createEnemy, createNpc, createResource } from ".";
 import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import {
   getEntityById,
@@ -6,7 +7,7 @@ import {
   previewMoveTowardPosition,
 } from "./state";
 import { createTestGameState } from "./testState";
-import type { Companion, GameMap } from "./types";
+import type { Companion, GameEntity, GameMap, Position } from "./types";
 
 const blockedMap: GameMap = {
   debugName: "Blocked Path Test Map",
@@ -88,6 +89,44 @@ const companion = {
   consumableBehavior: "auto",
 } as unknown as Companion;
 
+function createStateWithCachedFollowPath({
+  entity,
+  extraEntities = [],
+  map = openMap,
+  simulationDeltaMs = 100,
+  targetPosition,
+  waypoint,
+}: {
+  entity: GameEntity;
+  extraEntities?: GameEntity[];
+  map?: GameMap;
+  simulationDeltaMs?: number;
+  targetPosition: Position;
+  waypoint: Position;
+}) {
+  return createTestGameState({
+    entities: Object.fromEntries(
+      [entity, ...extraEntities].map((currentEntity) => [
+        currentEntity.id,
+        currentEntity,
+      ]),
+    ),
+    map,
+    movementPathsByEntityId: {
+      [entity.id]: {
+        blockedCount: 0,
+        lastRequestedAtMs: 100,
+        profile: "follow",
+        targetKey: "follow:__position_target__:follow:leader:solid-party",
+        targetPosition,
+        waypoints: [waypoint],
+      },
+    },
+    simulationDeltaMs,
+    simulationTimeMs: 100,
+  });
+}
+
 describe("movement path backoff", () => {
   it("does not request a full navigation path for a walkable direct step", () => {
     const state = createTestGameState({
@@ -146,6 +185,188 @@ describe("movement path backoff", () => {
 
     expect(consumeGamePerformanceMetrics().navigationPathQueries).toBe(0);
     expect(movedCompanion?.position.y).toBeGreaterThan(companion.position.y);
+  });
+
+  it("lets companions move through static passive NPCs", () => {
+    const movingCompanion = {
+      ...companion,
+      position: { x: 1, y: 1 },
+    };
+    const questGiver = createNpc(
+      "quest-giver",
+      { x: 1.8, y: 1 },
+      "Quest Giver",
+      "quest_giver",
+    );
+    const state = createStateWithCachedFollowPath({
+      entity: movingCompanion,
+      extraEntities: [questGiver],
+      targetPosition: { x: 4, y: 1 },
+      waypoint: { x: 4, y: 1 },
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      { x: 4, y: 1 },
+      {
+        pathProfile: "follow",
+        pathTargetKey: "follow:leader",
+        pathTargetPosition: { x: 4, y: 1 },
+      },
+    );
+
+    expect(getEntityById(nextState, movingCompanion.id)?.position.x).toBeGreaterThan(
+      movingCompanion.position.x,
+    );
+    expect(nextState.movementFailuresByEntityId?.[movingCompanion.id]).toBeUndefined();
+  });
+
+  it("keeps static passive NPCs solid for enemies", () => {
+    const enemy = createEnemy("enemy", { x: 1, y: 1 });
+    const questGiver = createNpc(
+      "quest-giver",
+      { x: 1.116, y: 1 },
+      "Quest Giver",
+      "quest_giver",
+    );
+    const state = createStateWithCachedFollowPath({
+      entity: enemy,
+      extraEntities: [questGiver],
+      targetPosition: { x: 4, y: 1 },
+      waypoint: { x: 4, y: 1 },
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      enemy,
+      { x: 4, y: 1 },
+      {
+        pathProfile: "follow",
+        pathTargetKey: "follow:leader",
+        pathTargetPosition: { x: 4, y: 1 },
+      },
+    );
+
+    expect(getEntityById(nextState, enemy.id)?.position).toEqual(enemy.position);
+    expect(nextState.failedMoveByEntityId?.[enemy.id]).toBe(true);
+  });
+
+  it("keeps resources and enemies solid for companion movement", () => {
+    const movingCompanion = {
+      ...companion,
+      position: { x: 1, y: 1 },
+    };
+    const resource = createResource("wood", { x: 1.8, y: 1 });
+    const enemy = createEnemy("enemy", { x: 1, y: 1.8 });
+
+    for (const blocker of [resource, enemy]) {
+      const state = createStateWithCachedFollowPath({
+        entity: movingCompanion,
+        extraEntities: [blocker],
+        targetPosition:
+          blocker.kind === "resource" ? { x: 4, y: 1 } : { x: 1, y: 4 },
+        waypoint:
+          blocker.kind === "resource" ? { x: 4, y: 1 } : { x: 1, y: 4 },
+      });
+
+      const nextState = moveEntityTowardPositionIfUnoccupied(
+        state,
+        movingCompanion,
+        blocker.kind === "resource" ? { x: 4, y: 1 } : { x: 1, y: 4 },
+        {
+          pathProfile: "follow",
+          pathTargetKey: "follow:leader",
+          pathTargetPosition:
+            blocker.kind === "resource" ? { x: 4, y: 1 } : { x: 1, y: 4 },
+        },
+      );
+
+      expect(getEntityById(nextState, movingCompanion.id)?.position).toEqual(
+        movingCompanion.position,
+      );
+      expect(nextState.failedMoveByEntityId?.[movingCompanion.id]).toBe(true);
+    }
+  });
+
+  it("keeps quest guide NPC movement collision unchanged without party pass-through", () => {
+    const movingCompanion = {
+      ...companion,
+      position: { x: 1, y: 1 },
+    };
+    const questGuide = createNpc(
+      "quest-guide",
+      { x: 1.8, y: 1 },
+      "Guide",
+      "quest_guide",
+    );
+    const state = createStateWithCachedFollowPath({
+      entity: movingCompanion,
+      extraEntities: [questGuide],
+      targetPosition: { x: 4, y: 1 },
+      waypoint: { x: 4, y: 1 },
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      { x: 4, y: 1 },
+      {
+        pathProfile: "follow",
+        pathTargetKey: "follow:leader",
+        pathTargetPosition: { x: 4, y: 1 },
+      },
+    );
+
+    expect(getEntityById(nextState, movingCompanion.id)?.position).toEqual(
+      movingCompanion.position,
+    );
+    expect(nextState.failedMoveByEntityId?.[movingCompanion.id]).toBe(true);
+  });
+
+  it("moves through the Quest Giver stall shape from telemetry", () => {
+    const stalledCompanion = {
+      ...companion,
+      position: { x: 42.63793423203175, y: 28.611057129586612 },
+    };
+    const questGiver = createNpc(
+      "quest-giver",
+      { x: 43, y: 28 },
+      "Quest Giver",
+      "quest_giver",
+    );
+    const state = createStateWithCachedFollowPath({
+      entity: stalledCompanion,
+      extraEntities: [questGiver],
+      map: {
+        debugName: "Telemetry Stall Test Map",
+        displayName: "Telemetry Stall Test Map",
+        columns: 60,
+        rows: 40,
+        walls: [],
+        teleports: [],
+        healingFountains: [],
+      },
+      simulationDeltaMs: 17,
+      targetPosition: { x: 49.65198495218459, y: 29.26854669743356 },
+      waypoint: { x: 44, y: 29 },
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      stalledCompanion,
+      { x: 49.65198495218459, y: 29.26854669743356 },
+      {
+        pathProfile: "follow",
+        pathTargetKey: "follow:leader",
+        pathTargetPosition: { x: 49.65198495218459, y: 29.26854669743356 },
+      },
+    );
+
+    expect(getEntityById(nextState, stalledCompanion.id)?.position.x).toBeGreaterThan(
+      stalledCompanion.position.x,
+    );
+    expect(nextState.movementFailuresByEntityId?.[stalledCompanion.id]).toBeUndefined();
   });
 
   it("reuses a static profile path for a stable target", () => {

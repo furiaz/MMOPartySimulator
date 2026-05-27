@@ -4,7 +4,7 @@ import { isSuperiorEnemy, rollEnemyVariantForSpawn } from "./enemyVariants";
 import { updateEntity, type GameState } from "./state";
 import type { Enemy } from "./types";
 
-export const ENEMY_RESPAWN_DELAY_MS = 10_000;
+export const ENEMY_RESPAWN_DELAY_MS = 30_000;
 
 export function updateEnemyRespawnSystem(
   state: GameState,

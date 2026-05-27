@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CombatFeedbackEvent, GameMap } from "../game";
-import { createEnemy, createTargetDummy } from "../game";
+import { createCompanion, createEnemy, createNpc, createResource, createTargetDummy } from "../game";
 import {
   getCombatFeedbackLaneKey,
   getEnemyNameplateColor,
   getEnemyNameplateText,
   getFullVisibleTileBounds,
+  getNearestHoverEntity,
+  getNearestInteractableEntity,
   getPreviewMapPosition,
   isPositionInTileBounds,
 } from "./PixiWorldRenderer";
@@ -109,6 +111,39 @@ describe("getFullVisibleTileBounds", () => {
 
     expect(isPositionInTileBounds({ x: 10, y: 2 }, bounds)).toBe(true);
     expect(isPositionInTileBounds({ x: 20, y: 2 }, bounds)).toBe(false);
+  });
+});
+
+describe("world entity pointer priority", () => {
+  it("targets NPCs before other overlapping interactables", () => {
+    const map = createWideMap();
+    const npc = createNpc("npc", { x: 4, y: 4 }, "Quest Giver", "quest_giver");
+    const resource = createResource("wood", { x: 4, y: 4 });
+    const enemy = createEnemy("enemy", { x: 4, y: 4 });
+
+    expect(
+      getNearestInteractableEntity({
+        cellPixelSize: 32,
+        entities: [enemy, resource, npc],
+        map,
+        mapPosition: { x: 4, y: 4 },
+      })?.id,
+    ).toBe(npc.id);
+  });
+
+  it("hovers NPCs before overlapping companions", () => {
+    const map = createWideMap();
+    const companion = createCompanion("companion", { x: 4, y: 4 }, "companion");
+    const npc = createNpc("npc", { x: 4, y: 4 }, "Quest Giver", "quest_giver");
+
+    expect(
+      getNearestHoverEntity({
+        cellPixelSize: 32,
+        entities: [companion, npc],
+        map,
+        mapPosition: { x: 4, y: 4 },
+      })?.id,
+    ).toBe(npc.id);
   });
 });
 

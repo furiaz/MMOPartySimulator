@@ -33,7 +33,7 @@ describe("enemy respawn system", () => {
     });
   });
 
-  it("does not respawn before ten seconds", () => {
+  it("does not respawn before thirty seconds", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 8, y: 7 }),
       state: "dead" as const,
@@ -58,7 +58,7 @@ describe("enemy respawn system", () => {
     });
   });
 
-  it("respawns a dead enemy after ten seconds using the same id and home position", () => {
+  it("respawns a dead enemy after thirty seconds using the same id and home position", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 8, y: 7 }, "aggressive", {
         subzoneId: "north-west",

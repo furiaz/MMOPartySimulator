@@ -1794,7 +1794,7 @@ function createNavigationBlockerLookup(
 
     if (
       entity.state !== "dead" &&
-      !canPassThroughPartyEntity(movingEntity, entity, options)
+      !canPassThroughBlockingEntity(movingEntity, entity, options)
     ) {
       addEntityCollisionPositionKeys(lookup.blockingEntityKeys, entity);
     }
@@ -2039,8 +2039,40 @@ function isPositionOccupiedByBlockingEntity(
       entity.id !== ignoredEntityId &&
       entity.kind !== "resource" &&
       entity.state !== "dead" &&
-      !canPassThroughPartyEntity(movingEntity, entity, options) &&
+      !canPassThroughBlockingEntity(movingEntity, entity, options) &&
       isPositionInsideEntityCollisionShape(entity, position),
+  );
+}
+
+function canPassThroughBlockingEntity(
+  movingEntity: GameEntity | undefined,
+  occupyingEntity: GameEntity,
+  options: WalkablePositionOptions,
+): boolean {
+  return (
+    canPassThroughStaticNpcForPartyMovement(movingEntity, occupyingEntity) ||
+    canPassThroughPartyEntity(movingEntity, occupyingEntity, options)
+  );
+}
+
+function canPassThroughStaticNpcForPartyMovement(
+  movingEntity: GameEntity | undefined,
+  occupyingEntity: GameEntity,
+): boolean {
+  return Boolean(
+    movingEntity?.kind === "companion" &&
+      occupyingEntity.kind === "npc" &&
+      isStaticPassiveNpcRole(occupyingEntity.npcRole),
+  );
+}
+
+function isStaticPassiveNpcRole(npcRole: string): boolean {
+  return (
+    npcRole === "quest_giver" ||
+    npcRole === "merchant" ||
+    npcRole === "smith" ||
+    npcRole === "dog" ||
+    npcRole === "test_blade"
   );
 }
 
