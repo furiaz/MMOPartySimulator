@@ -557,6 +557,38 @@ export type PartyExecutionIntentType = LeaderIntentType;
 
 export type PartyExecutionIntent = LeaderIntent;
 
+export type DirectCompanionCommandType = "attack" | "gather" | "move";
+
+export type DirectCompanionCommand =
+  | {
+      type: "attack";
+      companionId: string;
+      targetId: string;
+      targetPosition: Position | null;
+      issuedAt: number;
+    }
+  | {
+      type: "gather";
+      companionId: string;
+      targetId: string;
+      targetPosition: Position | null;
+      issuedAt: number;
+    }
+  | {
+      type: "move";
+      companionId: string;
+      targetPosition: Position;
+      issuedAt: number;
+    };
+
+export type DirectCompanionCommandResultCode =
+  | "success"
+  | "invalid_source"
+  | "invalid_target"
+  | "out_of_range"
+  | "resource_full"
+  | "blocked_position";
+
 export type PartyBehaviorMode =
   | "idle"
   | "travel"
@@ -956,6 +988,13 @@ export type DebugTelemetryEventType =
   | "resurrection_channel_progressed"
   | "resurrection_channel_canceled"
   | "companion_resurrected"
+  | "direct_command_issued"
+  | "direct_command_rejected"
+  | "direct_command_replaced"
+  | "direct_command_completed"
+  | "direct_command_canceled"
+  | "direct_command_grace_started"
+  | "direct_command_grace_expired"
   | "flask_fountain_refilled"
   | "flask_recharge_kill_progress"
   | "flask_charge_gained"
@@ -1010,6 +1049,10 @@ export type DebugTelemetryEntitySnapshot = {
   characterXpProgressPercent?: number;
   lastCharacterXpGained?: number;
   activeCooldownSkillId?: SkillId;
+  directCommandType?: DirectCompanionCommandType;
+  directCommandTargetId?: string | null;
+  directCommandTargetPosition?: Position | null;
+  directCommandGraceRemainingMs?: number;
   movementResult: DebugMovementResult;
   reason?: string;
   formationPhase?: FormationPhase;
@@ -1108,6 +1151,8 @@ export type DebugTelemetryEvent = {
   nextRole?: PartyMemberRole;
   result?: string;
   reason?: string;
+  directCommandType?: DirectCompanionCommandType;
+  directCommandTargetPosition?: Position | null;
   progressBeforeMs?: number;
   progressAfterMs?: number;
   progressContributionMs?: number;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, type MouseEvent, type PointerEvent } from "react";
 import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import {
   HUB_MAP_TILE_SRC,
@@ -15,6 +15,8 @@ import {
 import type {
   ActiveTeleport,
   CombatFeedbackEvent,
+  CompanionDirectCommandInput,
+  DirectCompanionCommand,
   DropVisualEvent,
   EntityCollisionShape,
   GameEntity,
@@ -105,12 +107,14 @@ type PixiWorldRendererProps = {
   cellPixelSize?: number;
   combatFeedbackEvents?: CombatFeedbackEvent[];
   currentTime: number;
+  directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
   entities: GameEntity[];
   leaderIntent?: LeaderIntent | null;
   map: GameMap;
   mode?: PixiRendererMode;
   onEnemyClick?: (enemyId: string) => void;
+  onCompanionDragCommand?: (command: CompanionDirectCommandInput) => void;
   onEntityHover?: (
     entityId: string | null,
     pointerPosition?: Position,
@@ -149,6 +153,19 @@ export type PixiRendererPerformanceSample = {
 type EntityVisualMovement = {
   direction: SpriteDirection;
   expiresAt: number;
+};
+
+type CompanionDragState = {
+  companionId: string;
+  hasDragged: boolean;
+  pointerId: number;
+  startClientPosition: Position;
+};
+
+type CompanionDragPreview = {
+  companionId: string;
+  targetKind: "enemy" | "floor" | "resource";
+  targetPosition: Position;
 };
 
 type PreviewTransform = {
@@ -223,6 +240,10 @@ type InteractableEntity = GameEntity & {
   kind: InteractableEntityKind;
 };
 
+type DirectCommandDropTarget = GameEntity & {
+  kind: "resource" | "enemy";
+};
+
 type EntitySpriteLayout = {
   anchorX: number;
   anchorY: number;
@@ -246,7 +267,9 @@ type DrawWorldOptions = {
   cameraOffset: Position;
   cellPixelSize: number;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  companionDragPreview: CompanionDragPreview | null;
   currentTime: number;
+  directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -967,6 +990,157 @@ export function getNearestInteractableEntity({
   return null;
 }
 
+function getNearestDirectCommandSourceCompanion({
+  cellPixelSize,
+  entities,
+  map,
+  mapPosition,
+}: {
+  cellPixelSize: number;
+  entities: GameEntity[];
+  map: GameMap;
+  mapPosition: Position;
+}): Extract<GameEntity, { kind: "companion" }> | null {
+  const maximumDistanceSquared =
+    fullModeInteractionRadius * fullModeInteractionRadius;
+
+  return (
+    entities
+      .filter(
+        (entity): entity is Extract<GameEntity, { kind: "companion" }> =>
+          entity.kind === "companion" &&
+          entity.state !== "dead" &&
+          entity.health > 0,
+      )
+      .map((entity) => {
+        const hit = getEntityPointerHit({
+          cellPixelSize,
+          entity,
+          map,
+          mapPosition,
+        });
+
+        return hit ? { ...hit, entity } : null;
+      })
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          distanceSquared: number;
+          entity: Extract<GameEntity, { kind: "companion" }>;
+        } => Boolean(candidate),
+      )
+      .filter((candidate) => candidate.distanceSquared <= maximumDistanceSquared)
+      .sort(
+        (first, second) =>
+          first.distanceSquared - second.distanceSquared ||
+          first.entity.id.localeCompare(second.entity.id),
+      )[0]?.entity ?? null
+  );
+}
+
+function getNearestDirectCommandDropTarget({
+  cellPixelSize,
+  entities,
+  map,
+  mapPosition,
+}: {
+  cellPixelSize: number;
+  entities: GameEntity[];
+  map: GameMap;
+  mapPosition: Position;
+}): DirectCommandDropTarget | null {
+  const priorities: DirectCommandDropTarget["kind"][] = ["resource", "enemy"];
+  const maximumDistanceSquared =
+    fullModeInteractionRadius * fullModeInteractionRadius;
+
+  for (const kind of priorities) {
+    const nearest = entities
+      .filter(
+        (entity): entity is DirectCommandDropTarget =>
+          entity.kind === kind && isInteractableEntity(entity),
+      )
+      .map((entity) => {
+        const hit = getEntityPointerHit({
+          cellPixelSize,
+          entity,
+          map,
+          mapPosition,
+        });
+
+        return hit ? { ...hit, entity } : null;
+      })
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          distanceSquared: number;
+          entity: DirectCommandDropTarget;
+        } => Boolean(candidate),
+      )
+      .filter((candidate) => candidate.distanceSquared <= maximumDistanceSquared)
+      .sort(
+        (first, second) =>
+          first.distanceSquared - second.distanceSquared ||
+          first.entity.id.localeCompare(second.entity.id),
+      )[0]?.entity;
+
+    if (nearest) {
+      return nearest;
+    }
+  }
+
+  return null;
+}
+
+function getCompanionDragPreview({
+  cellPixelSize,
+  companionId,
+  entities,
+  map,
+  pointerPosition,
+  targetBounds,
+  transform,
+}: {
+  cellPixelSize: number;
+  companionId: string;
+  entities: GameEntity[];
+  map: GameMap;
+  pointerPosition: Position;
+  targetBounds: ClientBounds;
+  transform: FullTransform;
+}): CompanionDragPreview {
+  const mapPosition = getFullMapPosition(pointerPosition, targetBounds, transform);
+  const target = getNearestDirectCommandDropTarget({
+    cellPixelSize,
+    entities,
+    map,
+    mapPosition,
+  });
+
+  if (target?.kind === "resource") {
+    return {
+      companionId,
+      targetKind: "resource",
+      targetPosition: { ...target.position },
+    };
+  }
+
+  if (target?.kind === "enemy") {
+    return {
+      companionId,
+      targetKind: "enemy",
+      targetPosition: { ...target.position },
+    };
+  }
+
+  return {
+    companionId,
+    targetKind: "floor",
+    targetPosition: getFloorPosition(mapPosition),
+  };
+}
+
 export function getNearestHoverEntity({
   cellPixelSize,
   entities,
@@ -1128,6 +1302,139 @@ function drawPoiRing(
   graphics
     .circle(center.x, center.y, radius + 5)
     .stroke({ color, alpha: 0.32, width: 2 });
+}
+
+function drawDirectCompanionCommandIndicators(
+  graphics: Graphics,
+  entities: GameEntity[],
+  commandsByCompanionId: Record<string, DirectCompanionCommand>,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const command of Object.values(commandsByCompanionId)) {
+    const companion = entities.find((entity) => entity.id === command.companionId);
+    const targetPosition = getDirectCommandRenderTargetPosition(command, entities);
+
+    if (
+      !companion ||
+      !targetPosition ||
+      !isPositionInTileBounds(companion.position, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const start = toFullPosition(companion.position, transform);
+    const end = toFullPosition(targetPosition, transform);
+    const color = getDirectCommandIndicatorColor(command.type);
+
+    graphics
+      .moveTo(start.x, start.y)
+      .lineTo(end.x, end.y)
+      .stroke({ color, alpha: 0.72, width: 2 });
+    graphics.circle(end.x, end.y, transform.cellPixelSize * 0.28).stroke({
+      color,
+      alpha: 0.9,
+      width: 2,
+    });
+  }
+}
+
+function drawCompanionDragPreview(
+  graphics: Graphics,
+  entities: GameEntity[],
+  preview: CompanionDragPreview | null,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  if (!preview) {
+    return;
+  }
+
+  const companion = entities.find((entity) => entity.id === preview.companionId);
+
+  if (
+    !companion ||
+    !isPositionInTileBounds(companion.position, visibleTileBounds)
+  ) {
+    return;
+  }
+
+  const start = toFullPosition(companion.position, transform);
+  const end = toFullPosition(preview.targetPosition, transform);
+  const color = getCompanionDragPreviewColor(preview.targetKind);
+  const radius = transform.cellPixelSize * 0.72;
+
+  graphics
+    .moveTo(start.x, start.y)
+    .lineTo(end.x, end.y)
+    .stroke({ color, alpha: 0.88, width: 3 });
+  graphics
+    .circle(start.x, start.y, transform.cellPixelSize * 0.34)
+    .stroke({ color: 0xffffff, alpha: 0.75, width: 2 });
+  drawDottedCircle(graphics, end, radius, color);
+}
+
+function drawDottedCircle(
+  graphics: Graphics,
+  center: Position,
+  radius: number,
+  color: number,
+) {
+  const dotCount = 28;
+  const dotRadius = 2.4;
+
+  for (let index = 0; index < dotCount; index += 1) {
+    const angle = (Math.PI * 2 * index) / dotCount;
+
+    graphics
+      .circle(
+        center.x + Math.cos(angle) * radius,
+        center.y + Math.sin(angle) * radius,
+        dotRadius,
+      )
+      .fill({ color, alpha: 0.92 });
+  }
+}
+
+function getCompanionDragPreviewColor(
+  targetKind: CompanionDragPreview["targetKind"],
+): number {
+  if (targetKind === "enemy") {
+    return 0xef4444;
+  }
+
+  if (targetKind === "resource") {
+    return 0x22c55e;
+  }
+
+  return 0x38bdf8;
+}
+
+function getDirectCommandRenderTargetPosition(
+  command: DirectCompanionCommand,
+  entities: GameEntity[],
+): Position | null {
+  if (command.type === "move") {
+    return command.targetPosition;
+  }
+
+  const target = entities.find((entity) => entity.id === command.targetId);
+
+  return target?.position ?? command.targetPosition;
+}
+
+function getDirectCommandIndicatorColor(
+  commandType: DirectCompanionCommand["type"],
+): number {
+  if (commandType === "attack") {
+    return 0xef4444;
+  }
+
+  if (commandType === "gather") {
+    return 0x22c55e;
+  }
+
+  return 0x38bdf8;
 }
 
 function isEntityVisuallyMoving(
@@ -3419,7 +3726,9 @@ function drawFullMap({
   cameraOffset,
   cellPixelSize,
   combatFeedbackEvents,
+  companionDragPreview,
   currentTime,
+  directCompanionCommandsById,
   dropVisualEvents,
   entities,
   leaderIntent,
@@ -3444,7 +3753,9 @@ function drawFullMap({
   cameraOffset: Position;
   cellPixelSize: number;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  companionDragPreview: CompanionDragPreview | null;
   currentTime: number;
+  directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -3599,6 +3910,23 @@ function drawFullMap({
     visibleTileBounds,
     questGiverHasWork,
   );
+  drawCompanionDragPreview(
+    overlayGraphics,
+    entities,
+    companionDragPreview,
+    transform,
+    visibleTileBounds,
+  );
+
+  if (showDebugOverlays) {
+    drawDirectCompanionCommandIndicators(
+      overlayGraphics,
+      entities,
+      directCompanionCommandsById,
+      transform,
+      visibleTileBounds,
+    );
+  }
 
   if (showDebugOverlays) {
     for (const subzone of map.subzones ?? []) {
@@ -3677,7 +4005,9 @@ function drawWorld({
   cameraOffset,
   cellPixelSize,
   combatFeedbackEvents,
+  companionDragPreview,
   currentTime,
+  directCompanionCommandsById,
   dropVisualEvents,
   entities,
   leaderIntent,
@@ -3706,7 +4036,9 @@ function drawWorld({
       cameraOffset,
       cellPixelSize,
       combatFeedbackEvents,
+      companionDragPreview,
       currentTime,
+      directCompanionCommandsById,
       dropVisualEvents,
       entities,
       leaderIntent,
@@ -3745,11 +4077,13 @@ export function PixiWorldRenderer({
   cellPixelSize = defaultCellPixelSize,
   combatFeedbackEvents = [],
   currentTime,
+  directCompanionCommandsById = {},
   dropVisualEvents = [],
   entities,
   leaderIntent = null,
   map,
   mode = "preview",
+  onCompanionDragCommand,
   onEnemyClick,
   onEntityHover,
   onFloorClick,
@@ -3779,6 +4113,7 @@ export function PixiWorldRenderer({
   const latestCellPixelSizeRef = useRef(cellPixelSize);
   const latestCombatFeedbackEventsRef = useRef(combatFeedbackEvents);
   const latestCurrentTimeRef = useRef(currentTime);
+  const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
   const latestActiveTeleportRef = useRef<ActiveTeleport | null>(activeTeleport);
   const latestMapRef = useRef(map);
@@ -3799,6 +4134,9 @@ export function PixiWorldRenderer({
   const latestSkillVisualEventsRef = useRef(skillVisualEvents);
   const latestTeleportWorkingByIdRef = useRef(teleportWorkingById);
   const latestVisualMovementByEntityIdRef = useRef(visualMovementByEntityId);
+  const companionDragStateRef = useRef<CompanionDragState | null>(null);
+  const companionDragPreviewRef = useRef<CompanionDragPreview | null>(null);
+  const suppressNextClickRef = useRef(false);
   const renderSize = useMemo(
     () => getRenderSize(mode, viewportSize),
     [mode, viewportSize],
@@ -3814,6 +4152,7 @@ export function PixiWorldRenderer({
     latestCellPixelSizeRef.current = cellPixelSize;
     latestCombatFeedbackEventsRef.current = combatFeedbackEvents;
     latestCurrentTimeRef.current = currentTime;
+    latestDirectCompanionCommandsByIdRef.current = directCompanionCommandsById;
     latestDropVisualEventsRef.current = dropVisualEvents;
     latestMapRef.current = map;
     latestEntitiesRef.current = sortedEntities;
@@ -3913,7 +4252,10 @@ export function PixiWorldRenderer({
         cameraOffset: latestCameraOffsetRef.current,
         cellPixelSize: latestCellPixelSizeRef.current,
         combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
+        companionDragPreview: companionDragPreviewRef.current,
         currentTime: latestCurrentTimeRef.current,
+        directCompanionCommandsById:
+          latestDirectCompanionCommandsByIdRef.current,
         dropVisualEvents: latestDropVisualEventsRef.current,
         entities: latestEntitiesRef.current,
         layers: layersRef.current,
@@ -4033,7 +4375,9 @@ export function PixiWorldRenderer({
       cameraOffset,
       cellPixelSize,
       combatFeedbackEvents,
+      companionDragPreview: companionDragPreviewRef.current,
       currentTime,
+      directCompanionCommandsById,
       dropVisualEvents,
       entities: sortedEntities,
       layers: layersRef.current,
@@ -4062,6 +4406,7 @@ export function PixiWorldRenderer({
     cellPixelSize,
     combatFeedbackEvents,
     currentTime,
+    directCompanionCommandsById,
     dropVisualEvents,
     leaderIntent,
     map,
@@ -4081,8 +4426,153 @@ export function PixiWorldRenderer({
     visualMovementByEntityId,
   ]);
 
+  function handleRendererPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (mode !== "full" || event.button !== 0 || !onCompanionDragCommand) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const mapPosition = getFullMapPosition(
+      { x: event.clientX, y: event.clientY },
+      bounds,
+      {
+        cameraOffset,
+        cellPixelSize,
+      },
+    );
+    const companion = getNearestDirectCommandSourceCompanion({
+      cellPixelSize,
+      entities: sortedEntities,
+      map,
+      mapPosition,
+    });
+
+    if (!companion) {
+      return;
+    }
+
+    companionDragStateRef.current = {
+      companionId: companion.id,
+      hasDragged: false,
+      pointerId: event.pointerId,
+      startClientPosition: { x: event.clientX, y: event.clientY },
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleRendererPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const dragState = companionDragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const dragDistance = Math.hypot(
+      event.clientX - dragState.startClientPosition.x,
+      event.clientY - dragState.startClientPosition.y,
+    );
+
+    if (dragDistance >= 6) {
+      dragState.hasDragged = true;
+      companionDragPreviewRef.current = getCompanionDragPreview({
+        cellPixelSize,
+        companionId: dragState.companionId,
+        entities: sortedEntities,
+        map,
+        pointerPosition: { x: event.clientX, y: event.clientY },
+        targetBounds: event.currentTarget.getBoundingClientRect(),
+        transform: {
+          cameraOffset,
+          cellPixelSize,
+        },
+      });
+      requestRedrawRef.current();
+      return;
+    }
+
+    if (companionDragPreviewRef.current) {
+      companionDragPreviewRef.current = null;
+      requestRedrawRef.current();
+    }
+  }
+
+  function handleRendererPointerUp(event: PointerEvent<HTMLDivElement>) {
+    const dragState = companionDragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    companionDragStateRef.current = null;
+    companionDragPreviewRef.current = null;
+    requestRedrawRef.current();
+    event.currentTarget.releasePointerCapture(event.pointerId);
+
+    if (!dragState.hasDragged || mode !== "full" || !onCompanionDragCommand) {
+      return;
+    }
+
+    suppressNextClickRef.current = true;
+    event.stopPropagation();
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const mapPosition = getFullMapPosition(
+      { x: event.clientX, y: event.clientY },
+      bounds,
+      {
+        cameraOffset,
+        cellPixelSize,
+      },
+    );
+    const target = getNearestDirectCommandDropTarget({
+      cellPixelSize,
+      entities: sortedEntities,
+      map,
+      mapPosition,
+    });
+
+    if (target?.kind === "resource") {
+      onCompanionDragCommand({
+        type: "gather",
+        companionId: dragState.companionId,
+        targetId: target.id,
+      });
+      return;
+    }
+
+    if (target?.kind === "enemy") {
+      onCompanionDragCommand({
+        type: "attack",
+        companionId: dragState.companionId,
+        targetId: target.id,
+      });
+      return;
+    }
+
+    onCompanionDragCommand({
+      type: "move",
+      companionId: dragState.companionId,
+      targetPosition: getFloorPosition(mapPosition),
+    });
+  }
+
+  function handleRendererPointerCancel(event: PointerEvent<HTMLDivElement>) {
+    const dragState = companionDragStateRef.current;
+
+    if (dragState?.pointerId === event.pointerId) {
+      companionDragStateRef.current = null;
+      companionDragPreviewRef.current = null;
+      requestRedrawRef.current();
+    }
+  }
+
   function handleRendererClick(event: MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
+
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
 
     if (mode === "preview") {
       const bounds =
@@ -4167,6 +4657,8 @@ export function PixiWorldRenderer({
   }
 
   function handleRendererMouseLeave() {
+    companionDragPreviewRef.current = null;
+    requestRedrawRef.current();
     onEntityHover?.(null);
   }
 
@@ -4177,6 +4669,10 @@ export function PixiWorldRenderer({
       onClick={handleRendererClick}
       onMouseLeave={handleRendererMouseLeave}
       onMouseMove={handleRendererMouseMove}
+      onPointerCancel={handleRendererPointerCancel}
+      onPointerDown={handleRendererPointerDown}
+      onPointerMove={handleRendererPointerMove}
+      onPointerUp={handleRendererPointerUp}
       aria-label={
         mode === "full"
           ? "PixiJS full world renderer"

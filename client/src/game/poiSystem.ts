@@ -17,7 +17,6 @@ import {
 } from "./navigation";
 import {
   getPartyLeader,
-  getPartyMembers,
   hasDeadPartyMembers,
 } from "./partySystem";
 import {
@@ -137,10 +136,6 @@ export function updatePoiSystem(
   const leader = getPartyLeader(state);
 
   if (!leader || leader.commandPriority === "direct") {
-    return clearPoiSelection(state);
-  }
-
-  if (getPartyMembers(state).some((member) => member.commandPriority === "direct")) {
     return clearPoiSelection(state);
   }
 

@@ -319,6 +319,8 @@ function completeTeleport(state: GameState): GameState {
     activeTeleport: null,
     partyIntent: null,
     leaderIntent: null,
+    directCompanionCommandsById: {},
+    directCommandGraceUntilByCompanionId: {},
     interruptedPoiTarget: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,

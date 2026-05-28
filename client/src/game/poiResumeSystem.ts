@@ -101,6 +101,10 @@ function getInterruptedDirectGatherIntent(
   state: GameState,
 ): PartyExecutionIntent | null {
   const directGatherer = getPartyMembers(state).find((member) => {
+    if (state.directCompanionCommandsById?.[member.id]) {
+      return false;
+    }
+
     if (member.commandPriority !== "direct" || member.state !== "gather" || !member.currentTargetId) {
       return false;
     }

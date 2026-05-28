@@ -217,6 +217,8 @@ function resetStateToRescueHub(
     activeTeleport: null,
     partyIntent: null,
     leaderIntent: null,
+    directCompanionCommandsById: {},
+    directCommandGraceUntilByCompanionId: {},
     globalPoiIntent: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,

@@ -312,6 +312,10 @@ function getTelemetryEventKey(event: DebugTelemetryEvent): string {
     event.flaskRechargeKillThreshold ?? "",
     event.flaskRechargeCountedEnemyDefeatMarker ?? "",
     event.flaskRechargeSource ?? "",
+    event.directCommandType ?? "",
+    event.directCommandTargetPosition
+      ? `${event.directCommandTargetPosition.x},${event.directCommandTargetPosition.y}`
+      : "",
     event.tableId ?? "",
     event.dropChance ?? "",
     event.result ?? "",
@@ -400,6 +404,14 @@ function getEntitySnapshot(
     characterXpProgressPercent: getCharacterXpProgressPercent(entity),
     lastCharacterXpGained: getLastCharacterXpGained(entity),
     activeCooldownSkillId: getActiveCooldownSkillId(nextState, entity),
+    directCommandType:
+      nextState.directCompanionCommandsById?.[entity.id]?.type,
+    directCommandTargetId: getDirectCommandTargetId(nextState, entity),
+    directCommandTargetPosition: getDirectCommandTargetPosition(nextState, entity),
+    directCommandGraceRemainingMs: getDirectCommandGraceRemainingMs(
+      nextState,
+      entity,
+    ),
     movementResult,
     reason: getReason(nextState, entity, movementResult),
     formationPhase: nextState.partyFormation?.phase,
@@ -835,6 +847,41 @@ function didPositionChange(a: Position, b: Position): boolean {
 
 function getCurrentTargetId(entity: GameEntity): string | null | undefined {
   return "currentTargetId" in entity ? entity.currentTargetId : undefined;
+}
+
+function getDirectCommandTargetId(
+  state: GameState,
+  entity: GameEntity,
+): string | null | undefined {
+  const command = state.directCompanionCommandsById?.[entity.id];
+
+  return command && "targetId" in command ? command.targetId : undefined;
+}
+
+function getDirectCommandTargetPosition(
+  state: GameState,
+  entity: GameEntity,
+): Position | null | undefined {
+  const command = state.directCompanionCommandsById?.[entity.id];
+
+  if (!command) {
+    return undefined;
+  }
+
+  return command.targetPosition ? { ...command.targetPosition } : null;
+}
+
+function getDirectCommandGraceRemainingMs(
+  state: GameState,
+  entity: GameEntity,
+): number | undefined {
+  const graceUntil = state.directCommandGraceUntilByCompanionId?.[entity.id];
+
+  if (!graceUntil) {
+    return undefined;
+  }
+
+  return Math.max(0, graceUntil - (state.simulationTimeMs ?? Date.now()));
 }
 
 function getArchetypeId(entity: GameEntity) {

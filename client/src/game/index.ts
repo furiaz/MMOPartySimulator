@@ -27,6 +27,9 @@ export type {
   DebugTelemetryReport,
   DebugTelemetryState,
   DebugTelemetryTick,
+  DirectCompanionCommand,
+  DirectCompanionCommandResultCode,
+  DirectCompanionCommandType,
   Enemy,
   EnemyAggressionMode,
   EnemyArchetypeId,
@@ -389,6 +392,17 @@ export {
   type EntityCommand,
   type PartyOrder,
 } from "./commands";
+export {
+  DIRECT_COMMAND_MAX_PATH_DISTANCE,
+  DIRECT_COMMAND_REJOIN_GRACE_MS,
+  getActiveDirectCompanionCommand,
+  getDirectGatherCommandTargetId,
+  isCompanionInDirectCommandGrace,
+  issueCompanionDirectCommand,
+  updateDirectCompanionCommandSystem,
+  type CompanionDirectCommandInput,
+  type CompanionDirectCommandResult,
+} from "./directCompanionCommands";
 export { updateGame } from "./updateGame";
 export {
   ATTACK_COOLDOWN_MS,

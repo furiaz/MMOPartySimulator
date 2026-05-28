@@ -11,6 +11,7 @@ import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { updateDropSystem } from "./dropSystem";
+import { updateDirectCompanionCommandSystem } from "./directCompanionCommands";
 import {
   reserveExploringPartyMemberNextTile,
   updateExplorationSystem,
@@ -121,6 +122,12 @@ export function updateGame(
       timing,
     );
   }
+
+  nextState = updateDirectCompanionCommandSystem(
+    nextState,
+    movedEntityIds,
+    timing.nowMs,
+  );
 
   let resourceWorkContext = createResourceWorkContext(nextState);
 

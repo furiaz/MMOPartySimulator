@@ -17,6 +17,7 @@ import {
   isQuestGuideObjectiveRelevant,
 } from "./questGuideSystem";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionInDirectCommandGrace } from "./directCompanionCommands";
 import {
   getEntityById,
   getPartyExecutionIntent,
@@ -556,6 +557,7 @@ function isRequiredForTravelCohesion(
 ): boolean {
   if (
     member.commandPriority === "direct" ||
+    isCompanionInDirectCommandGrace(state, member.id) ||
     isCompanionResurrectionChanneling(state, member.id) ||
     isPartyMemberRespondingToActiveThreat(state, member)
   ) {
@@ -692,6 +694,7 @@ function getNearbyPartyThreatTarget(state: GameState): Enemy | null {
         getPartyMembers(state).some(
           (member) =>
             member.commandPriority !== "direct" &&
+            !isCompanionInDirectCommandGrace(state, member.id) &&
             getDistance(member.position, enemy.position) <= COMBAT_BREAK_DISTANCE,
         ),
       )
@@ -718,7 +721,11 @@ function isWithinPartyCombatDistance(
 
 function getNearestPartyDistance(state: GameState, target: Enemy): number {
   const distances = getPartyMembers(state)
-    .filter((member) => member.commandPriority !== "direct")
+    .filter(
+      (member) =>
+        member.commandPriority !== "direct" &&
+        !isCompanionInDirectCommandGrace(state, member.id),
+    )
     .map((member) => getDistance(member.position, target.position));
 
   return distances.length > 0 ? Math.min(...distances) : Number.POSITIVE_INFINITY;

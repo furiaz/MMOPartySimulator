@@ -156,6 +156,23 @@
   pointer-events: none;
 }
 
+.direct-command-feedback-toast {
+  position: absolute;
+  top: 116px;
+  left: 50%;
+  z-index: 14;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 9px 12px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(59, 130, 246, 0.72);
+  background: rgba(239, 246, 255, 0.94);
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  pointer-events: none;
+}
+
 .map-debug-toggle-controls {
   z-index: 12;
   display: flex;

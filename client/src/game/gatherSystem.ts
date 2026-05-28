@@ -23,6 +23,7 @@ import { ROLE_TUNING } from "./roleProfiles";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
 import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { getDirectGatherCommandTargetId } from "./directCompanionCommands";
 import {
   isWithinGathererLeaderBoundary,
 } from "./gathererResourceReservation";
@@ -223,6 +224,7 @@ function findGathererSelfDefenseThreat(
 
   if (
     gatherer.commandPriority === "direct" &&
+    getDirectGatherCommandTargetId(state, gatherer.id) !== gatherer.currentTargetId &&
     (executionIntent?.type !== "gather" ||
       executionIntent.targetId !== gatherer.currentTargetId)
   ) {
@@ -350,9 +352,30 @@ function getAllowedGathererIdsByResource(
 ): Map<string, Set<string>> {
   const allowedGathererIdsByResource = new Map<string, Set<string>>();
   const gathererCountsByResource = new Map<string, number>();
+  const gatheringEntities = Object.values(state.entities)
+    .filter(
+      (entity): entity is AutonomousEntity =>
+        isGatheringEntity(entity) && Boolean(entity.currentTargetId),
+    )
+    .sort((first, second) => {
+      const firstDirectTargetId =
+        first.kind === "companion"
+          ? getDirectGatherCommandTargetId(state, first.id)
+          : null;
+      const secondDirectTargetId =
+        second.kind === "companion"
+          ? getDirectGatherCommandTargetId(state, second.id)
+          : null;
+      const firstIsDirect =
+        firstDirectTargetId !== null && firstDirectTargetId === first.currentTargetId;
+      const secondIsDirect =
+        secondDirectTargetId !== null && secondDirectTargetId === second.currentTargetId;
 
-  for (const entity of Object.values(state.entities)) {
-    if (!isGatheringEntity(entity) || !entity.currentTargetId) {
+      return Number(secondIsDirect) - Number(firstIsDirect) || first.id.localeCompare(second.id);
+    });
+
+  for (const entity of gatheringEntities) {
+    if (!entity.currentTargetId) {
       continue;
     }
 

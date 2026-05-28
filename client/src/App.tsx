@@ -92,6 +92,7 @@ import {
   getTeleportWorkingStateById,
   getTotalPartyCharacterLevel,
   hasQuestGiverWork,
+  issueCompanionDirectCommand,
   issuePartyOrder,
   isActiveResource,
   isMerchantUnlockedForQuests,
@@ -121,8 +122,10 @@ import {
   updateEntity,
   updateCompanionConsumableBehavior,
   type Companion,
+  type CompanionDirectCommandInput,
   type ConsumableBehaviorUpdate,
   type DebugMapId,
+  type DirectCompanionCommandResultCode,
   type Enemy,
   type EquipmentSlot,
   type EquipmentStatModifiers,
@@ -153,6 +156,7 @@ import { type SpriteDirection } from "./visualAssets";
 const debugMap = createDebugMap();
 const gameVersion = "0.01";
 const currencyGainFeedbackDurationMs = 1200;
+const directCommandFeedbackDurationMs = 1400;
 const currencyGainBurstSrc =
   "Asserts/Generated/prototype-vfx/sprites/currency-gain-burst.png";
 const mapConstructionCellPixelSize = 32;
@@ -1655,6 +1659,32 @@ function getCompanionDisplayName(member: Companion): string {
   return index >= 0 ? `Companion ${index + 1}` : member.id;
 }
 
+function getDirectCommandFeedbackText(
+  resultCode: DirectCompanionCommandResultCode | string,
+): string {
+  if (resultCode === "invalid_source") {
+    return "That companion cannot act.";
+  }
+
+  if (resultCode === "invalid_target") {
+    return "That target is not valid.";
+  }
+
+  if (resultCode === "out_of_range") {
+    return "Direct command is beyond 30 cells.";
+  }
+
+  if (resultCode === "resource_full") {
+    return "That resource already has max collectors.";
+  }
+
+  if (resultCode === "blocked_position") {
+    return "Cannot move there.";
+  }
+
+  return "Direct command rejected.";
+}
+
 function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
@@ -1704,6 +1734,10 @@ function App() {
   >(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [currencyGainFeedbackUntil, setCurrencyGainFeedbackUntil] = useState(0);
+  const [directCommandFeedback, setDirectCommandFeedback] = useState<{
+    text: string;
+    expiresAt: number;
+  } | null>(null);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -1824,6 +1858,16 @@ function App() {
     gameState.hubDepartureFoodWarning.expiresAt > currentTime
       ? gameState.hubDepartureFoodWarning
       : null;
+  const activeDirectCommandFeedback =
+    directCommandFeedback && directCommandFeedback.expiresAt > currentTime
+      ? directCommandFeedback
+      : null;
+  const activeDirectCommandCount = Object.keys(
+    gameState.directCompanionCommandsById ?? {},
+  ).length;
+  const directCommandGraceCount = Object.values(
+    gameState.directCommandGraceUntilByCompanionId ?? {},
+  ).filter((graceUntil) => graceUntil > currentTime).length;
   const previousInteractionMapIdRef = useRef(currentMap.id);
   const equipmentTutorialQuestStatus =
     gameState.quests[EQUIPMENT_TUTORIAL_QUEST_ID]?.status ?? null;
@@ -2703,6 +2747,25 @@ function App() {
     );
   }
 
+  function commandCompanionByDrag(command: CompanionDirectCommandInput) {
+    const now = Date.now();
+    let resultCode: DirectCompanionCommandResultCode | null = null;
+
+    setGameState((state) => {
+      const result = issueCompanionDirectCommand(state, command, now);
+      resultCode = result.code;
+
+      return result.state;
+    });
+
+    if (resultCode && resultCode !== "success") {
+      setDirectCommandFeedback({
+        text: getDirectCommandFeedbackText(resultCode),
+        expiresAt: now + directCommandFeedbackDurationMs,
+      });
+    }
+  }
+
   function commandPartyToMoveFromFloorPosition(targetPosition: Position) {
     if (!isValidFloorPosition(targetPosition)) {
       return;
@@ -2979,11 +3042,15 @@ function App() {
             cellPixelSize={mapConstructionCellPixelSize}
             combatFeedbackEvents={gameState.combatFeedbackEvents}
             currentTime={currentTime}
+            directCompanionCommandsById={
+              gameState.directCompanionCommandsById ?? {}
+            }
             dropVisualEvents={gameState.dropVisualEvents ?? []}
             entities={allEntities}
             leaderIntent={gameState.leaderIntent}
             map={currentMap}
             mode="full"
+            onCompanionDragCommand={commandCompanionByDrag}
             onEnemyClick={commandPartyToTargetEnemy}
             onEntityHover={updateEntityHoverTooltip}
             onFloorClick={commandPartyToMoveFromFloorPosition}
@@ -3306,6 +3373,11 @@ function App() {
             {hubDepartureFoodWarning.companionIds.length === 1 ? "" : "s"}
           </div>
         ) : null}
+        {activeDirectCommandFeedback ? (
+          <div className="direct-command-feedback-toast" role="status">
+            {activeDirectCommandFeedback.text}
+          </div>
+        ) : null}
 
         <div className="bottom-hud-controls">
           <div className="test-controls simulation-controls">
@@ -3366,6 +3438,10 @@ function App() {
                     {gameState.debugTelemetry?.ticks.length ?? 0}/
                     {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
                     {gameState.debugTelemetry?.events.length ?? 0}
+                  </span>
+                  <span>
+                    Direct Commands {activeDirectCommandCount} | Rejoin Grace{" "}
+                    {directCommandGraceCount}
                   </span>
                   <span>
                     Quest{" "}

@@ -34,6 +34,7 @@ import type {
   ConsumableUseState,
   DebugNavigationReason,
   DebugTelemetryState,
+  DirectCompanionCommand,
   ActiveTeleport,
   DebugMapId,
   GameMap,
@@ -90,7 +91,7 @@ const FOLLOW_PATH_REFRESH_MS = 500;
 const MOVEMENT_PATH_BLOCKED_REFRESH_COUNT = 2;
 const MEANINGFUL_TARGET_MOVE_DISTANCE = 1;
 
-type FindAvailablePositionOptions = {
+export type FindAvailablePositionOptions = {
   blockedPositions?: Position[];
   ignoredEntityId?: string;
 };
@@ -106,6 +107,7 @@ export type MovementPathProfile =
   | "poi"
   | "teleport"
   | "resurrection"
+  | "directCommand"
   | "explore"
   | "chase"
   | "combatSlot"
@@ -249,6 +251,8 @@ export type GameState = {
   leaderHandoffRemainingMs?: number;
   partyIntent: PartyIntent | null;
   leaderIntent: LeaderIntent | null;
+  directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
+  directCommandGraceUntilByCompanionId?: Record<string, number>;
   interruptedPoiTarget?: InterruptedPoiTarget | null;
   quests: Record<QuestId, QuestState>;
   globalPoiIntent: GlobalPoiIntent | null;
@@ -1993,10 +1997,10 @@ function getPositionRing(center: Position, radius: number): Position[] {
   return positions;
 }
 
-function isPositionAvailable(
+export function isPositionAvailable(
   state: GameState,
   position: Position,
-  options: FindAvailablePositionOptions,
+  options: FindAvailablePositionOptions = {},
 ): boolean {
   return (
     isInMapBounds(state, position) &&
