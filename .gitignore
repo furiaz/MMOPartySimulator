@@ -11,6 +11,10 @@ client/dist/
 .env.local
 .env.*.local
 
+# Local project exports
+.codex_project_items.json
+project-items.json
+
 # Logs
 *.log
 npm-debug.log*
@@ -19,6 +23,7 @@ yarn-error.log*
 
 # Codex/local generated artifacts
 .codex-artifacts/
+output/
 outputs/
 
 # OS/editor noise
