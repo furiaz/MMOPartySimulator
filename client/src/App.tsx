@@ -191,6 +191,7 @@ function getNextPoiSearchScope(scope: PoiSearchScope): PoiSearchScope {
 
 type EntityVisualMovement = {
   direction: SpriteDirection;
+  angleDegrees: number;
   expiresAt: number;
 };
 
@@ -899,6 +900,18 @@ function getMovementDirection(
   }
 
   return yDelta >= 0 ? "south" : "north";
+}
+
+function getMovementAngleDegrees(
+  previousPosition: Position,
+  currentPosition: Position,
+): number {
+  const xDelta = currentPosition.x - previousPosition.x;
+  const yDelta = currentPosition.y - previousPosition.y;
+  const radians = Math.atan2(-yDelta, xDelta);
+  const degrees = (radians * 180) / Math.PI;
+
+  return (degrees + 360) % 360;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -2126,6 +2139,10 @@ function App() {
           for (const entityId of movedEntityIds) {
             nextVisualMovement[entityId] = {
               direction: getMovementDirection(
+                previousPositions[entityId],
+                latestPositions[entityId],
+              ),
+              angleDegrees: getMovementAngleDegrees(
                 previousPositions[entityId],
                 latestPositions[entityId],
               ),

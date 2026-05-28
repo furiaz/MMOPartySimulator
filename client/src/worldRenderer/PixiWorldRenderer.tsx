@@ -157,6 +157,7 @@ export type PixiRendererPerformanceSample = {
 
 type EntityVisualMovement = {
   direction: SpriteDirection;
+  angleDegrees?: number;
   expiresAt: number;
 };
 
@@ -1856,6 +1857,7 @@ function getEntitySpriteSrc({
       visualAsset,
       isVisuallyMoving,
       visualMovement?.direction,
+      visualMovement?.angleDegrees,
     );
 
     if (animation.frames.length === 0) {

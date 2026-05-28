@@ -433,14 +433,23 @@ export function getSpriteAnimation(
   visualAsset: SpriteVisualAsset,
   isVisuallyMoving: boolean,
   movementDirection?: SpriteDirection,
+  movementAngleDegrees?: number,
 ): SpriteAnimationAsset {
   const direction = movementDirection ?? "south";
 
   if (isVisuallyMoving) {
-    return getDirectionalAnimation(visualAsset.animations.run, direction);
+    return getDirectionalAnimation(
+      visualAsset.animations.run,
+      direction,
+      movementAngleDegrees,
+    );
   }
 
-  return getDirectionalAnimation(visualAsset.animations.idle, direction);
+  return getDirectionalAnimation(
+    visualAsset.animations.idle,
+    direction,
+    movementAngleDegrees,
+  );
 }
 
 function getDirectionalAnimation(
@@ -448,6 +457,7 @@ function getDirectionalAnimation(
     | SpriteAnimationAsset
     | Partial<Record<SpriteDirection, SpriteAnimationAsset>>,
   direction: SpriteDirection,
+  movementAngleDegrees?: number,
 ): SpriteAnimationAsset {
   if ("frames" in animation) {
     return animation;
@@ -457,7 +467,7 @@ function getDirectionalAnimation(
 
   return (
     animation[direction] ??
-    animation[getCardinalDirection(direction)] ??
+    animation[getCardinalDirection(direction, movementAngleDegrees)] ??
     fallbackAnimation ?? {
       frames: [],
       frameDurationMs: defaultFrameDurationMs,
@@ -465,7 +475,14 @@ function getDirectionalAnimation(
   );
 }
 
-function getCardinalDirection(direction: SpriteDirection): SpriteDirection {
+function getCardinalDirection(
+  direction: SpriteDirection,
+  movementAngleDegrees?: number,
+): SpriteDirection {
+  if (movementAngleDegrees !== undefined) {
+    return getCardinalDirectionForAngle(movementAngleDegrees);
+  }
+
   if (direction === "northEast" || direction === "northWest") {
     return "north";
   }
@@ -475,4 +492,24 @@ function getCardinalDirection(direction: SpriteDirection): SpriteDirection {
   }
 
   return direction;
+}
+
+function getCardinalDirectionForAngle(
+  movementAngleDegrees: number,
+): CardinalSpriteDirection {
+  const angle = ((movementAngleDegrees % 360) + 360) % 360;
+
+  if (angle >= 75 && angle <= 105) {
+    return "north";
+  }
+
+  if (angle >= 255 && angle <= 285) {
+    return "south";
+  }
+
+  if (angle > 105 && angle < 255) {
+    return "west";
+  }
+
+  return "east";
 }

@@ -49,4 +49,32 @@ describe("entity visual assets", () => {
 
     expect(getEntityVisualAsset(testBlade)).toBe(entityVisualAssets.testBlade);
   });
+
+  it("uses narrow vertical angle bands for Beginner four-direction movement", () => {
+    const visualAsset = entityVisualAssets.beginnerCharacter;
+
+    const northAnimation = getSpriteAnimation(visualAsset, true, "northEast", 90);
+    const southAnimation = getSpriteAnimation(visualAsset, true, "southEast", 270);
+    const eastAnimation = getSpriteAnimation(visualAsset, true, "northEast", 45);
+    const westAnimation = getSpriteAnimation(visualAsset, true, "northWest", 180);
+    const nearNorthEastAnimation = getSpriteAnimation(
+      visualAsset,
+      true,
+      "northEast",
+      74.9,
+    );
+    const nearNorthWestAnimation = getSpriteAnimation(
+      visualAsset,
+      true,
+      "northWest",
+      105.1,
+    );
+
+    expect(northAnimation.frames[0]).toContain("BeginnerWalkingNorth");
+    expect(southAnimation.frames[0]).toContain("BeginnerWalkingSouth");
+    expect(eastAnimation.frames[0]).toContain("BeginnerWalkingEast");
+    expect(westAnimation.frames[0]).toContain("BeginnerWalkingWest");
+    expect(nearNorthEastAnimation.frames[0]).toContain("BeginnerWalkingEast");
+    expect(nearNorthWestAnimation.frames[0]).toContain("BeginnerWalkingWest");
+  });
 });
