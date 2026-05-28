@@ -3004,7 +3004,7 @@ function App() {
                   Scope: {poiSearchScopeLabels[poiSearchScope]}
                 </button>
               </div>
-              <span>debug: {currentMap.debugName}</span>
+              <span>Prototype Zone ID: {currentMap.debugName}</span>
             </div>
             <div className="map-debug-toggle-controls" aria-label="Debug multipliers">
               <button
