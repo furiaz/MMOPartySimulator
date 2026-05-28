@@ -50,6 +50,7 @@ Current game-logic implementation files include:
 - `attackSystem.ts`
 - `classes.ts`
 - `commands.ts`
+- `directCompanionCommands.ts`
 - `combatResolver.ts`
 - `companionCombat.ts`
 - `consumables.ts`
@@ -61,9 +62,11 @@ Current game-logic implementation files include:
 - `dropSystem.ts`
 - `dropTables.ts`
 - `enemyAISystem.ts`
+- `enemyAoeChannelSystem.ts`
 - `enemyArchetypes.ts`
 - `enemyRespawnSystem.ts`
 - `enemyScaling.ts`
+- `enemyVariants.ts`
 - `entities.ts`
 - `entityGuards.ts`
 - `equipmentRules.ts`
@@ -114,6 +117,7 @@ Current game-logic implementation files include:
 - `targetSelection.ts`
 - `testState.ts`
 - `teleportSystem.ts`
+- `teleportState.ts`
 - `types.ts`
 - `updateGame.ts`
 - `wallet.ts`
@@ -749,17 +753,27 @@ Commands can be direct entity commands, party member commands, party member grou
 
 Rules:
 
-- direct commands override autonomous behavior for the targeted entity
-- direct commands should not automatically change other entities
-- direct commands are absolute for this phase
-- direct leader commands update party execution intent through the party intent helpers
 - party orders update party intent and assign autonomous member states from that shared intent
+- direct companion commands are stored separately from party intent
+- direct companion commands can target attack, gather, or move behavior for one companion
+- direct companion commands override autonomous behavior for the targeted companion
+- direct companion commands do not automatically change other companions
+- direct companion commands cancel resurrection channeling for the commanded helper
+- direct companion commands reject invalid sources, invalid targets, blocked move positions, targets beyond the direct-command leash, and full resource gather slots
+- direct gather commands reserve resource capacity before autonomous collectors
+- direct gather commands may temporarily self-defend against personal threats without clearing the gather command
+- completed or canceled direct commands start a short rejoin grace period before normal autonomous behavior fully resumes
+- direct move commands clear stale movement planning for the commanded companion
 
 Current command priority values:
 
 ```ts
 type CommandPriority = "autonomous" | "direct";
 ```
+Current direct companion command constants:
+
+- `DIRECT_COMMAND_MAX_PATH_DISTANCE = 30`
+- `DIRECT_COMMAND_REJOIN_GRACE_MS = 1500`
 
 Current command types use entity states except `dead`.
 
@@ -1047,31 +1061,38 @@ Current high-level order:
 7. Synchronize derived max health again after consumable changes
 8. Update world-wipe recovery
 9. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
-10. Update teleport system
-11. If teleport is active or map transition happened, record telemetry and stop the tick early
-12. Update POI system
-13. Update healing fountain system
-14. Update resurrection system
-15. If auto mode is enabled, update role behavior
-16. If auto mode is enabled, update prototype skills
-17. If leader intent, auto mode, or teleport POI movement is active, update party formation movement
-18. If auto mode is enabled, reserve exploration movement
-19. Update defender behavior
-20. If auto mode is enabled, update exploration
-21. Update follow behavior
-22. Update quest guide escort behavior
-23. Update enemy AI
-24. Update attacks
-25. Update flask recharge from counted enemy defeats
-26. Restore interrupted POI target when valid
-27. Update passive health regeneration
-28. Update target dummy health regeneration
-29. Update drop system
-30. Update enemy respawn system
-31. Update gathering
-32. Update skill shield block positions
-33. Idle autonomous party members when no POI or leader intent is active
-34. Record debug telemetry
+10. Update party intent recovery
+11. Update resurrection
+12. Update party intent recovery again after resurrection changes
+13. Update teleport system
+14. If teleport is active or map transition happened, record telemetry and stop the tick early
+15. Update direct companion commands
+16. Build current resource work context
+17. Update POI system
+18. Update healing fountain system
+19. Rebuild resource work context
+20. If auto mode is enabled, update role behavior
+21. If auto mode is enabled, update prototype skills
+22. If party execution intent, auto mode, or teleport POI movement is active, update party formation movement
+23. If auto mode is enabled, reserve exploration movement
+24. Update defender behavior
+25. If auto mode is enabled, update exploration
+26. Update follow behavior
+27. Update quest guide escort behavior
+28. Update enemy AI
+29. Update enemy AoE channel behavior
+30. Update party intent self-defense
+31. Update attacks
+32. Update flask recharge from counted enemy defeats
+33. Restore interrupted POI target when valid
+34. Update passive health regeneration
+35. Update target dummy health regeneration
+36. Update drop system
+37. Update enemy respawn system
+38. Update gathering
+39. Update skill shield block positions
+40. Idle autonomous party members when no POI or leader intent is active
+41. Record debug telemetry
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
 
@@ -1275,7 +1296,8 @@ Current attack behavior:
 Current basic attack constants and helpers:
 
 - `DEFAULT_COMPANION_ATTACK_RANGE = 1`
-- `ATTACK_COOLDOWN_MS = 1000`
+- `ATTACK_COOLDOWN_MS = 2000`
+- `ENEMY_ATTACK_WINDUP_MS = 500`
 - `TARGET_SWITCH_DISTANCE = 6`
 - enemy attack range may come from enemy entity data, enemy type data, enemy archetype defaults, or the default enemy attack range
 
@@ -1402,7 +1424,7 @@ Current enemy respawn behavior:
 
 Current enemy respawn constant:
 
-- `ENEMY_RESPAWN_DELAY_MS = 10_000`
+- `ENEMY_RESPAWN_DELAY_MS = 30_000`
 
 Enemy respawn is prototype wild-map behavior.
 
@@ -1964,15 +1986,19 @@ Current prototype/debug routes:
 Current teleport behavior:
 
 - uses a small debug map teleport table
+- supports per-teleport runtime working state
+- teleports default to working unless their map definition sets `startsWorking: false`
+- quest route-unlock objectives may set a teleport to working
+- non-working teleports cannot be triggered or selected for route movement
 - can be triggered by player/debug action, World Travel menu selection, or AI conditions
 - can set a teleport point as party movement intent
-- auto mode may select eligible teleport points after living enemies are cleared or when quest progression requires a connected map
-- World Travel may select an eligible known destination and guide the party toward the matching teleport point
+- auto mode may select eligible working teleport points after living enemies are cleared or when quest progression requires a connected map
+- World Travel may select an eligible known destination and guide the party toward the matching working teleport point
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
-- map-local enemies, resources, hub placeholders, hub target dummy, explored tiles, movement planning, formation state, combat feedback, skill visuals, drop visuals, resurrection state, and follow trails are reset or rebuilt for the new map
-- companion progression, class, role, level, XP, health, party identity, equipment, consumables, wallet, inventory, quests, and party order are preserved
+- map-local enemies, resources, hub placeholders, hub target dummies, explored tiles, movement planning, direct commands, formation state, combat feedback, skill visuals, enemy AoE runtime, drop visuals, resurrection state, and follow trails are reset or rebuilt for the new map
+- companion progression, class, role, level, XP, health, party identity, equipment, consumables, wallet, inventory, quests, party order, and teleport working state are preserved
 
 Current active teleport state:
 
@@ -1986,6 +2012,15 @@ type ActiveTeleport = {
   triggeredBy: "ai" | "player";
 };
 ```
+Current teleport runtime state:
+
+```ts
+type TeleportRuntimeState = {
+  isWorking: boolean;
+};
+```
+
+`teleportState.ts` owns helper logic for resolving default and runtime teleport working state.
 
 World Travel should use current route and map data.
 
@@ -2238,7 +2273,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummy, sprite animation, enemy and NPC name labels, camera follow behavior, combat feedback, skill visual feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 

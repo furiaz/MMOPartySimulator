@@ -467,9 +467,20 @@ Current prototype enemy target preferences:
 - current leader
 - lowest-health party member
 
-Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, subzone ids, encounter area ids, lightweight roaming behavior, and defeated timestamps.
+Enemies may have levels, health, attack cooldowns, detection ranges, attack ranges, home positions, subzone ids, encounter area ids, lightweight roaming behavior, defeated timestamps, and optional prototype variants.
 
-Enemy XP rewards currently come from the enemy level XP table by default. Monster-specific XP adjustments, Superior monster reward modifiers, and special named Elite monster rewards are future-facing and should not be treated as part of the current enemy archetype or enemy type setup data.
+Enemy XP rewards currently come from the enemy level XP table by default. Superior enemies currently apply a prototype XP multiplier. Monster-specific XP adjustments and special named Elite monster reward modifiers are future-facing tuning work and should not be treated as part of normal enemy archetype or enemy type setup data.
+
+Current prototype enemy variants:
+
+- Superior enemies may appear on eligible wild-map enemy spawns.
+- Superior enemies do not spawn in the hub.
+- Superior enemies do not roll in the middle twenty percent of a map's height.
+- A subzone can have at most one living Superior enemy at a time.
+- Superior enemies have increased health, attack, defense, magic defense, XP, drop tables, render scale, and a visible renderer aura.
+- Superior enemy spawning may happen during map spawn, enemy respawn, or explicit debug forcing.
+
+Superior enemies are prototype rare-variant behavior, not final elite design, named boss design, affix design, or production rare-monster tuning.
 
 Current prototype enemy scaling:
 
@@ -483,7 +494,19 @@ Current prototype enemy respawn behavior:
 - defeated enemies may respawn on wild maps after a short delay
 - enemies respawn at their home position
 - respawn restores health and clears temporary target, roam, mark, and bind state
+- respawn may reroll eligible Superior enemy variant state
 - enemy respawn does not run in the hub
+
+Current prototype enemy AoE behavior:
+
+- the hub includes a debug AoE target dummy
+- the AoE dummy starts its stomp only when the player, party intent, direct command, or party combat state engages it
+- the stomp locks a circular area, channels briefly, enters a short windup, then deals small physical damage to living companions still inside the circle at impact
+- shield blocks and passive block can prevent the damage
+- binding the caster, killing the caster, or blocking line of sight to the locked area interrupts the channel and starts cooldown
+- the renderer shows the danger circle and channel bar
+
+Prototype enemy AoE behavior is debug combat-test behavior, not a final enemy ability framework, boss mechanic system, or production telegraph design.
 
 Current prototype enemy archetype/family ids:
 
@@ -1295,7 +1318,8 @@ Current XP intent:
 - early levels should be fast enough to show progression quickly
 - later levels should take significantly longer
 - XP rewards should scale from the enemy level table by default
-- monster-specific XP deltas and Superior monster XP modifiers are future-facing tuning work
+- Superior enemies currently apply a prototype XP multiplier
+- monster-specific XP deltas and named Elite reward modifiers are future-facing tuning work
 - lower-level enemies should become less valuable as party members outlevel them
 
 Leveling should remain simple and readable during the prototype phase.
@@ -1743,11 +1767,12 @@ Current prototype hub:
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
 - It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, decorative house/cabin/tent/dock-shore structure visuals, and a clear exit to the first wild zone.
-- Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, and a hub target dummy.
+- Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, a hub target dummy, and a hub AoE target dummy.
 - The Quest Giver supports the lightweight prototype quest chain only.
 - The Merchant supports prototype quick exchange of eligible junk items for Crowns and a fixed prototype buy stock for selected equipment and consumables.
-- The hub target dummy is a passive 100 HP debug enemy with no XP reward.
-- The hub target dummy can be manually attacked for combat testing, is not selected by autonomous POI behavior, and regenerates health over time.
+- Hub target dummies are passive 100 HP debug enemies with no XP reward.
+- The standard hub target dummy can be manually attacked for combat testing, is not selected by autonomous POI behavior, and regenerates health over time.
+- The hub AoE target dummy is a debug combat-test enemy for prototype enemy AoE channel and telegraph behavior.
 - The healing fountain restores party member health and refills equipped flask charges when party members are in range.
 - The prototype hub should not spawn hostile enemies for now.
 - The prototype hub must not implement full town systems, interiors, branching dialogue, full shops beyond the fixed prototype Merchant buy stock, crafting, recruitment, smithing, or NPC relationship systems unless explicitly requested.
@@ -1792,6 +1817,15 @@ Current prototype/debug map routes are:
 - `map-1` <-> `map-2`
 - `map-2` <-> `map-3`
 - `map-3` <-> `map-4`
+
+Some prototype forward teleports can start non-working and become working through quest route-unlock objectives.
+
+Current non-working starter routes:
+
+- `map-1` -> `map-2`
+- `map-2` -> `map-3`
+
+World Travel and AI route selection should use only working teleports.
 
 Current readable prototype/debug map names:
 
