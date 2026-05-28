@@ -9,6 +9,7 @@ import {
 } from "./consumables";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { updateDropSystem } from "./dropSystem";
 import { updateDirectCompanionCommandSystem } from "./directCompanionCommands";
@@ -165,6 +166,7 @@ export function updateGame(
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing);
+  nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateAttackSystem(
     nextState,

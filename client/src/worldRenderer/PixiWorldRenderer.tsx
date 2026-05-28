@@ -18,6 +18,7 @@ import type {
   CompanionDirectCommandInput,
   DirectCompanionCommand,
   DropVisualEvent,
+  EnemyAoeChannelState,
   EntityCollisionShape,
   GameEntity,
   GameMap,
@@ -39,6 +40,7 @@ import {
   isActiveResource,
   QUEST_GIVER_POI_ID,
   SKILL_DEFINITIONS,
+  aoeTargetDummyId,
 } from "../game";
 import {
   SUPERIOR_ENEMY_RENDER_SCALE,
@@ -73,6 +75,8 @@ const enemyNameplateFontSize = 10;
 const aggressiveEnemyNameplateColor = 0xdc2626;
 const passiveEnemyNameplateColor = 0x1f2937;
 const superiorEnemyAuraColor = 0xef4444;
+const enemyAoeFillColor = 0xdc2626;
+const enemyAoeStrokeColor = 0x7f1d1d;
 const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
@@ -109,6 +113,7 @@ type PixiWorldRendererProps = {
   currentTime: number;
   directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
+  enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent?: LeaderIntent | null;
   map: GameMap;
@@ -271,6 +276,7 @@ type DrawWorldOptions = {
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
   layers: PixiRenderLayers;
@@ -1586,6 +1592,7 @@ export function getEnemyNameplateText(
   const displayName =
     enemyType?.displayName ??
     archetype?.displayName ??
+    (enemy.id === aoeTargetDummyId ? "AoE Dummy" : undefined) ??
     (enemy.isTargetDummy ? "Target Dummy" : "Enemy");
   const variantPrefix = isSuperiorEnemy(enemy) ? "Superior " : "";
 
@@ -2699,6 +2706,87 @@ function drawSkillLink(
     .stroke({ color, alpha: 0.72, width });
 }
 
+function drawEnemyAoeChannels(
+  graphics: Graphics,
+  channelsByCasterId: Record<string, EnemyAoeChannelState>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const channel of Object.values(channelsByCasterId)) {
+    if (
+      channel.shape.type !== "circle" ||
+      !isPositionInTileBounds(channel.shape.center, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const center = toFullPosition(channel.shape.center, transform);
+    const channelProgress = getEnemyAoeChannelProgress(channel, currentTime);
+    const dangerOpacity = channel.phase === "windup" ? 1 : channelProgress;
+    const fillAlpha = 0.16 + dangerOpacity * 0.84;
+
+    graphics
+      .circle(
+        center.x,
+        center.y,
+        channel.shape.radius * transform.cellPixelSize,
+      )
+      .fill({ color: enemyAoeFillColor, alpha: fillAlpha })
+      .stroke({
+        color: enemyAoeStrokeColor,
+        alpha: 0.48 + dangerOpacity * 0.52,
+        width: 3,
+      });
+  }
+}
+
+function drawEnemyAoeChannelBars(
+  graphics: Graphics,
+  channelsByCasterId: Record<string, EnemyAoeChannelState>,
+  entitiesById: Map<string, GameEntity>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const channel of Object.values(channelsByCasterId)) {
+    const caster = entitiesById.get(channel.casterId);
+
+    if (!caster || !isPositionInTileBounds(caster.position, visibleTileBounds)) {
+      continue;
+    }
+
+    const progress =
+      channel.phase === "windup"
+        ? 1
+        : getEnemyAoeChannelProgress(channel, currentTime);
+    const center = toFullPosition(caster.position, transform);
+    const width = transform.cellPixelSize * 0.86;
+    const height = 4;
+    const x = center.x - width / 2;
+    const y = center.y - transform.cellPixelSize * 0.82 - height;
+
+    graphics.rect(x, y, width, height).fill({ color: 0x450a0a, alpha: 0.9 });
+    graphics.rect(x, y, width * progress, height).fill(0xef4444);
+  }
+}
+
+function getEnemyAoeChannelProgress(
+  channel: EnemyAoeChannelState,
+  currentTime: number,
+): number {
+  const duration = channel.channelEndsAt - channel.startedAt;
+
+  if (duration <= 0) {
+    return 1;
+  }
+
+  return Math.max(
+    0,
+    Math.min(1, (currentTime - channel.startedAt) / duration),
+  );
+}
+
 function drawFullEffects({
   cache,
   combatFeedbackEvents,
@@ -3730,6 +3818,7 @@ function drawFullMap({
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
+  enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
   layers,
@@ -3757,6 +3846,7 @@ function drawFullMap({
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
   layers: PixiRenderLayers;
@@ -3786,6 +3876,7 @@ function drawFullMap({
   const backgroundGraphics = layers.backgroundGraphics;
   const fallbackGraphics = layers.fallbackGraphics;
   const effectsGraphics = layers.effectsGraphics;
+  const entitiesById = getEntityById(entities);
   const visibleTileBounds = getFullVisibleTileBounds({
     cameraOffset,
     cellPixelSize,
@@ -3859,6 +3950,13 @@ function drawFullMap({
     visibleTileBounds,
     visualMovementByEntityId,
   });
+  drawEnemyAoeChannels(
+    effectsGraphics,
+    enemyAoeChannelsByCasterId,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
   drawFullEffects({
     cache: textureCache,
     combatFeedbackEvents,
@@ -3966,6 +4064,15 @@ function drawFullMap({
       .stroke({ color: 0xa855f7, alpha: 0.55, width: 3 });
   }
 
+  drawEnemyAoeChannelBars(
+    overlayGraphics,
+    enemyAoeChannelsByCasterId,
+    entitiesById,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
+
   for (const entity of entities) {
     if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
       continue;
@@ -4009,6 +4116,7 @@ function drawWorld({
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
+  enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
   layers,
@@ -4040,6 +4148,7 @@ function drawWorld({
       currentTime,
       directCompanionCommandsById,
       dropVisualEvents,
+      enemyAoeChannelsByCasterId,
       entities,
       leaderIntent,
       layers,
@@ -4079,6 +4188,7 @@ export function PixiWorldRenderer({
   currentTime,
   directCompanionCommandsById = {},
   dropVisualEvents = [],
+  enemyAoeChannelsByCasterId = {},
   entities,
   leaderIntent = null,
   map,
@@ -4115,6 +4225,7 @@ export function PixiWorldRenderer({
   const latestCurrentTimeRef = useRef(currentTime);
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
+  const latestEnemyAoeChannelsByCasterIdRef = useRef(enemyAoeChannelsByCasterId);
   const latestActiveTeleportRef = useRef<ActiveTeleport | null>(activeTeleport);
   const latestMapRef = useRef(map);
   const latestEntitiesRef = useRef<GameEntity[]>(entities);
@@ -4154,6 +4265,7 @@ export function PixiWorldRenderer({
     latestCurrentTimeRef.current = currentTime;
     latestDirectCompanionCommandsByIdRef.current = directCompanionCommandsById;
     latestDropVisualEventsRef.current = dropVisualEvents;
+    latestEnemyAoeChannelsByCasterIdRef.current = enemyAoeChannelsByCasterId;
     latestMapRef.current = map;
     latestEntitiesRef.current = sortedEntities;
     latestLeaderIntentRef.current = leaderIntent;
@@ -4177,7 +4289,9 @@ export function PixiWorldRenderer({
     cellPixelSize,
     combatFeedbackEvents,
     currentTime,
+    directCompanionCommandsById,
     dropVisualEvents,
+    enemyAoeChannelsByCasterId,
     leaderIntent,
     map,
     mode,
@@ -4257,6 +4371,8 @@ export function PixiWorldRenderer({
         directCompanionCommandsById:
           latestDirectCompanionCommandsByIdRef.current,
         dropVisualEvents: latestDropVisualEventsRef.current,
+        enemyAoeChannelsByCasterId:
+          latestEnemyAoeChannelsByCasterIdRef.current,
         entities: latestEntitiesRef.current,
         layers: layersRef.current,
         leaderIntent: latestLeaderIntentRef.current,
@@ -4379,6 +4495,7 @@ export function PixiWorldRenderer({
       currentTime,
       directCompanionCommandsById,
       dropVisualEvents,
+      enemyAoeChannelsByCasterId,
       entities: sortedEntities,
       layers: layersRef.current,
       leaderIntent,
@@ -4408,6 +4525,7 @@ export function PixiWorldRenderer({
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
+    enemyAoeChannelsByCasterId,
     leaderIntent,
     map,
     mode,

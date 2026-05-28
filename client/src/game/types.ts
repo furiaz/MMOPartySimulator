@@ -796,6 +796,36 @@ export type SkillVisualEvent = {
   expiresAt: number;
 };
 
+export type EnemyAoeAbilityId = "aoe_dummy_stomp";
+
+export type EnemyAoeChannelPhase = "channeling" | "windup";
+
+export type EnemyAoeInterruptReason = "caster_dead" | "caster_bound" | "line_of_sight";
+
+export type EnemyAoeCircleShape = {
+  type: "circle";
+  center: Position;
+  radius: number;
+};
+
+export type EnemyAoeChannelState = {
+  id: string;
+  abilityId: EnemyAoeAbilityId;
+  casterId: string;
+  shape: EnemyAoeCircleShape;
+  phase: EnemyAoeChannelPhase;
+  startedAt: number;
+  channelEndsAt: number;
+  windupEndsAt: number;
+  cooldownMs: number;
+};
+
+export type EnemyAoeCooldownState = {
+  abilityId: EnemyAoeAbilityId;
+  casterId: string;
+  expiresAt: number;
+};
+
 export type DropVisualEvent = {
   id: string;
   kind?: "inventory_item" | "quest_item";

@@ -13,6 +13,8 @@ import { createActiveQuestGuideNpc } from "./questGuideSystem";
 import { isTeleportWorking } from "./teleportState";
 import {
   companionIds,
+  aoeTargetDummyId,
+  aoeTargetDummyPosition,
   createDebugMap,
   debugMapDefinitions,
   hubNpcStartData,
@@ -339,6 +341,8 @@ function completeTeleport(state: GameState): GameState {
     defenderWaitMsByLeaderId: {},
     defenderBlockedMsByEntityId: {},
     skillVisualEvents: [],
+    enemyAoeChannelsByCasterId: {},
+    enemyAoeCooldownsByCasterId: {},
     dropVisualEvents: [],
     resurrectionProgressByCompanionId: {},
     resurrectionChannelsByHelperId: {},
@@ -433,6 +437,10 @@ function getMapEntities(
       );
     }
     entities[targetDummyId] = createTargetDummy(targetDummyId, targetDummyPosition);
+    entities[aoeTargetDummyId] = createTargetDummy(
+      aoeTargetDummyId,
+      aoeTargetDummyPosition,
+    );
 
     return entities;
   }

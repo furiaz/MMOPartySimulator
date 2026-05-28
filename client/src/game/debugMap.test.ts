@@ -11,6 +11,7 @@ import {
   MAP_TWO_ROWS,
   WILDERNESS_MAP_COLUMNS,
   WILDERNESS_MAP_ROWS,
+  aoeTargetDummyPosition,
   createDebugMap,
   debugMapDefinitions,
   hubCompanionStartPositions,
@@ -130,6 +131,7 @@ describe("debug maps", () => {
       ...hubNpcStartData.map((npc) => npc.position),
       ...hubHealingFountains.map((fountain) => fountain.position),
       targetDummyPosition,
+      aoeTargetDummyPosition,
       hubTeleport.position,
       ...hubTeleport.arrivalPositions,
     ]);

@@ -1,4 +1,6 @@
 import {
+  aoeTargetDummyId,
+  aoeTargetDummyPosition,
   createDebugMap,
   debugMapDefinitions,
   hubCompanionStartPositions,
@@ -245,6 +247,8 @@ function resetStateToRescueHub(
     skillShieldBlocksById: {},
     skillCooldownsByCompanionId: {},
     skillVisualEvents: [],
+    enemyAoeChannelsByCasterId: {},
+    enemyAoeCooldownsByCasterId: {},
     dropVisualEvents: [],
     resurrectionProgressByCompanionId: {},
     resurrectionChannelsByHelperId: {},
@@ -314,6 +318,10 @@ function getRescueHubEntities(
       );
     }
     entities[targetDummyId] = createTargetDummy(targetDummyId, targetDummyPosition);
+    entities[aoeTargetDummyId] = createTargetDummy(
+      aoeTargetDummyId,
+      aoeTargetDummyPosition,
+    );
   }
 
   return entities;

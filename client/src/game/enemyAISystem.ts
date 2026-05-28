@@ -7,6 +7,7 @@ import {
 } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
+import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
 import { GAME_LOOP_TICK_MS, type SimulationTiming } from "./simulationTiming";
 import { getPartyLeader } from "./partySystem";
 import {
@@ -55,6 +56,10 @@ export function updateEnemyAISystem(
 
   for (const entity of entities) {
     if (!isEnemy(entity) || entity.state === "dead") {
+      continue;
+    }
+
+    if (isEnemyAoeChanneling(nextState, entity.id)) {
       continue;
     }
 

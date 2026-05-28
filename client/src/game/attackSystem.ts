@@ -29,6 +29,7 @@ import {
   getEnemyAttackLeashDistance,
   getEnemyChaseSpeedMultiplier,
 } from "./enemyAISystem";
+import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
   cancelResurrectionChannelForHelper,
@@ -75,6 +76,8 @@ export function updateAttackSystem(
       !attacker ||
       (attacker.kind === "companion" &&
         isCompanionResurrectionChanneling(nextState, attacker.id)) ||
+      (attacker.kind === "enemy" &&
+        isEnemyAoeChanneling(nextState, attacker.id)) ||
       !isAttackingCombatEntity(attacker)
     ) {
       continue;

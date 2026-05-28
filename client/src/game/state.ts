@@ -52,6 +52,8 @@ import type {
   PartyMemberRole,
   Position,
   DropVisualEvent,
+  EnemyAoeChannelState,
+  EnemyAoeCooldownState,
   SkillBindState,
   SkillCooldownState,
   SkillGatherBuffState,
@@ -283,6 +285,8 @@ export type GameState = {
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
+  enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
+  enemyAoeCooldownsByCasterId?: Record<string, EnemyAoeCooldownState>;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
   hubDepartureFoodWarning?: HubDepartureFoodWarningState | null;
   flaskRechargeEnemyKillCounter?: number;

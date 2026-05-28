@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createTargetDummy } from "./entities";
 import {
+  aoeTargetDummyId,
+  aoeTargetDummyPosition,
   createDebugMap,
   HUB_MAP_ID,
   hubNpcStartData,
@@ -38,6 +40,29 @@ describe("hub target dummy", () => {
       currentTargetId: null,
     };
     const dummy = createTargetDummy("dummy", targetDummyPosition);
+    const state = [leader, dummy].reduce(
+      addEntity,
+      createTestGameState({
+        autoModeEnabled: true,
+        currentMapId: HUB_MAP_ID,
+        map: createDebugMap(HUB_MAP_ID),
+        partyLeaderId: leader.id,
+      }),
+    );
+
+    const nextState = updateGame(state, { nowMs: 1000, deltaMs: 100 });
+
+    expect(nextState.localPoiTarget?.targetEntityId).not.toBe(dummy.id);
+    expect(nextState.leaderIntent?.targetId).not.toBe(dummy.id);
+  });
+
+  it("does not select the AoE target dummy as an automatic POI", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 55, y: 10 }, "leader", "fighter"),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
     const state = [leader, dummy].reduce(
       addEntity,
       createTestGameState({

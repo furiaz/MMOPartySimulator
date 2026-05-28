@@ -75,6 +75,8 @@ import {
   getItemDefinition,
   getMerchantBuyStock,
   getMerchantSecondaryFilterOptions,
+  aoeTargetDummyId,
+  aoeTargetDummyPosition,
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
@@ -1104,6 +1106,7 @@ function createInitialState(): GameState {
     secondCompanion,
     ...npcs,
     createTargetDummy(targetDummyId, targetDummyPosition),
+    createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition),
   ].reduce(addEntity, {
     entities: {},
     inventory: createEmptyPartyInventory(),
@@ -3046,6 +3049,9 @@ function App() {
               gameState.directCompanionCommandsById ?? {}
             }
             dropVisualEvents={gameState.dropVisualEvents ?? []}
+            enemyAoeChannelsByCasterId={
+              gameState.enemyAoeChannelsByCasterId ?? {}
+            }
             entities={allEntities}
             leaderIntent={gameState.leaderIntent}
             map={currentMap}
