@@ -189,6 +189,28 @@ If protected documentation appears to need updates, Codex must:
 3. Wait for approval before editing.
 4. If approval is not given, provide proposed text for the user to apply manually.
 
+## Documentation Patch Format Rule
+
+When the user asks for a documentation update, documentation change, wording change, or proposed edit to any document, Codex must default to a paste-ready patch format unless the user explicitly asks Codex to edit the file directly.
+
+For documentation update instructions, Codex must show:
+
+- Exactly what text to remove, in a fenced text block
+- Exactly what text to paste, in a fenced text block
+- Where to place the pasted text
+- Any optional follow-up replacement as a separate remove/paste pair
+
+The fenced blocks must be safe for copying:
+
+- Use fenced code blocks labeled `text`
+- Use fences long enough that nested code, scripts, Markdown, or backticks inside the content cannot break the block
+- Do not place assistant commentary inside the remove or paste blocks
+- Do not let instructions leak into the document content
+- Keep explanatory notes outside the fenced blocks
+
+If no existing text should be removed, Codex must say where to insert the new text and provide only the paste block.
+
+This rule does not override protected documentation approval rules. Codex still must not directly edit AGENTS.md, GDD.md, or GTD.md without explicit approval naming the exact protected document.
 ---
 
 ## Ticket Workflow Rules
@@ -273,13 +295,58 @@ Ticket numbers must be unique across all GitHub Issues, regardless of whether th
 
 Do not guess the next ticket number from GitHub issue numbers. GitHub issue numbers and ticket numbers are separate.
 
+## Plan Review Gate
+
+After an initial implementation plan is created, Codex must automatically act as a reviewer before creating the implementation ticket.
+
+The review must inspect the plan for:
+
+- Predicted runtime behavior
+- Likely bugs, edge cases, or missing states
+- Conflicts with GDD.md, GTD.md, or AGENTS.md
+- Scope creep beyond the requested change
+- UI/game logic separation problems
+- Overengineering or unnecessary abstractions
+- Simpler and cleaner implementation structure
+- Future compatibility with documented systems without implementing future systems early
+- Focused verification needed to prove the change works
+
+The review must prefer:
+
+- Small, direct implementation steps
+- Clear ownership boundaries
+- Existing project patterns
+- Minimal diffs
+- Future-friendly structure only when it makes the current code clearer
+
+The review must not:
+
+- Add new behavior not requested by the user
+- Expand the implementation into future systems
+- Rewrite architecture unnecessarily
+- Treat "future proof" as permission to overengineer
+- Override GDD.md or GTD.md
+
+The Plan Review Gate output must include:
+
+- Predicted Behavior
+- Risks / Flaws
+- Cleaner Structure
+- Required Plan Changes
+- Final Reviewed Plan
+
+If the review finds conflicts with GDD.md or GTD.md, Codex must stop and ask for confirmation before creating the ticket.
+
+Only after the Final Reviewed Plan exists may Codex create the implementation ticket and companion documentation ticket.
 
 ## Execution Plan Workflow
 
 When the user asks for an execution plan:
 
-- Create a clear implementation plan first.
-- After the plan is created, automatically create a GitHub Issue ticket from that plan.
+- Create a clear initial implementation plan first.
+- Before creating any GitHub Issue ticket, run the Plan Review Gate.
+- Revise the implementation plan based on the Plan Review Gate findings.
+- Create the GitHub Issue ticket from the reviewed implementation plan.
 - Use the next available ticket number in this title format:
   - [Ticket 0001]: Short descriptive title
 - Also create the required companion documentation ticket.
