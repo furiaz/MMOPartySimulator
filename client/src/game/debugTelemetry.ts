@@ -442,7 +442,7 @@ function getNavigationTelemetry(
   const startCell = toNavigationNode(previousEntity.position);
   const targetCell = state.moveIntentsByEntityId?.[entity.id]
     ? toNavigationNode(state.moveIntentsByEntityId[entity.id])
-    : null;
+    : movementFailure?.requestedTargetCell ?? null;
   const nextCell = getNavigationNextCell(
     entity,
     movementResult,
@@ -478,6 +478,15 @@ function getNavigationTelemetry(
     nextCellWallAdjacent: nextNavigationCell?.wallAdjacent,
     blockedBy: movementFailure?.blockerKind ?? "none",
     reason: decisionReason,
+    pathFailureReason: movementFailure?.pathFailureReason,
+    requestedTargetCell: movementFailure?.requestedTargetCell,
+    resolvedGoalCells: movementFailure?.resolvedGoalCells,
+    targetCellWalkable: movementFailure?.targetCellWalkable,
+    targetCellBlockedBy: movementFailure?.targetCellBlockedBy,
+    startCellWalkable: movementFailure?.startCellWalkable,
+    freshPathAttempted: movementFailure?.freshPathAttempted,
+    nearbyReachableCellCount: movementFailure?.nearbyReachableCellCount,
+    nearbyBlockedCellSummary: movementFailure?.nearbyBlockedCellSummary,
   };
 }
 

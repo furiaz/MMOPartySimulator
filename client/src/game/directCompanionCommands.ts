@@ -77,6 +77,10 @@ export function issueCompanionDirectCommand(
   }
 
   const command = createDirectCommand(input, validation.targetPosition, now);
+  if (command.type === "move") {
+    nextState = clearMovementPlanningForCompanion(nextState, companion.id);
+  }
+
   nextState = {
     ...nextState,
     directCompanionCommandsById: {
@@ -364,6 +368,7 @@ function updateDirectMoveCommand(
     getCompanionCommandState(companion, command),
     command.targetPosition,
     {
+      allowPartyPassThrough: true,
       pathProfile: "directCommand",
       pathTargetKey: `direct-command:${companion.id}`,
       pathTargetPosition: command.targetPosition,
@@ -609,4 +614,34 @@ function removeRecordEntry<T>(
   delete nextRecord[key];
 
   return Object.keys(nextRecord).length > 0 ? nextRecord : undefined;
+}
+
+function clearMovementPlanningForCompanion(
+  state: GameState,
+  companionId: string,
+): GameState {
+  return {
+    ...state,
+    failedMoveByEntityId: removeRecordEntry(state.failedMoveByEntityId, companionId),
+    movementDecisionsByEntityId: removeRecordEntry(
+      state.movementDecisionsByEntityId,
+      companionId,
+    ),
+    movementFailuresByEntityId: removeRecordEntry(
+      state.movementFailuresByEntityId,
+      companionId,
+    ),
+    movementPathRetryAtMsByEntityId: removeRecordEntry(
+      state.movementPathRetryAtMsByEntityId,
+      companionId,
+    ),
+    movementPathsByEntityId: removeRecordEntry(
+      state.movementPathsByEntityId,
+      companionId,
+    ),
+    moveIntentsByEntityId: removeRecordEntry(
+      state.moveIntentsByEntityId,
+      companionId,
+    ),
+  };
 }

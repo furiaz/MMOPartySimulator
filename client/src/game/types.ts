@@ -895,6 +895,20 @@ export type DebugNavigationBlocker =
   | "unknown"
   | "none";
 
+export type DebugNavigationBlockerDetail = {
+  id?: string;
+  kind: DebugNavigationBlocker;
+};
+
+export type DebugNavigationPathFailureReason =
+  | "target_unwalkable"
+  | "target_blocked"
+  | "start_unwalkable"
+  | "unreachable"
+  | "path_backoff"
+  | "no_goals"
+  | "unknown";
+
 export type DebugNavigationTelemetry = {
   startCell?: Position;
   targetCell?: Position | null;
@@ -905,6 +919,15 @@ export type DebugNavigationTelemetry = {
   nextCellWallAdjacent?: boolean;
   blockedBy?: DebugNavigationBlocker;
   reason?: DebugNavigationReason;
+  pathFailureReason?: DebugNavigationPathFailureReason;
+  requestedTargetCell?: Position | null;
+  resolvedGoalCells?: Position[];
+  targetCellWalkable?: boolean;
+  targetCellBlockedBy?: DebugNavigationBlockerDetail;
+  startCellWalkable?: boolean;
+  freshPathAttempted?: boolean;
+  nearbyReachableCellCount?: number;
+  nearbyBlockedCellSummary?: Partial<Record<DebugNavigationBlocker, number>>;
 };
 
 export type DebugTelemetryEventType =

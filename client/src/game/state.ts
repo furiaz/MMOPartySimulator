@@ -32,6 +32,9 @@ import type {
   CombatFeedbackType,
   ClassId,
   ConsumableUseState,
+  DebugNavigationBlocker,
+  DebugNavigationBlockerDetail,
+  DebugNavigationPathFailureReason,
   DebugNavigationReason,
   DebugTelemetryState,
   DirectCompanionCommand,
@@ -220,6 +223,15 @@ export type MovementFailureDetail = {
   intendedPosition?: Position | null;
   blockerId?: string;
   blockerKind?: GameEntity["kind"] | "wall" | "bounds" | "reserved" | "unknown";
+  pathFailureReason?: DebugNavigationPathFailureReason;
+  requestedTargetCell?: Position | null;
+  resolvedGoalCells?: Position[];
+  targetCellWalkable?: boolean;
+  targetCellBlockedBy?: DebugNavigationBlockerDetail;
+  startCellWalkable?: boolean;
+  freshPathAttempted?: boolean;
+  nearbyReachableCellCount?: number;
+  nearbyBlockedCellSummary?: Partial<Record<DebugNavigationBlocker, number>>;
 };
 
 export type InterruptedPoiTarget = {
@@ -917,7 +929,13 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     return markMoveFailed(
       markCompatibleMovementPathBlocked(nextStateWithIntent, entity, target, options),
       entity.id,
-      getMovementFailureDetail(nextStateWithIntent, entity, target, moveResolution?.position),
+      getMovementFailureDetail(
+        nextStateWithIntent,
+        entity,
+        target,
+        options,
+        moveResolution?.position,
+      ),
       getFailedMovementReason(nextStateWithIntent, entity.id),
     );
   }
@@ -939,7 +957,13 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
       return markMoveFailed(
         markCompatibleMovementPathBlocked(decisionState, entity, target, options),
         entity.id,
-        getMovementFailureDetail(nextStateWithIntent, entity, target, moveResolution.position),
+        getMovementFailureDetail(
+          nextStateWithIntent,
+          entity,
+          target,
+          options,
+          moveResolution.position,
+        ),
         "blocked",
       );
     }
@@ -963,7 +987,13 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     return markMoveFailed(
       markCompatibleMovementPathBlocked(nextStateWithIntent, entity, target, options),
       entity.id,
-      getMovementFailureDetail(nextStateWithIntent, entity, target, moveResolution.position),
+      getMovementFailureDetail(
+        nextStateWithIntent,
+        entity,
+        target,
+        options,
+        moveResolution.position,
+      ),
       "blocked",
     );
   }
@@ -995,7 +1025,13 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     return markMoveFailed(
       markCompatibleMovementPathBlocked(decisionState, entity, target, options),
       entity.id,
-      getMovementFailureDetail(decisionState, entity, target, moveResolution.position),
+      getMovementFailureDetail(
+        decisionState,
+        entity,
+        target,
+        options,
+        moveResolution.position,
+      ),
       "blocked",
     );
   }
@@ -2196,20 +2232,26 @@ function getMovementFailureDetail(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
+  options: MovementOptions = {},
   intendedPosition?: Position | null,
 ): MovementFailureDetail {
   const blocker = intendedPosition
-    ? getPositionBlocker(state, intendedPosition, entity.id)
+    ? getNavigationCellBlocker(state, intendedPosition, entity.id, options)
     : undefined;
+  const pathFailureDetail = getPathFailureDetail(state, entity, target, options);
 
-  return createMovementFailureDetail(entity, target, intendedPosition, blocker);
+  return {
+    ...createMovementFailureDetail(entity, target, intendedPosition, blocker),
+    ...pathFailureDetail,
+  };
 }
 
-function getPositionBlocker(
+function getNavigationCellBlocker(
   state: GameState,
   position: Position,
   ignoredEntityId: string,
-): { id?: string; kind: MovementFailureDetail["blockerKind"] } | undefined {
+  options: WalkablePositionOptions,
+): { id?: string; kind: Exclude<DebugNavigationBlocker, "none"> } | undefined {
   if (!isInMapBounds(state, position)) {
     return { kind: "bounds" };
   }
@@ -2245,10 +2287,166 @@ function getPositionBlocker(
       candidate.id !== ignoredEntityId &&
       candidate.kind !== "resource" &&
       candidate.state !== "dead" &&
+      !canPassThroughBlockingEntity(
+        state.entities[ignoredEntityId],
+        candidate,
+        options,
+      ) &&
       isPositionInsideEntityCollisionShape(candidate, position),
   );
 
   return entity ? { id: entity.id, kind: entity.kind } : { kind: "unknown" };
+}
+
+function getPathFailureDetail(
+  state: GameState,
+  entity: GameEntity,
+  target: GameEntity,
+  options: MovementOptions,
+): Partial<MovementFailureDetail> {
+  if (!state.map) {
+    return {};
+  }
+
+  const startCell = toNavigationNode(entity.position);
+  const requestedTargetCell = toNavigationNode(target.position);
+  const startCellWalkable = isNavigationCellWalkable(state.map, startCell);
+  const targetCellWalkable = isNavigationCellWalkable(state.map, requestedTargetCell);
+  const targetCellBlockedBy = getNavigationCellBlocker(
+    state,
+    requestedTargetCell,
+    entity.id,
+    options,
+  );
+  const targetCellBlocked = Boolean(
+    targetCellBlockedBy && targetCellBlockedBy.kind !== "unknown",
+  );
+  const resolvedGoalCells = getPathGoals(state, entity, target, options)
+    .map(toNavigationNode);
+  const deepDetail = state.debugOptions?.deepNavigationTelemetryEnabled
+    ? getDeepPathFailureDetail(
+        state,
+        entity,
+        requestedTargetCell,
+        startCell,
+        options,
+      )
+    : {};
+  const freshPathAttempted = Boolean(
+    startCellWalkable &&
+      targetCellWalkable &&
+      resolvedGoalCells.length > 0 &&
+      !isFreshPathBackoffActive(state, entity.id),
+  );
+
+  return {
+    pathFailureReason: getPathFailureReason({
+      startCellWalkable,
+      targetCellWalkable,
+      targetCellBlocked,
+      hasResolvedGoals: resolvedGoalCells.length > 0,
+      isPathBackoffActive: isFreshPathBackoffActive(state, entity.id),
+      freshPathAttempted,
+    }),
+    requestedTargetCell,
+    resolvedGoalCells,
+    targetCellWalkable,
+    targetCellBlockedBy,
+    startCellWalkable,
+    freshPathAttempted,
+    ...deepDetail,
+  };
+}
+
+function getDeepPathFailureDetail(
+  state: GameState,
+  entity: GameEntity,
+  requestedTargetCell: Position,
+  startCell: Position,
+  options: MovementOptions,
+): Pick<MovementFailureDetail, "nearbyReachableCellCount" | "nearbyBlockedCellSummary"> {
+  if (!state.map) {
+    return {};
+  }
+
+  const nearbyBlockedCellSummary: Partial<Record<DebugNavigationBlocker, number>> = {};
+  const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
+  const maxPathDistance = state.map.columns * state.map.rows * 2;
+  let nearbyReachableCellCount = 0;
+
+  for (const nearbyCell of getNavigationNeighborPositions(requestedTargetCell)) {
+    const blocker = getNavigationCellBlocker(
+      state,
+      nearbyCell,
+      entity.id,
+      options,
+    );
+
+    if (blocker && blocker.kind !== "unknown") {
+      nearbyBlockedCellSummary[blocker.kind] =
+        (nearbyBlockedCellSummary[blocker.kind] ?? 0) + 1;
+      continue;
+    }
+
+    if (
+      isNavigationCellWalkable(state.map, nearbyCell) &&
+      getNavigationDistance(state.map, startCell, nearbyCell, maxPathDistance, {
+        isBlocked: (candidate) =>
+          isNavigationPositionBlocked(
+            state,
+            candidate,
+            entity.id,
+            options,
+            blockerLookup,
+          ),
+      }) !== null
+    ) {
+      nearbyReachableCellCount += 1;
+    }
+  }
+
+  return {
+    nearbyReachableCellCount,
+    nearbyBlockedCellSummary,
+  };
+}
+
+function getPathFailureReason({
+  startCellWalkable,
+  targetCellWalkable,
+  targetCellBlocked,
+  hasResolvedGoals,
+  isPathBackoffActive,
+  freshPathAttempted,
+}: {
+  startCellWalkable: boolean;
+  targetCellWalkable: boolean;
+  targetCellBlocked: boolean;
+  hasResolvedGoals: boolean;
+  isPathBackoffActive: boolean;
+  freshPathAttempted: boolean;
+}): DebugNavigationPathFailureReason {
+  if (!startCellWalkable) {
+    return "start_unwalkable";
+  }
+
+  if (!targetCellWalkable) {
+    return "target_unwalkable";
+  }
+
+  if (isPathBackoffActive) {
+    return "path_backoff";
+  }
+
+  if (!hasResolvedGoals) {
+    return "no_goals";
+  }
+
+  if (targetCellBlocked) {
+    return "target_blocked";
+  }
+
+  return freshPathAttempted ? "unreachable" : "unknown";
 }
 
 function swapEntityPositions(

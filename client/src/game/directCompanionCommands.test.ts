@@ -130,6 +130,90 @@ describe("companion direct commands", () => {
     expect(expiredState.directCommandGraceUntilByCompanionId?.[fighter.id]).toBeUndefined();
   });
 
+  it("clears stale movement retry and path state when issuing a direct move", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader");
+    const fighter = createCompanion("fighter", { x: 1, y: 0 }, leader.id, "fighter");
+    const state = {
+      ...createState([leader, fighter], leader.id),
+      failedMoveByEntityId: {
+        [fighter.id]: true as const,
+      },
+      movementDecisionsByEntityId: {
+        [fighter.id]: "no_path" as const,
+      },
+      movementFailuresByEntityId: {
+        [fighter.id]: {
+          pathFailureReason: "path_backoff" as const,
+        },
+      },
+      movementPathRetryAtMsByEntityId: {
+        [fighter.id]: 1250,
+      },
+      movementPathsByEntityId: {
+        [fighter.id]: {
+          blockedCount: 1,
+          lastRequestedAtMs: 1000,
+          profile: "follow" as const,
+          targetKey: "follow:old-target:solid-party",
+          targetPosition: { x: 4, y: 0 },
+          waypoints: [{ x: 2, y: 0 }],
+        },
+      },
+      moveIntentsByEntityId: {
+        [fighter.id]: { x: 2, y: 0 },
+      },
+    };
+
+    const result = issueCompanionDirectCommand(state, {
+      type: "move",
+      companionId: fighter.id,
+      targetPosition: { x: 3, y: 0 },
+    }, 1100);
+
+    expect(result.code).toBe("success");
+    expect(result.state.failedMoveByEntityId?.[fighter.id]).toBeUndefined();
+    expect(result.state.movementDecisionsByEntityId?.[fighter.id]).toBeUndefined();
+    expect(result.state.movementFailuresByEntityId?.[fighter.id]).toBeUndefined();
+    expect(result.state.movementPathRetryAtMsByEntityId?.[fighter.id]).toBeUndefined();
+    expect(result.state.movementPathsByEntityId?.[fighter.id]).toBeUndefined();
+    expect(result.state.moveIntentsByEntityId?.[fighter.id]).toBeUndefined();
+  });
+
+  it("lets direct move pass through nearby party members like validation does", () => {
+    const leader = createCompanion("leader", { x: 54, y: 8 }, "leader");
+    const fighter = createCompanion("fighter", { x: 54.06, y: 8.96 }, leader.id, "fighter");
+    const state = {
+      ...createState([leader, fighter], leader.id),
+      map: {
+        debugName: "Direct Move Pass Through Test Map",
+        displayName: "Direct Move Pass Through Test Map",
+        columns: 70,
+        rows: 20,
+        walls: [],
+        teleports: [],
+        healingFountains: [],
+      },
+      directCompanionCommandsById: {
+        [fighter.id]: {
+          type: "move" as const,
+          companionId: fighter.id,
+          targetPosition: { x: 57, y: 3 },
+          issuedAt: 1000,
+        },
+      },
+      simulationTimeMs: 1000,
+    };
+
+    const nextState = updateDirectCompanionCommandSystem(
+      state,
+      new Set<string>(),
+      1000,
+    );
+
+    expect(nextState.entities[fighter.id].position).not.toEqual(fighter.position);
+    expect(nextState.failedMoveByEntityId?.[fighter.id]).toBeUndefined();
+  });
+
   it("rejects targets beyond the 30-cell direct command leash", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader");
     const resource = createResource("wood", { x: 31, y: 0 });

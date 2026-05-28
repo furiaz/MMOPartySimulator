@@ -86,8 +86,11 @@ export function markMoveFailed(
   reason: DebugNavigationReason = "blocked",
 ): GameState {
   const deltaMs = state.simulationDeltaMs ?? 100;
-  const retryAtMs =
-    (state.simulationTimeMs ?? 0) + MOVEMENT_REPATH_FAILURE_BACKOFF_MS;
+  const currentRetryAtMs = state.movementPathRetryAtMsByEntityId?.[entityId];
+  const nowMs = state.simulationTimeMs ?? 0;
+  const retryAtMs = currentRetryAtMs && currentRetryAtMs > nowMs
+    ? currentRetryAtMs
+    : nowMs + MOVEMENT_REPATH_FAILURE_BACKOFF_MS;
 
   return {
     ...state,

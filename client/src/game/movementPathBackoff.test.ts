@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createEnemy, createNpc, createResource } from ".";
+import { markMoveFailed } from "./movementState";
 import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import {
   getEntityById,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
 } from "./state";
+import { updateDirectCompanionCommandSystem } from "./directCompanionCommands";
 import { createTestGameState } from "./testState";
 import type { Companion, GameEntity, GameMap, Position } from "./types";
 
@@ -44,6 +46,22 @@ const openMap: GameMap = {
   columns: 6,
   rows: 5,
   walls: [],
+  teleports: [],
+  healingFountains: [],
+};
+
+const noGoalMap: GameMap = {
+  debugName: "No Goal Path Test Map",
+  displayName: "No Goal Path Test Map",
+  columns: 6,
+  rows: 3,
+  walls: [
+    { x: 2, y: 1 },
+    { x: 3, y: 1 },
+    { x: 4, y: 0 },
+    { x: 4, y: 2 },
+    { x: 5, y: 1 },
+  ],
   teleports: [],
   healingFountains: [],
 };
@@ -88,6 +106,14 @@ const companion = {
   consumableBuffs: [],
   consumableBehavior: "auto",
 } as unknown as Companion;
+
+function createCompanion(overrides: Partial<Companion> = {}): Companion {
+  return {
+    ...companion,
+    ...overrides,
+    position: overrides.position ?? companion.position,
+  };
+}
 
 function createStateWithCachedFollowPath({
   entity,
@@ -521,6 +547,42 @@ describe("movement path backoff", () => {
     expect(consumeGamePerformanceMetrics().navigationPathQueries).toBe(0);
   });
 
+  it("does not extend active path retry backoff on repeated failures", () => {
+    const state = createTestGameState({
+      entities: {
+        [companion.id]: companion,
+      },
+      map: blockedMap,
+      movementPathRetryAtMsByEntityId: {
+        [companion.id]: 250,
+      },
+      simulationTimeMs: 100,
+    });
+
+    const firstFailureState = markMoveFailed(
+      state,
+      companion.id,
+      {},
+      "no_path",
+    );
+    const secondFailureState = markMoveFailed(
+      {
+        ...firstFailureState,
+        simulationTimeMs: 150,
+      },
+      companion.id,
+      {},
+      "no_path",
+    );
+
+    expect(
+      firstFailureState.movementPathRetryAtMsByEntityId?.[companion.id],
+    ).toBe(250);
+    expect(
+      secondFailureState.movementPathRetryAtMsByEntityId?.[companion.id],
+    ).toBe(250);
+  });
+
   it("regenerates navigation paths after retry backoff expires", () => {
     const state = createTestGameState({
       entities: {
@@ -541,5 +603,228 @@ describe("movement path backoff", () => {
     );
 
     expect(consumeGamePerformanceMetrics().navigationPathQueries).toBeGreaterThan(0);
+  });
+
+  it("reports target_unwalkable path failure detail for wall targets", () => {
+    const movingCompanion = createCompanion({
+      position: { x: 1.49, y: 1 },
+    });
+    const state = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: blockedMap,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      { x: 2, y: 1 },
+    );
+
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.pathFailureReason,
+    ).toBe("target_unwalkable");
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.targetCellWalkable,
+    ).toBe(false);
+  });
+
+  it("reports target_blocked path failure detail with blocker attribution", () => {
+    const movingCompanion = createCompanion();
+    const blockingCompanion = createCompanion({
+      id: "companion-blocker",
+      position: { x: 4, y: 1 },
+    });
+    const state = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+        [blockingCompanion.id]: blockingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: blockedMap,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      blockingCompanion.position,
+    );
+    const detail = nextState.movementFailuresByEntityId?.[movingCompanion.id];
+
+    expect(detail?.pathFailureReason).toBe("target_blocked");
+    expect(detail?.targetCellBlockedBy).toEqual({
+      id: blockingCompanion.id,
+      kind: "companion",
+    });
+    expect(detail?.resolvedGoalCells?.length).toBeGreaterThan(0);
+  });
+
+  it("reports unreachable path failure detail for separated valid targets", () => {
+    const movingCompanion = createCompanion();
+    const state = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: blockedMap,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      { x: 4, y: 1 },
+    );
+
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.pathFailureReason,
+    ).toBe("unreachable");
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.freshPathAttempted,
+    ).toBe(true);
+  });
+
+  it("reports path_backoff when a fresh path is skipped by retry timing", () => {
+    const movingCompanion = createCompanion();
+    const state = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: blockedMap,
+      movementPathRetryAtMsByEntityId: {
+        [movingCompanion.id]: 250,
+      },
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      { x: 4, y: 1 },
+    );
+
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.pathFailureReason,
+    ).toBe("path_backoff");
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.freshPathAttempted,
+    ).toBe(false);
+  });
+
+  it("reports no_goals when no valid path goal cells exist", () => {
+    const movingCompanion = createCompanion();
+    const blockingCompanion = createCompanion({
+      id: "companion-blocker",
+      position: { x: 4, y: 1 },
+    });
+    const state = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+        [blockingCompanion.id]: blockingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: noGoalMap,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      blockingCompanion.position,
+    );
+
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.pathFailureReason,
+    ).toBe("no_goals");
+    expect(
+      nextState.movementFailuresByEntityId?.[movingCompanion.id]?.resolvedGoalCells,
+    ).toEqual([]);
+  });
+
+  it("adds nearby-cell summaries only when deep navigation telemetry is enabled", () => {
+    const movingCompanion = createCompanion();
+    const blockingCompanion = createCompanion({
+      id: "companion-blocker",
+      position: { x: 4, y: 1 },
+    });
+    const state = createTestGameState({
+      debugOptions: {
+        superSpeedEnabled: false,
+        superExpEnabled: false,
+        deepNavigationTelemetryEnabled: true,
+      },
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+        [blockingCompanion.id]: blockingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: noGoalMap,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      movingCompanion,
+      blockingCompanion.position,
+    );
+    const detail = nextState.movementFailuresByEntityId?.[movingCompanion.id];
+
+    expect(detail?.nearbyReachableCellCount).toBe(0);
+    expect(detail?.nearbyBlockedCellSummary).toEqual({ wall: 4 });
+  });
+
+  it("records direct-command-shaped no_path detail without clearing the command", () => {
+    const movingCompanion = createCompanion();
+    const state = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+      },
+      failedMoveByEntityId: {
+        [movingCompanion.id]: true,
+      },
+      map: blockedMap,
+      directCompanionCommandsById: {
+        [movingCompanion.id]: {
+          type: "move",
+          companionId: movingCompanion.id,
+          targetPosition: { x: 4, y: 1 },
+          issuedAt: 100,
+        },
+      },
+      simulationTimeMs: 100,
+    });
+
+    const nextState = updateDirectCompanionCommandSystem(
+      state,
+      new Set<string>(),
+      100,
+    );
+    const movedCompanion = getEntityById(nextState, movingCompanion.id) as Companion;
+    const detail = nextState.movementFailuresByEntityId?.[movingCompanion.id];
+
+    expect(movedCompanion.commandPriority).toBe("direct");
+    expect(nextState.directCompanionCommandsById?.[movingCompanion.id]?.type).toBe(
+      "move",
+    );
+    expect(detail?.pathFailureReason).toBe("unreachable");
+    expect(detail?.requestedTargetCell).toEqual({ x: 4, y: 1 });
+    expect(detail?.resolvedGoalCells).toEqual([{ x: 4, y: 1 }]);
   });
 });
