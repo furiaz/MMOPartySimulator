@@ -8,7 +8,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { cancelResurrectionChannelForHelper } from "./resurrectionSystem";
+import { clearResurrectionRecoveryAssignmentForCompanion } from "./resurrectionSystem";
 import type {
   AutonomousEntity,
   CommandPriority,
@@ -88,7 +88,7 @@ export function issueEntityCommand(
 
   const commandState =
     commandPriority === "direct"
-      ? cancelResurrectionChannelForHelper(
+      ? clearResurrectionRecoveryAssignmentForCompanion(
           state,
           entity.id,
           Date.now(),

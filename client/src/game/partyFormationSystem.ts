@@ -16,7 +16,7 @@ import {
   QUEST_GUIDE_OBJECTIVE_ID,
   isQuestGuideObjectiveRelevant,
 } from "./questGuideSystem";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCompanionInDirectCommandGrace } from "./directCompanionCommands";
 import {
   getEntityById,
@@ -67,7 +67,7 @@ export function updatePartyFormationSystem(
     !leader ||
     leader.state === "dead" ||
     leader.commandPriority === "direct" ||
-    isCompanionResurrectionChanneling(state, leader.id)
+    isCompanionAssignedToResurrectionRecovery(state, leader.id)
   ) {
     return clearFormation(state);
   }
@@ -205,7 +205,7 @@ function assignPartyTravelTargets(
       member.commandPriority === "direct" ||
       (!hasPlayerIntent &&
         isPartyMemberRespondingToActiveThreat(nextState, member)) ||
-      isCompanionResurrectionChanneling(nextState, member.id) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       (!hasPlayerIntent && isGathererBusy(nextState, member))
     ) {
       continue;
@@ -238,7 +238,7 @@ function assignPartyGatherTarget(
       member.commandPriority === "direct" ||
       (!hasPlayerIntent &&
         isPartyMemberRespondingToActiveThreat(nextState, member)) ||
-      isCompanionResurrectionChanneling(nextState, member.id)
+      isCompanionAssignedToResurrectionRecovery(nextState, member.id)
     ) {
       continue;
     }
@@ -275,7 +275,7 @@ function clearStaleGatherPartyIntent(
   for (const member of getPartyMembers(nextState)) {
     if (
       member.commandPriority === "direct" ||
-      isCompanionResurrectionChanneling(nextState, member.id) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       member.state !== "gather" ||
       member.currentTargetId !== targetId
     ) {
@@ -311,7 +311,7 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
   for (const member of getPartyMembers(nextState)) {
     if (
       member.commandPriority === "direct" ||
-      isCompanionResurrectionChanneling(nextState, member.id) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       (!hasPlayerIntent &&
         isPartyMemberRespondingToActiveThreat(nextState, member)) ||
       (!hasPlayerIntent && isGathererBusy(nextState, member))
@@ -389,7 +389,7 @@ function moveFollowersTowardLeader(
     if (
       member.id === leader.id ||
       member.commandPriority === "direct" ||
-      isCompanionResurrectionChanneling(nextState, member.id) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       isPartyMemberRespondingToActiveThreat(nextState, member) ||
       isGathererBusy(nextState, member) ||
       movedEntityIds.has(member.id)
@@ -558,7 +558,7 @@ function isRequiredForTravelCohesion(
   if (
     member.commandPriority === "direct" ||
     isCompanionInDirectCommandGrace(state, member.id) ||
-    isCompanionResurrectionChanneling(state, member.id) ||
+    isCompanionAssignedToResurrectionRecovery(state, member.id) ||
     isPartyMemberRespondingToActiveThreat(state, member)
   ) {
     return false;

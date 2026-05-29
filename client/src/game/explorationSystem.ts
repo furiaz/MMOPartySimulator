@@ -15,7 +15,7 @@ import {
   findNearestReachableNavigationPosition,
   getNavigationPositionKey,
 } from "./navigation";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 
 export function updateExplorationSystem(
   state: GameState,
@@ -149,7 +149,7 @@ function getExploringPartyMember(state: GameState): PartyMember | undefined {
 
   if (
     leader?.commandPriority === "autonomous" &&
-    !isCompanionResurrectionChanneling(state, leader.id) &&
+    !isCompanionAssignedToResurrectionRecovery(state, leader.id) &&
     (leader.state === "idle" || leader.state === "follow")
   ) {
     return leader;
@@ -159,7 +159,7 @@ function getExploringPartyMember(state: GameState): PartyMember | undefined {
     (entity): entity is PartyMember =>
       entity.kind === "companion" &&
       entity.commandPriority === "autonomous" &&
-      !isCompanionResurrectionChanneling(state, entity.id) &&
+      !isCompanionAssignedToResurrectionRecovery(state, entity.id) &&
       (entity.state === "idle" || entity.state === "follow"),
   );
 }

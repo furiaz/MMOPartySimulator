@@ -3,10 +3,11 @@ import { createCompanion, createEnemy } from "./entities";
 import { issueCompanionCommand } from "./commands";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { updateAttackSystem } from "./attackSystem";
+import { updateSkillSystem } from "./skillSystem";
 import {
   RESURRECTION_REQUIRED_MS,
-  cancelResurrectionChannelForHelper,
-  isCompanionResurrectionChanneling,
+  clearResurrectionRecoveryAssignmentForCompanion,
+  isCompanionAssignedToResurrectionRecovery,
   updateResurrectionSystem,
 } from "./resurrectionSystem";
 import { addEntity, setPartyIntent } from "./state";
@@ -74,7 +75,7 @@ describe("resurrection system", () => {
     expect(nextState.resurrectionChannelsByHelperId?.[helper.id]).toBeUndefined();
   });
 
-  it("lets multiple helpers speed up target-owned resurrection progress", () => {
+  it("lets multiple helpers speed up target-owned resurrection progress with diminishing returns", () => {
     const helperOne = createCompanion("helper-1", { x: 0, y: 0 }, "helper-1");
     const helperTwo = createCompanion("helper-2", { x: 0, y: 1 }, "helper-1");
     const deadCompanion = createDeadCompanion("dead", { x: 1, y: 0 }, helperOne.id);
@@ -83,8 +84,8 @@ describe("resurrection system", () => {
     const nextState = updateResurrectionSystem(
       state,
       new Set(),
-      5_000,
-      RESURRECTION_REQUIRED_MS / 2,
+      7_000,
+      7_000,
     );
 
     expect(nextState.entities[deadCompanion.id]).toMatchObject({
@@ -110,7 +111,7 @@ describe("resurrection system", () => {
     ).toBe(9_000);
   });
 
-  it("cancels only the attacked helper channel", () => {
+  it("removes only the directly commanded helper assignment", () => {
     const helperOne = createCompanion("helper-1", { x: 0, y: 0 }, "helper-1");
     const helperTwo = createCompanion("helper-2", { x: 0, y: 1 }, "helper-1");
     const deadCompanion = createDeadCompanion("dead", { x: 1, y: 0 }, helperOne.id);
@@ -121,11 +122,11 @@ describe("resurrection system", () => {
       1_000,
     );
 
-    const nextState = cancelResurrectionChannelForHelper(
+    const nextState = clearResurrectionRecoveryAssignmentForCompanion(
       state,
       helperOne.id,
       2_000,
-      "attacked",
+      "direct_command",
     );
 
     expect(nextState.resurrectionChannelsByHelperId?.[helperOne.id]).toBeUndefined();
@@ -134,7 +135,7 @@ describe("resurrection system", () => {
     });
   });
 
-  it("keeps existing resurrection helpers channeling when combat starts", () => {
+  it("keeps existing resurrection participants assigned when combat starts", () => {
     const helper = createCompanion("helper", { x: 0, y: 0 }, "helper");
     const fighter = {
       ...createCompanion("fighter", { x: 5, y: 5 }, helper.id),
@@ -153,21 +154,23 @@ describe("resurrection system", () => {
       1_000,
       1_000,
     );
-    const helperOnlyChannelingState = cancelResurrectionChannelForHelper(
+    const helperOnlyAssignedState = clearResurrectionRecoveryAssignmentForCompanion(
       channelingState,
       fighter.id,
       1_500,
       "direct_command",
     );
 
-    const combatState = addEntity(helperOnlyChannelingState, enemy);
+    const combatState = addEntity(helperOnlyAssignedState, enemy);
     const nextState = updateResurrectionSystem(combatState, new Set(), 2_000, 1_000);
 
-    expect(isCompanionResurrectionChanneling(nextState, helper.id)).toBe(true);
+    expect(isCompanionAssignedToResurrectionRecovery(nextState, helper.id)).toBe(true);
     expect(
       nextState.resurrectionProgressByCompanionId?.[deadCompanion.id]?.progressMs,
-    ).toBe(2_000);
-    expect(nextState.resurrectionChannelsByHelperId?.[fighter.id]).toBeUndefined();
+    ).toBe(3_000);
+    expect(nextState.resurrectionChannelsByHelperId?.[fighter.id]).toMatchObject({
+      targetId: deadCompanion.id,
+    });
   });
 
   it("does not treat dead companions as harmful attack targets", () => {
@@ -192,6 +195,90 @@ describe("resurrection system", () => {
     });
   });
 
+  it("lets a recovery participant attack an enemy already in range", () => {
+    const helper = createCompanion("helper", { x: 2, y: 0 }, "helper");
+    const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
+    const enemy = createEnemy("enemy", { x: 3, y: 0 }, "aggressive");
+    const recoveryState = updateResurrectionSystem(
+      createState([helper, deadCompanion, enemy], helper.id),
+      new Set(),
+      1_000,
+      100,
+    );
+
+    const nextState = updateAttackSystem(recoveryState, new Set(), 3_000);
+
+    expect(nextState.entities[helper.id]).toMatchObject({
+      position: helper.position,
+    });
+    const damagedEnemy = nextState.entities[enemy.id];
+
+    expect(damagedEnemy?.kind).toBe("enemy");
+    expect(damagedEnemy?.kind === "enemy" ? damagedEnemy.health : enemy.health)
+      .toBeLessThan(enemy.health);
+  });
+
+  it("keeps a recovery participant from chasing an enemy out of range", () => {
+    const helper = {
+      ...createCompanion("helper", { x: 2, y: 0 }, "helper"),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
+    const enemy = createEnemy("enemy", { x: 8, y: 0 }, "aggressive");
+    const state: GameState = {
+      ...createState([helper, deadCompanion, enemy], helper.id),
+      resurrectionChannelsByHelperId: {
+        [helper.id]: {
+          helperId: helper.id,
+          targetId: deadCompanion.id,
+        },
+      },
+    };
+
+    const nextState = updateAttackSystem(state, new Set(), 3_000);
+
+    expect(nextState.entities[helper.id]).toMatchObject({
+      position: helper.position,
+      state: "attack",
+      currentTargetId: enemy.id,
+    });
+  });
+
+  it("keeps a recovery participant from casting ranged offensive skills out of attack range", () => {
+    const helper = {
+      ...createCompanion(
+        "helper",
+        { x: 2, y: 0 },
+        "dead",
+        "fighter",
+        1,
+        "elementalist",
+      ),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
+    const enemy = createEnemy("enemy", { x: 6, y: 0 }, "aggressive");
+    const state: GameState = {
+      ...createState([helper, deadCompanion, enemy], helper.id),
+      resurrectionChannelsByHelperId: {
+        [helper.id]: {
+          helperId: helper.id,
+          targetId: deadCompanion.id,
+        },
+      },
+    };
+
+    const nextState = updateSkillSystem(state, 20_000);
+    const untouchedEnemy = nextState.entities[enemy.id];
+
+    expect(untouchedEnemy?.kind).toBe("enemy");
+    expect(untouchedEnemy?.kind === "enemy" ? untouchedEnemy.health : 0).toBe(
+      enemy.health,
+    );
+  });
+
   it("records resurrection telemetry when debug recording is enabled", () => {
     const helper = createCompanion("helper", { x: 0, y: 0 }, "helper");
     const deadCompanion = createDeadCompanion("dead", { x: 1, y: 0 }, helper.id);
@@ -200,26 +287,26 @@ describe("resurrection system", () => {
     );
 
     const startedState = updateResurrectionSystem(state, new Set(), 1_000, 1_000);
-    const canceledState = cancelResurrectionChannelForHelper(
+    const canceledState = clearResurrectionRecoveryAssignmentForCompanion(
       startedState,
       helper.id,
       2_000,
-      "attacked",
+      "direct_command",
     );
 
     expect(canceledState.debugTelemetry?.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "resurrection_target_selected",
-        "resurrection_channel_started",
-        "resurrection_channel_progressed",
-        "resurrection_channel_canceled",
+        "resurrection_participant_assigned",
+        "resurrection_area_progressed",
+        "resurrection_participant_removed",
       ]),
     );
     expect(canceledState.debugTelemetry?.events.at(-1)).toMatchObject({
-      type: "resurrection_channel_canceled",
+      type: "resurrection_participant_removed",
       entityId: helper.id,
       targetId: deadCompanion.id,
-      cancelReason: "attacked",
+      cancelReason: "direct_command",
     });
   });
 });

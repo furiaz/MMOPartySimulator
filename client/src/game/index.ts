@@ -104,8 +104,8 @@ export type {
   ResourceItemId,
   ResourceType,
   ResurrectionCancelReason,
-  ResurrectionChannelState,
   ResurrectionProgressState,
+  ResurrectionRecoveryAssignmentState,
   SkillBindState,
   SkillCooldownState,
   SkillDefinition,
@@ -495,8 +495,10 @@ export { updatePoiSystem } from "./poiSystem";
 export {
   RESURRECTION_RANGE,
   RESURRECTION_REQUIRED_MS,
-  cancelResurrectionChannelForHelper,
-  isCompanionResurrectionChanneling,
+  clearResurrectionRecoveryAssignmentForCompanion,
+  isCompanionAssignedToResurrectionRecovery,
+  isCompanionInActiveResurrectionArea,
+  isPositionInActiveResurrectionArea,
   updateResurrectionSystem,
 } from "./resurrectionSystem";
 export {

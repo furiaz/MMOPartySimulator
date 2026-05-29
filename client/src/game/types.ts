@@ -630,7 +630,6 @@ export type PartyBehaviorMode =
 export type PartyIntentSource = "player" | "ai";
 
 export type PartyRecoveryAction =
-  | "fight_near_dead_leader"
   | "resurrect";
 
 export type PartyRecoveryIntent = {
@@ -1067,9 +1066,9 @@ export type DebugTelemetryEventType =
   | "skill_skipped"
   | "skill_effect_applied"
   | "resurrection_target_selected"
-  | "resurrection_channel_started"
-  | "resurrection_channel_progressed"
-  | "resurrection_channel_canceled"
+  | "resurrection_participant_assigned"
+  | "resurrection_area_progressed"
+  | "resurrection_participant_removed"
   | "companion_resurrected"
   | "direct_command_issued"
   | "direct_command_rejected"
@@ -1095,7 +1094,7 @@ export type ResurrectionProgressState = {
   requiredMs: number;
 };
 
-export type ResurrectionChannelState = {
+export type ResurrectionRecoveryAssignmentState = {
   helperId: string;
   targetId: string;
 };

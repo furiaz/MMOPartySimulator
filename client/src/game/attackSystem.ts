@@ -35,8 +35,8 @@ import {
 } from "./enemyAoeChannelSystem";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
-  cancelResurrectionChannelForHelper,
-  isCompanionResurrectionChanneling,
+  isCompanionAssignedToResurrectionRecovery,
+  isPositionInActiveResurrectionArea,
 } from "./resurrectionSystem";
 import {
   arePositionsEqual,
@@ -77,8 +77,6 @@ export function updateAttackSystem(
 
     if (
       !attacker ||
-      (attacker.kind === "companion" &&
-        isCompanionResurrectionChanneling(nextState, attacker.id)) ||
       (attacker.kind === "enemy" &&
         isEnemyAoeChanneling(nextState, attacker.id)) ||
       !isAttackingCombatEntity(attacker)
@@ -123,7 +121,25 @@ export function updateAttackSystem(
       continue;
     }
 
-    const finalStepPosition = getFinalStepAttackPosition(nextState, currentAttacker, target);
+    const isResurrectionParticipant =
+      isPartyCombatEntity(currentAttacker) &&
+      isCompanionAssignedToResurrectionRecovery(nextState, currentAttacker.id);
+
+    if (isResurrectionParticipant && !isInAttackRange(currentAttacker, target)) {
+      continue;
+    }
+
+    const candidateFinalStepPosition = getFinalStepAttackPosition(
+      nextState,
+      currentAttacker,
+      target,
+    );
+    const finalStepPosition =
+      candidateFinalStepPosition &&
+      (!isResurrectionParticipant ||
+        isPositionInActiveResurrectionArea(nextState, candidateFinalStepPosition))
+        ? candidateFinalStepPosition
+        : null;
     const attackReadyAttacker = finalStepPosition
       ? moveEntityTo(currentAttacker, finalStepPosition)
       : currentAttacker;
@@ -137,6 +153,7 @@ export function updateAttackSystem(
     if (
       isInAttackRange(attackReadyAttacker, target) &&
       isPartyCombatEntity(attackReadyAttacker) &&
+      !isResurrectionParticipant &&
       !isCombatPositionSpacedFromParty(
         nextState,
         attackReadyAttacker,
@@ -235,12 +252,6 @@ export function updateAttackSystem(
       }
 
       if (isEnemy(windupReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
-        nextState = cancelResurrectionChannelForHelper(
-          nextState,
-          updatedTarget.id,
-          now,
-          "attacked",
-        );
         nextState = protectPartyMember(nextState, updatedTarget, windupReadyAttacker);
       }
 
@@ -261,6 +272,10 @@ export function updateAttackSystem(
     nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
 
     if (movedEntityIds.has(currentAttacker.id)) {
+      continue;
+    }
+
+    if (isResurrectionParticipant) {
       continue;
     }
 

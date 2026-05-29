@@ -2,7 +2,7 @@ import { isCompanionEntity, isLivingEnemy } from "./entityGuards";
 import { getPartyMembers, isGathererBusy } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import {
   getEntityById,
   getPartyExecutionIntent,
@@ -20,12 +20,10 @@ import type {
   PartyExecutionIntent,
 } from "./types";
 
-const DEAD_LEADER_THREAT_RADIUS = 6;
 const SELF_DEFENSE_THREAT_RADIUS = 3;
 const STUCK_SELF_DEFENSE_RADIUS = 2;
 
 export function updatePartyIntentRecoverySystem(state: GameState): GameState {
-  const configuredLeader = getEntityById(state, state.partyLeaderId);
   const deadCompanion = getDeadCompanion(state);
 
   if (!deadCompanion) {
@@ -42,37 +40,7 @@ export function updatePartyIntentRecoverySystem(state: GameState): GameState {
 
   const queuedState = queuePartyIntent(state);
 
-  if (!isDeadCompanion(configuredLeader)) {
-    return setResurrectionRecoveryIntent(queuedState, deadCompanion);
-  }
-
-  const nearbyThreats = getLivingEnemiesNear(queuedState, configuredLeader);
-
-  if (nearbyThreats.length > 0) {
-    const target = nearbyThreats[0];
-    const recoveryState = setPartyIntent(queuedState, {
-      mode: "engage",
-      source: "ai",
-      executionIntent: createAttackIntent(target),
-      globalPoiIntent: null,
-      localPoiTarget: null,
-      worldTravelTargetMapId: queuedState.worldTravelTargetMapId,
-      queuedIntent: queuedState.partyIntent?.queuedIntent ?? null,
-      recoveryIntent: {
-        action: "fight_near_dead_leader",
-        deadCompanionId: configuredLeader.id,
-        threatEnemyIds: nearbyThreats.map((enemy) => enemy.id),
-      },
-    });
-
-    return assignLivingCompanionsToRecoveryFight(recoveryState, target);
-  }
-
-  return setResurrectionRecoveryIntent(queuedState, configuredLeader);
-}
-
-export function isPartyRecoveryFightActive(state: GameState): boolean {
-  return state.partyIntent?.recoveryIntent?.action === "fight_near_dead_leader";
+  return setResurrectionRecoveryIntent(queuedState, deadCompanion);
 }
 
 export function getPartyResurrectionRecoveryTargetId(
@@ -86,10 +54,6 @@ export function getPartyResurrectionRecoveryTargetId(
 }
 
 export function updatePartyIntentSelfDefenseSystem(state: GameState): GameState {
-  if (isPartyRecoveryFightActive(state)) {
-    return state;
-  }
-
   const executionIntent = getPartyExecutionIntent(state);
 
   if (executionIntent?.source === "player") {
@@ -142,28 +106,6 @@ function setResurrectionRecoveryIntent(
   });
 }
 
-function assignLivingCompanionsToRecoveryFight(
-  state: GameState,
-  target: Enemy,
-): GameState {
-  let nextState = state;
-
-  for (const companion of getPartyMembers(nextState)) {
-    if (companion.commandPriority === "direct") {
-      continue;
-    }
-
-    nextState = updateEntity(nextState, {
-      ...companion,
-      state: "attack",
-      currentTargetId: target.id,
-      commandPriority: "autonomous",
-    });
-  }
-
-  return nextState;
-}
-
 function assignCompanionsToSelfDefense(
   state: GameState,
   target: Enemy,
@@ -172,7 +114,7 @@ function assignCompanionsToSelfDefense(
 
   for (const companion of getPartyMembers(nextState)) {
     if (
-      isCompanionResurrectionChanneling(nextState, companion.id) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, companion.id) ||
       (companion.commandPriority === "direct" &&
         !isCompanionPersonallyBlockedOrThreatened(nextState, companion, target)) ||
       (companion.commandPriority !== "direct" &&
@@ -195,27 +137,17 @@ function assignCompanionsToSelfDefense(
 }
 
 function getDeadCompanion(state: GameState): Companion | null {
+  const configuredLeader = getEntityById(state, state.partyLeaderId);
+
+  if (isDeadCompanion(configuredLeader)) {
+    return configuredLeader;
+  }
+
   return (
     Object.values(state.entities).find(
       (entity): entity is Companion => isDeadCompanion(entity),
     ) ?? null
   );
-}
-
-function getLivingEnemiesNear(state: GameState, companion: Companion): Enemy[] {
-  return Object.values(state.entities)
-    .filter(isLivingEnemy)
-    .filter(
-      (enemy) =>
-        getGridDistance(enemy.position, companion.position) <=
-        DEAD_LEADER_THREAT_RADIUS,
-    )
-    .sort(
-      (first, second) =>
-        getGridDistance(first.position, companion.position) -
-          getGridDistance(second.position, companion.position) ||
-        first.id.localeCompare(second.id),
-    );
 }
 
 function getSelfDefenseTarget(

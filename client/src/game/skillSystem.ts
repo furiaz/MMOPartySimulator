@@ -31,7 +31,10 @@ import {
   getSkillDashPosition,
 } from "./skillMovement";
 import { findEnemyTarget, getSkillTarget } from "./skillTargeting";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import {
+  isCompanionAssignedToResurrectionRecovery,
+  isPositionInActiveResurrectionArea,
+} from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
@@ -171,7 +174,6 @@ function canUsePrototypeCombatSkill(
       entity.state !== "dead" &&
       entity.health > 0 &&
       hasCombatSkillContext(state, entity) &&
-      !isCompanionResurrectionChanneling(state, entity.id) &&
       !isSkillOnCooldown(state, entity, now),
   );
 }
@@ -187,7 +189,6 @@ function canUsePrototypeSkill(
       entity.state !== "dead" &&
       entity.health > 0 &&
       entity.commandPriority !== "direct" &&
-      !isCompanionResurrectionChanneling(state, entity.id) &&
       !isSkillOnCooldown(state, entity, now),
   );
 }
@@ -321,6 +322,15 @@ function chooseSkillUse(
         return null;
       }
 
+      if (!isRecoveryAreaSkillUseAllowed(state, caster, skill, target)) {
+        nextState = recordSkillTelemetry(nextState, caster, {
+          type: "skill_skipped",
+          skill,
+          reason: "resurrection_recovery",
+        });
+        return null;
+      }
+
       const roleScore = getSkillRoleScore(caster.role, skill.tags);
 
       if (roleScore <= 0) {
@@ -383,6 +393,32 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
   return (
     skill.effect.type === "heal" ||
     skill.effect.type === "selfCostHeal" ||
+    skill.effect.type === "shieldBlock"
+  );
+}
+
+function isRecoveryAreaSkillUseAllowed(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  target: Enemy | Companion,
+): boolean {
+  if (!isCompanionAssignedToResurrectionRecovery(state, caster.id)) {
+    return true;
+  }
+
+  if (isLivingEnemy(target)) {
+    return (
+      getGridDistance(caster.position, target.position) <=
+      getCompanionAttackRange(caster)
+    );
+  }
+
+  return (
+    skill.effect.type === "heal" ||
+    skill.effect.type === "selfCostHeal" ||
+    skill.effect.type === "selfBuff" ||
+    skill.effect.type === "allyBuff" ||
     skill.effect.type === "shieldBlock"
   );
 }
@@ -736,6 +772,13 @@ function applyLungeDamageSkill(
     return state;
   }
 
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, lungePosition)
+  ) {
+    return state;
+  }
+
   const lungedCaster = {
     ...caster,
     position: lungePosition,
@@ -1072,6 +1115,13 @@ function applyQuickStep(
   );
 
   if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
     return null;
   }
 

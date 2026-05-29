@@ -22,7 +22,7 @@ import { recordResourceGatheredForQuests } from "./questSystem";
 import { ROLE_TUNING } from "./roleProfiles";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getDirectGatherCommandTargetId } from "./directCompanionCommands";
 import {
   isWithinGathererLeaderBoundary,
@@ -47,7 +47,7 @@ export function updateGatherSystem(
     if (
       !gatherer ||
       (gatherer.kind === "companion" &&
-        isCompanionResurrectionChanneling(nextState, gatherer.id)) ||
+        isCompanionAssignedToResurrectionRecovery(nextState, gatherer.id)) ||
       !isGatheringEntity(gatherer)
     ) {
       continue;

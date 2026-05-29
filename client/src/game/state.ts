@@ -61,8 +61,8 @@ import type {
   SkillCooldownState,
   SkillGatherBuffState,
   SkillMarkState,
-  ResurrectionChannelState,
   ResurrectionProgressState,
+  ResurrectionRecoveryAssignmentState,
   SkillSelfBuffState,
   SkillShieldBlockState,
   SkillVisualEvent,
@@ -308,7 +308,7 @@ export type GameState = {
   dropVisualEvents?: DropVisualEvent[];
   slimewardDungeon?: SlimewardDungeonRuntimeState;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
-  resurrectionChannelsByHelperId?: Record<string, ResurrectionChannelState>;
+  resurrectionChannelsByHelperId?: Record<string, ResurrectionRecoveryAssignmentState>;
   worldWipeRecovery?: WorldWipeRecoveryState;
   lastHealthRegenAtByCompanionId?: Record<string, number>;
   lastTargetDummyRegenAtByEnemyId?: Record<string, number>;

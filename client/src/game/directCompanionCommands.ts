@@ -1,7 +1,7 @@
 import { isActiveResource, isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getGridDistance } from "./positionUtils";
-import { cancelResurrectionChannelForHelper } from "./resurrectionSystem";
+import { clearResurrectionRecoveryAssignmentForCompanion } from "./resurrectionSystem";
 import {
   addCombatFeedback,
   getBoundedPathDistance,
@@ -60,7 +60,7 @@ export function issueCompanionDirectCommand(
   }
 
   const previousCommand = state.directCompanionCommandsById?.[companion.id] ?? null;
-  let nextState = cancelResurrectionChannelForHelper(
+  let nextState = clearResurrectionRecoveryAssignmentForCompanion(
     state,
     companion.id,
     now,

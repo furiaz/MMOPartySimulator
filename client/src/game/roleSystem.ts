@@ -9,7 +9,7 @@ import {
 } from "./state";
 import { getPartyLeader, isPartyMember, type PartyMember } from "./partySystem";
 import { ROLE_TUNING } from "./roleProfiles";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import {
   createGathererResourceReservations,
   findAllowedGathererResourceTarget,
@@ -74,7 +74,7 @@ function canUseRoleBehavior(
 ): entity is PartyMember {
   if (
     !isPartyMember(entity) ||
-    isCompanionResurrectionChanneling(state, entity.id) ||
+    isCompanionAssignedToResurrectionRecovery(state, entity.id) ||
     entity.commandPriority === "direct" ||
     (entity.state !== "idle" &&
       entity.state !== "follow" &&

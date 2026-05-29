@@ -3136,6 +3136,7 @@ function App() {
             onNpcClick={commandPartyToInteractWithNpc}
             onPerformanceSample={handleRendererPerformanceSample}
             onResourceClick={commandCompanionsToGatherResource}
+            partyIntent={gameState.partyIntent}
             questGiverHasWork={questGiverHasWork}
             resurrectionProgressByCompanionId={
               gameState.resurrectionProgressByCompanionId ?? {}

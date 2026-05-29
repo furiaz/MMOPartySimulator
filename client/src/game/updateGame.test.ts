@@ -1622,7 +1622,7 @@ describe("game update intent priority", () => {
     });
   });
 
-  it("orders living companions to clear enemies near the dead leader before resurrection", () => {
+  it("keeps dead leader resurrection first while nearby enemies remain active", () => {
     const deadLeader = {
       ...createLeader({ x: 4, y: 4 }),
       state: "dead" as const,
@@ -1644,21 +1644,16 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.partyIntent).toMatchObject({
-      mode: "engage",
+      mode: "resurrect",
       recoveryIntent: {
-        action: "fight_near_dead_leader",
+        action: "resurrect",
         deadCompanionId: deadLeader.id,
-        threatEnemyIds: [nearbyEnemy.id],
+        threatEnemyIds: [],
       },
-      executionIntent: {
-        type: "attack",
-        targetId: nearbyEnemy.id,
-      },
+      executionIntent: null,
     });
-    expect(nextState.resurrectionChannelsByHelperId?.[fighter.id]).toBeUndefined();
-    expect(nextState.entities[fighter.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: nearbyEnemy.id,
+    expect(nextState.resurrectionChannelsByHelperId?.[fighter.id]).toMatchObject({
+      targetId: deadLeader.id,
     });
   });
 

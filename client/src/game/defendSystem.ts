@@ -25,7 +25,7 @@ import {
   getActiveQuestGuide,
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
-import { isCompanionResurrectionChanneling } from "./resurrectionSystem";
+import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
@@ -64,7 +64,7 @@ export function updateDefendSystem(
 
     if (
       !isDefendingCompanion(defender) ||
-      isCompanionResurrectionChanneling(nextState, defender.id) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, defender.id) ||
       movedEntityIds.has(defender.id)
     ) {
       continue;

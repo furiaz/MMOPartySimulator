@@ -25,6 +25,7 @@ import type {
   GameMap,
   LeaderIntent,
   MapVisualObject,
+  PartyIntent,
   Position,
   ResurrectionProgressState,
   SkillBindState,
@@ -40,6 +41,7 @@ import {
   getItemDefinition,
   isActiveResource,
   QUEST_GIVER_POI_ID,
+  RESURRECTION_RANGE,
   SKILL_DEFINITIONS,
   aoeTargetDummyId,
 } from "../game";
@@ -137,6 +139,7 @@ type PixiWorldRendererProps = {
   onNpcClick?: (npcId: string) => void;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   onResourceClick?: (resourceId: string) => void;
+  partyIntent?: PartyIntent | null;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
   questGiverHasWork?: boolean;
   showDebugOverlays?: boolean;
@@ -303,6 +306,7 @@ type DrawWorldOptions = {
   managedState: ManagedRendererState;
   mode: PixiRendererMode;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
+  partyIntent: PartyIntent | null;
   questGiverHasWork: boolean;
   requestRedraw?: () => void;
   renderSize: RenderSize;
@@ -2830,6 +2834,7 @@ function drawFullEffects({
   map,
   managedState,
   metrics,
+  partyIntent,
   requestRedraw,
   resurrectionProgressByCompanionId,
   skillBindsByEnemyId,
@@ -2849,6 +2854,7 @@ function drawFullEffects({
   map: GameMap;
   managedState: ManagedRendererState;
   metrics: PixiDrawMetrics;
+  partyIntent: PartyIntent | null;
   requestRedraw?: () => void;
   resurrectionProgressByCompanionId: Record<string, ResurrectionProgressState>;
   skillBindsByEnemyId: Record<string, SkillBindState>;
@@ -2859,6 +2865,29 @@ function drawFullEffects({
   visibleTileBounds: TileBounds;
 }) {
   const entitiesById = getEntityById(entities);
+  const resurrectionTargetId =
+    partyIntent?.recoveryIntent?.action === "resurrect"
+      ? partyIntent.recoveryIntent.deadCompanionId
+      : null;
+  const resurrectionTarget = resurrectionTargetId
+    ? entitiesById.get(resurrectionTargetId)
+    : undefined;
+
+  if (
+    resurrectionTarget?.kind === "companion" &&
+    isPositionInTileBounds(resurrectionTarget.position, visibleTileBounds)
+  ) {
+    const center = toFullPosition(resurrectionTarget.position, transform);
+
+    graphics
+      .circle(
+        center.x,
+        center.y,
+        RESURRECTION_RANGE * transform.cellPixelSize,
+      )
+      .fill({ color: 0x7c3aed, alpha: 0.13 })
+      .stroke({ color: 0xa855f7, alpha: 0.45, width: 2 });
+  }
 
   for (const shield of Object.values(skillShieldBlocksById)) {
     if (shield.expiresAt <= currentTime || shield.id.endsWith("-guard_up")) {
@@ -4057,6 +4086,7 @@ function drawFullMap({
   map,
   managedState,
   onPerformanceSample,
+  partyIntent,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -4085,6 +4115,7 @@ function drawFullMap({
   map: GameMap;
   managedState: ManagedRendererState;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
+  partyIntent: PartyIntent | null;
   questGiverHasWork: boolean;
   requestRedraw?: () => void;
   renderSize: RenderSize;
@@ -4200,6 +4231,7 @@ function drawFullMap({
     map,
     managedState,
     metrics,
+    partyIntent,
     requestRedraw,
     resurrectionProgressByCompanionId,
     skillBindsByEnemyId,
@@ -4384,6 +4416,7 @@ function drawWorld({
   managedState,
   mode,
   onPerformanceSample,
+  partyIntent,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -4415,6 +4448,7 @@ function drawWorld({
       map,
       managedState,
       onPerformanceSample,
+      partyIntent,
       questGiverHasWork,
       requestRedraw,
       renderSize,
@@ -4460,6 +4494,7 @@ export function PixiWorldRenderer({
   onNpcClick,
   onPerformanceSample,
   onResourceClick,
+  partyIntent = null,
   resurrectionProgressByCompanionId = {},
   questGiverHasWork = false,
   showDebugOverlays = false,
@@ -4492,6 +4527,7 @@ export function PixiWorldRenderer({
   const latestLeaderIntentRef = useRef<LeaderIntent | null>(leaderIntent);
   const latestModeRef = useRef(mode);
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
+  const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
   const latestQuestGiverHasWorkRef = useRef(questGiverHasWork);
   const latestRenderSizeRef = useRef(getRenderSize(mode, viewportSize));
   const latestViewportSizeRef = useRef(viewportSize);
@@ -4531,6 +4567,7 @@ export function PixiWorldRenderer({
     latestLeaderIntentRef.current = leaderIntent;
     latestModeRef.current = mode;
     latestOnPerformanceSampleRef.current = onPerformanceSample;
+    latestPartyIntentRef.current = partyIntent;
     latestQuestGiverHasWorkRef.current = questGiverHasWork;
     latestRenderSizeRef.current = renderSize;
     latestViewportSizeRef.current = viewportSize;
@@ -4556,6 +4593,7 @@ export function PixiWorldRenderer({
     map,
     mode,
     onPerformanceSample,
+    partyIntent,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,
@@ -4640,6 +4678,7 @@ export function PixiWorldRenderer({
         managedState: managedStateRef.current,
         mode: latestModeRef.current,
         onPerformanceSample: latestOnPerformanceSampleRef.current,
+        partyIntent: latestPartyIntentRef.current,
         questGiverHasWork: latestQuestGiverHasWorkRef.current,
         renderSize: latestRenderSizeRef.current,
         requestRedraw: requestRedrawRef.current,
@@ -4763,6 +4802,7 @@ export function PixiWorldRenderer({
       managedState: managedStateRef.current,
       mode,
       onPerformanceSample,
+      partyIntent,
       questGiverHasWork,
       requestRedraw: requestRedrawRef.current,
       renderSize,
@@ -4790,6 +4830,7 @@ export function PixiWorldRenderer({
     map,
     mode,
     onPerformanceSample,
+    partyIntent,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,
