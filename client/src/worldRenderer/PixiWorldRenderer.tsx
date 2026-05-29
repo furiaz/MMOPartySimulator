@@ -9,6 +9,7 @@ import {
   NPC_ICON_SRC,
   RESOURCE_ICON_SRC,
   SHARED_SKILL_VISUAL_ICON_SRC,
+  SLIMEWARD_DUNGEON_TILE_SRC,
   SKILL_VISUAL_ICON_SRC,
   WILDERNESS_MAP_TILE_SRC,
 } from "../assetIcons";
@@ -61,6 +62,8 @@ const previewHeight = 144;
 const previewPadding = 8;
 const defaultCellPixelSize = 32;
 const floorChunkCellSpan = 4;
+const slimewardFloorTileCellSpan = 4;
+const slimewardWallTileCellSpan = 2;
 const wildernessMapIds = new Set(["map-1", "map-2", "map-3", "map-4"]);
 const defaultFeedbackFontSize = 11;
 const emphasizedFeedbackFontSize = defaultFeedbackFontSize * 2;
@@ -262,7 +265,16 @@ type EntityTint = {
   color: number;
 };
 
-export function getTeleportIconSrc(isWorking = true): string {
+export function getTeleportIconSrc(
+  isWorking = true,
+  visualTheme: "default" | "slimeward" = "default",
+): string {
+  if (visualTheme === "slimeward") {
+    return isWorking
+      ? MAP_OBJECT_ICON_SRC.slimewardTeleportGood
+      : MAP_OBJECT_ICON_SRC.slimewardTeleportBroken;
+  }
+
   return isWorking
     ? MAP_OBJECT_ICON_SRC.teleportGood
     : MAP_OBJECT_ICON_SRC.teleportBroken;
@@ -485,6 +497,14 @@ function collectEntityVisualTextureSrcs(entity: GameEntity, map: GameMap): strin
 }
 
 function collectFullMapFloorTextureSrcs(map: GameMap): string[] {
+  if (map.visualTheme === "slimeward-cave") {
+    return [
+      SLIMEWARD_DUNGEON_TILE_SRC.floorDamp,
+      SLIMEWARD_DUNGEON_TILE_SRC.floorAzure,
+      SLIMEWARD_DUNGEON_TILE_SRC.wall,
+    ];
+  }
+
   if (!isHubVisualMap(map.id) && !isWildernessVisualMap(map.id)) {
     return [];
   }
@@ -896,6 +916,10 @@ function getFloorPosition(position: Position): Position {
 }
 
 function getMapFloorColor(map: GameMap): number {
+  if (map.visualTheme === "slimeward-cave") {
+    return 0x05080a;
+  }
+
   if (map.id === "hub") {
     return 0x7b9a47;
   }
@@ -3188,13 +3212,29 @@ function drawFullFloor({
   const mapX = -transform.cameraOffset.x;
   const mapY = -transform.cameraOffset.y;
   const useImageFloorTiles =
-    isHubVisualMap(map.id) || isWildernessVisualMap(map.id);
+    map.visualTheme === "slimeward-cave" ||
+    isHubVisualMap(map.id) ||
+    isWildernessVisualMap(map.id);
 
   backgroundGraphics
     .rect(mapX, mapY, mapPixelWidth, mapPixelHeight)
     .fill(getMapFloorColor(map));
 
   if (!useImageFloorTiles) {
+    return;
+  }
+
+  if (map.visualTheme === "slimeward-cave") {
+    drawSlimewardFloorCells({
+      cache,
+      layer,
+      map,
+      managedState,
+      metrics,
+      requestRedraw,
+      transform,
+      visibleTileBounds,
+    });
     return;
   }
 
@@ -3252,6 +3292,11 @@ function drawFullWalls({
   visibleTileBounds: TileBounds;
 }) {
   const hubWallKeys = isHubVisualMap(map.id) ? createHubWallKeySet(map.walls) : null;
+  const floorCellKeys =
+    map.visualTheme === "slimeward-cave"
+      ? new Set((map.floorCells ?? []).map(getHubWallKey))
+      : null;
+  const drawnSlimewardWallBlocks = new Set<string>();
 
   for (const wall of map.walls) {
     if (!isPositionInTileBounds(wall, visibleTileBounds)) {
@@ -3260,6 +3305,46 @@ function drawFullWalls({
 
     const wallX = wall.x * transform.cellPixelSize - transform.cameraOffset.x;
     const wallY = wall.y * transform.cellPixelSize - transform.cameraOffset.y;
+
+    if (floorCellKeys) {
+      const wallBlock = getSlimewardWallBlockPosition(wall);
+      const wallBlockKey = getHubWallKey(wallBlock);
+
+      if (
+        drawnSlimewardWallBlocks.has(wallBlockKey) ||
+        !isBlockInTileBounds(
+          wallBlock,
+          slimewardWallTileCellSpan,
+          visibleTileBounds,
+        ) ||
+        !isSlimewardWallBlockAdjacentToFloor(wallBlock, floorCellKeys)
+      ) {
+        continue;
+      }
+
+      drawnSlimewardWallBlocks.add(wallBlockKey);
+      const didDraw = drawManagedImageSprite({
+        anchorX: 0,
+        anchorY: 0,
+        cache,
+        height: transform.cellPixelSize * slimewardWallTileCellSpan,
+        key: `slimeward-wall:${map.id}:${wallBlock.x}:${wallBlock.y}`,
+        layer,
+        managedState,
+        metrics,
+        position: {
+          x: wallBlock.x * transform.cellPixelSize - transform.cameraOffset.x,
+          y: wallBlock.y * transform.cellPixelSize - transform.cameraOffset.y,
+        },
+        requestRedraw,
+        src: SLIMEWARD_DUNGEON_TILE_SRC.wall,
+        width: transform.cellPixelSize * slimewardWallTileCellSpan,
+      });
+
+      if (didDraw) {
+        continue;
+      }
+    }
 
     if (isWildernessVisualMap(map.id)) {
       const wallKind = getWildernessWallTileKind(wall);
@@ -3368,7 +3453,10 @@ function drawFullMapObjects({
       metrics,
       position: teleporterSpritePosition,
       requestRedraw,
-      src: getTeleportIconSrc(teleportWorkingById[teleport.id] ?? true),
+      src: getTeleportIconSrc(
+        teleportWorkingById[teleport.id] ?? true,
+        teleport.visualTheme ?? "default",
+      ),
       width: TELEPORT_OBJECT_SPRITE_SIZE_PX,
     });
 
@@ -3404,6 +3492,132 @@ function drawFullMapObjects({
         .fill(0x38bdf8);
     }
   }
+}
+
+function getSlimewardWallBlockPosition(wall: Position): Position {
+  return {
+    x: Math.floor(wall.x / slimewardWallTileCellSpan) * slimewardWallTileCellSpan,
+    y: Math.floor(wall.y / slimewardWallTileCellSpan) * slimewardWallTileCellSpan,
+  };
+}
+
+function isSlimewardWallBlockAdjacentToFloor(
+  wallBlock: Position,
+  floorCellKeys: Set<string>,
+): boolean {
+  for (let y = wallBlock.y; y < wallBlock.y + slimewardWallTileCellSpan; y += 1) {
+    for (let x = wallBlock.x; x < wallBlock.x + slimewardWallTileCellSpan; x += 1) {
+      if (
+        floorCellKeys.has(`${x - 1},${y}`) ||
+        floorCellKeys.has(`${x + 1},${y}`) ||
+        floorCellKeys.has(`${x},${y - 1}`) ||
+        floorCellKeys.has(`${x},${y + 1}`)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isBlockInTileBounds(
+  position: Position,
+  cellSpan: number,
+  bounds: TileBounds,
+): boolean {
+  return (
+    position.x + cellSpan - 1 >= bounds.minX &&
+    position.x <= bounds.maxX &&
+    position.y + cellSpan - 1 >= bounds.minY &&
+    position.y <= bounds.maxY
+  );
+}
+
+function drawSlimewardFloorCells({
+  cache,
+  layer,
+  map,
+  managedState,
+  metrics,
+  requestRedraw,
+  transform,
+  visibleTileBounds,
+}: {
+  cache: TextureCache;
+  layer: Container;
+  map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  requestRedraw?: () => void;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  const floorCellKeys = new Set((map.floorCells ?? []).map(getHubWallKey));
+  const startX =
+    Math.floor(visibleTileBounds.minX / slimewardFloorTileCellSpan) *
+    slimewardFloorTileCellSpan;
+  const startY =
+    Math.floor(visibleTileBounds.minY / slimewardFloorTileCellSpan) *
+    slimewardFloorTileCellSpan;
+  const tileSize = transform.cellPixelSize * slimewardFloorTileCellSpan;
+
+  for (
+    let y = startY;
+    y <= visibleTileBounds.maxY;
+    y += slimewardFloorTileCellSpan
+  ) {
+    for (
+      let x = startX;
+      x <= visibleTileBounds.maxX;
+      x += slimewardFloorTileCellSpan
+    ) {
+      const floorBlock = { x, y };
+
+      if (!doesBlockContainFloorCell(floorBlock, slimewardFloorTileCellSpan, floorCellKeys)) {
+        continue;
+      }
+
+      const src =
+        getCoordinateHash(floorBlock) % 5 === 0
+          ? SLIMEWARD_DUNGEON_TILE_SRC.floorAzure
+          : SLIMEWARD_DUNGEON_TILE_SRC.floorDamp;
+
+      drawManagedImageSprite({
+        anchorX: 0,
+        anchorY: 0,
+        cache,
+        height: tileSize,
+        key: `slimeward-floor:${map.id}:${floorBlock.x}:${floorBlock.y}:${src}`,
+        layer,
+        managedState,
+        metrics,
+        position: {
+          x: floorBlock.x * transform.cellPixelSize - transform.cameraOffset.x,
+          y: floorBlock.y * transform.cellPixelSize - transform.cameraOffset.y,
+        },
+        requestRedraw,
+        src,
+        width: tileSize,
+      });
+    }
+  }
+}
+
+function doesBlockContainFloorCell(
+  blockPosition: Position,
+  cellSpan: number,
+  floorCellKeys: Set<string>,
+): boolean {
+  for (let y = blockPosition.y; y < blockPosition.y + cellSpan; y += 1) {
+    for (let x = blockPosition.x; x < blockPosition.x + cellSpan; x += 1) {
+      if (floorCellKeys.has(`${x},${y}`)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function drawFullMapVisualObjects({
@@ -4038,6 +4252,34 @@ function drawFullMap({
           subzone.bounds.height * cellPixelSize,
         )
         .stroke({ color: 0xd9f99d, alpha: 0.42, width: 2 });
+    }
+
+    for (const waypoint of map.waypoints ?? []) {
+      if (!isPositionInTileBounds(waypoint.position, visibleTileBounds)) {
+        continue;
+      }
+
+      const waypointPosition = toFullPosition(waypoint.position, transform);
+      const didDraw = drawManagedImageSprite({
+        anchorX: 0.5,
+        anchorY: 0.5,
+        cache: textureCache,
+        height: cellPixelSize,
+        key: `waypoint:${map.id}:${waypoint.id}`,
+        layer: layers.effectsLayer,
+        managedState,
+        metrics,
+        position: waypointPosition,
+        requestRedraw,
+        src: MAP_OBJECT_ICON_SRC.slimewardWaypoint,
+        width: cellPixelSize,
+      });
+
+      if (!didDraw) {
+        overlayGraphics
+          .circle(waypointPosition.x, waypointPosition.y, cellPixelSize * 0.25)
+          .fill({ color: 0x38bdf8, alpha: 0.75 });
+      }
     }
 
     for (const entity of entities) {

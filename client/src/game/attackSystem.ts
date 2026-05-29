@@ -29,7 +29,10 @@ import {
   getEnemyAttackLeashDistance,
   getEnemyChaseSpeedMultiplier,
 } from "./enemyAISystem";
-import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
+import {
+  isEnemyAoeChanneling,
+  isStompOnlyEnemy,
+} from "./enemyAoeChannelSystem";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
   cancelResurrectionChannelForHelper,
@@ -156,6 +159,11 @@ export function updateAttackSystem(
     }
 
     if (isInAttackRange(attackReadyAttacker, target)) {
+      if (isEnemy(attackReadyAttacker) && isStompOnlyEnemy(attackReadyAttacker)) {
+        nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
+        continue;
+      }
+
       if (!canAttack(currentAttacker, now)) {
         nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;

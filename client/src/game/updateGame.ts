@@ -11,6 +11,10 @@ import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
+import {
+  isSlimewardDungeonChestUiOpen,
+  updateSlimewardDungeonSystem,
+} from "./dungeonSystem";
 import { updateDropSystem } from "./dropSystem";
 import { updateDirectCompanionCommandSystem } from "./directCompanionCommands";
 import {
@@ -66,6 +70,11 @@ export function updateGame(
   timingInput?: Partial<SimulationTiming>,
 ): GameState {
   const timing = getUpdateTiming(state, timingInput);
+
+  if (isSlimewardDungeonChestUiOpen(state)) {
+    return recordDebugTelemetryTick(state, state, timing);
+  }
+
   let nextState = clearExpiredSkillRuntimeState(
     clearExpiredCombatFeedback(
       clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
@@ -179,6 +188,7 @@ export function updateGame(
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateTargetDummyHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
+  nextState = updateSlimewardDungeonSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(
     nextState,

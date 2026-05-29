@@ -9,6 +9,7 @@ import type {
 export type DropTableId =
   | `${EnemyArchetypeId}_tier_${LootTier}_drops`
   | `${EnemyArchetypeId}_superior_tier_${LootTier}_drops`
+  | "azure_mass_tier_1_drops"
   | "goblin_shaman_tier_2_drops"
   | "goblin_shaman_superior_tier_2_drops";
 
@@ -182,6 +183,17 @@ export const SUPERIOR_ENEMY_DROP_TABLES: Partial<
 export const ENEMY_TYPE_DROP_TABLES: Partial<
   Record<EnemyTypeId, Partial<Record<LootTier, EnemyDropTable>>>
 > = {
+  azure_mass: {
+    1: {
+      id: "azure_mass_tier_1_drops",
+      archetypeId: "slime",
+      tier: 1,
+      groups: [
+        createDropGroup("azure_mass_gel", 6, "slime_gel_t1"),
+        createDropGroup("azure_mass_core", 2, "slime_core_t1"),
+      ],
+    },
+  },
   goblin_shaman: {
     2: {
       id: "goblin_shaman_tier_2_drops",

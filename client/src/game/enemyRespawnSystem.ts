@@ -1,5 +1,6 @@
 import { createEnemy } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { isSlimewardDungeonFloorMapId } from "./dungeonSystem";
 import { isSuperiorEnemy, rollEnemyVariantForSpawn } from "./enemyVariants";
 import { updateEntity, type GameState } from "./state";
 import type { Enemy } from "./types";
@@ -11,7 +12,11 @@ export function updateEnemyRespawnSystem(
   nowMs = Date.now(),
   random = Math.random,
 ): GameState {
-  if (!state.currentMapId || state.currentMapId === "hub") {
+  if (
+    !state.currentMapId ||
+    state.currentMapId === "hub" ||
+    isSlimewardDungeonFloorMapId(state.currentMapId)
+  ) {
     return state;
   }
 

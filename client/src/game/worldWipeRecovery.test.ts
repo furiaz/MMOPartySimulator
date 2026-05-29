@@ -6,10 +6,15 @@ import {
   MAP_ONE_ID,
   MAP_TWO_ID,
   npcIds,
+  SLIMEWARD_CAMP_ID,
+  SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
+  slimewardCampArrivalPositions,
 } from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import { createInitialQuestStates } from "./questSystem";
 import { addEntity, type GameState } from "./state";
+import { isTeleportWorking, setTeleportWorking } from "./teleportState";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";
 import type { ActiveTeleport, GameEntity } from "./types";
@@ -68,6 +73,55 @@ describe("world wipe recovery", () => {
         ? nextState.entities.leader.maxHealth
         : undefined,
     });
+  });
+
+  it("rescues a Slimeward dungeon full wipe to Slimeward Camp", () => {
+    const state = setCurrencyBalanceForDebug(
+      setTeleportWorking(
+        createSlimewardFloorTwoState([createDeadCompanion("leader")], {
+          partyLeaderId: "leader",
+          slimewardDungeon: {
+            chest: {
+              status: "available",
+              position: { x: 106, y: 20 },
+              exitTeleportId: SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
+              rolledLoot: [{ itemId: "slime_gel_t1", quantity: 1 }],
+              collectedLoot: [],
+              pendingLoot: [{ itemId: "slime_gel_t1", quantity: 1 }],
+            },
+          },
+        }),
+        SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
+        true,
+      ),
+      "crowns",
+      100,
+    ).state;
+
+    const nextState = updateGame(state, { nowMs: 1000 });
+
+    expect(nextState.currentMapId).toBe(SLIMEWARD_CAMP_ID);
+    expect(nextState.worldWipeRecovery).toMatchObject({
+      status: "rescued",
+      chargedFee: 5,
+      selectedChoice: {
+        hubDisplayName: "Slimeward Camp",
+        hopDistance: 0,
+        rescueActorId: "slimeward-camp-dog",
+      },
+    });
+    expect(nextState.entities.leader).toMatchObject({
+      state: "follow",
+      position: slimewardCampArrivalPositions[0],
+    });
+    expect(nextState.entities["slimeward-camp-dog"]).toMatchObject({
+      kind: "npc",
+    });
+    expect(nextState.slimewardDungeon?.chest).toBeNull();
+    expect(
+      isTeleportWorking(nextState, SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID),
+    ).toBe(false);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(95);
   });
 
   it("charges a higher route-hop fee from map-2", () => {
@@ -366,6 +420,22 @@ function createHubState(
     createTestGameState({
       currentMapId: HUB_MAP_ID,
       map: createDebugMap(HUB_MAP_ID),
+      activeTeleport: null,
+      quests: createInitialQuestStates(),
+      ...overrides,
+    }),
+  );
+}
+
+function createSlimewardFloorTwoState(
+  entities: GameEntity[],
+  overrides: Partial<GameState>,
+): GameState {
+  return entities.reduce(
+    addEntity,
+    createTestGameState({
+      currentMapId: SLIMEWARD_FLOOR_TWO_ID,
+      map: createDebugMap(SLIMEWARD_FLOOR_TWO_ID),
       activeTeleport: null,
       quests: createInitialQuestStates(),
       ...overrides,

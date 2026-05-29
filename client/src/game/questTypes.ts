@@ -18,7 +18,8 @@ export type QuestId =
   | "scout_rise_samples"
   | "rescue_the_grove_runner"
   | "hold_the_field_cache"
-  | "open_wolf_causeway";
+  | "open_wolf_causeway"
+  | "find_slimeward_camp";
 
 export type QuestStatus =
   | "locked"

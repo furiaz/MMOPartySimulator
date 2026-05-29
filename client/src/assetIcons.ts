@@ -13,6 +13,7 @@ const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
 const hubCastleWallAssetPath = "/Asserts/Generated/hub-castle-walls";
 const hubStructureAssetPath = "/Asserts/Generated/hub-structures/256";
 const teleportAssetPath = "/Asserts/Generated/teleports";
+const slimewardDungeonAssetPath = "/Asserts/Generated/Dungeon Generation";
 const beginnerSkillEffectsPath = "/Asserts/Generated/beginner-skill-effects-50/sprites";
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
@@ -72,6 +73,8 @@ export const NPC_ICON_SRC: Partial<Record<NpcEntity["npcRole"], string>> = {
   merchant: `${nowAssetPackPath}/merchant.png`,
   smith: `${nowAssetPackPath}/smith.png`,
   dog: `${nowAssetPackPath}/dog.png`,
+  dungeon_chest_closed: `${slimewardDungeonAssetPath}/dungeon-chest-closed-64.png`,
+  dungeon_chest_open: `${slimewardDungeonAssetPath}/dungeon-chest-open-64.png`,
 };
 
 export const WILDERNESS_MAP_TILE_SRC = {
@@ -103,6 +106,8 @@ export const MAP_VISUAL_OBJECT_SRC: Record<MapVisualObjectId, string> = {
   hub_cabin: `${hubStructureAssetPath}/hub_cabin.png`,
   hub_tent: `${hubStructureAssetPath}/hub_tent.png`,
   hub_dock_shore_connector: `${hubStructureAssetPath}/hub_dock_shore_connector.png`,
+  slime_covered_stone: `${slimewardDungeonAssetPath}/slime-covered-stone-64.png`,
+  azure_slime_rock_cluster: `${slimewardDungeonAssetPath}/azure-slime-rock-cluster-128.png`,
 };
 
 export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
@@ -127,4 +132,13 @@ export const MAP_OBJECT_ICON_SRC = {
   healingFountain: `${beginnerSkillEffectsPath}/hub_healing_fountain.png`,
   teleportBroken: `${teleportAssetPath}/TeleportBroken.png`,
   teleportGood: `${teleportAssetPath}/TeleportGood.png`,
+  slimewardTeleportBroken: `${slimewardDungeonAssetPath}/slimeward-teleporter-broken.png`,
+  slimewardTeleportGood: `${slimewardDungeonAssetPath}/slimeward-teleporter-active.png`,
+  slimewardWaypoint: `${slimewardDungeonAssetPath}/dungeon-waypoint-marker-32.png`,
+} as const;
+
+export const SLIMEWARD_DUNGEON_TILE_SRC = {
+  floorDamp: `${slimewardDungeonAssetPath}/slimeward-floor-damp-stone-128.png`,
+  floorAzure: `${slimewardDungeonAssetPath}/slimeward-floor-azure-slime-stone-128.png`,
+  wall: `${slimewardDungeonAssetPath}/slimeward-wall-azure-stone-64.png`,
 } as const;

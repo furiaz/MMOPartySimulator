@@ -1,6 +1,7 @@
 import type {
   DebugMapId,
   DebugTeleportPoint,
+  EnemyVariant,
   EnemyTypeId,
   GameMap,
   HealingFountain,
@@ -29,6 +30,28 @@ export const MAP_ONE_ID: DebugMapId = "map-1";
 export const MAP_TWO_ID: DebugMapId = "map-2";
 export const MAP_THREE_ID: DebugMapId = "map-3";
 export const MAP_FOUR_ID: DebugMapId = "map-4";
+export const SLIMEWARD_CAMP_ID: DebugMapId = "slimeward-camp";
+export const SLIMEWARD_FLOOR_ONE_ID: DebugMapId = "slimeward-floor-1";
+export const SLIMEWARD_FLOOR_TWO_ID: DebugMapId = "slimeward-floor-2";
+export const MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID =
+  "map-3-to-slimeward-camp";
+export const HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID = "hub-to-slimeward-camp";
+export const SLIMEWARD_CAMP_TO_MAP_THREE_TELEPORTER_ID =
+  "slimeward-camp-to-map-3";
+export const SLIMEWARD_CAMP_TO_FLOOR_ONE_TELEPORTER_ID =
+  "slimeward-camp-to-floor-1";
+export const SLIMEWARD_CAMP_BROKEN_EXIT_TELEPORTER_ID =
+  "slimeward-camp-broken-exit";
+export const SLIMEWARD_FLOOR_ONE_TO_CAMP_TELEPORTER_ID =
+  "slimeward-floor-1-to-camp";
+export const SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID =
+  "slimeward-floor-1-to-floor-2";
+export const SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID =
+  "slimeward-floor-2-exit";
+export const SLIMEWARD_BOSS_ID = "slimeward-azure-mass";
+export const SLIMEWARD_CHEST_ID = "slimeward-boss-chest";
+export const SLIMEWARD_CHEST_POSITION: Position = { x: 106, y: 20 };
+export const SLIMEWARD_EXIT_POSITION: Position = { x: 114, y: 20 };
 
 export const companionIds = [
   "test-companion-1",
@@ -168,6 +191,34 @@ const mapFourMapThreeArrivalPositions: Position[] = [
   { x: 153, y: 13 },
 ];
 
+export const slimewardCampArrivalPositions: Position[] = [
+  { x: 12, y: 17 },
+  { x: 13, y: 17 },
+  { x: 12, y: 18 },
+  { x: 13, y: 18 },
+];
+
+export const mapThreeSlimewardArrivalPositions: Position[] = [
+  { x: 96, y: 27 },
+  { x: 97, y: 27 },
+  { x: 96, y: 28 },
+  { x: 97, y: 28 },
+];
+
+export const slimewardFloorOneArrivalPositions: Position[] = [
+  { x: 8, y: 18 },
+  { x: 9, y: 18 },
+  { x: 8, y: 19 },
+  { x: 9, y: 19 },
+];
+
+export const slimewardFloorTwoArrivalPositions: Position[] = [
+  { x: 8, y: 18 },
+  { x: 9, y: 18 },
+  { x: 8, y: 19 },
+  { x: 9, y: 19 },
+];
+
 export const hubNpcStartData = [
   {
     id: npcIds[0],
@@ -198,6 +249,15 @@ export const hubNpcStartData = [
     position: { x: 73, y: 42 },
     displayName: "Test Blade",
     npcRole: "test_blade",
+  },
+] as const;
+
+export const slimewardCampNpcStartData = [
+  {
+    id: "slimeward-camp-dog",
+    position: { x: 18, y: 19 },
+    displayName: "Camp Dog",
+    npcRole: "dog",
   },
 ] as const;
 
@@ -780,6 +840,118 @@ export const mapThreeResourceStartData: ResourceStartData[] =
 export const mapFourResourceStartData: ResourceStartData[] =
   createResourceStartData(mapFourSubzones);
 
+const SLIMEWARD_FLOOR_ONE_PASSAGES: ZoneSubzonePassage[] = [
+  { id: "f1-room-1-to-room-2", fromSubzoneId: "f1-room-1", toSubzoneId: "f1-room-2", position: { x: 20, y: 20 } },
+  { id: "f1-room-2-to-room-3", fromSubzoneId: "f1-room-2", toSubzoneId: "f1-room-3", position: { x: 40, y: 20 } },
+  { id: "f1-room-3-to-room-4", fromSubzoneId: "f1-room-3", toSubzoneId: "f1-room-4", position: { x: 64, y: 20 } },
+  { id: "f1-room-4-to-room-5", fromSubzoneId: "f1-room-4", toSubzoneId: "f1-room-5", position: { x: 84, y: 20 } },
+];
+
+export const slimewardFloorOneSubzones: ZoneSubzone[] = [
+  createSlimewardSubzone("f1-room-1", "Slimeward Entry", { x: 4, y: 12, width: 12, height: 12 }, { x: 10, y: 18 }, 8, []),
+  createSlimewardSubzone("f1-room-2", "Gelstone Bend", { x: 24, y: 12, width: 12, height: 12 }, { x: 30, y: 18 }, 8, ["slimeward_heavy_slime", "slimeward_pale_ooze"]),
+  createSlimewardSubzone("f1-room-3", "Dripping Pocket", { x: 44, y: 8, width: 16, height: 16 }, { x: 52, y: 18 }, 8, ["slimeward_pale_ooze", "slimeward_spitter_slime"]),
+  createSlimewardSubzone("f1-room-4", "Slimecut Hall", { x: 68, y: 12, width: 12, height: 12 }, { x: 74, y: 18 }, 9, ["slimeward_heavy_slime", "slimeward_spitter_slime"]),
+  createSlimewardSubzone("f1-room-5", "Azure Threshold", { x: 88, y: 8, width: 16, height: 20 }, { x: 96, y: 18 }, 9, ["slimeward_heavy_slime", "slimeward_pale_ooze", "slimeward_spitter_slime"]),
+].map((subzone) => ({
+  ...subzone,
+  passages: getPassagesForSubzone(subzone.id, SLIMEWARD_FLOOR_ONE_PASSAGES),
+}));
+
+const SLIMEWARD_FLOOR_TWO_PASSAGES: ZoneSubzonePassage[] = [
+  { id: "f2-room-1-to-room-2", fromSubzoneId: "f2-room-1", toSubzoneId: "f2-room-2", position: { x: 20, y: 20 } },
+  { id: "f2-room-2-to-room-3", fromSubzoneId: "f2-room-2", toSubzoneId: "f2-room-3", position: { x: 40, y: 20 } },
+  { id: "f2-room-3-to-room-4", fromSubzoneId: "f2-room-3", toSubzoneId: "f2-room-4", position: { x: 60, y: 20 } },
+  { id: "f2-room-4-to-boss", fromSubzoneId: "f2-room-4", toSubzoneId: "f2-boss-room", position: { x: 80, y: 20 } },
+];
+
+export const slimewardFloorTwoSubzones: ZoneSubzone[] = [
+  createSlimewardSubzone("f2-room-1", "Lower Landing", { x: 4, y: 8, width: 12, height: 16 }, { x: 10, y: 18 }, 9, []),
+  createSlimewardSubzone("f2-room-2", "Azure Runoff", { x: 24, y: 8, width: 12, height: 16 }, { x: 30, y: 18 }, 9, ["slimeward_heavy_slime", "slimeward_pale_ooze"]),
+  createSlimewardSubzone("f2-room-3", "Heavy Pool", { x: 44, y: 8, width: 12, height: 16 }, { x: 50, y: 18 }, 9, ["slimeward_heavy_slime", "slimeward_spitter_slime"]),
+  createSlimewardSubzone("f2-room-4", "Mass Approach", { x: 64, y: 8, width: 12, height: 16 }, { x: 70, y: 18 }, 9, ["slimeward_heavy_slime", "slimeward_pale_ooze", "slimeward_spitter_slime"]),
+  createSlimewardSubzone("f2-boss-room", "Azure Mass Chamber", { x: 84, y: 4, width: 32, height: 32 }, { x: 100, y: 20 }, 9, ["azure_mass"]),
+].map((subzone) => ({
+  ...subzone,
+  passages: getPassagesForSubzone(subzone.id, SLIMEWARD_FLOOR_TWO_PASSAGES),
+}));
+
+export const slimewardFloorOneEnemyStartData: EnemyStartData[] = [
+  { id: "slimeward-f1-r2-1", position: { x: 28, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-2", encounterAreaId: "f1-room-2-pack" },
+  { id: "slimeward-f1-r2-2", position: { x: 31, y: 20 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-2", encounterAreaId: "f1-room-2-pack" },
+  { id: "slimeward-f1-r2-3", position: { x: 33, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-2", encounterAreaId: "f1-room-2-pack" },
+  { id: "slimeward-f1-r3-1", position: { x: 48, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-3", encounterAreaId: "f1-room-3-pack" },
+  { id: "slimeward-f1-r3-2", position: { x: 52, y: 20 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f1-room-3", encounterAreaId: "f1-room-3-pack" },
+  { id: "slimeward-f1-r3-3", position: { x: 56, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-3", encounterAreaId: "f1-room-3-pack" },
+  { id: "slimeward-f1-r3-4", position: { x: 52, y: 12 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f1-room-3", encounterAreaId: "f1-room-3-pack" },
+  { id: "slimeward-f1-r4-1", position: { x: 70, y: 16 }, enemyTypeId: "slimeward_heavy_slime", subzoneId: "f1-room-4", encounterAreaId: "f1-room-4-pack" },
+  { id: "slimeward-f1-r4-2", position: { x: 74, y: 20 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f1-room-4", encounterAreaId: "f1-room-4-pack" },
+  { id: "slimeward-f1-r4-3", position: { x: 76, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-4", encounterAreaId: "f1-room-4-pack" },
+  { id: "slimeward-f1-r4-4", position: { x: 72, y: 21 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f1-room-4", encounterAreaId: "f1-room-4-pack" },
+  { id: "slimeward-f1-r5-1", position: { x: 92, y: 16 }, enemyTypeId: "slimeward_heavy_slime", subzoneId: "f1-room-5", encounterAreaId: "f1-room-5-pack", variant: "superior" },
+  { id: "slimeward-f1-r5-2", position: { x: 96, y: 14 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-5", encounterAreaId: "f1-room-5-pack" },
+  { id: "slimeward-f1-r5-3", position: { x: 100, y: 20 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f1-room-5", encounterAreaId: "f1-room-5-pack" },
+  { id: "slimeward-f1-r5-4", position: { x: 94, y: 23 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f1-room-5", encounterAreaId: "f1-room-5-pack" },
+  { id: "slimeward-f1-r5-5", position: { x: 102, y: 16 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f1-room-5", encounterAreaId: "f1-room-5-pack" },
+];
+
+export const slimewardFloorTwoEnemyStartData: EnemyStartData[] = [
+  { id: "slimeward-f2-r2-1", position: { x: 28, y: 16 }, enemyTypeId: "slimeward_heavy_slime", subzoneId: "f2-room-2", encounterAreaId: "f2-room-2-pack", variant: "superior" },
+  { id: "slimeward-f2-r2-2", position: { x: 31, y: 20 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-2", encounterAreaId: "f2-room-2-pack" },
+  { id: "slimeward-f2-r2-3", position: { x: 33, y: 16 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-2", encounterAreaId: "f2-room-2-pack" },
+  { id: "slimeward-f2-r2-4", position: { x: 29, y: 21 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-2", encounterAreaId: "f2-room-2-pack" },
+  { id: "slimeward-f2-r3-1", position: { x: 48, y: 16 }, enemyTypeId: "slimeward_heavy_slime", subzoneId: "f2-room-3", encounterAreaId: "f2-room-3-pack", variant: "superior" },
+  { id: "slimeward-f2-r3-2", position: { x: 51, y: 20 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-3", encounterAreaId: "f2-room-3-pack" },
+  { id: "slimeward-f2-r3-3", position: { x: 53, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-3", encounterAreaId: "f2-room-3-pack" },
+  { id: "slimeward-f2-r3-4", position: { x: 48, y: 21 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-3", encounterAreaId: "f2-room-3-pack" },
+  { id: "slimeward-f2-r3-5", position: { x: 54, y: 21 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-3", encounterAreaId: "f2-room-3-pack" },
+  { id: "slimeward-f2-r4-1", position: { x: 68, y: 16 }, enemyTypeId: "slimeward_heavy_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack", variant: "superior" },
+  { id: "slimeward-f2-r4-2", position: { x: 71, y: 16 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
+  { id: "slimeward-f2-r4-3", position: { x: 73, y: 20 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
+  { id: "slimeward-f2-r4-4", position: { x: 68, y: 21 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
+  { id: "slimeward-f2-r4-5", position: { x: 72, y: 22 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
+  { id: SLIMEWARD_BOSS_ID, position: { x: 100, y: 20 }, enemyTypeId: "azure_mass", subzoneId: "f2-boss-room", encounterAreaId: "f2-boss-pack" },
+];
+
+export const slimewardFloorOneEnemyStartPositions: Position[] =
+  slimewardFloorOneEnemyStartData.map((enemy) => enemy.position);
+export const slimewardFloorTwoEnemyStartPositions: Position[] =
+  slimewardFloorTwoEnemyStartData.map((enemy) => enemy.position);
+
+const slimewardCampFloorCells = [
+  ...createRectFloorCells(4, 8, 36, 20),
+];
+
+const slimewardFloorOneFloorCells = dedupeWalls([
+  ...slimewardFloorOneSubzones.flatMap((subzone) =>
+    createRectFloorCells(
+      subzone.bounds.x,
+      subzone.bounds.y,
+      subzone.bounds.width,
+      subzone.bounds.height,
+    ),
+  ),
+  ...createRectFloorCells(16, 16, 8, 8),
+  ...createRectFloorCells(36, 16, 8, 8),
+  ...createRectFloorCells(60, 16, 8, 8),
+  ...createRectFloorCells(80, 16, 8, 8),
+]);
+
+const slimewardFloorTwoFloorCells = dedupeWalls([
+  ...slimewardFloorTwoSubzones.flatMap((subzone) =>
+    createRectFloorCells(
+      subzone.bounds.x,
+      subzone.bounds.y,
+      subzone.bounds.width,
+      subzone.bounds.height,
+    ),
+  ),
+  ...createRectFloorCells(16, 16, 8, 8),
+  ...createRectFloorCells(36, 16, 8, 8),
+  ...createRectFloorCells(56, 16, 8, 8),
+  ...createRectFloorCells(76, 16, 8, 8),
+]);
+
 export type ResourceStartData = {
   id: string;
   position: Position;
@@ -794,6 +966,7 @@ export type EnemyStartData = {
   enemyTypeId: EnemyTypeId;
   subzoneId: string;
   encounterAreaId: string;
+  variant?: EnemyVariant;
 };
 
 const HUB_VISUAL_OBJECTS: MapVisualObject[] = [
@@ -875,6 +1048,28 @@ const MAP_FOUR_WALLS = dedupeWalls([
   ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
 ]);
 
+const SLIMEWARD_CAMP_COLUMNS = 44;
+const SLIMEWARD_CAMP_ROWS = 30;
+const SLIMEWARD_FLOOR_ONE_COLUMNS = 112;
+const SLIMEWARD_FLOOR_ONE_ROWS = 36;
+const SLIMEWARD_FLOOR_TWO_COLUMNS = 122;
+const SLIMEWARD_FLOOR_TWO_ROWS = 40;
+const SLIMEWARD_CAMP_WALLS = createWallsOutsideFloorCells(
+  SLIMEWARD_CAMP_COLUMNS,
+  SLIMEWARD_CAMP_ROWS,
+  slimewardCampFloorCells,
+);
+const SLIMEWARD_FLOOR_ONE_WALLS = createWallsOutsideFloorCells(
+  SLIMEWARD_FLOOR_ONE_COLUMNS,
+  SLIMEWARD_FLOOR_ONE_ROWS,
+  slimewardFloorOneFloorCells,
+);
+const SLIMEWARD_FLOOR_TWO_WALLS = createWallsOutsideFloorCells(
+  SLIMEWARD_FLOOR_TWO_COLUMNS,
+  SLIMEWARD_FLOOR_TWO_ROWS,
+  slimewardFloorTwoFloorCells,
+);
+
 export const debugMapDefinitions: Record<
   DebugMapId,
   {
@@ -889,6 +1084,9 @@ export const debugMapDefinitions: Record<
     visualObjects?: MapVisualObject[];
     subzones?: ZoneSubzone[];
     subzoneNameLabels?: ZoneSubzoneNameLabel[];
+    floorCells?: Position[];
+    visualTheme?: GameMap["visualTheme"];
+    waypoints?: GameMap["waypoints"];
   }
 > = {
   [HUB_MAP_ID]: {
@@ -908,6 +1106,15 @@ export const debugMapDefinitions: Record<
         sourceMapId: HUB_MAP_ID,
         targetMapId: MAP_ONE_ID,
         arrivalPositions: mapOneHubArrivalPositions,
+      },
+      {
+        id: HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+        position: { x: hubTeleporterPosition.x, y: hubTeleporterPosition.y - 10 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: HUB_MAP_ID,
+        targetMapId: SLIMEWARD_CAMP_ID,
+        arrivalPositions: slimewardCampArrivalPositions,
+        visualTheme: "slimeward",
       },
     ],
   },
@@ -1001,6 +1208,16 @@ export const debugMapDefinitions: Record<
         arrivalPositions: mapThreeMapFourArrivalPositions,
         autoSelectAfterEnemiesCleared: true,
       },
+      {
+        id: MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+        position: { x: 98, y: 5 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: MAP_THREE_ID,
+        targetMapId: SLIMEWARD_CAMP_ID,
+        arrivalPositions: slimewardCampArrivalPositions,
+        startsWorking: false,
+        visualTheme: "slimeward",
+      },
     ],
   },
   [MAP_FOUR_ID]: {
@@ -1025,6 +1242,150 @@ export const debugMapDefinitions: Record<
       },
     ],
   },
+  [SLIMEWARD_CAMP_ID]: {
+    id: SLIMEWARD_CAMP_ID,
+    displayName: "Slimeward Camp",
+    debugName: "slimeward-camp",
+    columns: SLIMEWARD_CAMP_COLUMNS,
+    rows: SLIMEWARD_CAMP_ROWS,
+    walls: SLIMEWARD_CAMP_WALLS,
+    floorCells: slimewardCampFloorCells,
+    visualTheme: "slimeward-cave",
+    healingFountains: [],
+    visualObjects: [
+      {
+        id: "slimeward-camp-slime-stone",
+        visualId: "slime_covered_stone",
+        position: { x: 24, y: 22 },
+        widthCells: 4,
+        heightCells: 4,
+        anchorY: 1,
+      },
+    ],
+    teleports: [
+      {
+        id: SLIMEWARD_CAMP_TO_MAP_THREE_TELEPORTER_ID,
+        position: { x: 10, y: 17 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_CAMP_ID,
+        targetMapId: MAP_THREE_ID,
+        arrivalPositions: mapThreeSlimewardArrivalPositions,
+        visualTheme: "slimeward",
+      },
+      {
+        id: SLIMEWARD_CAMP_TO_FLOOR_ONE_TELEPORTER_ID,
+        position: { x: 30, y: 17 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_CAMP_ID,
+        targetMapId: SLIMEWARD_FLOOR_ONE_ID,
+        arrivalPositions: slimewardFloorOneArrivalPositions,
+        visualTheme: "slimeward",
+      },
+      {
+        id: SLIMEWARD_CAMP_BROKEN_EXIT_TELEPORTER_ID,
+        position: { x: 35, y: 17 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_CAMP_ID,
+        targetMapId: SLIMEWARD_CAMP_ID,
+        arrivalPositions: slimewardCampArrivalPositions,
+        startsWorking: false,
+        visualTheme: "slimeward",
+      },
+    ],
+  },
+  [SLIMEWARD_FLOOR_ONE_ID]: {
+    id: SLIMEWARD_FLOOR_ONE_ID,
+    displayName: "Slimeward Floor 1",
+    debugName: "slimeward-floor-1",
+    columns: SLIMEWARD_FLOOR_ONE_COLUMNS,
+    rows: SLIMEWARD_FLOOR_ONE_ROWS,
+    walls: SLIMEWARD_FLOOR_ONE_WALLS,
+    floorCells: slimewardFloorOneFloorCells,
+    visualTheme: "slimeward-cave",
+    healingFountains: [],
+    subzones: slimewardFloorOneSubzones,
+    waypoints: [
+      { id: "f1-waypoint-entry", position: { x: 10, y: 18 } },
+      { id: "f1-waypoint-room-2", position: { x: 30, y: 18 } },
+      { id: "f1-waypoint-room-3", position: { x: 52, y: 18 } },
+      { id: "f1-waypoint-room-4", position: { x: 74, y: 18 } },
+      { id: "f1-waypoint-room-5", position: { x: 96, y: 18 } },
+      { id: "f1-waypoint-floor-2", position: { x: 100, y: 18 } },
+    ],
+    teleports: [
+      {
+        id: SLIMEWARD_FLOOR_ONE_TO_CAMP_TELEPORTER_ID,
+        position: { x: 8, y: 18 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_FLOOR_ONE_ID,
+        targetMapId: SLIMEWARD_CAMP_ID,
+        arrivalPositions: slimewardCampArrivalPositions,
+        visualTheme: "slimeward",
+      },
+      {
+        id: SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
+        position: { x: 100, y: 18 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_FLOOR_ONE_ID,
+        targetMapId: SLIMEWARD_FLOOR_TWO_ID,
+        arrivalPositions: slimewardFloorTwoArrivalPositions,
+        autoSelectAfterEnemiesCleared: true,
+        visualTheme: "slimeward",
+      },
+    ],
+  },
+  [SLIMEWARD_FLOOR_TWO_ID]: {
+    id: SLIMEWARD_FLOOR_TWO_ID,
+    displayName: "Slimeward Floor 2",
+    debugName: "slimeward-floor-2",
+    columns: SLIMEWARD_FLOOR_TWO_COLUMNS,
+    rows: SLIMEWARD_FLOOR_TWO_ROWS,
+    walls: SLIMEWARD_FLOOR_TWO_WALLS,
+    floorCells: slimewardFloorTwoFloorCells,
+    visualTheme: "slimeward-cave",
+    healingFountains: [],
+    subzones: slimewardFloorTwoSubzones,
+    visualObjects: [
+      {
+        id: "slimeward-boss-azure-rocks",
+        visualId: "azure_slime_rock_cluster",
+        position: { x: 90, y: 30 },
+        widthCells: 5,
+        heightCells: 5,
+        anchorY: 1,
+      },
+    ],
+    waypoints: [
+      { id: "f2-waypoint-entry", position: { x: 10, y: 18 } },
+      { id: "f2-waypoint-room-2", position: { x: 30, y: 18 } },
+      { id: "f2-waypoint-room-3", position: { x: 50, y: 18 } },
+      { id: "f2-waypoint-room-4", position: { x: 70, y: 18 } },
+      { id: "f2-waypoint-boss", position: { x: 100, y: 20 } },
+      { id: "f2-waypoint-chest", position: SLIMEWARD_CHEST_POSITION },
+      { id: "f2-waypoint-exit", position: SLIMEWARD_EXIT_POSITION },
+    ],
+    teleports: [
+      {
+        id: "slimeward-floor-2-to-floor-1",
+        position: { x: 8, y: 18 },
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_FLOOR_TWO_ID,
+        targetMapId: SLIMEWARD_FLOOR_ONE_ID,
+        arrivalPositions: slimewardFloorOneArrivalPositions,
+        visualTheme: "slimeward",
+      },
+      {
+        id: SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
+        position: SLIMEWARD_EXIT_POSITION,
+        range: TELEPORTER_RANGE,
+        sourceMapId: SLIMEWARD_FLOOR_TWO_ID,
+        targetMapId: SLIMEWARD_CAMP_ID,
+        arrivalPositions: slimewardCampArrivalPositions,
+        startsWorking: false,
+        visualTheme: "slimeward",
+      },
+    ],
+  },
 };
 
 export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
@@ -1041,6 +1402,9 @@ export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
     visualObjects: definition.visualObjects,
     subzones: definition.subzones,
     subzoneNameLabels: definition.subzoneNameLabels,
+    floorCells: definition.floorCells,
+    visualTheme: definition.visualTheme,
+    waypoints: definition.waypoints,
   };
 
   return {
@@ -1113,6 +1477,70 @@ function createPerimeterWalls(columns: number, rows: number) {
     ...createVerticalWall(0, 1, rows - 2, []),
     ...createVerticalWall(columns - 1, 1, rows - 2, []),
   ];
+}
+
+function createRectFloorCells(
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+): Position[] {
+  const floorCells: Position[] = [];
+
+  for (let y = startY; y < startY + height; y += 1) {
+    for (let x = startX; x < startX + width; x += 1) {
+      floorCells.push({ x, y });
+    }
+  }
+
+  return floorCells;
+}
+
+function createWallsOutsideFloorCells(
+  columns: number,
+  rows: number,
+  floorCells: Position[],
+): Position[] {
+  const floorCellKeys = new Set(floorCells.map((cell) => `${cell.x},${cell.y}`));
+  const walls: Position[] = [];
+
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      if (!floorCellKeys.has(`${x},${y}`)) {
+        walls.push({ x, y });
+      }
+    }
+  }
+
+  return walls;
+}
+
+function createSlimewardSubzone(
+  id: string,
+  displayName: string,
+  bounds: ZoneSubzone["bounds"],
+  encounterCenter: Position,
+  level: number,
+  enemyTypeIds: EnemyTypeId[],
+): ZoneSubzone {
+  return {
+    id,
+    displayName,
+    bounds,
+    levelRange: { min: level, max: level },
+    enemyTypeIds,
+    encounterAreas: [
+      {
+        id: id === "f2-boss-room" ? "f2-boss-pack" : `${id}-pack`,
+        subzoneId: id,
+        center: encounterCenter,
+        radius: id === "f2-boss-room" ? 20 : 8,
+        leashRadius: id === "f2-boss-room" ? 24 : 10,
+      },
+    ],
+    resourceLocations: [],
+    passages: [],
+  };
 }
 
 function isInOpening(value: number, openings: [number, number][]): boolean {

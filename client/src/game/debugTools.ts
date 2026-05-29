@@ -1,7 +1,18 @@
-import { createCompanion, isResourceEntity, moveEntityTo } from "./entities";
+import { createCompanion, createNpc, isResourceEntity, moveEntityTo } from "./entities";
 import { PROTOTYPE_CONSUMABLE_ITEM_IDS } from "./consumables";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import {
+  clearSlimewardDungeonRuntime,
+  isSlimewardMapId,
+} from "./dungeonSystem";
 import { applyEnemyVariantStats, isSuperiorEnemy } from "./enemyVariants";
+import {
+  SLIMEWARD_CAMP_ID,
+  companionIds,
+  createDebugMap,
+  slimewardCampArrivalPositions,
+  slimewardCampNpcStartData,
+} from "./debugMap";
 import { getPartyLeader } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
 import { syncCompanionDerivedMaxHealth } from "./stats";
@@ -283,6 +294,7 @@ export function debugForceSuperiorEnemyInCurrentSubzone(
         entity.health > 0 &&
         entity.subzoneId === subzoneId &&
         !entity.isTargetDummy &&
+        entity.enemyTypeId !== "azure_mass" &&
         !entity.questSpawn &&
         !isSuperiorEnemy(entity),
     )
@@ -375,6 +387,88 @@ export function debugAddPrototypeConsumablesToInventory(state: GameState): GameS
       ).state,
     state,
   );
+}
+
+export function debugResetSlimewardDungeon(state: GameState): GameState {
+  const clearedState = clearSlimewardDungeonRuntime(state);
+
+  if (!isSlimewardMapId(clearedState.currentMapId)) {
+    return clearedState;
+  }
+
+  const map = createDebugMap(SLIMEWARD_CAMP_ID);
+  let entities: Record<string, GameEntity> = {};
+
+  for (const companionId of companionIds) {
+    const companion = clearedState.entities[companionId];
+
+    if (companion?.kind !== "companion") {
+      continue;
+    }
+
+    const position =
+      slimewardCampArrivalPositions[companionIds.indexOf(companionId)] ??
+      slimewardCampArrivalPositions[0];
+    entities[companion.id] = {
+      ...moveEntityTo(companion, position),
+      state: "follow",
+      currentTargetId:
+        companion.id === clearedState.partyLeaderId
+          ? null
+          : clearedState.partyLeaderId,
+      commandPriority: "autonomous",
+    };
+  }
+
+  for (const npc of slimewardCampNpcStartData) {
+    entities[npc.id] = createNpc(npc.id, npc.position, npc.displayName, npc.npcRole);
+  }
+
+  return {
+    ...clearedState,
+    currentMapId: SLIMEWARD_CAMP_ID,
+    map,
+    entities,
+    activeTeleport: null,
+    leaderIntent: null,
+    partyIntent: null,
+    localPoiTarget: null,
+    globalPoiIntent: null,
+    worldTravelTargetMapId: null,
+    lastPoiDecision: undefined,
+    directCompanionCommandsById: {},
+    directCommandGraceUntilByCompanionId: {},
+    interruptedPoiTarget: null,
+    exploredTiles: {},
+    followTrailsByEntityId: {},
+    combatFeedbackEvents: [],
+    failedMoveByEntityId: {},
+    movementFailuresByEntityId: {},
+    moveIntentsByEntityId: {},
+    reservedPositionsByEntityId: {},
+    movementPathsByEntityId: {},
+    movementDecisionsByEntityId: {},
+    lastPositionsByEntityId: {},
+    defenderWaitTicksByLeaderId: {},
+    defenderBlockedTicksByEntityId: {},
+    defenderWaitMsByLeaderId: {},
+    defenderBlockedMsByEntityId: {},
+    skillVisualEvents: [],
+    enemyAoeChannelsByCasterId: {},
+    enemyAoeCooldownsByCasterId: {},
+    dropVisualEvents: [],
+    resurrectionProgressByCompanionId: {},
+    resurrectionChannelsByHelperId: {},
+    partyFormation: {
+      phase: "idle",
+      targetId: null,
+      approachPoint: null,
+      direction: { x: 0, y: 0 },
+      slotsByEntityId: {},
+      slotReasonsByEntityId: {},
+      skippedTargetIds: [],
+    },
+  };
 }
 
 export function debugRefreshResources(state: GameState): GameState {

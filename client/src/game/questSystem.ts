@@ -3,6 +3,8 @@ import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
 import {
   HUB_MAP_ID,
   MAP_ONE_ID,
+  MAP_THREE_ID,
+  MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_TWO_ID,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
@@ -51,6 +53,7 @@ export const QUEST_ORDER: QuestId[] = [
   "rescue_the_grove_runner",
   "hold_the_field_cache",
   "open_wolf_causeway",
+  "find_slimeward_camp",
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -391,6 +394,30 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         { itemId: "bulwark_cuirass", quantity: 1 },
         { itemId: "plain_charm", quantity: 1 },
       ],
+    },
+    unlocksQuestIds: ["find_slimeward_camp"],
+  },
+  find_slimeward_camp: {
+    id: "find_slimeward_camp",
+    displayName: "Slimeward Trail",
+    sourceType: "npc",
+    objectiveFlow: "sequential",
+    questGiverPoiId: QUEST_GIVER_POI_ID,
+    objectives: [
+      {
+        id: "unlock_slimeward_camp_route",
+        type: "unlock_route",
+        targetMapId: MAP_THREE_ID,
+        targetSubzoneId: "north-west",
+        targetPoiId: MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+        targetPosition: { x: 98, y: 5 },
+        routeTeleportId: MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+        requiredCount: 1,
+      },
+    ],
+    rewards: {
+      crowns: 25,
+      characterXp: 10,
     },
   },
 };

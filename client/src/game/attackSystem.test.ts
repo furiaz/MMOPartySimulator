@@ -130,6 +130,31 @@ describe("enemy attack leash movement", () => {
     });
   });
 
+  it("prevents Heavy Slimes from using a basic attack", () => {
+    const companion = createIdleCompanion("leader", { x: 1, y: 0 });
+    const enemy = {
+      ...createEnemy("heavy-slime", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "slimeward_heavy_slime",
+      }),
+      state: "attack" as const,
+      currentTargetId: companion.id,
+      lastAttackAt: -5000,
+    };
+
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+    const nextCompanion = nextState.entities[companion.id];
+
+    expect(nextCompanion).toMatchObject({ health: companion.health });
+    expect(nextEnemy.attackWindupStartedAt).toBeUndefined();
+    expect(nextEnemy.state).toBe("attack");
+    expect(nextEnemy.currentTargetId).toBe(companion.id);
+  });
+
   it("moves attacking companions toward distinct combat positions around the same target", () => {
     const first = createAttackingCompanion("first", { x: 3, y: 5 }, 0);
     const second = createAttackingCompanion("second", { x: 3, y: 5.2 }, 1);

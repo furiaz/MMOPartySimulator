@@ -6,9 +6,16 @@ import {
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
+  SLIMEWARD_CAMP_ID,
+  slimewardCampArrivalPositions,
+  slimewardCampNpcStartData,
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
+import {
+  clearSlimewardDungeonRuntime,
+  isSlimewardDungeonFloorMapId,
+} from "./dungeonSystem";
 import { createNpc, createTargetDummy, moveEntityTo } from "./entities";
 import { recordMapReachedForQuests } from "./questSystem";
 import { updateEntity, type GameState } from "./state";
@@ -56,6 +63,17 @@ export const DEFAULT_RESCUE_HUBS: RescueHubDefinition[] = [
     arrivalPositions: hubCompanionStartPositions,
   },
 ];
+
+const SLIMEWARD_CAMP_RESCUE_HUB: RescueHubDefinition = {
+  id: "slimeward-camp",
+  mapId: SLIMEWARD_CAMP_ID,
+  displayName: "Slimeward Camp",
+  rescueActorId: "slimeward-camp-dog",
+  rescueActorName: "Camp Dog",
+  rescueLine: "Back to camp.",
+  isUnlocked: true,
+  arrivalPositions: slimewardCampArrivalPositions,
+};
 
 export function updateWorldWipeRecovery(
   state: GameState,
@@ -119,6 +137,10 @@ export function getWorldWipeRecoveryChoices(
     return [];
   }
 
+  if (isSlimewardDungeonFloorMapId(state.currentMapId)) {
+    return [createWorldWipeRecoveryChoice(SLIMEWARD_CAMP_RESCUE_HUB, 0)];
+  }
+
   const hubs = (options.rescueHubs ?? DEFAULT_RESCUE_HUBS).filter(
     (hub) => hub.isUnlocked,
   );
@@ -141,17 +163,9 @@ export function getWorldWipeRecoveryChoices(
 
   return reachableHubs
     .filter((entry) => entry.hopDistance === closestDistance)
-    .map(({ hub, hopDistance }) => ({
-      hubId: hub.id,
-      hubDisplayName: hub.displayName,
-      mapId: hub.mapId,
-      rescueActorId: hub.rescueActorId,
-      rescueActorName: hub.rescueActorName,
-      rescueLine: hub.rescueLine,
-      hopDistance,
-      fee: getRescueFee(hopDistance),
-      arrivalPositions: hub.arrivalPositions,
-    }));
+    .map(({ hub, hopDistance }) =>
+      createWorldWipeRecoveryChoice(hub, hopDistance),
+    );
 }
 
 function shouldTriggerWorldWipeRecovery(state: GameState): state is GameState & {
@@ -210,10 +224,14 @@ function resetStateToRescueHub(
   state: GameState,
   choice: WorldWipeRecoveryChoice,
 ): GameState {
+  const sourceState =
+    choice.mapId === SLIMEWARD_CAMP_ID
+      ? clearSlimewardDungeonRuntime(state)
+      : state;
   const targetMap = createDebugMap(choice.mapId);
   let nextState: GameState = {
-    ...state,
-    entities: getRescueHubEntities(state, choice),
+    ...sourceState,
+    entities: getRescueHubEntities(sourceState, choice),
     currentMapId: choice.mapId,
     map: targetMap,
     activeTeleport: null,
@@ -324,7 +342,35 @@ function getRescueHubEntities(
     );
   }
 
+  if (choice.mapId === SLIMEWARD_CAMP_ID) {
+    for (const npc of slimewardCampNpcStartData) {
+      entities[npc.id] = createNpc(
+        npc.id,
+        npc.position,
+        npc.displayName,
+        npc.npcRole,
+      );
+    }
+  }
+
   return entities;
+}
+
+function createWorldWipeRecoveryChoice(
+  hub: RescueHubDefinition,
+  hopDistance: number,
+): WorldWipeRecoveryChoice {
+  return {
+    hubId: hub.id,
+    hubDisplayName: hub.displayName,
+    mapId: hub.mapId,
+    rescueActorId: hub.rescueActorId,
+    rescueActorName: hub.rescueActorName,
+    rescueLine: hub.rescueLine,
+    hopDistance,
+    fee: getRescueFee(hopDistance),
+    arrivalPositions: hub.arrivalPositions,
+  };
 }
 
 function choiceArrivalPosition(

@@ -41,6 +41,10 @@ export type EnemyArchetypeId =
 
 export type EnemyTypeId =
   | "slime"
+  | "slimeward_heavy_slime"
+  | "slimeward_pale_ooze"
+  | "slimeward_spitter_slime"
+  | "azure_mass"
   | "cave_bat"
   | "forest_spider"
   | "goblin_scout"
@@ -468,6 +472,23 @@ export type PartyInventory = {
   slots: InventorySlot[];
 };
 
+export type DungeonChestRuntimeState = {
+  status: "hidden" | "available" | "opened" | "collected";
+  position: Position;
+  exitTeleportId: string;
+  rolledLoot: InventorySlot[];
+  collectedLoot: InventorySlot[];
+  pendingLoot: InventorySlot[];
+  isUiOpen?: boolean;
+  openedAtMs?: number;
+  autoContinueAtMs?: number;
+  inventoryFull?: boolean;
+};
+
+export type SlimewardDungeonRuntimeState = {
+  chest: DungeonChestRuntimeState | null;
+};
+
 export type CurrencyId = "crowns";
 
 export type CurrencyDefinition = {
@@ -489,6 +510,7 @@ export type InventoryMutationSource =
   | "quest_reward"
   | "merchant"
   | "consumable"
+  | "chest"
   | "unknown";
 
 export type CurrencyMutationSource =
@@ -537,7 +559,15 @@ export type InventoryRemoveResult = {
   remainingQuantity: number;
 };
 
-export type DebugMapId = "hub" | "map-1" | "map-2" | "map-3" | "map-4";
+export type DebugMapId =
+  | "hub"
+  | "map-1"
+  | "map-2"
+  | "map-3"
+  | "map-4"
+  | "slimeward-camp"
+  | "slimeward-floor-1"
+  | "slimeward-floor-2";
 
 export type Position = {
   x: number;
@@ -1328,6 +1358,7 @@ export type DebugTeleportPoint = {
   arrivalPositions: Position[];
   autoSelectAfterEnemiesCleared?: boolean;
   startsWorking?: boolean;
+  visualTheme?: "default" | "slimeward";
 };
 
 export type TeleportRuntimeState = {
@@ -1344,7 +1375,9 @@ export type MapVisualObjectId =
   | "hub_house"
   | "hub_cabin"
   | "hub_tent"
-  | "hub_dock_shore_connector";
+  | "hub_dock_shore_connector"
+  | "slime_covered_stone"
+  | "azure_slime_rock_cluster";
 
 export type MapVisualObject = {
   id: string;
@@ -1354,6 +1387,11 @@ export type MapVisualObject = {
   heightCells: number;
   anchorX?: number;
   anchorY?: number;
+};
+
+export type DungeonWaypoint = {
+  id: string;
+  position: Position;
 };
 
 export type GameMap = {
@@ -1368,6 +1406,9 @@ export type GameMap = {
   subzones?: ZoneSubzone[];
   subzoneNameLabels?: ZoneSubzoneNameLabel[];
   visualObjects?: MapVisualObject[];
+  floorCells?: Position[];
+  visualTheme?: "default" | "slimeward-cave";
+  waypoints?: DungeonWaypoint[];
   navigationGrid?: NavigationGrid;
 };
 
@@ -1510,7 +1551,9 @@ export type NpcEntity = BaseEntity & {
     | "smith"
     | "dog"
     | "test_blade"
-    | "quest_guide";
+    | "quest_guide"
+    | "dungeon_chest_closed"
+    | "dungeon_chest_open";
 };
 
 export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity;

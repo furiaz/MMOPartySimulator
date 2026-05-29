@@ -51,11 +51,15 @@ export function updateEnemyAoeChannelSystem(
     nextState = updateActiveChannel(nextState, channel, now, rng);
   }
 
-  return maybeStartAoeDummyChannel(nextState, now);
+  return maybeStartStompChannels(nextState, now);
 }
 
 export function isEnemyAoeChanneling(state: GameState, enemyId: string): boolean {
   return Boolean(state.enemyAoeChannelsByCasterId?.[enemyId]);
+}
+
+export function isStompOnlyEnemy(enemy: Enemy): boolean {
+  return enemy.enemyTypeId === "slimeward_heavy_slime";
 }
 
 export function clearEnemyAoeRuntime(state: GameState): GameState {
@@ -104,21 +108,47 @@ function updateActiveChannel(
   return resolveChannelImpact(state, channel, caster, now, rng);
 }
 
-function maybeStartAoeDummyChannel(state: GameState, now: number): GameState {
-  const caster = getEntityById(state, aoeTargetDummyId);
+function maybeStartStompChannels(state: GameState, now: number): GameState {
+  let nextState = state;
 
-  if (
-    !isLivingEnemy(caster) ||
-    isEnemyBound(state, caster) ||
-    state.enemyAoeChannelsByCasterId?.[caster.id] ||
-    state.enemyAoeCooldownsByCasterId?.[caster.id] ||
-    !isAoeDummyEngaged(state, caster) ||
-    !hasLineOfSightToAoe(state, caster, caster.position)
-  ) {
-    return state;
+  for (const entity of Object.values(state.entities)) {
+    if (!isLivingEnemy(entity) || !canCastStomp(nextState, entity)) {
+      continue;
+    }
+
+    nextState = startStompChannel(nextState, entity, now);
   }
 
-  const channel: EnemyAoeChannelState = {
+  return nextState;
+}
+
+function canCastStomp(state: GameState, caster: Enemy): boolean {
+  return (
+    (caster.id === aoeTargetDummyId || isStompOnlyEnemy(caster)) &&
+    !isEnemyBound(state, caster) &&
+    !state.enemyAoeChannelsByCasterId?.[caster.id] &&
+    !state.enemyAoeCooldownsByCasterId?.[caster.id] &&
+    isAoeStompCasterEngaged(state, caster) &&
+    hasLineOfSightToAoe(state, caster, caster.position)
+  );
+}
+
+function startStompChannel(
+  state: GameState,
+  caster: Enemy,
+  now: number,
+): GameState {
+  return {
+    ...state,
+    enemyAoeChannelsByCasterId: {
+      ...(state.enemyAoeChannelsByCasterId ?? {}),
+      [caster.id]: createStompChannel(caster, now),
+    },
+  };
+}
+
+function createStompChannel(caster: Enemy, now: number): EnemyAoeChannelState {
+  return {
     id: `${AOE_DUMMY_STOMP_ABILITY_ID}:${caster.id}:${now}`,
     abilityId: AOE_DUMMY_STOMP_ABILITY_ID,
     casterId: caster.id,
@@ -133,17 +163,9 @@ function maybeStartAoeDummyChannel(state: GameState, now: number): GameState {
     windupEndsAt: now + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS,
     cooldownMs: AOE_DUMMY_STOMP_COOLDOWN_MS,
   };
-
-  return {
-    ...state,
-    enemyAoeChannelsByCasterId: {
-      ...(state.enemyAoeChannelsByCasterId ?? {}),
-      [caster.id]: channel,
-    },
-  };
 }
 
-function isAoeDummyEngaged(state: GameState, caster: Enemy): boolean {
+function isAoeStompCasterEngaged(state: GameState, caster: Enemy): boolean {
   if (
     state.leaderIntent?.type === "attack" &&
     state.leaderIntent.targetId === caster.id

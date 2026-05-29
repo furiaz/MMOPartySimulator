@@ -7,6 +7,11 @@ import {
 } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { addHubDepartureFoodWarningIfNeeded } from "./consumables";
+import {
+  clearSlimewardDungeonRuntime,
+  createSlimewardChestNpc,
+  shouldResetSlimewardDungeonOnTeleport,
+} from "./dungeonSystem";
 import { rollEnemyVariantForSpawn, isSuperiorEnemy } from "./enemyVariants";
 import { recordMapReachedForQuests } from "./questSystem";
 import { createActiveQuestGuideNpc } from "./questGuideSystem";
@@ -19,6 +24,9 @@ import {
   debugMapDefinitions,
   hubNpcStartData,
   HUB_MAP_ID,
+  SLIMEWARD_CAMP_ID,
+  SLIMEWARD_CHEST_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
   mapOneEnemyStartData,
   mapOneResourceStartData,
   mapThreeEnemyStartData,
@@ -27,6 +35,9 @@ import {
   mapFourResourceStartData,
   mapTwoEnemyStartData,
   mapTwoResourceStartData,
+  slimewardCampNpcStartData,
+  slimewardFloorOneEnemyStartData,
+  slimewardFloorTwoEnemyStartData,
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
@@ -305,15 +316,18 @@ function completeTeleport(state: GameState): GameState {
 
   const previousMapId = state.currentMapId;
   const previousMap = state.map;
+  const sourceState = shouldResetSlimewardDungeonOnTeleport(teleport.id)
+    ? clearSlimewardDungeonRuntime(state)
+    : state;
   const hubDepartureFoodWarning =
     previousMapId === HUB_MAP_ID && teleport.targetMapId !== HUB_MAP_ID
-      ? addHubDepartureFoodWarningIfNeeded(state, Date.now()).hubDepartureFoodWarning
-      : state.hubDepartureFoodWarning;
-  const positionsBeforeTransition = getEntityPositions(state.entities);
+      ? addHubDepartureFoodWarningIfNeeded(sourceState, Date.now()).hubDepartureFoodWarning
+      : sourceState.hubDepartureFoodWarning;
+  const positionsBeforeTransition = getEntityPositions(sourceState.entities);
   const targetMap = createDebugMap(teleport.targetMapId);
-  const entities = getMapEntities(state, targetMap);
+  const entities = getMapEntities(sourceState, targetMap);
   let nextState: GameState = {
-    ...state,
+    ...sourceState,
     entities,
     currentMapId: teleport.targetMapId,
     map: targetMap,
@@ -427,8 +441,11 @@ function getMapEntities(
   const entities = getPreservedCompanions(state);
   const mapId = map.id ?? HUB_MAP_ID;
 
-  if (mapId === HUB_MAP_ID) {
-    for (const npc of hubNpcStartData) {
+  if (mapId === HUB_MAP_ID || mapId === SLIMEWARD_CAMP_ID) {
+    const npcStartData =
+      mapId === HUB_MAP_ID ? hubNpcStartData : slimewardCampNpcStartData;
+
+    for (const npc of npcStartData) {
       entities[npc.id] = createNpc(
         npc.id,
         npc.position,
@@ -436,6 +453,11 @@ function getMapEntities(
         npc.npcRole,
       );
     }
+
+    if (mapId === SLIMEWARD_CAMP_ID) {
+      return entities;
+    }
+
     entities[targetDummyId] = createTargetDummy(targetDummyId, targetDummyPosition);
     entities[aoeTargetDummyId] = createTargetDummy(
       aoeTargetDummyId,
@@ -451,6 +473,9 @@ function getMapEntities(
     "map-2": mapTwoEnemyStartData,
     "map-3": mapThreeEnemyStartData,
     "map-4": mapFourEnemyStartData,
+    "slimeward-camp": [],
+    "slimeward-floor-1": slimewardFloorOneEnemyStartData,
+    "slimeward-floor-2": slimewardFloorTwoEnemyStartData,
   };
   const resourceStartDataByMapId: Record<DebugMapId, typeof mapOneResourceStartData> = {
     hub: [],
@@ -458,24 +483,31 @@ function getMapEntities(
     "map-2": mapTwoResourceStartData,
     "map-3": mapThreeResourceStartData,
     "map-4": mapFourResourceStartData,
+    "slimeward-camp": [],
+    "slimeward-floor-1": [],
+    "slimeward-floor-2": [],
   };
   const enemyStartData = enemyStartDataByMapId[mapId];
   const resourceStartData = resourceStartDataByMapId[mapId];
 
   for (const enemyStart of enemyStartData) {
-    const variant = rollEnemyVariantForSpawn({
-      currentMapId: mapId,
-      map,
-      position: enemyStart.position,
-      subzoneId: enemyStart.subzoneId,
-      existingEntities: entities,
-    });
+    const variant =
+      enemyStart.variant ??
+      rollEnemyVariantForSpawn({
+        currentMapId: mapId,
+        map,
+        position: enemyStart.position,
+        subzoneId: enemyStart.subzoneId,
+        existingEntities: entities,
+      });
 
     entities[enemyStart.id] = createEnemy(enemyStart.id, enemyStart.position, undefined, {
       enemyTypeId: enemyStart.enemyTypeId,
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
       variant,
+      maxHealth: enemyStart.enemyTypeId === "azure_mass" ? 900 : undefined,
+      xpReward: enemyStart.enemyTypeId === "azure_mass" ? 160 : undefined,
     });
   }
 
@@ -489,6 +521,11 @@ function getMapEntities(
   const guide = createActiveQuestGuideNpc(state, mapId);
   if (guide) {
     entities[guide.id] = guide;
+  }
+
+  const chest = state.slimewardDungeon?.chest;
+  if (mapId === SLIMEWARD_FLOOR_TWO_ID && chest && chest.status !== "hidden") {
+    entities[SLIMEWARD_CHEST_ID] = createSlimewardChestNpc(chest);
   }
 
   return entities;

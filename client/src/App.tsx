@@ -49,12 +49,15 @@ import {
   createNpc,
   createTargetDummy,
   clearDebugTelemetry,
+  closeSlimewardDungeonChestUi,
+  continueSlimewardDungeonChest,
   debugAddCompanionToParty,
   debugAddPrototypeConsumablesToInventory,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
+  debugResetSlimewardDungeon,
   debugResurrectEnemy,
   debugRestorePartyHealth,
   debugToggleSuperExp,
@@ -149,6 +152,7 @@ import {
   type ResourceEntity,
   type WorldWipeRecoveryChoice,
 } from "./game";
+import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
 import {
   consumeGamePerformanceMetrics,
   type GamePerformanceMetrics,
@@ -270,6 +274,8 @@ const npcRoleLabels: Record<NpcEntity["npcRole"], string> = {
   dog: "Dog",
   test_blade: "Test Blade",
   quest_guide: "Quest Guide",
+  dungeon_chest_closed: "Dungeon Chest",
+  dungeon_chest_open: "Dungeon Chest",
 };
 
 const enemyTemperamentLabels: Record<Enemy["aggressionMode"], string> = {
@@ -1819,6 +1825,16 @@ function App() {
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find(isActiveResource);
   const inventory = gameState.inventory;
+  const activeDungeonChest = gameState.slimewardDungeon?.chest?.isUiOpen
+    ? gameState.slimewardDungeon.chest
+    : null;
+  const dungeonChestCountdownSeconds =
+    activeDungeonChest?.autoContinueAtMs && !activeDungeonChest.inventoryFull
+      ? Math.max(
+          0,
+          Math.ceil((activeDungeonChest.autoContinueAtMs - currentTime) / 1000),
+        )
+      : null;
   const activeTeleport = gameState.activeTeleport;
   const teleportWorkingById = getTeleportWorkingStateById(gameState);
   const activeMerchant =
@@ -1884,6 +1900,27 @@ function App() {
   const directCommandGraceCount = Object.values(
     gameState.directCommandGraceUntilByCompanionId ?? {},
   ).filter((graceUntil) => graceUntil > currentTime).length;
+
+  useEffect(() => {
+    if (!activeDungeonChest?.autoContinueAtMs || activeDungeonChest.inventoryFull) {
+      return;
+    }
+
+    const remainingMs = activeDungeonChest.autoContinueAtMs - Date.now();
+    if (remainingMs <= 0) {
+      setGameState(continueSlimewardDungeonChest);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setGameState(continueSlimewardDungeonChest);
+    }, remainingMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeDungeonChest?.autoContinueAtMs,
+    activeDungeonChest?.inventoryFull,
+  ]);
   const previousInteractionMapIdRef = useRef(currentMap.id);
   const equipmentTutorialQuestStatus =
     gameState.quests[EQUIPMENT_TUTORIAL_QUEST_ID]?.status ?? null;
@@ -2386,6 +2423,10 @@ function App() {
 
   function forceSuperiorEnemy() {
     setGameState(debugForceSuperiorEnemyInCurrentSubzone);
+  }
+
+  function resetSlimewardDungeon() {
+    setGameState(debugResetSlimewardDungeon);
   }
 
   function equipEquipment(
@@ -3336,6 +3377,49 @@ function App() {
           </section>
         ) : null}
 
+        {activeDungeonChest ? (
+          <section className="dungeon-chest-overlay" aria-label="Dungeon chest loot">
+            <div className="dungeon-chest-panel">
+              <h2>Dungeon's Chest Loot</h2>
+              {activeDungeonChest.inventoryFull ? (
+                <p className="dungeon-chest-warning">
+                  Inventory full. Auto Mode stopped.
+                </p>
+              ) : null}
+              {dungeonChestCountdownSeconds !== null ? (
+                <p className="dungeon-chest-countdown">
+                  Auto Mode continues in {dungeonChestCountdownSeconds}s.
+                </p>
+              ) : null}
+              <div className="dungeon-chest-grid">
+                {activeDungeonChest.collectedLoot.length > 0 ? (
+                  activeDungeonChest.collectedLoot.map((slot) => {
+                    const item = getItemDefinition(slot.itemId);
+                    const iconSrc = INVENTORY_ITEM_ICON_SRC[slot.itemId];
+
+                    return (
+                      <div className="dungeon-chest-slot" key={slot.itemId}>
+                        {iconSrc ? <img alt="" src={iconSrc} /> : null}
+                        <span>{item.displayName}</span>
+                        <strong>x{slot.quantity}</strong>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="dungeon-chest-empty">No loot collected.</div>
+                )}
+              </div>
+              <button
+                className="dungeon-chest-continue"
+                onClick={() => setGameState(closeSlimewardDungeonChestUi)}
+                type="button"
+              >
+                {activeDungeonChest.inventoryFull ? "Back" : "Continue"}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         {activeGuidePopup ? (
           <GuidePopup
             guide={activeGuidePopup}
@@ -3437,6 +3521,9 @@ function App() {
                   <button onClick={killOneCompanion}>Kill One Companion</button>
                   <button onClick={forceSuperiorEnemy}>
                     Force Superior Enemy
+                  </button>
+                  <button onClick={resetSlimewardDungeon}>
+                    Reset Slimeward Dungeon
                   </button>
                   <button onClick={refreshGatherPoints}>
                     Refresh Gather Points

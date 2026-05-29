@@ -473,6 +473,13 @@ export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
 export { updateSkillSystem } from "./skillSystem";
 export {
+  closeSlimewardDungeonChestUi,
+  continueSlimewardDungeonChest,
+  isSlimewardDungeonChestUiOpen,
+  openSlimewardDungeonChest,
+  updateSlimewardDungeonSystem,
+} from "./dungeonSystem";
+export {
   getTeleportWorkingStateById,
   isTeleportWorking,
   setTeleportWorking,
@@ -571,6 +578,7 @@ export {
   debugAddTestWoodToInventory,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
+  debugResetSlimewardDungeon,
   debugRefreshResources,
   debugRandomizeLocations,
   debugRemoveCompanion,

@@ -66,6 +66,7 @@ import type {
   SkillSelfBuffState,
   SkillShieldBlockState,
   SkillVisualEvent,
+  SlimewardDungeonRuntimeState,
   TeleportRuntimeState,
   WorldWipeRecoveryState,
 } from "./types";
@@ -304,6 +305,7 @@ export type GameState = {
   flaskRechargeEnemyKillCounter?: number;
   flaskRechargeCountedEnemyDefeats?: Record<string, number>;
   dropVisualEvents?: DropVisualEvent[];
+  slimewardDungeon?: SlimewardDungeonRuntimeState;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
   resurrectionChannelsByHelperId?: Record<string, ResurrectionChannelState>;
   worldWipeRecovery?: WorldWipeRecoveryState;

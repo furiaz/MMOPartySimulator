@@ -68,6 +68,8 @@ const beginnerCharacterBasePath = "/Asserts/Characters/Beginner";
 const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
 const testEnemyTwoBasePath = "/Asserts/Characters/Test-Enemy2";
 const prototypeEnemyBasePath = "/Asserts/Characters/Prototype-Enemies";
+const slimewardDungeonAssetPath = "/Asserts/Generated/Dungeon Generation";
+const bossSlimeTestAssetPath = "/Asserts/Characters/BossSlimeTest";
 const testNpcBasePath = "/Asserts/Characters/Test-NPC";
 const classPortraitBasePath = "/Asserts/Generated/class-portraits";
 const defaultFrameDurationMs = 100;
@@ -157,7 +159,10 @@ const enemyTwoDirectionalFrames = createEnemyTwoDirectionalFrames();
 const beginnerDirectionalFrames = createBeginnerDirectionalFrames();
 const beginnerIdleFrames = createDirectionalIdleFrames(beginnerDirectionalFrames);
 
-function createStaticEnemySprite(src: string): SpriteVisualAsset {
+function createStaticEnemySprite(
+  src: string,
+  naturalSize?: SpriteVisualAsset["naturalSize"],
+): SpriteVisualAsset {
   const frame = createSingleFrame(src);
 
   return {
@@ -172,11 +177,28 @@ function createStaticEnemySprite(src: string): SpriteVisualAsset {
         south: frame,
       },
     },
+    naturalSize,
   };
 }
 
 const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>> = {
   slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
+  slimeward_heavy_slime: createStaticEnemySprite(
+    `${slimewardDungeonAssetPath}/cave-slime-heavy-128.png`,
+    { width: 104, height: 104 },
+  ),
+  slimeward_pale_ooze: createStaticEnemySprite(
+    `${slimewardDungeonAssetPath}/pale-ooze-dripper-128.png`,
+    { width: 96, height: 96 },
+  ),
+  slimeward_spitter_slime: createStaticEnemySprite(
+    `${slimewardDungeonAssetPath}/spitter-slime-sac-128.png`,
+    { width: 112, height: 112 },
+  ),
+  azure_mass: createStaticEnemySprite(
+    `${bossSlimeTestAssetPath}/BossSlimeTestTransparent.png`,
+    { width: 260, height: 260 },
+  ),
   cave_bat: createStaticEnemySprite(`${prototypeEnemyBasePath}/cave-bat-se.png`),
   forest_spider: createStaticEnemySprite(`${prototypeEnemyBasePath}/forest-spider-se.png`),
   goblin_scout: createStaticEnemySprite(`${prototypeEnemyBasePath}/goblin-scout-se.png`),

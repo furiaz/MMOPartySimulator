@@ -1,4 +1,5 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { getSlimewardDungeonPoiTarget } from "./dungeonSystem";
 import { isTargetDummyEnemy } from "./entityGuards";
 import {
   debugMapDefinitions,
@@ -137,6 +138,27 @@ export function updatePoiSystem(
 
   if (!leader || leader.commandPriority === "direct") {
     return clearPoiSelection(state);
+  }
+
+  const dungeonPoiTarget = getSlimewardDungeonPoiTarget(state);
+  if (dungeonPoiTarget) {
+    const nextState: GameState = {
+      ...state,
+      globalPoiIntent: { type: "idle", reason: "Dungeon waypoint route" },
+      localPoiTarget: dungeonPoiTarget,
+      lastPoiDecision: {
+        evaluatedAtMs: state.simulationTimeMs ?? 0,
+        selectedPoiId: dungeonPoiTarget.poiId,
+        selectedCategory: dungeonPoiTarget.category,
+        selectedMapId: dungeonPoiTarget.mapId,
+        selectedPosition: dungeonPoiTarget.position,
+        selectedReason: dungeonPoiTarget.reason,
+        consideredTargets: [],
+        skippedReasons: {},
+      },
+    };
+
+    return applyLocalTargetToPartyIntent(nextState, dungeonPoiTarget);
   }
 
   const gathererReservations = createGathererResourceReservations(

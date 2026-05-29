@@ -47,6 +47,32 @@ describe("enemy AoE channel system", () => {
     });
   });
 
+  it("lets engaged Heavy Slimes cast the same stomp channel", () => {
+    const leader = createCompanion("leader", { x: 9, y: 8 }, "leader", "fighter");
+    const heavySlime = createEnemy("heavy-slime", { x: 10, y: 8 }, undefined, {
+      enemyTypeId: "slimeward_heavy_slime",
+    });
+    const engagedState = setLeaderIntent(createState([leader, heavySlime]), {
+      type: "attack",
+      targetId: heavySlime.id,
+      targetPosition: heavySlime.position,
+      source: "player",
+    });
+
+    const nextState = updateEnemyAoeChannelSystem(engagedState, 1000);
+    const channel = nextState.enemyAoeChannelsByCasterId?.[heavySlime.id];
+
+    expect(channel).toMatchObject({
+      abilityId: "aoe_dummy_stomp",
+      casterId: heavySlime.id,
+      shape: {
+        type: "circle",
+        center: heavySlime.position,
+        radius: AOE_DUMMY_STOMP_RADIUS,
+      },
+    });
+  });
+
   it("damages only living companions inside the locked AoE at impact time", () => {
     const leader = createCompanion("leader", { x: 54, y: 8 }, "leader", "fighter");
     const entering = createCompanion("entering", { x: 60, y: 8 }, "leader");
