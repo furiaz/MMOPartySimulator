@@ -19,6 +19,10 @@ import { syncCompanionDerivedMaxHealth } from "./stats";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import { addItemToInventoryState } from "./inventory";
 import {
+  getCharacterXpToNextLevel,
+  grantCharacterXpToCompanion,
+} from "./leveling";
+import {
   addCurrencyToWalletState,
   removeCurrencyFromWalletState,
   setCurrencyBalanceForDebug,
@@ -41,6 +45,7 @@ const DEBUG_TEST_CROWNS_AMOUNT = 100;
 const DEFAULT_DEBUG_OPTIONS = {
   superSpeedEnabled: false,
   superExpEnabled: false,
+  companionInfiniteHealthEnabled: false,
 };
 const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "training_sword",
@@ -186,6 +191,55 @@ export function debugToggleSuperExp(state: GameState): GameState {
       superExpEnabled: !debugOptions.superExpEnabled,
     },
   };
+}
+
+export function debugToggleCompanionInfiniteHealth(state: GameState): GameState {
+  const debugOptions = state.debugOptions ?? DEFAULT_DEBUG_OPTIONS;
+
+  const nextState = {
+    ...state,
+    debugOptions: {
+      ...debugOptions,
+      companionInfiniteHealthEnabled: !debugOptions.companionInfiniteHealthEnabled,
+    },
+  };
+
+  return nextState.debugOptions.companionInfiniteHealthEnabled
+    ? debugApplyCompanionInfiniteHealth(nextState)
+    : nextState;
+}
+
+export function debugLevelUpAllCompanions(state: GameState): GameState {
+  let nextState = state;
+
+  for (const entity of Object.values(state.entities)) {
+    if (entity.kind !== "companion") {
+      continue;
+    }
+
+    const xpToNextLevel = getCharacterXpToNextLevel(entity.characterLevel);
+
+    if (xpToNextLevel === null) {
+      continue;
+    }
+
+    const xpNeeded = Math.max(1, xpToNextLevel - entity.characterXp);
+
+    nextState = updateEntity(
+      nextState,
+      grantCharacterXpToCompanion(entity, xpNeeded),
+    );
+  }
+
+  return nextState;
+}
+
+export function debugApplyCompanionInfiniteHealth(state: GameState): GameState {
+  if (!state.debugOptions?.companionInfiniteHealthEnabled) {
+    return state;
+  }
+
+  return debugRestorePartyHealth(state);
 }
 
 export function debugRandomizeLocations(

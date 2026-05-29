@@ -53,13 +53,16 @@ import {
   continueSlimewardDungeonChest,
   debugAddCompanionToParty,
   debugAddPrototypeConsumablesToInventory,
+  debugAddTestCrowns,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
+  debugLevelUpAllCompanions,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
   debugResetSlimewardDungeon,
   debugResurrectEnemy,
   debugRestorePartyHealth,
+  debugToggleCompanionInfiniteHealth,
   debugToggleSuperExp,
   debugToggleSuperSpeed,
   enemyIds,
@@ -2413,6 +2416,18 @@ function App() {
     setGameState(debugRestorePartyHealth);
   }
 
+  function levelUpAllCompanions() {
+    setGameState(debugLevelUpAllCompanions);
+  }
+
+  function toggleCompanionInfiniteHealth() {
+    setGameState(debugToggleCompanionInfiniteHealth);
+  }
+
+  function addTestCrowns() {
+    setGameState(debugAddTestCrowns);
+  }
+
   function addPrototypeConsumables() {
     setGameState(debugAddPrototypeConsumablesToInventory);
   }
@@ -3515,6 +3530,23 @@ function App() {
                   </button>
                   <button onClick={resurrectEnemy}>Resurrect Enemy</button>
                   <button onClick={restorePartyHealth}>Restore Party HP</button>
+                  <button onClick={levelUpAllCompanions}>
+                    Level Up All Companions
+                  </button>
+                  <button
+                    className={
+                      gameState.debugOptions?.companionInfiniteHealthEnabled
+                        ? "active"
+                        : ""
+                    }
+                    onClick={toggleCompanionInfiniteHealth}
+                  >
+                    Companion Infinite Health{" "}
+                    {gameState.debugOptions?.companionInfiniteHealthEnabled
+                      ? "On"
+                      : "Off"}
+                  </button>
+                  <button onClick={addTestCrowns}>+100 Crowns</button>
                   <button onClick={addPrototypeConsumables}>
                     Add Prototype Consumables
                   </button>

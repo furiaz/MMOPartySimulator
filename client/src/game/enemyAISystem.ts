@@ -95,6 +95,11 @@ export function updateEnemyAISystem(
       continue;
     }
 
+    if (shouldPressureQuestTarget(entity)) {
+      nextState = moveQuestSpawnTowardPressureTarget(nextState, entity);
+      continue;
+    }
+
     if (
       !entity.questSpawn &&
       getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE
@@ -116,18 +121,7 @@ export function updateEnemyAISystem(
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
       nextState = updateEntity(nextState, reasonedEnemy);
       if (reasonedEnemy.questSpawn?.targetPosition) {
-        nextState = moveEntityTowardPositionIfUnoccupied(
-          nextState,
-          reasonedEnemy,
-          reasonedEnemy.questSpawn.targetPosition,
-          {
-            allowPartyPassThrough: false,
-            pathProfile: "chase",
-            pathTargetKey: `quest:${reasonedEnemy.questSpawn.questId}:${reasonedEnemy.questSpawn.objectiveId}`,
-            pathTargetPosition: reasonedEnemy.questSpawn.targetPosition,
-            speedMultiplier: ENEMY_CHASE_SPEED_MULTIPLIER,
-          },
-        );
+        nextState = moveQuestSpawnTowardPressureTarget(nextState, reasonedEnemy);
         continue;
       }
       nextState = updateEnemyWander(nextState, reasonedEnemy, timing);
@@ -380,6 +374,40 @@ function moveEnemyTowardHome(state: GameState, enemy: Enemy, now: number): GameS
       pathTargetKey: `home:${enemy.id}`,
       pathTargetPosition: enemy.homePosition,
       speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
+    },
+  );
+}
+
+function shouldPressureQuestTarget(enemy: Enemy): boolean {
+  const targetPosition = enemy.questSpawn?.targetPosition;
+
+  return Boolean(
+    targetPosition &&
+      getDistance(enemy.position, targetPosition) > getEnemyAggroRange(enemy),
+  );
+}
+
+function moveQuestSpawnTowardPressureTarget(
+  state: GameState,
+  enemy: Enemy,
+): GameState {
+  const questSpawn = enemy.questSpawn;
+  const targetPosition = questSpawn?.targetPosition;
+
+  if (!questSpawn || !targetPosition) {
+    return state;
+  }
+
+  return moveEntityTowardPositionIfUnoccupied(
+    state,
+    enemy,
+    targetPosition,
+    {
+      allowPartyPassThrough: false,
+      pathProfile: "chase",
+      pathTargetKey: `quest:${questSpawn.questId}:${questSpawn.objectiveId}`,
+      pathTargetPosition: targetPosition,
+      speedMultiplier: ENEMY_CHASE_SPEED_MULTIPLIER,
     },
   );
 }

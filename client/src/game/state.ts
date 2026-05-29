@@ -182,6 +182,7 @@ type NavigationBlockerLookup = {
 export type DebugOptions = {
   superSpeedEnabled: boolean;
   superExpEnabled: boolean;
+  companionInfiniteHealthEnabled?: boolean;
   deepNavigationTelemetryEnabled?: boolean;
 };
 

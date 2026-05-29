@@ -572,12 +572,14 @@ export {
 export {
   debugAddCompanion,
   debugAddCompanionToParty,
+  debugApplyCompanionInfiniteHealth,
   debugAddPrototypeConsumablesToInventory,
   debugAddPrototypeEquipmentToInventory,
   debugAddTestCrowns,
   debugAddTestWoodToInventory,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
+  debugLevelUpAllCompanions,
   debugResetSlimewardDungeon,
   debugRefreshResources,
   debugRandomizeLocations,
@@ -587,6 +589,7 @@ export {
   debugRemoveTestCrowns,
   debugResetCrowns,
   debugRestorePartyHealth,
+  debugToggleCompanionInfiniteHealth,
   debugToggleSuperExp,
   debugToggleSuperSpeed,
 } from "./debugTools";

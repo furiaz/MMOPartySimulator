@@ -1814,6 +1814,208 @@ describe("game update intent priority", () => {
     });
   });
 
+  it("uses combat skills for direct attack commands when Auto Mode is off", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
+      state: "attack" as const,
+      currentTargetId: "chosen-enemy",
+      commandPriority: "direct" as const,
+    };
+    const chosenEnemy = createEnemy("chosen-enemy", { x: 9, y: 4 });
+
+    const nextState = updateGame(
+      createMapOneState([leader, chosenEnemy], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        directCompanionCommandsById: {
+          [leader.id]: {
+            type: "attack",
+            companionId: leader.id,
+            targetId: chosenEnemy.id,
+            targetPosition: chosenEnemy.position,
+            issuedAt: 900,
+          },
+        },
+      }),
+      { nowMs: 1_000, deltaMs: 100 },
+    );
+    const currentEnemy = nextState.entities[chosenEnemy.id];
+
+    if (currentEnemy.kind !== "enemy") {
+      throw new Error("Expected chosen enemy in direct attack skill test");
+    }
+
+    expect(nextState.skillCooldownsByCompanionId?.[leader.id]?.skillId).toBe(
+      "kick",
+    );
+    expect(nextState.entities[leader.id].position.x).toBeGreaterThan(
+      leader.position.x,
+    );
+    expect(currentEnemy.health).toBeLessThan(chosenEnemy.health);
+  });
+
+  it("keeps direct attack combat skills on the ordered target", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
+      state: "attack" as const,
+      currentTargetId: "chosen-enemy",
+      commandPriority: "direct" as const,
+    };
+    const chosenEnemy = createEnemy("chosen-enemy", { x: 9, y: 4 });
+    const closerAttacker = {
+      ...createEnemy("closer-attacker", { x: 4, y: 5 }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, chosenEnemy, closerAttacker], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        directCompanionCommandsById: {
+          [leader.id]: {
+            type: "attack",
+            companionId: leader.id,
+            targetId: chosenEnemy.id,
+            targetPosition: chosenEnemy.position,
+            issuedAt: 900,
+          },
+        },
+      }),
+      { nowMs: 1_000, deltaMs: 100 },
+    );
+    const currentChosenEnemy = nextState.entities[chosenEnemy.id];
+    const currentCloserAttacker = nextState.entities[closerAttacker.id];
+
+    if (
+      currentChosenEnemy.kind !== "enemy" ||
+      currentCloserAttacker.kind !== "enemy"
+    ) {
+      throw new Error("Expected enemies in direct target preservation test");
+    }
+
+    expect(nextState.skillCooldownsByCompanionId?.[leader.id]?.skillId).toBe(
+      "kick",
+    );
+    expect(currentChosenEnemy.health).toBeLessThan(chosenEnemy.health);
+    expect(currentCloserAttacker.health).toBe(closerAttacker.health);
+  });
+
+  it("does not use skills for idle companions near passive enemies when Auto Mode is off", () => {
+    const leader = createLeader({ x: 4, y: 4 });
+    const passiveEnemy = createEnemy("passive-enemy", { x: 8, y: 4 }, "passive");
+
+    const nextState = updateGame(
+      createMapOneState([leader, passiveEnemy], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+      }),
+      { nowMs: 1_000, deltaMs: 100 },
+    );
+
+    expect(nextState.skillCooldownsByCompanionId?.[leader.id]).toBeUndefined();
+  });
+
+  it("does not use gathering skills for direct gather commands without threats", () => {
+    const resource = createResource("direct-resource", { x: 5, y: 4 });
+    const collector = {
+      ...createCompanion("collector", { x: 4, y: 4 }, "collector", "gatherer", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([collector, resource], {
+        autoModeEnabled: false,
+        partyLeaderId: collector.id,
+        map: createOpenTestMap(),
+        directCompanionCommandsById: {
+          [collector.id]: {
+            type: "gather",
+            companionId: collector.id,
+            targetId: resource.id,
+            targetPosition: resource.position,
+            issuedAt: 900,
+          },
+        },
+      }),
+      { nowMs: 1_000, deltaMs: 100 },
+    );
+
+    expect(nextState.skillCooldownsByCompanionId?.[collector.id]).toBeUndefined();
+    expect(nextState.skillGatherBuffsByCompanionId?.[collector.id]).toBeUndefined();
+  });
+
+  it("uses combat skills when a direct collector is forced into self-defense", () => {
+    const resource = createResource("direct-resource", { x: 4, y: 6 }, {
+      maxGatherers: 2,
+    });
+    const collector = {
+      ...createCompanion("collector", { x: 4, y: 4 }, "collector", "fighter", 0),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+    const ally = {
+      ...createCompanion("ally", { x: 5, y: 6 }, collector.id, "gatherer"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+    const attacker = {
+      ...createEnemy("attacking-enemy", { x: 9, y: 4 }),
+      state: "attack" as const,
+      currentTargetId: collector.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([collector, ally, resource, attacker], {
+        autoModeEnabled: false,
+        partyLeaderId: collector.id,
+        map: createOpenTestMap(),
+        directCompanionCommandsById: {
+          [collector.id]: {
+            type: "gather",
+            companionId: collector.id,
+            targetId: resource.id,
+            targetPosition: resource.position,
+            issuedAt: 900,
+          },
+          [ally.id]: {
+            type: "gather",
+            companionId: ally.id,
+            targetId: resource.id,
+            targetPosition: resource.position,
+            issuedAt: 901,
+          },
+        },
+      }),
+      { nowMs: 1_000, deltaMs: 100 },
+    );
+
+    expect(nextState.entities[collector.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: attacker.id,
+      commandPriority: "direct",
+    });
+    expect(nextState.skillCooldownsByCompanionId?.[collector.id]?.skillId).toBe(
+      "kick",
+    );
+    expect(nextState.entities[ally.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
+      commandPriority: "direct",
+    });
+    expect(nextState.skillCooldownsByCompanionId?.[ally.id]).toBeUndefined();
+  });
+
   it("switches to attack intent when a close enemy is chasing the party", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const wood = createResource("quest-herb", { x: 8, y: 4 }, {

@@ -2,10 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import { createCompanion, createEnemy } from "./entities";
 import { createDebugMap } from "./debugMap";
-import { debugForceSuperiorEnemyInCurrentSubzone } from "./debugTools";
+import {
+  debugAddTestCrowns,
+  debugApplyCompanionInfiniteHealth,
+  debugForceSuperiorEnemyInCurrentSubzone,
+  debugLevelUpAllCompanions,
+  debugToggleCompanionInfiniteHealth,
+} from "./debugTools";
 import { isSuperiorEnemy } from "./enemyVariants";
+import { MAX_CHARACTER_LEVEL } from "./leveling";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { createTestGameState } from "./testState";
+import { getCurrencyBalance } from "./wallet";
 
 describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
   it("turns the closest normal enemy in the leader subzone into a Superior enemy", () => {
@@ -124,5 +132,73 @@ describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
     });
 
     expect(debugForceSuperiorEnemyInCurrentSubzone(state)).toBe(state);
+  });
+});
+
+describe("companion debug test tools", () => {
+  it("levels up every eligible companion once", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const maxLevelCompanion = {
+      ...createCompanion("companion-2", { x: 11, y: 10 }, leader.id),
+      characterLevel: MAX_CHARACTER_LEVEL,
+      characterXp: 0,
+    };
+    const enemy = createEnemy("enemy", { x: 12, y: 10 });
+    const state = createTestGameState({
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+        [maxLevelCompanion.id]: maxLevelCompanion,
+        [enemy.id]: enemy,
+      },
+    });
+
+    const nextState = debugLevelUpAllCompanions(state);
+    const leveledCompanion = nextState.entities[leader.id];
+    const unchangedMaxLevelCompanion = nextState.entities[maxLevelCompanion.id];
+
+    expect(leveledCompanion?.kind === "companion" && leveledCompanion.characterLevel).toBe(2);
+    expect(
+      unchangedMaxLevelCompanion?.kind === "companion" &&
+        unchangedMaxLevelCompanion.characterLevel,
+    ).toBe(MAX_CHARACTER_LEVEL);
+    expect(nextState.entities[enemy.id]).toEqual(enemy);
+  });
+
+  it("toggles and applies companion infinite health", () => {
+    const deadCompanion = {
+      ...createCompanion("companion-1", { x: 10, y: 10 }, "companion-1"),
+      state: "dead" as const,
+      health: 0,
+    };
+    const state = createTestGameState({
+      partyLeaderId: deadCompanion.id,
+      entities: {
+        [deadCompanion.id]: deadCompanion,
+      },
+    });
+
+    const toggledState = debugToggleCompanionInfiniteHealth(state);
+    const nextState = debugApplyCompanionInfiniteHealth(toggledState);
+    const restoredCompanion = nextState.entities[deadCompanion.id];
+
+    expect(toggledState.debugOptions?.companionInfiniteHealthEnabled).toBe(true);
+    expect(restoredCompanion?.kind === "companion" && restoredCompanion.health).toBe(
+      deadCompanion.maxHealth,
+    );
+    expect(restoredCompanion?.state).toBe("idle");
+  });
+
+  it("adds 100 Crowns through the debug wallet helper", () => {
+    const state = createTestGameState();
+
+    const nextState = debugAddTestCrowns(state);
+
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
+    expect(nextState.wallet.visibleUntil).toBeGreaterThan(Date.now() - 1);
   });
 });

@@ -42,6 +42,7 @@ import { updateResurrectionSystem } from "./resurrectionSystem";
 import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
 import {
+  updateCombatSkillSystem,
   updateSkillShieldBlockPositions,
   updateSkillSystem,
 } from "./skillSystem";
@@ -50,6 +51,7 @@ import {
   updateTeleportSystem,
 } from "./teleportSystem";
 import { recordDebugTelemetryTick } from "./debugTelemetry";
+import { debugApplyCompanionInfiniteHealth } from "./debugTools";
 import { updateWorldWipeRecovery } from "./worldWipeRecovery";
 import {
   advanceSimulationTime,
@@ -90,9 +92,11 @@ export function updateGame(
   const wasTeleportActive = Boolean(nextState.activeTeleport);
 
   nextState = syncPartyDerivedMaxHealth(nextState);
+  nextState = debugApplyCompanionInfiniteHealth(nextState);
   nextState = updateConsumableBehaviorSystem(nextState, timing.nowMs);
   nextState = updateConsumableSystem(nextState, timing.nowMs);
   nextState = syncPartyDerivedMaxHealth(nextState);
+  nextState = debugApplyCompanionInfiniteHealth(nextState);
 
   const mapIdBeforeWipeRecovery = nextState.currentMapId;
   nextState = updateWorldWipeRecovery(nextState, timing.nowMs);
@@ -177,6 +181,7 @@ export function updateGame(
   nextState = updateEnemyAISystem(nextState, timing);
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
+  nextState = updateCombatSkillSystem(nextState, timing.nowMs);
   nextState = updateAttackSystem(
     nextState,
     movedEntityIds,
@@ -197,6 +202,7 @@ export function updateGame(
   );
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);
+  nextState = debugApplyCompanionInfiniteHealth(nextState);
 
   return recordDebugTelemetryTick(
     state,

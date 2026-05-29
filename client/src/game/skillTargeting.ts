@@ -21,10 +21,15 @@ const LOW_HEALTH_BUFFER = 1;
 const DEFAULT_ENEMY_CONTEXT_RANGE = 5;
 const PARTY_DANGER_RANGE = 5;
 
+export type SkillTargetOptions = {
+  forcedEnemyTargetId?: string | null;
+};
+
 export function getSkillTarget(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
+  options: SkillTargetOptions = {},
 ): Enemy | Companion | undefined {
   if (isHealingSkill(skill)) {
     if (
@@ -38,7 +43,7 @@ export function getSkillTarget(
   }
 
   if (skill.effect.type === "selfBuff") {
-    return hasValidEnemyContext(state, caster) &&
+    return hasValidEnemyContext(state, caster, options) &&
       canPayHpCost(caster, skill.effect.hpCost) &&
       !state.skillSelfBuffsByCompanionId?.[caster.id]
       ? caster
@@ -46,7 +51,7 @@ export function getSkillTarget(
   }
 
   if (skill.effect.type === "allyBuff") {
-    return hasValidEnemyContext(state, caster)
+    return hasValidEnemyContext(state, caster, options)
       ? findAllyBuffTarget(state, caster, skill.range)
       : undefined;
   }
@@ -59,7 +64,7 @@ export function getSkillTarget(
   }
 
   if (skill.effect.type === "quickStep") {
-    return findQuickStepTarget(state, caster, skill.effect.distance);
+    return findQuickStepTarget(state, caster, skill.effect.distance, options);
   }
 
   if (skill.effect.type === "shieldBlock") {
@@ -68,7 +73,7 @@ export function getSkillTarget(
       : undefined;
   }
 
-  const enemy = findEnemyTarget(state, caster, skill.range);
+  const enemy = findEnemyTarget(state, caster, skill.range, options);
 
   if (!enemy) {
     return undefined;
@@ -102,7 +107,17 @@ export function findEnemyTarget(
   state: GameState,
   caster: Companion,
   range: number,
+  options: SkillTargetOptions = {},
 ): Enemy | undefined {
+  if (options.forcedEnemyTargetId) {
+    const forcedTarget = getEntityById(state, options.forcedEnemyTargetId);
+
+    return isLivingEnemy(forcedTarget) &&
+      isEnemyInRange(caster, forcedTarget, range)
+      ? forcedTarget
+      : undefined;
+  }
+
   const currentTarget = caster.currentTargetId
     ? getEntityById(state, caster.currentTargetId)
     : undefined;
@@ -166,8 +181,14 @@ function findAllyBuffTarget(
     )[0];
 }
 
-function hasValidEnemyContext(state: GameState, caster: Companion): boolean {
-  return Boolean(findEnemyTarget(state, caster, DEFAULT_ENEMY_CONTEXT_RANGE));
+function hasValidEnemyContext(
+  state: GameState,
+  caster: Companion,
+  options: SkillTargetOptions,
+): boolean {
+  return Boolean(
+    findEnemyTarget(state, caster, DEFAULT_ENEMY_CONTEXT_RANGE, options),
+  );
 }
 
 function hasLungeDamageContext(
@@ -194,9 +215,10 @@ function findQuickStepTarget(
   state: GameState,
   caster: Companion,
   distance: number,
+  options: SkillTargetOptions,
 ): Enemy | undefined {
   if (isFrontlineQuickStepRole(caster)) {
-    const enemy = findEnemyTarget(state, caster, 6);
+    const enemy = findEnemyTarget(state, caster, 6, options);
 
     return enemy &&
       getSkillDashPosition(

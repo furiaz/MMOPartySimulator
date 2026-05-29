@@ -217,6 +217,50 @@ describe("enemy AI aggro and roaming", () => {
     });
   });
 
+  it("moves quest-spawned Goblin Scouts toward their pressure point before off-point aggro", () => {
+    const leader = createIdleCompanion("leader", { x: 1, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive", {
+      enemyTypeId: "goblin_scout",
+      questSpawn: {
+        questId: "hold_the_field_cache",
+        objectiveId: "defend_old_grove_cache",
+        targetPosition: { x: 20, y: 0 },
+        suppressNormalDrops: true,
+      },
+    });
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]));
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+    const targetPosition = enemy.questSpawn?.targetPosition;
+
+    expect(targetPosition).toBeDefined();
+    expect(nextEnemy.currentTargetId).toBeNull();
+    expect(nextEnemy.position.x).toBeGreaterThan(enemy.position.x);
+    expect(getDistance(nextEnemy.position, targetPosition!)).toBeLessThan(
+      getDistance(enemy.position, targetPosition!),
+    );
+  });
+
+  it("lets quest-spawned enemies acquire targets after reaching pressure range", () => {
+    const leader = createIdleCompanion("leader", { x: 10, y: 0 });
+    const enemy = createEnemy("enemy", { x: 9, y: 0 }, "aggressive", {
+      enemyTypeId: "goblin_scout",
+      questSpawn: {
+        questId: "hold_the_field_cache",
+        objectiveId: "defend_old_grove_cache",
+        targetPosition: { x: 20, y: 0 },
+        suppressNormalDrops: true,
+      },
+    });
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: leader.id,
+    });
+  });
+
   it("chooses idle roam targets inside roam leash", () => {
     vi.useFakeTimers();
     vi.setSystemTime(10_000);

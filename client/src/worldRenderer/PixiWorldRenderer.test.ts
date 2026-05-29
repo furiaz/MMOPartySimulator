@@ -6,6 +6,7 @@ import {
   getEnemyNameplateColor,
   getEnemyNameplateText,
   getFullVisibleTileBounds,
+  getHealingFountainRenderDiameterPx,
   getNearestHoverEntity,
   getNearestInteractableEntity,
   getPreviewMapPosition,
@@ -101,6 +102,12 @@ describe("teleport object art", () => {
   it("anchors the generated teleporter art from its center", () => {
     expect(TELEPORT_OBJECT_SPRITE_ANCHOR_X).toBe(0.5);
     expect(TELEPORT_OBJECT_SPRITE_ANCHOR_Y).toBe(0.5);
+  });
+});
+
+describe("healing fountain art", () => {
+  it("renders at the diameter of its healing range", () => {
+    expect(getHealingFountainRenderDiameterPx(5, 32)).toBe(320);
   });
 });
 

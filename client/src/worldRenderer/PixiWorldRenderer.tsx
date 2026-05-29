@@ -97,6 +97,12 @@ const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
 export const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
 export const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
 export const TELEPORT_OBJECT_SPRITE_ANCHOR_Y = 0.5;
+export function getHealingFountainRenderDiameterPx(
+  range: number,
+  cellPixelSize: number,
+): number {
+  return range * 2 * cellPixelSize;
+}
 const skillFeedbackDisplayNames = new Set(
   Object.values(SKILL_DEFINITIONS).map((skill) => skill.displayName),
 );
@@ -3473,9 +3479,15 @@ function drawFullMapObjects({
     }
 
     const fountainPosition = toFullPosition(fountain.position, transform);
+    const fountainDiameter = getHealingFountainRenderDiameterPx(
+      fountain.range,
+      transform.cellPixelSize,
+    );
     const didDraw = drawManagedImageSprite({
+      anchorX: 0.5,
+      anchorY: 0.5,
       cache,
-      height: objectSize,
+      height: fountainDiameter,
       key: `object:${map.id}:fountain:${fountain.position.x}:${fountain.position.y}`,
       layer,
       managedState,
@@ -3483,12 +3495,12 @@ function drawFullMapObjects({
       position: fountainPosition,
       requestRedraw,
       src: MAP_OBJECT_ICON_SRC.healingFountain,
-      width: objectSize,
+      width: fountainDiameter,
     });
 
     if (!didDraw) {
       fallbackGraphics
-        .circle(fountainPosition.x, fountainPosition.y, objectSize * 0.34)
+        .circle(fountainPosition.x, fountainPosition.y, fountainDiameter / 2)
         .fill(0x38bdf8);
     }
   }
@@ -3978,8 +3990,12 @@ function drawPreviewMap(
 
   for (const fountain of map.healingFountains) {
     const fountainPosition = toPreviewPosition(fountain.position, transform);
+    const fountainRadius = Math.max(
+      entityRadius + 1,
+      fountain.range * transform.scale,
+    );
 
-    graphics.circle(fountainPosition.x, fountainPosition.y, entityRadius + 1).fill(0x38bdf8);
+    graphics.circle(fountainPosition.x, fountainPosition.y, fountainRadius).fill(0x38bdf8);
   }
 
   for (const entity of entities) {

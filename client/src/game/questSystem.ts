@@ -316,7 +316,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         defenseRadius: 14,
         waveProgressPercents: [0, 25, 50, 75],
         questSpawnEnemies: [
-          { enemyTypeId: "goblin_scout", level: 5, count: 2 },
+          { enemyTypeId: "goblin_scout", level: 5, count: 1 },
           { enemyTypeId: "bog_imp", level: 5, count: 1 },
         ],
         requiredCount: 1,

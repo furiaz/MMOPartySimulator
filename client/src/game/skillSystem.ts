@@ -23,6 +23,7 @@ import {
   isTargetDummyEnemy,
 } from "./entityGuards";
 import { getCompanionAttackRange } from "./companionCombat";
+import { getActiveDirectCompanionCommand } from "./directCompanionCommands";
 import {
   getClearLungePosition,
   getDirectionAwayFrom,
@@ -55,6 +56,11 @@ type SkillUse = {
   target?: Enemy | Companion;
   score: number;
   selectionPriority: number;
+};
+
+type SkillUseOptions = {
+  combatOnly?: boolean;
+  forcedEnemyTargetId?: string | null;
 };
 
 export function updateSkillSystem(state: GameState, now = Date.now()): GameState {
@@ -92,6 +98,47 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
   return nextState;
 }
 
+export function updateCombatSkillSystem(
+  state: GameState,
+  now = Date.now(),
+): GameState {
+  let nextState = state;
+
+  for (const entity of Object.values(state.entities)) {
+    const caster = nextState.entities[entity.id];
+    const cooldownSkill =
+      isLivingCompanion(caster) && isSkillOnCooldown(nextState, caster, now)
+        ? getCooldownSkill(nextState, caster)
+        : undefined;
+
+    if (!canUsePrototypeCombatSkill(nextState, caster, now)) {
+      if (isLivingCompanion(caster) && cooldownSkill) {
+        nextState = recordSkillTelemetry(nextState, caster, {
+          type: "skill_skipped",
+          skill: cooldownSkill,
+          reason: "cooldown",
+        });
+      }
+      continue;
+    }
+
+    const result = chooseSkillUse(nextState, caster, {
+      combatOnly: true,
+      forcedEnemyTargetId: getForcedDirectAttackTargetId(nextState, caster),
+    });
+    nextState = result.state;
+    const skillUse = result.skillUse;
+
+    if (!skillUse) {
+      continue;
+    }
+
+    nextState = applySkill(nextState, caster, skillUse, now);
+  }
+
+  return nextState;
+}
+
 export function updateSkillShieldBlockPositions(state: GameState): GameState {
   const skillShieldBlocksById = Object.fromEntries(
     Object.entries(state.skillShieldBlocksById ?? {})
@@ -113,6 +160,22 @@ export function updateSkillShieldBlockPositions(state: GameState): GameState {
   };
 }
 
+function canUsePrototypeCombatSkill(
+  state: GameState,
+  entity: GameEntity | undefined,
+  now: number,
+): entity is Companion {
+  return Boolean(
+    entity &&
+      entity.kind === "companion" &&
+      entity.state !== "dead" &&
+      entity.health > 0 &&
+      hasCombatSkillContext(state, entity) &&
+      !isCompanionResurrectionChanneling(state, entity.id) &&
+      !isSkillOnCooldown(state, entity, now),
+  );
+}
+
 function canUsePrototypeSkill(
   state: GameState,
   entity: GameEntity | undefined,
@@ -126,6 +189,54 @@ function canUsePrototypeSkill(
       entity.commandPriority !== "direct" &&
       !isCompanionResurrectionChanneling(state, entity.id) &&
       !isSkillOnCooldown(state, entity, now),
+  );
+}
+
+function hasCombatSkillContext(state: GameState, caster: Companion): boolean {
+  const currentTarget = caster.currentTargetId
+    ? state.entities[caster.currentTargetId]
+    : undefined;
+
+  if (caster.commandPriority !== "direct") {
+    return caster.state === "attack" && isLivingEnemy(currentTarget);
+  }
+
+  const directCommand = getActiveDirectCompanionCommand(state, caster.id);
+
+  if (directCommand?.type === "attack") {
+    return (
+      caster.state === "attack" &&
+      isLivingEnemy(currentTarget) &&
+      currentTarget.id === directCommand.targetId
+    );
+  }
+
+  return (
+    caster.state === "attack" &&
+    isLivingEnemy(currentTarget) &&
+    isPersonalThreat(state, caster, currentTarget)
+  );
+}
+
+function getForcedDirectAttackTargetId(
+  state: GameState,
+  caster: Companion,
+): string | null {
+  const directCommand = getActiveDirectCompanionCommand(state, caster.id);
+
+  return directCommand?.type === "attack" ? directCommand.targetId : null;
+}
+
+function isPersonalThreat(
+  state: GameState,
+  caster: Companion,
+  enemy: Enemy,
+): boolean {
+  const movementFailure = state.movementFailuresByEntityId?.[caster.id];
+
+  return (
+    enemy.currentTargetId === caster.id ||
+    movementFailure?.blockerId === enemy.id
   );
 }
 
@@ -191,11 +302,15 @@ function getSkillTargetSkipReason(
 function chooseSkillUse(
   state: GameState,
   caster: Companion,
+  options: SkillUseOptions = {},
 ): { state: GameState; skillUse: SkillUse | null } {
   let nextState = state;
   const skillUses = getSkillsForClass(caster.classId)
+    .filter((skill) => !options.combatOnly || isCombatSkill(skill))
     .map((skill): SkillUse | null => {
-      const target = getSkillTarget(state, caster, skill);
+      const target = getSkillTarget(state, caster, skill, {
+        forcedEnemyTargetId: options.forcedEnemyTargetId,
+      });
 
       if (!target) {
         nextState = recordSkillTelemetry(nextState, caster, {
@@ -516,6 +631,10 @@ function startSkillCooldown(
       },
     },
   };
+}
+
+function isCombatSkill(skill: SkillDefinition): boolean {
+  return skill.effect.type !== "gatherBuff";
 }
 
 function getSkillCooldownMs(skill: SkillDefinition): number {
