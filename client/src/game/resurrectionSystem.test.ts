@@ -195,10 +195,14 @@ describe("resurrection system", () => {
     });
   });
 
-  it("lets a recovery participant attack an enemy already in range", () => {
+  it("lets a recovery participant attack an active enemy already in range", () => {
     const helper = createCompanion("helper", { x: 2, y: 0 }, "helper");
     const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
-    const enemy = createEnemy("enemy", { x: 3, y: 0 }, "aggressive");
+    const enemy = {
+      ...createEnemy("enemy", { x: 3, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: helper.id,
+    };
     const recoveryState = updateResurrectionSystem(
       createState([helper, deadCompanion, enemy], helper.id),
       new Set(),
@@ -216,6 +220,31 @@ describe("resurrection system", () => {
     expect(damagedEnemy?.kind).toBe("enemy");
     expect(damagedEnemy?.kind === "enemy" ? damagedEnemy.health : enemy.health)
       .toBeLessThan(enemy.health);
+  });
+
+  it("moves a recovery participant toward an active ranged threat inside the resurrection area", () => {
+    const helper = createCompanion("helper", { x: -1, y: 0 }, "helper");
+    const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
+    const enemy = {
+      ...createEnemy("enemy", { x: 4, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: helper.id,
+    };
+    const movedEntityIds = new Set<string>();
+    const recoveryState = updateResurrectionSystem(
+      createState([helper, deadCompanion, enemy], helper.id),
+      movedEntityIds,
+      1_000,
+      100,
+    );
+
+    const nextState = updateAttackSystem(recoveryState, movedEntityIds, 3_000);
+
+    expect(recoveryState.entities[helper.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+    });
+    expect(nextState.entities[helper.id].position).not.toEqual(helper.position);
   });
 
   it("keeps a recovery participant from chasing an enemy out of range", () => {
@@ -242,6 +271,37 @@ describe("resurrection system", () => {
       position: helper.position,
       state: "attack",
       currentTargetId: enemy.id,
+    });
+  });
+
+  it("returns a recovery participant to resurrection positioning after the in-area threat is invalid", () => {
+    const helper = {
+      ...createCompanion("helper", { x: -1, y: 0 }, "helper"),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
+    const enemy = {
+      ...createEnemy("enemy", { x: 4, y: 0 }, "aggressive"),
+      state: "dead" as const,
+      health: 0,
+      currentTargetId: helper.id,
+    };
+    const state: GameState = {
+      ...createState([helper, deadCompanion, enemy], helper.id),
+      resurrectionChannelsByHelperId: {
+        [helper.id]: {
+          helperId: helper.id,
+          targetId: deadCompanion.id,
+        },
+      },
+    };
+
+    const nextState = updateResurrectionSystem(state, new Set(), 2_000, 100);
+
+    expect(nextState.entities[helper.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: deadCompanion.id,
     });
   });
 

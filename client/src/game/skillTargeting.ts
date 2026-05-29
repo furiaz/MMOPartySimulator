@@ -1,5 +1,4 @@
-import { getPartyLeader, getPartyMembers } from "./partySystem";
-import { getLeaderEnemyTarget } from "./roleSystem";
+import { getPartyMembers } from "./partySystem";
 import {
   isActiveResource,
   isLivingCompanion,
@@ -15,6 +14,7 @@ import {
 import { getCompanionAttackRange } from "./companionCombat";
 import { getGridDistance } from "./positionUtils";
 import { getEntityById, getPartyExecutionIntent, type GameState } from "./state";
+import { getPartyCombatTarget } from "./partyTargetSystem";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
 const LOW_HEALTH_BUFFER = 1;
@@ -126,11 +126,10 @@ export function findEnemyTarget(
     return currentTarget;
   }
 
-  const leader = getPartyLeader(state);
-  const leaderTarget = leader ? getLeaderEnemyTarget(state, leader) : undefined;
+  const partyTarget = getPartyCombatTarget(state);
 
-  if (leaderTarget && isEnemyInRange(caster, leaderTarget, range)) {
-    return leaderTarget;
+  if (partyTarget && isEnemyInRange(caster, partyTarget, range)) {
+    return partyTarget;
   }
 
   return Object.values(state.entities).find(
@@ -199,14 +198,12 @@ function hasLungeDamageContext(
   const currentTarget = caster.currentTargetId
     ? getEntityById(state, caster.currentTargetId)
     : undefined;
-  const leader = getPartyLeader(state);
-  const leaderTarget = leader ? getLeaderEnemyTarget(state, leader) : undefined;
+  const partyTarget = getPartyCombatTarget(state);
   const partyExecutionIntent = getPartyExecutionIntent(state);
 
   return (
     currentTarget?.id === enemy.id ||
-    leaderTarget?.id === enemy.id ||
-    partyExecutionIntent?.type === "attack" ||
+    partyTarget?.id === enemy.id ||
     !partyExecutionIntent
   );
 }

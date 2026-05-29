@@ -502,6 +502,11 @@ export {
   updateResurrectionSystem,
 } from "./resurrectionSystem";
 export {
+  getActivePartyThreatTargetInArea,
+  getPartyCombatTarget,
+  getPartyMovementTargetPosition,
+} from "./partyTargetSystem";
+export {
   EQUIPMENT_TUTORIAL_QUEST_ID,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,

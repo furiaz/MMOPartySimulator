@@ -25,6 +25,7 @@ import {
   getActiveQuestGuide,
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
+import { getActivePartyThreatTarget } from "./partyThreatSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
@@ -319,7 +320,11 @@ function getDefenderTarget(
     return leaderTarget;
   }
 
-  return undefined;
+  const activeThreatTarget = getActivePartyThreatTarget(state);
+
+  return activeThreatTarget && isRelevantGuideEscortThreat(state, activeThreatTarget)
+    ? activeThreatTarget
+    : undefined;
 }
 
 function isRelevantGuideEscortThreat(

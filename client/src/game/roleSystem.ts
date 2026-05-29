@@ -1,9 +1,7 @@
-import { isCombatEntity } from "./entities";
 import { isWithinFollowLeash } from "./followSystem";
 import {
   getFollowTrailPosition,
   getEntityById,
-  getPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
@@ -18,6 +16,10 @@ import {
   type ResourceWorkContext,
 } from "./gathererResourceReservation";
 import { isPartyMemberRespondingToActiveThreat } from "./partyThreatSystem";
+import {
+  getPartyCombatTarget,
+  getPartyMovementTargetPosition,
+} from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
 import type {
   Companion,
@@ -132,7 +134,7 @@ function getRoleTarget(
       return getFollowTarget(partyMember, followTarget);
     }
 
-    const enemy = getLeaderCombatTarget(state, followTarget);
+    const enemy = getLeaderCombatTarget(state);
 
     return enemy
       ? { state: "attack", targetId: enemy.id }
@@ -172,7 +174,7 @@ function getRoleTarget(
       return null;
     }
 
-    const enemy = leader ? getLeaderCombatTarget(state, leader) : undefined;
+    const enemy = leader ? getLeaderCombatTarget(state) : undefined;
 
     return enemy ? { state: "attack", targetId: enemy.id } : null;
   }
@@ -236,36 +238,15 @@ export function getDefenderAnchorPosition(
 
 function getLeaderCombatTarget(
   state: GameState,
-  leader: GameEntity,
 ): Enemy | undefined {
-  return getLeaderEnemyTarget(state, leader);
+  return getLeaderEnemyTarget(state);
 }
 
 export function getLeaderEnemyTarget(
   state: GameState,
-  leader: GameEntity,
+  _leader?: GameEntity,
 ): Enemy | undefined {
-  if (isCombatEntity(leader) && leader.currentTargetId) {
-    const currentTarget = state.entities[leader.currentTargetId];
-
-    if (isValidEnemyTarget(currentTarget)) {
-      return currentTarget;
-    }
-  }
-
-  if (!isPartyMember(leader)) {
-    return undefined;
-  }
-
-  const targetId = getPartyExecutionIntent(state)?.targetId;
-
-  if (!targetId) {
-    return undefined;
-  }
-
-  const target = state.entities[targetId];
-
-  return isValidEnemyTarget(target) ? target : undefined;
+  return getPartyCombatTarget(state) ?? undefined;
 }
 
 export function isDefenderAttackTargetRelevant(
@@ -298,7 +279,7 @@ export function isDefenderAttackTargetRelevant(
     return false;
   }
 
-  const leaderTarget = getLeaderEnemyTarget(state, leader);
+  const leaderTarget = getLeaderEnemyTarget(state);
 
   if (
     leaderTarget?.id === target.id &&
@@ -427,31 +408,9 @@ export function getLeaderMovementDirection(
 
 export function getResolvedPartyExecutionIntentTargetPosition(
   state: GameState,
-  leader?: PartyMember,
+  _leader?: PartyMember,
 ): Position | null {
-  const currentTarget = leader?.currentTargetId
-    ? state.entities[leader.currentTargetId]
-    : undefined;
-
-  if (leader?.state === "attack" && currentTarget && currentTarget.state !== "dead") {
-    return currentTarget.position;
-  }
-
-  const executionIntent = getPartyExecutionIntent(state);
-
-  if (!executionIntent) {
-    return null;
-  }
-
-  const target = executionIntent.targetId
-    ? state.entities[executionIntent.targetId]
-    : undefined;
-
-  if (target && target.state !== "dead") {
-    return target.position;
-  }
-
-  return executionIntent.targetPosition;
+  return getPartyMovementTargetPosition(state);
 }
 
 function getDefenderSideOffset(

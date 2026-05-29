@@ -3,7 +3,6 @@ import { isActiveResource } from "./entityGuards";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
-  setPartyExecutionIntent,
   setPartyIntent,
   updateEntity,
   type GameState,
@@ -106,9 +105,7 @@ export function issueEntityCommand(
 
     const nextState = updateEntity(commandState, updatedEntity);
 
-    return entity.id === state.partyLeaderId
-      ? setPartyExecutionIntent(nextState, null)
-      : nextState;
+    return nextState;
   }
 
   const updatedEntity: AutonomousEntity = {
@@ -123,12 +120,7 @@ export function issueEntityCommand(
 
   const nextState = updateEntity(commandState, updatedEntity);
 
-  return entity.id === state.partyLeaderId
-    ? setPartyExecutionIntent(
-        nextState,
-        getPartyExecutionIntentFromCommand(state, command),
-      )
-    : nextState;
+  return nextState;
 }
 
 export function issueCompanionCommand(
@@ -226,20 +218,6 @@ function canApplyCommand(
   return commandPriority === "direct" || entity.commandPriority !== "direct";
 }
 
-function getPartyExecutionIntentFromCommand(
-  state: GameState,
-  command: Extract<EntityCommand, { targetId: string }>,
-): PartyExecutionIntent {
-  const targetPosition = getEntityById(state, command.targetId)?.position ?? null;
-
-  return {
-    type: getPartyExecutionIntentType(command.type),
-    targetId: command.targetId,
-    targetPosition,
-    source: command.priority === "autonomous" ? "ai" : "player",
-  };
-}
-
 function getPlayerPartyExecutionIntent(
   state: GameState,
   order: PartyOrder,
@@ -279,16 +257,3 @@ function getPartyOrderEntityState(
   };
 }
 
-function getPartyExecutionIntentType(
-  commandType: Exclude<EntityState, "idle" | "dead">,
-): PartyExecutionIntent["type"] {
-  if (commandType === "attack") {
-    return "attack";
-  }
-
-  if (commandType === "gather") {
-    return "gather";
-  }
-
-  return "move";
-}

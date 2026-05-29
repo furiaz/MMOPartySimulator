@@ -2,10 +2,35 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createResource } from "./entities";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
-import { issuePartyOrder } from "./commands";
+import { issueCompanionCommand, issuePartyOrder } from "./commands";
 import type { GameEntity } from "./types";
 
 describe("party orders", () => {
+  it("keeps a direct command to the current leader from becoming party-wide intent", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader");
+    const follower = createCompanion("follower", { x: 1, y: 0 }, leader.id);
+    const enemy = createEnemy("enemy", { x: 4, y: 0 });
+    const state = createState([leader, follower, enemy], leader.id);
+
+    const nextState = issueCompanionCommand(state, {
+      type: "attack",
+      companionId: leader.id,
+      targetId: enemy.id,
+    });
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+      commandPriority: "direct",
+    });
+    expect(nextState.entities[follower.id]).toMatchObject({
+      state: follower.state,
+      currentTargetId: follower.currentTargetId,
+    });
+  });
+
   it("issues party gather as player intent without locking companions as direct commands", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader");
     const fighter = createCompanion("fighter", { x: 1, y: 0 }, leader.id, "fighter");

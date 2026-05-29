@@ -125,7 +125,10 @@ export function updateAttackSystem(
       isPartyCombatEntity(currentAttacker) &&
       isCompanionAssignedToResurrectionRecovery(nextState, currentAttacker.id);
 
-    if (isResurrectionParticipant && !isInAttackRange(currentAttacker, target)) {
+    if (
+      isResurrectionParticipant &&
+      !isPositionInActiveResurrectionArea(nextState, target.position)
+    ) {
       continue;
     }
 
@@ -275,11 +278,7 @@ export function updateAttackSystem(
       continue;
     }
 
-    if (isResurrectionParticipant) {
-      continue;
-    }
-
-    const attackSlot = chooseAttackSlot(
+    const candidateAttackSlot = chooseAttackSlot(
       nextState,
       currentAttacker,
       target.position,
@@ -291,12 +290,27 @@ export function updateAttackSystem(
         pathDistanceCache,
         preferredSlotIndex: getAttackSlotPreference(currentAttacker),
         partySpacingMode:
-          currentAttacker.kind === "companion" ? "prefer" : "off",
+          currentAttacker.kind === "companion" && !isResurrectionParticipant
+            ? "prefer"
+            : "off",
         targetId: target.id,
       },
     );
+    const attackSlot =
+      candidateAttackSlot &&
+      (!isResurrectionParticipant ||
+        isPositionInActiveResurrectionArea(nextState, candidateAttackSlot))
+        ? candidateAttackSlot
+        : null;
 
-    const movementTarget = attackSlot ?? target.position;
+    const movementTarget = isResurrectionParticipant
+      ? attackSlot
+      : attackSlot ?? target.position;
+
+    if (!movementTarget) {
+      continue;
+    }
+
     const previousPosition = currentAttacker.position;
 
     if (attackSlot) {

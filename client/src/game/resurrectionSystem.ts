@@ -1,7 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { getCompanionAttackRange } from "./companionCombat";
 import { isCompanionEntity, isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyResurrectionRecoveryTargetId } from "./partyIntentSystem";
+import { getActivePartyThreatTargetInArea } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
 import {
   getEntityById,
@@ -46,8 +46,8 @@ export function updateResurrectionSystem(
     );
   }
 
-  nextState = moveResurrectionParticipants(nextState, movedEntityIds);
   nextState = assignResurrectionAreaCombatTargets(nextState);
+  nextState = moveResurrectionParticipants(nextState, movedEntityIds);
   nextState = progressResurrectionArea(
     nextState,
     now,
@@ -73,7 +73,11 @@ function assignResurrectionAreaCombatTargets(state: GameState): GameState {
       continue;
     }
 
-    const enemy = getAttackableEnemyInRange(nextState, helper);
+    const enemy = getActivePartyThreatTargetInArea(
+      nextState,
+      target.position,
+      RESURRECTION_RANGE,
+    );
 
     nextState = updateEntity(nextState, {
       ...helper,
@@ -166,6 +170,10 @@ function moveResurrectionParticipants(
     const target = getEntityById(nextState, channel.targetId);
 
     if (!isLivingCompanion(helper) || !isDeadCompanion(target)) {
+      continue;
+    }
+
+    if (isResurrectionParticipantAttackingAreaThreat(nextState, helper)) {
       continue;
     }
 
@@ -486,24 +494,16 @@ function getResurrectionContributorCount(
   ).length;
 }
 
-function getAttackableEnemyInRange(
+function isResurrectionParticipantAttackingAreaThreat(
   state: GameState,
   helper: Companion,
-): GameEntity | null {
-  return (
-    Object.values(state.entities)
-      .filter(isLivingEnemy)
-      .filter(
-        (enemy) =>
-          getGridDistance(helper.position, enemy.position) <=
-          getCompanionAttackRange(helper),
-      )
-      .sort(
-        (first, second) =>
-          getGridDistance(helper.position, first.position) -
-            getGridDistance(helper.position, second.position) ||
-          first.id.localeCompare(second.id),
-      )[0] ?? null
+): boolean {
+  const target = helper.currentTargetId
+    ? getEntityById(state, helper.currentTargetId)
+    : undefined;
+
+  return Boolean(
+    isLivingEnemy(target) && isPositionInActiveResurrectionArea(state, target.position),
   );
 }
 

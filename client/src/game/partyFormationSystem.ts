@@ -28,6 +28,10 @@ import {
   type GameState,
 } from "./state";
 import { isActivePartyThreat } from "./partyThreatSystem";
+import {
+  getPartyCombatTarget,
+  getPartyMovementTargetPosition,
+} from "./partyTargetSystem";
 import type {
   Enemy,
   FormationPhase,
@@ -117,7 +121,7 @@ export function updatePartyFormationSystem(
 }
 
 function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
-  const executionIntent = getPartyExecutionIntent(state);
+  const movementTargetPosition = getPartyMovementTargetPosition(state);
 
   if (hasDirectPlayerPartyIntent(state)) {
     const intentTarget = getIntentEnemyTarget(state);
@@ -131,18 +135,17 @@ function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
       target: intentTarget,
       targetPosition:
         intentTarget?.position ??
-        executionIntent?.targetPosition ??
+        movementTargetPosition ??
         null,
     };
   }
 
   const nearbyThreatTarget = getNearbyPartyThreatTarget(state);
   const intentTarget = getIntentEnemyTarget(state);
-  const leaderTarget = getLeaderEnemyTarget(state, leader);
-  const target = nearbyThreatTarget ?? intentTarget ?? leaderTarget;
+  const target = nearbyThreatTarget ?? intentTarget;
   const targetPosition =
     target?.position ??
-    executionIntent?.targetPosition ??
+    movementTargetPosition ??
     null;
   const phase =
     target && isWithinPartyCombatDistance(state, leader, target)
@@ -419,7 +422,7 @@ function moveFollowersTowardLeader(
           nextState,
           currentMember,
           leader,
-          nextState.leaderIntent?.targetPosition,
+          getPartyMovementTargetPosition(nextState),
         );
     const nextMemberState = moveEntityTowardPositionIfUnoccupied(
       nextState,
@@ -667,23 +670,7 @@ function createIdleFormation(): PartyFormationState {
 }
 
 function getIntentEnemyTarget(state: GameState): Enemy | null {
-  const executionIntent = getPartyExecutionIntent(state);
-  const target = executionIntent?.targetId
-    ? state.entities[executionIntent.targetId]
-    : undefined;
-
-  return isLiveEnemy(target) ? target : null;
-}
-
-function getLeaderEnemyTarget(
-  state: GameState,
-  leader: PartyMember,
-): Enemy | null {
-  const target = leader.currentTargetId
-    ? state.entities[leader.currentTargetId]
-    : undefined;
-
-  return isLiveEnemy(target) ? target : null;
+  return getPartyCombatTarget(state);
 }
 
 function getNearbyPartyThreatTarget(state: GameState): Enemy | null {

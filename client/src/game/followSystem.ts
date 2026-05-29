@@ -7,6 +7,7 @@ import {
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
+import { getPartyMovementTargetPosition } from "./partyTargetSystem";
 import { arePositionsEqual, getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, GameEntity } from "./types";
 
@@ -55,7 +56,7 @@ export function updateFollowSystem(
       nextState,
       follower,
       leader,
-      nextState.leaderIntent?.targetPosition,
+      getPartyMovementTargetPosition(nextState),
     );
 
     nextState = moveEntityTowardPositionIfUnoccupied(
