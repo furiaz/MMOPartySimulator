@@ -9,6 +9,7 @@ import {
   SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
   SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
   SLIMEWARD_FLOOR_TWO_ID,
+  debugMapDefinitions,
   slimewardFloorOneEnemyStartData,
   slimewardFloorTwoEnemyStartData,
 } from "./debugMap";
@@ -203,11 +204,21 @@ export function getSlimewardDungeonPoiTarget(state: GameState) {
       };
     }
 
+    const floorTwoTeleportPosition = getMapTeleportPosition(
+      state,
+      SLIMEWARD_FLOOR_ONE_ID,
+      SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
+    );
+
+    if (!floorTwoTeleportPosition) {
+      return null;
+    }
+
     return {
       poiId: SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
       category: "teleport" as const,
       mapId: SLIMEWARD_FLOOR_ONE_ID,
-      position: { x: 100, y: 18 },
+      position: floorTwoTeleportPosition,
       reason: "Dungeon floor clear",
     };
   }
@@ -301,6 +312,22 @@ function getNextDungeonEnemy(
   }
 
   return null;
+}
+
+function getMapTeleportPosition(
+  state: GameState,
+  mapId: DebugMapId,
+  teleportId: string,
+): Position | null {
+  const currentMapTeleport =
+    state.currentMapId === mapId
+      ? state.map?.teleports.find((teleport) => teleport.id === teleportId)
+      : undefined;
+  const authoredTeleport = debugMapDefinitions[mapId].teleports.find(
+    (teleport) => teleport.id === teleportId,
+  );
+
+  return currentMapTeleport?.position ?? authoredTeleport?.position ?? null;
 }
 
 function isDeadBoss(entity: GameEntity | undefined): entity is Enemy {

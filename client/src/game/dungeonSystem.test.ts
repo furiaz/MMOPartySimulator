@@ -5,18 +5,23 @@ import {
   updateEnemyRespawnSystem,
   updateSlimewardDungeonSystem,
 } from "./index";
+import { getSlimewardDungeonPoiTarget } from "./dungeonSystem";
 import {
   HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   SLIMEWARD_BOSS_ID,
   SLIMEWARD_CHEST_POSITION,
   SLIMEWARD_CAMP_ID,
+  SLIMEWARD_EXIT_POSITION,
   SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
   SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
   SLIMEWARD_FLOOR_TWO_ID,
   createDebugMap,
   debugMapDefinitions,
   slimewardFloorOneEnemyStartData,
+  slimewardFloorOneSubzones,
   slimewardFloorTwoEnemyStartData,
+  slimewardFloorTwoSubzones,
 } from "./debugMap";
 import { createCompanion, createEnemy } from "./entities";
 import { createEmptyPartyInventory } from "./inventory";
@@ -92,22 +97,74 @@ describe("Slimeward dungeon prototype", () => {
     const floorTwo = createDebugMap(SLIMEWARD_FLOOR_TWO_ID);
 
     for (const passage of [
-      { x: 16, y: 16 },
-      { x: 36, y: 16 },
-      { x: 60, y: 16 },
-      { x: 80, y: 16 },
+      { x: 20, y: 12 },
+      { x: 48, y: 12 },
+      { x: 76, y: 12 },
+      { x: 104, y: 12 },
     ]) {
-      assertWalkableRect(floorOne, passage, 8, 8);
+      assertWalkableRect(floorOne, passage, 8, 16);
     }
 
     for (const passage of [
-      { x: 16, y: 16 },
-      { x: 36, y: 16 },
-      { x: 56, y: 16 },
-      { x: 76, y: 16 },
+      { x: 24, y: 12 },
+      { x: 52, y: 12 },
+      { x: 80, y: 12 },
+      { x: 108, y: 12 },
     ]) {
-      assertWalkableRect(floorTwo, passage, 8, 8);
+      assertWalkableRect(floorTwo, passage, 8, 16);
     }
+  });
+
+  it("redraws dungeon regular rooms with larger safe interiors", () => {
+    expect(slimewardFloorOneSubzones.map((subzone) => subzone.bounds)).toEqual([
+      { x: 4, y: 8, width: 16, height: 24 },
+      { x: 28, y: 8, width: 20, height: 24 },
+      { x: 56, y: 4, width: 20, height: 28 },
+      { x: 84, y: 8, width: 20, height: 24 },
+      { x: 112, y: 4, width: 20, height: 32 },
+    ]);
+    expect(slimewardFloorTwoSubzones.map((subzone) => subzone.bounds)).toEqual([
+      { x: 4, y: 8, width: 20, height: 24 },
+      { x: 32, y: 8, width: 20, height: 24 },
+      { x: 60, y: 8, width: 20, height: 24 },
+      { x: 88, y: 8, width: 20, height: 24 },
+      { x: 116, y: 4, width: 32, height: 36 },
+    ]);
+  });
+
+  it("keeps redrawn dungeon authored placements on open interior floor", () => {
+    assertDungeonAuthoredPlacements(
+      createDebugMap(SLIMEWARD_FLOOR_ONE_ID),
+      slimewardFloorOneEnemyStartData.map((enemy) => enemy.position),
+    );
+    assertDungeonAuthoredPlacements(
+      createDebugMap(SLIMEWARD_FLOOR_TWO_ID),
+      [
+        ...slimewardFloorTwoEnemyStartData.map((enemy) => enemy.position),
+        SLIMEWARD_CHEST_POSITION,
+        SLIMEWARD_EXIT_POSITION,
+      ],
+    );
+  });
+
+  it("targets the real Floor 1 exit teleporter after Floor 1 is clear", () => {
+    const floorOne = createDebugMap(SLIMEWARD_FLOOR_ONE_ID);
+    const exitTeleport = floorOne.teleports.find(
+      (teleport) => teleport.id === SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
+    );
+    const state = createTestGameState({
+      currentMapId: SLIMEWARD_FLOOR_ONE_ID,
+      map: floorOne,
+      entities: {},
+    });
+
+    expect(exitTeleport).toBeDefined();
+    expect(getSlimewardDungeonPoiTarget(state)).toMatchObject({
+      poiId: SLIMEWARD_FLOOR_ONE_TO_FLOOR_TWO_TELEPORTER_ID,
+      category: "teleport",
+      position: exitTeleport?.position,
+      reason: "Dungeon floor clear",
+    });
   });
 
   it("does not respawn dungeon floor enemies", () => {
@@ -260,6 +317,38 @@ function assertWalkableRect(
       expect(isNavigationCellWalkable(map, { x, y })).toBe(true);
     }
   }
+}
+
+function assertDungeonAuthoredPlacements(map: GameMap, extraPositions: Position[]) {
+  const positions = [
+    ...extraPositions,
+    ...(map.waypoints ?? []).map((waypoint) => waypoint.position),
+    ...map.teleports.flatMap((teleport) => [
+      teleport.position,
+      ...teleport.arrivalPositions,
+    ]),
+    ...(map.visualObjects ?? []).map((visualObject) => visualObject.position),
+    ...(map.subzones ?? []).flatMap((subzone) => [
+      ...subzone.passages.map((passage) => passage.position),
+      ...subzone.encounterAreas.map((encounterArea) => encounterArea.center),
+    ]),
+  ];
+
+  for (const position of positions) {
+    expect(isNavigationCellWalkable(map, position)).toBe(true);
+    expect(isWallAdjacent(map, position)).toBe(false);
+  }
+}
+
+function isWallAdjacent(map: GameMap, position: Position): boolean {
+  return [
+    { x: position.x + 1, y: position.y },
+    { x: position.x - 1, y: position.y },
+    { x: position.x, y: position.y + 1 },
+    { x: position.x, y: position.y - 1 },
+  ].some((neighbor) =>
+    map.walls.some((wall) => wall.x === neighbor.x && wall.y === neighbor.y),
+  );
 }
 
 function getPositionKey(position: Position): string {
