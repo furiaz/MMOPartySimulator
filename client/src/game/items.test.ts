@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { getItemDefinitionForResourceType, ITEM_DEFINITIONS } from "./items";
 
 describe("prototype item definitions", () => {
+  const getArmorItems = () =>
+    Object.values(ITEM_DEFINITIONS).filter(
+      (itemDefinition) => itemDefinition.equipmentKind === "armor",
+    );
+
+  const getArmorItemIdsWithLevelRequirement = (levelRequirement: number) =>
+    getArmorItems()
+      .filter((itemDefinition) => itemDefinition.levelRequirement === levelRequirement)
+      .map((itemDefinition) => itemDefinition.id)
+      .sort();
+
   it("maps resource type and tier to the intended gathered item", () => {
     expect(getItemDefinitionForResourceType("wood", 1).id).toBe("softwood");
     expect(getItemDefinitionForResourceType("ore", 1).id).toBe("copper_ore");
@@ -25,9 +36,7 @@ describe("prototype item definitions", () => {
   });
 
   it("keeps regular armor class-unrestricted and grouped by family", () => {
-    const armorItems = Object.values(ITEM_DEFINITIONS).filter(
-      (itemDefinition) => itemDefinition.equipmentKind === "armor",
-    );
+    const armorItems = getArmorItems();
 
     expect(armorItems.length).toBe(40);
 
@@ -35,6 +44,55 @@ describe("prototype item definitions", () => {
       expect(itemDefinition.armorFamily).toMatch(/^(cloth|leather|mail|plate)$/);
       expect(itemDefinition.allowedClassIds).toBeUndefined();
     }
+  });
+
+  it("keeps early tier 1 armor unlocks split by level", () => {
+    expect(getArmorItemIdsWithLevelRequirement(1)).toEqual([
+      "guard_boots",
+      "guard_coif",
+      "guard_gloves",
+      "guard_hauberk",
+      "guard_legguards",
+      "scout_boots",
+      "scout_cap",
+      "scout_gloves",
+      "scout_jacket",
+      "scout_trousers",
+    ]);
+
+    expect(getArmorItemIdsWithLevelRequirement(5)).toEqual([
+      "stalker_boots",
+      "stalker_grips",
+      "stalker_leggings",
+      "stalker_mask",
+      "stalker_vest",
+      "vanguard_boots",
+      "vanguard_coif",
+      "vanguard_gloves",
+      "vanguard_hauberk",
+      "vanguard_legguards",
+    ]);
+  });
+
+  it("keeps cloth and plate tier 1 armor at level 10", () => {
+    const clothAndPlateItems = getArmorItems().filter(
+      (itemDefinition) =>
+        itemDefinition.armorFamily === "cloth" ||
+        itemDefinition.armorFamily === "plate",
+    );
+    const familiesAvailableAtLevel10 = new Set(
+      getArmorItems()
+        .filter((itemDefinition) => (itemDefinition.levelRequirement ?? 0) <= 10)
+        .map((itemDefinition) => itemDefinition.armorFamily),
+    );
+
+    expect(clothAndPlateItems.length).toBe(20);
+    for (const itemDefinition of clothAndPlateItems) {
+      expect(itemDefinition.levelRequirement).toBe(10);
+    }
+    expect(familiesAvailableAtLevel10).toEqual(
+      new Set(["cloth", "leather", "mail", "plate"]),
+    );
   });
 
   it("keeps regular mail and plate away from magic and healing power", () => {

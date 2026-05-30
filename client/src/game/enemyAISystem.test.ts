@@ -241,9 +241,33 @@ describe("enemy AI aggro and roaming", () => {
     );
   });
 
-  it("lets quest-spawned enemies acquire targets after reaching pressure range", () => {
+  it("keeps quest-spawned enemies moving toward their pressure point inside aggro range", () => {
     const leader = createIdleCompanion("leader", { x: 10, y: 0 });
     const enemy = createEnemy("enemy", { x: 9, y: 0 }, "aggressive", {
+      enemyTypeId: "goblin_scout",
+      questSpawn: {
+        questId: "hold_the_field_cache",
+        objectiveId: "defend_old_grove_cache",
+        targetPosition: { x: 20, y: 0 },
+        suppressNormalDrops: true,
+      },
+    });
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]));
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+    const targetPosition = enemy.questSpawn?.targetPosition;
+
+    expect(targetPosition).toBeDefined();
+    expect(nextEnemy.currentTargetId).toBeNull();
+    expect(nextEnemy.position.x).toBeGreaterThan(enemy.position.x);
+    expect(getDistance(nextEnemy.position, targetPosition!)).toBeLessThan(
+      getDistance(enemy.position, targetPosition!),
+    );
+  });
+
+  it("lets quest-spawned enemies acquire targets after reaching the pressure point", () => {
+    const leader = createIdleCompanion("leader", { x: 19.5, y: 0 });
+    const enemy = createEnemy("enemy", { x: 20, y: 0 }, "aggressive", {
       enemyTypeId: "goblin_scout",
       questSpawn: {
         questId: "hold_the_field_cache",

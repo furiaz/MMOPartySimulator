@@ -615,7 +615,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { wisdom: 1 },
     statModifiers: { healingPower: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   acolyte_robe: {
     id: "acolyte_robe",
@@ -631,7 +631,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { wisdom: 1 },
     statModifiers: { healingPower: 2, magicDefense: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   acolyte_pants: {
     id: "acolyte_pants",
@@ -647,7 +647,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { constitution: 1 },
     statModifiers: { magicDefense: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   acolyte_wraps: {
     id: "acolyte_wraps",
@@ -663,7 +663,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { wisdom: 1 },
     statModifiers: { healingPower: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   acolyte_sandals: {
     id: "acolyte_sandals",
@@ -678,7 +678,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "boots_armor",
     armorFamily: "cloth",
     statModifiers: { evasion: 1, magicDefense: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   scholar_hood: {
     id: "scholar_hood",
@@ -694,7 +694,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { intelligence: 1 },
     statModifiers: { magicPower: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   scholar_robe: {
     id: "scholar_robe",
@@ -710,7 +710,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { intelligence: 1 },
     statModifiers: { magicPower: 2, magicDefense: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   scholar_pants: {
     id: "scholar_pants",
@@ -726,7 +726,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "cloth",
     primaryStatModifiers: { intelligence: 1 },
     statModifiers: { magicDefense: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   scholar_gloves: {
     id: "scholar_gloves",
@@ -741,7 +741,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "gloves_armor",
     armorFamily: "cloth",
     statModifiers: { magicPower: 1, accuracy: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   scholar_sandals: {
     id: "scholar_sandals",
@@ -756,7 +756,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "boots_armor",
     armorFamily: "cloth",
     statModifiers: { evasion: 1, magicPower: 1 },
-    levelRequirement: 1,
+    levelRequirement: 10,
   },
   scout_cap: {
     id: "scout_cap",
@@ -851,7 +851,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "leather",
     primaryStatModifiers: { dexterity: 1 },
     statModifiers: { attack: 1 },
-    levelRequirement: 1,
+    levelRequirement: 5,
   },
   stalker_vest: {
     id: "stalker_vest",
@@ -866,7 +866,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "chest_armor",
     armorFamily: "leather",
     statModifiers: { attack: 1, defense: 1, evasion: 1 },
-    levelRequirement: 1,
+    levelRequirement: 5,
   },
   stalker_leggings: {
     id: "stalker_leggings",
@@ -882,7 +882,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "leather",
     primaryStatModifiers: { strength: 1 },
     statModifiers: { evasion: 1 },
-    levelRequirement: 1,
+    levelRequirement: 5,
   },
   stalker_grips: {
     id: "stalker_grips",
@@ -897,7 +897,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "gloves_armor",
     armorFamily: "leather",
     statModifiers: { attack: 1, criticalChance: 0.02 },
-    levelRequirement: 1,
+    levelRequirement: 5,
   },
   stalker_boots: {
     id: "stalker_boots",
@@ -913,7 +913,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "leather",
     primaryStatModifiers: { dexterity: 1 },
     statModifiers: { evasion: 1 },
-    levelRequirement: 1,
+    levelRequirement: 5,
   },
   guard_coif: {
     id: "guard_coif",
@@ -929,7 +929,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "mail",
     primaryStatModifiers: { constitution: 1 },
     statModifiers: { defense: 1 },
-    levelRequirement: 5,
+    levelRequirement: 1,
   },
   guard_hauberk: {
     id: "guard_hauberk",
@@ -944,7 +944,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "chest_armor",
     armorFamily: "mail",
     statModifiers: { defense: 3, maxHealth: 2, evasion: -1 },
-    levelRequirement: 5,
+    levelRequirement: 1,
   },
   guard_legguards: {
     id: "guard_legguards",
@@ -960,7 +960,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     armorFamily: "mail",
     primaryStatModifiers: { constitution: 1 },
     statModifiers: { defense: 2, evasion: -1 },
-    levelRequirement: 5,
+    levelRequirement: 1,
   },
   guard_gloves: {
     id: "guard_gloves",
@@ -975,7 +975,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "gloves_armor",
     armorFamily: "mail",
     statModifiers: { block: 1, defense: 1 },
-    levelRequirement: 5,
+    levelRequirement: 1,
   },
   guard_boots: {
     id: "guard_boots",
@@ -990,7 +990,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     equipmentType: "boots_armor",
     armorFamily: "mail",
     statModifiers: { defense: 1, maxHealth: 1 },
-    levelRequirement: 5,
+    levelRequirement: 1,
   },
   vanguard_coif: {
     id: "vanguard_coif",

@@ -239,6 +239,27 @@ describe("prototype equipment system", () => {
     });
   });
 
+  it("rejects moved level 5 leather armor at level 1", () => {
+    const { state, companion } = createStateWithCompanion(
+      "blade",
+      ["stalker_vest"],
+      10,
+      1,
+    );
+
+    const { result } = equipItemToCompanion(
+      state,
+      companion.id,
+      "stalker_vest",
+      "chest",
+    );
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "level_requirement_not_met",
+    });
+  });
+
   it("does not unequip when inventory is full", () => {
     const { state, companion } = createStateWithCompanion("blade", [
       "iron_sword",

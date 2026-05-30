@@ -166,6 +166,35 @@ describe("merchant buy", () => {
     );
   });
 
+  it("prices armor stock by early Tier 1 unlock progression", () => {
+    const stock = getMerchantBuyStock(createMerchantState(), MERCHANT_ID);
+    const pricesByItemId = Object.fromEntries(
+      stock.map((stockEntry) => [stockEntry.itemId, stockEntry.priceCrowns]),
+    );
+
+    expect(pricesByItemId).toMatchObject({
+      guard_coif: 26,
+      guard_hauberk: 35,
+      guard_legguards: 28,
+      guard_gloves: 24,
+      guard_boots: 24,
+      stalker_mask: 44,
+      stalker_vest: 60,
+      stalker_leggings: 50,
+      stalker_grips: 46,
+      stalker_boots: 44,
+      acolyte_robe: 82,
+      acolyte_pants: 62,
+      acolyte_wraps: 52,
+      acolyte_sandals: 52,
+      scholar_hood: 62,
+      scholar_robe: 82,
+      scholar_pants: 62,
+      scholar_gloves: 52,
+      scholar_sandals: 52,
+    });
+  });
+
   it("buys stock equipment into shared inventory for Crowns", () => {
     let state = createMerchantState();
     state = setCurrencyBalanceForDebug(state, "crowns", 100).state;

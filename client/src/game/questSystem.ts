@@ -97,7 +97,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         { itemId: "wolf_pelt", quantity: 2 },
         { itemId: "minor_recovery_flask", quantity: 1 },
       ],
-      equipment: [{ itemId: "acolyte_hood", quantity: 1 }],
+      equipment: [{ itemId: "guard_coif", quantity: 1 }],
     },
   },
   outfit_the_expedition: {
@@ -114,9 +114,9 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         requiredCount: 1,
       },
       {
-        id: "equip_acolyte_hood",
+        id: "equip_guard_coif",
         type: "equip_item",
-        itemId: "acolyte_hood",
+        itemId: "guard_coif",
         targetSlot: "head",
         requiredCount: 1,
       },

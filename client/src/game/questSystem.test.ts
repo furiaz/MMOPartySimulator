@@ -87,7 +87,7 @@ describe("prototype quest system", () => {
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
-      { itemId: "acolyte_hood", quantity: 1 },
+      { itemId: "guard_coif", quantity: 1 },
     ]);
     expect(getCompanion(state, "companion-1").characterLevel).toBe(2);
     expect(getCompanion(state, "companion-1").characterXp).toBe(2);
@@ -109,6 +109,7 @@ describe("prototype quest system", () => {
       "rescue_the_grove_runner",
       "hold_the_field_cache",
       "open_wolf_causeway",
+      "find_slimeward_camp",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");
@@ -123,7 +124,7 @@ describe("prototype quest system", () => {
     });
 
     state = addItemToInventoryState(state, "training_sword", 1, "debug").state;
-    state = addItemToInventoryState(state, "acolyte_hood", 1, "debug").state;
+    state = addItemToInventoryState(state, "guard_coif", 1, "debug").state;
     state = addItemToInventoryState(state, "minor_recovery_flask", 1, "debug").state;
     state = equipItemToCompanion(
       state,
@@ -134,7 +135,7 @@ describe("prototype quest system", () => {
     state = equipItemToCompanion(
       state,
       "companion-1",
-      "acolyte_hood",
+      "guard_coif",
       "head",
     ).state;
     state = equipFlaskToCompanion(
@@ -150,7 +151,7 @@ describe("prototype quest system", () => {
       completed: true,
     });
     expect(
-      state.quests.outfit_the_expedition.objectiveProgress.equip_acolyte_hood,
+      state.quests.outfit_the_expedition.objectiveProgress.equip_guard_coif,
     ).toMatchObject({
       currentCount: 1,
       completed: true,
@@ -171,7 +172,7 @@ describe("prototype quest system", () => {
         ...createCompanion("companion-template", { x: 0, y: 0 }, "companion-1")
           .equipment,
         mainHand: "training_sword" as const,
-        head: "acolyte_hood" as const,
+        head: "guard_coif" as const,
       },
       consumables: {
         ...createCompanion("companion-template", { x: 0, y: 0 }, "companion-1")
@@ -209,7 +210,7 @@ describe("prototype quest system", () => {
         .completed,
     ).toBe(true);
     expect(
-      state.quests.outfit_the_expedition.objectiveProgress.equip_acolyte_hood
+      state.quests.outfit_the_expedition.objectiveProgress.equip_guard_coif
         .completed,
     ).toBe(true);
     expect(
@@ -372,7 +373,7 @@ describe("prototype quest system", () => {
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
-      { itemId: "acolyte_hood", quantity: 1 },
+      { itemId: "guard_coif", quantity: 1 },
       { itemId: "hearty_trail_rations", quantity: 1 },
     ]);
     expect(getCompanion(state, "companion-1").lastCharacterXpGained).toBe(12);
@@ -831,7 +832,7 @@ describe("prototype quest system", () => {
     expect(state.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 2 },
       { itemId: "minor_recovery_flask", quantity: 1 },
-      { itemId: "acolyte_hood", quantity: 1 },
+      { itemId: "guard_coif", quantity: 1 },
     ]);
   });
 

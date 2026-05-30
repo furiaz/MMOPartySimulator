@@ -34,6 +34,7 @@ const ENEMY_ROAM_IDLE_MIN_MS = 2000;
 const ENEMY_ROAM_IDLE_MAX_MS = 3000;
 const ENEMY_COMBAT_RETAIN_RANGE = 1;
 const ROAM_TARGET_REACHED_DISTANCE = 0.1;
+const QUEST_PRESSURE_TARGET_REACHED_DISTANCE = 1;
 const ENEMY_WANDER_ATTEMPTS = 5;
 
 type TargetSearchResult = {
@@ -120,7 +121,7 @@ export function updateEnemyAISystem(
     if (!target) {
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
       nextState = updateEntity(nextState, reasonedEnemy);
-      if (reasonedEnemy.questSpawn?.targetPosition) {
+      if (shouldPressureQuestTarget(reasonedEnemy)) {
         nextState = moveQuestSpawnTowardPressureTarget(nextState, reasonedEnemy);
         continue;
       }
@@ -383,7 +384,8 @@ function shouldPressureQuestTarget(enemy: Enemy): boolean {
 
   return Boolean(
     targetPosition &&
-      getDistance(enemy.position, targetPosition) > getEnemyAggroRange(enemy),
+      getDistance(enemy.position, targetPosition) >
+        QUEST_PRESSURE_TARGET_REACHED_DISTANCE,
   );
 }
 
