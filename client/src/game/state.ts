@@ -84,6 +84,7 @@ import {
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const COMBAT_FEEDBACK_DURATION_MS = 1000;
+export const PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS = 2000;
 const POSITION_EPSILON = 0.001;
 export const ENTITY_COLLISION_DISTANCE = 0.7;
 export const BEGINNER_COLLISION_CAPSULE_WIDTH_MULTIPLIER = 0.8;
@@ -377,8 +378,11 @@ export function addCombatFeedback(
     targetEntityId?: string;
     text: string;
     now: number;
+    durationMs?: number;
   },
 ): GameState {
+  const durationMs = event.durationMs ?? COMBAT_FEEDBACK_DURATION_MS;
+
   return {
     ...state,
     combatFeedbackEvents: [
@@ -394,7 +398,7 @@ export function addCombatFeedback(
         targetEntityId: event.targetEntityId,
         text: event.text,
         createdAt: event.now,
-        expiresAt: event.now + COMBAT_FEEDBACK_DURATION_MS,
+        expiresAt: event.now + durationMs,
       },
     ],
   };

@@ -657,8 +657,10 @@ export type CombatFeedbackType =
   | "attack"
   | "damage"
   | "death"
+  | "enemy_spotted"
   | "gather"
-  | "heal";
+  | "heal"
+  | "level_up";
 
 export type CombatFeedbackEvent = {
   amount?: number;

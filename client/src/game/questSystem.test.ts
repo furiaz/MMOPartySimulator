@@ -10,7 +10,7 @@ import {
 } from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import { buyMerchantItem } from "./merchant";
-import { addEntity } from "./state";
+import { addEntity, PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS } from "./state";
 import { equipFlaskToCompanion } from "./consumables";
 import {
   acceptQuestFromQuestGiver,
@@ -95,6 +95,34 @@ describe("prototype quest system", () => {
     expect(getCompanion(state, "companion-2").characterLevel).toBe(2);
     expect(getCompanion(state, "companion-2").characterXp).toBe(2);
     expect(getCompanion(state, "companion-2").lastCharacterXpGained).toBe(8);
+  });
+
+  it("creates level-up feedback when quest XP levels companions", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        clear_the_shore: "ready_to_turn_in",
+      }),
+    });
+
+    state = updateQuestGiverInteraction(state, 5_000);
+
+    const levelUpEvents = state.combatFeedbackEvents.filter(
+      (event) => event.type === "level_up",
+    );
+
+    expect(levelUpEvents).toHaveLength(2);
+    expect(levelUpEvents).toEqual([
+      expect.objectContaining({
+        entityId: "companion-1",
+        createdAt: 5_000,
+        expiresAt: 5_000 + PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      }),
+      expect.objectContaining({
+        entityId: "companion-2",
+        createdAt: 5_000,
+        expiresAt: 5_000 + PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      }),
+    ]);
   });
 
   it("initializes the early quest chain in serial order", () => {

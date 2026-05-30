@@ -18,7 +18,12 @@ import {
   grantCharacterXpToCompanion,
 } from "./leveling";
 import { getPartyMembers } from "./partySystem";
-import { updateEntity, type GameState } from "./state";
+import {
+  addCombatFeedback,
+  PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+  updateEntity,
+  type GameState,
+} from "./state";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import { setTeleportWorking } from "./teleportState";
 import { addCurrencyToWalletState } from "./wallet";
@@ -622,7 +627,10 @@ export function recordMerchantLockedForQuest(
   });
 }
 
-export function updateQuestGiverInteraction(state: GameState): GameState {
+export function updateQuestGiverInteraction(
+  state: GameState,
+  now = Date.now(),
+): GameState {
   const nextState = appendDebugTelemetryEvent(state, {
     type: "quest_dialog_opened",
     entityId: QUEST_GIVER_POI_ID,
@@ -633,7 +641,9 @@ export function updateQuestGiverInteraction(state: GameState): GameState {
   const readyQuest = getQuestByStatuses(state, ["ready_to_turn_in"]);
 
   if (readyQuest) {
-    return claimQuestReward(nextState, readyQuest.questId, QUEST_GIVER_POI_ID);
+    return claimQuestReward(nextState, readyQuest.questId, QUEST_GIVER_POI_ID, {
+      now,
+    });
   }
 
   const availableQuest = getAvailableQuest(nextState);
@@ -658,6 +668,7 @@ export function acceptQuestFromQuestGiver(
 export function finishReadyQuestsForQuestGiver(
   state: GameState,
   questGiverPoiId: string,
+  now = Date.now(),
 ): GameState {
   const readyQuests = getQuestGiverReadyQuests(state, questGiverPoiId);
 
@@ -736,6 +747,7 @@ export function finishReadyQuestsForQuestGiver(
 
   for (const quest of readyQuests) {
     nextState = claimQuestReward(nextState, quest.questId, questGiverPoiId, {
+      now,
       skipValidation: true,
       skipFinishSelectedTelemetry: true,
     });
@@ -1054,6 +1066,7 @@ function claimQuestReward(
   questId: QuestId,
   questGiverPoiId: string,
   options: {
+    now?: number;
     skipValidation?: boolean;
     skipFinishSelectedTelemetry?: boolean;
   } = {},
@@ -1144,7 +1157,7 @@ function claimQuestReward(
     currentMapDebugName: nextState.map?.debugName,
   });
 
-  nextState = grantQuestRewards(nextState, questId);
+  nextState = grantQuestRewards(nextState, questId, options.now ?? Date.now());
 
   nextState = appendDebugTelemetryEvent(
     {
@@ -1357,7 +1370,11 @@ function simulateRewardItemAdd(
   };
 }
 
-function grantQuestRewards(state: GameState, questId: QuestId): GameState {
+function grantQuestRewards(
+  state: GameState,
+  questId: QuestId,
+  now = Date.now(),
+): GameState {
   const reward = QUEST_DEFINITIONS[questId].rewards;
 
   if (!reward) {
@@ -1387,7 +1404,12 @@ function grantQuestRewards(state: GameState, questId: QuestId): GameState {
   }
 
   if (reward.characterXp && reward.characterXp > 0) {
-    nextState = grantQuestXpToCurrentParty(nextState, questId, reward.characterXp);
+    nextState = grantQuestXpToCurrentParty(
+      nextState,
+      questId,
+      reward.characterXp,
+      now,
+    );
   }
 
   for (const rewardItem of reward.items ?? []) {
@@ -1415,6 +1437,7 @@ function grantQuestXpToCurrentParty(
   state: GameState,
   questId: QuestId,
   amount: number,
+  now = Date.now(),
 ): GameState {
   let nextState = state;
   const baseXpAmount = Math.floor(amount);
@@ -1458,6 +1481,13 @@ function grantQuestXpToCurrentParty(
     });
 
     if (updatedCompanion.characterLevel > companion.characterLevel) {
+      nextState = addCombatFeedback(nextState, {
+        type: "level_up",
+        entityId: updatedCompanion.id,
+        text: "Level Up",
+        now,
+        durationMs: PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      });
       nextState = appendDebugTelemetryEvent(nextState, {
         type: "character_level_up",
         entityId: companion.id,

@@ -11,6 +11,7 @@ import {
   grantCharacterXpToParty,
   MAX_CHARACTER_LEVEL,
 } from "./leveling";
+import { PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS } from "./state";
 import { createCompanionPrimaryStats } from "./stats";
 import { createTestGameState } from "./testState";
 
@@ -136,6 +137,141 @@ describe("character leveling", () => {
       characterLevel: 2,
       characterXp: 4,
       lastCharacterXpGained: 10,
+    });
+  });
+
+  it("does not create level-up feedback when XP does not grant a level", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive", {
+      level: 1,
+      xpReward: 1,
+    });
+
+    const nextState = grantCharacterXpToParty(
+      createTestGameState({
+        entities: {
+          [companion.id]: companion,
+          [enemy.id]: enemy,
+        },
+        simulationTimeMs: 0,
+      }),
+      enemy,
+      undefined,
+      1_000,
+    );
+
+    expect(nextState.entities[companion.id]).toMatchObject({
+      characterLevel: 1,
+      characterXp: 1,
+    });
+    expect(nextState.combatFeedbackEvents).toHaveLength(0);
+  });
+
+  it("creates one level-up feedback event when XP grants one level", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive", {
+      level: 1,
+      xpReward: getCharacterXpToNextLevel(1) ?? 0,
+    });
+
+    const nextState = grantCharacterXpToParty(
+      createTestGameState({
+        entities: {
+          [companion.id]: companion,
+          [enemy.id]: enemy,
+        },
+        simulationTimeMs: 0,
+      }),
+      enemy,
+      undefined,
+      1_000,
+    );
+
+    expect(nextState.combatFeedbackEvents).toHaveLength(1);
+    expect(nextState.combatFeedbackEvents[0]).toMatchObject({
+      type: "level_up",
+      entityId: companion.id,
+      targetEntityId: enemy.id,
+      text: "Level Up",
+      createdAt: 1_000,
+      expiresAt: 1_000 + PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+    });
+  });
+
+  it("creates one level-up feedback event when one XP update grants multiple levels", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive", {
+      level: 1,
+      xpReward:
+        (getCharacterXpToNextLevel(1) ?? 0) +
+        (getCharacterXpToNextLevel(2) ?? 0),
+    });
+
+    const nextState = grantCharacterXpToParty(
+      createTestGameState({
+        entities: {
+          [companion.id]: companion,
+          [enemy.id]: enemy,
+        },
+      }),
+      enemy,
+      undefined,
+      1_000,
+    );
+
+    expect(nextState.entities[companion.id]).toMatchObject({
+      characterLevel: 3,
+    });
+    expect(nextState.combatFeedbackEvents).toHaveLength(1);
+    expect(nextState.combatFeedbackEvents[0]).toMatchObject({
+      type: "level_up",
+      entityId: companion.id,
+    });
+  });
+
+  it("creates another level-up feedback event for a later separate level-up", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const firstEnemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive", {
+      level: 1,
+      xpReward: getCharacterXpToNextLevel(1) ?? 0,
+    });
+    const secondEnemy = createEnemy("enemy-2", { x: 2, y: 0 }, "aggressive", {
+      level: 1,
+      xpReward: getCharacterXpToNextLevel(2) ?? 0,
+    });
+
+    const firstState = grantCharacterXpToParty(
+      createTestGameState({
+        entities: {
+          [companion.id]: companion,
+          [firstEnemy.id]: firstEnemy,
+          [secondEnemy.id]: secondEnemy,
+        },
+        simulationTimeMs: 0,
+      }),
+      firstEnemy,
+      undefined,
+      1_000,
+    );
+    const secondState = grantCharacterXpToParty(
+      {
+        ...firstState,
+        simulationTimeMs: 100,
+      },
+      secondEnemy,
+      undefined,
+      1_100,
+    );
+
+    expect(secondState.entities[companion.id]).toMatchObject({
+      characterLevel: 3,
+    });
+    expect(secondState.combatFeedbackEvents).toHaveLength(2);
+    expect(secondState.combatFeedbackEvents[1]).toMatchObject({
+      type: "level_up",
+      entityId: companion.id,
+      targetEntityId: secondEnemy.id,
+      createdAt: 1_100,
     });
   });
 

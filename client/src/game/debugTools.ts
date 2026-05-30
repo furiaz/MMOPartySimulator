@@ -28,10 +28,12 @@ import {
   setCurrencyBalanceForDebug,
 } from "./wallet";
 import {
+  addCombatFeedback,
   addEntity,
   findClosestAvailablePosition,
   getEntityById,
   isWallPosition,
+  PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
   updateEntity,
   type GameState,
 } from "./state";
@@ -209,7 +211,10 @@ export function debugToggleCompanionInfiniteHealth(state: GameState): GameState 
     : nextState;
 }
 
-export function debugLevelUpAllCompanions(state: GameState): GameState {
+export function debugLevelUpAllCompanions(
+  state: GameState,
+  now = Date.now(),
+): GameState {
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
@@ -224,11 +229,19 @@ export function debugLevelUpAllCompanions(state: GameState): GameState {
     }
 
     const xpNeeded = Math.max(1, xpToNextLevel - entity.characterXp);
+    const updatedCompanion = grantCharacterXpToCompanion(entity, xpNeeded);
 
-    nextState = updateEntity(
-      nextState,
-      grantCharacterXpToCompanion(entity, xpNeeded),
-    );
+    nextState = updateEntity(nextState, updatedCompanion);
+
+    if (updatedCompanion.characterLevel > entity.characterLevel) {
+      nextState = addCombatFeedback(nextState, {
+        type: "level_up",
+        entityId: updatedCompanion.id,
+        text: "Level Up",
+        now,
+        durationMs: PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      });
+    }
   }
 
   return nextState;

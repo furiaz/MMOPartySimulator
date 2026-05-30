@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createCompanion, createEnemy } from "./entities";
+import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import {
   getEnemyAggroRange,
   getEnemyAttackLeashDistance,
@@ -8,7 +8,11 @@ import {
   updateEnemyAISystem,
 } from "./enemyAISystem";
 import { ENEMY_TYPES } from "./enemyArchetypes";
-import { addEntity, type GameState } from "./state";
+import {
+  addEntity,
+  PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+  type GameState,
+} from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
 
@@ -96,6 +100,20 @@ describe("enemy AI aggro and roaming", () => {
       state: "idle",
       currentTargetId: null,
     });
+    expect(nextState.combatFeedbackEvents).toHaveLength(0);
+  });
+
+  it("keeps target dummy enemies from creating spotted alerts", () => {
+    const leader = createIdleCompanion("leader", { x: 1, y: 0 });
+    const enemy = createTargetDummy("dummy", { x: 0, y: 0 });
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+    expect(nextState.combatFeedbackEvents).toHaveLength(0);
   });
 
   it("keeps starter slime archetypes from acquiring nearby targets", () => {
@@ -282,6 +300,104 @@ describe("enemy AI aggro and roaming", () => {
     expect(nextState.entities[enemy.id]).toMatchObject({
       state: "attack",
       currentTargetId: leader.id,
+    });
+  });
+
+  it("creates one spotted alert when an enemy newly acquires a companion target", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
+
+    const nextState = updateEnemyAISystem(createState([leader, enemy]), {
+      nowMs: 1_000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+
+    expect(nextState.combatFeedbackEvents).toHaveLength(1);
+    expect(nextState.combatFeedbackEvents[0]).toMatchObject({
+      type: "enemy_spotted",
+      entityId: enemy.id,
+      targetEntityId: leader.id,
+      text: "Spotted",
+      createdAt: 1_000,
+      expiresAt: 1_000 + PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+    });
+  });
+
+  it("does not replay the spotted alert while the enemy keeps a valid target", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 0 });
+    const ally = createIdleCompanion("ally", { x: 1, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
+    const firstState = updateEnemyAISystem(createState([leader, ally, enemy]), {
+      nowMs: 1_000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+
+    const nextState = updateEnemyAISystem(firstState, {
+      nowMs: 1_100,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 2,
+    });
+
+    expect(nextState.combatFeedbackEvents).toHaveLength(1);
+  });
+
+  it("can replay the spotted alert after the enemy clears combat targeting", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
+    const firstState = updateEnemyAISystem(createState([leader, enemy]), {
+      nowMs: 1_000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+    const clearedState = updateEnemyAISystem(
+      {
+        ...firstState,
+        entities: {
+          ...firstState.entities,
+          [leader.id]: {
+            ...leader,
+            position: { x: 30, y: 0 },
+          },
+        },
+      },
+      {
+        nowMs: 1_100,
+        deltaMs: 100,
+        deltaSeconds: 0.1,
+        frameNumber: 2,
+      },
+    );
+    const reacquiredState = updateEnemyAISystem(
+      {
+        ...clearedState,
+        entities: {
+          ...clearedState.entities,
+          [leader.id]: leader,
+        },
+      },
+      {
+        nowMs: 1_200,
+        deltaMs: 100,
+        deltaSeconds: 0.1,
+        frameNumber: 3,
+      },
+    );
+
+    expect(clearedState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+    expect(reacquiredState.combatFeedbackEvents).toHaveLength(2);
+    expect(reacquiredState.combatFeedbackEvents[1]).toMatchObject({
+      type: "enemy_spotted",
+      entityId: enemy.id,
+      targetEntityId: leader.id,
     });
   });
 

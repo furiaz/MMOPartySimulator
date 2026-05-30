@@ -236,6 +236,7 @@ export function updateAttackSystem(
           nextState,
           updatedTarget,
           windupReadyAttacker.id,
+          now,
         );
         nextState = recordEnemyDefeatedForQuests(
           nextState,

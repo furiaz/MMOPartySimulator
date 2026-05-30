@@ -2,16 +2,22 @@ import { describe, expect, it } from "vitest";
 import type { CombatFeedbackEvent, GameMap } from "../game";
 import { createCompanion, createEnemy, createNpc, createResource, createTargetDummy } from "../game";
 import {
+  collectCurrentMapVisualTextureSrcs,
+  enemySpottedAlertSrc,
+  getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
   getEnemyNameplateColor,
   getEnemyNameplateText,
   getFullVisibleTileBounds,
   getHealingFountainRenderDiameterPx,
+  getLevelUpBurstPresentation,
   getNearestHoverEntity,
   getNearestInteractableEntity,
   getPreviewMapPosition,
   getTeleportIconSrc,
   isPositionInTileBounds,
+  levelUpBurstSrc,
+  shouldDrawCombatFeedbackEvent,
   TELEPORT_OBJECT_SPRITE_ANCHOR_X,
   TELEPORT_OBJECT_SPRITE_ANCHOR_Y,
   TELEPORT_OBJECT_SPRITE_SIZE_PX,
@@ -246,6 +252,50 @@ describe("getCombatFeedbackLaneKey", () => {
         type: "attack",
       }),
     ).toBe("feedback-event:blocked-1:attack");
+  });
+});
+
+describe("prototype VFX feedback sprites", () => {
+  const baseEvent: CombatFeedbackEvent = {
+    createdAt: 1_000,
+    entityId: "companion-1",
+    expiresAt: 3_000,
+    id: "feedback-1",
+    text: "Level Up",
+    type: "level_up",
+  };
+
+  it("preloads enemy spotted and level-up sprite assets", () => {
+    const sources = collectCurrentMapVisualTextureSrcs(createWideMap(), []);
+
+    expect(sources).toContain(enemySpottedAlertSrc);
+    expect(sources).toContain(levelUpBurstSrc);
+  });
+
+  it("suppresses text labels for icon-only feedback events", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive");
+
+    expect(shouldDrawCombatFeedbackEvent(baseEvent, companion)).toBe(false);
+    expect(
+      shouldDrawCombatFeedbackEvent(
+        {
+          ...baseEvent,
+          entityId: enemy.id,
+          text: "Spotted",
+          type: "enemy_spotted",
+        },
+        enemy,
+      ),
+    ).toBe(false);
+  });
+
+  it("uses event lifetime progress for level-up burst scale and opacity", () => {
+    expect(getCombatFeedbackLifetimeProgress(baseEvent, 2_000)).toBe(0.5);
+    expect(getLevelUpBurstPresentation(baseEvent, 2_000).alpha).toBeCloseTo(0.65);
+    expect(getLevelUpBurstPresentation(baseEvent, 2_000).scale).toBe(1.5);
+    expect(getLevelUpBurstPresentation(baseEvent, 3_000).alpha).toBeCloseTo(0.3);
+    expect(getLevelUpBurstPresentation(baseEvent, 3_000).scale).toBe(2);
   });
 });
 

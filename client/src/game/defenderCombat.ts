@@ -39,6 +39,7 @@ export function attackDefenderTarget(
       nextState,
       damagedTarget,
       defender.id,
+      now,
     );
   }
 

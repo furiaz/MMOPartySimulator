@@ -1323,7 +1323,7 @@ function damageEnemy(
   const damagedTarget = combatResult.target;
 
   if (damagedTarget.kind === "enemy" && damagedTarget.state === "dead") {
-    nextState = grantCharacterXpToParty(nextState, damagedTarget, caster.id);
+    nextState = grantCharacterXpToParty(nextState, damagedTarget, caster.id, now);
     nextState = recordEnemyDefeatedForQuests(
       nextState,
       damagedTarget,

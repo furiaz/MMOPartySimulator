@@ -1,7 +1,9 @@
 import { getMovementStepDistance, isAutonomousEntity } from "./entities";
 import {
+  addCombatFeedback,
   getEntityById,
   moveEntityTowardPositionIfUnoccupied,
+  PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
   updateEntity,
   type GameState,
 } from "./state";
@@ -137,6 +139,14 @@ export function updateEnemyAISystem(
     };
 
     nextState = updateEntity(nextState, updatedEnemy);
+    nextState = addCombatFeedback(nextState, {
+      type: "enemy_spotted",
+      entityId: updatedEnemy.id,
+      targetEntityId: target.id,
+      text: "Spotted",
+      now: timing.nowMs,
+      durationMs: PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+    });
   }
 
   return nextState;

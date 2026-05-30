@@ -12,6 +12,7 @@ import {
 import { isSuperiorEnemy } from "./enemyVariants";
 import { MAX_CHARACTER_LEVEL } from "./leveling";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
+import { PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS } from "./state";
 import { createTestGameState } from "./testState";
 import { getCurrencyBalance } from "./wallet";
 
@@ -157,7 +158,7 @@ describe("companion debug test tools", () => {
       },
     });
 
-    const nextState = debugLevelUpAllCompanions(state);
+    const nextState = debugLevelUpAllCompanions(state, 5_000);
     const leveledCompanion = nextState.entities[leader.id];
     const unchangedMaxLevelCompanion = nextState.entities[maxLevelCompanion.id];
 
@@ -167,6 +168,15 @@ describe("companion debug test tools", () => {
         unchangedMaxLevelCompanion.characterLevel,
     ).toBe(MAX_CHARACTER_LEVEL);
     expect(nextState.entities[enemy.id]).toEqual(enemy);
+    expect(nextState.combatFeedbackEvents).toEqual([
+      expect.objectContaining({
+        type: "level_up",
+        entityId: leader.id,
+        text: "Level Up",
+        createdAt: 5_000,
+        expiresAt: 5_000 + PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      }),
+    ]);
   });
 
   it("toggles and applies companion infinite health", () => {

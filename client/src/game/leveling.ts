@@ -1,5 +1,10 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { updateEntity, type GameState } from "./state";
+import {
+  addCombatFeedback,
+  PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+  updateEntity,
+  type GameState,
+} from "./state";
 import type { Companion, Enemy } from "./types";
 import { applyCompanionLevelUpStatGrowth } from "./stats";
 import { SUPERIOR_ENEMY_XP_MULTIPLIER, isSuperiorEnemy } from "./enemyVariants";
@@ -149,6 +154,7 @@ export function grantCharacterXpToParty(
   state: GameState,
   enemy: Enemy,
   sourceId?: string,
+  now = Date.now(),
 ): GameState {
   const baseXpAmount = getEnemyXpReward(enemy);
   const debugXpMultiplier = getDebugXpMultiplier(state);
@@ -231,6 +237,14 @@ export function grantCharacterXpToParty(
     });
 
     if (updatedCompanion.characterLevel > entity.characterLevel) {
+      nextState = addCombatFeedback(nextState, {
+        type: "level_up",
+        entityId: updatedCompanion.id,
+        targetEntityId: enemy.id,
+        text: "Level Up",
+        now,
+        durationMs: PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      });
       nextState = appendDebugTelemetryEvent(nextState, {
         type: "character_level_up",
         entityId: entity.id,

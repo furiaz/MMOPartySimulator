@@ -86,9 +86,11 @@ const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
 const deathDownedPuffSrc = `${prototypeVfxSpritePath}/death-downed-puff.png`;
+export const enemySpottedAlertSrc = `${prototypeVfxSpritePath}/enemy-spotted-alert.png`;
 const healSparkleSrc = `${prototypeVfxSpritePath}/heal-sparkle.png`;
 const gatherCompleteSparkleSrc = `${prototypeVfxSpritePath}/gather-complete-sparkle.png`;
 const inventoryFullWarningSrc = `${prototypeVfxSpritePath}/inventory-full-warning.png`;
+export const levelUpBurstSrc = `${prototypeVfxSpritePath}/level-up-burst.png`;
 const missEvadePuffSrc = `${prototypeVfxSpritePath}/miss-evade-puff.png`;
 const resourceDepletedPuffSrc = `${prototypeVfxSpritePath}/resource-depleted-puff.png`;
 const resourceHitHerbSrc = `${prototypeVfxSpritePath}/resource-hit-herb.png`;
@@ -534,7 +536,7 @@ function collectFullMapFloorTextureSrcs(map: GameMap): string[] {
   return [...sources];
 }
 
-function collectCurrentMapVisualTextureSrcs(
+export function collectCurrentMapVisualTextureSrcs(
   map: GameMap,
   entities: GameEntity[],
 ): string[] {
@@ -548,9 +550,11 @@ function collectCurrentMapVisualTextureSrcs(
     blockImpactSrc,
     criticalHitBackingSrc,
     deathDownedPuffSrc,
+    enemySpottedAlertSrc,
     healSparkleSrc,
     gatherCompleteSparkleSrc,
     inventoryFullWarningSrc,
+    levelUpBurstSrc,
     missEvadePuffSrc,
     resourceDepletedPuffSrc,
     resourceHitHerbSrc,
@@ -2294,8 +2298,10 @@ function getCombatFeedbackColor(
     attack: 0x1d4ed8,
     damage: 0xb91c1c,
     death: 0x111827,
+    enemy_spotted: 0xdc2626,
     gather: 0x047857,
     heal: 0x65a30d,
+    level_up: 0xfacc15,
   } satisfies Record<CombatFeedbackEvent["type"], number>;
 
   return colorByType[event.type];
@@ -2313,10 +2319,14 @@ function getResourceHitEffectSrc(resource: Extract<GameEntity, { kind: "resource
   return resourceHitWoodSrc;
 }
 
-function shouldDrawCombatFeedbackEvent(
+export function shouldDrawCombatFeedbackEvent(
   event: CombatFeedbackEvent,
   entity: GameEntity,
 ): boolean {
+  if (event.type === "enemy_spotted" || event.type === "level_up") {
+    return false;
+  }
+
   if (event.type === "attack" && event.text === "Attack") {
     return false;
   }
@@ -2326,6 +2336,31 @@ function shouldDrawCombatFeedbackEvent(
   }
 
   return true;
+}
+
+export function getCombatFeedbackLifetimeProgress(
+  event: CombatFeedbackEvent,
+  currentTime: number,
+): number {
+  const duration = event.expiresAt - event.createdAt;
+
+  if (duration <= 0) {
+    return 1;
+  }
+
+  return Math.min(1, Math.max(0, (currentTime - event.createdAt) / duration));
+}
+
+export function getLevelUpBurstPresentation(
+  event: CombatFeedbackEvent,
+  currentTime: number,
+): { alpha: number; scale: number } {
+  const progress = getCombatFeedbackLifetimeProgress(event, currentTime);
+
+  return {
+    alpha: 1 - progress * 0.7,
+    scale: 1 + progress,
+  };
 }
 
 function getDamageNumberProgress(event: CombatFeedbackEvent, currentTime: number): number {
@@ -2521,6 +2556,55 @@ function drawCombatFeedbackSpriteEffect({
     transform,
   );
   const progress = getDamageNumberProgress(event, currentTime);
+
+  if (event.type === "enemy_spotted") {
+    const center = toFullPosition(entity.position, transform);
+    const lifetimeProgress = getCombatFeedbackLifetimeProgress(event, currentTime);
+
+    drawManagedImageSprite({
+      alpha: 1 - lifetimeProgress * 0.25,
+      anchorX: 0.5,
+      anchorY: 1,
+      cache,
+      height: 34,
+      key: `feedback-sprite:${event.id}:${enemySpottedAlertSrc}`,
+      layer,
+      managedState,
+      metrics,
+      position: {
+        x: center.x,
+        y: center.y - transform.cellPixelSize * 0.65,
+      },
+      requestRedraw,
+      src: enemySpottedAlertSrc,
+      width: 34,
+    });
+  }
+
+  if (event.type === "level_up") {
+    const center = toFullPosition(entity.position, transform);
+    const presentation = getLevelUpBurstPresentation(event, currentTime);
+    const baseSize = 42;
+
+    drawManagedImageSprite({
+      alpha: presentation.alpha,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache,
+      height: baseSize * presentation.scale,
+      key: `feedback-sprite:${event.id}:${levelUpBurstSrc}`,
+      layer,
+      managedState,
+      metrics,
+      position: {
+        x: center.x,
+        y: center.y - transform.cellPixelSize * 0.55,
+      },
+      requestRedraw,
+      src: levelUpBurstSrc,
+      width: baseSize * presentation.scale,
+    });
+  }
 
   if (event.text === "Dodged" && shouldDrawSkippedFrequentEffect(event)) {
     drawManagedImageSprite({
