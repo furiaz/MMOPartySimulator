@@ -23,6 +23,7 @@ const PARTY_DANGER_RANGE = 5;
 
 export type SkillTargetOptions = {
   forcedEnemyTargetId?: string | null;
+  enemyFilter?: (enemy: Enemy) => boolean;
 };
 
 export function getSkillTarget(
@@ -73,7 +74,13 @@ export function getSkillTarget(
       : undefined;
   }
 
-  const enemy = findEnemyTarget(state, caster, skill.range, options);
+  const enemy = findEnemyTarget(state, caster, skill.range, {
+    ...options,
+    enemyFilter:
+      skill.effect.type === "taunt"
+        ? (enemy) => enemy.currentTargetId !== caster.id
+        : options.enemyFilter,
+  });
 
   if (!enemy) {
     return undefined;
@@ -113,7 +120,8 @@ export function findEnemyTarget(
     const forcedTarget = getEntityById(state, options.forcedEnemyTargetId);
 
     return isLivingEnemy(forcedTarget) &&
-      isEnemyInRange(caster, forcedTarget, range)
+      isEnemyInRange(caster, forcedTarget, range) &&
+      isAllowedEnemyTarget(forcedTarget, options)
       ? forcedTarget
       : undefined;
   }
@@ -122,13 +130,21 @@ export function findEnemyTarget(
     ? getEntityById(state, caster.currentTargetId)
     : undefined;
 
-  if (isLivingEnemy(currentTarget) && isEnemyInRange(caster, currentTarget, range)) {
+  if (
+    isLivingEnemy(currentTarget) &&
+    isEnemyInRange(caster, currentTarget, range) &&
+    isAllowedEnemyTarget(currentTarget, options)
+  ) {
     return currentTarget;
   }
 
   const partyTarget = getPartyCombatTarget(state);
 
-  if (partyTarget && isEnemyInRange(caster, partyTarget, range)) {
+  if (
+    partyTarget &&
+    isEnemyInRange(caster, partyTarget, range) &&
+    isAllowedEnemyTarget(partyTarget, options)
+  ) {
     return partyTarget;
   }
 
@@ -136,8 +152,16 @@ export function findEnemyTarget(
     (entity): entity is Enemy =>
       isLivingEnemy(entity) &&
       !isTargetDummyEnemy(entity) &&
-      isEnemyInRange(caster, entity, range),
+      isEnemyInRange(caster, entity, range) &&
+      isAllowedEnemyTarget(entity, options),
   );
+}
+
+function isAllowedEnemyTarget(
+  enemy: Enemy,
+  options: SkillTargetOptions,
+): boolean {
+  return options.enemyFilter ? options.enemyFilter(enemy) : true;
 }
 
 function findHealingTarget(

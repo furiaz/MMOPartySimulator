@@ -52,7 +52,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 3,
     cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
-    effect: { type: "heal", powerMultiplier: 1 },
+    effect: { type: "heal", powerMultiplier: 5 },
   },
   deep_breath: {
     id: "deep_breath",

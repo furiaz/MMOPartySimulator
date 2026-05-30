@@ -4,6 +4,7 @@ import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { updateGatherSystem } from "./gatherSystem";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
+import { getCompanionDerivedStats } from "./stats";
 import { updateSkillSystem } from "./skillSystem";
 import type { Companion, GameEntity, GameMap, Position } from "./types";
 
@@ -21,6 +22,80 @@ describe("beginner skill system", () => {
       skillId: "throw_rock",
       type: "projectile",
     });
+  });
+
+  it("does not use Throw Rock on an enemy already targeting the caster", () => {
+    const defender = createBeginner("defender", "defender", { x: 3, y: 3 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 3 }),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const nextState = updateSkillSystem(
+      createSkillState([defender, enemy], {
+        map: createSkillMap(
+          [
+            { x: 4, y: 3 },
+            { x: 4, y: 4 },
+            { x: 4, y: 2 },
+            { x: 3, y: 4 },
+            { x: 3, y: 2 },
+          ],
+          8,
+        ),
+        ...createActiveShield(defender.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).not.toBe(
+      "throw_rock",
+    );
+    expect(
+      nextState.skillVisualEvents?.some(
+        (event) => event.skillId === "throw_rock" && event.type === "projectile",
+      ) ?? false,
+    ).toBe(false);
+  });
+
+  it("uses Throw Rock on another valid target when the current enemy already targets the caster", () => {
+    const defender = {
+      ...createBeginner("defender", "defender", { x: 3, y: 3 }),
+      currentTargetId: "current-enemy",
+    };
+    const currentEnemy = {
+      ...createEnemy("current-enemy", { x: 5, y: 3 }),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const otherEnemy = createEnemy("other-enemy", { x: 2, y: 3 });
+    const nextState = updateSkillSystem(
+      createSkillState([defender, currentEnemy, otherEnemy], {
+        map: createSkillMap(
+          [
+            { x: 4, y: 3 },
+            { x: 4, y: 4 },
+            { x: 4, y: 2 },
+            { x: 3, y: 4 },
+            { x: 3, y: 2 },
+          ],
+          8,
+        ),
+        ...createActiveShield(defender.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities["current-enemy"]).toMatchObject({
+      currentTargetId: defender.id,
+    });
+    expect(nextState.entities["other-enemy"]).toMatchObject({
+      state: "attack",
+      currentTargetId: defender.id,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+      "throw_rock",
+    );
   });
 
   it("uses Field Hands to improve gathering temporarily", () => {
@@ -373,7 +448,7 @@ describe("beginner skill system", () => {
     const ally = {
       ...createBeginner("ally", "fighter", { x: 1, y: 2 }),
       health: 2,
-      maxHealth: 3,
+      maxHealth: 20,
     };
     const enemy = createEnemy("enemy", { x: 6, y: 1 });
     const state = startDebugTelemetryRecording(
@@ -394,6 +469,17 @@ describe("beginner skill system", () => {
     expect(nextState.entities.enemy).toMatchObject({
       health: enemy.health,
     });
+    expect(nextState.entities.ally).toMatchObject({
+      health: ally.health + getCompanionDerivedStats(support).healingPower * 5,
+    });
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) =>
+          event.type === "healing_resolved" &&
+          event.skillId === "first_aid" &&
+          event.healingMultiplier === 5,
+      ),
+    ).toBe(true);
   });
 
   it("does not use Kick through active resources", () => {
