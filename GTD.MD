@@ -53,6 +53,7 @@ Current game-logic implementation files include:
 - `directCompanionCommands.ts`
 - `combatResolver.ts`
 - `companionCombat.ts`
+- `dungeonSystem.ts`
 - `consumables.ts`
 - `debugMap.ts`
 - `debugTelemetry.ts`
@@ -92,6 +93,7 @@ Current game-logic implementation files include:
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
+- `partyTargetSystem.ts`
 - `partyThreatSystem.ts`
 - `performanceMetrics.ts`
 - `poiResumeSystem.ts`
@@ -908,6 +910,7 @@ Current prototype quest chain:
 - `scout_rise_samples` unlocks `rescue_the_grove_runner`
 - `rescue_the_grove_runner` unlocks `hold_the_field_cache`
 - `hold_the_field_cache` unlocks `open_wolf_causeway`
+- `open_wolf_causeway` unlocks `find_slimeward_camp`
 
 Current quest rewards may include:
 
@@ -1330,6 +1333,10 @@ Current enemy type ids are:
 ```ts
 type EnemyTypeId =
   | "slime"
+  | "slimeward_heavy_slime"
+  | "slimeward_pale_ooze"
+  | "slimeward_spitter_slime"
+  | "azure_mass"
   | "cave_bat"
   | "forest_spider"
   | "goblin_scout"
@@ -1911,6 +1918,9 @@ type GameMap = {
   subzones?: ZoneSubzone[];
   subzoneNameLabels?: ZoneSubzoneNameLabel[];
   visualObjects?: MapVisualObject[];
+  floorCells?: Position[];
+  visualTheme?: "default" | "slimeward-cave";
+  waypoints?: DungeonWaypoint[];
   navigationGrid?: NavigationGrid;
 };
 ```
@@ -1918,7 +1928,15 @@ type GameMap = {
 Current debug map ids:
 
 ```ts
-type DebugMapId = "hub" | "map-1" | "map-2" | "map-3" | "map-4";
+type DebugMapId =
+  | "hub"
+  | "map-1"
+  | "map-2"
+  | "map-3"
+  | "map-4"
+  | "slimeward-camp"
+  | "slimeward-floor-1"
+  | "slimeward-floor-2";
 ```
 
 Current readable map names:
@@ -1928,6 +1946,9 @@ Current readable map names:
 - `map-2`: Second Wild Zone
 - `map-3`: Third Wild Zone
 - `map-4`: Fourth Wild Zone
+- `slimeward-camp`: Slimeward Camp
+- `slimeward-floor-1`: Slimeward Floor 1
+- `slimeward-floor-2`: Slimeward Floor 2
 
 Maps currently support dimensions, wall positions, baked navigation grid, companion start positions, enemy start positions, resource start data, hub NPC placeholder data, healing fountain data, decorative map visual objects, display/debug names, prototype teleport points, optional subzones, optional subzone labels, encounter areas, encounter leashes, and resource locations.
 
@@ -1940,6 +1961,9 @@ Current prototype map dimensions:
 - `map-2`: 160 columns by 57 rows
 - `map-3`: 160 columns by 30 rows
 - `map-4`: 160 columns by 30 rows
+- `slimeward-camp`: 44 columns by 30 rows
+- `slimeward-floor-1`: 136 columns by 40 rows
+- `slimeward-floor-2`: 152 columns by 44 rows
 
 The current row count reflects prototype debug-map presentation space.
 
@@ -2028,6 +2052,59 @@ World Travel must not require final zone ids, persistent zone state, final world
 
 Do not expand this into full zones, persistent world streaming, or a final teleport network unless explicitly requested.
 
+## Slimeward Dungeon Prototype
+
+`dungeonSystem.ts` owns current Slimeward dungeon runtime behavior.
+
+Current Slimeward dungeon maps are:
+
+- `slimeward-camp`
+- `slimeward-floor-1`
+- `slimeward-floor-2`
+
+Current Slimeward dungeon runtime state:
+
+```ts
+type DungeonChestRuntimeState = {
+  status: "hidden" | "available" | "opened" | "collected";
+  position: Position;
+  exitTeleportId: string;
+  rolledLoot: InventorySlot[];
+  collectedLoot: InventorySlot[];
+  pendingLoot: InventorySlot[];
+  isUiOpen?: boolean;
+  openedAtMs?: number;
+  autoContinueAtMs?: number;
+  inventoryFull?: boolean;
+};
+
+type SlimewardDungeonRuntimeState = {
+  chest: DungeonChestRuntimeState | null;
+};
+```
+
+Current Slimeward dungeon behavior:
+
+- `updateSlimewardDungeonSystem` runs during simulation updates after drops and before enemy respawn.
+- Simulation updates return early while the Slimeward dungeon chest UI is open.
+- Floor 1 POI routing targets the next living authored dungeon enemy, then the Floor 2 teleporter.
+- Floor 2 POI routing targets the next living authored dungeon enemy, then the boss chest, then the final exit.
+- The boss chest appears after The Azure Mass is dead.
+- Chest loot currently rolls fixed prototype inventory slots for slime gel, slime core, and a minor recovery flask.
+- Chest collection routes loot through shared inventory.
+- If inventory accepts all chest loot, the chest is collected and the Floor 2 exit teleport becomes working.
+- If inventory is full, Auto Mode is disabled, overflow loot remains pending, and the Floor 2 exit remains non-working.
+- Closing or continuing the chest UI hides the overlay without discarding pending loot.
+- Slimeward dungeon floor enemies do not respawn.
+- Starting a new Slimeward dungeon run from camp clears prior Slimeward dungeon runtime.
+- Debug reset clears Slimeward dungeon runtime and returns an in-dungeon party to Slimeward Camp.
+
+Current Slimeward dungeon map data may include floor cells, slimeward cave visual themes, dungeon waypoints, authored enemy packs, authored Superior variants, decorative dungeon visual objects, and Slimeward-specific teleport visuals.
+
+This is a prototype dungeon route and chest interaction.
+
+It is not a final dungeon framework, production boss system, procedural dungeon generator, final loot chest system, or persistent dungeon-state model.
+
 ---
 
 ## Resurrection and World-Wipe Recovery
@@ -2054,13 +2131,17 @@ Current resurrection constants:
 
 Current world-wipe recovery behavior:
 
-- triggers when every companion is dead outside the hub
-- chooses available unlocked rescue hubs by route distance
-- may enter a pending choice state when multiple equally valid hubs exist
-- currently defaults to Harbor Union Bastion as the unlocked rescue hub
+- triggers when every companion is dead outside Harbor Union Bastion
+- chooses available unlocked rescue hubs by route distance for normal wild-map wipes
+- rescues Slimeward dungeon floor wipes directly to Slimeward Camp
+- may enter a pending choice state when multiple equally valid rescue hubs exist
+- currently defaults to Harbor Union Bastion as the normal unlocked rescue hub
+- treats Slimeward Camp as the rescue hub for Slimeward dungeon floors
 - may charge Crowns using the current rescue fee calculation, capped by current wallet balance
 - restores companions to rescue hub arrival positions with full health
-- clears map-local runtime state, combat state, movement state, teleport state, POI state, skill runtime state, drop visuals, resurrection state, and formation state
+- rebuilds rescue hub NPCs and hub target dummies where appropriate
+- clears map-local runtime state, combat state, movement state, teleport state, POI state, skill runtime state, enemy AoE runtime, drop visuals, resurrection state, direct commands, follow trails, and formation state
+- clears Slimeward dungeon runtime when rescuing to Slimeward Camp
 - records map reach for quest state after rescue
 
 Current world-wipe recovery constants:

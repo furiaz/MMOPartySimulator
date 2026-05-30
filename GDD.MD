@@ -427,11 +427,16 @@ If all party members are defeated outside the hub, prototype world-wipe recovery
 
 Current prototype world-wipe recovery behavior:
 
-- does not trigger in the hub
-- restores companions to the selected rescue hub
+- does not trigger in Harbor Union Bastion
+- rescues normal wild-map wipes to the closest unlocked rescue hub by route distance
+- rescues Slimeward dungeon floor wipes directly to Slimeward Camp
+- may present a pending rescue choice if multiple unlocked rescue hubs are equally valid
+- restores companions to the selected rescue hub arrival positions
 - restores companion health
-- clears active combat, movement, teleport, POI, skill, drop, and resurrection runtime state
+- clears active combat, movement, teleport, POI, skill, drop, resurrection, formation, and map-local runtime state
+- clears Slimeward dungeon runtime when rescue returns the party to Slimeward Camp
 - may charge Crowns based on route distance, limited by the current wallet balance
+- records map reach for quest state after rescue
 - may show short-lived rescue feedback
 
 This is a prototype safety system, not the final death penalty, revive economy, checkpoint system, or town recovery design.
@@ -524,6 +529,10 @@ Current prototype enemy archetype/family ids:
 Current prototype enemy types:
 
 - Slime
+- Heavy Slime
+- Pale Ooze
+- Slime Spitter
+- The Azure Mass
 - Cave Bat
 - Forest Spider
 - Goblin Scout
@@ -535,6 +544,8 @@ Current prototype enemy types:
 - Mossling
 - Wolf
 - Orc
+
+Slimeward-specific enemy types currently use the Slime archetype/family and exist for the Slimeward dungeon prototype.
 
 Prototype enemy archetypes/families provide lightweight defaults such as display name, default combat style, default attack range, default temperament, and drop-family identity.
 
@@ -1193,6 +1204,12 @@ Current prototype quests:
   - Quest id: open_wolf_causeway
   - Objectives: escort the Causeway Worker, defend the Wolf Causeway blockage, defeat the causeway elite, and unlock the map-3 route
   - Rewards: 100 Crowns, 40 character XP, 1 Bulwark Cuirass, 1 Plain Charm
+  - Unlocks: Slimeward Trail
+
+- Slimeward Trail
+  - Quest id: find_slimeward_camp
+  - Objectives: unlock the Slimeward Camp route from Third Wild Zone
+  - Rewards: 25 Crowns, 10 character XP
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches interaction range.
 
@@ -1817,13 +1834,20 @@ Current prototype/debug map routes are:
 - `map-1` <-> `map-2`
 - `map-2` <-> `map-3`
 - `map-3` <-> `map-4`
+- `hub` -> `slimeward-camp`
+- `map-3` <-> `slimeward-camp`
+- `slimeward-camp` <-> `slimeward-floor-1`
+- `slimeward-floor-1` <-> `slimeward-floor-2`
+- `slimeward-floor-2` -> `slimeward-camp`
 
-Some prototype forward teleports can start non-working and become working through quest route-unlock objectives.
+Some prototype forward teleports can start non-working and become working through quest route-unlock objectives or dungeon runtime events.
 
 Current non-working starter routes:
 
 - `map-1` -> `map-2`
 - `map-2` -> `map-3`
+- `slimeward-camp` broken exit placeholder
+- `slimeward-floor-2` -> `slimeward-camp` until the Slimeward boss chest has collected loot
 
 World Travel and AI route selection should use only working teleports.
 
@@ -1834,6 +1858,9 @@ Current readable prototype/debug map names:
 - `map-2`: Second Wild Zone
 - `map-3`: Third Wild Zone
 - `map-4`: Fourth Wild Zone
+- `slimeward-camp`: Slimeward Camp
+- `slimeward-floor-1`: Slimeward Floor 1
+- `slimeward-floor-2`: Slimeward Floor 2
 
 Current prototype wilderness subzones are:
 
@@ -1842,13 +1869,33 @@ Current prototype wilderness subzones are:
 - Third Wild Zone: Broken Thicket, Crawler Shelf, Imp Fen
 - Fourth Wild Zone: Shaman Watch, Ash Hollow, Orc Approach
 
+Current Slimeward dungeon prototype rooms/subzones are:
+
+- Slimeward Floor 1: Slimeward Entry, Gelstone Bend, Dripping Pocket, Slimecut Hall, Azure Threshold
+- Slimeward Floor 2: Lower Landing, Azure Runoff, Heavy Pool, Mass Approach, Azure Mass Chamber
+
 Current prototype subzones may define level ranges, enemy archetype lists, encounter areas, encounter leash radii, resource locations, passages, and UI-facing name labels.
 
-Subzones and encounter areas are current prototype map-organization data.
+Subzones, encounter areas, dungeon rooms, and dungeon waypoints are current prototype map-organization data.
 
-Subzones and encounter areas must not be treated as the final zone system, final region content model, final encounter design pipeline, or persistent world-state structure.
+Subzones, encounter areas, dungeon rooms, and dungeon waypoints must not be treated as the final zone system, final region content model, final encounter design pipeline, dungeon framework, or persistent world-state structure.
 
-Prototype teleport behavior should not define the final world structure.
+Current Slimeward dungeon prototype behavior:
+
+- Slimeward Camp is a prototype staging map connected to the wider debug-map route network.
+- Slimeward Floor 1 and Slimeward Floor 2 are prototype dungeon floor maps.
+- Dungeon POI selection guides the party through ordered enemy packs, floor exits, the boss chest, and the final exit.
+- Slimeward floor enemies do not respawn.
+- The Azure Mass is the current prototype Slimeward boss.
+- After The Azure Mass is defeated, a dungeon chest becomes available on Slimeward Floor 2.
+- The boss chest grants prototype loot to the shared inventory.
+- If inventory space is available, the boss chest enables the Slimeward Floor 2 exit.
+- If inventory is full, Auto Mode stops, chest loot remains pending, and the exit stays closed until loot can be collected.
+- While the dungeon chest UI is open, simulation updates pause for the chest interaction.
+- Auto Mode may continue after a short chest countdown when loot was collected successfully.
+- The debug Slimeward dungeon reset returns an in-dungeon party to Slimeward Camp and clears Slimeward dungeon runtime.
+
+Prototype teleport and Slimeward dungeon behavior should not define the final world structure.
 
 The World Travel menu may expose known prototype/debug map destinations and guide the party toward the next teleport point needed to reach the selected map.
 
@@ -1856,7 +1903,7 @@ World Travel is menu-driven travel intent for existing prototype routes.
 
 World Travel is not instant fast travel unless explicitly implemented that way later.
 
-Do not build the final zone system, persistent zone state, full production teleport network, travel costs, map discovery, or a full world map unless explicitly requested.
+Do not build the final zone system, persistent zone state, full production teleport network, travel costs, map discovery, production dungeon framework, or a full world map unless explicitly requested.
 
 ---
 
