@@ -148,6 +148,7 @@ export type {
   QuestStatus,
 } from "./questTypes";
 export type { GameState } from "./state";
+export { createInitialGameState } from "./createInitialGameState";
 
 export {
   createCompanion,

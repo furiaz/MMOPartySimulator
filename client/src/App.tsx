@@ -33,20 +33,14 @@ import { PixiWorldRenderer } from "./worldRenderer/PixiWorldRenderer";
 import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
 
 import {
-  addEntity,
   allocateCompanionStatPoint,
   ARMOR_FAMILY_LABELS,
   buyMerchantItem,
   CLASS_DEFINITIONS,
   companionIds,
   companionStartPositions,
-  createCompanion,
   createDebugMap,
-  createEmptyPartyInventory,
-  createEmptyPartyWallet,
-  createInitialQuestStates,
-  createNpc,
-  createTargetDummy,
+  createInitialGameState,
   clearDebugTelemetry,
   closeSlimewardDungeonChestUi,
   continueSlimewardDungeonChest,
@@ -80,16 +74,12 @@ import {
   getItemDefinition,
   getMerchantBuyStock,
   getMerchantSecondaryFilterOptions,
-  aoeTargetDummyId,
-  aoeTargetDummyPosition,
   hubCompanionStartPositions,
-  hubNpcStartData,
   HUB_MAP_ID,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   QUEST_DEFINITIONS,
   acceptQuestFromQuestGiver,
-  addItemToInventoryState,
   finishReadyQuestsForQuestGiver,
   getPartyLeader,
   getQuestGiverAvailableQuests,
@@ -122,8 +112,6 @@ import {
   startGameLoop,
   startDebugTelemetryRecording,
   stopDebugTelemetryRecording,
-  targetDummyId,
-  targetDummyPosition,
   unequipItemFromCompanion,
   unequipFlaskFromCompanion,
   updateEntity,
@@ -1097,86 +1085,6 @@ function getSettledCameraOffset({
   };
 }
 
-function createInitialState(): GameState {
-  const leader: Companion = {
-    ...createCompanion(
-      companionIds[0],
-      hubCompanionStartPositions[0],
-      companionIds[0],
-      "defender",
-      0,
-    ),
-    state: "idle",
-    currentTargetId: null,
-  };
-  const secondCompanion: Companion = {
-    ...createCompanion(
-      companionIds[1],
-      hubCompanionStartPositions[1],
-      companionIds[0],
-      "fighter",
-      1,
-    ),
-    state: "idle",
-    currentTargetId: null,
-  };
-  const npcs = hubNpcStartData.map((npc) =>
-    createNpc(npc.id, npc.position, npc.displayName, npc.npcRole),
-  );
-
-  const initialState = [
-    leader,
-    secondCompanion,
-    ...npcs,
-    createTargetDummy(targetDummyId, targetDummyPosition),
-    createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition),
-  ].reduce(addEntity, {
-    entities: {},
-    inventory: createEmptyPartyInventory(),
-    wallet: createEmptyPartyWallet(),
-    map: debugMap,
-    currentMapId: HUB_MAP_ID,
-    activeTeleport: null,
-    teleportStatesById: {},
-    autoModeEnabled: false,
-    worldTravelTargetMapId: null,
-    poiPreferences: {
-      stayInMap: false,
-      searchScope: "free_travel",
-    },
-    simulationTick: 0,
-    simulationFrame: 0,
-    simulationTimeMs: 0,
-    simulationDeltaMs: 100,
-    partyLeaderId: leader.id,
-    partyIntent: null,
-    leaderIntent: null,
-    quests: createInitialQuestStates(),
-    globalPoiIntent: null,
-    localPoiTarget: null,
-    lastPoiDecision: undefined,
-    exploredTiles: {
-      [`${leader.position.x},${leader.position.y}`]: true,
-    },
-    followTrailsByEntityId: {},
-    combatFeedbackEvents: [],
-    skillMarksByEnemyId: {},
-    skillSelfBuffsByCompanionId: {},
-    skillBindsByEnemyId: {},
-    skillShieldBlocksById: {},
-    skillCooldownsByCompanionId: {},
-    skillVisualEvents: [],
-    dropVisualEvents: [],
-  });
-
-  return addItemToInventoryState(
-    initialState,
-    "training_sword",
-    1,
-    "debug",
-  ).state;
-}
-
 function RescueChoiceButton({
   choice,
   onChoose,
@@ -1711,7 +1619,7 @@ function getDirectCommandFeedbackText(
 }
 
 function App() {
-  const [gameState, setGameState] = useState<GameState>(createInitialState);
+  const [gameState, setGameState] = useState<GameState>(createInitialGameState);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(false);
   const [entityHoverTooltip, setEntityHoverTooltip] =
