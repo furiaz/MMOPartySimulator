@@ -3,8 +3,8 @@ import {
   isActiveResourcePosition,
   isWallPosition,
   previewMoveTowardPosition,
-  type GameState,
-} from "./state";
+} from "./movementPlanning";
+import type { GameState } from "./state";
 import { recordAttackSlotCheck } from "./performanceMetrics";
 import {
   arePositionsEqual,

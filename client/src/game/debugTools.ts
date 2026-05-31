@@ -30,13 +30,15 @@ import {
 import {
   addCombatFeedback,
   addEntity,
-  findClosestAvailablePosition,
   getEntityById,
-  isWallPosition,
   PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  findClosestAvailablePosition,
+  isWallPosition,
+} from "./movementPlanning";
 import type { Companion, Enemy, GameEntity, Position, ResourceEntity } from "./types";
 
 const DEBUG_ENEMY_HEALTH = 3;
@@ -464,7 +466,7 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
   }
 
   const map = createDebugMap(SLIMEWARD_CAMP_ID);
-  let entities: Record<string, GameEntity> = {};
+  const entities: Record<string, GameEntity> = {};
 
   for (const companionId of companionIds) {
     const companion = clearedState.entities[companionId];

@@ -6,8 +6,8 @@ import { getPartyLeader } from "./partySystem";
 import {
   ENTITY_COLLISION_DISTANCE,
   getBoundedNavigationDistance,
-  type GameState,
-} from "./state";
+} from "./movementPlanning";
+import type { GameState } from "./state";
 import type { GameEntity, GameMap, Position } from "./types";
 import { getEuclideanDistance, getManhattanDistance } from "./positionUtils";
 

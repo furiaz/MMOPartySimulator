@@ -3,10 +3,10 @@ import { isActiveResource } from "./entityGuards";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
-  setPartyIntent,
   updateEntity,
   type GameState,
 } from "./state";
+import { setPartyIntent } from "./partyIntentState";
 import { clearResurrectionRecoveryAssignmentForCompanion } from "./resurrectionSystem";
 import type {
   AutonomousEntity,

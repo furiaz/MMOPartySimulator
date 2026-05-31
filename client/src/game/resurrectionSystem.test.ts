@@ -10,7 +10,8 @@ import {
   isCompanionAssignedToResurrectionRecovery,
   updateResurrectionSystem,
 } from "./resurrectionSystem";
-import { addEntity, setPartyIntent } from "./state";
+import { addEntity } from "./state";
+import { setPartyIntent } from "./partyIntentState";
 import { createTestGameState } from "./testState";
 import type { GameState } from "./state";
 import type { Companion, GameEntity } from "./types";

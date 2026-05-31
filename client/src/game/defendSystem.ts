@@ -1,12 +1,14 @@
 import {
+  updateEntity,
+  type GameState,
+} from "./state";
+import {
   getBoundedPathDistance,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
   reservePositionForFrame,
-  updateEntity,
-  type GameState,
-} from "./state";
+} from "./movementPlanning";
 import type { SimulationTiming } from "./simulationTiming";
 import {
   chooseAttackSlot,
@@ -86,7 +88,7 @@ export function updateDefendSystem(
         )
       : null;
     const target = leader
-      ? getDefenderTarget(nextState, leader)
+      ? getDefenderTarget(nextState)
       : undefined;
     const shouldWaitForIntercept =
       target &&
@@ -310,11 +312,8 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
   );
 }
 
-function getDefenderTarget(
-  state: GameState,
-  leader: GameEntity,
-): Enemy | undefined {
-  const leaderTarget = getLeaderEnemyTarget(state, leader);
+function getDefenderTarget(state: GameState): Enemy | undefined {
+  const leaderTarget = getLeaderEnemyTarget(state);
 
   if (leaderTarget && isRelevantGuideEscortThreat(state, leaderTarget)) {
     return leaderTarget;

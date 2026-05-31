@@ -4,10 +4,10 @@ import { getEuclideanDistance, getGridDistance } from "./positionUtils";
 import { ROLE_TUNING } from "./roleProfiles";
 import {
   getEntityById,
-  getPartyExecutionIntent,
   getPoiSearchScope,
   type GameState,
 } from "./state";
+import { getPartyExecutionIntent } from "./partyIntentState";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
 import { isResourceTargetInRange } from "./targetSelection";
 import type { Position, ResourceEntity, ZoneSubzone } from "./types";

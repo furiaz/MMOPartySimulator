@@ -4,9 +4,12 @@ import { markMoveFailed } from "./movementState";
 import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import {
   getEntityById,
+} from "./state";
+import {
+  getBoundedPathDistance,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
-} from "./state";
+} from "./movementPlanning";
 import { updateDirectCompanionCommandSystem } from "./directCompanionCommands";
 import { createTestGameState } from "./testState";
 import type { Companion, GameEntity, GameMap, Position } from "./types";
@@ -48,6 +51,21 @@ const openMap: GameMap = {
   walls: [],
   teleports: [],
   healingFountains: [],
+};
+
+const singleRowMap: GameMap = {
+  debugName: "Single Row Path Test Map",
+  displayName: "Single Row Path Test Map",
+  columns: 5,
+  rows: 1,
+  walls: [],
+  teleports: [],
+  healingFountains: [],
+};
+
+const singleRowWallMap: GameMap = {
+  ...singleRowMap,
+  walls: [{ x: 2, y: 0 }],
 };
 
 const noGoalMap: GameMap = {
@@ -176,6 +194,34 @@ describe("movement path backoff", () => {
     );
   });
 
+  it("keeps reserved positions unavailable for movement", () => {
+    const reservedStep = { x: 1.8, y: 1 };
+    const state = createTestGameState({
+      entities: {
+        [companion.id]: companion,
+      },
+      failedMoveByEntityId: {
+        [companion.id]: true,
+      },
+      reservedPositionsByEntityId: {
+        other: reservedStep,
+      },
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      companion,
+      { x: 4, y: 1 },
+    );
+
+    expect(getEntityById(nextState, companion.id)?.position).toEqual(
+      companion.position,
+    );
+    expect(nextState.failedMoveByEntityId?.[companion.id]).toBe(true);
+    expect(nextState.reservedPositionsByEntityId?.[companion.id]).toBeUndefined();
+  });
+
   it("uses a cached path before direct movement toward the final target", () => {
     const state = createTestGameState({
       entities: {
@@ -246,6 +292,40 @@ describe("movement path backoff", () => {
       movingCompanion.position.x,
     );
     expect(nextState.movementFailuresByEntityId?.[movingCompanion.id]).toBeUndefined();
+  });
+
+  it("swaps party members that are moving into each other's positions", () => {
+    const firstCompanion = createCompanion({
+      id: "first-companion",
+      position: { x: 1, y: 1 },
+    });
+    const secondCompanion = createCompanion({
+      id: "second-companion",
+      position: { x: 1.8, y: 1 },
+    });
+    const state = createTestGameState({
+      entities: {
+        [firstCompanion.id]: firstCompanion,
+        [secondCompanion.id]: secondCompanion,
+      },
+      moveIntentsByEntityId: {
+        [secondCompanion.id]: firstCompanion.position,
+      },
+      simulationTimeMs: 100,
+    });
+
+    const nextState = moveEntityTowardPositionIfUnoccupied(
+      state,
+      firstCompanion,
+      { x: 4, y: 1 },
+    );
+
+    expect(getEntityById(nextState, firstCompanion.id)?.position).toEqual(
+      secondCompanion.position,
+    );
+    expect(getEntityById(nextState, secondCompanion.id)?.position).toEqual(
+      firstCompanion.position,
+    );
   });
 
   it("keeps static passive NPCs solid for enemies", () => {
@@ -603,6 +683,61 @@ describe("movement path backoff", () => {
     );
 
     expect(consumeGamePerformanceMetrics().navigationPathQueries).toBeGreaterThan(0);
+  });
+
+  it("keeps bounded path distance blocked by walls, resources, and reservations", () => {
+    const movingCompanion = createCompanion({
+      position: { x: 0, y: 0 },
+    });
+    const resource = createResource("wood", { x: 2, y: 0 });
+    const openState = createTestGameState({
+      entities: {
+        [movingCompanion.id]: movingCompanion,
+      },
+      map: singleRowMap,
+    });
+
+    expect(
+      getBoundedPathDistance(openState, movingCompanion, { x: 4, y: 0 }, 10),
+    ).toBe(4);
+    expect(
+      getBoundedPathDistance(
+        {
+          ...openState,
+          map: singleRowWallMap,
+        },
+        movingCompanion,
+        { x: 4, y: 0 },
+        10,
+      ),
+    ).toBeNull();
+    expect(
+      getBoundedPathDistance(
+        {
+          ...openState,
+          entities: {
+            ...openState.entities,
+            [resource.id]: resource,
+          },
+        },
+        movingCompanion,
+        { x: 4, y: 0 },
+        10,
+      ),
+    ).toBeNull();
+    expect(
+      getBoundedPathDistance(
+        {
+          ...openState,
+          reservedPositionsByEntityId: {
+            other: { x: 2, y: 0 },
+          },
+        },
+        movingCompanion,
+        { x: 4, y: 0 },
+        10,
+      ),
+    ).toBeNull();
   });
 
   it("reports target_unwalkable path failure detail for wall targets", () => {

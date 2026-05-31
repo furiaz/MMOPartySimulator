@@ -17,44 +17,49 @@ import {
   isQuestGuideObjectiveRelevant,
 } from "./questGuideSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
-import { isCompanionInDirectCommandGrace } from "./directCompanionCommands";
 import {
   getEntityById,
-  getPartyExecutionIntent,
-  hasDirectPlayerPartyIntent,
-  moveEntityTowardPositionIfUnoccupied,
-  setPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
-import { isActivePartyThreat } from "./partyThreatSystem";
+import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import {
-  getPartyCombatTarget,
-  getPartyMovementTargetPosition,
-} from "./partyTargetSystem";
+  getPartyExecutionIntent,
+  hasDirectPlayerPartyIntent,
+  setPartyExecutionIntent,
+} from "./partyIntentState";
+import { getPartyMovementTargetPosition } from "./partyTargetSystem";
+import {
+  FOLLOW_DISTANCE,
+  PARTY_COHESION_DISTANCE,
+  PARTY_WAIT_DISTANCE,
+  POI_REACHED_DISTANCE,
+  canAssignPartyCombatTarget,
+  canAssignPartyGatherTarget,
+  canAssignPartyTravelTarget,
+  isRequiredForTravelCohesion,
+  resolvePartyActivityPlan,
+  type PartyActivityPlan,
+} from "./partyActivityCoordinator";
 import type {
   Enemy,
-  FormationPhase,
   GameEntity,
   PartyFormationState,
   Position,
 } from "./types";
 
-export const PARTY_COHESION_DISTANCE = 4;
-export const PARTY_WAIT_DISTANCE = 7;
-export const FOLLOW_DISTANCE = 1.5;
-export const FOLLOW_CATCHUP_DISTANCE = 5;
+export {
+  COMBAT_BREAK_DISTANCE,
+  FOLLOW_CATCHUP_DISTANCE,
+  FOLLOW_DISTANCE,
+  GATHERER_REJOIN_DISTANCE,
+  PARTY_COHESION_DISTANCE,
+  PARTY_WAIT_DISTANCE,
+  POI_REACHED_DISTANCE,
+} from "./partyActivityCoordinator";
+
 const LEADER_COHESION_SLOW_SPEED_MULTIPLIER = 0.45;
 const FOLLOWER_CATCH_UP_SPEED_MULTIPLIER = 1.8;
-export const COMBAT_BREAK_DISTANCE = 3;
-export const POI_REACHED_DISTANCE = 1;
-export const GATHERER_REJOIN_DISTANCE = 6;
-
-type PartyPlan = {
-  phase: FormationPhase;
-  target: Enemy | null;
-  targetPosition: Position | null;
-};
 
 type PartyTravelCohesion = {
   canMoveLeader: boolean;
@@ -82,7 +87,7 @@ export function updatePartyFormationSystem(
     return gatherIntentClearedState;
   }
 
-  const plan = getPartyPlan(state, leader);
+  const plan = resolvePartyActivityPlan(state, leader);
 
   if (!plan.targetPosition) {
     return clearFinishedCombat(clearFormation(state));
@@ -120,49 +125,10 @@ export function updatePartyFormationSystem(
   );
 }
 
-function getPartyPlan(state: GameState, leader: PartyMember): PartyPlan {
-  const movementTargetPosition = getPartyMovementTargetPosition(state);
-
-  if (hasDirectPlayerPartyIntent(state)) {
-    const intentTarget = getIntentEnemyTarget(state);
-
-    return {
-      phase:
-        intentTarget &&
-        getDistance(leader.position, intentTarget.position) <= COMBAT_BREAK_DISTANCE
-          ? "combat"
-          : "traveling",
-      target: intentTarget,
-      targetPosition:
-        intentTarget?.position ??
-        movementTargetPosition ??
-        null,
-    };
-  }
-
-  const nearbyThreatTarget = getNearbyPartyThreatTarget(state);
-  const intentTarget = getIntentEnemyTarget(state);
-  const target = nearbyThreatTarget ?? intentTarget;
-  const targetPosition =
-    target?.position ??
-    movementTargetPosition ??
-    null;
-  const phase =
-    target && isWithinPartyCombatDistance(state, leader, target)
-      ? "combat"
-      : "traveling";
-
-  return {
-    phase,
-    target,
-    targetPosition,
-  };
-}
-
 function assignPartyTravelTargets(
   state: GameState,
   leader: PartyMember,
-  plan: PartyPlan,
+  plan: PartyActivityPlan,
 ): GameState {
   const hasPlayerIntent = hasDirectPlayerPartyIntent(state);
   const executionIntent = getPartyExecutionIntent(state);
@@ -203,14 +169,7 @@ function assignPartyTravelTargets(
   }
 
   for (const member of getPartyMembers(nextState)) {
-    if (
-      member.id === leader.id ||
-      member.commandPriority === "direct" ||
-      (!hasPlayerIntent &&
-        isPartyMemberRespondingToActiveThreat(nextState, member)) ||
-      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
-      (!hasPlayerIntent && isGathererBusy(nextState, member))
-    ) {
+    if (!canAssignPartyTravelTarget(nextState, member, leader.id, hasPlayerIntent)) {
       continue;
     }
 
@@ -237,12 +196,7 @@ function assignPartyGatherTarget(
   }
 
   for (const member of getPartyMembers(nextState)) {
-    if (
-      member.commandPriority === "direct" ||
-      (!hasPlayerIntent &&
-        isPartyMemberRespondingToActiveThreat(nextState, member)) ||
-      isCompanionAssignedToResurrectionRecovery(nextState, member.id)
-    ) {
+    if (!canAssignPartyGatherTarget(nextState, member, hasPlayerIntent)) {
       continue;
     }
 
@@ -312,13 +266,7 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
   });
 
   for (const member of getPartyMembers(nextState)) {
-    if (
-      member.commandPriority === "direct" ||
-      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
-      (!hasPlayerIntent &&
-        isPartyMemberRespondingToActiveThreat(nextState, member)) ||
-      (!hasPlayerIntent && isGathererBusy(nextState, member))
-    ) {
+    if (!canAssignPartyCombatTarget(nextState, member, hasPlayerIntent)) {
       continue;
     }
 
@@ -336,7 +284,7 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
 function moveLeaderTowardPoi(
   state: GameState,
   leaderId: string,
-  plan: PartyPlan,
+  plan: PartyActivityPlan,
   movedEntityIds: Set<string>,
   speedMultiplier = 1,
 ): GameState {
@@ -450,7 +398,7 @@ function moveFollowersTowardLeader(
 function maybeFinishReachedPoi(
   state: GameState,
   leaderId: string,
-  plan: PartyPlan,
+  plan: PartyActivityPlan,
 ): GameState {
   if (plan.target || !plan.targetPosition) {
     return state;
@@ -553,30 +501,6 @@ function getPartyTravelCohesion(
   };
 }
 
-function isRequiredForTravelCohesion(
-  state: GameState,
-  member: PartyMember,
-  leader: PartyMember,
-): boolean {
-  if (
-    member.commandPriority === "direct" ||
-    isCompanionInDirectCommandGrace(state, member.id) ||
-    isCompanionAssignedToResurrectionRecovery(state, member.id) ||
-    isPartyMemberRespondingToActiveThreat(state, member)
-  ) {
-    return false;
-  }
-
-  if (member.role !== "gatherer") {
-    return true;
-  }
-
-  return (
-    !isGathererBusy(state, member) &&
-    getDistance(member.position, leader.position) <= GATHERER_REJOIN_DISTANCE
-  );
-}
-
 function isLeaderHandoffActive(state: GameState, leader: PartyMember): boolean {
   return (
     state.partyLeaderId === leader.id &&
@@ -606,7 +530,7 @@ function consumeLeaderHandoffTick(
   };
 }
 
-function setFormationState(state: GameState, plan: PartyPlan): GameState {
+function setFormationState(state: GameState, plan: PartyActivityPlan): GameState {
   const previousFormation = state.partyFormation ?? createIdleFormation();
   const nextFormation: PartyFormationState = {
     phase: plan.phase,
@@ -667,55 +591,6 @@ function createIdleFormation(): PartyFormationState {
     slotReasonsByEntityId: {},
     skippedTargetIds: [],
   };
-}
-
-function getIntentEnemyTarget(state: GameState): Enemy | null {
-  return getPartyCombatTarget(state);
-}
-
-function getNearbyPartyThreatTarget(state: GameState): Enemy | null {
-  return (
-    Object.values(state.entities)
-      .filter((entity): entity is Enemy => isActivePartyThreat(state, entity))
-      .filter((enemy) =>
-        getPartyMembers(state).some(
-          (member) =>
-            member.commandPriority !== "direct" &&
-            !isCompanionInDirectCommandGrace(state, member.id) &&
-            getDistance(member.position, enemy.position) <= COMBAT_BREAK_DISTANCE,
-        ),
-      )
-      .sort(
-        (first, second) =>
-          getNearestPartyDistance(state, first) -
-            getNearestPartyDistance(state, second) ||
-          first.id.localeCompare(second.id),
-      )[0] ?? null
-  );
-}
-
-function isWithinPartyCombatDistance(
-  state: GameState,
-  leader: PartyMember,
-  target: Enemy,
-): boolean {
-  if (getDistance(leader.position, target.position) <= COMBAT_BREAK_DISTANCE) {
-    return true;
-  }
-
-  return getNearestPartyDistance(state, target) <= COMBAT_BREAK_DISTANCE;
-}
-
-function getNearestPartyDistance(state: GameState, target: Enemy): number {
-  const distances = getPartyMembers(state)
-    .filter(
-      (member) =>
-        member.commandPriority !== "direct" &&
-        !isCompanionInDirectCommandGrace(state, member.id),
-    )
-    .map((member) => getDistance(member.position, target.position));
-
-  return distances.length > 0 ? Math.min(...distances) : Number.POSITIVE_INFINITY;
 }
 
 function isLiveEnemy(entity: GameEntity | undefined): entity is Enemy {

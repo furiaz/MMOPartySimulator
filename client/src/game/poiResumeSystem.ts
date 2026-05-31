@@ -7,7 +7,7 @@ import type {
 import {
   getPartyExecutionIntent,
   setPartyIntent,
-} from "./state";
+} from "./partyIntentState";
 import { isTeleportWorking } from "./teleportState";
 import type {
   CommandPriority,

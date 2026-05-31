@@ -21,7 +21,7 @@ import {
   TELEPORT_OBJECT_SPRITE_ANCHOR_X,
   TELEPORT_OBJECT_SPRITE_ANCHOR_Y,
   TELEPORT_OBJECT_SPRITE_SIZE_PX,
-} from "./PixiWorldRenderer";
+} from "./PixiWorldRendererHelpers";
 import { MAP_OBJECT_ICON_SRC } from "../assetIcons";
 
 const previewCanvasBounds = {

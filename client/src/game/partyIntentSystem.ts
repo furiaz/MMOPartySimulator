@@ -1,17 +1,19 @@
 import { isCompanionEntity, isLivingEnemy } from "./entityGuards";
-import { getPartyMembers, isGathererBusy } from "./partySystem";
+import { getPartyMembers } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
-import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import {
   getEntityById,
+  updateEntity,
+  type GameState,
+} from "./state";
+import {
   getPartyExecutionIntent,
   queuePartyIntent,
   restoreQueuedPartyIntent,
   setPartyIntent,
-  updateEntity,
-  type GameState,
-} from "./state";
+} from "./partyIntentState";
+import { canAssignSelfDefenseTarget } from "./partyActivityCoordinator";
 import { isActivePartyThreat } from "./partyThreatSystem";
 import type {
   Companion,
@@ -113,14 +115,7 @@ function assignCompanionsToSelfDefense(
   let nextState = state;
 
   for (const companion of getPartyMembers(nextState)) {
-    if (
-      isCompanionAssignedToResurrectionRecovery(nextState, companion.id) ||
-      (companion.commandPriority === "direct" &&
-        !isCompanionPersonallyBlockedOrThreatened(nextState, companion, target)) ||
-      (companion.commandPriority !== "direct" &&
-        isGathererBusy(nextState, companion) &&
-        !isCompanionPersonallyBlockedOrThreatened(nextState, companion, target))
-    ) {
+    if (!canAssignSelfDefenseTarget(nextState, companion, target)) {
       continue;
     }
 
@@ -256,17 +251,6 @@ function getNearestCompanionDistance(state: GameState, enemy: Enemy): number {
     .map((companion) => getGridDistance(companion.position, enemy.position));
 
   return distances.length > 0 ? Math.min(...distances) : Number.POSITIVE_INFINITY;
-}
-
-function isCompanionPersonallyBlockedOrThreatened(
-  state: GameState,
-  companion: Companion,
-  target: Enemy,
-): boolean {
-  return (
-    getMovementBlockerEnemy(state, companion)?.id === target.id ||
-    target.currentTargetId === companion.id
-  );
 }
 
 function createAttackIntent(target: Enemy): PartyExecutionIntent {

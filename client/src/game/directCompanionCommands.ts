@@ -4,13 +4,15 @@ import { getGridDistance } from "./positionUtils";
 import { clearResurrectionRecoveryAssignmentForCompanion } from "./resurrectionSystem";
 import {
   addCombatFeedback,
-  getBoundedPathDistance,
   getEntityById,
-  isPositionAvailable,
-  moveEntityTowardPositionIfUnoccupied,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  getBoundedPathDistance,
+  isPositionAvailable,
+  moveEntityTowardPositionIfUnoccupied,
+} from "./movementPlanning";
 import type {
   Companion,
   DirectCompanionCommand,

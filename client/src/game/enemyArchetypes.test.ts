@@ -5,10 +5,14 @@ import { createEnemy } from "./entities";
 describe("prototype enemy identity definitions", () => {
   it("defines broad archetypes and specific spawnable enemy types separately", () => {
     expect(Object.keys(ENEMY_ARCHETYPES)).toHaveLength(10);
-    expect(Object.keys(ENEMY_TYPES)).toHaveLength(12);
+    expect(Object.keys(ENEMY_TYPES)).toHaveLength(16);
     expect(ENEMY_ARCHETYPES).toHaveProperty("wolf");
     expect(ENEMY_ARCHETYPES).toHaveProperty("orc");
     expect(ENEMY_ARCHETYPES).toHaveProperty("goblin");
+    expect(ENEMY_TYPES).toHaveProperty("slimeward_heavy_slime");
+    expect(ENEMY_TYPES).toHaveProperty("slimeward_pale_ooze");
+    expect(ENEMY_TYPES).toHaveProperty("slimeward_spitter_slime");
+    expect(ENEMY_TYPES).toHaveProperty("azure_mass");
     expect(ENEMY_TYPES).toHaveProperty("goblin_shaman");
   });
 

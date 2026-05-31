@@ -9,10 +9,10 @@ import {
 } from "./questSystem";
 import {
   addEntity,
-  moveEntityTowardPositionIfUnoccupied,
   updateEntity,
   type GameState,
 } from "./state";
+import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { isPositionInsideSubzone } from "./subzoneSystem";
 import type { NpcEntity, Position } from "./types";
 import type { QuestId, QuestObjectiveDefinition } from "./questTypes";
@@ -201,7 +201,7 @@ function updateRescueObjective(
   state: GameState,
   context: ActiveObjectiveContext,
 ): GameState {
-  let nextState = ensureQuestNpc(state, context.objective);
+  const nextState = ensureQuestNpc(state, context.objective);
   const guide = getActiveQuestGuide(nextState);
   const leader = getPartyLeader(nextState);
 

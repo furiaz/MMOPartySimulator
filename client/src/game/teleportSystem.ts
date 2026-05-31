@@ -43,12 +43,14 @@ import {
 } from "./debugMap";
 import { hasDeadPartyMembers } from "./partySystem";
 import {
-  getPartyExecutionIntent,
-  moveEntityTowardPositionIfUnoccupied,
-  setPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
+import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import {
+  getPartyExecutionIntent,
+  setPartyExecutionIntent,
+} from "./partyIntentState";
 import type {
   ActiveTeleport,
   Companion,

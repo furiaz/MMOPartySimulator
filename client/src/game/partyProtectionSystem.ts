@@ -5,12 +5,14 @@ import {
   QUEST_GUIDE_ESCORT_RANGE,
 } from "./questGuideSystem";
 import {
-  getPartyExecutionIntent,
-  hasDirectPlayerPartyIntent,
-  setPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  getPartyExecutionIntent,
+  hasDirectPlayerPartyIntent,
+  setPartyExecutionIntent,
+} from "./partyIntentState";
 import { isGathererBusy, isPartyMember } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";

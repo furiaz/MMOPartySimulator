@@ -15,12 +15,14 @@ import { grantCharacterXpToParty } from "./leveling";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
 import {
   getEntityById,
-  isWalkablePosition,
-  moveEntityTowardPositionIfUnoccupied,
-  reservePositionForFrame,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  isWalkablePosition,
+  moveEntityTowardPositionIfUnoccupied,
+  reservePositionForFrame,
+} from "./movementPlanning";
 import { protectPartyMember } from "./partyProtectionSystem";
 import { getRolePriority } from "./roleProfiles";
 import { isEnemyBound } from "./skillRuntime";

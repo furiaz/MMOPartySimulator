@@ -97,6 +97,8 @@ export function getScaledEnemyStats(
   level: number,
   archetypeId?: EnemyArchetypeId,
 ): EnemyScalingResult {
+  void archetypeId;
+
   const effectiveLevel = getEffectiveEnemyScalingLevel(level);
   const scalingBand = getEnemyScalingBand(effectiveLevel);
   const curve = STANDARD_ENEMY_CURVES[scalingBand];
@@ -114,7 +116,7 @@ export function getScaledEnemyStats(
     ),
   };
   const levelThreat = effectiveLevel;
-  const archetypeThreatModifier = getArchetypeThreatModifier(archetypeId);
+  const archetypeThreatModifier = getArchetypeThreatModifier();
   const threat = Math.round(
     levelThreat * archetypeThreatModifier * BAND_MODIFIERS[scalingBand],
   );
@@ -172,8 +174,6 @@ function interpolateStat(minValue: number, maxValue: number, progress: number): 
   return Math.round(minValue + (maxValue - minValue) * progress);
 }
 
-function getArchetypeThreatModifier(
-  _archetypeId: EnemyArchetypeId | undefined,
-): number {
+function getArchetypeThreatModifier(): number {
   return DEFAULT_ARCHETYPE_THREAT_MODIFIER;
 }

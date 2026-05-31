@@ -1,16 +1,17 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import "./App.css";
 import { GameMenu } from "./GameMenu";
+import { GuidePopup } from "./GuidePopup";
 import {
-  GuidePopup,
   guidePopupDefinitions,
   type GuidePopupId,
-} from "./GuidePopup";
+} from "./guidePopupDefinitions";
 import {
   CompanionVitalsPanel,
   type GameMenuTab,
@@ -28,10 +29,8 @@ import {
   getQuestTurnInErrorText,
 } from "./questUiHelpers";
 import { QuestTrackerPanel } from "./QuestPanels";
-import {
-  PixiWorldRenderer,
-  type PixiRendererPerformanceSample,
-} from "./worldRenderer/PixiWorldRenderer";
+import { PixiWorldRenderer } from "./worldRenderer/PixiWorldRenderer";
+import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
 
 import {
   addEntity,
@@ -544,6 +543,10 @@ function consumeRendererPerformanceAccumulator(
   return snapshot;
 }
 
+function createEmptyRendererPerformanceSnapshot(): RendererPerformanceSnapshot {
+  return createRendererPerformanceAccumulator();
+}
+
 function PerformanceOverlay({
   currentMap,
   gameState,
@@ -563,9 +566,7 @@ function PerformanceOverlay({
       gameMetrics: consumeGamePerformanceMetrics(),
       fps: 0,
       frameMs: 0,
-      rendererSnapshot: consumeRendererPerformanceAccumulator(
-        rendererPerformanceRef.current,
-      ),
+      rendererSnapshot: createEmptyRendererPerformanceSnapshot(),
       slowFrames: 0,
       simFramesPerSecond: 0,
       elapsedSeconds: 1,
@@ -643,7 +644,7 @@ function PerformanceOverlay({
     return () => {
       window.cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [rendererPerformanceRef]);
 
   return (
     <aside
@@ -1209,13 +1210,21 @@ function MerchantBuyPanel({
   const [partyCompatibleOnly, setPartyCompatibleOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<ItemId | null>(null);
   const stock = getMerchantBuyStock(state, merchantNpcId);
-  const secondaryFilterOptions =
-    activeFilter === "all"
-      ? []
-      : getMerchantSecondaryFilterOptions(stock, activeFilter);
+  const secondaryFilterOptions = useMemo(
+    () =>
+      activeFilter === "all"
+        ? []
+        : getMerchantSecondaryFilterOptions(stock, activeFilter),
+    [activeFilter, stock],
+  );
+  const effectiveSecondaryFilter =
+    activeSecondaryFilter &&
+    secondaryFilterOptions.some((option) => option.id === activeSecondaryFilter)
+      ? activeSecondaryFilter
+      : null;
   const filteredStock = getFilteredMerchantBuyStock(state, merchantNpcId, {
     mainFilter: activeFilter,
-    secondaryFilter: activeSecondaryFilter,
+    secondaryFilter: effectiveSecondaryFilter,
     partyCompatibleOnly,
   });
   const selectedEntry =
@@ -1230,15 +1239,6 @@ function MerchantBuyPanel({
   const selectedBlockReason = selectedEntry
     ? getMerchantBuyBlockReason(selectedEntry, state)
     : "No item selected";
-
-  useEffect(() => {
-    if (
-      activeSecondaryFilter &&
-      !secondaryFilterOptions.some((option) => option.id === activeSecondaryFilter)
-    ) {
-      setActiveSecondaryFilter(null);
-    }
-  }, [activeSecondaryFilter, secondaryFilterOptions]);
 
   return (
     <aside className="merchant-detail-panel merchant-buy-panel" aria-label="Merchant buy">
@@ -1271,7 +1271,7 @@ function MerchantBuyPanel({
         {secondaryFilterOptions.length > 0 ? (
           <nav className="merchant-buy-filter-tabs" aria-label="Merchant stock subtype filters">
             <button
-              className={activeSecondaryFilter === null ? "active" : ""}
+              className={effectiveSecondaryFilter === null ? "active" : ""}
               onClick={() => setActiveSecondaryFilter(null)}
               type="button"
             >
@@ -1280,7 +1280,7 @@ function MerchantBuyPanel({
             {secondaryFilterOptions.map((filter) => (
               <button
                 key={filter.id}
-                className={activeSecondaryFilter === filter.id ? "active" : ""}
+                className={effectiveSecondaryFilter === filter.id ? "active" : ""}
                 onClick={() => {
                   setActiveSecondaryFilter(filter.id);
                   setSelectedItemId(null);
@@ -1780,6 +1780,10 @@ function App() {
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
+  const [terrainCameraOffset, setTerrainCameraOffset] = useState<Position>({
+    x: 0,
+    y: 0,
+  });
   const rendererPerformanceRef = useRef(createRendererPerformanceAccumulator());
   const cameraMapIdRef = useRef<string | undefined>(undefined);
   const previousCameraFocusRef = useRef<Position | null>(null);
@@ -1903,6 +1907,74 @@ function App() {
   const directCommandGraceCount = Object.values(
     gameState.directCommandGraceUntilByCompanionId ?? {},
   ).filter((graceUntil) => graceUntil > currentTime).length;
+  const isMerchantCurrentlyUnlocked = isMerchantUnlockedForQuests(gameState);
+
+  const openMerchantInteraction = useCallback((npc: NpcEntity) => {
+    setPendingNpcInteractionId(null);
+    setActiveQuestGiverNpcId(null);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+    setActiveMerchantNpcId(npc.id);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(
+      isMerchantCurrentlyUnlocked
+        ? null
+        : "Merchant unlocks during Outfit the Expedition",
+    );
+    setGameState((state) =>
+      isMerchantUnlockedForQuests(state)
+        ? recordMerchantInteractionOpened(state, npc.id)
+        : recordMerchantLockedForQuest(state, npc.id, "merchant_interaction_locked"),
+    );
+  }, [isMerchantCurrentlyUnlocked]);
+
+  const openQuestGiverInteraction = useCallback((npc: NpcEntity) => {
+    setPendingNpcInteractionId(null);
+    setActiveMerchantNpcId(null);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+    setActiveQuestGiverNpcId(npc.id);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+  }, []);
+
+  const openNpcInteraction = useCallback((npc: NpcEntity) => {
+    const interactionKind = getNpcInteractionKind(npc);
+
+    if (interactionKind === "merchant") {
+      openMerchantInteraction(npc);
+      return;
+    }
+
+    if (interactionKind === "quest_giver") {
+      openQuestGiverInteraction(npc);
+    }
+  }, [openMerchantInteraction, openQuestGiverInteraction]);
+
+  const closeNpcInteractions = useCallback(() => {
+    const merchantNpcId = activeMerchantNpcId;
+
+    setPendingNpcInteractionId(null);
+    setActiveMerchantNpcId(null);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+    setActiveQuestGiverNpcId(null);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+
+    if (!merchantNpcId) {
+      return;
+    }
+
+    setGameState((state) => {
+      const selectedState = recordMerchantMenuSelected(state, merchantNpcId, "leave");
+
+      return recordMerchantInteractionClosed(selectedState, merchantNpcId);
+    });
+  }, [activeMerchantNpcId]);
 
   useEffect(() => {
     if (!activeDungeonChest?.autoContinueAtMs || activeDungeonChest.inventoryFull) {
@@ -1910,14 +1982,9 @@ function App() {
     }
 
     const remainingMs = activeDungeonChest.autoContinueAtMs - Date.now();
-    if (remainingMs <= 0) {
-      setGameState(continueSlimewardDungeonChest);
-      return;
-    }
-
     const timeoutId = window.setTimeout(() => {
       setGameState(continueSlimewardDungeonChest);
-    }, remainingMs);
+    }, Math.max(0, remainingMs));
 
     return () => window.clearTimeout(timeoutId);
   }, [
@@ -1993,19 +2060,22 @@ function App() {
     }
 
     const [nextGuidePopupId, ...remainingGuidePopupIds] = queuedGuidePopupIds;
+    const timeoutId = window.setTimeout(() => {
+      queuedGuidePopupIdsRef.current = remainingGuidePopupIds;
+      setQueuedGuidePopupIds(remainingGuidePopupIds);
 
-    queuedGuidePopupIdsRef.current = remainingGuidePopupIds;
-    setQueuedGuidePopupIds(remainingGuidePopupIds);
+      if (!isGuideSequenceActiveRef.current) {
+        isGuideSequenceActiveRef.current = true;
+        shouldResumeAfterGuideSequenceRef.current = Boolean(stopLoopRef.current);
+        stopSimulationLoop();
+      }
 
-    if (!isGuideSequenceActiveRef.current) {
-      isGuideSequenceActiveRef.current = true;
-      shouldResumeAfterGuideSequenceRef.current = Boolean(stopLoopRef.current);
-      stopSimulationLoop();
-    }
+      activeGuidePopupIdRef.current = nextGuidePopupId;
+      setActiveGuidePopupId(nextGuidePopupId);
+      setActiveGuidePanelIndex(0);
+    }, 0);
 
-    activeGuidePopupIdRef.current = nextGuidePopupId;
-    setActiveGuidePopupId(nextGuidePopupId);
-    setActiveGuidePanelIndex(0);
+    return () => window.clearTimeout(timeoutId);
   }, [activeGuidePopupId, queuedGuidePopupIds, stopSimulationLoop]);
 
   useEffect(() => {
@@ -2047,6 +2117,7 @@ function App() {
   }, [
     activeMerchantNpcId,
     activeQuestGiverNpcId,
+    closeNpcInteractions,
     currentMap.id,
     pendingNpcInteractionId,
   ]);
@@ -2065,7 +2136,7 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMerchantNpcId, activeQuestGiverNpcId]);
+  }, [activeMerchantNpcId, activeQuestGiverNpcId, closeNpcInteractions]);
 
   useEffect(() => {
     if (!activeMerchantNpcId && !activeQuestGiverNpcId) {
@@ -2086,12 +2157,14 @@ function App() {
     document.addEventListener("pointerdown", handlePointerDown);
 
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [activeMerchantNpcId, activeQuestGiverNpcId]);
+  }, [activeMerchantNpcId, activeQuestGiverNpcId, closeNpcInteractions]);
 
   useEffect(() => {
     if (!leader) {
       if (activeMerchantNpcId || activeQuestGiverNpcId || pendingNpcInteractionId) {
-        closeNpcInteractions();
+        const timeoutId = window.setTimeout(closeNpcInteractions, 0);
+
+        return () => window.clearTimeout(timeoutId);
       }
       return;
     }
@@ -2107,8 +2180,9 @@ function App() {
       getPositionDistance(leader.position, activeNpc.position) >
         getNpcInteractionRange(activeNpc)
     ) {
-      closeNpcInteractions();
-      return;
+      const timeoutId = window.setTimeout(closeNpcInteractions, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
 
     const pendingNpc =
@@ -2119,7 +2193,11 @@ function App() {
 
     if (!pendingNpc) {
       if (pendingNpcInteractionId) {
-        setPendingNpcInteractionId(null);
+        const timeoutId = window.setTimeout(() => {
+          setPendingNpcInteractionId(null);
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
       }
       return;
     }
@@ -2128,14 +2206,21 @@ function App() {
       getPositionDistance(leader.position, pendingNpc.position) <=
       getNpcInteractionRange(pendingNpc)
     ) {
-      openNpcInteraction(pendingNpc);
+      const timeoutId = window.setTimeout(() => {
+        openNpcInteraction(pendingNpc);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
   }, [
     activeMerchantNpcId,
     activeQuestGiverNpcId,
     gameState.entities,
+    closeNpcInteractions,
     leader?.position.x,
     leader?.position.y,
+    leader,
+    openNpcInteraction,
     pendingNpcInteractionId,
   ]);
 
@@ -2220,7 +2305,7 @@ function App() {
     return () => {
       window.removeEventListener("resize", updateViewportSize);
     };
-  }, []);
+  }, [rendererPerformanceRef]);
 
   useEffect(() => {
     latestAnimatedEntityPositionsRef.current = [
@@ -2605,73 +2690,6 @@ function App() {
     });
   }
 
-  function openMerchantInteraction(npc: NpcEntity) {
-    setPendingNpcInteractionId(null);
-    setActiveQuestGiverNpcId(null);
-    setActiveQuestGiverPanel(null);
-    setSelectedQuestGiverQuestId(null);
-    setQuestGiverResultMessage(null);
-    setActiveMerchantNpcId(npc.id);
-    setActiveMerchantPanel(null);
-    setMerchantResultMessage(
-      isMerchantUnlockedForQuests(gameState)
-        ? null
-        : "Merchant unlocks during Outfit the Expedition",
-    );
-    setGameState((state) =>
-      isMerchantUnlockedForQuests(state)
-        ? recordMerchantInteractionOpened(state, npc.id)
-        : recordMerchantLockedForQuest(state, npc.id, "merchant_interaction_locked"),
-    );
-  }
-
-  function openQuestGiverInteraction(npc: NpcEntity) {
-    setPendingNpcInteractionId(null);
-    setActiveMerchantNpcId(null);
-    setActiveMerchantPanel(null);
-    setMerchantResultMessage(null);
-    setActiveQuestGiverNpcId(npc.id);
-    setActiveQuestGiverPanel(null);
-    setSelectedQuestGiverQuestId(null);
-    setQuestGiverResultMessage(null);
-  }
-
-  function openNpcInteraction(npc: NpcEntity) {
-    const interactionKind = getNpcInteractionKind(npc);
-
-    if (interactionKind === "merchant") {
-      openMerchantInteraction(npc);
-      return;
-    }
-
-    if (interactionKind === "quest_giver") {
-      openQuestGiverInteraction(npc);
-    }
-  }
-
-  function closeNpcInteractions() {
-    const merchantNpcId = activeMerchantNpcId;
-
-    setPendingNpcInteractionId(null);
-    setActiveMerchantNpcId(null);
-    setActiveMerchantPanel(null);
-    setMerchantResultMessage(null);
-    setActiveQuestGiverNpcId(null);
-    setActiveQuestGiverPanel(null);
-    setSelectedQuestGiverQuestId(null);
-    setQuestGiverResultMessage(null);
-
-    if (!merchantNpcId) {
-      return;
-    }
-
-    setGameState((state) => {
-      const selectedState = recordMerchantMenuSelected(state, merchantNpcId, "leave");
-
-      return recordMerchantInteractionClosed(selectedState, merchantNpcId);
-    });
-  }
-
   function selectMerchantPanel(panel: MerchantPanel) {
     if (!activeMerchantNpcId) {
       return;
@@ -2941,19 +2959,16 @@ function App() {
   const hoveredEntity = entityHoverTooltip
     ? gameState.entities[entityHoverTooltip.entityId]
     : null;
-  const leaderCameraPosition = leader?.position ?? { x: 0, y: 0 };
-  const leaderCameraFocusPosition = {
-    x: leaderCameraPosition.x * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
-    y: leaderCameraPosition.y * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
-  };
+  const leaderCameraPositionX = leader?.position.x ?? 0;
+  const leaderCameraPositionY = leader?.position.y ?? 0;
+  const leaderCameraFocusPosition = useMemo(
+    () => ({
+      x: leaderCameraPositionX * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
+      y: leaderCameraPositionY * mapConstructionCellPixelSize + mapConstructionCellPixelSize / 2,
+    }),
+    [leaderCameraPositionX, leaderCameraPositionY],
+  );
   const currentMapKey = currentMap.id ?? currentMap.debugName;
-  const terrainCameraOffset = getDeadZoneCameraOffset({
-    focusPosition: leaderCameraFocusPosition,
-    currentOffset: visualCameraOffsetRef.current,
-    viewportSize,
-    mapPixelWidth,
-    mapPixelHeight,
-  });
   useEffect(() => {
     const maximumOffset = getMaximumCameraOffset({
       viewportSize,
@@ -2972,7 +2987,11 @@ function App() {
       cameraMapIdRef.current = currentMapKey;
       previousCameraFocusRef.current = leaderCameraFocusPosition;
       visualCameraOffsetRef.current = targetOffset;
-      return;
+      const syncFrameId = window.requestAnimationFrame(() => {
+        setTerrainCameraOffset(targetOffset);
+      });
+
+      return () => window.cancelAnimationFrame(syncFrameId);
     }
 
     const previousFocus =
@@ -3014,6 +3033,7 @@ function App() {
         Math.abs(yDistance) <= cameraSnapDistance
       ) {
         visualCameraOffsetRef.current = nextTargetOffset;
+        setTerrainCameraOffset(nextTargetOffset);
         return;
       }
 
@@ -3024,6 +3044,7 @@ function App() {
       });
 
       visualCameraOffsetRef.current = nextOffset;
+      setTerrainCameraOffset(nextOffset);
 
       if (isActive) {
         animationFrameId = window.requestAnimationFrame(stepCamera);
@@ -3038,12 +3059,10 @@ function App() {
     };
   }, [
     currentMapKey,
-    leaderCameraFocusPosition.x,
-    leaderCameraFocusPosition.y,
+    leaderCameraFocusPosition,
     mapPixelHeight,
     mapPixelWidth,
-    viewportSize.height,
-    viewportSize.width,
+    viewportSize,
   ]);
 
   return (

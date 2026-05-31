@@ -1,8 +1,5 @@
-import {
-  ENTITY_COLLISION_DISTANCE,
-  getFollowTrailPosition,
-  type GameState,
-} from "./state";
+import { getFollowTrailPosition, type GameState } from "./state";
+import { ENTITY_COLLISION_DISTANCE } from "./movementPlanning";
 import { getOrderedPartyMembers, type PartyMember } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
 import type { GameEntity, Position } from "./types";

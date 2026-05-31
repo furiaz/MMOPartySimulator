@@ -86,11 +86,11 @@ const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
 const deathDownedPuffSrc = `${prototypeVfxSpritePath}/death-downed-puff.png`;
-export const enemySpottedAlertSrc = `${prototypeVfxSpritePath}/enemy-spotted-alert.png`;
+const enemySpottedAlertSrc = `${prototypeVfxSpritePath}/enemy-spotted-alert.png`;
 const healSparkleSrc = `${prototypeVfxSpritePath}/heal-sparkle.png`;
 const gatherCompleteSparkleSrc = `${prototypeVfxSpritePath}/gather-complete-sparkle.png`;
 const inventoryFullWarningSrc = `${prototypeVfxSpritePath}/inventory-full-warning.png`;
-export const levelUpBurstSrc = `${prototypeVfxSpritePath}/level-up-burst.png`;
+const levelUpBurstSrc = `${prototypeVfxSpritePath}/level-up-burst.png`;
 const missEvadePuffSrc = `${prototypeVfxSpritePath}/miss-evade-puff.png`;
 const resourceDepletedPuffSrc = `${prototypeVfxSpritePath}/resource-depleted-puff.png`;
 const resourceHitHerbSrc = `${prototypeVfxSpritePath}/resource-hit-herb.png`;
@@ -98,10 +98,10 @@ const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png`;
 const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
 const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
 const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
-export const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
-export const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
-export const TELEPORT_OBJECT_SPRITE_ANCHOR_Y = 0.5;
-export function getHealingFountainRenderDiameterPx(
+const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
+const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
+const TELEPORT_OBJECT_SPRITE_ANCHOR_Y = 0.5;
+function getHealingFountainRenderDiameterPx(
   range: number,
   cellPixelSize: number,
 ): number {
@@ -154,7 +154,7 @@ type PixiWorldRendererProps = {
   visualMovementByEntityId?: Record<string, EntityVisualMovement>;
 };
 
-export type PixiRendererPerformanceSample = {
+type PixiRendererPerformanceSample = {
   activeFeedbackCount: number;
   drawCount: number;
   drawnEntityCount: number;
@@ -206,7 +206,7 @@ type RenderSize = {
 
 type ClientBounds = Pick<DOMRect, "left" | "top" | "width" | "height">;
 
-export type TileBounds = {
+type TileBounds = {
   minX: number;
   maxX: number;
   minY: number;
@@ -276,7 +276,7 @@ type EntityTint = {
   color: number;
 };
 
-export function getTeleportIconSrc(
+function getTeleportIconSrc(
   isWorking = true,
   visualTheme: "default" | "slimeward" = "default",
 ): string {
@@ -536,7 +536,7 @@ function collectFullMapFloorTextureSrcs(map: GameMap): string[] {
   return [...sources];
 }
 
-export function collectCurrentMapVisualTextureSrcs(
+function collectCurrentMapVisualTextureSrcs(
   map: GameMap,
   entities: GameEntity[],
 ): string[] {
@@ -678,7 +678,7 @@ function getVisibleTileBounds({
   };
 }
 
-export function getFullVisibleTileBounds({
+function getFullVisibleTileBounds({
   bufferTiles = 4,
   cameraOffset,
   cellPixelSize,
@@ -720,7 +720,7 @@ function createVisibleFloorChunkPositions(bounds: TileBounds): Position[] {
   return chunks;
 }
 
-export function isPositionInTileBounds(position: Position, bounds: TileBounds): boolean {
+function isPositionInTileBounds(position: Position, bounds: TileBounds): boolean {
   return (
     position.x >= bounds.minX &&
     position.x <= bounds.maxX &&
@@ -879,7 +879,7 @@ function getFullMapPosition(
   };
 }
 
-export function getPreviewMapPosition(
+function getPreviewMapPosition(
   clientPosition: Position,
   bounds: ClientBounds,
   map: GameMap,
@@ -981,7 +981,7 @@ function shouldRenderEntity(entity: GameEntity): boolean {
   return entity.kind !== "resource" || isActiveResource(entity);
 }
 
-export function getNearestInteractableEntity({
+function getNearestInteractableEntity({
   cellPixelSize,
   entities,
   map,
@@ -1186,7 +1186,7 @@ function getCompanionDragPreview({
   };
 }
 
-export function getNearestHoverEntity({
+function getNearestHoverEntity({
   cellPixelSize,
   entities,
   map,
@@ -1623,7 +1623,7 @@ function drawHealthBar(
   graphics.rect(x, y, width * healthPercent, height).fill(healthColor);
 }
 
-export function getEnemyNameplateText(
+function getEnemyNameplateText(
   enemy: Extract<GameEntity, { kind: "enemy" }>,
 ): string {
   const enemyType = getEnemyType(enemy.enemyTypeId);
@@ -1638,7 +1638,7 @@ export function getEnemyNameplateText(
   return `${variantPrefix}${displayName} Lv ${enemy.level}`;
 }
 
-export function getEnemyNameplateColor(
+function getEnemyNameplateColor(
   enemy: Extract<GameEntity, { kind: "enemy" }>,
 ): number {
   return enemy.aggressionMode === "aggressive"
@@ -2226,7 +2226,7 @@ function isHealingNumberFeedback(event: CombatFeedbackEvent): boolean {
   return event.type === "heal" && /^\+\d+ HP$/.test(event.text);
 }
 
-export function getCombatFeedbackLaneKey(event: CombatFeedbackEvent): string {
+function getCombatFeedbackLaneKey(event: CombatFeedbackEvent): string {
   const feedbackKind = event.feedbackKind ?? event.type;
 
   if (
@@ -2319,7 +2319,7 @@ function getResourceHitEffectSrc(resource: Extract<GameEntity, { kind: "resource
   return resourceHitWoodSrc;
 }
 
-export function shouldDrawCombatFeedbackEvent(
+function shouldDrawCombatFeedbackEvent(
   event: CombatFeedbackEvent,
   entity: GameEntity,
 ): boolean {
@@ -2338,7 +2338,7 @@ export function shouldDrawCombatFeedbackEvent(
   return true;
 }
 
-export function getCombatFeedbackLifetimeProgress(
+function getCombatFeedbackLifetimeProgress(
   event: CombatFeedbackEvent,
   currentTime: number,
 ): number {
@@ -2351,7 +2351,7 @@ export function getCombatFeedbackLifetimeProgress(
   return Math.min(1, Math.max(0, (currentTime - event.createdAt) / duration));
 }
 
-export function getLevelUpBurstPresentation(
+function getLevelUpBurstPresentation(
   event: CombatFeedbackEvent,
   currentTime: number,
 ): { alpha: number; scale: number } {
@@ -4728,6 +4728,7 @@ export function PixiWorldRenderer({
       overlayGraphics: new Graphics(),
       wallLayer: new Container(),
     };
+    const managedState = managedStateRef.current;
 
     function cancelScheduledRedraw() {
       if (scheduledRedrawFrame === null) {
@@ -4848,7 +4849,7 @@ export function PixiWorldRenderer({
       if (isInitialized) {
         app.destroy(true, { children: true });
       }
-      resetManagedRendererState(managedStateRef.current);
+      resetManagedRendererState(managedState);
     };
   }, []);
 

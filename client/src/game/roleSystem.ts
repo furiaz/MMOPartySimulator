@@ -1,4 +1,3 @@
-import { isWithinFollowLeash } from "./followSystem";
 import {
   getFollowTrailPosition,
   getEntityById,
@@ -7,7 +6,6 @@ import {
 } from "./state";
 import { getPartyLeader, isPartyMember, type PartyMember } from "./partySystem";
 import { ROLE_TUNING } from "./roleProfiles";
-import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import {
   createGathererResourceReservations,
   findAllowedGathererResourceTarget,
@@ -15,7 +13,7 @@ import {
   type GathererResourceReservations,
   type ResourceWorkContext,
 } from "./gathererResourceReservation";
-import { isPartyMemberRespondingToActiveThreat } from "./partyThreatSystem";
+import { canUseAutonomousRoleBehavior } from "./partyActivityCoordinator";
 import {
   getPartyCombatTarget,
   getPartyMovementTargetPosition,
@@ -44,7 +42,7 @@ export function updateRoleSystem(
   );
 
   for (const entity of Object.values(state.entities)) {
-    if (!canUseRoleBehavior(nextState, entity)) {
+    if (!canUseAutonomousRoleBehavior(nextState, entity)) {
       continue;
     }
 
@@ -70,46 +68,6 @@ export function updateRoleSystem(
   return nextState;
 }
 
-function canUseRoleBehavior(
-  state: GameState,
-  entity: GameEntity,
-): entity is PartyMember {
-  if (
-    !isPartyMember(entity) ||
-    isCompanionAssignedToResurrectionRecovery(state, entity.id) ||
-    entity.commandPriority === "direct" ||
-    (entity.state !== "idle" &&
-      entity.state !== "follow" &&
-      entity.state !== "attack" &&
-      entity.state !== "gather" &&
-      entity.state !== "defend")
-  ) {
-    return false;
-  }
-
-  if (entity.state === "attack") {
-    return entity.role === "gatherer";
-  }
-
-  if (entity.state === "gather") {
-    return entity.role === "gatherer";
-  }
-
-  if (entity.state === "idle" || entity.state === "defend") {
-    return true;
-  }
-
-  const followTarget = getPartyLeader(state);
-
-  if (entity.role === "gatherer") {
-    return Boolean(
-      followTarget && isWithinGathererLeaderBoundary(state, entity, followTarget),
-    );
-  }
-
-  return Boolean(followTarget && isWithinFollowLeash(state, entity, followTarget));
-}
-
 function getRoleTarget(
   state: GameState,
   partyMember: PartyMember,
@@ -118,10 +76,6 @@ function getRoleTarget(
 ): { state: "attack" | "gather" | "follow" | "defend"; targetId: string | null } | null {
   const leader = getPartyLeader(state);
   const isTravelFormation = isFormationTravelMovementActive(state);
-
-  if (isPartyMemberRespondingToActiveThreat(state, partyMember)) {
-    return null;
-  }
 
   if (partyMember.role === "fighter") {
     const followTarget = leader;
@@ -242,10 +196,7 @@ function getLeaderCombatTarget(
   return getLeaderEnemyTarget(state);
 }
 
-export function getLeaderEnemyTarget(
-  state: GameState,
-  _leader?: GameEntity,
-): Enemy | undefined {
+export function getLeaderEnemyTarget(state: GameState): Enemy | undefined {
   return getPartyCombatTarget(state) ?? undefined;
 }
 
@@ -341,10 +292,7 @@ function getPartyExecutionIntentAnchorPosition(
 ): Position {
   const partyIntentPosition = getPartyExecutionIntentPosition(state, leader);
   const movementDirection = getLeaderMovementDirection(state, leader);
-  const targetPosition = getResolvedPartyExecutionIntentTargetPosition(
-    state,
-    leader,
-  );
+  const targetPosition = getResolvedPartyExecutionIntentTargetPosition(state);
   const defenderOffset = getDefenderSideOffset(
     state,
     companion,
@@ -374,10 +322,7 @@ export function getLeaderMovementDirection(
   state: GameState,
   leader: PartyMember,
 ): Position {
-  const targetPosition = getResolvedPartyExecutionIntentTargetPosition(
-    state,
-    leader,
-  );
+  const targetPosition = getResolvedPartyExecutionIntentTargetPosition(state);
 
   if (targetPosition) {
     const xDirection = Math.sign(targetPosition.x - leader.position.x);
@@ -408,7 +353,6 @@ export function getLeaderMovementDirection(
 
 export function getResolvedPartyExecutionIntentTargetPosition(
   state: GameState,
-  _leader?: PartyMember,
 ): Position | null {
   return getPartyMovementTargetPosition(state);
 }

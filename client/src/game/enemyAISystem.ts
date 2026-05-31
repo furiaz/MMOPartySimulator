@@ -2,11 +2,11 @@ import { getMovementStepDistance, isAutonomousEntity } from "./entities";
 import {
   addCombatFeedback,
   getEntityById,
-  moveEntityTowardPositionIfUnoccupied,
   PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
   updateEntity,
   type GameState,
 } from "./state";
+import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
 import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
