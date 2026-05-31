@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { createCompanion } from "./entities";
-import { moveEntityTowardPositionIfUnoccupied } from "./state";
+import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";
 

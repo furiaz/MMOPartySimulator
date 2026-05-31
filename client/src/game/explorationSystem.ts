@@ -8,9 +8,9 @@ import {
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
   reservePositionForFrame,
-  setPartyExecutionIntent,
-  type GameState,
-} from "./state";
+} from "./movementPlanning";
+import type { GameState } from "./state";
+import { setPartyExecutionIntent } from "./partyIntentState";
 import {
   findNearestReachableNavigationPosition,
   getNavigationPositionKey,

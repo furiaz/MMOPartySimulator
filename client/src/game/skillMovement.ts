@@ -2,8 +2,8 @@ import {
   isActiveResourcePosition,
   isPositionInsideEntityCollisionShape,
   isWallPosition,
-  type GameState,
-} from "./state";
+} from "./movementPlanning";
+import type { GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 

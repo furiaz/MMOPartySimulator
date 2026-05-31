@@ -13,7 +13,8 @@ import {
   aoeTargetDummyPosition,
   createDebugMap,
 } from "./debugMap";
-import { addEntity, setLeaderIntent, updateEntity, type GameState } from "./state";
+import { addEntity, updateEntity, type GameState } from "./state";
+import { setLeaderIntent } from "./partyIntentState";
 import { createTestGameState } from "./testState";
 import type { EnemyAoeChannelState, GameEntity } from "./types";
 

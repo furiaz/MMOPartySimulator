@@ -7,7 +7,7 @@ import {
   ENTITY_COLLISION_DISTANCE,
   getEntityCollisionShape,
   isPositionInsideEntityCollisionShape,
-} from "./state";
+} from "./movementPlanning";
 
 describe("entity collision shapes", () => {
   it("uses a vertical capsule for Beginner companions", () => {

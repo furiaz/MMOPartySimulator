@@ -1,9 +1,9 @@
 import { isAutonomousEntity } from "./entities";
 import {
   getEntityById,
-  moveEntityTowardPositionIfUnoccupied,
   type GameState,
 } from "./state";
+import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";

@@ -2,7 +2,8 @@ import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyMembers } from "./partySystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
 import { getGridDistance } from "./positionUtils";
-import { getEntityById, getPartyExecutionIntent, type GameState } from "./state";
+import { getEntityById, type GameState } from "./state";
+import { getPartyExecutionIntent } from "./partyIntentState";
 import type { Enemy, Position } from "./types";
 
 export function getPartyCombatTarget(state: GameState): Enemy | null {

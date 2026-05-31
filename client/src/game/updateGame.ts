@@ -58,10 +58,10 @@ import {
   clearExpiredCombatFeedback,
   clearExpiredSkillRuntimeState,
   clearFrameMovementPlanning,
-  getPartyExecutionIntent,
   updateEntity,
   type GameState,
 } from "./state";
+import { getPartyExecutionIntent } from "./partyIntentState";
 import {
   createSimulationTiming,
   type SimulationTiming,

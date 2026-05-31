@@ -9,7 +9,8 @@ import {
   targetDummyPosition,
 } from "./debugMap";
 import { updateEnemyAISystem } from "./enemyAISystem";
-import { addEntity, setLeaderIntent } from "./state";
+import { addEntity } from "./state";
+import { setLeaderIntent } from "./partyIntentState";
 import { findEnemyTarget } from "./skillTargeting";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";

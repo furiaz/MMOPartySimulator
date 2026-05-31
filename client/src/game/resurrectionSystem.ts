@@ -5,11 +5,13 @@ import { getActivePartyThreatTargetInArea } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
 import {
   getEntityById,
-  isPositionAvailable,
-  moveEntityTowardPositionIfUnoccupied,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  isPositionAvailable,
+  moveEntityTowardPositionIfUnoccupied,
+} from "./movementPlanning";
 import type {
   Companion,
   GameEntity,
@@ -31,17 +33,17 @@ export function updateResurrectionSystem(
   now: number,
   deltaMs: number,
 ): GameState {
+  void now;
+
   const recoveryTargetId = getPartyResurrectionRecoveryTargetId(state);
   let nextState = clearInvalidResurrectionAssignments(
     state,
-    now,
     recoveryTargetId,
   );
 
   if (recoveryTargetId) {
     nextState = assignAvailableResurrectionParticipants(
       nextState,
-      now,
       recoveryTargetId,
     );
   }
@@ -50,7 +52,6 @@ export function updateResurrectionSystem(
   nextState = moveResurrectionParticipants(nextState, movedEntityIds);
   nextState = progressResurrectionArea(
     nextState,
-    now,
     deltaMs,
     recoveryTargetId,
   );
@@ -123,18 +124,19 @@ export function clearResurrectionRecoveryAssignmentForCompanion(
   now: number,
   cancelReason: ResurrectionCancelReason,
 ): GameState {
+  void now;
+
   const channel = state.resurrectionChannelsByHelperId?.[helperId];
 
   if (!channel) {
     return state;
   }
 
-  return removeResurrectionAssignment(state, channel, now, cancelReason);
+  return removeResurrectionAssignment(state, channel, cancelReason);
 }
 
 function assignAvailableResurrectionParticipants(
   state: GameState,
-  now: number,
   recoveryTargetId: string,
 ): GameState {
   let nextState = state;
@@ -153,7 +155,7 @@ function assignAvailableResurrectionParticipants(
     }
 
     nextState = ensureResurrectionProgress(nextState, target.id);
-    nextState = setResurrectionAssignment(nextState, helper.id, target.id, now);
+    nextState = setResurrectionAssignment(nextState, helper.id, target.id);
   }
 
   return nextState;
@@ -217,7 +219,6 @@ function moveResurrectionParticipants(
 
 function progressResurrectionArea(
   state: GameState,
-  now: number,
   deltaMs: number,
   recoveryTargetId: string | null,
 ): GameState {
@@ -242,21 +243,19 @@ function progressResurrectionArea(
   const nextState = addResurrectionProgress(
     state,
     target.id,
-    now,
     contributionMs,
     contributorCount,
   );
   const progress = nextState.resurrectionProgressByCompanionId?.[target.id];
 
   return progress && progress.progressMs >= progress.requiredMs
-    ? completeResurrection(nextState, target, now)
+    ? completeResurrection(nextState, target)
     : nextState;
 }
 
 function addResurrectionProgress(
   state: GameState,
   targetId: string,
-  _now: number,
   contributionMs: number,
   contributorCount: number,
 ): GameState {
@@ -296,7 +295,6 @@ function addResurrectionProgress(
 function completeResurrection(
   state: GameState,
   companion: Companion,
-  now: number,
 ): GameState {
   const revivedCompanion: Companion = {
     ...companion,
@@ -316,7 +314,6 @@ function completeResurrection(
       nextState = removeResurrectionAssignment(
         nextState,
         channel,
-        now,
         "target_revived",
       );
     }
@@ -343,7 +340,6 @@ function completeResurrection(
 
 function clearInvalidResurrectionAssignments(
   state: GameState,
-  now: number,
   recoveryTargetId: string | null,
 ): GameState {
   let nextState = state;
@@ -362,7 +358,6 @@ function clearInvalidResurrectionAssignments(
       nextState = removeResurrectionAssignment(
         nextState,
         channel,
-        now,
         helper?.kind === "companion" && helper.commandPriority === "direct"
           ? "direct_command"
           : "target_invalid",
@@ -377,7 +372,6 @@ function setResurrectionAssignment(
   state: GameState,
   helperId: string,
   targetId: string,
-  _now: number,
 ): GameState {
   const helper = state.entities[helperId];
   const channel: ResurrectionRecoveryAssignmentState = { helperId, targetId };
@@ -416,7 +410,6 @@ function setResurrectionAssignment(
 function removeResurrectionAssignment(
   state: GameState,
   channel: ResurrectionRecoveryAssignmentState,
-  _now: number,
   cancelReason: ResurrectionCancelReason,
 ): GameState {
   const resurrectionChannelsByHelperId = {

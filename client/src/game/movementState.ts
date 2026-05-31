@@ -1,5 +1,6 @@
 import { getGridDistance } from "./positionUtils";
-import type { GameState, MovementFailureDetail } from "./state";
+import type { MovementFailureDetail } from "./movementTypes";
+import type { GameState } from "./state";
 import type { DebugNavigationReason, GameEntity, Position } from "./types";
 
 const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;

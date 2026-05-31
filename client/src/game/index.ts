@@ -148,6 +148,7 @@ export type {
   QuestStatus,
 } from "./questTypes";
 export type { GameState } from "./state";
+export { createInitialGameState } from "./createInitialGameState";
 
 export {
   createCompanion,
@@ -177,24 +178,15 @@ export {
   clearExpiredSkillRuntimeState,
   getEntityById,
   getPoiSearchScope,
-  getPartyExecutionIntent,
-  hasDirectPlayerPartyIntent,
-  clearPartyIntent,
-  queuePartyIntent,
-  restoreQueuedPartyIntent,
   setAutoModeEnabled,
   setCompanionDefendPosition,
   setCompanionRole,
-  setLeaderIntent,
-  setPartyExecutionIntent,
-  setPartyIntent,
   setPartyLeader,
   setPartyMemberClass,
   setPartyMemberRole,
   setPartyOrder,
   setPoiSearchScope,
   setStayInMapEnabled,
-  setWorldTravelTargetMapId,
   updateEntity,
   BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
   ENTITY_COLLISION_DISTANCE,
@@ -203,6 +195,17 @@ export {
   type EntityCollisionShape,
   type PoiSearchScope,
 } from "./state";
+export {
+  clearPartyIntent,
+  getPartyExecutionIntent,
+  hasDirectPlayerPartyIntent,
+  queuePartyIntent,
+  restoreQueuedPartyIntent,
+  setLeaderIntent,
+  setPartyExecutionIntent,
+  setPartyIntent,
+  setWorldTravelTargetMapId,
+} from "./partyIntentState";
 export {
   ITEM_DEFINITIONS,
   getItemDefinition,

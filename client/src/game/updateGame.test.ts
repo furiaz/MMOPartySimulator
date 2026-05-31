@@ -31,14 +31,16 @@ import {
 } from "./questGuideSystem";
 import {
   addEntity,
-  getPartyExecutionIntent,
   getPoiSearchScope,
   setPoiSearchScope,
-  setPartyExecutionIntent,
   setStayInMapEnabled,
-  setWorldTravelTargetMapId,
   type GameState,
 } from "./state";
+import {
+  getPartyExecutionIntent,
+  setPartyExecutionIntent,
+  setWorldTravelTargetMapId,
+} from "./partyIntentState";
 import { setMapTeleportPoi } from "./teleportSystem";
 import { createTestGameState } from "./testState";
 import { updateGame } from "./updateGame";

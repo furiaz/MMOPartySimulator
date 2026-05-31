@@ -1,6 +1,7 @@
 import { isCombatEntity } from "./entities";
 import { isActiveResource, isTargetDummyEnemy } from "./entityGuards";
-import { getBoundedNavigationDistance, type GameState } from "./state";
+import { getBoundedNavigationDistance } from "./movementPlanning";
+import type { GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
 

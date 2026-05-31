@@ -13,7 +13,8 @@ import {
 } from "./skillMovement";
 import { getCompanionAttackRange } from "./companionCombat";
 import { getGridDistance } from "./positionUtils";
-import { getEntityById, getPartyExecutionIntent, type GameState } from "./state";
+import { getEntityById, type GameState } from "./state";
+import { getPartyExecutionIntent } from "./partyIntentState";
 import { getPartyCombatTarget } from "./partyTargetSystem";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 

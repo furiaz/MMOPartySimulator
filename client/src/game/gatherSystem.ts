@@ -8,14 +8,16 @@ import { isActiveResource } from "./entityGuards";
 import { getEnemyAttackLeashDistance } from "./enemyAISystem";
 import {
   addCombatFeedback,
-  ENTITY_COLLISION_DISTANCE,
-  getBoundedPathDistance,
   getEntityById,
-  getPartyExecutionIntent,
-  moveEntityTowardIfUnoccupied,
   updateEntity,
   type GameState,
 } from "./state";
+import {
+  ENTITY_COLLISION_DISTANCE,
+  getBoundedPathDistance,
+  moveEntityTowardIfUnoccupied,
+} from "./movementPlanning";
+import { getPartyExecutionIntent } from "./partyIntentState";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
 import { recordResourceGatheredForQuests } from "./questSystem";
