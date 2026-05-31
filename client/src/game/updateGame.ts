@@ -123,7 +123,7 @@ export function updateGame(
 
   nextState = updatePartyIntentRecoverySystem(nextState);
 
-  nextState = updateTeleportSystem(nextState, movedEntityIds);
+  nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
 
   if (
     wasTeleportActive ||

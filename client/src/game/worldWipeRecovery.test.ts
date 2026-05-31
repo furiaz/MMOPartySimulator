@@ -237,6 +237,17 @@ describe("world wipe recovery", () => {
             targetEntityId: "enemy",
             reason: "test",
           },
+          interruptedPoiTarget: {
+            interruptedByEnemyId: "enemy",
+            mapId: MAP_ONE_ID,
+            leaderIntent: {
+              type: "move",
+              targetId: null,
+              targetPosition: { x: 10, y: 10 },
+            },
+            globalPoiIntent: null,
+            localPoiTarget: null,
+          },
           combatFeedbackEvents: [
             {
               id: "feedback",
@@ -272,10 +283,32 @@ describe("world wipe recovery", () => {
           moveIntentsByEntityId: {
             leader: { x: 10, y: 10 },
           },
+          movementFailureMsByEntityId: {
+            leader: 250,
+          },
+          movementFailuresByEntityId: {
+            leader: {
+              pathFailureReason: "unreachable",
+            },
+          },
+          movementPathRetryAtMsByEntityId: {
+            leader: 2000,
+          },
           movementPathsByEntityId: {
             leader: {
               targetKey: "10,10",
               waypoints: [{ x: 10, y: 10 }],
+            },
+          },
+          attackSlotCacheByEntityId: {
+            leader: {
+              attackRange: 1,
+              attackSlot: { x: 5, y: 6 },
+              createdAtMs: 500,
+              mapKey: MAP_ONE_ID,
+              targetId: "enemy",
+              targetPosition: { x: 6, y: 6 },
+              usesPartyPassThrough: false,
             },
           },
         },
@@ -305,11 +338,16 @@ describe("world wipe recovery", () => {
     expect(nextState.leaderIntent).toBeNull();
     expect(nextState.globalPoiIntent).toBeNull();
     expect(nextState.localPoiTarget).toBeNull();
+    expect(nextState.interruptedPoiTarget).toBeNull();
     expect(nextState.combatFeedbackEvents).toEqual([]);
     expect(nextState.skillVisualEvents).toEqual([]);
     expect(nextState.dropVisualEvents).toEqual([]);
     expect(nextState.moveIntentsByEntityId).toEqual({});
+    expect(nextState.movementFailureMsByEntityId).toEqual({});
+    expect(nextState.movementFailuresByEntityId).toEqual({});
+    expect(nextState.movementPathRetryAtMsByEntityId).toEqual({});
     expect(nextState.movementPathsByEntityId).toEqual({});
+    expect(nextState.attackSlotCacheByEntityId).toEqual({});
   });
 
   it("creates a pending choice when closest unlocked rescue hubs tie", () => {

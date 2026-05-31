@@ -42,6 +42,7 @@ import {
   targetDummyPosition,
 } from "./debugMap";
 import { hasDeadPartyMembers } from "./partySystem";
+import { clearMapTransitionRuntimeState } from "./mapRuntimeCleanup";
 import {
   updateEntity,
   type GameState,
@@ -127,6 +128,7 @@ export function setMapTeleportPoi(
 export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
+  nowMs = Date.now(),
 ): GameState {
   if (isAiTeleportPausedForResurrection(state)) {
     return state;
@@ -141,7 +143,7 @@ export function updateTeleportSystem(
   }
 
   if (isPartyWithinTeleportRange(activatedState)) {
-    return completeTeleport(activatedState);
+    return completeTeleport(activatedState, nowMs);
   }
 
   return movePartyToTeleport(activatedState, movedEntityIds);
@@ -303,7 +305,7 @@ function movePartyToTeleport(
   return nextState;
 }
 
-function completeTeleport(state: GameState): GameState {
+function completeTeleport(state: GameState, nowMs: number): GameState {
   const teleport = state.activeTeleport;
 
   if (!teleport) {
@@ -323,54 +325,21 @@ function completeTeleport(state: GameState): GameState {
     : state;
   const hubDepartureFoodWarning =
     previousMapId === HUB_MAP_ID && teleport.targetMapId !== HUB_MAP_ID
-      ? addHubDepartureFoodWarningIfNeeded(sourceState, Date.now()).hubDepartureFoodWarning
+      ? addHubDepartureFoodWarningIfNeeded(sourceState, nowMs).hubDepartureFoodWarning
       : sourceState.hubDepartureFoodWarning;
   const positionsBeforeTransition = getEntityPositions(sourceState.entities);
   const targetMap = createDebugMap(teleport.targetMapId);
   const entities = getMapEntities(sourceState, targetMap);
   let nextState: GameState = {
-    ...sourceState,
+    ...clearMapTransitionRuntimeState(sourceState),
     entities,
     currentMapId: teleport.targetMapId,
     map: targetMap,
     hubDepartureFoodWarning,
-    activeTeleport: null,
     partyIntent: null,
     leaderIntent: null,
-    directCompanionCommandsById: {},
-    directCommandGraceUntilByCompanionId: {},
-    interruptedPoiTarget: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,
-    exploredTiles: {},
-    followTrailsByEntityId: {},
-    combatFeedbackEvents: [],
-    failedMoveByEntityId: {},
-    movementFailuresByEntityId: {},
-    moveIntentsByEntityId: {},
-    reservedPositionsByEntityId: {},
-    movementPathsByEntityId: {},
-    movementDecisionsByEntityId: {},
-    lastPositionsByEntityId: {},
-    defenderWaitTicksByLeaderId: {},
-    defenderBlockedTicksByEntityId: {},
-    defenderWaitMsByLeaderId: {},
-    defenderBlockedMsByEntityId: {},
-    skillVisualEvents: [],
-    enemyAoeChannelsByCasterId: {},
-    enemyAoeCooldownsByCasterId: {},
-    dropVisualEvents: [],
-    resurrectionProgressByCompanionId: {},
-    resurrectionChannelsByHelperId: {},
-    partyFormation: {
-      phase: "idle",
-      targetId: null,
-      approachPoint: null,
-      direction: { x: 0, y: 0 },
-      slotsByEntityId: {},
-      slotReasonsByEntityId: {},
-      skippedTargetIds: [],
-    },
   };
 
   for (const companionId of companionIds) {

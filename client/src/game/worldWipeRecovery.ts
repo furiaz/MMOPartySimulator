@@ -17,6 +17,7 @@ import {
   isSlimewardDungeonFloorMapId,
 } from "./dungeonSystem";
 import { createNpc, createTargetDummy, moveEntityTo } from "./entities";
+import { clearMapTransitionRuntimeState } from "./mapRuntimeCleanup";
 import { recordMapReachedForQuests } from "./questSystem";
 import { updateEntity, type GameState } from "./state";
 import type {
@@ -230,55 +231,22 @@ function resetStateToRescueHub(
       : state;
   const targetMap = createDebugMap(choice.mapId);
   let nextState: GameState = {
-    ...sourceState,
+    ...clearMapTransitionRuntimeState(sourceState),
     entities: getRescueHubEntities(sourceState, choice),
     currentMapId: choice.mapId,
     map: targetMap,
-    activeTeleport: null,
     partyIntent: null,
     leaderIntent: null,
-    directCompanionCommandsById: {},
-    directCommandGraceUntilByCompanionId: {},
     globalPoiIntent: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,
     worldTravelTargetMapId: null,
-    exploredTiles: {},
-    followTrailsByEntityId: {},
-    combatFeedbackEvents: [],
-    failedMoveByEntityId: {},
-    movementFailureMsByEntityId: {},
-    movementFailuresByEntityId: {},
-    moveIntentsByEntityId: {},
-    reservedPositionsByEntityId: {},
-    movementPathsByEntityId: {},
-    movementDecisionsByEntityId: {},
-    lastPositionsByEntityId: {},
-    defenderWaitTicksByLeaderId: {},
-    defenderBlockedTicksByEntityId: {},
-    defenderWaitMsByLeaderId: {},
-    defenderBlockedMsByEntityId: {},
     skillMarksByEnemyId: {},
     skillSelfBuffsByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillBindsByEnemyId: {},
     skillShieldBlocksById: {},
     skillCooldownsByCompanionId: {},
-    skillVisualEvents: [],
-    enemyAoeChannelsByCasterId: {},
-    enemyAoeCooldownsByCasterId: {},
-    dropVisualEvents: [],
-    resurrectionProgressByCompanionId: {},
-    resurrectionChannelsByHelperId: {},
-    partyFormation: {
-      phase: "idle",
-      targetId: null,
-      approachPoint: null,
-      direction: { x: 0, y: 0 },
-      slotsByEntityId: {},
-      slotReasonsByEntityId: {},
-      skippedTargetIds: [],
-    },
   };
 
   const companions = getCompanions(nextState).sort(

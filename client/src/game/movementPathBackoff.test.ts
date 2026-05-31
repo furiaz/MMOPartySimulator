@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createEnemy, createNpc, createResource } from ".";
+import {
+  createCompanion as createGameCompanion,
+  createEnemy,
+  createNpc,
+  createResource,
+} from ".";
 import { markMoveFailed } from "./movementState";
 import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import {
@@ -84,46 +89,13 @@ const noGoalMap: GameMap = {
   healingFountains: [],
 };
 
-const companion = {
-  id: "companion-1",
-  kind: "companion",
-  position: { x: 1, y: 1 },
-  state: "follow",
-  health: 10,
-  maxHealth: 10,
-  lastAttackAt: 0,
-  classId: "beginner",
-  characterLevel: 1,
-  characterXp: 0,
-  lastCharacterXpGained: 0,
-  naturalStats: {
-    strength: 1,
-    dexterity: 1,
-    constitution: 1,
-    intelligence: 1,
-    wisdom: 1,
-  },
-  allocatedStats: {
-    strength: 0,
-    dexterity: 0,
-    constitution: 0,
-    intelligence: 0,
-    wisdom: 0,
-  },
-  unspentStatPoints: 0,
-  role: "fighter",
-  partyOrder: 0,
-  followTargetId: null,
-  defendPosition: null,
-  currentTargetId: null,
-  lastGatherAt: 0,
-  gatherSpeed: 1,
-  commandPriority: "autonomous",
-  equipment: {},
-  consumables: {},
-  consumableBuffs: [],
-  consumableBehavior: "auto",
-} as unknown as Companion;
+const companion = createGameCompanion(
+  "companion-1",
+  { x: 1, y: 1 },
+  "companion-1",
+  "fighter",
+  0,
+);
 
 function createCompanion(overrides: Partial<Companion> = {}): Companion {
   return {
