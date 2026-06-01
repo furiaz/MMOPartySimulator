@@ -1,12 +1,14 @@
 import { InventoryPanel } from "./InventoryPanel";
 import { QuestsPanel } from "./QuestPanels";
 import { WorldPanel } from "./WorldPanel";
+import type {
+  GameMenuTab,
+  PartyManagementSection,
+  PartyMenuSection,
+} from "./gameMenuTypes";
 import {
   PartyManagementPanel,
   PartyMenuPanel,
-  type GameMenuTab,
-  type PartyManagementSection,
-  type PartyMenuSection,
 } from "./CompanionPanels";
 import type {
   Companion,
@@ -27,7 +29,6 @@ export function GameMenu({
   activePartySection,
   inventory,
   wallet,
-  isOpen,
   leaderId,
   members,
   currentTime,
@@ -52,7 +53,6 @@ export function GameMenu({
   onSelectTab,
   onSetWorldTravelRoute,
   onClearWorldTravelRoute,
-  onToggle,
   onUnequipEquipment,
   onUnequipFlask,
   onMovePartyOrder,
@@ -62,7 +62,6 @@ export function GameMenu({
   activePartySection: PartyMenuSection;
   inventory: PartyInventory;
   wallet: PartyWallet;
-  isOpen: boolean;
   leaderId: string;
   members: Companion[];
   currentTime: number;
@@ -94,18 +93,12 @@ export function GameMenu({
   onSelectTab: (tab: GameMenuTab | null) => void;
   onSetWorldTravelRoute: (targetMapId: DebugMapId) => void;
   onClearWorldTravelRoute: () => void;
-  onToggle: () => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
   onUnequipFlask: (companionId: string) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
   return (
-    <>
-      <button className="game-menu-toggle-button" onClick={onToggle} type="button">
-        {isOpen ? "Close Menu" : "Menu"}
-      </button>
-      {isOpen ? (
-        <aside className="game-menu-panel" aria-label="Game menu">
+    <aside className="game-menu-panel" aria-label="Game menu">
           <nav className="game-menu-tabs" aria-label="Menu sections">
             <button
               className={activeTab === "party" ? "active" : ""}
@@ -199,8 +192,6 @@ export function GameMenu({
               )}
             </div>
           ) : null}
-        </aside>
-      ) : null}
-    </>
+    </aside>
   );
 }

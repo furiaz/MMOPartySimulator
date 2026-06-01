@@ -1,23 +1,24 @@
 import {
   useCallback,
   useEffect,
+  lazy,
   useMemo,
   useRef,
   useState,
+  Suspense,
 } from "react";
 import "./App.css";
-import { GameMenu } from "./GameMenu";
+import { CompanionVitalsPanel } from "./CompanionVitalsPanel";
 import { GuidePopup } from "./GuidePopup";
 import {
   guidePopupDefinitions,
   type GuidePopupId,
 } from "./guidePopupDefinitions";
-import {
-  CompanionVitalsPanel,
-  type GameMenuTab,
-  type PartyManagementSection,
-  type PartyMenuSection,
-} from "./CompanionPanels";
+import type {
+  GameMenuTab,
+  PartyManagementSection,
+  PartyMenuSection,
+} from "./gameMenuTypes";
 import {
   formatQuestStatus,
   getDisplayQuest,
@@ -28,8 +29,7 @@ import {
   getQuestRewardText,
   getQuestTurnInErrorText,
 } from "./questUiHelpers";
-import { QuestTrackerPanel } from "./QuestPanels";
-import { PixiWorldRenderer } from "./worldRenderer/PixiWorldRenderer";
+import { QuestTrackerPanel } from "./QuestTrackerPanel";
 import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
 
 import {
@@ -148,6 +148,25 @@ import {
   type GamePerformanceMetrics,
 } from "./game/performanceMetrics";
 import { type SpriteDirection } from "./visualAssets";
+
+const LazyGameMenu = lazy(() =>
+  import("./GameMenu").then((module) => ({ default: module.GameMenu })),
+);
+
+const LazyPixiWorldRenderer = lazy(() =>
+  import("./worldRenderer/PixiWorldRenderer").then((module) => ({
+    default: module.PixiWorldRenderer,
+  })),
+);
+
+function PixiWorldRendererFallback({ mode }: { mode: "full" | "preview" }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pixi-world-renderer pixi-world-renderer-${mode} pixi-world-renderer-loading`}
+    />
+  );
+}
 
 const debugMap = createDebugMap();
 const gameVersion = "0.01";
@@ -3039,44 +3058,46 @@ function App() {
             consideredTargets={gameState.lastPoiDecision?.consideredTargets}
             hasLeader={hasPartyLeader}
           />
-          <PixiWorldRenderer
-            activeTeleport={activeTeleport}
-            cameraOffset={terrainCameraOffset}
-            cellPixelSize={mapConstructionCellPixelSize}
-            combatFeedbackEvents={gameState.combatFeedbackEvents}
-            currentTime={currentTime}
-            directCompanionCommandsById={
-              gameState.directCompanionCommandsById ?? {}
-            }
-            dropVisualEvents={gameState.dropVisualEvents ?? []}
-            enemyAoeChannelsByCasterId={
-              gameState.enemyAoeChannelsByCasterId ?? {}
-            }
-            entities={allEntities}
-            leaderIntent={gameState.leaderIntent}
-            map={currentMap}
-            mode="full"
-            onCompanionDragCommand={commandCompanionByDrag}
-            onEnemyClick={commandPartyToTargetEnemy}
-            onEntityHover={updateEntityHoverTooltip}
-            onFloorClick={commandPartyToMoveFromFloorPosition}
-            onNpcClick={commandPartyToInteractWithNpc}
-            onPerformanceSample={handleRendererPerformanceSample}
-            onResourceClick={commandCompanionsToGatherResource}
-            partyIntent={gameState.partyIntent}
-            questGiverHasWork={questGiverHasWork}
-            resurrectionProgressByCompanionId={
-              gameState.resurrectionProgressByCompanionId ?? {}
-            }
-            showDebugOverlays={showEntityInfo}
-            skillBindsByEnemyId={gameState.skillBindsByEnemyId ?? {}}
-            skillMarksByEnemyId={gameState.skillMarksByEnemyId ?? {}}
-            skillShieldBlocksById={gameState.skillShieldBlocksById ?? {}}
-            skillVisualEvents={gameState.skillVisualEvents ?? []}
-            teleportWorkingById={teleportWorkingById}
-            viewportSize={viewportSize}
-            visualMovementByEntityId={visualMovementByEntityId}
-          />
+          <Suspense fallback={<PixiWorldRendererFallback mode="full" />}>
+            <LazyPixiWorldRenderer
+              activeTeleport={activeTeleport}
+              cameraOffset={terrainCameraOffset}
+              cellPixelSize={mapConstructionCellPixelSize}
+              combatFeedbackEvents={gameState.combatFeedbackEvents}
+              currentTime={currentTime}
+              directCompanionCommandsById={
+                gameState.directCompanionCommandsById ?? {}
+              }
+              dropVisualEvents={gameState.dropVisualEvents ?? []}
+              enemyAoeChannelsByCasterId={
+                gameState.enemyAoeChannelsByCasterId ?? {}
+              }
+              entities={allEntities}
+              leaderIntent={gameState.leaderIntent}
+              map={currentMap}
+              mode="full"
+              onCompanionDragCommand={commandCompanionByDrag}
+              onEnemyClick={commandPartyToTargetEnemy}
+              onEntityHover={updateEntityHoverTooltip}
+              onFloorClick={commandPartyToMoveFromFloorPosition}
+              onNpcClick={commandPartyToInteractWithNpc}
+              onPerformanceSample={handleRendererPerformanceSample}
+              onResourceClick={commandCompanionsToGatherResource}
+              partyIntent={gameState.partyIntent}
+              questGiverHasWork={questGiverHasWork}
+              resurrectionProgressByCompanionId={
+                gameState.resurrectionProgressByCompanionId ?? {}
+              }
+              showDebugOverlays={showEntityInfo}
+              skillBindsByEnemyId={gameState.skillBindsByEnemyId ?? {}}
+              skillMarksByEnemyId={gameState.skillMarksByEnemyId ?? {}}
+              skillShieldBlocksById={gameState.skillShieldBlocksById ?? {}}
+              skillVisualEvents={gameState.skillVisualEvents ?? []}
+              teleportWorkingById={teleportWorkingById}
+              viewportSize={viewportSize}
+              visualMovementByEntityId={visualMovementByEntityId}
+            />
+          </Suspense>
           {hoveredEntity && entityHoverTooltip ? (
             <EntityHoverTooltip
               entity={hoveredEntity}
@@ -3084,20 +3105,22 @@ function App() {
               viewportSize={viewportSize}
             />
           ) : null}
-          <PixiWorldRenderer
-            activeTeleport={activeTeleport}
-            cameraOffset={terrainCameraOffset}
-            cellPixelSize={mapConstructionCellPixelSize}
-            currentTime={currentTime}
-            entities={allEntities}
-            leaderIntent={gameState.leaderIntent}
-            map={currentMap}
-            mode="preview"
-            onFloorClick={commandPartyToMoveFromMinimapPosition}
-            teleportWorkingById={teleportWorkingById}
-            viewportSize={viewportSize}
-            visualMovementByEntityId={visualMovementByEntityId}
-          />
+          <Suspense fallback={<PixiWorldRendererFallback mode="preview" />}>
+            <LazyPixiWorldRenderer
+              activeTeleport={activeTeleport}
+              cameraOffset={terrainCameraOffset}
+              cellPixelSize={mapConstructionCellPixelSize}
+              currentTime={currentTime}
+              entities={allEntities}
+              leaderIntent={gameState.leaderIntent}
+              map={currentMap}
+              mode="preview"
+              onFloorClick={commandPartyToMoveFromMinimapPosition}
+              teleportWorkingById={teleportWorkingById}
+              viewportSize={viewportSize}
+              visualMovementByEntityId={visualMovementByEntityId}
+            />
+          </Suspense>
         </div>
 
         {activeMerchant ? (
@@ -3373,42 +3396,51 @@ function App() {
           />
         ) : null}
 
-        <GameMenu
-          activeTab={activeGameMenuTab}
-          activeManagementSection={activePartyManagementSection}
-          activePartySection={activePartyMenuSection}
-          inventory={inventory}
-          wallet={gameState.wallet}
-          isOpen={isGameMenuOpen}
-          leaderId={gameState.partyLeaderId}
-          members={partyMembers}
-          currentTime={currentTime}
-          quests={gameState.quests}
-          currentMapId={gameState.currentMapId}
-          worldTravelTargetMapId={gameState.worldTravelTargetMapId}
-          selectedCompanionId={selectedMenuCompanionId}
-          selectedQuestId={selectedMenuQuestId}
-          totalPartyLevel={totalPartyLevel}
-          onAllocateStatPoint={allocateStatPoint}
-          onChangeLeader={changePartyLeader}
-          onChangeRole={changePartyMemberRole}
-          onAssignFood={assignFood}
-          onChangeConsumableBehavior={changeConsumableBehavior}
-          onEquipEquipment={equipEquipment}
-          onEquipFlask={equipFlask}
-          onOpenEquipmentManagement={openEquipmentManagementFromInventory}
-          onSelectCompanion={setSelectedCompanionId}
-          onSelectManagementSection={setActivePartyManagementSection}
-          onSelectPartySection={setActivePartyMenuSection}
-          onSelectQuest={setSelectedQuestId}
-          onSelectTab={selectGameMenuTab}
-          onSetWorldTravelRoute={setWorldTravelRoute}
-          onClearWorldTravelRoute={clearWorldTravelRoute}
-          onToggle={toggleGameMenu}
-          onUnequipEquipment={unequipEquipment}
-          onUnequipFlask={unequipFlask}
-          onMovePartyOrder={movePartyMemberOrder}
-        />
+        <button
+          className="game-menu-toggle-button"
+          onClick={toggleGameMenu}
+          type="button"
+        >
+          {isGameMenuOpen ? "Close Menu" : "Menu"}
+        </button>
+        {isGameMenuOpen ? (
+          <Suspense fallback={null}>
+            <LazyGameMenu
+              activeTab={activeGameMenuTab}
+              activeManagementSection={activePartyManagementSection}
+              activePartySection={activePartyMenuSection}
+              inventory={inventory}
+              wallet={gameState.wallet}
+              leaderId={gameState.partyLeaderId}
+              members={partyMembers}
+              currentTime={currentTime}
+              quests={gameState.quests}
+              currentMapId={gameState.currentMapId}
+              worldTravelTargetMapId={gameState.worldTravelTargetMapId}
+              selectedCompanionId={selectedMenuCompanionId}
+              selectedQuestId={selectedMenuQuestId}
+              totalPartyLevel={totalPartyLevel}
+              onAllocateStatPoint={allocateStatPoint}
+              onChangeLeader={changePartyLeader}
+              onChangeRole={changePartyMemberRole}
+              onAssignFood={assignFood}
+              onChangeConsumableBehavior={changeConsumableBehavior}
+              onEquipEquipment={equipEquipment}
+              onEquipFlask={equipFlask}
+              onOpenEquipmentManagement={openEquipmentManagementFromInventory}
+              onSelectCompanion={setSelectedCompanionId}
+              onSelectManagementSection={setActivePartyManagementSection}
+              onSelectPartySection={setActivePartyMenuSection}
+              onSelectQuest={setSelectedQuestId}
+              onSelectTab={selectGameMenuTab}
+              onSetWorldTravelRoute={setWorldTravelRoute}
+              onClearWorldTravelRoute={clearWorldTravelRoute}
+              onUnequipEquipment={unequipEquipment}
+              onUnequipFlask={unequipFlask}
+              onMovePartyOrder={movePartyMemberOrder}
+            />
+          </Suspense>
+        ) : null}
         <CompanionVitalsPanel currentTime={currentTime} members={partyMembers} />
         <QuestTrackerPanel
           isHidden={isQuestTrackerHidden}
