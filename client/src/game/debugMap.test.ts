@@ -7,6 +7,8 @@ import {
   MAP_ONE_ROWS,
   MAP_ONE_ID,
   MAP_THREE_ID,
+  MAP_THREE_ROWS,
+  MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_TWO_ID,
   MAP_TWO_ROWS,
   WILDERNESS_MAP_COLUMNS,
@@ -32,6 +34,7 @@ import {
   SECURE_LANDING_PASSAGE_GATE_POSITION,
   mapThreeEnemyStartPositions,
   mapThreeEnemyStartData,
+  mapThreeSlimewardCampTeleporterPosition,
   mapThreeSubzoneNameLabels,
   mapThreeResourceStartData,
   mapThreeSubzones,
@@ -40,6 +43,7 @@ import {
   mapTwoSubzoneNameLabels,
   mapTwoResourceStartData,
   mapTwoSubzones,
+  SLIMEWARD_CAMP_ID,
   targetDummyPosition,
 } from "./debugMap";
 import { ENEMY_TYPES } from "./enemyArchetypes";
@@ -102,7 +106,7 @@ describe("debug maps", () => {
     });
     expect(createDebugMap(MAP_THREE_ID)).toMatchObject({
       columns: WILDERNESS_MAP_COLUMNS,
-      rows: WILDERNESS_MAP_ROWS,
+      rows: MAP_THREE_ROWS,
     });
     expect(createDebugMap(MAP_FOUR_ID)).toMatchObject({
       columns: WILDERNESS_MAP_COLUMNS,
@@ -149,7 +153,10 @@ describe("debug maps", () => {
       if (wildernessMap.mapId === MAP_ONE_ID) {
         expect(wildernessMap.enemyPositions).toHaveLength(48);
         expect(wildernessMap.resources).toHaveLength(9);
-      } else if (wildernessMap.mapId === MAP_TWO_ID) {
+      } else if (
+        wildernessMap.mapId === MAP_TWO_ID ||
+        wildernessMap.mapId === MAP_THREE_ID
+      ) {
         expect(wildernessMap.enemyPositions).toHaveLength(48);
         expect(wildernessMap.resources).toHaveLength(8);
       } else {
@@ -440,6 +447,101 @@ describe("debug maps", () => {
         ),
       ).toBe(true);
     }
+  });
+
+  it("lays out map three as a larger full-height progression map", () => {
+    const mapThreeDefinition = debugMapDefinitions[MAP_THREE_ID];
+    const mapThree = createDebugMap(MAP_THREE_ID);
+    const returnEntry = mapThreeDefinition.teleports.find(
+      (teleport) => teleport.targetMapId === MAP_TWO_ID,
+    );
+    const forwardEntry = mapThreeDefinition.teleports.find(
+      (teleport) => teleport.targetMapId === MAP_FOUR_ID,
+    );
+    const slimewardEntry = mapThreeDefinition.teleports.find(
+      (teleport) => teleport.targetMapId === SLIMEWARD_CAMP_ID,
+    );
+    const slimewardReturnEntry = debugMapDefinitions[
+      SLIMEWARD_CAMP_ID
+    ].teleports.find((teleport) => teleport.targetMapId === MAP_THREE_ID);
+    const brokenThicket = getSubzone(mapThreeSubzones, "south-west");
+    const crawlerShelf = getSubzone(mapThreeSubzones, "north-west");
+    const impFen = getSubzone(mapThreeSubzones, "south-center");
+    const slimewardObjective =
+      QUEST_DEFINITIONS.find_slimeward_camp.objectives.find(
+        (objective) => objective.id === "unlock_slimeward_camp_route",
+      );
+
+    expect(mapThreeDefinition.rows).toBe(MAP_THREE_ROWS);
+    expect(MAP_THREE_ROWS).toBe(MAP_ONE_ROWS);
+    expect(mapThreeSubzones.map((subzone) => subzone.bounds)).toEqual([
+      { x: 1, y: 1, width: 51, height: 55 },
+      { x: 53, y: 1, width: 52, height: 55 },
+      { x: 106, y: 1, width: 53, height: 55 },
+    ]);
+    expect(getSubzone(mapThreeSubzones, "south-west").levelRange.min).toBeLessThan(
+      getSubzone(mapThreeSubzones, "north-west").levelRange.min,
+    );
+    expect(getSubzone(mapThreeSubzones, "north-west").levelRange.min).toBeLessThan(
+      getSubzone(mapThreeSubzones, "south-center").levelRange.min,
+    );
+
+    expect(returnEntry && isInsideSubzone(brokenThicket, returnEntry.position)).toBe(true);
+    expect(forwardEntry && isInsideSubzone(impFen, forwardEntry.position)).toBe(true);
+    expect(slimewardEntry && isInsideSubzone(impFen, slimewardEntry.position)).toBe(true);
+    expect(slimewardEntry?.position).toEqual(mapThreeSlimewardCampTeleporterPosition);
+    expect(slimewardObjective).toMatchObject({
+      targetSubzoneId: "south-center",
+      targetPosition: mapThreeSlimewardCampTeleporterPosition,
+      targetPoiId: MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+    });
+
+    for (const arrivalPosition of debugMapDefinitions[MAP_TWO_ID].teleports[1].arrivalPositions) {
+      expect(isInsideSubzone(brokenThicket, arrivalPosition)).toBe(true);
+    }
+    for (const arrivalPosition of debugMapDefinitions[MAP_FOUR_ID].teleports[0].arrivalPositions) {
+      expect(isInsideSubzone(impFen, arrivalPosition)).toBe(true);
+    }
+    for (const arrivalPosition of slimewardReturnEntry?.arrivalPositions ?? []) {
+      expect(isInsideSubzone(impFen, arrivalPosition)).toBe(true);
+    }
+
+    for (const dividerX of [52, 105]) {
+      expect(mapThree.walls).toContainEqual({ x: dividerX, y: 0 });
+      expect(mapThree.walls).toContainEqual({ x: dividerX, y: MAP_THREE_ROWS - 1 });
+      expect(isNavigationCellWalkable(mapThree, { x: dividerX, y: 29 })).toBe(true);
+
+      for (let y = 1; y < MAP_THREE_ROWS - 1; y += 1) {
+        if (y >= 24 && y <= 34) {
+          expect(mapThree.walls).not.toContainEqual({ x: dividerX, y });
+        } else {
+          expect(mapThree.walls).toContainEqual({ x: dividerX, y });
+        }
+      }
+    }
+
+    const expectedSubzoneEnemyTypes = new Map([
+      ["south-west", ["stone_crawler", "mossling"]],
+      ["north-west", ["stone_crawler", "goblin_shaman"]],
+      ["south-center", ["mossling", "goblin_shaman"]],
+    ]);
+
+    for (const subzone of mapThreeSubzones) {
+      const expectedEnemyTypes = expectedSubzoneEnemyTypes.get(subzone.id);
+      const subzoneEnemies = mapThreeEnemyStartData.filter(
+        (enemy) => enemy.subzoneId === subzone.id,
+      );
+
+      expect(subzone.enemyTypeIds).toEqual(expectedEnemyTypes);
+      expect(subzoneEnemies).toHaveLength(16);
+      expect(
+        subzoneEnemies.every((enemy) =>
+          expectedEnemyTypes?.includes(enemy.enemyTypeId),
+        ),
+      ).toBe(true);
+    }
+
+    expect(crawlerShelf.displayName).toBe("Crawler Shelf");
   });
 
   it("keeps one map one enemy near each resource node", () => {

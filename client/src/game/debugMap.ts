@@ -21,6 +21,7 @@ export const WILDERNESS_MAP_COLUMNS = 160;
 export const WILDERNESS_MAP_ROWS = 30;
 export const MAP_ONE_ROWS = 57;
 export const MAP_TWO_ROWS = MAP_ONE_ROWS;
+export const MAP_THREE_ROWS = MAP_ONE_ROWS;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const MAP_TWO_TO_MAP_THREE_TELEPORTER_ID = "map-2-to-map-3";
 export const MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID = "map-3-to-map-4";
@@ -116,11 +117,12 @@ export const mapTwoCompanionStartPositions: Position[] = [
 
 export const teleporterPosition: Position = { x: 154, y: 29 };
 export const mapTwoForwardTeleporterPosition: Position = { x: 154, y: 29 };
-export const mapThreeForwardTeleporterPosition: Position = { x: 154, y: 12 };
+export const mapThreeForwardTeleporterPosition: Position = { x: 154, y: 29 };
+export const mapThreeSlimewardCampTeleporterPosition: Position = { x: 154, y: 8 };
 export const hubTeleporterPosition: Position = { x: 102, y: 30 };
 export const mapOneHubTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 29 };
-export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 12 };
+export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapFourReturnTeleporterPosition: Position = { x: 5, y: 12 };
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
@@ -164,10 +166,10 @@ const mapTwoMapOneArrivalPositions: Position[] = [
 ];
 
 const mapTwoMapThreeArrivalPositions: Position[] = [
-  { x: 7, y: 12 },
-  { x: 8, y: 12 },
-  { x: 7, y: 13 },
-  { x: 8, y: 13 },
+  { x: 7, y: 29 },
+  { x: 8, y: 29 },
+  { x: 7, y: 30 },
+  { x: 8, y: 30 },
 ];
 
 const mapThreeMapTwoArrivalPositions: Position[] = [
@@ -185,10 +187,10 @@ const mapThreeMapFourArrivalPositions: Position[] = [
 ];
 
 const mapFourMapThreeArrivalPositions: Position[] = [
-  { x: 154, y: 12 },
-  { x: 153, y: 12 },
-  { x: 154, y: 13 },
-  { x: 153, y: 13 },
+  { x: 154, y: 29 },
+  { x: 153, y: 29 },
+  { x: 154, y: 30 },
+  { x: 153, y: 30 },
 ];
 
 export const slimewardCampArrivalPositions: Position[] = [
@@ -199,10 +201,10 @@ export const slimewardCampArrivalPositions: Position[] = [
 ];
 
 export const mapThreeSlimewardArrivalPositions: Position[] = [
-  { x: 96, y: 27 },
-  { x: 97, y: 27 },
-  { x: 96, y: 28 },
-  { x: 97, y: 28 },
+  { x: 151, y: 8 },
+  { x: 152, y: 8 },
+  { x: 151, y: 9 },
+  { x: 152, y: 9 },
 ];
 
 export const slimewardFloorOneArrivalPositions: Position[] = [
@@ -296,13 +298,13 @@ const MAP_THREE_PASSAGES: ZoneSubzonePassage[] = [
     id: "south-west-to-north-west",
     fromSubzoneId: "south-west",
     toSubzoneId: "north-west",
-    position: { x: 26, y: 24 },
+    position: { x: 52, y: 29 },
   },
   {
-    id: "south-west-to-south-center",
-    fromSubzoneId: "south-west",
+    id: "north-west-to-south-center",
+    fromSubzoneId: "north-west",
     toSubzoneId: "south-center",
-    position: { x: 52, y: 36 },
+    position: { x: 105, y: 29 },
   },
 ];
 
@@ -341,13 +343,13 @@ const MAP_THREE_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
     id: "south-west-to-north-west",
     fromSubzoneId: "south-west",
     toSubzoneId: "north-west",
-    position: { x: 52, y: 12 },
+    position: { x: 52, y: 29 },
   },
   {
     id: "north-west-to-south-center",
     fromSubzoneId: "north-west",
     toSubzoneId: "south-center",
-    position: { x: 105, y: 12 },
+    position: { x: 105, y: 29 },
   },
 ];
 
@@ -477,41 +479,50 @@ const mapThreeSourceSubzones: ZoneSubzone[] = [
   {
     id: "south-west",
     displayName: "Broken Thicket",
-    bounds: { x: 1, y: 25, width: 51, height: 22 },
+    bounds: { x: 1, y: 1, width: 51, height: 55 },
     levelRange: { min: 8, max: 9 },
     enemyTypeIds: ["stone_crawler", "mossling"],
-    encounterAreas: [{ id: "broken-thicket-nest", subzoneId: "south-west", center: { x: 27, y: 36 }, radius: 17, leashRadius: 19 }],
+    encounterAreas: [
+      { id: "broken-thicket-north-nest", subzoneId: "south-west", center: { x: 27, y: 16 }, radius: 21, leashRadius: 23 },
+      { id: "broken-thicket-south-nest", subzoneId: "south-west", center: { x: 28, y: 42 }, radius: 21, leashRadius: 23 },
+    ],
     resourceLocations: [
-      { id: resourceIds[0], subzoneId: "south-west", position: { x: 48, y: 43 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[10], subzoneId: "south-west", position: { x: 7, y: 28 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[0], subzoneId: "south-west", position: { x: 8, y: 50 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[10], subzoneId: "south-west", position: { x: 47, y: 7 }, resourceType: "herb", tier: 2 },
     ],
     passages: getPassagesForSubzone("south-west", MAP_THREE_PASSAGES),
   },
   {
     id: "north-west",
     displayName: "Crawler Shelf",
-    bounds: { x: 1, y: 1, width: 51, height: 23 },
-    levelRange: { min: 8, max: 10 },
+    bounds: { x: 53, y: 1, width: 52, height: 55 },
+    levelRange: { min: 9, max: 10 },
     enemyTypeIds: ["stone_crawler", "goblin_shaman"],
-    encounterAreas: [{ id: "crawler-shelf", subzoneId: "north-west", center: { x: 27, y: 11 }, radius: 17, leashRadius: 19 }],
+    encounterAreas: [
+      { id: "crawler-shelf-north", subzoneId: "north-west", center: { x: 79, y: 16 }, radius: 22, leashRadius: 24 },
+      { id: "crawler-shelf-south", subzoneId: "north-west", center: { x: 80, y: 42 }, radius: 22, leashRadius: 24 },
+    ],
     resourceLocations: [
-      { id: resourceIds[1], subzoneId: "north-west", position: { x: 6, y: 20 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[2], subzoneId: "north-west", position: { x: 49, y: 20 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[11], subzoneId: "north-west", position: { x: 49, y: 4 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[1], subzoneId: "north-west", position: { x: 58, y: 50 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[2], subzoneId: "north-west", position: { x: 101, y: 50 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[11], subzoneId: "north-west", position: { x: 101, y: 7 }, resourceType: "wood", tier: 2 },
     ],
     passages: getPassagesForSubzone("north-west", MAP_THREE_PASSAGES),
   },
   {
     id: "south-center",
     displayName: "Imp Fen",
-    bounds: { x: 53, y: 25, width: 52, height: 22 },
-    levelRange: { min: 9, max: 10 },
+    bounds: { x: 106, y: 1, width: 53, height: 55 },
+    levelRange: { min: 10, max: 10 },
     enemyTypeIds: ["mossling", "goblin_shaman"],
-    encounterAreas: [{ id: "imp-fen-circle", subzoneId: "south-center", center: { x: 80, y: 36 }, radius: 17, leashRadius: 19 }],
+    encounterAreas: [
+      { id: "imp-fen-north-circle", subzoneId: "south-center", center: { x: 132, y: 16 }, radius: 22, leashRadius: 24 },
+      { id: "imp-fen-south-circle", subzoneId: "south-center", center: { x: 133, y: 42 }, radius: 22, leashRadius: 24 },
+    ],
     resourceLocations: [
-      { id: resourceIds[4], subzoneId: "south-center", position: { x: 56, y: 43 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[5], subzoneId: "south-center", position: { x: 102, y: 43 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[12], subzoneId: "south-center", position: { x: 102, y: 28 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[4], subzoneId: "south-center", position: { x: 110, y: 50 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[5], subzoneId: "south-center", position: { x: 155, y: 50 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[12], subzoneId: "south-center", position: { x: 110, y: 7 }, resourceType: "wood", tier: 2 },
     ],
     passages: getPassagesForSubzone("south-center", MAP_THREE_PASSAGES),
   },
@@ -564,11 +575,7 @@ const mapFourSourceSubzones: ZoneSubzone[] = [
 const MAP_TWO_COMPACT_OFFSETS: Record<string, Position> = {
 };
 
-const MAP_THREE_COMPACT_OFFSETS: Record<string, Position> = {
-  "south-west": { x: 0, y: -24 },
-  "north-west": { x: 53, y: 0 },
-  "south-center": { x: 53, y: -24 },
-};
+const MAP_THREE_COMPACT_OFFSETS: Record<string, Position> = {};
 
 const MAP_FOUR_COMPACT_OFFSETS: Record<string, Position> = {
   "north-center": { x: -52, y: 0 },
@@ -615,12 +622,12 @@ const mapTwoSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
 ];
 
 const mapThreeSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-2-broken-thicket-entry-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 8, y: 36 } },
-  { id: "map-2-broken-thicket-crawler-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 26, y: 27 } },
-  { id: "map-2-crawler-shelf-broken-label", subzoneId: "north-west", text: "Crawler Shelf", position: { x: 26, y: 21 } },
-  { id: "map-2-broken-thicket-imp-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 47, y: 36 } },
-  { id: "map-2-imp-fen-broken-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 57, y: 36 } },
-  { id: "map-3-imp-fen-exit-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 100, y: 36 } },
+  { id: "map-3-broken-thicket-entry-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 10, y: 29 } },
+  { id: "map-3-broken-thicket-crawler-label", subzoneId: "south-west", text: "Broken Thicket", position: { x: 45, y: 29 } },
+  { id: "map-3-crawler-shelf-broken-label", subzoneId: "north-west", text: "Crawler Shelf", position: { x: 59, y: 29 } },
+  { id: "map-3-crawler-shelf-imp-label", subzoneId: "north-west", text: "Crawler Shelf", position: { x: 99, y: 29 } },
+  { id: "map-3-imp-fen-crawler-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 112, y: 29 } },
+  { id: "map-3-imp-fen-exit-label", subzoneId: "south-center", text: "Imp Fen", position: { x: 151, y: 29 } },
 ];
 
 const mapFourSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
@@ -759,25 +766,58 @@ export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(
   ],
 );
 
-const mapTwoProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 12, y: 34 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
-  { id: enemyIds[1], position: { x: 27, y: 39 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
-  { id: enemyIds[2], position: { x: 43, y: 33 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
-  { id: enemyIds[3], position: { x: 17, y: 41 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
-  { id: enemyIds[4], position: { x: 34, y: 31 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
-  { id: enemyIds[5], position: { x: 43, y: 39 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-nest" },
-  { id: enemyIds[6], position: { x: 12, y: 8 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf" },
-  { id: enemyIds[7], position: { x: 28, y: 13 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf" },
-  { id: enemyIds[8], position: { x: 43, y: 8 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf" },
-  { id: enemyIds[9], position: { x: 16, y: 17 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf" },
-  { id: enemyIds[10], position: { x: 31, y: 6 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf" },
-  { id: enemyIds[11], position: { x: 43, y: 14 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf" },
-  { id: enemyIds[12], position: { x: 64, y: 33 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-circle" },
-  { id: enemyIds[13], position: { x: 80, y: 39 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-circle" },
-  { id: enemyIds[14], position: { x: 96, y: 33 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-circle" },
-  { id: enemyIds[15], position: { x: 68, y: 40 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-circle" },
-  { id: enemyIds[16], position: { x: 84, y: 31 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-circle" },
-  { id: enemyIds[17], position: { x: 96, y: 40 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-circle" },
+const mapThreeProgressionEnemyStartData: EnemyStartData[] = [
+  { id: enemyIds[0], position: { x: 12, y: 10 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[1], position: { x: 23, y: 8 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[2], position: { x: 36, y: 11 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[3], position: { x: 44, y: 18 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[4], position: { x: 16, y: 20 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[5], position: { x: 28, y: 23 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[6], position: { x: 39, y: 24 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[7], position: { x: 23, y: 15 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { id: enemyIds[8], position: { x: 11, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[9], position: { x: 22, y: 47 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[10], position: { x: 35, y: 36 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[11], position: { x: 45, y: 46 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[12], position: { x: 15, y: 51 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[13], position: { x: 29, y: 34 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[14], position: { x: 39, y: 51 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[15], position: { x: 28, y: 43 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { id: enemyIds[16], position: { x: 62, y: 10 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[17], position: { x: 74, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[18], position: { x: 88, y: 11 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[19], position: { x: 98, y: 18 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[20], position: { x: 70, y: 21 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[21], position: { x: 78, y: 23 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[22], position: { x: 92, y: 24 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[23], position: { x: 80, y: 15 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { id: enemyIds[24], position: { x: 62, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[25], position: { x: 75, y: 48 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[26], position: { x: 89, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[27], position: { x: 99, y: 47 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[28], position: { x: 64, y: 51 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[29], position: { x: 78, y: 35 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[30], position: { x: 92, y: 52 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[31], position: { x: 83, y: 43 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { id: enemyIds[32], position: { x: 113, y: 10 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[33], position: { x: 125, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[34], position: { x: 139, y: 11 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[35], position: { x: 151, y: 18 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[36], position: { x: 115, y: 22 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[37], position: { x: 128, y: 23 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[38], position: { x: 142, y: 24 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[39], position: { x: 132, y: 16 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { id: enemyIds[40], position: { x: 113, y: 37 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[41], position: { x: 126, y: 48 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[42], position: { x: 140, y: 36 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[43], position: { x: 152, y: 47 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[44], position: { x: 116, y: 51 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[45], position: { x: 132, y: 35 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[46], position: { x: 144, y: 52 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { id: enemyIds[47], position: { x: 133, y: 43 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+];
+
+const mapFourProgressionEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[18], position: { x: 64, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
   { id: enemyIds[19], position: { x: 80, y: 13 }, enemyTypeId: "ash_wisp", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
   { id: enemyIds[20], position: { x: 96, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
@@ -804,12 +844,12 @@ const mapTwoProgressionEnemyStartData: EnemyStartData[] = [
 
 export const mapThreeEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapThreeSubzones,
-  compactEnemyStartData(mapTwoProgressionEnemyStartData, MAP_THREE_COMPACT_OFFSETS),
+  mapThreeProgressionEnemyStartData,
 );
 
 export const mapFourEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapFourSubzones,
-  compactEnemyStartData(mapTwoProgressionEnemyStartData, MAP_FOUR_COMPACT_OFFSETS),
+  compactEnemyStartData(mapFourProgressionEnemyStartData, MAP_FOUR_COMPACT_OFFSETS),
 );
 
 export const mapOneEnemyStartPositions: Position[] = mapOneEnemyStartData.map(
@@ -1055,9 +1095,9 @@ const MAP_TWO_WALLS = dedupeWalls([
 ]);
 
 const MAP_THREE_WALLS = dedupeWalls([
-  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
-  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
+  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, MAP_THREE_ROWS),
+  ...createVerticalWall(52, 0, MAP_THREE_ROWS - 1, [[24, 34]]),
+  ...createVerticalWall(105, 0, MAP_THREE_ROWS - 1, [[24, 34]]),
 ]);
 
 const MAP_FOUR_WALLS = dedupeWalls([
@@ -1203,7 +1243,7 @@ export const debugMapDefinitions: Record<
     displayName: "Third Wild Zone",
     debugName: "map-3",
     columns: WILDERNESS_MAP_COLUMNS,
-    rows: WILDERNESS_MAP_ROWS,
+    rows: MAP_THREE_ROWS,
     walls: MAP_THREE_WALLS,
     healingFountains: [],
     subzones: mapThreeSubzones,
@@ -1228,7 +1268,7 @@ export const debugMapDefinitions: Record<
       },
       {
         id: MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
-        position: { x: 98, y: 5 },
+        position: mapThreeSlimewardCampTeleporterPosition,
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_THREE_ID,
         targetMapId: SLIMEWARD_CAMP_ID,
