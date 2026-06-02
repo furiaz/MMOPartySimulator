@@ -6,7 +6,7 @@ import {
   MAP_TWO_ID,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
-  createDebugMap,
+  createDebugMapForQuestState,
   npcIds,
 } from "./debugMap";
 import { createCompanion, createEnemy, createNpc, createResource } from "./entities";
@@ -342,11 +342,12 @@ function createGameState(
   entities: GameEntity[],
   overrides: Partial<GameState> = {},
 ): GameState {
+  const quests = overrides.quests ?? createQuestStates();
   const state = createTestGameState({
     autoModeEnabled: true,
     currentMapId: mapId,
-    map: createDebugMap(mapId),
-    quests: createQuestStates(),
+    quests,
+    map: overrides.map ?? createDebugMapForQuestState(mapId, quests),
     activeTeleport: null,
     ...overrides,
   });

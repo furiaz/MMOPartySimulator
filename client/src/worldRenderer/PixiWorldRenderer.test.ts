@@ -25,7 +25,7 @@ import {
   TELEPORT_OBJECT_SPRITE_ANCHOR_Y,
   TELEPORT_OBJECT_SPRITE_SIZE_PX,
 } from "./PixiWorldRendererHelpers";
-import { MAP_OBJECT_ICON_SRC } from "../assetIcons";
+import { MAP_OBJECT_ICON_SRC, MAP_VISUAL_OBJECT_SRC } from "../assetIcons";
 
 const previewCanvasBounds = {
   left: 100,
@@ -176,6 +176,22 @@ describe("texture lifetime classification", () => {
       ...createWideMap(),
       id: "map-1",
       walls: [{ x: 1, y: 1 }],
+      visualObjects: [
+        {
+          id: "test-closed-gate",
+          visualId: "passage_gate_closed",
+          position: { x: 52, y: 29 },
+          widthCells: 100 / 32,
+          heightCells: 350 / 32,
+        },
+        {
+          id: "test-open-gate",
+          visualId: "passage_gate_open",
+          position: { x: 52, y: 29 },
+          widthCells: 100 / 32,
+          heightCells: 350 / 32,
+        },
+      ],
     };
     const resource = createResource("wood", { x: 4, y: 4 });
     const enemy = createEnemy("enemy", { x: 6, y: 6 }, undefined, {
@@ -187,6 +203,8 @@ describe("texture lifetime classification", () => {
     ]);
 
     expect(scopedSources).toContain(MAP_OBJECT_ICON_SRC.teleportGood);
+    expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.passage_gate_closed);
+    expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.passage_gate_open);
     expect(scopedSources.some((src) => src.includes("map-wilderness"))).toBe(true);
     expect(scopedSources.some((src) => src.includes("slime-se.png"))).toBe(true);
     expect(scopedSources).not.toContain(enemySpottedAlertSrc);

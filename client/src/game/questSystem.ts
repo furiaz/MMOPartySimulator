@@ -7,6 +7,7 @@ import {
   MAP_TWO_ID,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
+  createDebugMapForQuestState,
   npcIds,
 } from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
@@ -96,7 +97,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         targetMapId: MAP_ONE_ID,
         targetSubzoneId: "shore-fringe",
         targetPoiId: "shore-fringe-supply-marker",
-        targetPosition: { x: 46, y: 22 },
+        targetPosition: { x: 50, y: 29 },
         requiredCount: 1,
       },
     ],
@@ -955,7 +956,18 @@ function claimQuestReward(
     currentMapDebugName: nextState.map?.debugName,
   });
 
-  return unlockAvailableQuests(nextState, questId);
+  return unlockAvailableQuests(refreshCurrentMapForQuestState(nextState), questId);
+}
+
+function refreshCurrentMapForQuestState(state: GameState): GameState {
+  if (state.currentMapId !== MAP_ONE_ID || !state.map) {
+    return state;
+  }
+
+  return {
+    ...state,
+    map: createDebugMapForQuestState(MAP_ONE_ID, state.quests),
+  };
 }
 
 function validateQuestRewards(

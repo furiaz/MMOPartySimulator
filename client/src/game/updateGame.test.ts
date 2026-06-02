@@ -8,6 +8,7 @@ import {
 } from "./entities";
 import {
   createDebugMap,
+  createDebugMapForQuestState,
   HUB_MAP_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
@@ -4920,12 +4921,15 @@ function createMapOneState(
   entities: GameEntity[],
   overrides: Partial<GameState>,
 ): GameState {
+  const quests = overrides.quests ?? createQuestStates();
+
   return entities.reduce(
     addEntity,
     createTestGameState({
       autoModeEnabled: true,
       currentMapId: MAP_ONE_ID,
-      map: createDebugMap(MAP_ONE_ID),
+      quests,
+      map: overrides.map ?? createDebugMapForQuestState(MAP_ONE_ID, quests),
       activeTeleport: null,
       exploredTiles: {},
       ...overrides,

@@ -20,7 +20,7 @@ import {
   companionIds,
   aoeTargetDummyId,
   aoeTargetDummyPosition,
-  createDebugMap,
+  createDebugMapForQuestState,
   debugMapDefinitions,
   hubNpcStartData,
   HUB_MAP_ID,
@@ -331,7 +331,10 @@ function completeTeleport(state: GameState, nowMs: number): GameState {
       ? addHubDepartureFoodWarningIfNeeded(sourceState, nowMs).hubDepartureFoodWarning
       : sourceState.hubDepartureFoodWarning;
   const positionsBeforeTransition = getEntityPositions(sourceState.entities);
-  const targetMap = createDebugMap(teleport.targetMapId);
+  const targetMap = createDebugMapForQuestState(
+    teleport.targetMapId,
+    sourceState.quests,
+  );
   const entities = getMapEntities(sourceState, targetMap);
   let nextState: GameState = {
     ...clearMapTransitionRuntimeState(sourceState),

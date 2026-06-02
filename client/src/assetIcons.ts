@@ -13,6 +13,7 @@ const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
 const hubCastleWallAssetPath = "/Asserts/Generated/hub-castle-walls";
 const hubStructureAssetPath = "/Asserts/Generated/hub-structures/256";
 const teleportAssetPath = "/Asserts/Generated/teleports";
+const passageBlockerAssetPath = "/Asserts/Generated/passage-blockers";
 const slimewardDungeonAssetPath = "/Asserts/Generated/Dungeon Generation";
 const beginnerSkillEffectsPath = "/Asserts/Generated/beginner-skill-effects-50/sprites";
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
@@ -106,6 +107,8 @@ export const MAP_VISUAL_OBJECT_SRC: Record<MapVisualObjectId, string> = {
   hub_cabin: `${hubStructureAssetPath}/hub_cabin.png`,
   hub_tent: `${hubStructureAssetPath}/hub_tent.png`,
   hub_dock_shore_connector: `${hubStructureAssetPath}/hub_dock_shore_connector.png`,
+  passage_gate_closed: `${passageBlockerAssetPath}/passage_gate_closed_edge_v2_100x350.png`,
+  passage_gate_open: `${passageBlockerAssetPath}/passage_gate_open_faces_v2_100x350.png`,
   slime_covered_stone: `${slimewardDungeonAssetPath}/slime-covered-stone-64.png`,
   azure_slime_rock_cluster: `${slimewardDungeonAssetPath}/azure-slime-rock-cluster-128.png`,
 };

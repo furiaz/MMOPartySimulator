@@ -1377,6 +1377,8 @@ export type MapVisualObjectId =
   | "hub_cabin"
   | "hub_tent"
   | "hub_dock_shore_connector"
+  | "passage_gate_closed"
+  | "passage_gate_open"
   | "slime_covered_stone"
   | "azure_slime_rock_cluster";
 

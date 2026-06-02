@@ -1,7 +1,7 @@
 import {
   aoeTargetDummyId,
   aoeTargetDummyPosition,
-  createDebugMap,
+  createDebugMapForQuestState,
   debugMapDefinitions,
   hubCompanionStartPositions,
   hubNpcStartData,
@@ -232,7 +232,7 @@ function resetStateToRescueHub(
     choice.mapId === SLIMEWARD_CAMP_ID
       ? clearSlimewardDungeonRuntime(state)
       : state;
-  const targetMap = createDebugMap(choice.mapId);
+  const targetMap = createDebugMapForQuestState(choice.mapId, sourceState.quests);
   let nextState: GameState = {
     ...clearMapTransitionRuntimeState(sourceState),
     entities: getRescueHubEntities(sourceState, choice),

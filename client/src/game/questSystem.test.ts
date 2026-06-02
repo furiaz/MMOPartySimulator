@@ -5,6 +5,8 @@ import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
 import {
   createDebugMap,
   MAP_ONE_ID,
+  SECURE_LANDING_PASSAGE_GATE_ID,
+  SECURE_LANDING_PASSAGE_GATE_POSITION,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
 } from "./debugMap";
@@ -32,6 +34,7 @@ import {
   updateQuestGiverInteraction,
 } from "./questSystem";
 import { isTeleportWorking } from "./teleportState";
+import { isNavigationCellWalkable } from "./navigation";
 import { equipItemToCompanion } from "./equipmentSystem";
 import { createTestGameState } from "./testState";
 import type { EnemyArchetypeId } from "./types";
@@ -95,6 +98,56 @@ describe("prototype quest system", () => {
     expect(getCompanion(state, "companion-2").characterLevel).toBe(2);
     expect(getCompanion(state, "companion-2").characterXp).toBe(2);
     expect(getCompanion(state, "companion-2").lastCharacterXpGained).toBe(8);
+  });
+
+  it("opens the Secure the Landing passage gate when the quest is completed on Map 1", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      quests: createInitialQuestStates(),
+    });
+
+    state = updateQuestGiverInteraction(state);
+    const closedMap = state.map;
+    expect(state.quests.clear_the_shore.status).toBe("active");
+    expect(closedMap).toBeDefined();
+    expect(
+      isNavigationCellWalkable(closedMap!, SECURE_LANDING_PASSAGE_GATE_POSITION),
+    ).toBe(false);
+
+    for (let count = 0; count < 10; count += 1) {
+      state = completeQuestObjective(
+        state,
+        "clear_the_shore",
+        "defeat_shore_fringe_slimes",
+      );
+    }
+    for (let count = 0; count < 3; count += 1) {
+      state = completeQuestObjective(
+        state,
+        "clear_the_shore",
+        "gather_shore_fringe_wood",
+      );
+    }
+    state = completeQuestObjective(
+      state,
+      "clear_the_shore",
+      "inspect_shore_fringe_marker",
+    );
+    expect(state.quests.clear_the_shore.status).toBe("ready_to_turn_in");
+
+    state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
+    const openedMap = state.map;
+    expect(openedMap).toBeDefined();
+    const gateVisual = openedMap!.visualObjects?.find(
+      (visualObject) => visualObject.id === SECURE_LANDING_PASSAGE_GATE_ID,
+    );
+
+    expect(state.quests.clear_the_shore.status).toBe("completed");
+    expect(gateVisual?.visualId).toBe("passage_gate_open");
+    expect(
+      isNavigationCellWalkable(openedMap!, SECURE_LANDING_PASSAGE_GATE_POSITION),
+    ).toBe(true);
   });
 
   it("creates level-up feedback when quest XP levels companions", () => {

@@ -969,6 +969,24 @@ export type EnemyStartData = {
   variant?: EnemyVariant;
 };
 
+type DebugMapCreationOptions = {
+  secureLandingGateOpen?: boolean;
+};
+
+type DebugMapQuestStates = Partial<Record<string, { status?: string }>>;
+
+export const SECURE_LANDING_PASSAGE_GATE_ID = "map-1-shore-fringe-passage-gate";
+export const SECURE_LANDING_PASSAGE_GATE_POSITION: Position = { x: 52, y: 29 };
+const SECURE_LANDING_PASSAGE_GATE_CLOSED_WALLS = createVerticalWall(52, 24, 34, []);
+const SECURE_LANDING_PASSAGE_GATE_VISUAL: MapVisualObject = {
+  id: SECURE_LANDING_PASSAGE_GATE_ID,
+  visualId: "passage_gate_closed",
+  position: SECURE_LANDING_PASSAGE_GATE_POSITION,
+  widthCells: 100 / 32,
+  heightCells: 350 / 32,
+  anchorY: 0.5,
+};
+
 const HUB_VISUAL_OBJECTS: MapVisualObject[] = [
   {
     id: "hub-dock-shore-connector",
@@ -1014,7 +1032,7 @@ const HUB_WALLS = dedupeWalls([
 
 const MAP_ONE_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, MAP_ONE_ROWS),
-  ...createVerticalWall(52, 3, MAP_ONE_ROWS - 4, [[24, 34]]),
+  ...createVerticalWall(52, 1, MAP_ONE_ROWS - 2, [[24, 34]]),
   ...createVerticalWall(105, 3, MAP_ONE_ROWS - 4, [[24, 34]]),
   ...createWallBlock(12, 22, 20, 22),
   ...createWallBlock(34, 46, 32, 34),
@@ -1388,18 +1406,23 @@ export const debugMapDefinitions: Record<
   },
 };
 
-export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
+export function createDebugMap(
+  mapId: DebugMapId = HUB_MAP_ID,
+  options: DebugMapCreationOptions = {},
+): GameMap {
   const definition = debugMapDefinitions[mapId];
+  const walls = getDebugMapWalls(definition, options);
+  const visualObjects = getDebugMapVisualObjects(definition, options);
   const map = {
     id: definition.id,
     displayName: definition.displayName,
     debugName: definition.debugName,
     columns: definition.columns,
     rows: definition.rows,
-    walls: definition.walls,
+    walls,
     teleports: definition.teleports,
     healingFountains: definition.healingFountains,
-    visualObjects: definition.visualObjects,
+    visualObjects,
     subzones: definition.subzones,
     subzoneNameLabels: definition.subzoneNameLabels,
     floorCells: definition.floorCells,
@@ -1413,8 +1436,56 @@ export function createDebugMap(mapId: DebugMapId = HUB_MAP_ID): GameMap {
   };
 }
 
+export function createDebugMapForQuestState(
+  mapId: DebugMapId = HUB_MAP_ID,
+  quests: DebugMapQuestStates = {},
+): GameMap {
+  return createDebugMap(mapId, {
+    secureLandingGateOpen: isSecureLandingPassageGateOpen(quests),
+  });
+}
+
+export function isSecureLandingPassageGateOpen(
+  quests: DebugMapQuestStates = {},
+): boolean {
+  return quests.clear_the_shore?.status === "completed";
+}
+
 export function getDebugMapDefinition(mapId: DebugMapId) {
   return debugMapDefinitions[mapId];
+}
+
+function getDebugMapWalls(
+  definition: (typeof debugMapDefinitions)[DebugMapId],
+  options: DebugMapCreationOptions,
+): Position[] {
+  if (definition.id !== MAP_ONE_ID || options.secureLandingGateOpen) {
+    return definition.walls;
+  }
+
+  return dedupeWalls([
+    ...definition.walls,
+    ...SECURE_LANDING_PASSAGE_GATE_CLOSED_WALLS,
+  ]);
+}
+
+function getDebugMapVisualObjects(
+  definition: (typeof debugMapDefinitions)[DebugMapId],
+  options: DebugMapCreationOptions,
+): MapVisualObject[] | undefined {
+  if (definition.id !== MAP_ONE_ID) {
+    return definition.visualObjects;
+  }
+
+  return [
+    ...(definition.visualObjects ?? []),
+    {
+      ...SECURE_LANDING_PASSAGE_GATE_VISUAL,
+      visualId: options.secureLandingGateOpen
+        ? "passage_gate_open"
+        : "passage_gate_closed",
+    },
+  ];
 }
 
 function createVerticalWall(

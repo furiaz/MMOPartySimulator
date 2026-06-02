@@ -13,6 +13,7 @@ import {
   WILDERNESS_MAP_ROWS,
   aoeTargetDummyPosition,
   createDebugMap,
+  createDebugMapForQuestState,
   debugMapDefinitions,
   hubCompanionStartPositions,
   hubHealingFountains,
@@ -27,6 +28,8 @@ import {
   mapOneSubzoneNameLabels,
   mapOneResourceStartData,
   mapOneSubzones,
+  SECURE_LANDING_PASSAGE_GATE_ID,
+  SECURE_LANDING_PASSAGE_GATE_POSITION,
   mapThreeEnemyStartPositions,
   mapThreeEnemyStartData,
   mapThreeSubzoneNameLabels,
@@ -78,6 +81,10 @@ const wildernessMaps = [
     labels: mapFourSubzoneNameLabels,
   },
 ] as const;
+
+const secureLandingCompleteQuestStates = {
+  clear_the_shore: { status: "completed" },
+};
 
 describe("debug maps", () => {
   it("remakes the hub as a larger port base while preserving wilderness map sizes", () => {
@@ -159,12 +166,12 @@ describe("debug maps", () => {
 
   it("keeps wilderness teleports and arrivals on reachable open floor", () => {
     for (const definition of Object.values(debugMapDefinitions)) {
-      const sourceMap = createDebugMap(definition.id);
+      const sourceMap = createReachabilityValidationMap(definition.id);
 
       for (const teleport of definition.teleports) {
         assertOpenReachablePosition(sourceMap, teleport.position);
 
-        const targetMap = createDebugMap(teleport.targetMapId);
+        const targetMap = createReachabilityValidationMap(teleport.targetMapId);
         for (const arrivalPosition of teleport.arrivalPositions) {
           assertOpenReachablePosition(targetMap, arrivalPosition);
         }
@@ -202,6 +209,33 @@ describe("debug maps", () => {
 
       expect(interiorWallCount).toBeGreaterThan(0);
     }
+  });
+
+  it("quest-gates the Shore Fringe to Mossy Glade passage for Secure the Landing", () => {
+    const closedMap = createDebugMap(MAP_ONE_ID);
+    const openMap = createDebugMapForQuestState(
+      MAP_ONE_ID,
+      secureLandingCompleteQuestStates,
+    );
+    const closedGate = closedMap.visualObjects?.find(
+      (visualObject) => visualObject.id === SECURE_LANDING_PASSAGE_GATE_ID,
+    );
+    const openGate = openMap.visualObjects?.find(
+      (visualObject) => visualObject.id === SECURE_LANDING_PASSAGE_GATE_ID,
+    );
+
+    expect(closedGate).toMatchObject({
+      visualId: "passage_gate_closed",
+      position: SECURE_LANDING_PASSAGE_GATE_POSITION,
+    });
+    expect(openGate).toMatchObject({
+      visualId: "passage_gate_open",
+      position: SECURE_LANDING_PASSAGE_GATE_POSITION,
+    });
+    expect(isNavigationCellWalkable(closedMap, SECURE_LANDING_PASSAGE_GATE_POSITION)).toBe(false);
+    expect(isNavigationCellWalkable(openMap, SECURE_LANDING_PASSAGE_GATE_POSITION)).toBe(true);
+    expect(getNavigationDistance(closedMap, { x: 50, y: 29 }, { x: 54, y: 29 }, 80)).toBeNull();
+    expect(getNavigationDistance(openMap, { x: 50, y: 29 }, { x: 54, y: 29 }, 80)).not.toBeNull();
   });
 
   it("keeps authored subzones, passages, encounter areas, and resource locations valid", () => {
@@ -251,13 +285,17 @@ describe("debug maps", () => {
   });
 
   it("keeps map one quest inspection and guide points reachable inside their subzones", () => {
+    const secureLandingInspectObjective =
+      QUEST_DEFINITIONS.clear_the_shore.objectives.find(
+        (objective) => objective.id === "inspect_shore_fringe_marker",
+      );
+
+    expect(secureLandingInspectObjective?.targetPosition).toEqual({ x: 50, y: 29 });
+
     const questPoints = [
       {
         subzoneId: "shore-fringe",
-        position:
-          QUEST_DEFINITIONS.clear_the_shore.objectives.find(
-            (objective) => objective.id === "inspect_shore_fringe_marker",
-          )?.targetPosition,
+        position: secureLandingInspectObjective?.targetPosition,
       },
       {
         subzoneId: "lower-shore",
@@ -281,7 +319,7 @@ describe("debug maps", () => {
           )?.targetPosition,
       },
     ];
-    const map = createDebugMap(MAP_ONE_ID);
+    const map = createReachabilityValidationMap(MAP_ONE_ID);
 
     for (const questPoint of questPoints) {
       expect(questPoint.position).toBeDefined();
@@ -428,7 +466,7 @@ describe("debug maps", () => {
 });
 
 function assertMapPlacements(mapId: DebugMapId, positions: Position[]) {
-  const map = createDebugMap(mapId);
+  const map = createReachabilityValidationMap(mapId);
 
   for (const position of positions) {
     assertOpenReachablePosition(map, position);
@@ -438,6 +476,10 @@ function assertMapPlacements(mapId: DebugMapId, positions: Position[]) {
       );
     }
   }
+}
+
+function createReachabilityValidationMap(mapId: DebugMapId): GameMap {
+  return createDebugMapForQuestState(mapId, secureLandingCompleteQuestStates);
 }
 
 function assertSubzoneContentDensity(
@@ -496,7 +538,7 @@ function getNeighborPositions(position: Position): Position[] {
 }
 
 function assertSubzones(mapId: DebugMapId, subzones: ZoneSubzone[]) {
-  const map = createDebugMap(mapId);
+  const map = createReachabilityValidationMap(mapId);
 
   for (const subzone of subzones) {
     assertBoundsInsideMap(map, subzone);
@@ -552,7 +594,7 @@ function assertEnemyStartData(
     encounterAreaId: string;
   }>,
 ) {
-  const map = createDebugMap(mapId);
+  const map = createReachabilityValidationMap(mapId);
 
   for (const enemy of enemies) {
     const subzone = subzones.find((candidate) => candidate.id === enemy.subzoneId);
@@ -581,7 +623,7 @@ function assertSubzoneNameLabels(
   subzones: ZoneSubzone[],
   labels: Array<{ id: string; subzoneId: string; text: string; position: Position }>,
 ) {
-  const map = createDebugMap(mapId);
+  const map = createReachabilityValidationMap(mapId);
 
   expect(labels.length).toBeGreaterThan(0);
   for (const label of labels) {
