@@ -5036,6 +5036,12 @@ export function PixiWorldRenderer({
     () => getRenderSize(mode, viewportSize),
     [mode, viewportSize],
   );
+  const requestLatestRedraw = useMemo(
+    () => () => {
+      requestRedrawRef.current();
+    },
+    [],
+  );
   const sortedEntities = useMemo(
     () => [...entities].sort((first, second) => first.id.localeCompare(second.id)),
     [entities],
@@ -5113,9 +5119,9 @@ export function PixiWorldRenderer({
       cache: textureCacheRef.current,
       entities: sortedEntities,
       map,
-      requestRedraw: requestRedrawRef.current,
+      requestRedraw: requestLatestRedraw,
     });
-  }, [map, sortedEntities]);
+  }, [map, requestLatestRedraw, sortedEntities]);
 
   useEffect(() => {
     let isDisposed = false;
@@ -5215,7 +5221,7 @@ export function PixiWorldRenderer({
         previewSignatureRef,
         questGiverHasWork: latestQuestGiverHasWorkRef.current,
         renderSize: latestRenderSizeRef.current,
-        requestRedraw: requestRedrawRef.current,
+        requestRedraw: requestLatestRedraw,
         resurrectionProgressByCompanionId:
           latestResurrectionProgressByCompanionIdRef.current,
         showDebugOverlays: latestShowDebugOverlaysRef.current,
@@ -5249,19 +5255,19 @@ export function PixiWorldRenderer({
     preloadSpriteVisualAssetTextures(
       entityVisualAssets.beginnerCharacter,
       textureCacheRef.current,
-      requestRedrawRef.current,
+      requestLatestRedraw,
       { durable: true },
     );
     preloadSpriteVisualAssetTextures(
       entityVisualAssets.testCharacter,
       textureCacheRef.current,
-      requestRedrawRef.current,
+      requestLatestRedraw,
       { durable: true },
     );
     preloadSpriteVisualAssetTextures(
       entityVisualAssets.questGuideCharacter,
       textureCacheRef.current,
-      requestRedrawRef.current,
+      requestLatestRedraw,
       { durable: true },
     );
 
@@ -5355,7 +5361,7 @@ export function PixiWorldRenderer({
       partyIntent,
       previewSignatureRef,
       questGiverHasWork,
-      requestRedraw: requestRedrawRef.current,
+      requestRedraw: requestLatestRedraw,
       renderSize,
       resurrectionProgressByCompanionId,
       showDebugOverlays,
