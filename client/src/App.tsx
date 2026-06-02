@@ -117,11 +117,14 @@ import {
   updateEntity,
   updateCompanionConsumableBehavior,
   type Companion,
+  type DirectCompanionCommand,
   type CompanionDirectCommandInput,
   type ConsumableBehaviorUpdate,
   type DebugMapId,
   type DirectCompanionCommandResultCode,
+  type DropVisualEvent,
   type Enemy,
+  type EnemyAoeChannelState,
   type EquipmentSlot,
   type EquipmentStatModifiers,
   type GameEntity,
@@ -140,6 +143,11 @@ import {
   type QuestId,
   type QuestState,
   type ResourceEntity,
+  type ResurrectionProgressState,
+  type SkillBindState,
+  type SkillMarkState,
+  type SkillShieldBlockState,
+  type SkillVisualEvent,
   type WorldWipeRecoveryChoice,
 } from "./game";
 import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
@@ -147,6 +155,10 @@ import {
   consumeGamePerformanceMetrics,
   type GamePerformanceMetrics,
 } from "./game/performanceMetrics";
+import {
+  getTrackedVisualMovementPositions,
+  pruneVisualMovementEntries,
+} from "./visualMovement";
 import { type SpriteDirection } from "./visualAssets";
 
 const LazyGameMenu = lazy(() =>
@@ -176,6 +188,8 @@ const currencyGainBurstSrc =
   "Asserts/Generated/prototype-vfx/sprites/currency-gain-burst.png";
 const mapConstructionCellPixelSize = 32;
 const visualMovementGraceMs = 180;
+const visualMovementEnemyViewportMarginTiles = 6;
+const uiClockIntervalMs = 250;
 const cameraSettleFactor = 0.08;
 const cameraSnapDistance = 0.35;
 const cameraDeadZoneWidthRatio = 0.34;
@@ -193,6 +207,14 @@ const poiSearchScopeCycle: PoiSearchScope[] = [
 ];
 const questGiverInteractionRange = 2;
 const defaultNpcInteractionRange = 1.5;
+const emptyDirectCompanionCommands: Record<string, DirectCompanionCommand> = {};
+const emptyDropVisualEvents: DropVisualEvent[] = [];
+const emptyEnemyAoeChannels: Record<string, EnemyAoeChannelState> = {};
+const emptyResurrectionProgress: Record<string, ResurrectionProgressState> = {};
+const emptySkillBinds: Record<string, SkillBindState> = {};
+const emptySkillMarks: Record<string, SkillMarkState> = {};
+const emptySkillShieldBlocks: Record<string, SkillShieldBlockState> = {};
+const emptySkillVisualEvents: SkillVisualEvent[] = [];
 
 function getNextPoiSearchScope(scope: PoiSearchScope): PoiSearchScope {
   const currentIndex = poiSearchScopeCycle.indexOf(scope);
@@ -328,15 +350,27 @@ type BrowserPerformance = Performance & {
 type PerformanceOverlayStats = {
   activeFeedbackCount: number;
   attackSlotChecksPerSecond: number;
+  combatFeedbackEventCount: number;
+  debugTelemetryEventCount: number;
+  debugTelemetryRecording: boolean;
+  debugTelemetryTickCount: number;
+  dropVisualEventCount: number;
   fps: number;
   frameMs: number;
   drawnEntityCount: number;
   drawnFeedbackCount: number;
   drawnSprites: number;
   drawnTexts: number;
+  durableTextureSourceCount: number;
+  enemyAiActivePerSecond: number;
+  enemyAiDormantPerSecond: number;
+  enemyRoamMovesPerSecond: number;
+  enemyRoamStartsPerSecond: number;
+  failedTextureCount: number;
   slowFrames: number;
   simFramesPerSecond: number;
   fullDrawsPerSecond: number;
+  previewDrawsPerSecond: number;
   entityCount: number;
   companionCount: number;
   enemyCount: number;
@@ -357,16 +391,30 @@ type PerformanceOverlayStats = {
   navigationPathRoamPerSecond: number;
   pathDistanceQueriesPerSecond: number;
   movementFailuresPerSecond: number;
+  movementRuntimeRecordCount: number;
   memoryUsedMb: number | null;
   memoryTotalMb: number | null;
   memoryLimitMb: number | null;
+  mapScopedTextureSourceCount: number;
+  mapTrackedTextureSourceCount: number;
+  evictedTextureCount: number;
+  pendingTextureCount: number;
+  retainedMapCount: number;
   renderMs: number;
   spriteCreatesPerSecond: number;
   spriteReusesPerSecond: number;
+  managedSpriteCount: number;
+  managedStaticSpriteCount: number;
+  managedTextCount: number;
   textCreatesPerSecond: number;
   textReusesPerSecond: number;
+  textureCount: number;
+  stalePendingTextureCount: number;
+  skillVisualEventCount: number;
+  unloadFailedTextureCount: number;
   updateMs: number;
   visibleEntityCount: number;
+  visualMovementEntryCount: number;
 };
 
 type RendererPerformanceAccumulator = Omit<
@@ -383,11 +431,26 @@ type RendererPerformanceSnapshot = {
   drawnFeedbackCount: number;
   drawnSprites: number;
   drawnTexts: number;
+  durableTextureSourceCount: number;
+  failedTextureCount: number;
+  fullDrawCount: number;
+  managedSpriteCount: number;
+  managedTextCount: number;
+  mapScopedTextureSourceCount: number;
+  mapTrackedTextureSourceCount: number;
+  pendingTextureCount: number;
+  previewDrawCount: number;
+  retainedMapCount: number;
   renderMs: number;
   spriteCreates: number;
   spriteReuses: number;
+  stalePendingTextureCount: number;
   textCreates: number;
   textReuses: number;
+  textureCount: number;
+  evictedTextureCount: number;
+  managedStaticSpriteCount: number;
+  unloadFailedTextureCount: number;
   visibleEntityCount: number;
 };
 
@@ -499,11 +562,26 @@ function createRendererPerformanceAccumulator(): RendererPerformanceAccumulator 
     drawnFeedbackCount: 0,
     drawnSprites: 0,
     drawnTexts: 0,
+    durableTextureSourceCount: 0,
+    evictedTextureCount: 0,
+    failedTextureCount: 0,
+    fullDrawCount: 0,
+    managedSpriteCount: 0,
+    managedStaticSpriteCount: 0,
+    managedTextCount: 0,
+    mapScopedTextureSourceCount: 0,
+    mapTrackedTextureSourceCount: 0,
+    pendingTextureCount: 0,
+    previewDrawCount: 0,
+    retainedMapCount: 0,
     renderMs: 0,
     spriteCreates: 0,
     spriteReuses: 0,
+    stalePendingTextureCount: 0,
     textCreates: 0,
     textReuses: 0,
+    textureCount: 0,
+    unloadFailedTextureCount: 0,
     visibleEntityCount: 0,
   };
 }
@@ -518,11 +596,26 @@ function recordRendererPerformanceSample(
   accumulator.drawnFeedbackCount = sample.drawnFeedbackCount;
   accumulator.drawnSprites = sample.drawnSprites;
   accumulator.drawnTexts = sample.drawnTexts;
+  accumulator.durableTextureSourceCount = sample.durableTextureSourceCount;
+  accumulator.evictedTextureCount = sample.evictedTextureCount;
+  accumulator.failedTextureCount = sample.failedTextureCount;
+  accumulator.fullDrawCount += sample.fullDrawCount;
+  accumulator.managedSpriteCount = sample.managedSpriteCount;
+  accumulator.managedStaticSpriteCount = sample.managedStaticSpriteCount;
+  accumulator.managedTextCount = sample.managedTextCount;
+  accumulator.mapScopedTextureSourceCount = sample.mapScopedTextureSourceCount;
+  accumulator.mapTrackedTextureSourceCount = sample.mapTrackedTextureSourceCount;
+  accumulator.pendingTextureCount = sample.pendingTextureCount;
+  accumulator.previewDrawCount += sample.previewDrawCount;
+  accumulator.retainedMapCount = sample.retainedMapCount;
   accumulator.renderMs += sample.renderMs;
   accumulator.spriteCreates += sample.spriteCreates;
   accumulator.spriteReuses += sample.spriteReuses;
+  accumulator.stalePendingTextureCount = sample.stalePendingTextureCount;
   accumulator.textCreates += sample.textCreates;
   accumulator.textReuses += sample.textReuses;
+  accumulator.textureCount = sample.textureCount;
+  accumulator.unloadFailedTextureCount = sample.unloadFailedTextureCount;
   accumulator.visibleEntityCount = sample.visibleEntityCount;
 }
 
@@ -537,11 +630,26 @@ function consumeRendererPerformanceAccumulator(
     drawnFeedbackCount: accumulator.drawnFeedbackCount,
     drawnSprites: accumulator.drawnSprites,
     drawnTexts: accumulator.drawnTexts,
+    durableTextureSourceCount: accumulator.durableTextureSourceCount,
+    evictedTextureCount: accumulator.evictedTextureCount,
+    failedTextureCount: accumulator.failedTextureCount,
+    fullDrawCount: accumulator.fullDrawCount,
+    managedSpriteCount: accumulator.managedSpriteCount,
+    managedStaticSpriteCount: accumulator.managedStaticSpriteCount,
+    managedTextCount: accumulator.managedTextCount,
+    mapScopedTextureSourceCount: accumulator.mapScopedTextureSourceCount,
+    mapTrackedTextureSourceCount: accumulator.mapTrackedTextureSourceCount,
+    pendingTextureCount: accumulator.pendingTextureCount,
+    previewDrawCount: accumulator.previewDrawCount,
+    retainedMapCount: accumulator.retainedMapCount,
     renderMs: drawCount > 0 ? accumulator.renderMs / drawCount : 0,
     spriteCreates: accumulator.spriteCreates,
     spriteReuses: accumulator.spriteReuses,
+    stalePendingTextureCount: accumulator.stalePendingTextureCount,
     textCreates: accumulator.textCreates,
     textReuses: accumulator.textReuses,
+    textureCount: accumulator.textureCount,
+    unloadFailedTextureCount: accumulator.unloadFailedTextureCount,
     visibleEntityCount: accumulator.visibleEntityCount,
   };
 
@@ -558,6 +666,7 @@ function PerformanceOverlay({
   currentMap,
   gameState,
   rendererPerformanceRef,
+  visualMovementEntryCount,
 }: {
   currentMap: {
     columns: number;
@@ -566,6 +675,7 @@ function PerformanceOverlay({
   };
   gameState: GameState;
   rendererPerformanceRef: { current: RendererPerformanceAccumulator };
+  visualMovementEntryCount: number;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [stats, setStats] = useState<PerformanceOverlayStats>(() =>
@@ -577,15 +687,18 @@ function PerformanceOverlay({
       slowFrames: 0,
       simFramesPerSecond: 0,
       elapsedSeconds: 1,
+      visualMovementEntryCount,
     }),
   );
   const latestGameStateRef = useRef(gameState);
   const latestMapRef = useRef(currentMap);
+  const latestVisualMovementEntryCountRef = useRef(visualMovementEntryCount);
 
   useEffect(() => {
     latestGameStateRef.current = gameState;
     latestMapRef.current = currentMap;
-  }, [currentMap, gameState]);
+    latestVisualMovementEntryCountRef.current = visualMovementEntryCount;
+  }, [currentMap, gameState, visualMovementEntryCount]);
 
   useEffect(() => {
     let animationFrameId = 0;
@@ -626,6 +739,7 @@ function PerformanceOverlay({
           ),
           slowFrames,
           simFramesPerSecond: simulationFrameDelta / elapsedSeconds,
+          visualMovementEntryCount: latestVisualMovementEntryCountRef.current,
         };
 
         setStats(
@@ -676,6 +790,11 @@ function PerformanceOverlay({
             label="Draws"
             value={`${formatStat(stats.fullDrawsPerSecond)}/s`}
           />
+          <PerformanceStat
+            label="Preview"
+            value={`${formatStat(stats.previewDrawsPerSecond)}/s`}
+          />
+          <PerformanceStat label="Pixi" value="manual" />
           <PerformanceStat label="Entities" value={stats.entityCount.toString()} />
           <PerformanceStat
             label="Drawn"
@@ -746,16 +865,52 @@ function PerformanceOverlay({
             value={`${formatStat(stats.movementFailuresPerSecond)}/s`}
           />
           <PerformanceStat
+            label="Enemy AI"
+            value={`${formatStat(stats.enemyAiActivePerSecond)}/${formatStat(stats.enemyAiDormantPerSecond)}`}
+          />
+          <PerformanceStat
+            label="Roam"
+            value={`${formatStat(stats.enemyRoamStartsPerSecond)}/${formatStat(stats.enemyRoamMovesPerSecond)}/s`}
+          />
+          <PerformanceStat
             label="Sprites"
-            value={`${stats.drawnSprites} (${formatStat(stats.spriteCreatesPerSecond)}/${formatStat(stats.spriteReusesPerSecond)})`}
+            value={`${stats.drawnSprites}/${stats.managedSpriteCount} (${formatStat(stats.spriteCreatesPerSecond)}/${formatStat(stats.spriteReusesPerSecond)})`}
+          />
+          <PerformanceStat
+            label="Static Spr"
+            value={stats.managedStaticSpriteCount.toString()}
           />
           <PerformanceStat
             label="Text"
-            value={`${stats.drawnTexts} (${formatStat(stats.textCreatesPerSecond)}/${formatStat(stats.textReusesPerSecond)})`}
+            value={`${stats.drawnTexts}/${stats.managedTextCount} (${formatStat(stats.textCreatesPerSecond)}/${formatStat(stats.textReusesPerSecond)})`}
           />
           <PerformanceStat
             label="Feedback"
             value={`${stats.drawnFeedbackCount}/${stats.activeFeedbackCount}`}
+          />
+          <PerformanceStat
+            label="Visual Move"
+            value={stats.visualMovementEntryCount.toString()}
+          />
+          <PerformanceStat
+            label="Textures"
+            value={`${stats.textureCount} (${stats.pendingTextureCount}/${stats.failedTextureCount})`}
+          />
+          <PerformanceStat
+            label="Map Tex"
+            value={`${stats.mapScopedTextureSourceCount}/${stats.durableTextureSourceCount} m${stats.retainedMapCount} ev${stats.evictedTextureCount}`}
+          />
+          <PerformanceStat
+            label="Tex Hold"
+            value={`st${stats.stalePendingTextureCount} uf${stats.unloadFailedTextureCount} all${stats.mapTrackedTextureSourceCount}`}
+          />
+          <PerformanceStat
+            label="Runtime"
+            value={`m${stats.movementRuntimeRecordCount} f${stats.combatFeedbackEventCount} s${stats.skillVisualEventCount} d${stats.dropVisualEventCount}`}
+          />
+          <PerformanceStat
+            label="Telemetry"
+            value={`${stats.debugTelemetryRecording ? "on" : "off"} ${stats.debugTelemetryTickCount}/${stats.debugTelemetryEventCount}`}
           />
           <PerformanceStat
             label="Heap"
@@ -800,6 +955,7 @@ function getPerformanceOverlayStats(
     elapsedSeconds: number;
     gameMetrics: GamePerformanceMetrics;
     rendererSnapshot: RendererPerformanceSnapshot;
+    visualMovementEntryCount: number;
   },
 ): PerformanceOverlayStats {
   const entities = Object.values(gameState.entities);
@@ -809,6 +965,14 @@ function getPerformanceOverlayStats(
   const npcs = entities.filter((entity) => entity.kind === "npc");
   const memorySnapshot = getPerformanceMemorySnapshot();
   const { elapsedSeconds, gameMetrics, rendererSnapshot } = timingStats;
+  const movementRuntimeRecordCount =
+    Object.keys(gameState.failedMoveByEntityId ?? {}).length +
+    Object.keys(gameState.movementFailureMsByEntityId ?? {}).length +
+    Object.keys(gameState.movementFailuresByEntityId ?? {}).length +
+    Object.keys(gameState.movementPathRetryAtMsByEntityId ?? {}).length +
+    Object.keys(gameState.movementDecisionsByEntityId ?? {}).length +
+    Object.keys(gameState.moveIntentsByEntityId ?? {}).length +
+    Object.keys(gameState.reservedPositionsByEntityId ?? {}).length;
   const updateMs =
     gameMetrics.updateCount > 0
       ? gameMetrics.updateMsTotal / gameMetrics.updateCount
@@ -822,11 +986,24 @@ function getPerformanceOverlayStats(
     activeFeedbackCount: rendererSnapshot.activeFeedbackCount,
     attackSlotChecksPerSecond:
       gameMetrics.attackSlotChecks / elapsedSeconds,
+    combatFeedbackEventCount: gameState.combatFeedbackEvents.length,
+    debugTelemetryEventCount: gameState.debugTelemetry?.events.length ?? 0,
+    debugTelemetryRecording: Boolean(gameState.debugTelemetry?.isRecording),
+    debugTelemetryTickCount: gameState.debugTelemetry?.ticks.length ?? 0,
+    dropVisualEventCount: gameState.dropVisualEvents?.length ?? 0,
     drawnEntityCount: rendererSnapshot.drawnEntityCount,
     drawnFeedbackCount: rendererSnapshot.drawnFeedbackCount,
     drawnSprites: rendererSnapshot.drawnSprites,
     drawnTexts: rendererSnapshot.drawnTexts,
-    fullDrawsPerSecond: rendererSnapshot.drawCount / elapsedSeconds,
+    durableTextureSourceCount: rendererSnapshot.durableTextureSourceCount,
+    enemyAiActivePerSecond: gameMetrics.enemyAiActiveCount / elapsedSeconds,
+    enemyAiDormantPerSecond: gameMetrics.enemyAiDormantCount / elapsedSeconds,
+    enemyRoamMovesPerSecond: gameMetrics.enemyRoamMoves / elapsedSeconds,
+    enemyRoamStartsPerSecond: gameMetrics.enemyRoamStarts / elapsedSeconds,
+    evictedTextureCount: rendererSnapshot.evictedTextureCount,
+    failedTextureCount: rendererSnapshot.failedTextureCount,
+    fullDrawsPerSecond: rendererSnapshot.fullDrawCount / elapsedSeconds,
+    previewDrawsPerSecond: rendererSnapshot.previewDrawCount / elapsedSeconds,
     entityCount: entities.length,
     companionCount: companions.length,
     enemyCount: enemies.length,
@@ -858,6 +1035,7 @@ function getPerformanceOverlayStats(
     pathDistanceQueriesPerSecond:
       gameMetrics.pathDistanceQueries / elapsedSeconds,
     movementFailuresPerSecond: gameMetrics.movementFailures / elapsedSeconds,
+    movementRuntimeRecordCount,
     memoryUsedMb: memorySnapshot
       ? bytesToMegabytes(memorySnapshot.usedJSHeapSize)
       : null,
@@ -867,13 +1045,25 @@ function getPerformanceOverlayStats(
     memoryLimitMb: memorySnapshot
       ? bytesToMegabytes(memorySnapshot.jsHeapSizeLimit)
       : null,
+    mapScopedTextureSourceCount: rendererSnapshot.mapScopedTextureSourceCount,
+    mapTrackedTextureSourceCount: rendererSnapshot.mapTrackedTextureSourceCount,
+    retainedMapCount: rendererSnapshot.retainedMapCount,
     renderMs: rendererSnapshot.renderMs,
     spriteCreatesPerSecond: rendererSnapshot.spriteCreates / elapsedSeconds,
     spriteReusesPerSecond: rendererSnapshot.spriteReuses / elapsedSeconds,
+    managedSpriteCount: rendererSnapshot.managedSpriteCount,
+    managedStaticSpriteCount: rendererSnapshot.managedStaticSpriteCount,
+    managedTextCount: rendererSnapshot.managedTextCount,
+    pendingTextureCount: rendererSnapshot.pendingTextureCount,
     textCreatesPerSecond: rendererSnapshot.textCreates / elapsedSeconds,
     textReusesPerSecond: rendererSnapshot.textReuses / elapsedSeconds,
+    textureCount: rendererSnapshot.textureCount,
+    stalePendingTextureCount: rendererSnapshot.stalePendingTextureCount,
+    skillVisualEventCount: gameState.skillVisualEvents?.length ?? 0,
+    unloadFailedTextureCount: rendererSnapshot.unloadFailedTextureCount,
     updateMs,
     visibleEntityCount: rendererSnapshot.visibleEntityCount,
+    visualMovementEntryCount: timingStats.visualMovementEntryCount,
   };
 }
 
@@ -929,6 +1119,18 @@ function getMovementAngleDegrees(
   const degrees = (radians * 180) / Math.PI;
 
   return (degrees + 360) % 360;
+}
+
+function getNextVisualMovementPruneAt(
+  visualMovementByEntityId: Record<string, EntityVisualMovement>,
+): number {
+  const nextExpiry = Math.min(
+    ...Object.values(visualMovementByEntityId).map(
+      (visualMovement) => visualMovement.expiresAt,
+    ),
+  );
+
+  return Number.isFinite(nextExpiry) ? nextExpiry : Infinity;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -1685,6 +1887,7 @@ function App() {
     string | null
   >(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [rendererResetNonce, setRendererResetNonce] = useState(0);
   const [currencyGainFeedbackUntil, setCurrencyGainFeedbackUntil] = useState(0);
   const [directCommandFeedback, setDirectCommandFeedback] = useState<{
     text: string;
@@ -1705,7 +1908,10 @@ function App() {
   const isGuideSequenceActiveRef = useRef(false);
   const shouldResumeAfterGuideSequenceRef = useRef(false);
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
+  const latestTrackedVisualMovementEntityIdsRef = useRef<Set<string>>(new Set());
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
+  const visualMovementMapIdRef = useRef<string | undefined>(undefined);
+  const nextVisualMovementPruneAtRef = useRef(Infinity);
   const visualCameraOffsetRef = useRef<Position>({ x: 0, y: 0 });
   const [terrainCameraOffset, setTerrainCameraOffset] = useState<Position>({
     x: 0,
@@ -1717,17 +1923,33 @@ function App() {
   const currentCrownBalance = getCurrencyBalance(gameState.wallet, "crowns");
   const previousCrownBalanceRef = useRef(currentCrownBalance);
   const currentMap = gameState.map ?? debugMap;
-  const allEntities = Object.values(gameState.entities);
+  const allEntities = useMemo(
+    () => Object.values(gameState.entities),
+    [gameState.entities],
+  );
   const handleRendererPerformanceSample = useCallback(
     (sample: PixiRendererPerformanceSample) => {
       recordRendererPerformanceSample(rendererPerformanceRef.current, sample);
     },
     [],
   );
+  const releaseRendererCache = useCallback(() => {
+    latestAnimatedEntityPositionsRef.current = {};
+    latestTrackedVisualMovementEntityIdsRef.current.clear();
+    previousAnimatedEntityPositionsRef.current = {};
+    nextVisualMovementPruneAtRef.current = Infinity;
+    rendererPerformanceRef.current = createRendererPerformanceAccumulator();
+    setVisualMovementByEntityId({});
+    setRendererResetNonce((currentValue) => currentValue + 1);
+  }, []);
 
-  const partyMembers = companionIds
-    .map((id) => gameState.entities[id] as Companion | undefined)
-    .filter((companion): companion is Companion => Boolean(companion));
+  const partyMembers = useMemo(
+    () =>
+      companionIds
+        .map((id) => gameState.entities[id] as Companion | undefined)
+        .filter((companion): companion is Companion => Boolean(companion)),
+    [gameState.entities],
+  );
   const selectedMenuCompanionId = partyMembers.some(
     (member) => member.id === selectedCompanionId,
   )
@@ -1736,16 +1958,28 @@ function App() {
   const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
   const leader = getPartyLeader(gameState);
   const hasPartyLeader = Boolean(leader);
-  const enemies = Object.values(gameState.entities).filter(
-    (entity): entity is Enemy => entity.kind === "enemy",
+  const enemies = useMemo(
+    () =>
+      allEntities.filter(
+        (entity): entity is Enemy => entity.kind === "enemy",
+      ),
+    [allEntities],
   );
-  const questGuideNpcs = allEntities.filter(
-    (entity): entity is NpcEntity =>
-      entity.kind === "npc" && entity.npcRole === "quest_guide",
+  const questGuideNpcs = useMemo(
+    () =>
+      allEntities.filter(
+        (entity): entity is NpcEntity =>
+          entity.kind === "npc" && entity.npcRole === "quest_guide",
+      ),
+    [allEntities],
   );
-  const resources = resourceIds
-    .map((id) => gameState.entities[id] as ResourceEntity | undefined)
-    .filter((resource): resource is ResourceEntity => Boolean(resource));
+  const resources = useMemo(
+    () =>
+      resourceIds
+        .map((id) => gameState.entities[id] as ResourceEntity | undefined)
+        .filter((resource): resource is ResourceEntity => Boolean(resource)),
+    [gameState.entities],
+  );
   const displayQuest = getDisplayQuest(gameState.quests);
   const poiSearchScope = getPoiSearchScope(gameState);
   const activeQuestIds = getQuestLogQuests(gameState.quests).map(
@@ -1770,7 +2004,26 @@ function App() {
         )
       : null;
   const activeTeleport = gameState.activeTeleport;
-  const teleportWorkingById = getTeleportWorkingStateById(gameState);
+  const teleportWorkingById = useMemo(
+    () =>
+      getTeleportWorkingStateById({
+        map: gameState.map,
+        teleportStatesById: gameState.teleportStatesById,
+      }),
+    [gameState.map, gameState.teleportStatesById],
+  );
+  const directCompanionCommandsById =
+    gameState.directCompanionCommandsById ?? emptyDirectCompanionCommands;
+  const dropVisualEvents = gameState.dropVisualEvents ?? emptyDropVisualEvents;
+  const enemyAoeChannelsByCasterId =
+    gameState.enemyAoeChannelsByCasterId ?? emptyEnemyAoeChannels;
+  const resurrectionProgressByCompanionId =
+    gameState.resurrectionProgressByCompanionId ?? emptyResurrectionProgress;
+  const skillBindsByEnemyId = gameState.skillBindsByEnemyId ?? emptySkillBinds;
+  const skillMarksByEnemyId = gameState.skillMarksByEnemyId ?? emptySkillMarks;
+  const skillShieldBlocksById =
+    gameState.skillShieldBlocksById ?? emptySkillShieldBlocks;
+  const skillVisualEvents = gameState.skillVisualEvents ?? emptySkillVisualEvents;
   const activeMerchant =
     activeMerchantNpcId && isMerchantNpc(gameState.entities[activeMerchantNpcId])
       ? gameState.entities[activeMerchantNpcId]
@@ -1829,7 +2082,7 @@ function App() {
       ? directCommandFeedback
       : null;
   const activeDirectCommandCount = Object.keys(
-    gameState.directCompanionCommandsById ?? {},
+    directCompanionCommandsById,
   ).length;
   const directCommandGraceCount = Object.values(
     gameState.directCommandGraceUntilByCompanionId ?? {},
@@ -2162,8 +2415,31 @@ function App() {
   }, [currentCrownBalance]);
 
   useEffect(() => {
+    const mapId = gameState.currentMapId ?? currentMap.id ?? currentMap.debugName;
+
+    if (visualMovementMapIdRef.current === undefined) {
+      visualMovementMapIdRef.current = mapId;
+      return;
+    }
+
+    if (visualMovementMapIdRef.current === mapId) {
+      return;
+    }
+
+    visualMovementMapIdRef.current = mapId;
+    latestAnimatedEntityPositionsRef.current = {};
+    previousAnimatedEntityPositionsRef.current = {};
+    latestTrackedVisualMovementEntityIdsRef.current = new Set();
+    nextVisualMovementPruneAtRef.current = Infinity;
+    setVisualMovementByEntityId((currentVisualMovement) =>
+      Object.keys(currentVisualMovement).length === 0 ? currentVisualMovement : {},
+    );
+  }, [currentMap.debugName, currentMap.id, gameState.currentMapId]);
+
+  useEffect(() => {
     let animationFrameId = 0;
     let isActive = true;
+    let lastUiClockAt = 0;
 
     function stepVisualClock() {
       if (!isActive) {
@@ -2171,8 +2447,22 @@ function App() {
       }
 
       const now = Date.now();
+      if (now - lastUiClockAt >= uiClockIntervalMs) {
+        lastUiClockAt = now;
+        setCurrentTime(now);
+      }
+
       const latestPositions = latestAnimatedEntityPositionsRef.current;
       const previousPositions = previousAnimatedEntityPositionsRef.current;
+
+      const shouldPruneVisualMovement =
+        now >= nextVisualMovementPruneAtRef.current;
+
+      if (latestPositions === previousPositions && !shouldPruneVisualMovement) {
+        animationFrameId = window.requestAnimationFrame(stepVisualClock);
+        return;
+      }
+
       const movedEntityIds = Object.keys(latestPositions).filter(
         (entityId) =>
           previousPositions[entityId] &&
@@ -2182,13 +2472,21 @@ function App() {
           ),
       );
 
-      setCurrentTime(now);
-
-      if (movedEntityIds.length > 0) {
+      if (movedEntityIds.length > 0 || shouldPruneVisualMovement) {
         setVisualMovementByEntityId((currentVisualMovement) => {
-          const nextVisualMovement = { ...currentVisualMovement };
+          let nextVisualMovement = shouldPruneVisualMovement
+            ? pruneVisualMovementEntries(
+                currentVisualMovement,
+                latestTrackedVisualMovementEntityIdsRef.current,
+                now,
+              )
+            : currentVisualMovement;
 
           for (const entityId of movedEntityIds) {
+            if (nextVisualMovement === currentVisualMovement) {
+              nextVisualMovement = { ...currentVisualMovement };
+            }
+
             nextVisualMovement[entityId] = {
               direction: getMovementDirection(
                 previousPositions[entityId],
@@ -2202,11 +2500,14 @@ function App() {
             };
           }
 
+          nextVisualMovementPruneAtRef.current =
+            getNextVisualMovementPruneAt(nextVisualMovement);
+
           return nextVisualMovement;
         });
       }
 
-      previousAnimatedEntityPositionsRef.current = { ...latestPositions };
+      previousAnimatedEntityPositionsRef.current = latestPositions;
       animationFrameId = window.requestAnimationFrame(stepVisualClock);
     }
 
@@ -2235,17 +2536,40 @@ function App() {
   }, [rendererPerformanceRef]);
 
   useEffect(() => {
-    latestAnimatedEntityPositionsRef.current = [
-      ...partyMembers,
-      ...enemies,
-      ...questGuideNpcs,
-    ]
-      .filter((entity) => entity.state !== "dead")
-      .reduce<Record<string, Position>>((positionsById, entity) => {
-        positionsById[entity.id] = entity.position;
-        return positionsById;
-      }, {});
-  }, [enemies, partyMembers, questGuideNpcs]);
+    const trackedPositions = getTrackedVisualMovementPositions({
+      cameraOffset: terrainCameraOffset,
+      cellPixelSize: mapConstructionCellPixelSize,
+      combatFeedbackEvents: gameState.combatFeedbackEvents,
+      currentTime,
+      enemies,
+      marginTiles: visualMovementEnemyViewportMarginTiles,
+      partyMembers,
+      questGuideNpcs,
+      viewportSize,
+      visualMovementByEntityId,
+    });
+
+    latestAnimatedEntityPositionsRef.current = trackedPositions;
+    latestTrackedVisualMovementEntityIdsRef.current = new Set(
+      Object.keys(trackedPositions),
+    );
+
+    if (Object.keys(visualMovementByEntityId).length > 0) {
+      nextVisualMovementPruneAtRef.current = Math.min(
+        nextVisualMovementPruneAtRef.current,
+        currentTime,
+      );
+    }
+  }, [
+    currentTime,
+    enemies,
+    gameState.combatFeedbackEvents,
+    partyMembers,
+    questGuideNpcs,
+    terrainCameraOffset,
+    viewportSize,
+    visualMovementByEntityId,
+  ]);
 
   useEffect(() => {
     function handleConsumableShortcut(event: KeyboardEvent) {
@@ -2851,7 +3175,9 @@ function App() {
     setGameState(clearDebugTelemetry);
   }
 
-  function exportDebugTelemetryJson() {
+  function exportDebugTelemetryJson({
+    clearAfterExport = false,
+  }: { clearAfterExport?: boolean } = {}) {
     const report = exportDebugTelemetryReport(gameState);
     const blob = new Blob([JSON.stringify(report, null, 2)], {
       type: "application/json",
@@ -2864,7 +3190,11 @@ function App() {
       .toISOString()
       .replace(/[:.]/g, "-")}.json`;
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+
+    if (clearAfterExport) {
+      setGameState(clearDebugTelemetry);
+    }
   }
 
   function isValidFloorPosition(position: Position): boolean {
@@ -3052,6 +3382,7 @@ function App() {
             currentMap={currentMap}
             gameState={gameState}
             rendererPerformanceRef={rendererPerformanceRef}
+            visualMovementEntryCount={Object.keys(visualMovementByEntityId).length}
           />
           <LeaderPoiPanel
             autoModeEnabled={gameState.autoModeEnabled}
@@ -3060,18 +3391,14 @@ function App() {
           />
           <Suspense fallback={<PixiWorldRendererFallback mode="full" />}>
             <LazyPixiWorldRenderer
+              key={`full-${currentMap.id ?? currentMap.debugName}-${rendererResetNonce}`}
               activeTeleport={activeTeleport}
               cameraOffset={terrainCameraOffset}
               cellPixelSize={mapConstructionCellPixelSize}
               combatFeedbackEvents={gameState.combatFeedbackEvents}
-              currentTime={currentTime}
-              directCompanionCommandsById={
-                gameState.directCompanionCommandsById ?? {}
-              }
-              dropVisualEvents={gameState.dropVisualEvents ?? []}
-              enemyAoeChannelsByCasterId={
-                gameState.enemyAoeChannelsByCasterId ?? {}
-              }
+              directCompanionCommandsById={directCompanionCommandsById}
+              dropVisualEvents={dropVisualEvents}
+              enemyAoeChannelsByCasterId={enemyAoeChannelsByCasterId}
               entities={allEntities}
               leaderIntent={gameState.leaderIntent}
               map={currentMap}
@@ -3085,14 +3412,12 @@ function App() {
               onResourceClick={commandCompanionsToGatherResource}
               partyIntent={gameState.partyIntent}
               questGiverHasWork={questGiverHasWork}
-              resurrectionProgressByCompanionId={
-                gameState.resurrectionProgressByCompanionId ?? {}
-              }
+              resurrectionProgressByCompanionId={resurrectionProgressByCompanionId}
               showDebugOverlays={showEntityInfo}
-              skillBindsByEnemyId={gameState.skillBindsByEnemyId ?? {}}
-              skillMarksByEnemyId={gameState.skillMarksByEnemyId ?? {}}
-              skillShieldBlocksById={gameState.skillShieldBlocksById ?? {}}
-              skillVisualEvents={gameState.skillVisualEvents ?? []}
+              skillBindsByEnemyId={skillBindsByEnemyId}
+              skillMarksByEnemyId={skillMarksByEnemyId}
+              skillShieldBlocksById={skillShieldBlocksById}
+              skillVisualEvents={skillVisualEvents}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}
               visualMovementByEntityId={visualMovementByEntityId}
@@ -3107,18 +3432,18 @@ function App() {
           ) : null}
           <Suspense fallback={<PixiWorldRendererFallback mode="preview" />}>
             <LazyPixiWorldRenderer
+              key={`preview-${currentMap.id ?? currentMap.debugName}-${rendererResetNonce}`}
               activeTeleport={activeTeleport}
               cameraOffset={terrainCameraOffset}
               cellPixelSize={mapConstructionCellPixelSize}
-              currentTime={currentTime}
               entities={allEntities}
               leaderIntent={gameState.leaderIntent}
               map={currentMap}
               mode="preview"
               onFloorClick={commandPartyToMoveFromMinimapPosition}
+              onPerformanceSample={handleRendererPerformanceSample}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}
-              visualMovementByEntityId={visualMovementByEntityId}
             />
           </Suspense>
         </div>
@@ -3528,11 +3853,21 @@ function App() {
                       ? "Stop Debug Recording"
                       : "Start Debug Recording"}
                   </button>
-                  <button onClick={exportDebugTelemetryJson}>
+                  <button onClick={() => exportDebugTelemetryJson()}>
                     Export Debug JSON
+                  </button>
+                  <button
+                    onClick={() =>
+                      exportDebugTelemetryJson({ clearAfterExport: true })
+                    }
+                  >
+                    Export & Clear JSON
                   </button>
                   <button onClick={clearDebugTelemetryReport}>
                     Clear Debug Report
+                  </button>
+                  <button onClick={releaseRendererCache}>
+                    Release Renderer Cache
                   </button>
                   <span>
                     Debug Recording{" "}

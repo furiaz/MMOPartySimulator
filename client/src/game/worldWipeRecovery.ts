@@ -17,7 +17,10 @@ import {
   isSlimewardDungeonFloorMapId,
 } from "./dungeonSystem";
 import { createNpc, createTargetDummy, moveEntityTo } from "./entities";
-import { clearMapTransitionRuntimeState } from "./mapRuntimeCleanup";
+import {
+  clearMapTransitionRuntimeState,
+  pruneMissingEntityRuntimeState,
+} from "./mapRuntimeCleanup";
 import { recordMapReachedForQuests } from "./questSystem";
 import { updateEntity, type GameState } from "./state";
 import type {
@@ -283,7 +286,10 @@ function resetStateToRescueHub(
         : {},
   };
 
-  return recordMapReachedForQuests(nextState, choice.mapId);
+  return recordMapReachedForQuests(
+    pruneMissingEntityRuntimeState(nextState),
+    choice.mapId,
+  );
 }
 
 function getRescueHubEntities(

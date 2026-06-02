@@ -8,6 +8,19 @@ import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 
 describe("passive health regen", () => {
+  it("preserves state when companion regen has no elapsed interval or stale ids", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "companion");
+    const state = addEntity(
+      createTestGameState({
+        partyLeaderId: companion.id,
+        lastHealthRegenAtByCompanionId: { [companion.id]: 1000 },
+      }),
+      companion,
+    );
+
+    expect(updatePassiveHealthRegen(state, 2000)).toBe(state);
+  });
+
   it("heals living companions every five seconds without exceeding max health", () => {
     const companion = {
       ...createCompanion("companion", { x: 0, y: 0 }, "companion"),
@@ -44,6 +57,26 @@ describe("passive health regen", () => {
     });
   });
 
+  it("removes stale companion regen timestamp ids", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "companion");
+    const state = addEntity(
+      createTestGameState({
+        partyLeaderId: companion.id,
+        lastHealthRegenAtByCompanionId: {
+          [companion.id]: 1000,
+          missing: 1000,
+        },
+      }),
+      companion,
+    );
+    const nextState = updatePassiveHealthRegen(state, 2000);
+
+    expect(nextState).not.toBe(state);
+    expect(nextState.lastHealthRegenAtByCompanionId).toEqual({
+      [companion.id]: 1000,
+    });
+  });
+
   it("heals target dummies every five seconds without exceeding max health", () => {
     const dummy = {
       ...createTargetDummy("dummy", { x: 0, y: 0 }),
@@ -60,5 +93,36 @@ describe("passive health regen", () => {
 
     expect(nextState.entities[dummy.id]).toMatchObject({ health: 95 });
     expect(cappedState.entities[dummy.id]).toMatchObject({ health: 100 });
+  });
+
+  it("preserves state when target dummy regen has no elapsed interval or stale ids", () => {
+    const dummy = createTargetDummy("dummy", { x: 0, y: 0 });
+    const state = addEntity(
+      createTestGameState({
+        lastTargetDummyRegenAtByEnemyId: { [dummy.id]: 1000 },
+      }),
+      dummy,
+    );
+
+    expect(updateTargetDummyHealthRegen(state, 2000)).toBe(state);
+  });
+
+  it("removes stale target dummy regen timestamp ids", () => {
+    const dummy = createTargetDummy("dummy", { x: 0, y: 0 });
+    const state = addEntity(
+      createTestGameState({
+        lastTargetDummyRegenAtByEnemyId: {
+          [dummy.id]: 1000,
+          missing: 1000,
+        },
+      }),
+      dummy,
+    );
+    const nextState = updateTargetDummyHealthRegen(state, 2000);
+
+    expect(nextState).not.toBe(state);
+    expect(nextState.lastTargetDummyRegenAtByEnemyId).toEqual({
+      [dummy.id]: 1000,
+    });
   });
 });

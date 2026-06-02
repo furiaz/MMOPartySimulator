@@ -12,6 +12,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
+import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { isPositionInsideSubzone } from "./subzoneSystem";
 import type { NpcEntity, Position } from "./types";
@@ -668,11 +669,11 @@ function removeEntities(state: GameState, entityIds: string[]): GameState {
     delete followTrailsByEntityId[entityId];
   }
 
-  return {
+  return pruneMissingEntityRuntimeState({
     ...state,
     entities,
     followTrailsByEntityId,
-  };
+  });
 }
 
 function isAtPosition(position: Position, target: Position): boolean {

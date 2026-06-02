@@ -11,6 +11,34 @@ import { createTestGameState } from "./testState";
 import type { DropVisualEvent } from "./types";
 
 describe("enemy drop system", () => {
+  it("preserves the state reference when there are no drop visuals", () => {
+    const state = createTestGameState({
+      dropVisualEvents: [],
+    });
+
+    expect(updateDropSystem(state, 1000)).toBe(state);
+  });
+
+  it("preserves the state reference when all drop visuals are still active", () => {
+    const now = 1000;
+    const state = createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      dropVisualEvents: [
+        createDropVisualEvent({
+          enemyId: "wolf",
+          itemId: "wolf_fang",
+          now,
+          currentMapId: MAP_ONE_ID,
+        }),
+      ],
+    });
+
+    expect(updateDropSystem(state, now + DROP_VISUAL_DURATION_MS - 1)).toBe(
+      state,
+    );
+  });
+
   it("queues drop visuals before adding drops to inventory", () => {
     const now = 1000;
     const enemy = {

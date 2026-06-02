@@ -106,6 +106,11 @@ export function updateDropSystem(
   now = Date.now(),
 ): GameState {
   const dropVisualEvents = state.dropVisualEvents ?? [];
+
+  if (dropVisualEvents.length === 0) {
+    return state;
+  }
+
   const activeEvents: DropVisualEvent[] = [];
   let nextState = state;
 
@@ -116,6 +121,13 @@ export function updateDropSystem(
     }
 
     nextState = completeDropVisualEvent(nextState, event, now);
+  }
+
+  if (
+    nextState === state &&
+    activeEvents.length === dropVisualEvents.length
+  ) {
+    return state;
   }
 
   return {

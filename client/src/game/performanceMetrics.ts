@@ -9,6 +9,10 @@ export type NavigationPathMetricBucket =
 
 export type GamePerformanceMetrics = {
   attackSlotChecks: number;
+  enemyAiActiveCount: number;
+  enemyAiDormantCount: number;
+  enemyRoamMoves: number;
+  enemyRoamStarts: number;
   movementFailures: number;
   navigationPathQueries: number;
   navigationPathQueriesByBucket: Record<NavigationPathMetricBucket, number>;
@@ -31,6 +35,10 @@ function createEmptyNavigationPathBuckets(): Record<NavigationPathMetricBucket, 
 
 const emptyMetrics: GamePerformanceMetrics = {
   attackSlotChecks: 0,
+  enemyAiActiveCount: 0,
+  enemyAiDormantCount: 0,
+  enemyRoamMoves: 0,
+  enemyRoamStarts: 0,
   movementFailures: 0,
   navigationPathQueries: 0,
   navigationPathQueriesByBucket: createEmptyNavigationPathBuckets(),
@@ -46,6 +54,22 @@ let metrics: GamePerformanceMetrics = {
 
 export function recordAttackSlotCheck(): void {
   metrics.attackSlotChecks += 1;
+}
+
+export function recordEnemyAiActive(): void {
+  metrics.enemyAiActiveCount += 1;
+}
+
+export function recordEnemyAiDormant(): void {
+  metrics.enemyAiDormantCount += 1;
+}
+
+export function recordEnemyRoamMove(): void {
+  metrics.enemyRoamMoves += 1;
+}
+
+export function recordEnemyRoamStart(): void {
+  metrics.enemyRoamStarts += 1;
 }
 
 export function recordMovementFailure(): void {

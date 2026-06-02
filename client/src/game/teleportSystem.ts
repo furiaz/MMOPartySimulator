@@ -42,7 +42,10 @@ import {
   targetDummyPosition,
 } from "./debugMap";
 import { hasDeadPartyMembers } from "./partySystem";
-import { clearMapTransitionRuntimeState } from "./mapRuntimeCleanup";
+import {
+  clearMapTransitionRuntimeState,
+  pruneMissingEntityRuntimeState,
+} from "./mapRuntimeCleanup";
 import {
   updateEntity,
   type GameState,
@@ -371,6 +374,7 @@ function completeTeleport(state: GameState, nowMs: number): GameState {
       ? { [`${Math.round(leader.position.x)},${Math.round(leader.position.y)}`]: true }
       : {},
   };
+  nextState = pruneMissingEntityRuntimeState(nextState);
   nextState = recordMapReachedForQuests(nextState, teleport.targetMapId);
   nextState = appendSuperiorEnemySpawnEvents(nextState, "map_spawn");
 

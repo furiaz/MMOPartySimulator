@@ -6,6 +6,23 @@ import type { DebugNavigationReason, GameEntity, Position } from "./types";
 const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
 
 export function clearFrameMovementPlanning(state: GameState): GameState {
+  const hasFramePlanning =
+    Object.keys(state.failedMoveByEntityId ?? {}).length > 0 ||
+    Object.keys(state.movementFailuresByEntityId ?? {}).length > 0 ||
+    Object.keys(state.movementDecisionsByEntityId ?? {}).length > 0 ||
+    Object.keys(state.moveIntentsByEntityId ?? {}).length > 0 ||
+    Object.keys(state.reservedPositionsByEntityId ?? {}).length > 0 ||
+    Object.keys(state.movementFailureMsByEntityId ?? {}).length > 0 ||
+    Object.keys(state.movementPathRetryAtMsByEntityId ?? {}).some(
+      (entityId) =>
+        (state.movementPathRetryAtMsByEntityId?.[entityId] ?? 0) <=
+        (state.simulationTimeMs ?? 0),
+    );
+
+  if (!hasFramePlanning) {
+    return state;
+  }
+
   const movementFailureMsByEntityId = { ...(state.movementFailureMsByEntityId ?? {}) };
   const movementPathRetryAtMsByEntityId = {
     ...(state.movementPathRetryAtMsByEntityId ?? {}),

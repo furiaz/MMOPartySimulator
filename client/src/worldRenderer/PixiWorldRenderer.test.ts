@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { CombatFeedbackEvent, GameMap } from "../game";
 import { createCompanion, createEnemy, createNpc, createResource, createTargetDummy } from "../game";
 import {
-  collectCurrentMapVisualTextureSrcs,
+  collectCurrentMapScopedVisualTextureSrcs,
+  collectDurableVisualTextureSrcs,
   enemySpottedAlertSrc,
   getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
@@ -14,8 +15,10 @@ import {
   getNearestHoverEntity,
   getNearestInteractableEntity,
   getPreviewMapPosition,
+  getPreviewRenderSignature,
   getTeleportIconSrc,
   isPositionInTileBounds,
+  isStaticMapSpriteKey,
   levelUpBurstSrc,
   shouldDrawCombatFeedbackEvent,
   TELEPORT_OBJECT_SPRITE_ANCHOR_X,
@@ -92,6 +95,104 @@ describe("getPreviewMapPosition", () => {
   });
 });
 
+describe("getPreviewRenderSignature", () => {
+  it("changes when preview-visible inputs change", () => {
+    const map = createWideMap();
+    const companion = createCompanion("companion", { x: 4, y: 4 }, "companion");
+    const baseInput = {
+      cameraOffset: { x: 0, y: 0 },
+      cellPixelSize: 32,
+      entities: [companion],
+      map,
+      viewportSize: { width: 800, height: 600 },
+    };
+    const baseSignature = getPreviewRenderSignature(baseInput);
+
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        entities: [
+          {
+            ...companion,
+            position: { x: 5, y: 4 },
+          },
+        ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        entities: [
+          {
+            ...companion,
+            state: "dead",
+          },
+        ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        map: {
+          ...map,
+          id: "map-1",
+        },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        cameraOffset: { x: 32, y: 0 },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        viewportSize: { width: 1024, height: 600 },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        cellPixelSize: 16,
+      }),
+    ).not.toBe(baseSignature);
+  });
+});
+
+describe("texture lifetime classification", () => {
+  it("classifies walking frames and shared VFX as durable", () => {
+    const durableSources = collectDurableVisualTextureSrcs();
+
+    expect(durableSources.has(enemySpottedAlertSrc)).toBe(true);
+    expect(durableSources.has(MAP_OBJECT_ICON_SRC.teleportGood)).toBe(false);
+    expect(
+      [...durableSources].some((src) => src.includes("/Asserts/Characters/Beginner/")),
+    ).toBe(true);
+  });
+
+  it("classifies wild-map visual sources as current-map scoped", () => {
+    const map: GameMap = {
+      ...createWideMap(),
+      id: "map-1",
+      walls: [{ x: 1, y: 1 }],
+    };
+    const resource = createResource("wood", { x: 4, y: 4 });
+    const enemy = createEnemy("enemy", { x: 6, y: 6 }, undefined, {
+      enemyTypeId: "slime",
+    });
+    const scopedSources = collectCurrentMapScopedVisualTextureSrcs(map, [
+      resource,
+      enemy,
+    ]);
+
+    expect(scopedSources).toContain(MAP_OBJECT_ICON_SRC.teleportGood);
+    expect(scopedSources.some((src) => src.includes("map-wilderness"))).toBe(true);
+    expect(scopedSources.some((src) => src.includes("slime-se.png"))).toBe(true);
+    expect(scopedSources).not.toContain(enemySpottedAlertSrc);
+  });
+});
+
 describe("teleport object art", () => {
   it("uses the good teleport asset for working teleports", () => {
     expect(getTeleportIconSrc(true)).toBe(MAP_OBJECT_ICON_SRC.teleportGood);
@@ -148,6 +249,17 @@ describe("getFullVisibleTileBounds", () => {
 
     expect(isPositionInTileBounds({ x: 10, y: 2 }, bounds)).toBe(true);
     expect(isPositionInTileBounds({ x: 20, y: 2 }, bounds)).toBe(false);
+  });
+});
+
+describe("isStaticMapSpriteKey", () => {
+  it("identifies static map sprite keys but not transient entity/effect keys", () => {
+    expect(isStaticMapSpriteKey("floor:map-1:0:0:grass.png")).toBe(true);
+    expect(isStaticMapSpriteKey("wall:map-1:4:5:tree.png")).toBe(true);
+    expect(isStaticMapSpriteKey("object:map-1:teleport:hub:1:2")).toBe(true);
+    expect(isStaticMapSpriteKey("map-visual-object:map-1:tree-1")).toBe(true);
+    expect(isStaticMapSpriteKey("entity:test-enemy-1")).toBe(false);
+    expect(isStaticMapSpriteKey("feedback:damage-1")).toBe(false);
   });
 });
 
@@ -266,10 +378,10 @@ describe("prototype VFX feedback sprites", () => {
   };
 
   it("preloads enemy spotted and level-up sprite assets", () => {
-    const sources = collectCurrentMapVisualTextureSrcs(createWideMap(), []);
+    const sources = collectDurableVisualTextureSrcs();
 
-    expect(sources).toContain(enemySpottedAlertSrc);
-    expect(sources).toContain(levelUpBurstSrc);
+    expect(sources.has(enemySpottedAlertSrc)).toBe(true);
+    expect(sources.has(levelUpBurstSrc)).toBe(true);
   });
 
   it("suppresses text labels for icon-only feedback events", () => {

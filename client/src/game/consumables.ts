@@ -563,7 +563,7 @@ export function updateFlaskRechargeFromEnemyKills(
   state: GameState,
   now: number,
 ): GameState {
-  let nextState = state;
+  let nextState = removeStaleFlaskRechargeCountedEnemyDefeats(state);
 
   for (const entity of Object.values(nextState.entities)) {
     if (entity.kind !== "enemy" || entity.state !== "dead" || entity.health > 0) {
@@ -812,6 +812,36 @@ function countEnemyDefeatForFlaskRecharge(
   }
 
   return nextState;
+}
+
+function removeStaleFlaskRechargeCountedEnemyDefeats(
+  state: GameState,
+): GameState {
+  const countedDefeats = state.flaskRechargeCountedEnemyDefeats;
+
+  if (!countedDefeats) {
+    return state;
+  }
+
+  let nextCountedDefeats: Record<string, number> | null = null;
+
+  for (const enemyId of Object.keys(countedDefeats)) {
+    if (state.entities[enemyId]?.kind === "enemy") {
+      continue;
+    }
+
+    nextCountedDefeats ??= { ...countedDefeats };
+    delete nextCountedDefeats[enemyId];
+  }
+
+  if (!nextCountedDefeats) {
+    return state;
+  }
+
+  return {
+    ...state,
+    flaskRechargeCountedEnemyDefeats: nextCountedDefeats,
+  };
 }
 
 function grantFlaskRechargeCharge(state: GameState): GameState {

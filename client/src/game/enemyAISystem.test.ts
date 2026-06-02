@@ -420,6 +420,44 @@ describe("enemy AI aggro and roaming", () => {
     ).toBeLessThanOrEqual(8);
   });
 
+  it("parks far wild-zone enemies without starting roam", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const leader = createIdleCompanion("leader", { x: 40, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 0, y: 0 }),
+      nextRoamAt: 9_999,
+    };
+    const state = createState([leader, enemy], { currentMapId: "map-1" });
+
+    const nextState = updateEnemyAISystem(state);
+
+    expect(nextState).toBe(state);
+    expect(nextState.entities[enemy.id]).toBe(enemy);
+    expect((nextState.entities[enemy.id] as Enemy).roamTargetPosition).toBeUndefined();
+  });
+
+  it("keeps near wild-zone enemies active for normal roam behavior", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const leader = createIdleCompanion("leader", { x: 2, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 0, y: 0 }),
+      nextRoamAt: 9_999,
+    };
+
+    const nextState = updateEnemyAISystem(
+      createState([leader, enemy], { currentMapId: "map-1" }),
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.roamTargetPosition).toBeTruthy();
+  });
+
   it("continues roaming across small real-time movement frames", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 0, y: 0 }),

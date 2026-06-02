@@ -40,9 +40,169 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     skillVisualEvents: [],
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    flaskRechargeCountedEnemyDefeats: {},
+    lastHealthRegenAtByCompanionId: {},
+    lastTargetDummyRegenAtByEnemyId: {},
     dropVisualEvents: [],
     resurrectionProgressByCompanionId: {},
     resurrectionChannelsByHelperId: {},
+    skillBindsByEnemyId: {},
+    skillMarksByEnemyId: {},
+    skillShieldBlocksById: {},
     partyFormation: createIdlePartyFormation(),
   };
+}
+
+export function pruneMissingEntityRuntimeState(state: GameState): GameState {
+  const currentEntityIds = new Set(Object.keys(state.entities));
+  const followTrailsByEntityId =
+    pruneRecordById(state.followTrailsByEntityId, currentEntityIds) ??
+    state.followTrailsByEntityId;
+  const failedMoveByEntityId = pruneRecordById(state.failedMoveByEntityId, currentEntityIds);
+  const movementFailureMsByEntityId = pruneRecordById(
+    state.movementFailureMsByEntityId,
+    currentEntityIds,
+  );
+  const movementFailuresByEntityId = pruneRecordById(
+    state.movementFailuresByEntityId,
+    currentEntityIds,
+  );
+  const movementPathRetryAtMsByEntityId = pruneRecordById(
+    state.movementPathRetryAtMsByEntityId,
+    currentEntityIds,
+  );
+  const moveIntentsByEntityId = pruneRecordById(state.moveIntentsByEntityId, currentEntityIds);
+  const reservedPositionsByEntityId = pruneRecordById(
+    state.reservedPositionsByEntityId,
+    currentEntityIds,
+  );
+  const movementPathsByEntityId = pruneRecordById(
+    state.movementPathsByEntityId,
+    currentEntityIds,
+  );
+  const attackSlotCacheByEntityId = pruneRecordById(
+    state.attackSlotCacheByEntityId,
+    currentEntityIds,
+  );
+  const movementDecisionsByEntityId = pruneRecordById(
+    state.movementDecisionsByEntityId,
+    currentEntityIds,
+  );
+  const lastPositionsByEntityId = pruneRecordById(
+    state.lastPositionsByEntityId,
+    currentEntityIds,
+  );
+  const skillMarksByEnemyId = pruneRecordById(state.skillMarksByEnemyId, currentEntityIds);
+  const skillBindsByEnemyId = pruneRecordById(state.skillBindsByEnemyId, currentEntityIds);
+  const enemyAoeCooldownsByCasterId = pruneRecordById(
+    state.enemyAoeCooldownsByCasterId,
+    currentEntityIds,
+  );
+  const flaskRechargeCountedEnemyDefeats = pruneRecordById(
+    state.flaskRechargeCountedEnemyDefeats,
+    currentEntityIds,
+  );
+  const lastHealthRegenAtByCompanionId = pruneRecordById(
+    state.lastHealthRegenAtByCompanionId,
+    currentEntityIds,
+  );
+  const lastTargetDummyRegenAtByEnemyId = pruneRecordById(
+    state.lastTargetDummyRegenAtByEnemyId,
+    currentEntityIds,
+  );
+  const resurrectionProgressByCompanionId = pruneRecordById(
+    state.resurrectionProgressByCompanionId,
+    currentEntityIds,
+  );
+  const resurrectionChannelsByHelperId = pruneRecordById(
+    state.resurrectionChannelsByHelperId,
+    currentEntityIds,
+  );
+
+  if (
+    followTrailsByEntityId === state.followTrailsByEntityId &&
+    failedMoveByEntityId === state.failedMoveByEntityId &&
+    movementFailureMsByEntityId === state.movementFailureMsByEntityId &&
+    movementFailuresByEntityId === state.movementFailuresByEntityId &&
+    movementPathRetryAtMsByEntityId === state.movementPathRetryAtMsByEntityId &&
+    moveIntentsByEntityId === state.moveIntentsByEntityId &&
+    reservedPositionsByEntityId === state.reservedPositionsByEntityId &&
+    movementPathsByEntityId === state.movementPathsByEntityId &&
+    attackSlotCacheByEntityId === state.attackSlotCacheByEntityId &&
+    movementDecisionsByEntityId === state.movementDecisionsByEntityId &&
+    lastPositionsByEntityId === state.lastPositionsByEntityId &&
+    skillMarksByEnemyId === state.skillMarksByEnemyId &&
+    skillBindsByEnemyId === state.skillBindsByEnemyId &&
+    enemyAoeCooldownsByCasterId === state.enemyAoeCooldownsByCasterId &&
+    flaskRechargeCountedEnemyDefeats === state.flaskRechargeCountedEnemyDefeats &&
+    lastHealthRegenAtByCompanionId === state.lastHealthRegenAtByCompanionId &&
+    lastTargetDummyRegenAtByEnemyId === state.lastTargetDummyRegenAtByEnemyId &&
+    resurrectionProgressByCompanionId === state.resurrectionProgressByCompanionId &&
+    resurrectionChannelsByHelperId === state.resurrectionChannelsByHelperId
+  ) {
+    return state;
+  }
+
+  return {
+    ...state,
+    followTrailsByEntityId,
+    failedMoveByEntityId,
+    movementFailureMsByEntityId,
+    movementFailuresByEntityId,
+    movementPathRetryAtMsByEntityId,
+    moveIntentsByEntityId,
+    reservedPositionsByEntityId,
+    movementPathsByEntityId,
+    attackSlotCacheByEntityId,
+    movementDecisionsByEntityId,
+    lastPositionsByEntityId,
+    skillMarksByEnemyId,
+    skillBindsByEnemyId,
+    enemyAoeCooldownsByCasterId,
+    flaskRechargeCountedEnemyDefeats,
+    lastHealthRegenAtByCompanionId,
+    lastTargetDummyRegenAtByEnemyId,
+    resurrectionProgressByCompanionId,
+    resurrectionChannelsByHelperId,
+  };
+}
+
+function pruneRecordById<T>(
+  record: Record<string, T> | undefined,
+  currentEntityIds: Set<string>,
+): Record<string, T> | undefined {
+  if (!record) {
+    return record;
+  }
+
+  let nextRecord: Record<string, T> | undefined;
+
+  for (const [id, value] of Object.entries(record)) {
+    if (currentEntityIds.has(id)) {
+      if (nextRecord) {
+        nextRecord[id] = value;
+      }
+      continue;
+    }
+
+    nextRecord = nextRecord ?? copyCurrentEntries(record, currentEntityIds);
+    delete nextRecord[id];
+  }
+
+  return nextRecord ?? record;
+}
+
+function copyCurrentEntries<T>(
+  record: Record<string, T>,
+  currentEntityIds: Set<string>,
+): Record<string, T> {
+  const nextRecord: Record<string, T> = {};
+
+  for (const [id, value] of Object.entries(record)) {
+    if (currentEntityIds.has(id)) {
+      nextRecord[id] = value;
+    }
+  }
+
+  return nextRecord;
 }

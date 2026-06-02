@@ -3,7 +3,7 @@ import {
   HUB_WALL_TILE_SRC,
   MAP_OBJECT_ICON_SRC,
   MAP_VISUAL_OBJECT_SRC,
-  RESOURCE_ICON_SRC,
+  NPC_ICON_SRC,
   SHARED_SKILL_VISUAL_ICON_SRC,
   SLIMEWARD_DUNGEON_TILE_SRC,
   SKILL_VISUAL_ICON_SRC,
@@ -26,6 +26,7 @@ import {
   isSuperiorEnemy,
 } from "../game/enemyVariants";
 import {
+  entityVisualAssets,
   getEntityVisualAsset,
   type ImageVisualAsset,
   type SpriteAnimationAsset,
@@ -64,6 +65,15 @@ export const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
 export const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
 export const TELEPORT_OBJECT_SPRITE_ANCHOR_Y = 0.5;
 
+const staticMapSpriteKeyPrefixes = [
+  "floor:",
+  "slimeward-floor:",
+  "wall:",
+  "slimeward-wall:",
+  "object:",
+  "map-visual-object:",
+];
+
 export type PixiRendererPerformanceSample = {
   activeFeedbackCount: number;
   drawCount: number;
@@ -71,11 +81,26 @@ export type PixiRendererPerformanceSample = {
   drawnFeedbackCount: number;
   drawnSprites: number;
   drawnTexts: number;
+  durableTextureSourceCount: number;
+  evictedTextureCount: number;
+  fullDrawCount: number;
+  managedSpriteCount: number;
+  managedTextCount: number;
+  mapScopedTextureSourceCount: number;
+  mapTrackedTextureSourceCount: number;
+  pendingTextureCount: number;
+  previewDrawCount: number;
+  managedStaticSpriteCount: number;
   renderMs: number;
   spriteCreates: number;
   spriteReuses: number;
   textCreates: number;
   textReuses: number;
+  textureCount: number;
+  retainedMapCount: number;
+  stalePendingTextureCount: number;
+  failedTextureCount: number;
+  unloadFailedTextureCount: number;
   visibleEntityCount: number;
 };
 
@@ -98,6 +123,15 @@ export type RenderSize = {
 };
 
 export type ClientBounds = Pick<DOMRect, "left" | "top" | "width" | "height">;
+
+export type ViewportSize = {
+  width: number;
+  height: number;
+};
+
+export function isStaticMapSpriteKey(key: string): boolean {
+  return staticMapSpriteKeyPrefixes.some((prefix) => key.startsWith(prefix));
+}
 
 export type EntitySpriteLayout = {
   anchorX: number;
@@ -199,13 +233,9 @@ function collectFullMapFloorTextureSrcs(map: GameMap): string[] {
   return [...sources];
 }
 
-export function collectCurrentMapVisualTextureSrcs(
-  map: GameMap,
-  entities: GameEntity[],
-): string[] {
+export function collectDurableVisualTextureSrcs(): Set<string> {
   const sources = new Set<string>([
-    ...Object.values(MAP_OBJECT_ICON_SRC),
-    ...Object.values(RESOURCE_ICON_SRC),
+    ...Object.values(NPC_ICON_SRC),
     ...Object.values(SHARED_SKILL_VISUAL_ICON_SRC),
     ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
       (src): src is string => Boolean(src),
@@ -225,6 +255,21 @@ export function collectCurrentMapVisualTextureSrcs(
     resourceHitWoodSrc,
     shieldInvulnerableGlintSrc,
     teleportPulseSrc,
+  ]);
+
+  addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.beginnerCharacter);
+  addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.testCharacter);
+  addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.questGuideCharacter);
+
+  return sources;
+}
+
+export function collectCurrentMapVisualTextureSrcs(
+  map: GameMap,
+  entities: GameEntity[],
+): string[] {
+  const sources = new Set<string>([
+    ...Object.values(MAP_OBJECT_ICON_SRC),
     ...collectFullMapFloorTextureSrcs(map),
   ]);
 
@@ -251,6 +296,33 @@ export function collectCurrentMapVisualTextureSrcs(
   }
 
   return [...sources].sort();
+}
+
+export function collectCurrentMapScopedVisualTextureSrcs(
+  map: GameMap,
+  entities: GameEntity[],
+): string[] {
+  const durableSources = collectDurableVisualTextureSrcs();
+
+  return collectCurrentMapVisualTextureSrcs(map, entities).filter(
+    (src) => !durableSources.has(src),
+  );
+}
+
+function addEntityVisualAssetTextureSrcs(
+  sources: Set<string>,
+  visualAsset: ReturnType<typeof getEntityVisualAsset>,
+) {
+  if (visualAsset.kind === "image") {
+    sources.add(visualAsset.src);
+    return;
+  }
+
+  if (visualAsset.kind === "sprite") {
+    for (const src of collectSpriteVisualAssetFrames(visualAsset)) {
+      sources.add(src);
+    }
+  }
 }
 
 export function isWildernessVisualMap(mapId: string | undefined): boolean {
@@ -528,6 +600,70 @@ export function isInteractableEntity(entity: GameEntity): entity is Interactable
 
 export function shouldRenderEntity(entity: GameEntity): boolean {
   return entity.kind !== "resource" || isActiveResource(entity);
+}
+
+export function getPreviewRenderSignature({
+  cameraOffset,
+  cellPixelSize,
+  entities,
+  map,
+  viewportSize,
+}: {
+  cameraOffset: Position;
+  cellPixelSize: number;
+  entities: GameEntity[];
+  map: GameMap;
+  viewportSize?: ViewportSize;
+}): string {
+  const wallSignature = map.walls
+    .map((wall) => `${wall.x},${wall.y}`)
+    .join(";");
+  const teleportSignature = map.teleports
+    .map(
+      (teleport) =>
+        `${teleport.id}:${teleport.position.x},${teleport.position.y}:${teleport.range}`,
+    )
+    .join(";");
+  const fountainSignature = map.healingFountains
+    .map(
+      (fountain) =>
+        `${fountain.id}:${fountain.position.x},${fountain.position.y}:${fountain.range}`,
+    )
+    .join(";");
+  const subzoneSignature = (map.subzones ?? [])
+    .map(
+      (subzone) =>
+        `${subzone.id}:${subzone.bounds.x},${subzone.bounds.y},${subzone.bounds.width},${subzone.bounds.height}`,
+    )
+    .join(";");
+  const entitySignature = entities
+    .filter(shouldRenderEntity)
+    .map((entity) => {
+      const resourceState =
+        entity.kind === "resource" ? `:${entity.isDepleted ? "d" : "a"}` : "";
+
+      return `${entity.id}:${entity.kind}:${entity.state}:${entity.position.x},${entity.position.y}${resourceState}`;
+    })
+    .sort()
+    .join(";");
+
+  return [
+    map.id ?? "",
+    map.debugName,
+    map.columns,
+    map.rows,
+    map.visualTheme ?? "",
+    wallSignature,
+    teleportSignature,
+    fountainSignature,
+    subzoneSignature,
+    entitySignature,
+    cameraOffset.x,
+    cameraOffset.y,
+    cellPixelSize,
+    viewportSize?.width ?? "",
+    viewportSize?.height ?? "",
+  ].join("|");
 }
 
 export function getNearestInteractableEntity({

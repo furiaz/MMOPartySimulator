@@ -13,6 +13,19 @@ import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
 import { GAME_LOOP_TICK_MS, type SimulationTiming } from "./simulationTiming";
 import { getPartyLeader } from "./partySystem";
 import {
+  HUB_MAP_ID,
+  MAP_FOUR_ID,
+  MAP_ONE_ID,
+  MAP_THREE_ID,
+  MAP_TWO_ID,
+} from "./debugMap";
+import {
+  recordEnemyAiActive,
+  recordEnemyAiDormant,
+  recordEnemyRoamMove,
+  recordEnemyRoamStart,
+} from "./performanceMetrics";
+import {
   getEnemyDetectionRange as getArchetypeDetectionRange,
   getEnemyTargetPreference,
   getEnemyTemperament,
@@ -38,6 +51,8 @@ const ENEMY_COMBAT_RETAIN_RANGE = 1;
 const ROAM_TARGET_REACHED_DISTANCE = 0.1;
 const QUEST_PRESSURE_TARGET_REACHED_DISTANCE = 1;
 const ENEMY_WANDER_ATTEMPTS = 5;
+const WILD_ZONE_BACKGROUND_ACTIVITY_RADIUS = 28;
+const WILD_ZONE_MAP_IDS = new Set([MAP_ONE_ID, MAP_TWO_ID, MAP_THREE_ID, MAP_FOUR_ID]);
 
 type TargetSearchResult = {
   target?: AutonomousEntity;
@@ -63,10 +78,12 @@ export function updateEnemyAISystem(
     }
 
     if (isEnemyAoeChanneling(nextState, entity.id)) {
+      recordEnemyAiActive();
       continue;
     }
 
     if (isTargetDummyEnemy(entity)) {
+      recordEnemyAiActive();
       nextState = updateEntity(nextState, keepTargetDummyStationary(entity));
       continue;
     }
@@ -94,11 +111,13 @@ export function updateEnemyAISystem(
     }
 
     if (entity.currentTargetId) {
+      recordEnemyAiActive();
       nextState = updateEntity(nextState, clearEnemyTarget(entity, timing.nowMs));
       continue;
     }
 
     if (shouldPressureQuestTarget(entity)) {
+      recordEnemyAiActive();
       nextState = moveQuestSpawnTowardPressureTarget(nextState, entity);
       continue;
     }
@@ -107,9 +126,17 @@ export function updateEnemyAISystem(
       !entity.questSpawn &&
       getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE
     ) {
+      recordEnemyAiActive();
       nextState = moveEnemyTowardHome(nextState, entity, timing.nowMs);
       continue;
     }
+
+    if (isDormantBackgroundWildEnemy(nextState, entity, entities)) {
+      recordEnemyAiDormant();
+      continue;
+    }
+
+    recordEnemyAiActive();
 
     if (getEnemyTemperament(entity) === "passive") {
       const reasonedEnemy = withTargetDecisionReason(entity, "passive_no_auto_target");
@@ -153,6 +180,18 @@ export function updateEnemyAISystem(
 }
 
 function keepTargetDummyStationary(enemy: Enemy): Enemy {
+  if (
+    getDistance(enemy.position, enemy.homePosition) <= 0.001 &&
+    enemy.state === "idle" &&
+    enemy.currentTargetId === null &&
+    enemy.roamTargetPosition === null &&
+    enemy.nextRoamAt === undefined &&
+    enemy.roamMoveUntil === undefined &&
+    enemy.targetDecisionReason === "passive_no_auto_target"
+  ) {
+    return enemy;
+  }
+
   return {
     ...enemy,
     position: enemy.homePosition,
@@ -179,6 +218,10 @@ export function getEnemyDetectionRange(): number {
 
 export function getEnemyAggroRange(enemy: Enemy): number {
   return getArchetypeDetectionRange(enemy, ENEMY_DETECTION_RANGE);
+}
+
+export function getWildZoneBackgroundActivityRadius(): number {
+  return WILD_ZONE_BACKGROUND_ACTIVITY_RADIUS;
 }
 
 export function getEnemyChaseSpeedMultiplier(): number {
@@ -361,6 +404,8 @@ function updateEnemyWander(
   );
   const wanderTarget = getRandomWanderTarget(enemy, roamMoveDuration);
 
+  recordEnemyRoamStart();
+
   return updateEntity(state, {
     ...enemy,
     roamTargetPosition: wanderTarget,
@@ -451,6 +496,10 @@ function moveEnemyTowardRoamTarget(
     return movedState;
   }
 
+  if (getDistance(enemy.position, movedEnemy.position) > 0.001) {
+    recordEnemyRoamMove();
+  }
+
   if (getDistance(movedEnemy.position, movedEnemy.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
     return updateEntity(
       movedState,
@@ -537,6 +586,46 @@ function isInsideAttackLeash(enemy: Enemy, position: Position): boolean {
   }
 
   return getDistance(enemy.homePosition, position) <= ENEMY_ATTACK_LEASH_DISTANCE;
+}
+
+function isDormantBackgroundWildEnemy(
+  state: GameState,
+  enemy: Enemy,
+  entities: GameEntity[],
+): boolean {
+  if (
+    state.currentMapId === HUB_MAP_ID ||
+    !state.currentMapId ||
+    !WILD_ZONE_MAP_IDS.has(state.currentMapId) ||
+    enemy.currentTargetId ||
+    enemy.questSpawn ||
+    enemy.state === "attack" ||
+    enemy.attackWindupStartedAt !== undefined ||
+    enemy.attackWindupTargetId ||
+    isEnemyAoeChanneling(state, enemy.id)
+  ) {
+    return false;
+  }
+
+  return getNearestLivingCompanionDistance(enemy, entities) >
+    WILD_ZONE_BACKGROUND_ACTIVITY_RADIUS;
+}
+
+function getNearestLivingCompanionDistance(
+  enemy: Enemy,
+  entities: GameEntity[],
+): number {
+  let nearestDistance = Infinity;
+
+  for (const entity of entities) {
+    if (entity.kind !== "companion" || entity.state === "dead" || entity.health <= 0) {
+      continue;
+    }
+
+    nearestDistance = Math.min(nearestDistance, getDistance(enemy.position, entity.position));
+  }
+
+  return nearestDistance;
 }
 
 function canKeepCurrentTarget(enemy: Enemy, target: AutonomousEntity): boolean {

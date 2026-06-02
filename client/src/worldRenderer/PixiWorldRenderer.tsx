@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, type MouseEvent, type PointerEvent } from "react";
-import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
+import * as PIXI from "pixi.js";
+import type {
+  Application as PixiApplication,
+  Container as PixiContainer,
+  Graphics as PixiGraphics,
+  Sprite as PixiSprite,
+  Text as PixiText,
+  Texture,
+} from "pixi.js";
 import {
   HUB_MAP_TILE_SRC,
   HUB_WALL_TILE_SRC,
@@ -7,7 +15,6 @@ import {
   MAP_OBJECT_ICON_SRC,
   MAP_VISUAL_OBJECT_SRC,
   NPC_ICON_SRC,
-  RESOURCE_ICON_SRC,
   SHARED_SKILL_VISUAL_ICON_SRC,
   SLIMEWARD_DUNGEON_TILE_SRC,
   SKILL_VISUAL_ICON_SRC,
@@ -58,6 +65,18 @@ import {
   type SpriteDirection,
   type SpriteVisualAsset,
 } from "../visualAssets";
+import {
+  getPreviewRenderSignature,
+  isStaticMapSpriteKey,
+  type PixiRendererPerformanceSample,
+} from "./PixiWorldRendererHelpers";
+
+const { Application, Assets, Container, Graphics, Sprite, Text } = PIXI;
+type Application = PixiApplication;
+type Container = PixiContainer;
+type Graphics = PixiGraphics;
+type Sprite = PixiSprite;
+type Text = PixiText;
 
 const previewWidth = 256;
 const previewHeight = 144;
@@ -123,7 +142,7 @@ type PixiWorldRendererProps = {
   cameraOffset?: Position;
   cellPixelSize?: number;
   combatFeedbackEvents?: CombatFeedbackEvent[];
-  currentTime: number;
+  currentTime?: number;
   directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
@@ -152,21 +171,6 @@ type PixiWorldRendererProps = {
   teleportWorkingById?: Record<string, boolean>;
   viewportSize?: ViewportSize;
   visualMovementByEntityId?: Record<string, EntityVisualMovement>;
-};
-
-type PixiRendererPerformanceSample = {
-  activeFeedbackCount: number;
-  drawCount: number;
-  drawnEntityCount: number;
-  drawnFeedbackCount: number;
-  drawnSprites: number;
-  drawnTexts: number;
-  renderMs: number;
-  spriteCreates: number;
-  spriteReuses: number;
-  textCreates: number;
-  textReuses: number;
-  visibleEntityCount: number;
 };
 
 type EntityVisualMovement = {
@@ -226,10 +230,23 @@ type PixiRenderLayers = {
 };
 
 type TextureCache = {
+  currentMapId: string | null;
+  durableTextureSrcs: Set<string>;
+  evictedTextureCount: number;
   failedSrcs: Set<string>;
   lastEntitySpriteSrcById: Map<string, string>;
+  mapTextureSrcsByMapId: Map<string, Set<string>>;
+  pendingRequests: Map<string, TextureRequestScope>;
   pendingSrcs: Set<string>;
+  recentMapIds: string[];
+  stalePendingTextureCount: number;
   textures: Map<string, Texture>;
+  unloadFailedTextureCount: number;
+};
+
+type TextureRequestScope = {
+  durable?: boolean;
+  mapId?: string;
 };
 
 type ManagedSpriteEntry = {
@@ -253,6 +270,12 @@ type ManagedRendererState = {
 };
 
 type PixiDrawMetrics = PixiRendererPerformanceSample;
+
+type StaticMapRenderCache = {
+  floorCellKeys: Set<string> | null;
+  hubWallKeys: Set<string> | null;
+  sortedVisualObjects: MapVisualObject[];
+};
 
 type InteractableEntityKind = "enemy" | "resource" | "npc";
 
@@ -320,18 +343,53 @@ type DrawWorldOptions = {
   skillVisualEvents: SkillVisualEvent[];
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
+  previewSignatureRef: { current: string | null };
   viewportSize?: ViewportSize;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 };
 
 const fullModeInteractionRadius = 1.5;
+const staticMapRenderCacheByMap = new WeakMap<GameMap, StaticMapRenderCache>();
+const visibleFloorChunkCache = new Map<string, Position[]>();
+
+function getStaticMapRenderCache(map: GameMap): StaticMapRenderCache {
+  const cached = staticMapRenderCacheByMap.get(map);
+
+  if (cached) {
+    return cached;
+  }
+
+  const cache = {
+    floorCellKeys:
+      map.visualTheme === "slimeward-cave"
+        ? new Set((map.floorCells ?? []).map(getHubWallKey))
+        : null,
+    hubWallKeys: isHubVisualMap(map.id) ? createHubWallKeySet(map.walls) : null,
+    sortedVisualObjects: [...(map.visualObjects ?? [])].sort(
+      (first, second) =>
+        first.position.y - second.position.y || first.id.localeCompare(second.id),
+    ),
+  };
+
+  staticMapRenderCacheByMap.set(map, cache);
+
+  return cache;
+}
 
 function createTextureCache(): TextureCache {
   return {
+    currentMapId: null,
+    durableTextureSrcs: new Set<string>(),
+    evictedTextureCount: 0,
     failedSrcs: new Set<string>(),
     lastEntitySpriteSrcById: new Map<string, string>(),
+    mapTextureSrcsByMapId: new Map<string, Set<string>>(),
+    pendingRequests: new Map<string, TextureRequestScope>(),
     pendingSrcs: new Set<string>(),
+    recentMapIds: [],
+    stalePendingTextureCount: 0,
     textures: new Map<string, Texture>(),
+    unloadFailedTextureCount: 0,
   };
 }
 
@@ -371,13 +429,84 @@ function createPixiDrawMetrics(): PixiDrawMetrics {
     drawnFeedbackCount: 0,
     drawnSprites: 0,
     drawnTexts: 0,
+    durableTextureSourceCount: 0,
+    evictedTextureCount: 0,
+    failedTextureCount: 0,
+    fullDrawCount: 0,
+    managedSpriteCount: 0,
+    managedStaticSpriteCount: 0,
+    managedTextCount: 0,
+    mapScopedTextureSourceCount: 0,
+    mapTrackedTextureSourceCount: 0,
+    pendingTextureCount: 0,
+    previewDrawCount: 0,
     renderMs: 0,
     spriteCreates: 0,
     spriteReuses: 0,
     textCreates: 0,
     textReuses: 0,
+    textureCount: 0,
+    retainedMapCount: 0,
+    stalePendingTextureCount: 0,
+    unloadFailedTextureCount: 0,
     visibleEntityCount: 0,
   };
+}
+
+function finishPixiDrawMetrics(
+  metrics: PixiDrawMetrics,
+  managedState: ManagedRendererState,
+  textureCache: TextureCache,
+) {
+  metrics.evictedTextureCount = textureCache.evictedTextureCount;
+  metrics.failedTextureCount = textureCache.failedSrcs.size;
+  metrics.durableTextureSourceCount = textureCache.durableTextureSrcs.size;
+  metrics.managedSpriteCount = managedState.sprites.size;
+  metrics.managedStaticSpriteCount = getManagedStaticSpriteCount(managedState);
+  metrics.managedTextCount = managedState.texts.size;
+  metrics.mapScopedTextureSourceCount =
+    getMapScopedTextureSourceCount(textureCache);
+  metrics.mapTrackedTextureSourceCount =
+    getMapTrackedTextureSourceCount(textureCache);
+  metrics.pendingTextureCount = textureCache.pendingSrcs.size;
+  metrics.retainedMapCount = textureCache.mapTextureSrcsByMapId.size;
+  metrics.stalePendingTextureCount = textureCache.stalePendingTextureCount;
+  metrics.textureCount = textureCache.textures.size;
+  metrics.unloadFailedTextureCount = textureCache.unloadFailedTextureCount;
+}
+
+function getManagedStaticSpriteCount(managedState: ManagedRendererState) {
+  let staticSpriteCount = 0;
+
+  for (const key of managedState.sprites.keys()) {
+    if (isStaticMapSpriteKey(key)) {
+      staticSpriteCount += 1;
+    }
+  }
+
+  return staticSpriteCount;
+}
+
+function getMapScopedTextureSourceCount(textureCache: TextureCache): number {
+  let sourceCount = 0;
+
+  for (const mapSources of textureCache.mapTextureSrcsByMapId.values()) {
+    sourceCount += mapSources.size;
+  }
+
+  return sourceCount;
+}
+
+function getMapTrackedTextureSourceCount(textureCache: TextureCache): number {
+  const sources = new Set<string>();
+
+  for (const mapSources of textureCache.mapTextureSrcsByMapId.values()) {
+    for (const src of mapSources) {
+      sources.add(src);
+    }
+  }
+
+  return sources.size;
 }
 
 function destroyManagedRendererState(state: ManagedRendererState) {
@@ -434,31 +563,106 @@ function requestTexture(
   src: string,
   cache: TextureCache,
   requestRedraw?: () => void,
+  scope: TextureRequestScope = {},
 ): Texture | null {
+  registerTextureScope(cache, src, scope);
+
   const cachedTexture = cache.textures.get(src);
 
   if (cachedTexture) {
     return cachedTexture;
   }
 
-  if (cache.failedSrcs.has(src) || cache.pendingSrcs.has(src)) {
+  if (cache.failedSrcs.has(src)) {
+    return null;
+  }
+
+  if (cache.pendingSrcs.has(src)) {
+    const pendingScope = cache.pendingRequests.get(src) ?? {};
+    cache.pendingRequests.set(src, mergeTextureScopes(pendingScope, scope));
     return null;
   }
 
   cache.pendingSrcs.add(src);
+  cache.pendingRequests.set(src, scope);
   void Assets.load<Texture>(src)
     .then((texture) => {
       cache.pendingSrcs.delete(src);
-      cache.textures.set(src, texture);
+      const requestScope = cache.pendingRequests.get(src) ?? scope;
+      cache.pendingRequests.delete(src);
+
+      if (shouldRetainLoadedTexture(cache, src, requestScope)) {
+        cache.textures.set(src, texture);
+      } else {
+        cache.stalePendingTextureCount += 1;
+        unloadTextureSrc(cache, src);
+      }
+
       requestRedraw?.();
     })
     .catch(() => {
       cache.pendingSrcs.delete(src);
+      cache.pendingRequests.delete(src);
       cache.failedSrcs.add(src);
       requestRedraw?.();
     });
 
   return null;
+}
+
+function registerTextureScope(
+  cache: TextureCache,
+  src: string,
+  scope: TextureRequestScope,
+) {
+  if (scope.durable) {
+    cache.durableTextureSrcs.add(src);
+  }
+
+  if (scope.mapId) {
+    let mapSources = cache.mapTextureSrcsByMapId.get(scope.mapId);
+
+    if (!mapSources) {
+      mapSources = new Set<string>();
+      cache.mapTextureSrcsByMapId.set(scope.mapId, mapSources);
+    }
+
+    mapSources.add(src);
+  }
+}
+
+function mergeTextureScopes(
+  currentScope: TextureRequestScope,
+  nextScope: TextureRequestScope,
+): TextureRequestScope {
+  return {
+    durable: Boolean(currentScope.durable || nextScope.durable),
+    mapId: nextScope.mapId ?? currentScope.mapId,
+  };
+}
+
+function shouldRetainLoadedTexture(
+  cache: TextureCache,
+  src: string,
+  scope: TextureRequestScope,
+): boolean {
+  if (scope.durable || cache.durableTextureSrcs.has(src)) {
+    return true;
+  }
+
+  return Boolean(scope.mapId && cache.mapTextureSrcsByMapId.get(scope.mapId)?.has(src));
+}
+
+function unloadTextureSrc(cache: TextureCache, src: string) {
+  cache.failedSrcs.delete(src);
+  cache.lastEntitySpriteSrcById.forEach((entitySrc, entityId) => {
+    if (entitySrc === src) {
+      cache.lastEntitySpriteSrcById.delete(entityId);
+    }
+  });
+  void Assets.unload(src).catch(() => {
+    cache.unloadFailedTextureCount += 1;
+  });
 }
 
 function collectAnimationFrames(
@@ -488,9 +692,10 @@ function preloadSpriteVisualAssetTextures(
   visualAsset: SpriteVisualAsset,
   cache: TextureCache,
   requestRedraw?: () => void,
+  scope: TextureRequestScope = {},
 ) {
   for (const src of new Set(collectSpriteVisualAssetFrames(visualAsset))) {
-    requestTexture(src, cache, requestRedraw);
+    requestTexture(src, cache, requestRedraw, scope);
   }
 }
 
@@ -506,6 +711,53 @@ function collectEntityVisualTextureSrcs(entity: GameEntity, map: GameMap): strin
   }
 
   return [];
+}
+
+function collectDurableVisualTextureSrcs(): Set<string> {
+  const sources = new Set<string>([
+    ...Object.values(NPC_ICON_SRC),
+    ...Object.values(SHARED_SKILL_VISUAL_ICON_SRC),
+    ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
+      (src): src is string => Boolean(src),
+    ),
+    blockImpactSrc,
+    criticalHitBackingSrc,
+    deathDownedPuffSrc,
+    enemySpottedAlertSrc,
+    healSparkleSrc,
+    gatherCompleteSparkleSrc,
+    inventoryFullWarningSrc,
+    levelUpBurstSrc,
+    missEvadePuffSrc,
+    resourceDepletedPuffSrc,
+    resourceHitHerbSrc,
+    resourceHitOreSrc,
+    resourceHitWoodSrc,
+    shieldInvulnerableGlintSrc,
+    teleportPulseSrc,
+  ]);
+
+  addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.beginnerCharacter);
+  addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.testCharacter);
+  addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.questGuideCharacter);
+
+  return sources;
+}
+
+function addEntityVisualAssetTextureSrcs(
+  sources: Set<string>,
+  visualAsset: ReturnType<typeof getEntityVisualAsset>,
+) {
+  if (visualAsset.kind === "image") {
+    sources.add(visualAsset.src);
+    return;
+  }
+
+  if (visualAsset.kind === "sprite") {
+    for (const src of collectSpriteVisualAssetFrames(visualAsset)) {
+      sources.add(src);
+    }
+  }
 }
 
 function collectFullMapFloorTextureSrcs(map: GameMap): string[] {
@@ -542,26 +794,6 @@ function collectCurrentMapVisualTextureSrcs(
 ): string[] {
   const sources = new Set<string>([
     ...Object.values(MAP_OBJECT_ICON_SRC),
-    ...Object.values(RESOURCE_ICON_SRC),
-    ...Object.values(SHARED_SKILL_VISUAL_ICON_SRC),
-    ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
-      (src): src is string => Boolean(src),
-    ),
-    blockImpactSrc,
-    criticalHitBackingSrc,
-    deathDownedPuffSrc,
-    enemySpottedAlertSrc,
-    healSparkleSrc,
-    gatherCompleteSparkleSrc,
-    inventoryFullWarningSrc,
-    levelUpBurstSrc,
-    missEvadePuffSrc,
-    resourceDepletedPuffSrc,
-    resourceHitHerbSrc,
-    resourceHitOreSrc,
-    resourceHitWoodSrc,
-    shieldInvulnerableGlintSrc,
-    teleportPulseSrc,
     ...collectFullMapFloorTextureSrcs(map),
   ]);
 
@@ -594,9 +826,13 @@ function getCurrentMapVisualTextureSignature(
   map: GameMap,
   entities: GameEntity[],
 ): string {
+  const durableSources = collectDurableVisualTextureSrcs();
+
   return [
     map.id ?? map.debugName,
-    ...collectCurrentMapVisualTextureSrcs(map, entities),
+    ...collectCurrentMapVisualTextureSrcs(map, entities).filter(
+      (src) => !durableSources.has(src),
+    ),
   ].join("|");
 }
 
@@ -611,8 +847,70 @@ function preloadCurrentMapVisualTextures({
   map: GameMap;
   requestRedraw?: () => void;
 }) {
-  for (const src of collectCurrentMapVisualTextureSrcs(map, entities)) {
-    requestTexture(src, cache, requestRedraw);
+  const mapId = map.id ?? map.debugName;
+  const durableSources = collectDurableVisualTextureSrcs();
+  const mapScopedSources = collectCurrentMapVisualTextureSrcs(map, entities)
+    .filter((src) => !durableSources.has(src));
+
+  cache.currentMapId = mapId;
+  cache.mapTextureSrcsByMapId.set(mapId, new Set(mapScopedSources));
+  cache.recentMapIds = [mapId];
+
+  evictOldMapTextures(cache);
+  pruneLastEntitySpriteSrcs(cache, entities);
+
+  for (const src of durableSources) {
+    requestTexture(src, cache, requestRedraw, { durable: true });
+  }
+
+  for (const src of mapScopedSources) {
+    requestTexture(src, cache, requestRedraw, { mapId });
+  }
+}
+
+function evictOldMapTextures(cache: TextureCache) {
+  const keptMapIds = new Set(cache.currentMapId ? [cache.currentMapId] : []);
+  const keptSrcs = new Set<string>();
+
+  for (const mapId of keptMapIds) {
+    for (const src of cache.mapTextureSrcsByMapId.get(mapId) ?? []) {
+      keptSrcs.add(src);
+    }
+  }
+
+  for (const [mapId, srcs] of cache.mapTextureSrcsByMapId) {
+    if (keptMapIds.has(mapId)) {
+      continue;
+    }
+
+    for (const src of srcs) {
+      if (
+        cache.durableTextureSrcs.has(src) ||
+        keptSrcs.has(src) ||
+        !cache.textures.has(src)
+      ) {
+        continue;
+      }
+
+      cache.textures.delete(src);
+      cache.evictedTextureCount += 1;
+      unloadTextureSrc(cache, src);
+    }
+
+    cache.mapTextureSrcsByMapId.delete(mapId);
+  }
+}
+
+function pruneLastEntitySpriteSrcs(
+  cache: TextureCache,
+  entities: GameEntity[],
+) {
+  const currentEntityIds = new Set(entities.map((entity) => entity.id));
+
+  for (const entityId of cache.lastEntitySpriteSrcById.keys()) {
+    if (!currentEntityIds.has(entityId)) {
+      cache.lastEntitySpriteSrcById.delete(entityId);
+    }
   }
 }
 
@@ -705,6 +1003,13 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function createVisibleFloorChunkPositions(bounds: TileBounds): Position[] {
+  const cacheKey = `${bounds.minX}:${bounds.maxX}:${bounds.minY}:${bounds.maxY}`;
+  const cached = visibleFloorChunkCache.get(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
   const chunks: Position[] = [];
   const startX =
     Math.floor(bounds.minX / floorChunkCellSpan) * floorChunkCellSpan;
@@ -716,6 +1021,12 @@ function createVisibleFloorChunkPositions(bounds: TileBounds): Position[] {
       chunks.push({ x, y });
     }
   }
+
+  if (visibleFloorChunkCache.size > 128) {
+    visibleFloorChunkCache.clear();
+  }
+
+  visibleFloorChunkCache.set(cacheKey, chunks);
 
   return chunks;
 }
@@ -1758,6 +2069,7 @@ function updateSpriteVisualState({
   sprite.position.set(position.x, position.y);
   sprite.rotation = rotation;
   sprite.tint = tint ?? 0xffffff;
+  sprite.visible = true;
   sprite.width = width;
   sprite.height = height;
 }
@@ -1795,7 +2107,14 @@ function drawManagedImageSprite({
   tint?: number;
   width: number;
 }): boolean {
-  const texture = requestTexture(src, cache, requestRedraw);
+  const texture = requestTexture(
+    src,
+    cache,
+    requestRedraw,
+    cache.durableTextureSrcs.has(src)
+      ? { durable: true }
+      : { mapId: cache.currentMapId ?? undefined },
+  );
   const existingEntry = managedState.sprites.get(key);
 
   if (!texture) {
@@ -1820,11 +2139,16 @@ function drawManagedImageSprite({
     return true;
   }
 
-  if (existingEntry && existingEntry.src === src) {
+  if (existingEntry) {
     if (existingEntry.layer !== layer) {
       existingEntry.layer.removeChild(existingEntry.sprite);
       layer.addChild(existingEntry.sprite);
       existingEntry.layer = layer;
+    }
+
+    if (existingEntry.src !== src) {
+      existingEntry.sprite.texture = texture;
+      existingEntry.src = src;
     }
 
     managedState.activeSpriteKeys.add(key);
@@ -1842,11 +2166,6 @@ function drawManagedImageSprite({
     metrics.spriteReuses += 1;
     metrics.drawnSprites += 1;
     return true;
-  }
-
-  if (existingEntry) {
-    existingEntry.sprite.destroy();
-    managedState.sprites.delete(key);
   }
 
   const sprite = new Sprite(texture);
@@ -3410,11 +3729,9 @@ function drawFullWalls({
   transform: FullTransform;
   visibleTileBounds: TileBounds;
 }) {
-  const hubWallKeys = isHubVisualMap(map.id) ? createHubWallKeySet(map.walls) : null;
-  const floorCellKeys =
-    map.visualTheme === "slimeward-cave"
-      ? new Set((map.floorCells ?? []).map(getHubWallKey))
-      : null;
+  const staticMapCache = getStaticMapRenderCache(map);
+  const hubWallKeys = staticMapCache.hubWallKeys;
+  const floorCellKeys = staticMapCache.floorCellKeys;
   const drawnSlimewardWallBlocks = new Set<string>();
 
   for (const wall of map.walls) {
@@ -3764,10 +4081,7 @@ function drawFullMapVisualObjects({
   transform: FullTransform;
   visibleTileBounds: TileBounds;
 }) {
-  const visualObjects = [...(map.visualObjects ?? [])].sort(
-    (first, second) =>
-      first.position.y - second.position.y || first.id.localeCompare(second.id),
-  );
+  const visualObjects = getStaticMapRenderCache(map).sortedVisualObjects;
 
   for (const visualObject of visualObjects) {
     if (!isMapVisualObjectInTileBounds(visualObject, visibleTileBounds)) {
@@ -4479,6 +4793,8 @@ function drawFullMap({
   }
 
   endManagedFrame(managedState);
+  metrics.fullDrawCount = 1;
+  finishPixiDrawMetrics(metrics, managedState, textureCache);
   metrics.renderMs = performance.now() - renderStartedAt;
   onPerformanceSample?.(metrics);
 }
@@ -4501,6 +4817,7 @@ function drawWorld({
   mode,
   onPerformanceSample,
   partyIntent,
+  previewSignatureRef,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -4514,8 +4831,9 @@ function drawWorld({
   textureCache,
   viewportSize,
   visualMovementByEntityId,
-}: DrawWorldOptions) {
+}: DrawWorldOptions): boolean {
   if (mode === "full") {
+    previewSignatureRef.current = null;
     drawFullMap({
       activeTeleport,
       cameraOffset,
@@ -4546,16 +4864,101 @@ function drawWorld({
       textureCache,
       visualMovementByEntityId,
     });
-    return;
+    return true;
   }
 
+  const previewSignature = getPreviewRenderSignature({
+    cameraOffset,
+    cellPixelSize,
+    entities,
+    map,
+    viewportSize,
+  });
+
+  if (previewSignatureRef.current === previewSignature) {
+    return false;
+  }
+
+  previewSignatureRef.current = previewSignature;
   clearLayers(layers);
   resetManagedRendererState(managedState);
+  const renderStartedAt = performance.now();
+  const metrics = createPixiDrawMetrics();
+  metrics.previewDrawCount = 1;
   drawPreviewMap(layers.overlayGraphics, map, entities, {
     cameraOffset,
     cellPixelSize,
     viewportSize,
   });
+  finishPixiDrawMetrics(metrics, managedState, textureCache);
+  metrics.renderMs = performance.now() - renderStartedAt;
+  onPerformanceSample?.(metrics);
+
+  return true;
+}
+
+function hasActiveTimedRendererWork({
+  activeTeleport,
+  combatFeedbackEvents,
+  currentTime,
+  dropVisualEvents,
+  enemyAoeChannelsByCasterId,
+  entities,
+  mode,
+  skillBindsByEnemyId,
+  skillMarksByEnemyId,
+  skillShieldBlocksById,
+  skillVisualEvents,
+  visualMovementByEntityId,
+}: {
+  activeTeleport: ActiveTeleport | null;
+  combatFeedbackEvents: CombatFeedbackEvent[];
+  currentTime: number;
+  dropVisualEvents: DropVisualEvent[];
+  enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
+  entities: GameEntity[];
+  mode: PixiRendererMode;
+  skillBindsByEnemyId: Record<string, SkillBindState>;
+  skillMarksByEnemyId: Record<string, SkillMarkState>;
+  skillShieldBlocksById: Record<string, SkillShieldBlockState>;
+  skillVisualEvents: SkillVisualEvent[];
+  visualMovementByEntityId: Record<string, EntityVisualMovement>;
+}): boolean {
+  if (mode !== "full") {
+    return false;
+  }
+
+  return (
+    Boolean(activeTeleport) ||
+    combatFeedbackEvents.some((event) => event.expiresAt > currentTime) ||
+    dropVisualEvents.some((event) => event.expiresAt > currentTime) ||
+    skillVisualEvents.some((event) => event.expiresAt > currentTime) ||
+    Object.values(visualMovementByEntityId).some(
+      (movement) => movement.expiresAt > currentTime,
+    ) ||
+    Object.values(skillBindsByEnemyId).some((bind) => bind.expiresAt > currentTime) ||
+    Object.values(skillMarksByEnemyId).some((mark) => mark.expiresAt > currentTime) ||
+    Object.values(skillShieldBlocksById).some(
+      (shield) => shield.expiresAt > currentTime,
+    ) ||
+    Object.values(enemyAoeChannelsByCasterId).some(
+      (channel) =>
+        channel.channelEndsAt > currentTime ||
+        channel.windupEndsAt > currentTime,
+    ) ||
+    entities.some(
+      (entity) =>
+        (entity.kind === "enemy" &&
+          entity.state === "dead" &&
+          (entity.defeatedAtMs ?? currentTime) + deadEnemyFadeDurationMs >
+            currentTime) ||
+        (entity.kind === "enemy" &&
+          entity.attackWindupStartedAt !== undefined &&
+          entity.attackWindupStartedAt +
+            (entity.attackWindupDurationMs ?? 500) >
+            currentTime),
+    )
+  );
 }
 
 export function PixiWorldRenderer({
@@ -4597,11 +5000,12 @@ export function PixiWorldRenderer({
   const requestRedrawRef = useRef<() => void>(() => {});
   const textureCacheRef = useRef(createTextureCache());
   const managedStateRef = useRef(createManagedRendererState());
+  const previewSignatureRef = useRef<string | null>(null);
   const preloadedVisualTextureSignatureRef = useRef<string | null>(null);
   const latestCameraOffsetRef = useRef(cameraOffset);
   const latestCellPixelSizeRef = useRef(cellPixelSize);
   const latestCombatFeedbackEventsRef = useRef(combatFeedbackEvents);
-  const latestCurrentTimeRef = useRef(currentTime);
+  const latestCurrentTimeRef = useRef(currentTime ?? 0);
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
   const latestEnemyAoeChannelsByCasterIdRef = useRef(enemyAoeChannelsByCasterId);
@@ -4642,7 +5046,9 @@ export function PixiWorldRenderer({
     latestCameraOffsetRef.current = cameraOffset;
     latestCellPixelSizeRef.current = cellPixelSize;
     latestCombatFeedbackEventsRef.current = combatFeedbackEvents;
-    latestCurrentTimeRef.current = currentTime;
+    if (currentTime !== undefined) {
+      latestCurrentTimeRef.current = currentTime;
+    }
     latestDirectCompanionCommandsByIdRef.current = directCompanionCommandsById;
     latestDropVisualEventsRef.current = dropVisualEvents;
     latestEnemyAoeChannelsByCasterIdRef.current = enemyAoeChannelsByCasterId;
@@ -4715,6 +5121,7 @@ export function PixiWorldRenderer({
     let isDisposed = false;
     let isInitialized = false;
     let scheduledRedrawFrame: number | null = null;
+    let timedRedrawFrame: number | null = null;
     const app = new Application();
     const stage = new Container();
     const layers: PixiRenderLayers = {
@@ -4739,12 +5146,53 @@ export function PixiWorldRenderer({
       scheduledRedrawFrame = null;
     }
 
+    function cancelTimedRedraw() {
+      if (timedRedrawFrame === null) {
+        return;
+      }
+
+      window.cancelAnimationFrame(timedRedrawFrame);
+      timedRedrawFrame = null;
+    }
+
+    function shouldRunTimedRedraw() {
+      const now = Date.now();
+
+      return hasActiveTimedRendererWork({
+        activeTeleport: latestActiveTeleportRef.current,
+        combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
+        currentTime: now,
+        dropVisualEvents: latestDropVisualEventsRef.current,
+        enemyAoeChannelsByCasterId:
+          latestEnemyAoeChannelsByCasterIdRef.current,
+        entities: latestEntitiesRef.current,
+        mode: latestModeRef.current,
+        skillBindsByEnemyId: latestSkillBindsByEnemyIdRef.current,
+        skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
+        skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
+        skillVisualEvents: latestSkillVisualEventsRef.current,
+        visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
+      });
+    }
+
+    function scheduleTimedRedraw() {
+      if (isDisposed || timedRedrawFrame !== null || !shouldRunTimedRedraw()) {
+        return;
+      }
+
+      timedRedrawFrame = window.requestAnimationFrame(() => {
+        timedRedrawFrame = null;
+        latestCurrentTimeRef.current = Date.now();
+        redrawLatestWorld();
+      });
+    }
+
     function redrawLatestWorld() {
       if (isDisposed || !isInitialized || !layersRef.current) {
         return;
       }
 
-      drawWorld({
+      const didDraw = drawWorld({
         activeTeleport: latestActiveTeleportRef.current,
         cameraOffset: latestCameraOffsetRef.current,
         cellPixelSize: latestCellPixelSizeRef.current,
@@ -4764,6 +5212,7 @@ export function PixiWorldRenderer({
         mode: latestModeRef.current,
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
+        previewSignatureRef,
         questGiverHasWork: latestQuestGiverHasWorkRef.current,
         renderSize: latestRenderSizeRef.current,
         requestRedraw: requestRedrawRef.current,
@@ -4779,6 +5228,10 @@ export function PixiWorldRenderer({
         viewportSize: latestViewportSizeRef.current,
         visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
       });
+      if (didDraw) {
+        appRef.current?.render();
+      }
+      scheduleTimedRedraw();
     }
 
     function scheduleRedraw() {
@@ -4797,16 +5250,25 @@ export function PixiWorldRenderer({
       entityVisualAssets.beginnerCharacter,
       textureCacheRef.current,
       requestRedrawRef.current,
+      { durable: true },
     );
     preloadSpriteVisualAssetTextures(
       entityVisualAssets.testCharacter,
       textureCacheRef.current,
       requestRedrawRef.current,
+      { durable: true },
+    );
+    preloadSpriteVisualAssetTextures(
+      entityVisualAssets.questGuideCharacter,
+      textureCacheRef.current,
+      requestRedrawRef.current,
+      { durable: true },
     );
 
     async function initPixiApp() {
       await app.init({
         antialias: false,
+        autoStart: false,
         autoDensity: true,
         backgroundAlpha: 0,
         height: latestRenderSizeRef.current.height,
@@ -4842,6 +5304,7 @@ export function PixiWorldRenderer({
     return () => {
       isDisposed = true;
       cancelScheduledRedraw();
+      cancelTimedRedraw();
       requestRedrawRef.current = () => {};
       appRef.current = null;
       layersRef.current = null;
@@ -4849,7 +5312,7 @@ export function PixiWorldRenderer({
       if (isInitialized) {
         app.destroy(true, { children: true });
       }
-      resetManagedRendererState(managedState);
+      destroyManagedRendererState(managedState);
     };
   }, []);
 
@@ -4870,13 +5333,15 @@ export function PixiWorldRenderer({
       appliedRenderSizeRef.current = renderSize;
     }
 
-    drawWorld({
+    latestCurrentTimeRef.current = currentTime ?? Date.now();
+
+    const didDraw = drawWorld({
       activeTeleport,
       cameraOffset,
       cellPixelSize,
       combatFeedbackEvents,
       companionDragPreview: companionDragPreviewRef.current,
-      currentTime,
+      currentTime: latestCurrentTimeRef.current,
       directCompanionCommandsById,
       dropVisualEvents,
       enemyAoeChannelsByCasterId,
@@ -4888,6 +5353,7 @@ export function PixiWorldRenderer({
       mode,
       onPerformanceSample,
       partyIntent,
+      previewSignatureRef,
       questGiverHasWork,
       requestRedraw: requestRedrawRef.current,
       renderSize,
@@ -4902,6 +5368,28 @@ export function PixiWorldRenderer({
       viewportSize,
       visualMovementByEntityId,
     });
+    if (didDraw) {
+      appRef.current?.render();
+    }
+
+    if (
+      hasActiveTimedRendererWork({
+        activeTeleport,
+        combatFeedbackEvents,
+        currentTime: latestCurrentTimeRef.current,
+        dropVisualEvents,
+        enemyAoeChannelsByCasterId,
+        entities: sortedEntities,
+        mode,
+        skillBindsByEnemyId,
+        skillMarksByEnemyId,
+        skillShieldBlocksById,
+        skillVisualEvents,
+        visualMovementByEntityId,
+      })
+    ) {
+      requestRedrawRef.current();
+    }
   }, [
     activeTeleport,
     cameraOffset,

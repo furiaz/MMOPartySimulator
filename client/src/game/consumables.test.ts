@@ -617,4 +617,30 @@ describe("prototype consumables", () => {
     expect(countedAfterRespawn.flaskRechargeEnemyKillCounter).toBe(2);
     expect(countedAfterRespawn.flaskRechargeCountedEnemyDefeats?.["enemy-1"]).toBe(5000);
   });
+
+  it("removes flask counted defeat markers for missing enemies only", () => {
+    const { state } = createConsumableState(["minor_recovery_flask"]);
+    const withMarkers = {
+      ...state,
+      currentMapId: "map-1" as const,
+      entities: {
+        ...state.entities,
+        "enemy-1": {
+          ...createDeadEnemy("enemy-1"),
+          defeatedAtMs: 1000,
+        },
+      },
+      flaskRechargeEnemyKillCounter: 7,
+      flaskRechargeCountedEnemyDefeats: {
+        "enemy-1": 1000,
+        missing: 1000,
+      },
+    };
+    const nextState = updateFlaskRechargeFromEnemyKills(withMarkers, 2000);
+
+    expect(nextState.flaskRechargeEnemyKillCounter).toBe(7);
+    expect(nextState.flaskRechargeCountedEnemyDefeats).toEqual({
+      "enemy-1": 1000,
+    });
+  });
 });

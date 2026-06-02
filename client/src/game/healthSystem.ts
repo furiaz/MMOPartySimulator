@@ -36,23 +36,28 @@ export function updateTargetDummyHealthRegen(
   state: GameState,
   now: number,
 ): GameState {
-  const lastRegenAtByEnemyId = {
-    ...(state.lastTargetDummyRegenAtByEnemyId ?? {}),
-  };
-  let nextState: GameState = {
-    ...state,
-    lastTargetDummyRegenAtByEnemyId: lastRegenAtByEnemyId,
-  };
+  let nextState = state;
+  let lastRegenAtByEnemyId = state.lastTargetDummyRegenAtByEnemyId;
+  const validDummyIds = new Set<string>();
 
-  for (const entity of Object.values(nextState.entities)) {
+  for (const entity of Object.values(state.entities)) {
     if (!isTargetDummyEnemy(entity)) {
       continue;
     }
 
-    const lastRegenAt = lastRegenAtByEnemyId[entity.id];
+    validDummyIds.add(entity.id);
+    const lastRegenAt = lastRegenAtByEnemyId?.[entity.id];
 
     if (lastRegenAt === undefined) {
-      lastRegenAtByEnemyId[entity.id] = now;
+      lastRegenAtByEnemyId = setTargetDummyRegenTimestamp(
+        lastRegenAtByEnemyId,
+        entity.id,
+        now,
+      );
+      nextState = {
+        ...nextState,
+        lastTargetDummyRegenAtByEnemyId: lastRegenAtByEnemyId,
+      };
       continue;
     }
 
@@ -60,7 +65,15 @@ export function updateTargetDummyHealthRegen(
       continue;
     }
 
-    lastRegenAtByEnemyId[entity.id] = now;
+    lastRegenAtByEnemyId = setTargetDummyRegenTimestamp(
+      lastRegenAtByEnemyId,
+      entity.id,
+      now,
+    );
+    nextState = {
+      ...nextState,
+      lastTargetDummyRegenAtByEnemyId: lastRegenAtByEnemyId,
+    };
 
     if (entity.health >= entity.maxHealth) {
       continue;
@@ -95,6 +108,8 @@ export function updateTargetDummyHealthRegen(
     });
   }
 
+  nextState = removeStaleTargetDummyRegenTimestamps(nextState, validDummyIds);
+
   return nextState;
 }
 
@@ -102,19 +117,24 @@ export function updatePassiveHealthRegen(
   state: GameState,
   now: number,
 ): GameState {
-  const lastRegenAtByCompanionId = {
-    ...(state.lastHealthRegenAtByCompanionId ?? {}),
-  };
-  let nextState: GameState = {
-    ...state,
-    lastHealthRegenAtByCompanionId: lastRegenAtByCompanionId,
-  };
+  let nextState = state;
+  let lastRegenAtByCompanionId = state.lastHealthRegenAtByCompanionId;
+  const validCompanionIds = new Set<string>();
 
-  for (const member of getPartyMembers(nextState)) {
-    const lastRegenAt = lastRegenAtByCompanionId[member.id];
+  for (const member of getPartyMembers(state)) {
+    validCompanionIds.add(member.id);
+    const lastRegenAt = lastRegenAtByCompanionId?.[member.id];
 
     if (lastRegenAt === undefined) {
-      lastRegenAtByCompanionId[member.id] = now;
+      lastRegenAtByCompanionId = setCompanionRegenTimestamp(
+        lastRegenAtByCompanionId,
+        member.id,
+        now,
+      );
+      nextState = {
+        ...nextState,
+        lastHealthRegenAtByCompanionId: lastRegenAtByCompanionId,
+      };
       continue;
     }
 
@@ -122,7 +142,15 @@ export function updatePassiveHealthRegen(
       continue;
     }
 
-    lastRegenAtByCompanionId[member.id] = now;
+    lastRegenAtByCompanionId = setCompanionRegenTimestamp(
+      lastRegenAtByCompanionId,
+      member.id,
+      now,
+    );
+    nextState = {
+      ...nextState,
+      lastHealthRegenAtByCompanionId: lastRegenAtByCompanionId,
+    };
 
     if (!isLivingCompanion(member) || member.health >= member.maxHealth) {
       continue;
@@ -157,5 +185,89 @@ export function updatePassiveHealthRegen(
     });
   }
 
+  nextState = removeStaleCompanionRegenTimestamps(nextState, validCompanionIds);
+
   return nextState;
+}
+
+function setCompanionRegenTimestamp(
+  timestamps: Record<string, number> | undefined,
+  companionId: string,
+  now: number,
+): Record<string, number> {
+  if (timestamps?.[companionId] === now) {
+    return timestamps;
+  }
+
+  return {
+    ...(timestamps ?? {}),
+    [companionId]: now,
+  };
+}
+
+function setTargetDummyRegenTimestamp(
+  timestamps: Record<string, number> | undefined,
+  enemyId: string,
+  now: number,
+): Record<string, number> {
+  if (timestamps?.[enemyId] === now) {
+    return timestamps;
+  }
+
+  return {
+    ...(timestamps ?? {}),
+    [enemyId]: now,
+  };
+}
+
+function removeStaleCompanionRegenTimestamps(
+  state: GameState,
+  validCompanionIds: Set<string>,
+): GameState {
+  return removeStaleRegenTimestamps(
+    state,
+    "lastHealthRegenAtByCompanionId",
+    validCompanionIds,
+  );
+}
+
+function removeStaleTargetDummyRegenTimestamps(
+  state: GameState,
+  validDummyIds: Set<string>,
+): GameState {
+  return removeStaleRegenTimestamps(
+    state,
+    "lastTargetDummyRegenAtByEnemyId",
+    validDummyIds,
+  );
+}
+
+function removeStaleRegenTimestamps<
+  TKey extends "lastHealthRegenAtByCompanionId" | "lastTargetDummyRegenAtByEnemyId",
+>(state: GameState, key: TKey, validIds: Set<string>): GameState {
+  const timestamps = state[key];
+
+  if (!timestamps) {
+    return state;
+  }
+
+  let nextTimestamps: Record<string, number> | null = null;
+
+  for (const id of Object.keys(timestamps)) {
+    if (validIds.has(id)) {
+      continue;
+    }
+
+    nextTimestamps ??= { ...timestamps };
+    delete nextTimestamps[id];
+  }
+
+  if (!nextTimestamps) {
+    return state;
+  }
+
+  return {
+    ...state,
+    [key]: nextTimestamps,
+  };
 }

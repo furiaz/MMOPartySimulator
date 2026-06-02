@@ -1,6 +1,7 @@
 import { createCompanion, createNpc, isResourceEntity, moveEntityTo } from "./entities";
 import { PROTOTYPE_CONSUMABLE_ITEM_IDS } from "./consumables";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import {
   clearSlimewardDungeonRuntime,
   isSlimewardMapId,
@@ -148,13 +149,13 @@ export function debugRemoveCompanion(
   delete entities[companionId];
   delete followTrailsByEntityId[companionId];
 
-  return {
+  return pruneMissingEntityRuntimeState({
     ...state,
     entities,
     followTrailsByEntityId,
     partyLeaderId:
       state.partyLeaderId === companionId ? getFallbackLeaderId(entities) : state.partyLeaderId,
-  };
+  });
 }
 
 export function debugRemoveCompanionFromParty(

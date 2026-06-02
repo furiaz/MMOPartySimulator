@@ -217,6 +217,10 @@ export function addEnemy(state: GameState, enemy: Enemy): GameState {
 export function updateEntity(state: GameState, entity: GameEntity): GameState {
   const previousEntity = state.entities[entity.id];
 
+  if (previousEntity === entity) {
+    return state;
+  }
+
   return {
     ...state,
     entities: {
@@ -346,9 +350,19 @@ export function clearExpiredSkillRuntimeState(
     state.skillCooldownsByCompanionId,
     now,
   );
-  const skillVisualEvents = (state.skillVisualEvents ?? []).filter(
-    (event) => event.expiresAt > now,
-  );
+  const skillVisualEvents = filterExpiredEvents(state.skillVisualEvents, now);
+
+  if (
+    skillMarksByEnemyId === state.skillMarksByEnemyId &&
+    skillSelfBuffsByCompanionId === state.skillSelfBuffsByCompanionId &&
+    skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
+    skillBindsByEnemyId === state.skillBindsByEnemyId &&
+    skillShieldBlocksById === state.skillShieldBlocksById &&
+    skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
+    skillVisualEvents === state.skillVisualEvents
+  ) {
+    return state;
+  }
 
   return {
     ...state,
@@ -365,10 +379,34 @@ export function clearExpiredSkillRuntimeState(
 function filterExpiredRecord<T extends { expiresAt: number }>(
   record: Record<string, T> | undefined,
   now: number,
-): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(record ?? {}).filter(([, value]) => value.expiresAt > now),
-  );
+): Record<string, T> | undefined {
+  if (!record) {
+    return record;
+  }
+
+  let didExpire = false;
+  const entries = Object.entries(record).filter(([, value]) => {
+    const isActive = value.expiresAt > now;
+    didExpire ||= !isActive;
+    return isActive;
+  });
+
+  return didExpire ? Object.fromEntries(entries) : record;
+}
+
+function filterExpiredEvents<T extends { expiresAt: number }>(
+  events: T[] | undefined,
+  now: number,
+): T[] | undefined {
+  if (!events) {
+    return events;
+  }
+
+  const hasExpiredEvent = events.some((event) => event.expiresAt <= now);
+
+  return hasExpiredEvent
+    ? events.filter((event) => event.expiresAt > now)
+    : events;
 }
 
 export function getFollowTrailPosition(
