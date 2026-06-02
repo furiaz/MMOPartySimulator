@@ -6,7 +6,10 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import {
+  getBoundedPathDistance,
+  moveEntityTowardPositionIfUnoccupied,
+} from "./movementPlanning";
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
 import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
@@ -59,6 +62,11 @@ type TargetSearchResult = {
   reason: EnemyTargetDecisionReason;
 };
 
+type TargetCandidate = {
+  target: AutonomousEntity;
+  pathDistance: number;
+};
+
 export function updateEnemyAISystem(
   state: GameState,
   timing: SimulationTiming = {
@@ -95,7 +103,7 @@ export function updateEnemyAISystem(
     if (
       currentTarget &&
       isValidEnemyTarget(currentTarget) &&
-      canKeepCurrentTarget(entity, currentTarget)
+      canKeepCurrentTarget(nextState, entity, currentTarget)
     ) {
       if (entity.state === "attack") {
         continue;
@@ -145,7 +153,12 @@ export function updateEnemyAISystem(
       continue;
     }
 
-    const { target, reason } = findPreferredTarget(entity, entities, partyLeader);
+    const { target, reason } = findPreferredTarget(
+      nextState,
+      entity,
+      entities,
+      partyLeader,
+    );
 
     if (!target) {
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
@@ -240,14 +253,15 @@ function clearEnemyTarget(enemy: Enemy, now = Date.now()): Enemy {
 }
 
 function findPreferredTarget(
+  state: GameState,
   enemy: Enemy,
   entities: GameEntity[],
   partyLeader: AutonomousEntity | undefined,
 ): TargetSearchResult {
-  const candidates = getValidTargetCandidates(enemy, entities);
+  const candidates = getValidTargetCandidates(state, enemy, entities);
 
   if (candidates.length === 0) {
-    return getNoTargetReason(enemy, entities);
+    return getNoTargetReason(state, enemy, entities);
   }
 
   const preference = getEnemyTargetPreference(enemy);
@@ -255,45 +269,59 @@ function findPreferredTarget(
   if (preference === "leader") {
     if (
       partyLeader &&
-      candidates.some((candidate) => candidate.id === partyLeader.id)
+      candidates.some((candidate) => candidate.target.id === partyLeader.id)
     ) {
       return { target: partyLeader, reason: "leader" };
     }
 
     return {
-      target: findClosestCandidate(enemy, candidates),
+      target: findClosestCandidate(candidates),
       reason: "closest",
     };
   }
 
   if (preference === "lowestHealth") {
     return {
-      target: findLowestHealthCandidate(enemy, candidates),
+      target: findLowestHealthCandidate(candidates),
       reason: "lowest_health",
     };
   }
 
   return {
-    target: findClosestCandidate(enemy, candidates),
+    target: findClosestCandidate(candidates),
     reason: "closest",
   };
 }
 
 function getValidTargetCandidates(
+  state: GameState,
   enemy: Enemy,
   entities: GameEntity[],
-): AutonomousEntity[] {
+): TargetCandidate[] {
   const detectionRange = getEnemyAggroRange(enemy);
 
-  return entities.filter(
-    (entity): entity is AutonomousEntity =>
-      isValidEnemyTarget(entity) &&
-      getDistanceSquared(enemy, entity) <= detectionRange * detectionRange &&
-      isInsideAttackLeash(enemy, entity.position),
-  );
+  return entities.flatMap((entity) => {
+    if (
+      !isValidEnemyTarget(entity) ||
+      getDistanceSquared(enemy, entity) > detectionRange * detectionRange ||
+      !isInsideAttackLeash(enemy, entity.position)
+    ) {
+      return [];
+    }
+
+    const pathDistance = getBoundedPathDistance(
+      state,
+      enemy,
+      entity.position,
+      detectionRange,
+    );
+
+    return pathDistance === null ? [] : [{ target: entity, pathDistance }];
+  });
 }
 
 function getNoTargetReason(
+  state: GameState,
   enemy: Enemy,
   entities: GameEntity[],
 ): TargetSearchResult {
@@ -310,6 +338,24 @@ function getNoTargetReason(
     return { reason: "outside_leash" };
   }
 
+  if (
+    validTargets.some((entity) => {
+      if (
+        getDistanceSquared(enemy, entity) > detectionRange * detectionRange ||
+        !isInsideAttackLeash(enemy, entity.position)
+      ) {
+        return false;
+      }
+
+      return (
+        getBoundedPathDistance(state, enemy, entity.position, detectionRange) ===
+        null
+      );
+    })
+  ) {
+    return { reason: "unreachable" };
+  }
+
   if (validTargets.length > 0) {
     return { reason: "outside_detection" };
   }
@@ -318,17 +364,16 @@ function getNoTargetReason(
 }
 
 function findClosestCandidate(
-  enemy: Enemy,
-  candidates: AutonomousEntity[],
+  candidates: TargetCandidate[],
 ): AutonomousEntity | undefined {
   let closestCandidate: AutonomousEntity | undefined;
   let closestDistance = Number.POSITIVE_INFINITY;
 
   for (const candidate of candidates) {
-    const distance = getDistanceSquared(enemy, candidate);
+    const distance = candidate.pathDistance;
 
     if (distance < closestDistance) {
-      closestCandidate = candidate;
+      closestCandidate = candidate.target;
       closestDistance = distance;
     }
   }
@@ -337,22 +382,21 @@ function findClosestCandidate(
 }
 
 function findLowestHealthCandidate(
-  enemy: Enemy,
-  candidates: AutonomousEntity[],
+  candidates: TargetCandidate[],
 ): AutonomousEntity | undefined {
   let lowestHealthCandidate: AutonomousEntity | undefined;
   let lowestHealthRatio = Number.POSITIVE_INFINITY;
   let lowestDistance = Number.POSITIVE_INFINITY;
 
   for (const candidate of candidates) {
-    const healthRatio = candidate.health / candidate.maxHealth;
-    const distance = getDistanceSquared(enemy, candidate);
+    const healthRatio = candidate.target.health / candidate.target.maxHealth;
+    const distance = candidate.pathDistance;
 
     if (
       healthRatio < lowestHealthRatio ||
       (healthRatio === lowestHealthRatio && distance < lowestDistance)
     ) {
-      lowestHealthCandidate = candidate;
+      lowestHealthCandidate = candidate.target;
       lowestHealthRatio = healthRatio;
       lowestDistance = distance;
     }
@@ -628,11 +672,34 @@ function getNearestLivingCompanionDistance(
   return nearestDistance;
 }
 
-function canKeepCurrentTarget(enemy: Enemy, target: AutonomousEntity): boolean {
+function canKeepCurrentTarget(
+  state: GameState,
+  enemy: Enemy,
+  target: AutonomousEntity,
+): boolean {
+  if (
+    !isInsideAttackLeash(enemy, target.position) &&
+    getDistance(enemy.position, target.position) > ENEMY_COMBAT_RETAIN_RANGE
+  ) {
+    return false;
+  }
+
   return (
-    isInsideAttackLeash(enemy, target.position) ||
-    getDistance(enemy.position, target.position) <= ENEMY_COMBAT_RETAIN_RANGE
+    getBoundedPathDistance(
+      state,
+      enemy,
+      target.position,
+      getTargetRetainPathDistance(state, enemy),
+    ) !== null
   );
+}
+
+function getTargetRetainPathDistance(state: GameState, enemy: Enemy): number {
+  if (enemy.questSpawn && state.map) {
+    return state.map.columns * state.map.rows * 2;
+  }
+
+  return enemy.questSpawn ? Number.POSITIVE_INFINITY : ENEMY_ATTACK_LEASH_DISTANCE;
 }
 
 function withTargetDecisionReason(

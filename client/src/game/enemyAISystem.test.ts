@@ -14,7 +14,7 @@ import {
   type GameState,
 } from "./state";
 import { createTestGameState } from "./testState";
-import type { Enemy, GameEntity, Position } from "./types";
+import type { Enemy, GameEntity, GameMap, Position } from "./types";
 
 describe("enemy AI aggro and roaming", () => {
   afterEach(() => {
@@ -101,6 +101,40 @@ describe("enemy AI aggro and roaming", () => {
       currentTargetId: null,
     });
     expect(nextState.combatFeedbackEvents).toHaveLength(0);
+  });
+
+  it("does not acquire a companion behind a solid wall inside detection range", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 2 });
+    const enemy = createEnemy("enemy", { x: 1, y: 2 }, "aggressive");
+
+    const nextState = updateEnemyAISystem(
+      createState([leader, enemy], {
+        map: createAggroTestMap(createVerticalWall(2, 0, 4)),
+      }),
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+      targetDecisionReason: "unreachable",
+    });
+    expect(nextState.combatFeedbackEvents).toHaveLength(0);
+  });
+
+  it("acquires a companion through a reachable corridor inside detection range", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 2 });
+    const enemy = createEnemy("enemy", { x: 1, y: 2 }, "aggressive");
+
+    const nextState = updateEnemyAISystem(
+      createState([leader, enemy], {
+        map: createAggroTestMap(createVerticalWall(2, 1, 4)),
+      }),
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: leader.id,
+    });
   });
 
   it("keeps target dummy enemies from creating spotted alerts", () => {
@@ -228,6 +262,76 @@ describe("enemy AI aggro and roaming", () => {
     };
 
     const nextState = updateEnemyAISystem(createState([leader, enemy]));
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+  });
+
+  it("falls back from leader targeting when the leader is unreachable", () => {
+    const previousPreference = ENEMY_TYPES.wolf.targetPreference;
+    ENEMY_TYPES.wolf.targetPreference = "leader";
+
+    try {
+      const blockedLeader = createIdleCompanion("leader", { x: 3, y: 2 });
+      const reachableCompanion = createIdleCompanion("reachable", { x: 1, y: 4 });
+      const enemy = createEnemy("enemy", { x: 1, y: 2 }, undefined, {
+        enemyTypeId: "wolf",
+      });
+
+      const nextState = updateEnemyAISystem(
+        createState([blockedLeader, reachableCompanion, enemy], {
+          map: createAggroTestMap(createVerticalWall(2, 0, 4)),
+        }),
+      );
+
+      expect(nextState.entities[enemy.id]).toMatchObject({
+        state: "attack",
+        currentTargetId: reachableCompanion.id,
+        targetDecisionReason: "closest",
+      });
+    } finally {
+      ENEMY_TYPES.wolf.targetPreference = previousPreference;
+    }
+  });
+
+  it("ignores unreachable lowest-health targets", () => {
+    const injured = {
+      ...createIdleCompanion("injured", { x: 3, y: 2 }),
+      health: 1,
+    };
+    const reachable = createIdleCompanion("reachable", { x: 1, y: 4 });
+    const enemy = createEnemy("enemy", { x: 1, y: 2 }, undefined, {
+      enemyTypeId: "wolf",
+    });
+
+    const nextState = updateEnemyAISystem(
+      createState([injured, reachable, enemy], {
+        map: createAggroTestMap(createVerticalWall(2, 0, 4)),
+      }),
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: reachable.id,
+      targetDecisionReason: "lowest_health",
+    });
+  });
+
+  it("clears an existing target that becomes unreachable", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 2 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 2 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateEnemyAISystem(
+      createState([leader, enemy], {
+        map: createAggroTestMap(createVerticalWall(2, 0, 4)),
+      }),
+    );
 
     expect(nextState.entities[enemy.id]).toMatchObject({
       state: "idle",
@@ -491,6 +595,25 @@ function createState(entities: GameEntity[], overrides: Partial<GameState> = {})
       ...overrides,
     }),
   );
+}
+
+function createAggroTestMap(walls: Position[]): GameMap {
+  return {
+    displayName: "Aggro Test Map",
+    debugName: "aggro-test-map",
+    columns: 8,
+    rows: 5,
+    walls,
+    teleports: [],
+    healingFountains: [],
+  };
+}
+
+function createVerticalWall(x: number, startY: number, endY: number): Position[] {
+  return Array.from({ length: endY - startY + 1 }, (_, index) => ({
+    x,
+    y: startY + index,
+  }));
 }
 
 function createIdleCompanion(id: string, position: Position) {

@@ -87,6 +87,7 @@ export type EnemyTargetDecisionReason =
   | "passive_no_auto_target"
   | "outside_detection"
   | "outside_leash"
+  | "unreachable"
   | "no_valid_target";
 
 export type LootTier = 1 | 2;
