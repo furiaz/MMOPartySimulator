@@ -307,21 +307,23 @@ The leader moves toward the current intent:
 - prototype map transition point
 - prototype World Travel route step
 
-Other party members follow the leader unless their role, current task, resurrection channel, or direct command gives them another task.
+Other party members follow the leader unless their role, current task, resurrection participation, or direct command gives them another task.
 
 The party does not use a player-authored grid formation.
 
 Current prototype movement uses a lightweight automatic party formation and cohesion layer.
 
-Current prototype party formation behavior:
+Current prototype party formation and activity behavior:
 
-- tracks whether the party is idle, traveling, or in combat
+- tracks whether the party is idle, forming, traveling, or in combat
+- uses party activity coordination to choose travel or combat from direct player intent, nearby active threats, party combat targets, movement targets, and current distance
 - assigns shared travel or combat intent from the leader's current target or POI target
 - moves the leader toward the current POI or target when cohesion allows it
 - moves followers toward the leader or soft follow positions
 - allows party members to pass through each other in specific party movement cases
 - may assign all autonomous party members to gather when the leader intent is a shared gather target
 - assigns combat targets to autonomous party members when combat begins
+- excludes direct-commanded, direct-command grace, resurrection-assigned, and threat-responding companions from autonomous travel cohesion where appropriate
 - clears formation state when no valid target or travel point remains
 - records formation changes in debug telemetry
 
@@ -358,7 +360,7 @@ Required party members include living, non-incapacitated Defenders, Fighters, Su
 
 Gatherers are required for cohesion only when they are not actively gathering and are close enough to be rejoining the party.
 
-Direct-commanded members and resurrection-channeling members are excluded from autonomous cohesion behavior.
+Direct-commanded members and resurrection participants are excluded from autonomous cohesion behavior.
 
 Current prototype cohesion distances are implementation tuning values and should not be treated as final balance.
 
@@ -414,13 +416,15 @@ Current prototype resurrection behavior:
 
 - resurrection is driven by party recovery intent when a companion is dead
 - the recovery intent may temporarily pause POI, World Travel, teleport, gathering, or combat intent
-- living autonomous companions may move to the selected dead companion
-- resurrection requires close range
-- resurrection channels over time and multiple helpers may contribute progress to the same target
-- direct-commanded helpers do not start or continue resurrection
-- helpers targeted by active enemies may avoid starting a new resurrection channel during combat
-- if the dead leader has nearby threats, living companions may first clear those threats before resurrection
-- when recovery ends, queued party intent may resume if still valid
+- existing party intent may be queued and restored when recovery ends
+- living autonomous companions may be assigned as resurrection participants for the selected dead companion
+- participants move toward valid stand positions inside the resurrection area
+- the current prototype resurrection area uses a short range around the dead companion
+- resurrection progresses over time when living companions are within the resurrection area
+- multiple living contributors may speed resurrection progress through prototype contribution multipliers
+- participants may attack active threats inside the resurrection area while recovery remains active
+- direct-commanded companions do not start or continue resurrection participation
+- resurrection assignments are cleared when the helper, target, or recovery intent becomes invalid
 - revived companions return with minimal health and resume party behavior
 
 If all party members are defeated outside the hub, prototype world-wipe recovery may rescue the party to an unlocked rescue hub.
@@ -579,6 +583,14 @@ Current resource categories:
 - Wood
 - Ore
 - Herb
+
+Current gathered material routing:
+
+- Wood grants Softwood at Tier 1 and Hardwood at Tier 2
+- Ore grants Copper Ore at Tier 1 and Iron Ore at Tier 2
+- Herb grants Field Herb at Tier 1 and Redleaf Herb at Tier 2
+
+Legacy Wood, Ore, and Herb item definitions may still exist as prototype data, but current gathering routes resource type and tier into the tiered material items above.
 
 Resources currently grant prototype item stacks into the shared party inventory.
 
@@ -884,12 +896,26 @@ Do not implement generalized dual wield, arbitrary two-handed combinations, subc
 
 The player can give direct orders to specific party members.
 
+Current direct order types:
+
+- attack
+- gather
+- move
+
 Direct orders:
 
-- override autonomous role behavior
+- override autonomous role behavior for the targeted party member
 - affect only the targeted party member
 - do not automatically change other party members
-- remain active until replaced, completed, cleared, or invalidated by inability to act
+- replace any previous direct order on that same party member
+- clear resurrection participation for that party member
+- validate source, target, path distance, blocked positions, resource capacity, and ability to act
+- remain active until replaced, completed, canceled, or invalidated
+- start a short rejoin grace period after normal completion or cancellation
+
+Direct gather orders respect resource `maxGatherers`.
+
+A direct-commanded companion may temporarily attack a personal threat or movement blocker while keeping direct-command priority.
 
 Example:
 
@@ -905,8 +931,8 @@ Initial prototype party:
 
 - 1 current leader
 - 2 starting party members
-- current starting leader is a Fighter
-- current second starting member is a Defender
+- current starting leader is a Defender
+- current second starting member is a Fighter
 - the party currently starts in Harbor Union Bastion
 - the shared inventory currently starts with one Training Sword as prototype/debug setup
 
@@ -2003,7 +2029,8 @@ Temporary debug tools may include:
 - inspect AI decision reasons
 - inspect XP and level progression
 - inspect class and skill behavior
-- inspect movement/pathing issues
+- inspect movement/pathing issues, movement planning, path backoff, and navigation grid behavior
+- inspect direct companion command issue, rejection, replacement, completion, cancellation, and rejoin grace behavior
 - debug map transitions
 - export debug telemetry
 - inspect quest state and POI decisions
@@ -2014,7 +2041,7 @@ Temporary debug tools may include:
 - inspect healing fountain health restoration and flask refill behavior
 - inspect enemy archetype, combat style, target preference, attack range, and target decision behavior
 - inspect enemy scaling, respawn, subzone, and encounter area behavior
-- inspect party intent, self-defense recovery, resurrection, and world-wipe recovery behavior
+- inspect party intent, party activity coordination, self-defense recovery, resurrection, and world-wipe recovery behavior
 - inspect interrupted POI restore behavior
 - inspect quest guide escort behavior
 - inspect PixiJS world rendering behavior

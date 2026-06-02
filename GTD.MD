@@ -49,19 +49,20 @@ Current game-logic implementation files include:
 - `attackSlots.ts`
 - `attackSystem.ts`
 - `classes.ts`
-- `commands.ts`
-- `directCompanionCommands.ts`
 - `combatResolver.ts`
+- `commands.ts`
 - `companionCombat.ts`
-- `dungeonSystem.ts`
 - `consumables.ts`
+- `createInitialGameState.ts`
 - `debugMap.ts`
 - `debugTelemetry.ts`
 - `debugTools.ts`
 - `defendSystem.ts`
 - `defenderCombat.ts`
+- `directCompanionCommands.ts`
 - `dropSystem.ts`
 - `dropTables.ts`
+- `dungeonSystem.ts`
 - `enemyAISystem.ts`
 - `enemyAoeChannelSystem.ts`
 - `enemyArchetypes.ts`
@@ -84,11 +85,16 @@ Current game-logic implementation files include:
 - `inventory.ts`
 - `items.ts`
 - `leveling.ts`
+- `mapRuntimeCleanup.ts`
 - `merchant.ts`
+- `movementPlanning.ts`
 - `movementState.ts`
+- `movementTypes.ts`
 - `navigation.ts`
 - `navigationClick.ts`
+- `partyActivityCoordinator.ts`
 - `partyFormationSystem.ts`
+- `partyIntentState.ts`
 - `partyIntentSystem.ts`
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
@@ -98,31 +104,35 @@ Current game-logic implementation files include:
 - `performanceMetrics.ts`
 - `poiResumeSystem.ts`
 - `poiSystem.ts`
+- `poiTargetSelection.ts`
 - `poiTypes.ts`
 - `positionUtils.ts`
 - `questGuideSystem.ts`
+- `questProgressionHooks.ts`
 - `questSystem.ts`
 - `questTypes.ts`
 - `resurrectionSystem.ts`
 - `roleProfiles.ts`
 - `roleSystem.ts`
 - `simulationTiming.ts`
+- `skillEffectResolution.ts`
 - `skillMovement.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
 - `skillSystem.ts`
 - `skillTargeting.ts`
-- `subzoneSystem.ts`
 - `skills.ts`
 - `state.ts`
 - `stats.ts`
+- `subzoneSystem.ts`
 - `targetSelection.ts`
-- `testState.ts`
-- `teleportSystem.ts`
 - `teleportState.ts`
+- `teleportSystem.ts`
+- `testState.ts`
 - `types.ts`
 - `updateGame.ts`
 - `wallet.ts`
+- `worldTravelRouting.ts`
 - `worldWipeRecovery.ts`
 
 Current tests live beside game-logic files as `*.test.ts`.
@@ -147,9 +157,9 @@ The player is not represented as a world entity.
 
 The player is the manager/controller issuing intent and commands to party members.
 
-NPC entities are prototype placeholders for hub visuals, simple interactions, and quest guide behavior.
+NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, and dungeon chest presentation.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, and prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
 
 NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
 
@@ -326,7 +336,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, resurrection channel/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, enemy AoE runtime state, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -356,6 +366,13 @@ Current party intent, POI, and travel fields include:
 
 `leaderIntent`, `globalPoiIntent`, `localPoiTarget`, `worldTravelTargetMapId`, and `lastPoiDecision` remain synchronized compatibility fields for systems and UI that still read those values directly.
 
+Current direct companion command fields include:
+
+- `directCompanionCommandsById`
+- `directCommandGraceUntilByCompanionId`
+
+Direct companion command state tracks active attack, gather, and move orders plus short rejoin grace after normal command completion or cancellation.
+
 Current POI preferences include:
 
 - `stayInMap`
@@ -372,6 +389,11 @@ Current prototype consumable runtime fields include:
 - `flaskRechargeEnemyKillCounter`
 - `flaskRechargeCountedEnemyDefeats`
 
+Current prototype drop and dungeon runtime fields include:
+
+- `dropVisualEvents`
+- `slimewardDungeon`
+
 Current prototype skill runtime fields include:
 
 - `skillMarksByEnemyId`
@@ -381,6 +403,11 @@ Current prototype skill runtime fields include:
 - `skillShieldBlocksById`
 - `skillCooldownsByCompanionId`
 - `skillVisualEvents`
+
+Current enemy AoE runtime fields include:
+
+- `enemyAoeChannelsByCasterId`
+- `enemyAoeCooldownsByCasterId`
 
 Current resurrection and recovery fields include:
 
@@ -402,6 +429,20 @@ Current debug option fields include:
 State helpers should remain low-level and safe.
 
 Systems should own behavior decisions.
+
+Initial game state is created by `createInitialGameState.ts`.
+
+Current initial prototype state includes:
+
+- Harbor Union Bastion as the starting map
+- two starting companions
+- the starting leader as a Defender-role companion
+- the second starting companion as a Fighter-role companion
+- hub Quest Giver, Merchant, Smith, Dog, and Test Blade NPCs
+- hub target dummy and hub AoE target dummy
+- empty shared party inventory and wallet
+- initial quest state
+- one Training Sword added to shared inventory as prototype/debug setup
 
 ---
 
@@ -540,13 +581,14 @@ Skills are simple class-based actions used to extend existing behavior.
 
 Skill definitions live in `skills.ts`.
 
-Skill selection and execution live in:
+Skill selection, execution, and effect resolution live in:
 
 - `skillSystem.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
 - `skillTargeting.ts`
 - `skillMovement.ts`
+- `skillEffectResolution.ts`
 
 Current skill runtime is prototype-only.
 
@@ -597,6 +639,8 @@ Current base class prototype skills:
 - Penitent: Penitent's Gift
 
 Current skill effects may include direct damage, lunge damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, gathering speed buff, quick-step movement, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
+
+`skillEffectResolution.ts` owns applying current prototype skill effects after selection, including damage, lunge damage, sweeping damage, taunt, mark, self buff, ally buff, gather buff, quick step, shield block, bind, heal, self-cost heal, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
 
 Current skill rules:
 
@@ -760,7 +804,7 @@ Rules:
 - direct companion commands can target attack, gather, or move behavior for one companion
 - direct companion commands override autonomous behavior for the targeted companion
 - direct companion commands do not automatically change other companions
-- direct companion commands cancel resurrection channeling for the commanded helper
+- direct companion commands cancel resurrection participation for the commanded helper
 - direct companion commands reject invalid sources, invalid targets, blocked move positions, targets beyond the direct-command leash, and full resource gather slots
 - direct gather commands reserve resource capacity before autonomous collectors
 - direct gather commands may temporarily self-defend against personal threats without clearing the gather command
@@ -810,7 +854,6 @@ type PartyBehaviorMode =
 type PartyIntentSource = "player" | "ai";
 
 type PartyRecoveryAction =
-  | "fight_near_dead_leader"
   | "resurrect";
 
 type PartyRecoveryIntent = {
@@ -837,11 +880,13 @@ type PartyIntent = PartyIntentSnapshot & {
 
 `partyIntent` is used by party movement, role behavior, combat targeting, exploration, defender positioning, POI targeting, teleport movement, resurrection recovery, and self-defense recovery.
 
+`partyIntentState.ts` owns helper behavior for setting party execution intent, setting World Travel targets, queueing current party intent, restoring queued party intent, and synchronizing compatibility fields.
+
 `leaderIntent` remains synchronized from `partyIntent.executionIntent` for compatibility with existing systems and UI.
 
 Party intent may be cleared when a point of interest is reached, combat ends, map transition completes, teleport completes, or recovery intent finishes.
 
-`partyIntentSystem.ts` owns current recovery and self-defense intent behavior. It can queue existing party intent, switch to resurrection or nearby-threat combat, and restore queued intent when recovery ends.
+`partyIntentSystem.ts` owns current recovery and self-defense intent behavior. It can queue existing party intent, switch to resurrection recovery or nearby-threat combat, and restore queued intent when recovery ends.
 
 ## Prototype Quests and POIs
 
@@ -865,6 +910,7 @@ Current quest ids are:
 - `rescue_the_grove_runner`
 - `hold_the_field_cache`
 - `open_wolf_causeway`
+- `find_slimeward_camp`
 
 Current quest display names are:
 
@@ -876,6 +922,7 @@ Current quest display names are:
 - `rescue_the_grove_runner`: Rescue the Grove Runner
 - `hold_the_field_cache`: Hold the Field Cache
 - `open_wolf_causeway`: Open the Wolf Causeway
+- `find_slimeward_camp`: Slimeward Trail
 
 Current quest objective types are:
 
@@ -954,7 +1001,9 @@ Current POI categories are:
 - `idle`
 - `event`
 
-`poiSystem.ts` selects global quest intent and local map targets for auto-mode behavior.
+`poiSystem.ts` selects global quest intent and coordinates local map target selection for auto-mode behavior.
+
+`poiTargetSelection.ts` builds and scores local POI candidates, handles World Travel route targets, quest targets, hub Merchant quick exchange targets, wild fallback combat/resource targets, leader subzone restrictions, progressive fallback distance tiers, and stable target reuse.
 
 POI selection should evaluate progression targets before generic map activity.
 
@@ -978,6 +1027,8 @@ POI selection may score candidates by priority, path distance, fallback score, n
 Wild POI selection may reuse a valid target briefly before reevaluating.
 
 Active quest resource POIs may use a longer short commitment window than generic wild fallback POIs.
+
+When an active quest objective targets another subzone on the current map, POI target selection may create a route-to-subzone exploration target using current subzone passage data.
 
 POI selection should record debug telemetry for selected POIs and skipped POIs where useful.
 
@@ -1014,29 +1065,38 @@ It must not become a full job scheduler, worker assignment system, logistics sys
 
 Systems operate on `GameState`.
 
-Current systems include:
+Current systems and update helpers include:
 
 - Teleport System
+- Teleport State helpers
+- World Travel Routing helpers
 - POI System
+- POI Target Selection helpers
 - POI Resume System
 - Healing Fountain System
 - Health System
 - Consumable System
+- Direct Companion Command System
 - Resurrection System
 - Role System
 - Skill System
+- Skill Effect Resolution helpers
+- Party Activity Coordinator helpers
 - Party Formation System
 - Exploration System
 - Defend System
 - Follow System
 - Quest Guide System
 - Enemy AI System
+- Enemy AoE Channel System
 - Attack System
 - Drop System
+- Slimeward Dungeon System
 - Enemy Respawn System
 - Gathering System
 - Party Protection System
 - World Wipe Recovery
+- Map Runtime Cleanup helpers
 - Debug Telemetry
 
 Each system reads `GameState`, updates entities through state helpers, runs during simulation ticks, and keeps behavior focused and simple.
@@ -1055,47 +1115,53 @@ The game loop runs continuously while enabled, executes systems in order, update
 
 Current high-level order:
 
-1. Advance simulation timing and clear expired combat feedback, skill runtime state, and frame movement planning
-2. Clear expired consumable buffs
-3. Clear expired hub departure food warnings
-4. Synchronize derived max health
-5. Update consumable behavior
-6. Update active consumable use
-7. Synchronize derived max health again after consumable changes
-8. Update world-wipe recovery
-9. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
-10. Update party intent recovery
-11. Update resurrection
-12. Update party intent recovery again after resurrection changes
-13. Update teleport system
-14. If teleport is active or map transition happened, record telemetry and stop the tick early
-15. Update direct companion commands
-16. Build current resource work context
-17. Update POI system
-18. Update healing fountain system
-19. Rebuild resource work context
-20. If auto mode is enabled, update role behavior
-21. If auto mode is enabled, update prototype skills
-22. If party execution intent, auto mode, or teleport POI movement is active, update party formation movement
-23. If auto mode is enabled, reserve exploration movement
-24. Update defender behavior
-25. If auto mode is enabled, update exploration
-26. Update follow behavior
-27. Update quest guide escort behavior
-28. Update enemy AI
-29. Update enemy AoE channel behavior
-30. Update party intent self-defense
-31. Update attacks
-32. Update flask recharge from counted enemy defeats
-33. Restore interrupted POI target when valid
-34. Update passive health regeneration
-35. Update target dummy health regeneration
-36. Update drop system
-37. Update enemy respawn system
-38. Update gathering
-39. Update skill shield block positions
-40. Idle autonomous party members when no POI or leader intent is active
-41. Record debug telemetry
+1. If the Slimeward dungeon chest UI is open, record telemetry and stop the tick early
+2. Advance simulation timing, clear frame movement planning, clear expired combat feedback, and clear expired skill runtime state
+3. Clear expired consumable buffs
+4. Clear expired hub departure food warnings
+5. Synchronize derived max health
+6. Apply debug companion infinite health when enabled
+7. Update consumable behavior
+8. Update active consumable use
+9. Synchronize derived max health again after consumable changes
+10. Apply debug companion infinite health again when enabled
+11. Update world-wipe recovery
+12. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
+13. Update party intent recovery
+14. Update resurrection
+15. Update party intent recovery again after resurrection changes
+16. Update teleport system
+17. If teleport is active or map transition happened, record telemetry and stop the tick early
+18. Update direct companion commands
+19. Build current resource work context
+20. Update POI system
+21. Update healing fountain system
+22. Rebuild resource work context
+23. If auto mode is enabled, update role behavior
+24. If auto mode is enabled, update prototype skills
+25. If party execution intent, auto mode, or teleport POI movement is active, update party formation movement
+26. If auto mode is enabled, reserve exploration movement
+27. Update defender behavior
+28. If auto mode is enabled, update exploration
+29. Update follow behavior
+30. Update quest guide escort behavior
+31. Update enemy AI
+32. Update enemy AoE channel behavior
+33. Update party intent self-defense
+34. Update combat skills
+35. Update attacks
+36. Update flask recharge from counted enemy defeats
+37. Restore interrupted POI target when valid
+38. Update passive health regeneration
+39. Update target dummy health regeneration
+40. Update drop system
+41. Update Slimeward dungeon system
+42. Update enemy respawn system
+43. Update gathering
+44. Update skill shield block positions
+45. Idle autonomous party members when no POI or leader intent is active
+46. Apply debug companion infinite health again when enabled
+47. Record debug telemetry
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
 
@@ -1121,13 +1187,19 @@ Movement rules:
 - fallback movement is attempted when direct/path movement fails
 - navigation/path metrics may be recorded for performance inspection
 
-Movement helpers live primarily in `state.ts`.
+Movement planning, collision checks, path retries, movement reservations, party pass-through, swaps, fallback movement, and movement helper behavior live primarily in `movementPlanning.ts`.
+
+Movement frame/tick cleanup helpers live in `movementState.ts`.
+
+Movement-related types live in `movementTypes.ts`.
+
+`state.ts` re-exports selected movement helpers for compatibility with existing callers.
 
 Navigation helpers live in `navigation.ts`.
 
 Navigation click helpers live in `navigationClick.ts`.
 
-If movement logic grows significantly, pathing and collision helpers may be moved to dedicated modules, but no restructure is required now.
+Movement logic should remain in game logic modules and must not move into React or PixiJS.
 
 ---
 
@@ -1154,7 +1226,9 @@ Navigation remains a simple prototype pathing system and should not become a com
 
 Party movement is simple and leader-centered.
 
-`partyFormationSystem.ts` currently owns reading leader intent, selecting a target position, deciding travel or combat phase, assigning travel follow targets, assigning shared combat targets, moving the leader toward the point of interest, moving followers toward the leader, and clearing completed movement or combat state.
+`partyFormationSystem.ts` currently owns party formation state, shared travel/combat assignment, leader movement toward the point of interest, follower movement toward the leader, and clearing completed movement or combat state.
+
+`partyActivityCoordinator.ts` helps decide whether current party activity is traveling or combat by considering direct player party intent, nearby active threats, party combat targets, movement targets, and current distance.
 
 Current party movement does not use strict formation slots.
 
@@ -1181,6 +1255,39 @@ A gatherer rejoins normal cohesion when not actively gathering and close enough 
 Direct-commanded members are excluded from autonomous cohesion behavior.
 
 Resurrection-channeling members are excluded from autonomous cohesion behavior where supported.
+
+---
+## Direct Companion Commands
+
+`directCompanionCommands.ts` owns direct player orders for individual companions.
+
+Current direct command types are:
+
+```ts
+type DirectCompanionCommandType = "attack" | "gather" | "move";
+```
+
+Current direct command behavior:
+
+- validates the source companion is living
+- validates attack targets, gather targets, move positions, path distance, blocked positions, and resource capacity
+- stores active commands in `directCompanionCommandsById`
+- replaces any existing direct command for the same companion
+- clears resurrection recovery assignment for the commanded companion
+- marks the companion with `commandPriority: "direct"`
+- updates the companion state to attack, gather, or follow for direct movement
+- moves direct-move companions with the direct-command path profile
+- allows direct-gather companions to respond to personal threats or movement-blocking enemies
+- completes or cancels commands when targets become invalid, resources are full, companions die, or move targets are reached
+- starts a short rejoin grace period after normal completion or cancellation
+- records direct command issue, rejection, replacement, completion, cancellation, and grace telemetry
+
+Current direct command constants:
+
+- `DIRECT_COMMAND_MAX_PATH_DISTANCE = 30`
+- `DIRECT_COMMAND_REJOIN_GRACE_MS = 1500`
+
+Direct commands are prototype player intervention behavior, not a hotbar, RTS control framework, or final input model.
 
 ---
 
@@ -2006,6 +2113,15 @@ Current prototype/debug routes:
 - `map-3` -> `map-2`
 - `map-3` -> `map-4`
 - `map-4` -> `map-3`
+- `hub` -> `slimeward-camp`
+- `map-3` -> `slimeward-camp`
+- `slimeward-camp` -> `map-3`
+- `slimeward-camp` -> `slimeward-floor-1`
+- `slimeward-camp` -> `slimeward-camp`
+- `slimeward-floor-1` -> `slimeward-camp`
+- `slimeward-floor-1` -> `slimeward-floor-2`
+- `slimeward-floor-2` -> `slimeward-floor-1`
+- `slimeward-floor-2` -> `slimeward-camp`
 
 Current teleport behavior:
 
@@ -2023,6 +2139,10 @@ Current teleport behavior:
 - on completion, current map changes to the teleport target map
 - map-local enemies, resources, hub placeholders, hub target dummies, explored tiles, movement planning, direct commands, formation state, combat feedback, skill visuals, enemy AoE runtime, drop visuals, resurrection state, and follow trails are reset or rebuilt for the new map
 - companion progression, class, role, level, XP, health, party identity, equipment, consumables, wallet, inventory, quests, party order, and teleport working state are preserved
+
+`mapRuntimeCleanup.ts` owns clearing map-local runtime state during map transitions and pruning runtime records for entities that no longer exist.
+
+Map transition cleanup clears or resets active teleport, direct commands, direct-command grace, interrupted POI state, explored tiles, follow trails, combat feedback, movement planning, attack slot cache, defender wait/blocking state, skill visuals, enemy AoE runtime, flask counted defeat records, health regeneration timing, target dummy regeneration timing, drop visuals, resurrection state, skill binds, skill marks, skill shield blocks, and party formation state.
 
 Current active teleport state:
 
@@ -2046,7 +2166,18 @@ type TeleportRuntimeState = {
 
 `teleportState.ts` owns helper logic for resolving default and runtime teleport working state.
 
+`worldTravelRouting.ts` owns current prototype World Travel route-step selection.
+
 World Travel should use current route and map data.
+
+Current World Travel routing:
+
+- returns no route when the current map is missing or already matches the destination
+- prefers a direct working teleport when one exists
+- routes between main-world maps through the ordered main route from hub through map-4
+- uses breadth-first route search for other working prototype routes, including Slimeward routes
+- ignores non-working teleports
+- restricts main-world-to-main-world travel to main-world route teleports
 
 World Travel must not require final zone ids, persistent zone state, final world streaming, map discovery, travel costs, or a production teleport network.
 
@@ -2114,18 +2245,23 @@ It is not a final dungeon framework, production boss system, procedural dungeon 
 Current resurrection behavior:
 
 - runs during simulation updates after POI and healing fountain updates
-- only assigns resurrection helpers when the party is not in combat
-- living autonomous companions may move toward dead companions
-- resurrection requires close range
-- resurrection progresses over time while the helper remains valid and in range
-- direct-commanded helpers do not continue resurrection channeling
+- uses party recovery intent to select the active dead companion target
+- assigns living autonomous companions as resurrection participants
+- stores participant assignments in `resurrectionChannelsByHelperId`
+- stores target progress in `resurrectionProgressByCompanionId`
+- moves participants toward valid stand positions inside the resurrection area
+- lets participants attack active threats inside the resurrection area
+- progresses resurrection when living companions are within the resurrection area
+- scales progress contribution by current contributor count using prototype contribution multipliers
+- removes participant assignments when the helper, target, or recovery intent becomes invalid
+- direct-commanded helpers do not continue resurrection participation
 - completed resurrection returns the target companion to follow behavior with minimal health
-- resurrection channels and progress emit debug telemetry
+- resurrection participant assignment, removal, area progress, and completion emit debug telemetry
 
 Current resurrection constants:
 
 - `RESURRECTION_REQUIRED_MS = 10000`
-- `RESURRECTION_RANGE = 1`
+- `RESURRECTION_RANGE = 5`
 
 `worldWipeRecovery.ts` owns current prototype party defeat recovery.
 
@@ -2167,8 +2303,10 @@ type CombatFeedbackType =
   | "attack"
   | "damage"
   | "death"
+  | "enemy_spotted"
   | "gather"
-  | "heal";
+  | "heal"
+  | "level_up";
 ```
 
 Feedback events expire automatically.
@@ -2284,7 +2422,7 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, resurrection target selection, resurrection channel start, resurrection channel progress, resurrection channel cancellation, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, Superior enemy spawning, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, quest drop visuals, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, direct command issue/rejection/replacement/completion/cancellation/grace events, resurrection target selection, resurrection participant assignment, resurrection area progress, resurrection participant removal, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 
@@ -2335,6 +2473,10 @@ Debug/testing helpers may exist for development:
 - randomize positions
 - debug telemetry recording/export
 - debug maps
+- direct companion command testing
+- map runtime cleanup testing
+- Slimeward dungeon runtime and chest testing
+- enemy AoE channel testing
 - add prototype consumables to shared inventory
 - hub target dummy testing
 - explicit aggressive-enemy test setups
