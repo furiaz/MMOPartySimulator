@@ -1080,6 +1080,8 @@ export type DebugTelemetryEventType =
   | "direct_command_canceled"
   | "direct_command_grace_started"
   | "direct_command_grace_expired"
+  | "party_order_rejected"
+  | "party_intent_canceled"
   | "flask_fountain_refilled"
   | "flask_recharge_kill_progress"
   | "flask_charge_gained"

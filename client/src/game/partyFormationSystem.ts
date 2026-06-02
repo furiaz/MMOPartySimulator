@@ -2,6 +2,7 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
+import { getPartyExecutionIntentReachability } from "./partyOrderReachability";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getPartyLeader,
@@ -79,6 +80,12 @@ export function updatePartyFormationSystem(
     isCompanionAssignedToResurrectionRecovery(state, leader.id)
   ) {
     return clearFormation(state);
+  }
+
+  const playerIntentClearedState = clearStalePlayerPartyIntent(state, leader);
+
+  if (playerIntentClearedState !== state) {
+    return playerIntentClearedState;
   }
 
   const gatherIntentClearedState = clearStaleGatherPartyIntent(state, leader);
@@ -211,6 +218,61 @@ function assignPartyGatherTarget(
   return nextState;
 }
 
+function clearStalePlayerPartyIntent(
+  state: GameState,
+  leader: PartyMember,
+): GameState {
+  if (!hasDirectPlayerPartyIntent(state)) {
+    return state;
+  }
+
+  const executionIntent = getPartyExecutionIntent(state);
+
+  if (!executionIntent) {
+    return state;
+  }
+
+  const reachability = getPartyExecutionIntentReachability(
+    state,
+    leader,
+    executionIntent,
+    { allowBlockedMoveTarget: true },
+  );
+
+  if (reachability.reason === "valid") {
+    return state;
+  }
+
+  let nextState = setPartyExecutionIntent(clearFormation(state), null);
+  nextState = appendDebugTelemetryEvent(nextState, {
+    type: "party_intent_canceled",
+    entityId: leader.id,
+    targetId: reachability.targetId,
+    intendedPosition: reachability.targetPosition,
+    reason: reachability.reason,
+  });
+
+  for (const member of getPartyMembers(nextState)) {
+    if (
+      member.commandPriority === "direct" ||
+      isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
+      isPartyMemberRespondingToActiveThreat(nextState, member) ||
+      !isMemberAssignedToExecutionIntent(member, leader.id, executionIntent)
+    ) {
+      continue;
+    }
+
+    nextState = updateEntity(nextState, {
+      ...member,
+      state: "follow",
+      currentTargetId: member.id === leader.id ? null : leader.id,
+      commandPriority: "autonomous",
+    });
+  }
+
+  return nextState;
+}
+
 function clearStaleGatherPartyIntent(
   state: GameState,
   leader: PartyMember,
@@ -248,6 +310,26 @@ function clearStaleGatherPartyIntent(
   }
 
   return nextState;
+}
+
+function isMemberAssignedToExecutionIntent(
+  member: PartyMember,
+  leaderId: string,
+  executionIntent: NonNullable<ReturnType<typeof getPartyExecutionIntent>>,
+): boolean {
+  if (executionIntent.type === "move") {
+    return (
+      member.state === "follow" &&
+      (member.id === leaderId
+        ? member.currentTargetId === null
+        : member.currentTargetId === leaderId)
+    );
+  }
+
+  return (
+    member.state === executionIntent.type &&
+    member.currentTargetId === executionIntent.targetId
+  );
 }
 
 function assignPartyCombatTarget(state: GameState, targetId: string): GameState {

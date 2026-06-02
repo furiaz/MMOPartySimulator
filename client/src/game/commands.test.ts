@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createResource } from "./entities";
-import { addEntity } from "./state";
+import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { issueCompanionCommand, issuePartyOrder } from "./commands";
-import type { GameEntity } from "./types";
+import type { GameEntity, GameMap, Position } from "./types";
 
 describe("party orders", () => {
   it("keeps a direct command to the current leader from becoming party-wide intent", () => {
@@ -187,13 +187,138 @@ describe("party orders", () => {
       commandPriority: "autonomous",
     });
   });
+
+  it("rejects unreachable party attack orders", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader");
+    const fighter = createCompanion("fighter", { x: 3, y: 2 }, leader.id, "fighter");
+    const enemy = createEnemy("blocked-enemy", { x: 10, y: 10 });
+    const state = createState([leader, fighter, enemy], leader.id, {
+      map: createBlockedTargetMap(enemy.position),
+    });
+
+    const nextState = issuePartyOrder(state, {
+      type: "attack",
+      targetId: enemy.id,
+    });
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: leader.state,
+      currentTargetId: leader.currentTargetId,
+    });
+    expect(nextState.entities[fighter.id]).toMatchObject({
+      state: fighter.state,
+      currentTargetId: fighter.currentTargetId,
+    });
+  });
+
+  it("accepts reachable party attack orders when a path exists", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader");
+    const enemy = createEnemy("enemy", { x: 6, y: 2 });
+    const state = createState([leader, enemy], leader.id, {
+      map: createOpenTestMap(),
+    });
+
+    const nextState = issuePartyOrder(state, {
+      type: "attack",
+      targetId: enemy.id,
+    });
+
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "engage",
+      source: "player",
+      executionIntent: {
+        type: "attack",
+        targetId: enemy.id,
+      },
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: enemy.id,
+    });
+  });
+
+  it("rejects unreachable party gather orders", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader");
+    const resource = createResource("blocked-wood", { x: 10, y: 10 });
+    const state = createState([leader, resource], leader.id, {
+      map: createBlockedTargetMap(resource.position),
+    });
+
+    const nextState = issuePartyOrder(state, {
+      type: "gather",
+      targetId: resource.id,
+    });
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: leader.state,
+      currentTargetId: leader.currentTargetId,
+    });
+  });
+
+  it("rejects unreachable party move orders", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader");
+    const targetPosition = { x: 10, y: 10 };
+    const state = createState([leader], leader.id, {
+      map: createBlockedTargetMap(targetPosition),
+    });
+
+    const nextState = issuePartyOrder(state, {
+      type: "move",
+      targetPosition,
+    });
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: leader.state,
+      currentTargetId: leader.currentTargetId,
+    });
+  });
 });
 
-function createState(entities: GameEntity[], partyLeaderId: string) {
+function createState(
+  entities: GameEntity[],
+  partyLeaderId: string,
+  overrides: Partial<GameState> = {},
+) {
   return entities.reduce(
     addEntity,
     createTestGameState({
       partyLeaderId,
+      ...overrides,
     }),
   );
+}
+
+function createOpenTestMap(): GameMap {
+  return {
+    displayName: "Open Test Map",
+    debugName: "open-test-map",
+    columns: 20,
+    rows: 20,
+    walls: [],
+    teleports: [],
+    healingFountains: [],
+  };
+}
+
+function createBlockedTargetMap(blockedPosition: Position): GameMap {
+  return {
+    displayName: "Blocked Test Map",
+    debugName: "blocked-test-map",
+    columns: 20,
+    rows: 20,
+    walls: [
+      { x: blockedPosition.x - 1, y: blockedPosition.y },
+      { x: blockedPosition.x + 1, y: blockedPosition.y },
+      { x: blockedPosition.x, y: blockedPosition.y - 1 },
+      { x: blockedPosition.x, y: blockedPosition.y + 1 },
+    ],
+    teleports: [],
+    healingFountains: [],
+  };
 }

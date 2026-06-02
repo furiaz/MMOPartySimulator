@@ -1,5 +1,7 @@
+import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isAutonomousEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
+import { getPartyExecutionIntentReachability } from "./partyOrderReachability";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   getEntityById,
@@ -187,6 +189,22 @@ export function issuePartyOrder(
   }
 
   const playerIntent = getPlayerPartyExecutionIntent(state, order);
+  const reachability = getPartyExecutionIntentReachability(
+    state,
+    leader,
+    playerIntent,
+  );
+
+  if (reachability.reason !== "valid") {
+    return appendDebugTelemetryEvent(state, {
+      type: "party_order_rejected",
+      entityId: leader.id,
+      targetId: reachability.targetId,
+      intendedPosition: reachability.targetPosition,
+      reason: reachability.reason,
+    });
+  }
+
   let nextState = setPartyIntent(state, {
     mode: playerIntent.type === "attack" ? "engage" : "travel",
     source: "player",

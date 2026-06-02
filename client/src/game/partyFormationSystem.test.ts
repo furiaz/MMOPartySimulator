@@ -5,8 +5,10 @@ import {
   createResource,
   getMovementStepDistance,
 } from "./entities";
+import { issuePartyOrder } from "./commands";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { createTestGameState } from "./testState";
+import type { GameMap, Position } from "./types";
 
 describe("party formation real-time cohesion", () => {
   it("slows the leader instead of stopping when followers are slightly outside cohesion", () => {
@@ -380,4 +382,164 @@ describe("party formation real-time cohesion", () => {
       currentTargetId: leader.id,
     });
   });
+
+  it("clears player attack intent when the target becomes unreachable", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader", "fighter");
+    const follower = createCompanion(
+      "follower",
+      { x: 3, y: 2 },
+      leader.id,
+      "support",
+    );
+    const enemy = createEnemy("enemy", { x: 10, y: 10 });
+    const issuedState = issuePartyOrder(
+      createTestGameState({
+        entities: {
+          [leader.id]: leader,
+          [follower.id]: follower,
+          [enemy.id]: enemy,
+        },
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationDeltaMs: 100,
+      }),
+      {
+        type: "attack",
+        targetId: enemy.id,
+      },
+    );
+    const blockedState = {
+      ...issuedState,
+      map: createBlockedTargetMap(enemy.position),
+    };
+
+    const nextState = updatePartyFormationSystem(blockedState);
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: null,
+    });
+    expect(nextState.entities[follower.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("clears player move intent when the destination becomes unreachable", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader", "fighter");
+    const follower = createCompanion(
+      "follower",
+      { x: 3, y: 2 },
+      leader.id,
+      "support",
+    );
+    const targetPosition = { x: 10, y: 10 };
+    const issuedState = issuePartyOrder(
+      createTestGameState({
+        entities: {
+          [leader.id]: leader,
+          [follower.id]: follower,
+        },
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationDeltaMs: 100,
+      }),
+      {
+        type: "move",
+        targetPosition,
+      },
+    );
+    const blockedState = {
+      ...issuedState,
+      map: createBlockedTargetMap(targetPosition),
+    };
+
+    const nextState = updatePartyFormationSystem(blockedState);
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: null,
+    });
+    expect(nextState.entities[follower.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+  });
+
+  it("does not override direct-commanded companions when clearing stale player intent", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader", "fighter");
+    const directFollower = {
+      ...createCompanion("direct-follower", { x: 3, y: 2 }, leader.id, "support"),
+      commandPriority: "direct" as const,
+      state: "attack" as const,
+      currentTargetId: "personal-target",
+    };
+    const enemy = createEnemy("enemy", { x: 10, y: 10 });
+    const issuedState = issuePartyOrder(
+      createTestGameState({
+        entities: {
+          [leader.id]: leader,
+          [directFollower.id]: directFollower,
+          [enemy.id]: enemy,
+        },
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationDeltaMs: 100,
+      }),
+      {
+        type: "attack",
+        targetId: enemy.id,
+      },
+    );
+    const blockedState = {
+      ...issuedState,
+      entities: {
+        ...issuedState.entities,
+        [directFollower.id]: directFollower,
+      },
+      map: createBlockedTargetMap(enemy.position),
+    };
+
+    const nextState = updatePartyFormationSystem(blockedState);
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.entities[directFollower.id]).toMatchObject({
+      commandPriority: "direct",
+      state: "attack",
+      currentTargetId: "personal-target",
+    });
+  });
 });
+
+function createOpenTestMap(): GameMap {
+  return {
+    displayName: "Open Test Map",
+    debugName: "open-test-map",
+    columns: 20,
+    rows: 20,
+    walls: [],
+    teleports: [],
+    healingFountains: [],
+  };
+}
+
+function createBlockedTargetMap(blockedPosition: Position): GameMap {
+  return {
+    displayName: "Blocked Test Map",
+    debugName: "blocked-test-map",
+    columns: 20,
+    rows: 20,
+    walls: [
+      { x: blockedPosition.x - 1, y: blockedPosition.y },
+      { x: blockedPosition.x + 1, y: blockedPosition.y },
+      { x: blockedPosition.x, y: blockedPosition.y - 1 },
+      { x: blockedPosition.x, y: blockedPosition.y + 1 },
+    ],
+    teleports: [],
+    healingFountains: [],
+  };
+}
