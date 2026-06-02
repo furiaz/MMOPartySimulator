@@ -8,7 +8,9 @@ type NavigationSearchOptions = {
 };
 
 export function bakeNavigationGrid(map: GameMap): NavigationGrid {
-  const wallKeys = new Set(map.walls.map(getNavigationPositionKey));
+  const wallKeys = new Set(
+    [...map.walls, ...(map.collisionWalls ?? [])].map(getNavigationPositionKey),
+  );
   const cellsByKey: NavigationGrid["cellsByKey"] = {};
 
   for (let y = 0; y < map.rows; y += 1) {

@@ -977,13 +977,13 @@ type DebugMapQuestStates = Partial<Record<string, { status?: string }>>;
 
 export const SECURE_LANDING_PASSAGE_GATE_ID = "map-1-shore-fringe-passage-gate";
 export const SECURE_LANDING_PASSAGE_GATE_POSITION: Position = { x: 52, y: 29 };
-const SECURE_LANDING_PASSAGE_GATE_CLOSED_WALLS = createVerticalWall(52, 24, 34, []);
+const SECURE_LANDING_PASSAGE_GATE_COLLISION_WALLS = createVerticalWall(52, 24, 34, []);
 const SECURE_LANDING_PASSAGE_GATE_VISUAL: MapVisualObject = {
   id: SECURE_LANDING_PASSAGE_GATE_ID,
   visualId: "passage_gate_closed",
   position: SECURE_LANDING_PASSAGE_GATE_POSITION,
   widthCells: 100 / 32,
-  heightCells: 350 / 32,
+  heightCells: 525 / 32,
   anchorY: 0.5,
 };
 
@@ -1412,6 +1412,7 @@ export function createDebugMap(
 ): GameMap {
   const definition = debugMapDefinitions[mapId];
   const walls = getDebugMapWalls(definition, options);
+  const collisionWalls = getDebugMapCollisionWalls(definition, options);
   const visualObjects = getDebugMapVisualObjects(definition, options);
   const map = {
     id: definition.id,
@@ -1420,6 +1421,7 @@ export function createDebugMap(
     columns: definition.columns,
     rows: definition.rows,
     walls,
+    collisionWalls,
     teleports: definition.teleports,
     healingFountains: definition.healingFountains,
     visualObjects,
@@ -1457,16 +1459,20 @@ export function getDebugMapDefinition(mapId: DebugMapId) {
 
 function getDebugMapWalls(
   definition: (typeof debugMapDefinitions)[DebugMapId],
-  options: DebugMapCreationOptions,
+  _options: DebugMapCreationOptions,
 ): Position[] {
+  return definition.walls;
+}
+
+function getDebugMapCollisionWalls(
+  definition: (typeof debugMapDefinitions)[DebugMapId],
+  options: DebugMapCreationOptions,
+): Position[] | undefined {
   if (definition.id !== MAP_ONE_ID || options.secureLandingGateOpen) {
-    return definition.walls;
+    return undefined;
   }
 
-  return dedupeWalls([
-    ...definition.walls,
-    ...SECURE_LANDING_PASSAGE_GATE_CLOSED_WALLS,
-  ]);
+  return SECURE_LANDING_PASSAGE_GATE_COLLISION_WALLS;
 }
 
 function getDebugMapVisualObjects(

@@ -227,11 +227,15 @@ describe("debug maps", () => {
     expect(closedGate).toMatchObject({
       visualId: "passage_gate_closed",
       position: SECURE_LANDING_PASSAGE_GATE_POSITION,
+      heightCells: 525 / 32,
     });
     expect(openGate).toMatchObject({
       visualId: "passage_gate_open",
       position: SECURE_LANDING_PASSAGE_GATE_POSITION,
     });
+    expect(closedMap.walls).not.toContainEqual(SECURE_LANDING_PASSAGE_GATE_POSITION);
+    expect(closedMap.collisionWalls).toContainEqual(SECURE_LANDING_PASSAGE_GATE_POSITION);
+    expect(openMap.collisionWalls).toBeUndefined();
     expect(isNavigationCellWalkable(closedMap, SECURE_LANDING_PASSAGE_GATE_POSITION)).toBe(false);
     expect(isNavigationCellWalkable(openMap, SECURE_LANDING_PASSAGE_GATE_POSITION)).toBe(true);
     expect(getNavigationDistance(closedMap, { x: 50, y: 29 }, { x: 54, y: 29 }, 80)).toBeNull();

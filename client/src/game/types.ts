@@ -1404,6 +1404,7 @@ export type GameMap = {
   columns: number;
   rows: number;
   walls: Position[];
+  collisionWalls?: Position[];
   teleports: DebugTeleportPoint[];
   healingFountains: HealingFountain[];
   subzones?: ZoneSubzone[];

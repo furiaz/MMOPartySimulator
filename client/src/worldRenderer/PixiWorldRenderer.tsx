@@ -132,6 +132,11 @@ const skillFeedbackDisplayNames = new Set(
 
 type PixiRendererMode = "preview" | "full";
 
+type QuestInspectMarker = {
+  id: string;
+  position: Position;
+};
+
 type ViewportSize = {
   width: number;
   height: number;
@@ -161,6 +166,7 @@ type PixiWorldRendererProps = {
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   onResourceClick?: (resourceId: string) => void;
   partyIntent?: PartyIntent | null;
+  questInspectMarkers?: QuestInspectMarker[];
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
   questGiverHasWork?: boolean;
   showDebugOverlays?: boolean;
@@ -332,6 +338,7 @@ type DrawWorldOptions = {
   mode: PixiRendererMode;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
+  questInspectMarkers: QuestInspectMarker[];
   questGiverHasWork: boolean;
   requestRedraw?: () => void;
   renderSize: RenderSize;
@@ -1658,6 +1665,26 @@ function drawPoiRing(
   graphics
     .circle(center.x, center.y, radius + 5)
     .stroke({ color, alpha: 0.32, width: 2 });
+}
+
+function drawQuestInspectMarkers(
+  graphics: Graphics,
+  markers: QuestInspectMarker[],
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const marker of markers) {
+    if (!isPositionInTileBounds(marker.position, visibleTileBounds)) {
+      continue;
+    }
+
+    drawDottedCircle(
+      graphics,
+      toFullPosition(marker.position, transform),
+      transform.cellPixelSize * 0.82,
+      0xfacc15,
+    );
+  }
 }
 
 function drawDirectCompanionCommandIndicators(
@@ -4485,6 +4512,7 @@ function drawFullMap({
   managedState,
   onPerformanceSample,
   partyIntent,
+  questInspectMarkers,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -4514,6 +4542,7 @@ function drawFullMap({
   managedState: ManagedRendererState;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
+  questInspectMarkers: QuestInspectMarker[];
   questGiverHasWork: boolean;
   requestRedraw?: () => void;
   renderSize: RenderSize;
@@ -4639,6 +4668,12 @@ function drawFullMap({
     transform,
     visibleTileBounds,
   });
+  drawQuestInspectMarkers(
+    overlayGraphics,
+    questInspectMarkers,
+    transform,
+    visibleTileBounds,
+  );
   if (activeTeleport && isPositionInTileBounds(activeTeleport.position, visibleTileBounds)) {
     const activeTeleportPosition = toFullPosition(activeTeleport.position, transform);
     const pulseProgress = (currentTime % 900) / 900;
@@ -4818,6 +4853,7 @@ function drawWorld({
   onPerformanceSample,
   partyIntent,
   previewSignatureRef,
+  questInspectMarkers,
   questGiverHasWork,
   requestRedraw,
   renderSize,
@@ -4851,6 +4887,7 @@ function drawWorld({
       managedState,
       onPerformanceSample,
       partyIntent,
+      questInspectMarkers,
       questGiverHasWork,
       requestRedraw,
       renderSize,
@@ -4982,6 +5019,7 @@ export function PixiWorldRenderer({
   onPerformanceSample,
   onResourceClick,
   partyIntent = null,
+  questInspectMarkers = [],
   resurrectionProgressByCompanionId = {},
   questGiverHasWork = false,
   showDebugOverlays = false,
@@ -5016,6 +5054,7 @@ export function PixiWorldRenderer({
   const latestModeRef = useRef(mode);
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
+  const latestQuestInspectMarkersRef = useRef(questInspectMarkers);
   const latestQuestGiverHasWorkRef = useRef(questGiverHasWork);
   const latestRenderSizeRef = useRef(getRenderSize(mode, viewportSize));
   const latestViewportSizeRef = useRef(viewportSize);
@@ -5064,6 +5103,7 @@ export function PixiWorldRenderer({
     latestModeRef.current = mode;
     latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestPartyIntentRef.current = partyIntent;
+    latestQuestInspectMarkersRef.current = questInspectMarkers;
     latestQuestGiverHasWorkRef.current = questGiverHasWork;
     latestRenderSizeRef.current = renderSize;
     latestViewportSizeRef.current = viewportSize;
@@ -5090,6 +5130,7 @@ export function PixiWorldRenderer({
     mode,
     onPerformanceSample,
     partyIntent,
+    questInspectMarkers,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,
@@ -5218,6 +5259,7 @@ export function PixiWorldRenderer({
         mode: latestModeRef.current,
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
+        questInspectMarkers: latestQuestInspectMarkersRef.current,
         previewSignatureRef,
         questGiverHasWork: latestQuestGiverHasWorkRef.current,
         renderSize: latestRenderSizeRef.current,
@@ -5359,6 +5401,7 @@ export function PixiWorldRenderer({
       mode,
       onPerformanceSample,
       partyIntent,
+      questInspectMarkers,
       previewSignatureRef,
       questGiverHasWork,
       requestRedraw: requestLatestRedraw,
@@ -5410,6 +5453,7 @@ export function PixiWorldRenderer({
     mode,
     onPerformanceSample,
     partyIntent,
+    questInspectMarkers,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,

@@ -71,6 +71,7 @@ import {
   getEnemyArchetype,
   getEnemyType,
   getFilteredMerchantBuyStock,
+  getActiveQuest,
   getItemDefinition,
   getMerchantBuyStock,
   getMerchantSecondaryFilterOptions,
@@ -1990,6 +1991,26 @@ function App() {
       ? selectedQuestId
       : activeQuestIds[0] ?? null;
   const questGiverHasWork = hasQuestGiverWork(gameState);
+  const questInspectMarkers = useMemo(() => {
+    const activeQuest = getActiveQuest(gameState);
+
+    if (!activeQuest) {
+      return [];
+    }
+
+    return QUEST_DEFINITIONS[activeQuest.questId].objectives
+      .filter(
+        (objective) =>
+          objective.type === "inspect_poi" &&
+          objective.targetMapId === gameState.currentMapId &&
+          Boolean(objective.targetPosition) &&
+          !activeQuest.objectiveProgress[objective.id]?.completed,
+      )
+      .map((objective) => ({
+        id: `${activeQuest.questId}:${objective.id}`,
+        position: objective.targetPosition!,
+      }));
+  }, [gameState]);
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find(isActiveResource);
   const inventory = gameState.inventory;
@@ -3411,6 +3432,7 @@ function App() {
               onPerformanceSample={handleRendererPerformanceSample}
               onResourceClick={commandCompanionsToGatherResource}
               partyIntent={gameState.partyIntent}
+              questInspectMarkers={questInspectMarkers}
               questGiverHasWork={questGiverHasWork}
               resurrectionProgressByCompanionId={resurrectionProgressByCompanionId}
               showDebugOverlays={showEntityInfo}
