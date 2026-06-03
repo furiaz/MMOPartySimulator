@@ -10,10 +10,21 @@ import {
   WILDERNESS_MAP_TILE_SRC,
 } from "../assetIcons";
 import type {
+  ActiveTeleport,
   CombatFeedbackEvent,
+  DirectCompanionCommand,
+  DropVisualEvent,
+  EnemyAoeChannelState,
   GameEntity,
   GameMap,
+  LeaderIntent,
+  PartyIntent,
   Position,
+  ResurrectionProgressState,
+  SkillBindState,
+  SkillMarkState,
+  SkillShieldBlockState,
+  SkillVisualEvent,
 } from "../game";
 import {
   aoeTargetDummyId,
@@ -39,6 +50,8 @@ export const previewHeight = 144;
 export const previewPadding = 8;
 export const floorChunkCellSpan = 4;
 export const fullModeInteractionRadius = 1.5;
+export const MAX_RENDER_FPS = 60;
+export const MIN_RENDER_FRAME_MS = 1000 / MAX_RENDER_FPS;
 
 const wildernessMapIds = new Set(["map-1", "map-2", "map-3", "map-4"]);
 const aggressiveEnemyNameplateColor = 0xdc2626;
@@ -111,6 +124,144 @@ export type TileBounds = {
   maxY: number;
 };
 
+export type RendererFrameSchedulerOptions = {
+  cancelAnimationFrame: (frameId: number) => void;
+  draw: () => boolean;
+  getShouldContinueRedrawing?: () => boolean;
+  minFrameMs?: number;
+  now: () => number;
+  requestAnimationFrame: (callback: (nowMs: number) => void) => number;
+};
+
+export type RendererFrameScheduler = {
+  cancel: () => void;
+  getLastDrawAtMs: () => number | null;
+  hasPendingFrame: () => boolean;
+  requestImmediateRedraw: () => void;
+  requestRedraw: () => void;
+};
+
+export function createRendererFrameScheduler({
+  cancelAnimationFrame,
+  draw,
+  getShouldContinueRedrawing = () => false,
+  minFrameMs = MIN_RENDER_FRAME_MS,
+  now,
+  requestAnimationFrame,
+}: RendererFrameSchedulerOptions): RendererFrameScheduler {
+  let isCancelled = false;
+  let lastDrawAtMs: number | null = null;
+  let scheduledFrameId: number | null = null;
+
+  function clearScheduledFrame() {
+    if (scheduledFrameId === null) {
+      return;
+    }
+
+    cancelAnimationFrame(scheduledFrameId);
+    scheduledFrameId = null;
+  }
+
+  function requestRedraw() {
+    if (isCancelled || scheduledFrameId !== null) {
+      return;
+    }
+
+    scheduledFrameId = requestAnimationFrame(runScheduledFrame);
+  }
+
+  function runScheduledFrame(frameTimeMs: number) {
+    scheduledFrameId = null;
+
+    if (isCancelled) {
+      return;
+    }
+
+    const drawAtMs = Number.isFinite(frameTimeMs) ? frameTimeMs : now();
+
+    if (!isRendererFrameDue(drawAtMs, lastDrawAtMs, minFrameMs)) {
+      requestRedraw();
+      return;
+    }
+
+    runDraw(drawAtMs);
+  }
+
+  function runDraw(drawAtMs: number) {
+    if (isCancelled) {
+      return;
+    }
+
+    const didDraw = draw();
+
+    if (didDraw) {
+      lastDrawAtMs = getAdvancedRendererDrawTime(drawAtMs, lastDrawAtMs, minFrameMs);
+    }
+
+    if (getShouldContinueRedrawing()) {
+      requestRedraw();
+    }
+  }
+
+  return {
+    cancel() {
+      isCancelled = true;
+      clearScheduledFrame();
+    },
+    getLastDrawAtMs() {
+      return lastDrawAtMs;
+    },
+    hasPendingFrame() {
+      return scheduledFrameId !== null;
+    },
+    requestImmediateRedraw() {
+      clearScheduledFrame();
+      runDraw(now());
+    },
+    requestRedraw,
+  };
+}
+
+export function isRendererFrameDue(
+  nowMs: number,
+  lastDrawAtMs: number | null,
+  minFrameMs = MIN_RENDER_FRAME_MS,
+): boolean {
+  if (lastDrawAtMs === null || !Number.isFinite(lastDrawAtMs)) {
+    return true;
+  }
+
+  if (!Number.isFinite(nowMs) || !Number.isFinite(minFrameMs) || minFrameMs <= 0) {
+    return true;
+  }
+
+  return nowMs - lastDrawAtMs >= minFrameMs;
+}
+
+export function getAdvancedRendererDrawTime(
+  nowMs: number,
+  lastDrawAtMs: number | null,
+  minFrameMs = MIN_RENDER_FRAME_MS,
+): number {
+  if (
+    lastDrawAtMs === null ||
+    !Number.isFinite(lastDrawAtMs) ||
+    !Number.isFinite(nowMs) ||
+    !Number.isFinite(minFrameMs) ||
+    minFrameMs <= 0
+  ) {
+    return nowMs;
+  }
+
+  const elapsedMs = nowMs - lastDrawAtMs;
+
+  if (elapsedMs < minFrameMs) {
+    return lastDrawAtMs;
+  }
+
+  return lastDrawAtMs + Math.floor(elapsedMs / minFrameMs) * minFrameMs;
+}
+
 export type PreviewTransform = {
   scale: number;
   xOffset: number;
@@ -127,6 +278,50 @@ export type ClientBounds = Pick<DOMRect, "left" | "top" | "width" | "height">;
 export type ViewportSize = {
   width: number;
   height: number;
+};
+
+export type QuestInspectMarker = {
+  id: string;
+  position: Position;
+};
+
+export type FullRenderVisualMovement = {
+  direction: SpriteDirection;
+  angleDegrees?: number;
+  expiresAt: number;
+};
+
+export type FullRenderSignatureInput = {
+  activeTeleport: ActiveTeleport | null;
+  cameraOffset: Position;
+  cellPixelSize: number;
+  combatFeedbackEvents: CombatFeedbackEvent[];
+  directCompanionCommandsById: Record<string, DirectCompanionCommand>;
+  dropVisualEvents: DropVisualEvent[];
+  enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
+  entities: GameEntity[];
+  leaderIntent: LeaderIntent | null;
+  map: GameMap;
+  partyIntent: PartyIntent | null;
+  questGiverHasWork: boolean;
+  questInspectMarkers: QuestInspectMarker[];
+  renderSize: RenderSize;
+  resurrectionProgressByCompanionId: Record<string, ResurrectionProgressState>;
+  showDebugOverlays: boolean;
+  skillBindsByEnemyId: Record<string, SkillBindState>;
+  skillMarksByEnemyId: Record<string, SkillMarkState>;
+  skillShieldBlocksById: Record<string, SkillShieldBlockState>;
+  skillVisualEvents: SkillVisualEvent[];
+  teleportWorkingById: Record<string, boolean>;
+  visualMovementByEntityId: Record<string, FullRenderVisualMovement>;
+};
+
+export type StableRendererFrameSkipInput = {
+  hadTimedWork: boolean;
+  hasTimedWork: boolean;
+  lastDrawnTextureRevision: number | null;
+  signatureUnchanged: boolean;
+  textureRevision: number;
 };
 
 export function isStaticMapSpriteKey(key: string): boolean {
@@ -664,6 +859,379 @@ export function getPreviewRenderSignature({
     viewportSize?.width ?? "",
     viewportSize?.height ?? "",
   ].join("|");
+}
+
+export function shouldSkipStableRendererFrame({
+  hadTimedWork,
+  hasTimedWork,
+  lastDrawnTextureRevision,
+  signatureUnchanged,
+  textureRevision,
+}: StableRendererFrameSkipInput): boolean {
+  return (
+    signatureUnchanged &&
+    !hasTimedWork &&
+    !hadTimedWork &&
+    lastDrawnTextureRevision === textureRevision
+  );
+}
+
+export function getFullRenderSignature({
+  activeTeleport,
+  cameraOffset,
+  cellPixelSize,
+  combatFeedbackEvents,
+  directCompanionCommandsById,
+  dropVisualEvents,
+  enemyAoeChannelsByCasterId,
+  entities,
+  leaderIntent,
+  map,
+  partyIntent,
+  questGiverHasWork,
+  questInspectMarkers,
+  renderSize,
+  resurrectionProgressByCompanionId,
+  showDebugOverlays,
+  skillBindsByEnemyId,
+  skillMarksByEnemyId,
+  skillShieldBlocksById,
+  skillVisualEvents,
+  teleportWorkingById,
+  visualMovementByEntityId,
+}: FullRenderSignatureInput): string {
+  const visibleTileBounds = getFullVisibleTileBounds({
+    cameraOffset,
+    cellPixelSize,
+    map,
+    renderSize,
+  });
+  const visibleEntitySignature = entities
+    .filter(
+      (entity) =>
+        shouldRenderEntity(entity) &&
+        isPositionInTileBounds(entity.position, visibleTileBounds),
+    )
+    .map(getFullRenderEntitySignature)
+    .sort()
+    .join(";");
+
+  return [
+    map.id ?? "",
+    map.debugName,
+    map.columns,
+    map.rows,
+    map.visualTheme ?? "",
+    map.walls.length,
+    map.floorCells?.length ?? 0,
+    getMapObjectSignature(map),
+    getTileBoundsSignature(visibleTileBounds),
+    getPositionSignature(cameraOffset),
+    cellPixelSize,
+    renderSize.width,
+    renderSize.height,
+    visibleEntitySignature,
+    getIntentSignature(leaderIntent),
+    getPartyRenderSignature(partyIntent),
+    getActiveTeleportSignature(activeTeleport),
+    getRecordSignature(teleportWorkingById, (_, isWorking) =>
+      isWorking ? "1" : "0",
+    ),
+    getEventSignature(combatFeedbackEvents, getCombatFeedbackSignature),
+    getEventSignature(dropVisualEvents, getDropVisualSignature),
+    getRecordSignature(enemyAoeChannelsByCasterId, getEnemyAoeChannelSignature),
+    getEventSignature(skillVisualEvents, getSkillVisualSignature),
+    getRecordSignature(skillBindsByEnemyId, getSkillBindSignature),
+    getRecordSignature(skillMarksByEnemyId, getSkillMarkSignature),
+    getRecordSignature(skillShieldBlocksById, getSkillShieldBlockSignature),
+    getRecordSignature(
+      resurrectionProgressByCompanionId,
+      getResurrectionProgressSignature,
+    ),
+    getEventSignature(questInspectMarkers, getQuestInspectMarkerSignature),
+    questGiverHasWork ? "quest-work" : "quest-idle",
+    showDebugOverlays ? "debug-on" : "debug-off",
+    showDebugOverlays
+      ? getRecordSignature(directCompanionCommandsById, getDirectCommandSignature)
+      : "",
+    getRecordSignature(visualMovementByEntityId, getVisualMovementSignature),
+    collectCurrentMapScopedVisualTextureSrcs(map, entities).join(";"),
+  ].join("|");
+}
+
+function getFullRenderEntitySignature(entity: GameEntity): string {
+  const baseSignature = [
+    entity.id,
+    entity.kind,
+    entity.state,
+    getPositionSignature(entity.position),
+  ];
+
+  if (entity.kind === "companion") {
+    return [
+      ...baseSignature,
+      entity.classId,
+      entity.role,
+      entity.commandPriority,
+      entity.health,
+      entity.maxHealth,
+      entity.currentTargetId ?? "",
+      getPositionSignature(entity.defendPosition),
+    ].join(":");
+  }
+
+  if (entity.kind === "enemy") {
+    return [
+      ...baseSignature,
+      entity.aggressionMode,
+      entity.archetypeId ?? "",
+      entity.enemyTypeId ?? "",
+      entity.variant ?? "",
+      entity.isTargetDummy ? "dummy" : "",
+      entity.health,
+      entity.maxHealth,
+      entity.currentTargetId ?? "",
+      entity.level,
+      entity.defeatedAtMs ?? "",
+      entity.attackWindupStartedAt ?? "",
+      entity.attackWindupDurationMs ?? "",
+      entity.attackWindupTargetId ?? "",
+    ].join(":");
+  }
+
+  if (entity.kind === "resource") {
+    return [
+      ...baseSignature,
+      entity.resourceType,
+      entity.tier,
+      entity.durability,
+      entity.maxDurability,
+      entity.quantity,
+      entity.isDepleted ? "depleted" : "active",
+    ].join(":");
+  }
+
+  return [...baseSignature, entity.displayName, entity.npcRole].join(":");
+}
+
+function getMapObjectSignature(map: GameMap): string {
+  return [
+    map.teleports
+      .map(
+        (teleport) =>
+          `${teleport.id}:${teleport.targetMapId}:${getPositionSignature(
+            teleport.position,
+          )}:${teleport.range}:${teleport.visualTheme ?? ""}`,
+      )
+      .sort()
+      .join(";"),
+    map.healingFountains
+      .map(
+        (fountain) =>
+          `${fountain.id}:${getPositionSignature(fountain.position)}:${fountain.range}`,
+      )
+      .sort()
+      .join(";"),
+    (map.visualObjects ?? [])
+      .map(
+        (visualObject) =>
+          `${visualObject.id}:${visualObject.visualId}:${getPositionSignature(
+            visualObject.position,
+          )}:${visualObject.widthCells}:${visualObject.heightCells}`,
+      )
+      .sort()
+      .join(";"),
+    (map.waypoints ?? [])
+      .map(
+        (waypoint) =>
+          `${waypoint.id}:${getPositionSignature(waypoint.position)}`,
+      )
+      .sort()
+      .join(";"),
+  ].join("|");
+}
+
+function getTileBoundsSignature(bounds: TileBounds): string {
+  return `${bounds.minX},${bounds.maxX},${bounds.minY},${bounds.maxY}`;
+}
+
+function getPositionSignature(position: Position | null | undefined): string {
+  return position ? `${formatNumber(position.x)},${formatNumber(position.y)}` : "";
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? value.toString() : value.toFixed(3);
+}
+
+function getIntentSignature(intent: LeaderIntent | null): string {
+  return intent
+    ? `${intent.type}:${intent.source ?? ""}:${intent.targetId ?? ""}:${getPositionSignature(
+        intent.targetPosition,
+      )}`
+    : "";
+}
+
+function getPartyRenderSignature(partyIntent: PartyIntent | null): string {
+  if (!partyIntent) {
+    return "";
+  }
+
+  const recoveryThreatEnemyIds = Array.isArray(
+    partyIntent.recoveryIntent?.threatEnemyIds,
+  )
+    ? partyIntent.recoveryIntent.threatEnemyIds
+    : [];
+
+  return [
+    partyIntent.mode,
+    partyIntent.source,
+    getIntentSignature(partyIntent.executionIntent),
+    partyIntent.recoveryIntent
+      ? `${partyIntent.recoveryIntent.action}:${partyIntent.recoveryIntent.deadCompanionId}:${recoveryThreatEnemyIds.join(",")}`
+      : "",
+  ].join(":");
+}
+
+function getActiveTeleportSignature(activeTeleport: ActiveTeleport | null): string {
+  return activeTeleport
+    ? `${activeTeleport.id}:${getPositionSignature(activeTeleport.position)}:${
+        activeTeleport.range
+      }:${activeTeleport.sourceMapId}:${activeTeleport.targetMapId}:${
+        activeTeleport.triggeredBy
+      }`
+    : "";
+}
+
+function getRecordSignature<T>(
+  record: Record<string, T> | null | undefined,
+  getValueSignature: (key: string, value: T) => string,
+): string {
+  return Object.entries(record ?? {})
+    .filter((entry): entry is [string, T] => entry[1] !== null && entry[1] !== undefined)
+    .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey))
+    .map(([key, value]) => `${key}:${getValueSignature(key, value)}`)
+    .join(";");
+}
+
+function getEventSignature<T extends { id: string }>(
+  events: T[] | null | undefined,
+  getValueSignature: (event: T) => string,
+): string {
+  return (events ?? [])
+    .filter((event): event is T => Boolean(event?.id))
+    .map((event) => `${event.id}:${getValueSignature(event)}`)
+    .sort()
+    .join(";");
+}
+
+function getCombatFeedbackSignature(event: CombatFeedbackEvent): string {
+  return [
+    event.type,
+    event.feedbackKind ?? "",
+    event.entityId,
+    event.sourceEntityId ?? "",
+    event.targetEntityId ?? "",
+    event.text,
+    event.amount ?? "",
+    event.createdAt,
+    event.expiresAt,
+  ].join(":");
+}
+
+function getDropVisualSignature(event: DropVisualEvent): string {
+  return [
+    event.kind ?? "",
+    event.enemyId,
+    event.itemId ?? "",
+    event.displayName ?? "",
+    event.iconRole ?? "",
+    event.quantity,
+    getPositionSignature(event.position),
+    event.createdAt,
+    event.expiresAt,
+    event.currentMapId ?? "",
+  ].join(":");
+}
+
+function getEnemyAoeChannelSignature(
+  _casterId: string,
+  channel: EnemyAoeChannelState,
+): string {
+  return [
+    channel.id,
+    channel.abilityId,
+    channel.phase,
+    getPositionSignature(channel.shape.center),
+    channel.shape.radius,
+    channel.startedAt,
+    channel.channelEndsAt,
+    channel.windupEndsAt,
+  ].join(":");
+}
+
+function getSkillVisualSignature(event: SkillVisualEvent): string {
+  return [
+    event.type,
+    event.skillId ?? "",
+    event.sourceId,
+    event.targetId ?? "",
+    getPositionSignature(event.position),
+    event.createdAt,
+    event.expiresAt,
+  ].join(":");
+}
+
+function getSkillBindSignature(_enemyId: string, bind: SkillBindState): string {
+  return `${bind.sourceId}:${bind.targetId}:${bind.expiresAt}`;
+}
+
+function getSkillMarkSignature(_enemyId: string, mark: SkillMarkState): string {
+  return `${mark.sourceId}:${mark.targetId}:${mark.bonusDamage}:${mark.expiresAt}`;
+}
+
+function getSkillShieldBlockSignature(
+  _shieldId: string,
+  shield: SkillShieldBlockState,
+): string {
+  return [
+    shield.ownerId,
+    getPositionSignature(shield.position),
+    shield.rotationRadians,
+    shield.expiresAt,
+    shield.remainingBlocks,
+    shield.blockedDamageTypes?.join(",") ?? "",
+  ].join(":");
+}
+
+function getResurrectionProgressSignature(
+  _companionId: string,
+  progress: ResurrectionProgressState,
+): string {
+  return `${progress.companionId}:${progress.progressMs}:${progress.requiredMs}`;
+}
+
+function getQuestInspectMarkerSignature(marker: QuestInspectMarker): string {
+  return getPositionSignature(marker.position);
+}
+
+function getDirectCommandSignature(
+  _companionId: string,
+  command: DirectCompanionCommand,
+): string {
+  return [
+    command.type,
+    command.companionId,
+    command.type === "move" ? "" : command.targetId,
+    getPositionSignature(command.targetPosition),
+    command.issuedAt,
+  ].join(":");
+}
+
+function getVisualMovementSignature(
+  _entityId: string,
+  movement: FullRenderVisualMovement,
+): string {
+  return `${movement.direction}:${movement.angleDegrees ?? ""}:${movement.expiresAt}`;
 }
 
 export function getNearestInteractableEntity({

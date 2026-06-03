@@ -1,14 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CombatFeedbackEvent, GameMap } from "../game";
 import { createCompanion, createEnemy, createNpc, createResource, createTargetDummy } from "../game";
 import {
   collectCurrentMapScopedVisualTextureSrcs,
   collectDurableVisualTextureSrcs,
+  createRendererFrameScheduler,
   enemySpottedAlertSrc,
   getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
   getEnemyNameplateColor,
   getEnemyNameplateText,
+  getFullRenderSignature,
   getFullVisibleTileBounds,
   getHealingFountainRenderDiameterPx,
   getLevelUpBurstPresentation,
@@ -17,13 +19,17 @@ import {
   getPreviewMapPosition,
   getPreviewRenderSignature,
   getTeleportIconSrc,
+  MAX_RENDER_FPS,
+  MIN_RENDER_FRAME_MS,
   isPositionInTileBounds,
   isStaticMapSpriteKey,
   levelUpBurstSrc,
   shouldDrawCombatFeedbackEvent,
+  shouldSkipStableRendererFrame,
   TELEPORT_OBJECT_SPRITE_ANCHOR_X,
   TELEPORT_OBJECT_SPRITE_ANCHOR_Y,
   TELEPORT_OBJECT_SPRITE_SIZE_PX,
+  type FullRenderSignatureInput,
 } from "./PixiWorldRendererHelpers";
 import { MAP_OBJECT_ICON_SRC, MAP_VISUAL_OBJECT_SRC } from "../assetIcons";
 
@@ -155,6 +161,332 @@ describe("getPreviewRenderSignature", () => {
       getPreviewRenderSignature({
         ...baseInput,
         cellPixelSize: 16,
+      }),
+    ).not.toBe(baseSignature);
+  });
+});
+
+describe("shouldSkipStableRendererFrame", () => {
+  it("skips stable frames only when signature, timed work, and texture revision are unchanged", () => {
+    expect(
+      shouldSkipStableRendererFrame({
+        hadTimedWork: false,
+        hasTimedWork: false,
+        lastDrawnTextureRevision: 7,
+        signatureUnchanged: true,
+        textureRevision: 7,
+      }),
+    ).toBe(true);
+  });
+
+  it("draws when a texture revision changes even if the visual signature is stable", () => {
+    expect(
+      shouldSkipStableRendererFrame({
+        hadTimedWork: false,
+        hasTimedWork: false,
+        lastDrawnTextureRevision: 7,
+        signatureUnchanged: true,
+        textureRevision: 8,
+      }),
+    ).toBe(false);
+  });
+
+  it("draws a final frame after timed renderer work ends", () => {
+    expect(
+      shouldSkipStableRendererFrame({
+        hadTimedWork: true,
+        hasTimedWork: false,
+        lastDrawnTextureRevision: 7,
+        signatureUnchanged: true,
+        textureRevision: 7,
+      }),
+    ).toBe(false);
+  });
+});
+
+function createRendererSchedulerHarness({
+  draw = vi.fn(() => true),
+  getShouldContinueRedrawing = vi.fn(() => false),
+}: {
+  draw?: () => boolean;
+  getShouldContinueRedrawing?: () => boolean;
+} = {}) {
+  let nowMs = 0;
+  let nextFrameId = 1;
+  const frameCallbacks = new Map<number, (nowMs: number) => void>();
+  const cancelAnimationFrame = vi.fn((frameId: number) => {
+    frameCallbacks.delete(frameId);
+  });
+  const requestAnimationFrame = vi.fn((callback: (frameTimeMs: number) => void) => {
+    const frameId = nextFrameId;
+    nextFrameId += 1;
+    frameCallbacks.set(frameId, callback);
+    return frameId;
+  });
+  const scheduler = createRendererFrameScheduler({
+    cancelAnimationFrame,
+    draw,
+    getShouldContinueRedrawing,
+    now: () => nowMs,
+    requestAnimationFrame,
+  });
+
+  function runNextFrame(frameTimeMs: number) {
+    nowMs = frameTimeMs;
+    const nextFrame = frameCallbacks.entries().next().value;
+
+    if (!nextFrame) {
+      return false;
+    }
+
+    const [frameId, callback] = nextFrame;
+    frameCallbacks.delete(frameId);
+    callback(frameTimeMs);
+    return true;
+  }
+
+  return {
+    cancelAnimationFrame,
+    frameCallbacks,
+    requestAnimationFrame,
+    runNextFrame,
+    scheduler,
+    setNow(frameTimeMs: number) {
+      nowMs = frameTimeMs;
+    },
+  };
+}
+
+describe("createRendererFrameScheduler", () => {
+  it("coalesces multiple redraw requests into one pending frame", () => {
+    const draw = vi.fn(() => true);
+    const { frameCallbacks, runNextFrame, scheduler } = createRendererSchedulerHarness({
+      draw,
+    });
+
+    scheduler.requestRedraw();
+    scheduler.requestRedraw();
+    scheduler.requestRedraw();
+
+    expect(frameCallbacks.size).toBe(1);
+
+    runNextFrame(0);
+
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect(frameCallbacks.size).toBe(0);
+  });
+
+  it("caps 120 Hz redraw requests to about 60 actual draws per second", () => {
+    const draw = vi.fn(() => true);
+    const { runNextFrame, scheduler } = createRendererSchedulerHarness({ draw });
+    const frameMs = 1000 / 120;
+
+    for (let frame = 1; frame <= 120; frame += 1) {
+      scheduler.requestRedraw();
+      runNextFrame(frame * frameMs);
+    }
+
+    expect(draw).toHaveBeenCalledTimes(MAX_RENDER_FPS);
+    expect(scheduler.getLastDrawAtMs()).toBeCloseTo(1000 - frameMs, 4);
+  });
+
+  it("does not throttle a later texture-ready draw after an idle skipped frame", () => {
+    const draw = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const { runNextFrame, scheduler } = createRendererSchedulerHarness({ draw });
+
+    scheduler.requestRedraw();
+    runNextFrame(0);
+    scheduler.requestRedraw();
+    runNextFrame(1);
+
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(scheduler.getLastDrawAtMs()).toBe(1);
+  });
+
+  it("continues timed renderer work at capped cadence and allows a final draw", () => {
+    const draw = vi.fn(() => true);
+    const getShouldContinueRedrawing = vi
+      .fn()
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+    const { frameCallbacks, runNextFrame, scheduler } = createRendererSchedulerHarness({
+      draw,
+      getShouldContinueRedrawing,
+    });
+
+    scheduler.requestImmediateRedraw();
+
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect(frameCallbacks.size).toBe(1);
+
+    runNextFrame(MIN_RENDER_FRAME_MS / 2);
+
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect(frameCallbacks.size).toBe(1);
+
+    runNextFrame(MIN_RENDER_FRAME_MS);
+
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(frameCallbacks.size).toBe(0);
+  });
+
+  it("cancels pending redraws and ignores later requests after cleanup", () => {
+    const draw = vi.fn(() => true);
+    const { cancelAnimationFrame, frameCallbacks, runNextFrame, scheduler } =
+      createRendererSchedulerHarness({ draw });
+
+    scheduler.requestRedraw();
+
+    expect(frameCallbacks.size).toBe(1);
+
+    scheduler.cancel();
+
+    expect(cancelAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(frameCallbacks.size).toBe(0);
+
+    scheduler.requestRedraw();
+
+    expect(frameCallbacks.size).toBe(0);
+    expect(runNextFrame(MIN_RENDER_FRAME_MS)).toBe(false);
+    expect(draw).not.toHaveBeenCalled();
+  });
+});
+
+function createFullRenderSignatureInput(
+  overrides: Partial<FullRenderSignatureInput> = {},
+): FullRenderSignatureInput {
+  const companion = createCompanion("companion", { x: 4, y: 4 }, "companion");
+
+  return {
+    activeTeleport: null,
+    cameraOffset: { x: 0, y: 0 },
+    cellPixelSize: 32,
+    combatFeedbackEvents: [],
+    directCompanionCommandsById: {},
+    dropVisualEvents: [],
+    enemyAoeChannelsByCasterId: {},
+    entities: [companion],
+    leaderIntent: null,
+    map: createWideMap(),
+    partyIntent: null,
+    questGiverHasWork: false,
+    questInspectMarkers: [],
+    renderSize: { width: 320, height: 180 },
+    resurrectionProgressByCompanionId: {},
+    showDebugOverlays: false,
+    skillBindsByEnemyId: {},
+    skillMarksByEnemyId: {},
+    skillShieldBlocksById: {},
+    skillVisualEvents: [],
+    teleportWorkingById: {},
+    visualMovementByEntityId: {},
+    ...overrides,
+  };
+}
+
+describe("getFullRenderSignature", () => {
+  it("stays stable across non-visual simulation ticks", () => {
+    const input = createFullRenderSignatureInput();
+    const baseSignature = getFullRenderSignature(input);
+
+    expect(
+      getFullRenderSignature({
+        ...input,
+        entities: input.entities.map((entity) => ({ ...entity })),
+      }),
+    ).toBe(baseSignature);
+  });
+
+  it("tolerates legacy recovery intent objects without threat enemy ids", () => {
+    const input = createFullRenderSignatureInput({
+      partyIntent: {
+        executionIntent: null,
+        globalPoiIntent: null,
+        lastPoiDecision: undefined,
+        localPoiTarget: null,
+        mode: "resurrect",
+        recoveryIntent: {
+          action: "resurrect",
+          deadCompanionId: "companion",
+        },
+        source: "ai",
+        worldTravelTargetMapId: null,
+      } as FullRenderSignatureInput["partyIntent"],
+    });
+
+    expect(() => getFullRenderSignature(input)).not.toThrow();
+  });
+
+  it("changes when full-render visible inputs change", () => {
+    const input = createFullRenderSignatureInput();
+    const companion = input.entities[0];
+    const baseSignature = getFullRenderSignature(input);
+    expect(companion?.kind).toBe("companion");
+
+    if (companion?.kind !== "companion") {
+      throw new Error("Expected companion test entity");
+    }
+
+    expect(
+      getFullRenderSignature({
+        ...input,
+        entities: [
+          {
+            ...companion,
+            position: { x: companion.position.x + 1, y: companion.position.y },
+          },
+        ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        entities: [
+          {
+            ...companion,
+            health: companion.health - 1,
+          },
+        ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        cameraOffset: { x: 32, y: 0 },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        renderSize: { width: 640, height: 360 },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        skillVisualEvents: [
+          {
+            createdAt: 1000,
+            expiresAt: 1500,
+            id: "skill-visual",
+            sourceId: companion.id,
+            type: "slash",
+          },
+        ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        showDebugOverlays: true,
+        directCompanionCommandsById: {
+          [companion.id]: {
+            companionId: companion.id,
+            issuedAt: 1000,
+            targetPosition: { x: 8, y: 4 },
+            type: "move",
+          },
+        },
       }),
     ).not.toBe(baseSignature);
   });

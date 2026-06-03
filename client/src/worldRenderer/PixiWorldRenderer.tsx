@@ -66,8 +66,11 @@ import {
   type SpriteVisualAsset,
 } from "../visualAssets";
 import {
+  createRendererFrameScheduler,
+  getFullRenderSignature,
   getPreviewRenderSignature,
   isStaticMapSpriteKey,
+  shouldSkipStableRendererFrame,
   type PixiRendererPerformanceSample,
 } from "./PixiWorldRendererHelpers";
 
@@ -246,6 +249,7 @@ type TextureCache = {
   pendingSrcs: Set<string>;
   recentMapIds: string[];
   stalePendingTextureCount: number;
+  textureRevision: number;
   textures: Map<string, Texture>;
   unloadFailedTextureCount: number;
 };
@@ -350,6 +354,9 @@ type DrawWorldOptions = {
   skillVisualEvents: SkillVisualEvent[];
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
+  fullHadTimedWorkRef: { current: boolean };
+  fullSignatureRef: { current: string | null };
+  lastDrawnTextureRevisionRef: { current: number | null };
   previewSignatureRef: { current: string | null };
   viewportSize?: ViewportSize;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
@@ -395,9 +402,14 @@ function createTextureCache(): TextureCache {
     pendingSrcs: new Set<string>(),
     recentMapIds: [],
     stalePendingTextureCount: 0,
+    textureRevision: 0,
     textures: new Map<string, Texture>(),
     unloadFailedTextureCount: 0,
   };
+}
+
+function bumpTextureRevision(cache: TextureCache) {
+  cache.textureRevision += 1;
 }
 
 function clearLayer(layer: Container) {
@@ -605,12 +617,14 @@ function requestTexture(
         unloadTextureSrc(cache, src);
       }
 
+      bumpTextureRevision(cache);
       requestRedraw?.();
     })
     .catch(() => {
       cache.pendingSrcs.delete(src);
       cache.pendingRequests.delete(src);
       cache.failedSrcs.add(src);
+      bumpTextureRevision(cache);
       requestRedraw?.();
     });
 
@@ -623,7 +637,12 @@ function registerTextureScope(
   scope: TextureRequestScope,
 ) {
   if (scope.durable) {
+    const durableSize = cache.durableTextureSrcs.size;
     cache.durableTextureSrcs.add(src);
+
+    if (cache.durableTextureSrcs.size !== durableSize) {
+      bumpTextureRevision(cache);
+    }
   }
 
   if (scope.mapId) {
@@ -632,9 +651,15 @@ function registerTextureScope(
     if (!mapSources) {
       mapSources = new Set<string>();
       cache.mapTextureSrcsByMapId.set(scope.mapId, mapSources);
+      bumpTextureRevision(cache);
     }
 
+    const mapSourceSize = mapSources.size;
     mapSources.add(src);
+
+    if (mapSources.size !== mapSourceSize) {
+      bumpTextureRevision(cache);
+    }
   }
 }
 
@@ -860,7 +885,7 @@ function preloadCurrentMapVisualTextures({
     .filter((src) => !durableSources.has(src));
 
   cache.currentMapId = mapId;
-  cache.mapTextureSrcsByMapId.set(mapId, new Set(mapScopedSources));
+  replaceMapScopedTextureSources(cache, mapId, mapScopedSources);
   cache.recentMapIds = [mapId];
 
   evictOldMapTextures(cache);
@@ -875,9 +900,43 @@ function preloadCurrentMapVisualTextures({
   }
 }
 
+function replaceMapScopedTextureSources(
+  cache: TextureCache,
+  mapId: string,
+  sources: string[],
+) {
+  const currentSources = cache.mapTextureSrcsByMapId.get(mapId);
+  const nextSources = new Set(sources);
+
+  if (areTextureSourceSetsEqual(currentSources, nextSources)) {
+    return;
+  }
+
+  cache.mapTextureSrcsByMapId.set(mapId, nextSources);
+  bumpTextureRevision(cache);
+}
+
+function areTextureSourceSetsEqual(
+  firstSources: Set<string> | undefined,
+  secondSources: Set<string>,
+): boolean {
+  if (!firstSources || firstSources.size !== secondSources.size) {
+    return false;
+  }
+
+  for (const src of firstSources) {
+    if (!secondSources.has(src)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function evictOldMapTextures(cache: TextureCache) {
   const keptMapIds = new Set(cache.currentMapId ? [cache.currentMapId] : []);
   const keptSrcs = new Set<string>();
+  let didEvict = false;
 
   for (const mapId of keptMapIds) {
     for (const src of cache.mapTextureSrcsByMapId.get(mapId) ?? []) {
@@ -901,10 +960,16 @@ function evictOldMapTextures(cache: TextureCache) {
 
       cache.textures.delete(src);
       cache.evictedTextureCount += 1;
+      didEvict = true;
       unloadTextureSrc(cache, src);
     }
 
     cache.mapTextureSrcsByMapId.delete(mapId);
+    didEvict = true;
+  }
+
+  if (didEvict) {
+    bumpTextureRevision(cache);
   }
 }
 
@@ -4852,6 +4917,9 @@ function drawWorld({
   mode,
   onPerformanceSample,
   partyIntent,
+  fullHadTimedWorkRef,
+  fullSignatureRef,
+  lastDrawnTextureRevisionRef,
   previewSignatureRef,
   questInspectMarkers,
   questGiverHasWork,
@@ -4870,6 +4938,62 @@ function drawWorld({
 }: DrawWorldOptions): boolean {
   if (mode === "full") {
     previewSignatureRef.current = null;
+    const hasTimedWork = hasActiveTimedRendererWork({
+      activeTeleport,
+      combatFeedbackEvents,
+      currentTime,
+      dropVisualEvents,
+      enemyAoeChannelsByCasterId,
+      entities,
+      mode,
+      skillBindsByEnemyId,
+      skillMarksByEnemyId,
+      skillShieldBlocksById,
+      skillVisualEvents,
+      visualMovementByEntityId,
+    });
+    const fullSignature = getFullRenderSignature({
+      activeTeleport,
+      cameraOffset,
+      cellPixelSize,
+      combatFeedbackEvents,
+      directCompanionCommandsById,
+      dropVisualEvents,
+      enemyAoeChannelsByCasterId,
+      entities,
+      leaderIntent,
+      map,
+      partyIntent,
+      questGiverHasWork,
+      questInspectMarkers,
+      renderSize,
+      resurrectionProgressByCompanionId,
+      showDebugOverlays,
+      skillBindsByEnemyId,
+      skillMarksByEnemyId,
+      skillShieldBlocksById,
+      skillVisualEvents,
+      teleportWorkingById,
+      visualMovementByEntityId,
+    });
+
+    const textureRevision = textureCache.textureRevision;
+
+    if (
+      shouldSkipStableRendererFrame({
+        hadTimedWork: fullHadTimedWorkRef.current,
+        hasTimedWork,
+        lastDrawnTextureRevision: lastDrawnTextureRevisionRef.current,
+        signatureUnchanged: fullSignatureRef.current === fullSignature,
+        textureRevision,
+      })
+    ) {
+      return false;
+    }
+
+    fullSignatureRef.current = fullSignature;
+    fullHadTimedWorkRef.current = hasTimedWork;
+    lastDrawnTextureRevisionRef.current = textureRevision;
     drawFullMap({
       activeTeleport,
       cameraOffset,
@@ -4904,6 +5028,8 @@ function drawWorld({
     return true;
   }
 
+  fullHadTimedWorkRef.current = false;
+  fullSignatureRef.current = null;
   const previewSignature = getPreviewRenderSignature({
     cameraOffset,
     cellPixelSize,
@@ -4912,11 +5038,22 @@ function drawWorld({
     viewportSize,
   });
 
-  if (previewSignatureRef.current === previewSignature) {
+  const textureRevision = textureCache.textureRevision;
+
+  if (
+    shouldSkipStableRendererFrame({
+      hadTimedWork: false,
+      hasTimedWork: false,
+      lastDrawnTextureRevision: lastDrawnTextureRevisionRef.current,
+      signatureUnchanged: previewSignatureRef.current === previewSignature,
+      textureRevision,
+    })
+  ) {
     return false;
   }
 
   previewSignatureRef.current = previewSignature;
+  lastDrawnTextureRevisionRef.current = textureRevision;
   clearLayers(layers);
   resetManagedRendererState(managedState);
   const renderStartedAt = performance.now();
@@ -5038,6 +5175,9 @@ export function PixiWorldRenderer({
   const requestRedrawRef = useRef<() => void>(() => {});
   const textureCacheRef = useRef(createTextureCache());
   const managedStateRef = useRef(createManagedRendererState());
+  const fullHadTimedWorkRef = useRef(false);
+  const fullSignatureRef = useRef<string | null>(null);
+  const lastDrawnTextureRevisionRef = useRef<number | null>(null);
   const previewSignatureRef = useRef<string | null>(null);
   const preloadedVisualTextureSignatureRef = useRef<string | null>(null);
   const latestCameraOffsetRef = useRef(cameraOffset);
@@ -5167,8 +5307,6 @@ export function PixiWorldRenderer({
   useEffect(() => {
     let isDisposed = false;
     let isInitialized = false;
-    let scheduledRedrawFrame: number | null = null;
-    let timedRedrawFrame: number | null = null;
     const app = new Application();
     const stage = new Container();
     const layers: PixiRenderLayers = {
@@ -5184,25 +5322,7 @@ export function PixiWorldRenderer({
     };
     const managedState = managedStateRef.current;
 
-    function cancelScheduledRedraw() {
-      if (scheduledRedrawFrame === null) {
-        return;
-      }
-
-      window.cancelAnimationFrame(scheduledRedrawFrame);
-      scheduledRedrawFrame = null;
-    }
-
-    function cancelTimedRedraw() {
-      if (timedRedrawFrame === null) {
-        return;
-      }
-
-      window.cancelAnimationFrame(timedRedrawFrame);
-      timedRedrawFrame = null;
-    }
-
-    function shouldRunTimedRedraw() {
+    function shouldContinueRedrawing() {
       const now = Date.now();
 
       return hasActiveTimedRendererWork({
@@ -5222,23 +5342,12 @@ export function PixiWorldRenderer({
       });
     }
 
-    function scheduleTimedRedraw() {
-      if (isDisposed || timedRedrawFrame !== null || !shouldRunTimedRedraw()) {
-        return;
-      }
-
-      timedRedrawFrame = window.requestAnimationFrame(() => {
-        timedRedrawFrame = null;
-        latestCurrentTimeRef.current = Date.now();
-        redrawLatestWorld();
-      });
-    }
-
-    function redrawLatestWorld() {
+    function redrawLatestWorld(): boolean {
       if (isDisposed || !isInitialized || !layersRef.current) {
-        return;
+        return false;
       }
 
+      latestCurrentTimeRef.current = Date.now();
       const didDraw = drawWorld({
         activeTeleport: latestActiveTeleportRef.current,
         cameraOffset: latestCameraOffsetRef.current,
@@ -5259,6 +5368,9 @@ export function PixiWorldRenderer({
         mode: latestModeRef.current,
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
+        fullHadTimedWorkRef,
+        fullSignatureRef,
+        lastDrawnTextureRevisionRef,
         questInspectMarkers: latestQuestInspectMarkersRef.current,
         previewSignatureRef,
         questGiverHasWork: latestQuestGiverHasWorkRef.current,
@@ -5279,18 +5391,20 @@ export function PixiWorldRenderer({
       if (didDraw) {
         appRef.current?.render();
       }
-      scheduleTimedRedraw();
+
+      return didDraw;
     }
 
-    function scheduleRedraw() {
-      if (isDisposed || scheduledRedrawFrame !== null) {
-        return;
-      }
+    const redrawScheduler = createRendererFrameScheduler({
+      cancelAnimationFrame: (frameId) => window.cancelAnimationFrame(frameId),
+      draw: redrawLatestWorld,
+      getShouldContinueRedrawing: shouldContinueRedrawing,
+      now: () => performance.now(),
+      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    });
 
-      scheduledRedrawFrame = window.requestAnimationFrame(() => {
-        scheduledRedrawFrame = null;
-        redrawLatestWorld();
-      });
+    function scheduleRedraw() {
+      redrawScheduler.requestRedraw();
     }
 
     requestRedrawRef.current = scheduleRedraw;
@@ -5344,19 +5458,21 @@ export function PixiWorldRenderer({
       appRef.current = app;
       layersRef.current = layers;
       appliedRenderSizeRef.current = latestRenderSizeRef.current;
-      redrawLatestWorld();
+      redrawScheduler.requestImmediateRedraw();
     }
 
     void initPixiApp();
 
     return () => {
       isDisposed = true;
-      cancelScheduledRedraw();
-      cancelTimedRedraw();
+      redrawScheduler.cancel();
       requestRedrawRef.current = () => {};
       appRef.current = null;
       layersRef.current = null;
       appliedRenderSizeRef.current = null;
+      fullHadTimedWorkRef.current = false;
+      fullSignatureRef.current = null;
+      lastDrawnTextureRevisionRef.current = null;
       if (isInitialized) {
         app.destroy(true, { children: true });
       }
@@ -5382,63 +5498,7 @@ export function PixiWorldRenderer({
     }
 
     latestCurrentTimeRef.current = currentTime ?? Date.now();
-
-    const didDraw = drawWorld({
-      activeTeleport,
-      cameraOffset,
-      cellPixelSize,
-      combatFeedbackEvents,
-      companionDragPreview: companionDragPreviewRef.current,
-      currentTime: latestCurrentTimeRef.current,
-      directCompanionCommandsById,
-      dropVisualEvents,
-      enemyAoeChannelsByCasterId,
-      entities: sortedEntities,
-      layers: layersRef.current,
-      leaderIntent,
-      map,
-      managedState: managedStateRef.current,
-      mode,
-      onPerformanceSample,
-      partyIntent,
-      questInspectMarkers,
-      previewSignatureRef,
-      questGiverHasWork,
-      requestRedraw: requestLatestRedraw,
-      renderSize,
-      resurrectionProgressByCompanionId,
-      showDebugOverlays,
-      skillBindsByEnemyId,
-      skillMarksByEnemyId,
-      skillShieldBlocksById,
-      skillVisualEvents,
-      teleportWorkingById,
-      textureCache: textureCacheRef.current,
-      viewportSize,
-      visualMovementByEntityId,
-    });
-    if (didDraw) {
-      appRef.current?.render();
-    }
-
-    if (
-      hasActiveTimedRendererWork({
-        activeTeleport,
-        combatFeedbackEvents,
-        currentTime: latestCurrentTimeRef.current,
-        dropVisualEvents,
-        enemyAoeChannelsByCasterId,
-        entities: sortedEntities,
-        mode,
-        skillBindsByEnemyId,
-        skillMarksByEnemyId,
-        skillShieldBlocksById,
-        skillVisualEvents,
-        visualMovementByEntityId,
-      })
-    ) {
-      requestRedrawRef.current();
-    }
+    requestRedrawRef.current();
   }, [
     activeTeleport,
     cameraOffset,

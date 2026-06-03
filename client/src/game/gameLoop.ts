@@ -4,12 +4,15 @@ import { clampSimulationDelta } from "./simulationTiming";
 import { recordUpdateDuration } from "./performanceMetrics";
 
 export type GameStateUpdater = (update: (state: GameState) => GameState) => void;
+export const MAX_SIMULATION_FPS = 60;
+export const MIN_SIMULATION_FRAME_MS = 1000 / MAX_SIMULATION_FPS;
 
 export function startGameLoop(
   updateState: GameStateUpdater,
 ): () => void {
   let animationFrameId = 0;
-  let previousTimeMs: number | null = null;
+  let accumulatedElapsedMs = 0;
+  let previousTimeMs = Date.now();
   let isRunning = true;
 
   function step() {
@@ -18,24 +21,30 @@ export function startGameLoop(
     }
 
     const nowMs = Date.now();
-    const deltaMs =
-      previousTimeMs === null
-        ? 0
-        : clampSimulationDelta(nowMs - previousTimeMs);
+    const elapsedMs = nowMs - previousTimeMs;
     previousTimeMs = nowMs;
 
-    updateState((state) => {
-      const updateStartedAt = performance.now();
-      const nextState = updateGame(state, {
-        nowMs,
-        deltaMs,
-        frameNumber: (state.simulationFrame ?? state.simulationTick ?? 0) + 1,
+    if (Number.isFinite(elapsedMs) && elapsedMs > 0) {
+      accumulatedElapsedMs += elapsedMs;
+    }
+
+    if (accumulatedElapsedMs >= MIN_SIMULATION_FRAME_MS) {
+      const deltaMs = clampSimulationDelta(accumulatedElapsedMs);
+      accumulatedElapsedMs %= MIN_SIMULATION_FRAME_MS;
+
+      updateState((state) => {
+        const updateStartedAt = performance.now();
+        const nextState = updateGame(state, {
+          nowMs,
+          deltaMs,
+          frameNumber: (state.simulationFrame ?? state.simulationTick ?? 0) + 1,
+        });
+
+        recordUpdateDuration(performance.now() - updateStartedAt);
+
+        return nextState;
       });
-
-      recordUpdateDuration(performance.now() - updateStartedAt);
-
-      return nextState;
-    });
+    }
 
     animationFrameId = requestAnimationFrame(step);
   }
