@@ -19,6 +19,8 @@ export type QuestId =
   | "rescue_the_grove_runner"
   | "hold_the_field_cache"
   | "open_wolf_causeway"
+  | "broken_thicket_survey"
+  | "crawler_shelf_report"
   | "find_slimeward_camp";
 
 export type QuestStatus =

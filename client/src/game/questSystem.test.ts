@@ -4,6 +4,8 @@ import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debug
 import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
 import {
   createDebugMap,
+  MAP_THREE_ID,
+  MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_ONE_ID,
   SECURE_LANDING_PASSAGE_GATE_ID,
   SECURE_LANDING_PASSAGE_GATE_POSITION,
@@ -190,11 +192,62 @@ describe("prototype quest system", () => {
       "rescue_the_grove_runner",
       "hold_the_field_cache",
       "open_wolf_causeway",
+      "broken_thicket_survey",
+      "crawler_shelf_report",
       "find_slimeward_camp",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");
     expect(quests.open_wolf_causeway.status).toBe("locked");
+    expect(quests.broken_thicket_survey.status).toBe("locked");
+    expect(quests.crawler_shelf_report.status).toBe("locked");
+    expect(quests.find_slimeward_camp.status).toBe("locked");
+  });
+
+  it("unlocks the Third Wild Zone bridge quests before Slimeward Trail", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        open_wolf_causeway: "ready_to_turn_in",
+      }),
+    });
+
+    state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
+
+    expect(state.quests.open_wolf_causeway.status).toBe("completed");
+    expect(state.quests.broken_thicket_survey.status).toBe("available");
+    expect(state.quests.crawler_shelf_report.status).toBe("locked");
+    expect(state.quests.find_slimeward_camp.status).toBe("locked");
+
+    state = {
+      ...state,
+      quests: {
+        ...state.quests,
+        broken_thicket_survey: {
+          ...state.quests.broken_thicket_survey,
+          status: "ready_to_turn_in",
+        },
+      },
+    };
+    state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
+
+    expect(state.quests.broken_thicket_survey.status).toBe("completed");
+    expect(state.quests.crawler_shelf_report.status).toBe("available");
+    expect(state.quests.find_slimeward_camp.status).toBe("locked");
+
+    state = {
+      ...state,
+      quests: {
+        ...state.quests,
+        crawler_shelf_report: {
+          ...state.quests.crawler_shelf_report,
+          status: "ready_to_turn_in",
+        },
+      },
+    };
+    state = finishReadyQuestsForQuestGiver(state, QUEST_GIVER_POI_ID);
+
+    expect(state.quests.crawler_shelf_report.status).toBe("completed");
+    expect(state.quests.find_slimeward_camp.status).toBe("available");
   });
 
   it("completes equipment tutorial objectives from current equipment state", () => {
@@ -720,6 +773,124 @@ describe("prototype quest system", () => {
     expect(isTeleportWorking(state, TELEPORTER_ID)).toBe(true);
     expect(isTeleportWorking(state, MAP_TWO_TO_MAP_THREE_TELEPORTER_ID)).toBe(
       false,
+    );
+  });
+
+  it("progresses the Third Wild Zone bridge quests and Slimeward route unlock", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_THREE_ID,
+      map: createDebugMap(MAP_THREE_ID),
+      quests: createQuestStates({
+        broken_thicket_survey: "active",
+        crawler_shelf_report: "active",
+        find_slimeward_camp: "active",
+      }),
+    });
+    const brokenThicketHerb = createResource("broken-thicket-herb", { x: 47, y: 7 }, {
+      resourceType: "herb",
+    });
+
+    state = recordQuestPoiReachedForQuests(
+      state,
+      "broken-thicket-trail-marker",
+      MAP_THREE_ID,
+    );
+    for (let count = 0; count < 10; count += 1) {
+      state = recordEnemyDefeatedForQuests(
+        state,
+        createDefeatedEnemy("broken-crawler", "crawler", "south-west"),
+        MAP_THREE_ID,
+        () => 0.99,
+      );
+    }
+    state = recordResourceGatheredForQuests(
+      state,
+      brokenThicketHerb,
+      MAP_THREE_ID,
+      2,
+    );
+
+    expect(state.quests.broken_thicket_survey.status).toBe("ready_to_turn_in");
+    expect(
+      state.quests.broken_thicket_survey.objectiveProgress
+        .collect_crawler_shell_fragments,
+    ).toMatchObject({
+      currentCount: 5,
+      completed: true,
+    });
+
+    state = recordQuestPoiReachedForQuests(
+      state,
+      "crawler-shelf-overlook",
+      MAP_THREE_ID,
+    );
+    for (let count = 0; count < 8; count += 1) {
+      state = recordEnemyDefeatedForQuests(
+        state,
+        createDefeatedEnemy("shelf-shaman", "goblin", "north-west"),
+        MAP_THREE_ID,
+        () => 0.99,
+      );
+    }
+    state = recordQuestRepairProgress(
+      state,
+      "crawler_shelf_report",
+      "repair_crawler_shelf_route_marker",
+      6000,
+    );
+
+    expect(state.quests.crawler_shelf_report.status).toBe("ready_to_turn_in");
+    expect(
+      state.quests.crawler_shelf_report.objectiveProgress.collect_shelf_rune_scraps,
+    ).toMatchObject({
+      currentCount: 4,
+      completed: true,
+    });
+
+    expect(isTeleportWorking(state, MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID)).toBe(
+      false,
+    );
+
+    state = recordQuestPoiReachedForQuests(
+      state,
+      MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+      MAP_THREE_ID,
+    );
+    for (let count = 0; count < 4; count += 1) {
+      state = recordEnemyDefeatedForQuests(
+        state,
+        createDefeatedEnemy("imp-fen-mossling", "mossling", "south-center"),
+        MAP_THREE_ID,
+      );
+    }
+    for (let count = 0; count < 8; count += 1) {
+      state = recordEnemyDefeatedForQuests(
+        state,
+        createDefeatedEnemy("imp-fen-shaman", "goblin", "south-center"),
+        MAP_THREE_ID,
+        () => 0.99,
+      );
+    }
+    state = recordQuestRepairProgress(
+      state,
+      "find_slimeward_camp",
+      "repair_slimeward_camp_teleporter",
+      8000,
+    );
+
+    expect(isTeleportWorking(state, MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID)).toBe(
+      false,
+    );
+
+    state = completeQuestObjective(
+      state,
+      "find_slimeward_camp",
+      "unlock_slimeward_camp_route",
+    );
+
+    expect(state.quests.find_slimeward_camp.status).toBe("ready_to_turn_in");
+    expect(isTeleportWorking(state, MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID)).toBe(
+      true,
     );
   });
 

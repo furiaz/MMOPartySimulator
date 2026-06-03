@@ -276,6 +276,14 @@ function formatQuestEnemyName(
     return "Goblins";
   }
 
+  if (enemyArchetypeId === "crawler") {
+    return "Stone Crawlers";
+  }
+
+  if (enemyArchetypeId === "mossling") {
+    return "Mosslings";
+  }
+
   if (enemyArchetypeId === "imp") {
     return "Bog Imps";
   }
