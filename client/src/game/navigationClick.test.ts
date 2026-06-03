@@ -6,7 +6,10 @@ import {
   createNpc,
   createResource,
 } from ".";
-import { resolveNavigationClickTarget } from "./navigationClick";
+import {
+  resolveNavigationClickTarget,
+  resolveNpcInteractionApproachTarget,
+} from "./navigationClick";
 import { createTestGameState } from "./testState";
 import type { GameMap, Position } from "./types";
 
@@ -121,5 +124,66 @@ describe("resolveNavigationClickTarget", () => {
     expect(resolveNavigationClickTarget(noLeaderState, { x: 1, y: 1 })).toBeNull();
     expect(resolveNavigationClickTarget(noMapState, { x: 1, y: 1 })).toBeNull();
     expect(resolveNavigationClickTarget(surroundedState, { x: 4, y: 3 })).toBeNull();
+  });
+});
+
+describe("resolveNpcInteractionApproachTarget", () => {
+  it("returns a reachable approach position instead of the occupied NPC position", () => {
+    const npc = createNpc("merchant", { x: 3, y: 2 }, "Merchant", "merchant");
+    const state = createState({ extraEntities: [npc] });
+
+    expect(resolveNpcInteractionApproachTarget(state, npc.position, 1.5)).toEqual({
+      x: 3,
+      y: 1,
+    });
+  });
+
+  it("uses the interaction range to find farther reachable approach positions", () => {
+    const npc = createNpc("quest-giver", { x: 3, y: 3 }, "Quest Giver", "quest_giver");
+    const state = createState({
+      leaderPosition: { x: 0, y: 3 },
+      map: createMap({
+        columns: 7,
+        rows: 7,
+        walls: [
+          { x: 2, y: 2 },
+          { x: 3, y: 2 },
+          { x: 4, y: 2 },
+          { x: 2, y: 3 },
+          { x: 4, y: 3 },
+          { x: 2, y: 4 },
+          { x: 3, y: 4 },
+          { x: 4, y: 4 },
+        ],
+      }),
+      extraEntities: [npc],
+    });
+
+    expect(resolveNpcInteractionApproachTarget(state, npc.position, 1.5)).toBeNull();
+    expect(resolveNpcInteractionApproachTarget(state, npc.position, 2)).toEqual({
+      x: 3,
+      y: 1,
+    });
+  });
+
+  it("returns null when every in-range approach position is blocked or unreachable", () => {
+    const npc = createNpc("merchant", { x: 3, y: 2 }, "Merchant", "merchant");
+    const state = createState({
+      map: createMap({
+        walls: [
+          { x: 2, y: 1 },
+          { x: 3, y: 1 },
+          { x: 4, y: 1 },
+          { x: 2, y: 2 },
+          { x: 4, y: 2 },
+          { x: 2, y: 3 },
+          { x: 3, y: 3 },
+          { x: 4, y: 3 },
+        ],
+      }),
+      extraEntities: [npc],
+    });
+
+    expect(resolveNpcInteractionApproachTarget(state, npc.position, 1.5)).toBeNull();
   });
 });

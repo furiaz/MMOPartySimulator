@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createEnemy, createResource } from "./entities";
+import { createCompanion, createEnemy, createNpc, createResource } from "./entities";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { issueCompanionCommand, issuePartyOrder } from "./commands";
+import { startDebugTelemetryRecording } from "./debugTelemetry";
+import { resolveNpcInteractionApproachTarget } from "./navigationClick";
 import type { GameEntity, GameMap, Position } from "./types";
 
 describe("party orders", () => {
@@ -276,6 +278,68 @@ describe("party orders", () => {
     expect(nextState.entities[leader.id]).toMatchObject({
       state: leader.state,
       currentTargetId: leader.currentTargetId,
+    });
+  });
+
+  it("rejects party move orders to occupied NPC positions", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader");
+    const merchant = createNpc("merchant", { x: 4, y: 2 }, "Merchant", "merchant");
+    const state = startDebugTelemetryRecording(
+      createState([leader, merchant], leader.id, {
+        map: createOpenTestMap(),
+      }),
+    );
+
+    const nextState = issuePartyOrder(state, {
+      type: "move",
+      targetPosition: merchant.position,
+    });
+
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.debugTelemetry?.events.at(-1)).toMatchObject({
+      type: "party_order_rejected",
+      reason: "blocked_position",
+      intendedPosition: merchant.position,
+    });
+  });
+
+  it("accepts party move orders to resolved NPC approach positions", () => {
+    const leader = createCompanion("leader", { x: 2, y: 2 }, "leader");
+    const merchant = createNpc("merchant", { x: 4, y: 2 }, "Merchant", "merchant");
+    const state = createState([leader, merchant], leader.id, {
+      map: createOpenTestMap(),
+    });
+    const approachTarget = resolveNpcInteractionApproachTarget(
+      state,
+      merchant.position,
+      1.5,
+    );
+
+    expect(approachTarget).toEqual({ x: 4, y: 1 });
+
+    if (!approachTarget) {
+      throw new Error("Expected NPC approach target");
+    }
+
+    const nextState = issuePartyOrder(state, {
+      type: "move",
+      targetPosition: approachTarget,
+    });
+
+    expect(nextState.leaderIntent).toMatchObject({
+      type: "move",
+      targetId: null,
+      targetPosition: approachTarget,
+      source: "player",
+    });
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "travel",
+      source: "player",
+      executionIntent: {
+        type: "move",
+        targetPosition: approachTarget,
+      },
     });
   });
 });

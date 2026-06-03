@@ -102,6 +102,7 @@ import {
   recordMerchantMenuSelected,
   resourceIds,
   resolveNavigationClickTarget,
+  resolveNpcInteractionApproachTarget,
   resolveWorldWipeRecoveryChoice,
   setAutoModeEnabled,
   setPartyLeader,
@@ -3163,25 +3164,45 @@ function App() {
     }
 
     const interactionKind = getNpcInteractionKind(npc);
+    const interactionRange = getNpcInteractionRange(npc);
 
     if (!interactionKind) {
       closeNpcInteractions();
-      commandPartyToMoveToPosition(npc.position);
+      const approachTarget = resolveNpcInteractionApproachTarget(
+        gameState,
+        npc.position,
+        interactionRange,
+      );
+
+      if (approachTarget) {
+        commandPartyToMoveToPosition(approachTarget);
+      }
+
       return;
     }
 
     if (
       leader &&
-      getPositionDistance(leader.position, npc.position) <=
-        getNpcInteractionRange(npc)
+      getPositionDistance(leader.position, npc.position) <= interactionRange
     ) {
       openNpcInteraction(npc);
       return;
     }
 
+    const approachTarget = resolveNpcInteractionApproachTarget(
+      gameState,
+      npc.position,
+      interactionRange,
+    );
+
+    if (!approachTarget) {
+      closeNpcInteractions();
+      return;
+    }
+
     closeNpcInteractions();
     setPendingNpcInteractionId(npc.id);
-    commandPartyToMoveToPosition(npc.position);
+    commandPartyToMoveToPosition(approachTarget);
   }
 
   function toggleDebugTelemetryRecording() {

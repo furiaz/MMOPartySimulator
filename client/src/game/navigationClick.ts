@@ -50,6 +50,47 @@ export function resolveNavigationClickTarget(
   return null;
 }
 
+export function resolveNpcInteractionApproachTarget(
+  state: GameState,
+  npcPosition: Position,
+  interactionRange: number,
+): Position | null {
+  const map = state.map;
+  const leader = getPartyLeader(state);
+
+  if (!map || !leader || interactionRange <= 0) {
+    return null;
+  }
+
+  const maxDistance = map.columns * map.rows * 2;
+  const candidates = getMapPositionsByDistance(map, npcPosition);
+
+  for (const candidate of candidates) {
+    if (getEuclideanDistance(candidate, npcPosition) > interactionRange) {
+      continue;
+    }
+
+    if (!isValidNavigationClickDestination(state, candidate, leader.id)) {
+      continue;
+    }
+
+    const distance = getBoundedNavigationDistance(
+      state,
+      leader.position,
+      candidate,
+      maxDistance,
+      leader.id,
+      { allowPartyPassThrough: true },
+    );
+
+    if (distance !== null) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function getMapPositionsByDistance(map: GameMap, origin: Position): Position[] {
   const positions: Position[] = [];
 
