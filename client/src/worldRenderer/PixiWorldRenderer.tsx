@@ -2355,7 +2355,7 @@ function getEntitySpriteLayout(
 
     return {
       anchorX: 0.5,
-      anchorY: 0.7,
+      anchorY: entity.enemyTypeId === "azure_mass" ? 0.5 : 0.7,
       width: (naturalSize?.width ?? cellPixelSize * 2.25) * variantScale,
       height: (naturalSize?.height ?? cellPixelSize * 2.25) * variantScale,
     };
