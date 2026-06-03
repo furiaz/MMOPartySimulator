@@ -186,9 +186,29 @@ describe("enemy attack leash movement", () => {
     });
   });
 
-  it("keeps normal enemy melee range center-to-center without body spacing", () => {
+  it("lets companions attack normal enemies from their combat body edge", () => {
     const companion = {
-      ...createAttackingCompanion("attacker", { x: 1.2, y: 0 }, 0),
+      ...createAttackingCompanion("attacker", { x: 1.7, y: 0 }, 0),
+      lastAttackAt: -2000,
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      maxHealth: 50,
+    });
+
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBeLessThan(enemy.health);
+  });
+
+  it("keeps normal enemy attacks outside their effective melee range", () => {
+    const companion = {
+      ...createAttackingCompanion("attacker", { x: 1.8, y: 0 }, 0),
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {

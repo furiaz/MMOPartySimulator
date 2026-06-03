@@ -99,6 +99,7 @@ export {
   getBoundedNavigationDistance,
   getBoundedPathDistance,
   getEntityCollisionShape,
+  isEntitySeparationPositionAvailable,
   isActiveResourcePosition,
   isPositionAvailable,
   isPositionInsideEntityCollisionShape,

@@ -191,6 +191,7 @@ export {
   BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
   ENTITY_COLLISION_DISTANCE,
   getEntityCollisionShape,
+  isEntitySeparationPositionAvailable,
   isPositionInsideEntityCollisionShape,
   type EntityCollisionShape,
   type PoiSearchScope,
@@ -363,6 +364,7 @@ export {
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
 } from "./navigationClick";
+export { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 export {
   isActiveResource,
   isCompanionEntity,

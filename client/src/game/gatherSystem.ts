@@ -13,7 +13,6 @@ import {
   type GameState,
 } from "./state";
 import {
-  ENTITY_COLLISION_DISTANCE,
   getBoundedPathDistance,
   moveEntityTowardIfUnoccupied,
 } from "./movementPlanning";
@@ -29,11 +28,10 @@ import { getDirectGatherCommandTargetId } from "./directCompanionCommands";
 import {
   isWithinGathererLeaderBoundary,
 } from "./gathererResourceReservation";
+import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
-const GATHER_RANGE = ENTITY_COLLISION_DISTANCE * 2;
 const GATHER_COOLDOWN_MS = 1000;
-const GATHER_APPROACH_BUFFER = 0.15;
 
 export function updateGatherSystem(
   state: GameState,
@@ -414,7 +412,7 @@ function isInGatherRange(gatherer: GameEntity, resource: GameEntity): boolean {
     resource.position.y - gatherer.position.y,
   );
 
-  return distance <= GATHER_RANGE + GATHER_APPROACH_BUFFER;
+  return distance <= RESOURCE_INTERACTION_RANGE;
 }
 
 function canGather(entity: AutonomousEntity, now: number): boolean {

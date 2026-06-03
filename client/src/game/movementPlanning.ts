@@ -418,6 +418,25 @@ export function isWalkablePosition(
   );
 }
 
+export function isEntitySeparationPositionAvailable(
+  state: GameState,
+  movingEntityId: string,
+  sourceEntityId: string,
+  position: Position,
+): boolean {
+  return (
+    isNavigationPositionWalkable(state, position) &&
+    !isActiveResourcePosition(state, position, movingEntityId) &&
+    !isReservedPosition(state, position, movingEntityId) &&
+    !isPositionOccupiedBySeparationBlocker(
+      state,
+      position,
+      movingEntityId,
+      sourceEntityId,
+    )
+  );
+}
+
 export function isPositionAvailable(
   state: GameState,
   position: Position,
@@ -1275,6 +1294,22 @@ function isPositionOccupiedByBlockingEntity(
       entity.kind !== "resource" &&
       entity.state !== "dead" &&
       !canPassThroughBlockingEntity(movingEntity, entity, options) &&
+      isPositionInsideEntityCollisionShape(entity, position),
+  );
+}
+
+function isPositionOccupiedBySeparationBlocker(
+  state: GameState,
+  position: Position,
+  movingEntityId: string,
+  sourceEntityId: string,
+): boolean {
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.id !== movingEntityId &&
+      entity.id !== sourceEntityId &&
+      entity.kind !== "resource" &&
+      entity.state !== "dead" &&
       isPositionInsideEntityCollisionShape(entity, position),
   );
 }

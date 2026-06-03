@@ -11,6 +11,7 @@ import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
+import { updateEntitySeparationSystem } from "./entitySeparationSystem";
 import {
   isSlimewardDungeonChestUiOpen,
   updateSlimewardDungeonSystem,
@@ -178,7 +179,7 @@ export function updateGame(
   }
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
-  nextState = updateEnemyAISystem(nextState, timing);
+  nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateCombatSkillSystem(nextState, timing.nowMs);
@@ -200,6 +201,7 @@ export function updateGame(
     movedEntityIds,
     timing.nowMs,
   );
+  nextState = updateEntitySeparationSystem(nextState, movedEntityIds);
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);
   nextState = debugApplyCompanionInfiniteHealth(nextState);

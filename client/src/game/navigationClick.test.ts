@@ -10,6 +10,7 @@ import {
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
 } from "./navigationClick";
+import { isActiveResourcePosition } from "./movementPlanning";
 import { createTestGameState } from "./testState";
 import type { GameMap, Position } from "./types";
 
@@ -104,6 +105,14 @@ describe("resolveNavigationClickTarget", () => {
       x: 4,
       y: 2,
     });
+  });
+
+  it("keeps active resource collision at the movement blocker radius", () => {
+    const resource = createResource("wood", { x: 3, y: 2 });
+    const state = createState({ extraEntities: [resource] });
+
+    expect(isActiveResourcePosition(state, { x: 3.69, y: 2 })).toBe(true);
+    expect(isActiveResourcePosition(state, { x: 3.7, y: 2 })).toBe(false);
   });
 
   it("returns null when there is no leader, map, or reachable destination", () => {

@@ -95,6 +95,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 1,
     attackCooldownMs: 2400,
     detectionRange: 10,
+    combatBodyRadius: 0.7,
   },
   slimeward_heavy_slime: {
     id: "slimeward_heavy_slime",
@@ -105,6 +106,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 8,
     attackCooldownMs: 2600,
     detectionRange: 10,
+    combatBodyRadius: 1.25,
   },
   slimeward_pale_ooze: {
     id: "slimeward_pale_ooze",
@@ -115,6 +117,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 8,
     attackCooldownMs: 2200,
     detectionRange: 10,
+    combatBodyRadius: 0.6,
   },
   slimeward_spitter_slime: {
     id: "slimeward_spitter_slime",
@@ -127,6 +130,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     attackCooldownMs: 2800,
     detectionRange: 11,
     attackRange: 4,
+    combatBodyRadius: 1.4,
   },
   azure_mass: {
     id: "azure_mass",
@@ -149,6 +153,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 2,
     attackCooldownMs: 1800,
     detectionRange: 10,
+    combatBodyRadius: 0.75,
   },
   forest_spider: {
     id: "forest_spider",
@@ -159,6 +164,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 3,
     attackCooldownMs: 2400,
     detectionRange: 8,
+    combatBodyRadius: 0.8,
   },
   goblin_scout: {
     id: "goblin_scout",
@@ -169,6 +175,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 4,
     attackCooldownMs: 2000,
     detectionRange: 12,
+    combatBodyRadius: 0.75,
   },
   goblin_thrower: {
     id: "goblin_thrower",
@@ -181,6 +188,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     attackCooldownMs: 2600,
     detectionRange: 10,
     attackRange: 4,
+    combatBodyRadius: 0.75,
   },
   bog_imp: {
     id: "bog_imp",
@@ -191,6 +199,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 5,
     attackCooldownMs: 2600,
     detectionRange: 10,
+    combatBodyRadius: 0.6,
   },
   stone_crawler: {
     id: "stone_crawler",
@@ -201,6 +210,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 8,
     attackCooldownMs: 3000,
     detectionRange: 8,
+    combatBodyRadius: 0.75,
   },
   goblin_shaman: {
     id: "goblin_shaman",
@@ -213,6 +223,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     attackCooldownMs: 3000,
     detectionRange: 10,
     attackRange: 3,
+    combatBodyRadius: 0.6,
   },
   ash_wisp: {
     id: "ash_wisp",
@@ -223,6 +234,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 11,
     attackCooldownMs: 2400,
     detectionRange: 12,
+    combatBodyRadius: 0.6,
   },
   mossling: {
     id: "mossling",
@@ -233,6 +245,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 9,
     attackCooldownMs: 2800,
     detectionRange: 8,
+    combatBodyRadius: 0.6,
   },
   wolf: {
     id: "wolf",
@@ -243,6 +256,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 6,
     attackCooldownMs: 2000,
     detectionRange: 10,
+    combatBodyRadius: 0.6,
   },
   orc: {
     id: "orc",
@@ -253,6 +267,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     level: 12,
     attackCooldownMs: 2660,
     detectionRange: 10,
+    combatBodyRadius: 0.6,
   },
 };
 

@@ -29,6 +29,7 @@ import {
   hasDirectPlayerPartyIntent,
   setPartyExecutionIntent,
 } from "./partyIntentState";
+import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 import { getPartyMovementTargetPosition } from "./partyTargetSystem";
 import {
   FOLLOW_DISTANCE,
@@ -380,7 +381,10 @@ function moveLeaderTowardPoi(
     return state;
   }
 
-  if (getDistance(leader.position, plan.targetPosition) <= POI_REACHED_DISTANCE) {
+  if (
+    getDistance(leader.position, plan.targetPosition) <=
+    getPoiReachedDistance(state, plan)
+  ) {
     return state;
   }
 
@@ -404,6 +408,31 @@ function moveLeaderTowardPoi(
   }
 
   return nextState;
+}
+
+function getPoiReachedDistance(
+  state: GameState,
+  plan: PartyActivityPlan,
+): number {
+  return isGatherPoiTarget(state, plan)
+    ? RESOURCE_INTERACTION_RANGE
+    : POI_REACHED_DISTANCE;
+}
+
+function isGatherPoiTarget(
+  state: GameState,
+  plan: PartyActivityPlan,
+): boolean {
+  if (plan.target) {
+    return false;
+  }
+
+  const executionIntent = getPartyExecutionIntent(state);
+  const target = executionIntent?.targetId
+    ? getEntityById(state, executionIntent.targetId)
+    : undefined;
+
+  return executionIntent?.type === "gather" && isActiveResource(target);
 }
 
 function moveFollowersTowardLeader(

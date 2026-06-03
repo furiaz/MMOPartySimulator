@@ -7,6 +7,7 @@ import {
 } from "./entities";
 import { issuePartyOrder } from "./commands";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
+import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 import { createTestGameState } from "./testState";
 import type { GameMap, Position } from "./types";
 
@@ -380,6 +381,37 @@ describe("party formation real-time cohesion", () => {
     expect(nextState.entities[follower.id]).toMatchObject({
       state: "follow",
       currentTargetId: leader.id,
+    });
+  });
+
+  it("stops the leader at resource interaction range for gather POIs", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const resource = createResource("resource", {
+      x: RESOURCE_INTERACTION_RANGE,
+      y: 0,
+    });
+    const issuedState = issuePartyOrder(
+      createTestGameState({
+        entities: {
+          [leader.id]: leader,
+          [resource.id]: resource,
+        },
+        partyLeaderId: leader.id,
+        map: createOpenTestMap(),
+        simulationDeltaMs: 100,
+      }),
+      {
+        type: "gather",
+        targetId: resource.id,
+      },
+    );
+
+    const nextState = updatePartyFormationSystem(issuedState);
+
+    expect(nextState.entities[leader.id].position).toEqual(leader.position);
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "gather",
+      currentTargetId: resource.id,
     });
   });
 

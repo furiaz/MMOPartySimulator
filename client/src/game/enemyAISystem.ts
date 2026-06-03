@@ -75,6 +75,7 @@ export function updateEnemyAISystem(
     deltaSeconds: GAME_LOOP_TICK_MS / 1000,
     frameNumber: state.simulationFrame ?? state.simulationTick ?? 0,
   },
+  movedEntityIds = new Set<string>(),
 ): GameState {
   let nextState = state;
   const entities = Object.values(state.entities);
@@ -126,7 +127,11 @@ export function updateEnemyAISystem(
 
     if (shouldPressureQuestTarget(entity)) {
       recordEnemyAiActive();
-      nextState = moveQuestSpawnTowardPressureTarget(nextState, entity);
+      nextState = moveQuestSpawnTowardPressureTarget(
+        nextState,
+        entity,
+        movedEntityIds,
+      );
       continue;
     }
 
@@ -135,7 +140,12 @@ export function updateEnemyAISystem(
       getDistance(entity.position, entity.homePosition) > ENEMY_ROAM_LEASH_DISTANCE
     ) {
       recordEnemyAiActive();
-      nextState = moveEnemyTowardHome(nextState, entity, timing.nowMs);
+      nextState = moveEnemyTowardHome(
+        nextState,
+        entity,
+        timing.nowMs,
+        movedEntityIds,
+      );
       continue;
     }
 
@@ -149,7 +159,12 @@ export function updateEnemyAISystem(
     if (getEnemyTemperament(entity) === "passive") {
       const reasonedEnemy = withTargetDecisionReason(entity, "passive_no_auto_target");
       nextState = updateEntity(nextState, reasonedEnemy);
-      nextState = updateEnemyWander(nextState, reasonedEnemy, timing);
+      nextState = updateEnemyWander(
+        nextState,
+        reasonedEnemy,
+        timing,
+        movedEntityIds,
+      );
       continue;
     }
 
@@ -164,10 +179,19 @@ export function updateEnemyAISystem(
       const reasonedEnemy = withTargetDecisionReason(entity, reason);
       nextState = updateEntity(nextState, reasonedEnemy);
       if (shouldPressureQuestTarget(reasonedEnemy)) {
-        nextState = moveQuestSpawnTowardPressureTarget(nextState, reasonedEnemy);
+        nextState = moveQuestSpawnTowardPressureTarget(
+          nextState,
+          reasonedEnemy,
+          movedEntityIds,
+        );
         continue;
       }
-      nextState = updateEnemyWander(nextState, reasonedEnemy, timing);
+      nextState = updateEnemyWander(
+        nextState,
+        reasonedEnemy,
+        timing,
+        movedEntityIds,
+      );
       continue;
     }
 
@@ -420,11 +444,12 @@ function updateEnemyWander(
   state: GameState,
   enemy: Enemy,
   timing: SimulationTiming,
+  movedEntityIds: Set<string>,
 ): GameState {
   const now = timing.nowMs;
 
   if (enemy.roamTargetPosition && enemy.roamMoveUntil && now <= enemy.roamMoveUntil) {
-    return moveEnemyTowardRoamTarget(state, enemy, now);
+    return moveEnemyTowardRoamTarget(state, enemy, now, movedEntityIds);
   }
 
   if (enemy.roamTargetPosition) {
@@ -458,23 +483,32 @@ function updateEnemyWander(
   });
 }
 
-function moveEnemyTowardHome(state: GameState, enemy: Enemy, now: number): GameState {
+function moveEnemyTowardHome(
+  state: GameState,
+  enemy: Enemy,
+  now: number,
+  movedEntityIds: Set<string>,
+): GameState {
   const clearedEnemy = clearEnemyTarget(enemy, now);
   const nextState =
     enemy.state === "idle" && !enemy.currentTargetId
       ? state
       : updateEntity(state, clearedEnemy);
 
-  return moveEntityTowardPositionIfUnoccupied(
-    nextState,
-    clearedEnemy,
-    enemy.homePosition,
-    {
-      pathProfile: "home",
-      pathTargetKey: `home:${enemy.id}`,
-      pathTargetPosition: enemy.homePosition,
-      speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
-    },
+  return markEnemyMovedIfPositionChanged(
+    enemy,
+    moveEntityTowardPositionIfUnoccupied(
+      nextState,
+      clearedEnemy,
+      enemy.homePosition,
+      {
+        pathProfile: "home",
+        pathTargetKey: `home:${enemy.id}`,
+        pathTargetPosition: enemy.homePosition,
+        speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
+      },
+    ),
+    movedEntityIds,
   );
 }
 
@@ -491,6 +525,7 @@ function shouldPressureQuestTarget(enemy: Enemy): boolean {
 function moveQuestSpawnTowardPressureTarget(
   state: GameState,
   enemy: Enemy,
+  movedEntityIds: Set<string>,
 ): GameState {
   const questSpawn = enemy.questSpawn;
   const targetPosition = questSpawn?.targetPosition;
@@ -499,17 +534,21 @@ function moveQuestSpawnTowardPressureTarget(
     return state;
   }
 
-  return moveEntityTowardPositionIfUnoccupied(
-    state,
+  return markEnemyMovedIfPositionChanged(
     enemy,
-    targetPosition,
-    {
-      allowPartyPassThrough: false,
-      pathProfile: "chase",
-      pathTargetKey: `quest:${questSpawn.questId}:${questSpawn.objectiveId}`,
-      pathTargetPosition: targetPosition,
-      speedMultiplier: ENEMY_CHASE_SPEED_MULTIPLIER,
-    },
+    moveEntityTowardPositionIfUnoccupied(
+      state,
+      enemy,
+      targetPosition,
+      {
+        allowPartyPassThrough: false,
+        pathProfile: "chase",
+        pathTargetKey: `quest:${questSpawn.questId}:${questSpawn.objectiveId}`,
+        pathTargetPosition: targetPosition,
+        speedMultiplier: ENEMY_CHASE_SPEED_MULTIPLIER,
+      },
+    ),
+    movedEntityIds,
   );
 }
 
@@ -517,6 +556,7 @@ function moveEnemyTowardRoamTarget(
   state: GameState,
   enemy: Enemy,
   now: number,
+  movedEntityIds: Set<string>,
 ): GameState {
   const roamTarget = enemy.roamTargetPosition;
 
@@ -542,6 +582,7 @@ function moveEnemyTowardRoamTarget(
 
   if (getDistance(enemy.position, movedEnemy.position) > 0.001) {
     recordEnemyRoamMove();
+    movedEntityIds.add(enemy.id);
   }
 
   if (getDistance(movedEnemy.position, movedEnemy.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
@@ -558,6 +599,24 @@ function moveEnemyTowardRoamTarget(
   }
 
   return movedState;
+}
+
+function markEnemyMovedIfPositionChanged(
+  previousEnemy: Enemy,
+  state: GameState,
+  movedEntityIds: Set<string>,
+): GameState {
+  const nextEnemy = getEntityById(state, previousEnemy.id);
+
+  if (
+    nextEnemy &&
+    isEnemy(nextEnemy) &&
+    getDistance(previousEnemy.position, nextEnemy.position) > 0.001
+  ) {
+    movedEntityIds.add(previousEnemy.id);
+  }
+
+  return state;
 }
 
 function finishEnemyRoam(enemy: Enemy, now: number): Enemy {

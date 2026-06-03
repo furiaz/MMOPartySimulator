@@ -19,6 +19,7 @@ import type {
   PartyManagementSection,
   PartyMenuSection,
 } from "./gameMenuTypes";
+import { getNpcInteractionRange } from "./npcInteractionRange";
 import {
   formatQuestStatus,
   getDisplayQuest,
@@ -207,8 +208,6 @@ const poiSearchScopeCycle: PoiSearchScope[] = [
   "zone_only",
   "subzone_only",
 ];
-const questGiverInteractionRange = 2;
-const defaultNpcInteractionRange = 1.5;
 const emptyDirectCompanionCommands: Record<string, DirectCompanionCommand> = {};
 const emptyDropVisualEvents: DropVisualEvent[] = [];
 const emptyEnemyAoeChannels: Record<string, EnemyAoeChannelState> = {};
@@ -474,12 +473,6 @@ function getNpcInteractionKind(npc: NpcEntity): NpcInteractionKind | null {
   }
 
   return null;
-}
-
-function getNpcInteractionRange(npc: NpcEntity): number {
-  return npc.npcRole === "quest_giver"
-    ? questGiverInteractionRange
-    : defaultNpcInteractionRange;
 }
 
 function getPositionDistance(first: Position, second: Position): number {
