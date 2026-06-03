@@ -47,7 +47,10 @@ import {
 } from "./positionUtils";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
-import { getEnemyAttackRange } from "./enemyArchetypes";
+import {
+  getEnemyAttackRange,
+  getEnemyCombatBodyRadius,
+} from "./enemyArchetypes";
 import {
   DEFAULT_COMPANION_ATTACK_RANGE,
   getCompanionAttackRange,
@@ -285,7 +288,7 @@ export function updateAttackSystem(
       nextState,
       currentAttacker,
       target.position,
-      getAttackRange(currentAttacker),
+      getEffectiveAttackRange(currentAttacker, target),
       {
         allowPartyPassThrough: true,
         maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
@@ -321,7 +324,7 @@ export function updateAttackSystem(
         nextState,
         currentAttacker,
         target.position,
-        getAttackRange(currentAttacker),
+        getEffectiveAttackRange(currentAttacker, target),
         attackSlot,
         {
           allowPartyPassThrough: true,
@@ -505,7 +508,10 @@ function isLiveCombatTarget(
 }
 
 function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
-  return getDistance(attacker.position, target.position) <= getAttackRange(attacker);
+  return (
+    getDistance(attacker.position, target.position) <=
+    getEffectiveAttackRange(attacker, target)
+  );
 }
 
 function canAttack(entity: CombatEntity, now: number): boolean {
@@ -598,8 +604,8 @@ function getFinalStepAttackPosition(
   }
 
   const euclideanDistance = getEuclideanDistance(attacker.position, target.position);
-  const attackRange = getAttackRange(attacker);
-  const gap = euclideanDistance - attackRange;
+  const effectiveAttackRange = getEffectiveAttackRange(attacker, target);
+  const gap = euclideanDistance - effectiveAttackRange;
 
   if (gap <= 0 || gap > FINAL_STEP_ATTACK_DISTANCE) {
     return null;
@@ -616,8 +622,8 @@ function getFinalStepAttackPosition(
   }
 
   const finalPosition = {
-    x: target.position.x + (direction.x / directionLength) * attackRange,
-    y: target.position.y + (direction.y / directionLength) * attackRange,
+    x: target.position.x + (direction.x / directionLength) * effectiveAttackRange,
+    y: target.position.y + (direction.y / directionLength) * effectiveAttackRange,
   };
 
   if (
@@ -649,7 +655,7 @@ function moveTowardRequiredSpacedAttackSlot(
     state,
     attacker,
     target.position,
-    getAttackRange(attacker),
+    getEffectiveAttackRange(attacker, target),
     {
       allowPartyPassThrough: true,
       maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
@@ -669,7 +675,7 @@ function moveTowardRequiredSpacedAttackSlot(
     state,
     attacker,
     target.position,
-    getAttackRange(attacker),
+    getEffectiveAttackRange(attacker, target),
     attackSlot,
     {
       allowPartyPassThrough: true,
@@ -704,6 +710,18 @@ function getAttackRange(attacker: GameEntity): number {
   return attacker.kind === "companion"
     ? getCompanionAttackRange(attacker)
     : DEFAULT_COMPANION_ATTACK_RANGE;
+}
+
+function getEffectiveAttackRange(attacker: GameEntity, target: GameEntity): number {
+  return (
+    getAttackRange(attacker) +
+    getCombatBodyRadius(attacker) +
+    getCombatBodyRadius(target)
+  );
+}
+
+function getCombatBodyRadius(entity: GameEntity): number {
+  return isEnemy(entity) ? getEnemyCombatBodyRadius(entity) : 0;
 }
 
 function setCombatSlot(

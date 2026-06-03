@@ -76,6 +76,7 @@ export type EnemyTypeDefinition = {
   attackCooldownMs: number;
   detectionRange: number;
   attackRange?: number;
+  combatBodyRadius?: number;
 };
 
 export type EnemyScalingBand = "starter" | "early";
@@ -1502,6 +1503,7 @@ export type Enemy = LivingEntity & {
   scalingOverrides: string[];
   attackCooldownMs?: number;
   attackRange?: number;
+  combatBodyRadius?: number;
   attackWindupStartedAt?: number;
   attackWindupDurationMs?: number;
   attackWindupTargetId?: string | null;

@@ -63,6 +63,7 @@ describe("enemy respawn system", () => {
       ...createEnemy("enemy", { x: 8, y: 7 }, "aggressive", {
         subzoneId: "north-west",
         encounterAreaId: "shore-fringe-den",
+        combatBodyRadius: 1.75,
       }),
       position: { x: 12, y: 12 },
       state: "dead" as const,
@@ -81,6 +82,7 @@ describe("enemy respawn system", () => {
     const nextState = updateEnemyRespawnSystem(
       state,
       1000 + ENEMY_RESPAWN_DELAY_MS,
+      () => 0.99,
     );
 
     expect(nextState.entities[enemy.id]).toMatchObject({
@@ -91,6 +93,7 @@ describe("enemy respawn system", () => {
       position: enemy.homePosition,
       subzoneId: "north-west",
       encounterAreaId: "shore-fringe-den",
+      combatBodyRadius: 1.75,
     });
     const respawnedEnemy = nextState.entities[enemy.id];
     expect(respawnedEnemy?.kind).toBe("enemy");

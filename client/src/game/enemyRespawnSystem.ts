@@ -73,6 +73,7 @@ function respawnEnemy(
       xpReward: enemy.xpReward,
       attackCooldownMs: enemy.attackCooldownMs,
       attackRange: enemy.attackRange,
+      combatBodyRadius: enemy.combatBodyRadius,
       subzoneId: enemy.subzoneId,
       encounterAreaId: enemy.encounterAreaId,
       variant,

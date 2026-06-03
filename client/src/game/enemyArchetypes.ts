@@ -10,6 +10,7 @@ import type {
 } from "./types";
 
 const DEFAULT_ENEMY_ATTACK_RANGE = 1;
+export const AZURE_MASS_COMBAT_BODY_RADIUS = 2.5;
 
 export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition> = {
   slime: {
@@ -137,6 +138,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     attackCooldownMs: 3000,
     detectionRange: 18,
     attackRange: 2,
+    combatBodyRadius: AZURE_MASS_COMBAT_BODY_RADIUS,
   },
   cave_bat: {
     id: "cave_bat",
@@ -315,5 +317,14 @@ export function getEnemyAttackRange(enemy: Enemy): number {
     getEnemyTypeDefinition(enemy)?.attackRange ??
     getEnemyArchetypeDefinition(enemy)?.defaultAttackRange ??
     DEFAULT_ENEMY_ATTACK_RANGE
+  );
+}
+
+export function getEnemyCombatBodyRadius(enemy: Enemy): number {
+  return Math.max(
+    0,
+    enemy.combatBodyRadius ??
+      getEnemyTypeDefinition(enemy)?.combatBodyRadius ??
+      0,
   );
 }

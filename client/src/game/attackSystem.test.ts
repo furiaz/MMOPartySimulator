@@ -130,6 +130,82 @@ describe("enemy attack leash movement", () => {
     });
   });
 
+  it("lets companions attack Azure Mass from its combat body edge", () => {
+    const companion = {
+      ...createAttackingCompanion("attacker", { x: 3.5, y: 0 }, 0),
+      lastAttackAt: -2000,
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "azure_mass",
+      maxHealth: 50,
+    });
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+    const nextCompanion = nextState.entities[companion.id];
+
+    expect(nextEnemy.health).toBeLessThan(enemy.health);
+    expect(nextCompanion.position).toEqual(companion.position);
+  });
+
+  it("lets Azure Mass attack from its combat body edge", () => {
+    const companion = createIdleCompanion("leader", { x: 4.5, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "azure_mass",
+      }),
+      state: "attack" as const,
+      currentTargetId: companion.id,
+      lastAttackAt: -2000,
+    };
+
+    const windupState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const windupEnemy = windupState.entities[enemy.id] as Enemy;
+
+    expect(windupEnemy.position).toEqual(enemy.position);
+    expect(windupEnemy.attackWindupStartedAt).toBe(1000);
+
+    const nextState = updateAttackSystem(
+      windupState,
+      new Set(),
+      1000 + ENEMY_ATTACK_WINDUP_MS,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+    const nextCompanion = nextState.entities[companion.id];
+
+    expect(nextEnemy.position).toEqual(enemy.position);
+    expect(nextCompanion).toMatchObject({
+      health: companion.health - enemy.attack,
+    });
+  });
+
+  it("keeps normal enemy melee range center-to-center without body spacing", () => {
+    const companion = {
+      ...createAttackingCompanion("attacker", { x: 1.2, y: 0 }, 0),
+      lastAttackAt: -2000,
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      maxHealth: 50,
+    });
+
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBe(enemy.health);
+  });
+
   it("prevents Heavy Slimes from using a basic attack", () => {
     const companion = createIdleCompanion("leader", { x: 1, y: 0 });
     const enemy = {
@@ -199,6 +275,21 @@ describe("enemy attack leash movement", () => {
 
     expect(nextEnemy.health).toBe(enemy.health);
     expect(movedAttacker.position).not.toEqual(attacker.position);
+  });
+
+  it("places attack slots outside Azure Mass combat body spacing", () => {
+    const attacker = createAttackingCompanion("attacker", { x: 1.4, y: 5 }, 0);
+    const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
+      enemyTypeId: "azure_mass",
+      maxHealth: 50,
+    });
+    const state = createState([attacker, enemy]);
+
+    const nextState = updateAttackSystem(state, new Set(), 2000);
+    const cachedSlot = nextState.attackSlotCacheByEntityId?.[attacker.id];
+
+    expect(cachedSlot?.attackRange).toBe(3.5);
+    expect(cachedSlot?.attackSlot).toEqual({ x: 1.5, y: 5 });
   });
 
   it("still attacks from an unspaced position when no spaced combat slot exists", () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ENEMY_ARCHETYPES, ENEMY_TYPES } from "./enemyArchetypes";
+import {
+  AZURE_MASS_COMBAT_BODY_RADIUS,
+  ENEMY_ARCHETYPES,
+  ENEMY_TYPES,
+  getEnemyCombatBodyRadius,
+} from "./enemyArchetypes";
 import { createEnemy } from "./entities";
 
 describe("prototype enemy identity definitions", () => {
@@ -67,6 +72,24 @@ describe("prototype enemy identity definitions", () => {
     expect(enemy.scalingBand).toBe("starter");
     expect(enemy.attackCooldownMs).toBe(2600);
     expect(enemy.attackRange).toBe(4);
+    expect(getEnemyCombatBodyRadius(enemy)).toBe(0);
+  });
+
+  it("configures only Azure Mass with prototype combat body spacing", () => {
+    const azureMass = createEnemy("azure-mass", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "azure_mass",
+    });
+    const normalSlime = createEnemy("normal-slime", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+    });
+
+    expect(ENEMY_TYPES.azure_mass.combatBodyRadius).toBe(
+      AZURE_MASS_COMBAT_BODY_RADIUS,
+    );
+    expect(azureMass.combatBodyRadius).toBe(AZURE_MASS_COMBAT_BODY_RADIUS);
+    expect(getEnemyCombatBodyRadius(azureMass)).toBe(AZURE_MASS_COMBAT_BODY_RADIUS);
+    expect(normalSlime.combatBodyRadius).toBe(0);
+    expect(getEnemyCombatBodyRadius(normalSlime)).toBe(0);
   });
 
   it("creates slime archetypes as passive starter enemies", () => {
@@ -86,6 +109,7 @@ describe("prototype enemy identity definitions", () => {
       attack: 4,
       attackCooldownMs: 500,
       attackRange: 2,
+      combatBodyRadius: 1.25,
     });
 
     expect(enemy.level).toBe(5);
@@ -95,5 +119,6 @@ describe("prototype enemy identity definitions", () => {
     expect(enemy.scalingOverrides).toEqual(["maxHealth", "attack"]);
     expect(enemy.attackCooldownMs).toBe(500);
     expect(enemy.attackRange).toBe(2);
+    expect(enemy.combatBodyRadius).toBe(1.25);
   });
 });

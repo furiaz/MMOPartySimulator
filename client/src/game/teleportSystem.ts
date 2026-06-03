@@ -484,6 +484,7 @@ function getMapEntities(
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
       variant,
+      combatBodyRadius: enemyStart.combatBodyRadius,
       maxHealth: enemyStart.enemyTypeId === "azure_mass" ? 900 : undefined,
       xpReward: enemyStart.enemyTypeId === "azure_mass" ? 160 : undefined,
     });

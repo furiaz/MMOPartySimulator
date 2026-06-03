@@ -1007,6 +1007,7 @@ export type EnemyStartData = {
   subzoneId: string;
   encounterAreaId: string;
   variant?: EnemyVariant;
+  combatBodyRadius?: number;
 };
 
 type DebugMapCreationOptions = {

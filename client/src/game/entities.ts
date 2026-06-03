@@ -77,6 +77,7 @@ type CreateEnemyOptions = {
   variant?: EnemyVariant;
   attackCooldownMs?: number;
   attackRange?: number;
+  combatBodyRadius?: number;
   subzoneId?: string;
   encounterAreaId?: string;
   questSpawn?: Enemy["questSpawn"];
@@ -132,6 +133,7 @@ export function createEnemy(
       options.attackRange ??
       enemyType?.attackRange ??
       archetype?.defaultAttackRange,
+    combatBodyRadius: options.combatBodyRadius ?? enemyType?.combatBodyRadius ?? 0,
     questSpawn: options.questSpawn,
   });
 }
