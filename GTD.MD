@@ -22,7 +22,7 @@ The game is divided into:
 
 - Game Logic: `client/src/game/`
 - UI Layer: React components in `client/src/`
-- World renderer: `client/src/worldRenderer/PixiWorldRenderer.tsx`
+- World renderer: `client/src/worldRenderer/PixiWorldRenderer.tsx` and `client/src/worldRenderer/PixiWorldRendererHelpers.ts`
 - Visual asset registry, image icon mappings, and sprite helpers: `client/src/visualAssets.ts`, `client/src/assetIcons.ts`, and `client/src/SpriteAnimation.tsx`
 
 Game logic must not depend on React or PixiJS.
@@ -70,6 +70,7 @@ Current game-logic implementation files include:
 - `enemyScaling.ts`
 - `enemyVariants.ts`
 - `entities.ts`
+- `entitySeparationSystem.ts`
 - `entityGuards.ts`
 - `equipmentRules.ts`
 - `equipmentSystem.ts`
@@ -83,6 +84,7 @@ Current game-logic implementation files include:
 - `healthSystem.ts`
 - `index.ts`
 - `inventory.ts`
+- `interactionApproach.ts`
 - `items.ts`
 - `leveling.ts`
 - `mapRuntimeCleanup.ts`
@@ -96,6 +98,7 @@ Current game-logic implementation files include:
 - `partyFormationSystem.ts`
 - `partyIntentState.ts`
 - `partyIntentSystem.ts`
+- `partyOrderReachability.ts`
 - `partyProtectionSystem.ts`
 - `partySpacing.ts`
 - `partySystem.ts`
@@ -112,6 +115,7 @@ Current game-logic implementation files include:
 - `questSystem.ts`
 - `questTypes.ts`
 - `resurrectionSystem.ts`
+- `resourceInteraction.ts`
 - `roleProfiles.ts`
 - `roleSystem.ts`
 - `simulationTiming.ts`
@@ -213,8 +217,10 @@ Current movement model supports:
 - simple pathing
 - path retry/backoff data
 - fallback movement
+- interaction stand-position resolution for nearby target interactions
 - party pass-through in specific party movement cases
 - party swaps in specific movement edge cases
+- stationary overlap separation for selected companions, enemies, and NPCs
 - navigation and path performance metrics
 
 Current collision behavior:
@@ -378,9 +384,17 @@ Current POI preferences include:
 - `stayInMap`
 - `searchScope`
 
-`stayInMap` currently represents the Stay in Subzone prototype control.
+Current POI search scope values are:
 
-When enabled, POI and autonomous gatherer selection use the leader's current subzone as a local boundary where supported.
+```ts
+type PoiSearchScope = "free_travel" | "zone_only" | "subzone_only";
+```
+
+`stayInMap` is compatibility state for the older Stay in Subzone prototype control.
+
+`subzone_only` sets `stayInMap` to true and lets POI and autonomous gatherer selection use the leader's current subzone as a local boundary where supported.
+
+`zone_only` keeps autonomous POI selection on the current prototype map without applying leader-subzone filtering. It is not the final zone system.
 
 Current prototype consumable runtime fields include:
 
@@ -799,7 +813,9 @@ Commands can be direct entity commands, party member commands, party member grou
 
 Rules:
 
-- party orders update party intent and assign autonomous member states from that shared intent
+- party orders validate leader reachability, blocked positions, target validity, and path distance before updating shared party intent
+- rejected party orders leave party intent unchanged and record debug telemetry
+- accepted party orders update party intent and assign autonomous member states from that shared intent
 - direct companion commands are stored separately from party intent
 - direct companion commands can target attack, gather, or move behavior for one companion
 - direct companion commands override autonomous behavior for the targeted companion
@@ -910,6 +926,8 @@ Current quest ids are:
 - `rescue_the_grove_runner`
 - `hold_the_field_cache`
 - `open_wolf_causeway`
+- `broken_thicket_survey`
+- `crawler_shelf_report`
 - `find_slimeward_camp`
 
 Current quest display names are:
@@ -922,6 +940,8 @@ Current quest display names are:
 - `rescue_the_grove_runner`: Rescue the Grove Runner
 - `hold_the_field_cache`: Hold the Field Cache
 - `open_wolf_causeway`: Open the Wolf Causeway
+- `broken_thicket_survey`: Broken Thicket Survey
+- `crawler_shelf_report`: Crawler Shelf Report
 - `find_slimeward_camp`: Slimeward Trail
 
 Current quest objective types are:
@@ -957,7 +977,9 @@ Current prototype quest chain:
 - `scout_rise_samples` unlocks `rescue_the_grove_runner`
 - `rescue_the_grove_runner` unlocks `hold_the_field_cache`
 - `hold_the_field_cache` unlocks `open_wolf_causeway`
-- `open_wolf_causeway` unlocks `find_slimeward_camp`
+- `open_wolf_causeway` unlocks `broken_thicket_survey`
+- `broken_thicket_survey` unlocks `crawler_shelf_report`
+- `crawler_shelf_report` unlocks `find_slimeward_camp`
 
 Current quest rewards may include:
 
@@ -1094,6 +1116,10 @@ Current systems and update helpers include:
 - Slimeward Dungeon System
 - Enemy Respawn System
 - Gathering System
+- Entity Separation System
+- Interaction Approach helpers
+- Resource Interaction helpers
+- Party Order Reachability helpers
 - Party Protection System
 - World Wipe Recovery
 - Map Runtime Cleanup helpers
@@ -1158,10 +1184,11 @@ Current high-level order:
 41. Update Slimeward dungeon system
 42. Update enemy respawn system
 43. Update gathering
-44. Update skill shield block positions
-45. Idle autonomous party members when no POI or leader intent is active
-46. Apply debug companion infinite health again when enabled
-47. Record debug telemetry
+44. Update entity separation
+45. Update skill shield block positions
+46. Idle autonomous party members when no POI or leader intent is active
+47. Apply debug companion infinite health again when enabled
+48. Record debug telemetry
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
 
@@ -1194,6 +1221,12 @@ Movement frame/tick cleanup helpers live in `movementState.ts`.
 Movement-related types live in `movementTypes.ts`.
 
 `state.ts` re-exports selected movement helpers for compatibility with existing callers.
+
+`interactionApproach.ts` resolves reachable stand positions near interaction targets while respecting map bounds, walls, collisions, reserved positions, and path reachability.
+
+`resourceInteraction.ts` owns the current prototype resource interaction range constant.
+
+`entitySeparationSystem.ts` owns lightweight stationary overlap cleanup for selected companions, enemies, and NPCs after normal movement and gathering updates.
 
 Navigation helpers live in `navigation.ts`.
 
@@ -1721,33 +1754,22 @@ Enemy drop logic lives in:
 - `dropTables.ts`
 - `dropSystem.ts`
 
-Drops roll by enemy family and loot tier, create short-lived drop visual events, and route completed drops into shared inventory.
+Drops roll by enemy archetype, enemy type exceptions, loot tier, and optional Superior variant, create short-lived drop visual events, and route completed drops into shared inventory.
 
 Drops do not create persistent ground loot.
 
-Current enemy family ids:
+Current drop table ids are derived from enemy archetype, loot tier, optional Superior variant, and selected enemy-type exceptions.
 
 ```ts
-type EnemyFamilyId =
-  | "slime"
-  | "bat"
-  | "spider"
-  | "goblin"
-  | "imp"
-  | "wolf"
-  | "crawler"
-  | "mossling"
-  | "wisp"
-  | "orc";
+type DropTableId =
+  | `${EnemyArchetypeId}_tier_${LootTier}_drops`
+  | `${EnemyArchetypeId}_superior_tier_${LootTier}_drops`
+  | "azure_mass_tier_1_drops"
+  | "goblin_shaman_tier_2_drops"
+  | "goblin_shaman_superior_tier_2_drops";
 ```
 
-Current enemy type aliases enemy family id:
-
-```ts
-type EnemyType = EnemyFamilyId;
-```
-
-Current drop tables are keyed by enemy family and loot tier.
+Current drop tables are keyed by enemy archetype, enemy type exceptions, loot tier, and optional Superior variant.
 
 Loot tier is currently derived from enemy level.
 
@@ -1759,10 +1781,13 @@ Current loot tier behavior:
 
 Current drop table behavior:
 
-- family drop tables may roll common and rare junk drops
-- archetype-specific drop tables may add special exceptions
-- `goblin_shaman` currently has a low-chance tier 2 Holy Lantern equipment drop
-- missing family or tier tables simply produce no drops from that table
+- archetype drop tables may roll common and rare junk drops
+- Superior archetype drop tables may roll higher-yield prototype junk drops
+- enemy-type drop tables may add special exceptions
+- `azure_mass` currently has a type-specific Tier 1 Slime loot table
+- `goblin_shaman` currently has a low-chance Tier 2 Holy Lantern equipment drop
+- Superior `goblin_shaman` currently has a higher prototype Tier 2 Holy Lantern equipment drop chance
+- missing archetype, enemy-type, variant, or tier tables simply produce no drops from that table
 
 Current prototype junk item ids:
 
@@ -2020,6 +2045,7 @@ type GameMap = {
   columns: number;
   rows: number;
   walls: Position[];
+  collisionWalls?: Position[];
   teleports: DebugTeleportPoint[];
   healingFountains: HealingFountain[];
   subzones?: ZoneSubzone[];
@@ -2031,6 +2057,8 @@ type GameMap = {
   navigationGrid?: NavigationGrid;
 };
 ```
+
+`walls` are authored map wall positions. `collisionWalls` are optional extra collision-only blockers used by prototype quest or route state without necessarily changing the main visual wall list.
 
 Current debug map ids:
 
@@ -2329,6 +2357,7 @@ Current visual and rendering files:
 - `client/src/assetIcons.ts`
 - `client/src/SpriteAnimation.tsx`
 - `client/src/worldRenderer/PixiWorldRenderer.tsx`
+- `client/src/worldRenderer/PixiWorldRendererHelpers.ts`
 
 Current public asset path root:
 
@@ -2423,6 +2452,8 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 Debug telemetry records simulation information for inspection.
 
 Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, Superior enemy spawning, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, quest drop visuals, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, direct command issue/rejection/replacement/completion/cancellation/grace events, resurrection target selection, resurrection participant assignment, resurrection area progress, resurrection participant removal, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
+
+Party-order rejection telemetry currently uses `party_order_rejected` for invalid, blocked, or unreachable party orders.
 
 Telemetry snapshots may include tick, current map id, current map display name, current map debug name, active teleport id, active teleport source map, active teleport target map, teleport trigger source, entity id, kind, class id, role, state, position, target, command priority, character level, character XP, XP to next level, XP progress percent, last XP gained, movement result, reason, formation phase, formation slot data, target distance, intended position, blocker data, and navigation data.
 

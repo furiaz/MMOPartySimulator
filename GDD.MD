@@ -340,6 +340,13 @@ Gatherers are allowed to temporarily leave the group while gathering.
 
 Direct-commanded party members are not forced back into group movement by autonomous behavior.
 
+Current prototype movement also includes lightweight overlap cleanup:
+
+- stationary overlapping companions, normal enemies, and NPCs may be nudged apart when an available position exists
+- moving entities, reserved positions, walls, active resources, and blocked positions are respected
+- companions and small/simple enemies may be pushed; NPCs can participate as overlap sources but are not general movement actors
+- this is a readability and unclogging aid, not a final crowd simulation, physics system, or collision-push combat mechanic
+
 This is an automatic prototype movement aid, not a final formation editor, tactical formation system, or player-authored positioning system.
 
 ---
@@ -551,9 +558,9 @@ Current prototype enemy types:
 
 Slimeward-specific enemy types currently use the Slime archetype/family and exist for the Slimeward dungeon prototype.
 
-Prototype enemy archetypes/families provide lightweight defaults such as display name, default combat style, default attack range, default temperament, and drop-family identity.
+Prototype enemy archetypes/families provide lightweight defaults such as display name, default combat style, default attack range, and default temperament.
 
-Prototype enemy types provide current setup values such as level, attack cooldown, detection range, attack range override, temperament, combat style override, and target preference.
+Prototype enemy types provide current setup values such as level, attack cooldown, detection range, attack range override, combat body radius, temperament, combat style override, and target preference.
 
 Prototype enemy archetypes and enemy types are not final bestiary content, final encounter design, faction design, AI behavior trees, production combat roles, or XP reward tables.
 ---
@@ -574,9 +581,12 @@ Resources:
 
 Gathering is task-based, not manual.
 
-Gatherers search for valid resources, move to them, gather over time, then return to party behavior when the task is finished, invalid, unsafe, or no longer worth pursuing.
+Gatherers and collectors search for or receive valid resources, move to an open reachable stand position near the resource when needed, gather over time while within the current prototype resource interaction range, then return to party behavior when the task is finished, invalid, unsafe, or no longer worth pursuing.
 
-Resources may limit how many gatherers can gather them at once.
+Current prototype resource interaction range is 2.
+
+Resources may limit how many gatherers or collectors can gather them at once.
+
 
 Current resource categories:
 
@@ -663,12 +673,15 @@ Enemy drops currently use lightweight prototype drop tables.
 
 Current enemy drop behavior:
 
-- defeated enemies may roll drops by enemy family and loot tier
+- defeated enemies may roll drops by enemy archetype, enemy type, loot tier, and optional Superior variant
 - loot tier is currently derived from enemy level
 - Tier 1 currently covers enemies below level 10
 - Tier 2 currently covers enemies level 10 and above
-- family/tier drops route prototype junk items into shared inventory
-- Goblin Shaman may also roll a low-chance archetype-specific Holy Lantern equipment drop at Tier 2
+- archetype/tier drops route prototype junk items into shared inventory
+- Superior enemies use higher-yield prototype drop tables where supported
+- Azure Mass currently has a type-specific Slime loot table
+- Goblin Shaman may also roll a low-chance type-specific Holy Lantern equipment drop at Tier 2
+- Superior Goblin Shaman has a higher prototype Holy Lantern drop chance
 - drop results use short-lived visual feedback before being routed into shared inventory
 - drops do not create persistent ground loot
 - inventory overflow may partially or fully reject dropped items
@@ -914,6 +927,8 @@ Direct orders:
 - start a short rejoin grace period after normal completion or cancellation
 
 Direct gather orders respect resource `maxGatherers`.
+
+Direct party orders may be rejected without changing party intent when the target is invalid, blocked, or unreachable. Rejections should be recorded through debug telemetry.
 
 A direct-commanded companion may temporarily attack a personal threat or movement blocker while keeping direct-command priority.
 
@@ -1230,11 +1245,23 @@ Current prototype quests:
   - Quest id: open_wolf_causeway
   - Objectives: escort the Causeway Worker, defend the Wolf Causeway blockage, defeat the causeway elite, and unlock the map-3 route
   - Rewards: 100 Crowns, 40 character XP, 1 Bulwark Cuirass, 1 Plain Charm
+  - Unlocks: Broken Thicket Survey
+
+- Broken Thicket Survey
+  - Quest id: broken_thicket_survey
+  - Objectives: inspect the Broken Thicket trail marker, collect 5 Crawler Shell Fragment quest drops in Broken Thicket, and gather 2 Herbs in Broken Thicket
+  - Rewards: 35 Crowns, 10 character XP, 1 Hearty Trail Rations
+  - Unlocks: Crawler Shelf Report
+
+- Crawler Shelf Report
+  - Quest id: crawler_shelf_report
+  - Objectives: inspect the Crawler Shelf overlook, collect 4 Shelf Rune Scrap quest drops in Crawler Shelf, and repair the Crawler Shelf route marker
+  - Rewards: 45 Crowns, 12 character XP, 1 Minor Recovery Flask
   - Unlocks: Slimeward Trail
 
 - Slimeward Trail
   - Quest id: find_slimeward_camp
-  - Objectives: unlock the Slimeward Camp route from Third Wild Zone
+  - Objectives: inspect the Slimeward Camp teleporter, defeat 4 Mosslings in Imp Fen, collect 4 Teleporter Stabilizer quest drops in Imp Fen, repair the Slimeward Camp teleporter, and unlock the Slimeward Camp route
   - Rewards: 25 Crowns, 10 character XP
 
 The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches interaction range.
@@ -1295,11 +1322,11 @@ POI selection should prefer progression-relevant targets before generic local ac
 Current intended POI priority order:
 
 1. active World Travel route target
-2. active quest objective on the current map
-3. ready quest turn-in target
-4. available quest acceptance target on the current map
-5. quest-required prototype teleport when the active objective is on another reachable prototype map
-6. hub Merchant quick exchange when eligible junk is available
+2. eligible hub Merchant quick exchange when eligible junk is available and the Merchant is unlocked
+3. active quest objective on the current map
+4. ready quest turn-in target
+5. available quest acceptance target on the current map
+6. quest-required prototype teleport when the active objective is on another reachable prototype map
 7. reachable wild combat target when combat fallback is relevant
 8. reachable wild resource target when gathering fallback is relevant
 9. reachable exploration or inspect target for quest objectives
@@ -1312,6 +1339,15 @@ POI selection should avoid selecting invalid, unreachable, depleted, dead, compl
 POI selection may use path distance, priority, target scoring, progressive fallback, local target preference, and short commitment windows to avoid unstable target switching.
 
 When Stay in Subzone is enabled, POI selection should prefer targets inside the leader's current subzone while still allowing valid teleport POIs and local quest interactions.
+
+
+Current prototype UI exposes POI search scope as Free Travel, Zone Only, and Subzone Only.
+
+- Free Travel allows current prototype route and map travel where supported.
+- Zone Only keeps autonomous POI selection on the current prototype map.
+- Subzone Only keeps autonomous POI selection inside the leader's current subzone where supported.
+
+Zone Only is a prototype map-scope control and must not be treated as the final zone system.
 
 POI direction may route the leader toward:
 
