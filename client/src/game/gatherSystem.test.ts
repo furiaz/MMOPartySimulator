@@ -3,6 +3,7 @@ import { createCompanion, createResource } from "./entities";
 import { updateGatherSystem } from "./gatherSystem";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 import { createTestGameState } from "./testState";
+import type { GameMap } from "./types";
 
 describe("gather system interaction range", () => {
   it("lets a collector gather at the resource interaction edge without moving closer", () => {
@@ -67,4 +68,44 @@ describe("gather system interaction range", () => {
       durability: resource.durability,
     });
   });
+
+  it("moves toward an open stand position without reporting the resource cell as blocked", () => {
+    const resource = createResource("resource", { x: 5, y: 5 });
+    const collector = {
+      ...createCompanion("collector", { x: 1, y: 5 }, "collector", "fighter"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+    const state = createTestGameState({
+      entities: {
+        [collector.id]: collector,
+        [resource.id]: resource,
+      },
+      map: createOpenMap(),
+      partyLeaderId: collector.id,
+      simulationDeltaMs: 100,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = updateGatherSystem(state, new Set(), 1_000);
+
+    expect(nextState.entities[collector.id].position.x).toBeGreaterThan(
+      collector.position.x,
+    );
+    expect(nextState.movementFailuresByEntityId?.[collector.id]).toBeUndefined();
+  });
 });
+
+function createOpenMap(): GameMap {
+  return {
+    displayName: "Open Gather Test Map",
+    debugName: "open-gather-test-map",
+    columns: 8,
+    rows: 8,
+    walls: [],
+    teleports: [],
+    healingFountains: [],
+  };
+}

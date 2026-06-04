@@ -14,6 +14,7 @@ import {
   getPartyLeader,
   isGathererBusy,
   isPartyMember,
+  isPartyMemberBusyGatheringResource,
   type PartyMember,
 } from "./partySystem";
 import {
@@ -99,7 +100,7 @@ export function canAssignPartyTravelTarget(
     member.commandPriority !== "direct" &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member)) &&
-    (hasPlayerIntent || !isGathererBusy(state, member))
+    (hasPlayerIntent || !isPartyMemberBusyGatheringResource(state, member))
   );
 }
 
@@ -124,7 +125,7 @@ export function canAssignPartyCombatTarget(
     member.commandPriority !== "direct" &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member)) &&
-    (hasPlayerIntent || !isGathererBusy(state, member))
+    (hasPlayerIntent || !isPartyMemberBusyGatheringResource(state, member))
   );
 }
 
@@ -141,7 +142,7 @@ export function canAssignSelfDefenseTarget(
     return true;
   }
 
-  return member.commandPriority !== "direct" && !isGathererBusy(state, member);
+  return member.commandPriority !== "direct" && !isPartyMemberBusyGatheringResource(state, member);
 }
 
 export function isRequiredForTravelCohesion(
@@ -156,6 +157,10 @@ export function isRequiredForTravelCohesion(
     isCompanionAssignedToResurrectionRecovery(state, member.id) ||
     isPartyMemberRespondingToActiveThreat(state, member)
   ) {
+    return false;
+  }
+
+  if (isPartyMemberBusyGatheringResource(state, member)) {
     return false;
   }
 

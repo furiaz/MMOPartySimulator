@@ -152,6 +152,7 @@ export type LocalPoiTarget = {
   category: PoiCategory;
   mapId: DebugMapId;
   position: Position;
+  interactionRange?: number;
   targetEntityId?: string;
   questId?: QuestId;
   objectiveId?: string;
@@ -167,6 +168,7 @@ export type PoiConsideration = {
   priority: number;
   pathDistance: number;
   score?: number;
+  interactionRange?: number;
   targetEntityId?: string;
   questId?: QuestId;
   objectiveId?: string;

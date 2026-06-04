@@ -30,6 +30,7 @@ import {
 } from "./questSystem";
 import { isTeleportWorking } from "./teleportState";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
+import { QUEST_REPAIR_RANGE } from "./questGuideSystem";
 import { getNextWorldTravelTeleport } from "./worldTravelRouting";
 import {
   getCurrentPartyGatherResourceTargetId,
@@ -963,6 +964,7 @@ function toPoiConsideration(
     priority: target.priority,
     score: target.score,
     pathDistance: target.pathDistance,
+    interactionRange: target.localTarget.interactionRange,
     targetEntityId: target.localTarget.targetEntityId,
     questId: target.localTarget.questId,
     objectiveId: target.localTarget.objectiveId,
@@ -1286,9 +1288,20 @@ function createObjectivePositionPoi(
     mapId,
     displayName: QUEST_DEFINITIONS[questId].displayName,
     position: objective.targetPosition ?? getMapExplorationTarget(mapId),
+    interactionRange: getObjectivePoiInteractionRange(objective),
     linkedQuestId: questId,
     linkedObjectiveId: objective.id,
   };
+}
+
+function getObjectivePoiInteractionRange(
+  objective: QuestObjectiveDefinition,
+): number | undefined {
+  if (objective.type === "repair_poi" || objective.type === "defend_area") {
+    return QUEST_REPAIR_RANGE;
+  }
+
+  return undefined;
 }
 
 function createGuideObjectivePoi(
@@ -1350,6 +1363,7 @@ function toLocalTarget(
     category: poi.category,
     mapId: poi.mapId,
     position: poi.position,
+    interactionRange: poi.interactionRange,
     targetEntityId: poi.targetEntityId,
     questId: details.questId ?? poi.linkedQuestId,
     objectiveId: details.objectiveId ?? poi.linkedObjectiveId,

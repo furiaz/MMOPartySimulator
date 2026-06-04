@@ -14,8 +14,9 @@ import {
 } from "./state";
 import {
   getBoundedPathDistance,
-  moveEntityTowardIfUnoccupied,
+  moveEntityTowardPositionIfUnoccupied,
 } from "./movementPlanning";
+import { resolveInteractionStandPosition } from "./interactionApproach";
 import { getPartyExecutionIntent } from "./partyIntentState";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
@@ -119,10 +120,18 @@ export function updateGatherSystem(
         continue;
       }
 
-      nextState = moveEntityTowardIfUnoccupied(nextState, gatherer, resource, {
+      const standPosition =
+        resolveInteractionStandPosition(
+          nextState,
+          gatherer,
+          resource.position,
+          RESOURCE_INTERACTION_RANGE,
+        ) ?? resource.position;
+
+      nextState = moveEntityTowardPositionIfUnoccupied(nextState, gatherer, standPosition, {
         pathProfile: "gather",
         pathTargetKey: `gather:${resource.id}`,
-        pathTargetPosition: resource.position,
+        pathTargetPosition: standPosition,
       });
       if (didEntityMove(nextState, gatherer)) {
         movedEntityIds.add(gatherer.id);

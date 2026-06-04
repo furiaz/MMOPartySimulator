@@ -2,6 +2,7 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getSlimewardDungeonPoiTarget } from "./dungeonSystem";
 import { HUB_MAP_ID } from "./debugMap";
 import { getQuickExchangeItems, quickExchangeParts } from "./merchant";
+import { resolveInteractionStandPosition } from "./interactionApproach";
 import {
   getPartyLeader,
   hasDeadPartyMembers,
@@ -44,6 +45,7 @@ import {
 import type { PoiCategory } from "./poiTypes";
 import type {
   Enemy,
+  GameEntity,
   Position,
   ResourceType,
 } from "./types";
@@ -219,7 +221,7 @@ function canReuseWildPoiSelection(
 
   return (
     getDistance(leader.position, state.localPoiTarget.position) >
-    DEFAULT_POI_INTERACTION_RANGE
+    getLocalTargetInteractionRange(state.localPoiTarget)
   );
 }
 
@@ -415,7 +417,7 @@ function updateReachedQuestInspectInteraction(state: GameState): GameState {
     !target?.questId ||
     !target.objectiveId ||
     target.mapId !== state.currentMapId ||
-    getDistance(leader.position, target.position) > DEFAULT_POI_INTERACTION_RANGE
+    getDistance(leader.position, target.position) > getLocalTargetInteractionRange(target)
   ) {
     return state;
   }
@@ -527,13 +529,22 @@ function applyLocalTargetToPartyIntent(
   const targetEntity = localTarget.targetEntityId
     ? getEntityById(state, localTarget.targetEntityId)
     : undefined;
+  const baseTargetPosition = targetEntity?.position ?? localTarget.position;
+  const targetPosition = leader
+    ? getLocalTargetMovementPosition(
+        state,
+        leader,
+        localTarget,
+        baseTargetPosition,
+      )
+    : baseTargetPosition;
   const executionIntent = {
     type: getPoiExecutionIntentType(localTarget.category),
     targetId:
       localTarget.category === "combat" || localTarget.category === "resource"
         ? localTarget.targetEntityId ?? null
         : null,
-    targetPosition: targetEntity?.position ?? localTarget.position,
+    targetPosition,
     source: "ai" as const,
   };
   const nextState = setPartyIntent(state, {
@@ -571,6 +582,31 @@ function applyLocalTargetToPartyIntent(
         : null,
     commandPriority: "autonomous",
   });
+}
+
+function getLocalTargetMovementPosition(
+  state: GameState,
+  leader: GameEntity,
+  localTarget: LocalPoiTarget,
+  targetPosition: Position,
+): Position {
+  if (
+    localTarget.category === "combat" ||
+    localTarget.category === "resource" ||
+    localTarget.category === "teleport" ||
+    !localTarget.interactionRange
+  ) {
+    return targetPosition;
+  }
+
+  return (
+    resolveInteractionStandPosition(
+      state,
+      leader,
+      targetPosition,
+      localTarget.interactionRange,
+    ) ?? targetPosition
+  );
 }
 
 function applyActivePartyThreatToPartyIntent(
@@ -630,6 +666,10 @@ function getPoiExecutionIntentType(
   }
 
   return "move";
+}
+
+function getLocalTargetInteractionRange(target: LocalPoiTarget): number {
+  return target.interactionRange ?? DEFAULT_POI_INTERACTION_RANGE;
 }
 
 function getResourceTypeFromLocalTarget(

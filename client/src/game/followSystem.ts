@@ -5,7 +5,11 @@ import {
 } from "./state";
 import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
-import { getPartyLeader, isGathererBusy, isPartyMember } from "./partySystem";
+import {
+  getPartyLeader,
+  isPartyMember,
+  isPartyMemberBusyGatheringResource,
+} from "./partySystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getPartyMovementTargetPosition } from "./partyTargetSystem";
 import { arePositionsEqual, getGridDistance } from "./positionUtils";
@@ -33,7 +37,7 @@ export function updateFollowSystem(
       follower.id === leader.id ||
       isCompanionAssignedToResurrectionRecovery(nextState, follower.id) ||
       follower.commandPriority === "direct" ||
-      isGathererBusy(nextState, follower) ||
+      isPartyMemberBusyGatheringResource(nextState, follower) ||
       movedEntityIds.has(follower.id)
     ) {
       continue;

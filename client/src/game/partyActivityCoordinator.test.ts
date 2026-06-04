@@ -183,6 +183,32 @@ describe("party activity coordinator", () => {
     expect(canAssignPartyCombatTarget(state, gatherer, true)).toBe(true);
   });
 
+  it("preserves non-Gatherer-role collectors during AI travel and combat retasks", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const resource = createResource("resource", { x: 2, y: 0 });
+    const collector = {
+      ...createCompanion("collector", { x: 1, y: 0 }, leader.id, "defender"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [collector.id]: collector,
+        [resource.id]: resource,
+      },
+      partyLeaderId: leader.id,
+    });
+
+    expect(canAssignPartyTravelTarget(state, collector, leader.id, false)).toBe(
+      false,
+    );
+    expect(canAssignPartyCombatTarget(state, collector, false)).toBe(false);
+    expect(isRequiredForTravelCohesion(state, collector, leader)).toBe(false);
+    expect(canAssignPartyTravelTarget(state, collector, leader.id, true)).toBe(true);
+    expect(canAssignPartyCombatTarget(state, collector, true)).toBe(true);
+  });
+
   it("ignores direct-command grace and personal threat responders for travel cohesion", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const graceFollower = createCompanion(

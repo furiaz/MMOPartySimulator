@@ -13,7 +13,7 @@ import {
   hasDirectPlayerPartyIntent,
   setPartyExecutionIntent,
 } from "./partyIntentState";
-import { isGathererBusy, isPartyMember } from "./partySystem";
+import { isPartyMember, isPartyMemberBusyGatheringResource } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
 
@@ -177,7 +177,7 @@ function canProtectPartyMember(
   if (
     entity.kind === "companion" &&
     entity.id !== attackedMember.id &&
-    isGathererBusy(state, entity)
+    isPartyMemberBusyGatheringResource(state, entity)
   ) {
     return false;
   }

@@ -423,9 +423,15 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent).toMatchObject({
       type: "move",
     });
-    expect(nextState.leaderIntent?.targetPosition).toEqual(
+    expect(nextState.leaderIntent?.targetPosition).not.toEqual(
       nextState.localPoiTarget?.position,
     );
+    expect(
+      getDistance(
+        nextState.leaderIntent?.targetPosition,
+        nextState.localPoiTarget?.position,
+      ),
+    ).toBeLessThanOrEqual(1.5);
 
     const guideAfterFirstTick = nextState.entities[QUEST_GUIDE_NPC_ID];
     const reusedState = updateGame(nextState, { deltaMs: 100 });
@@ -438,8 +444,16 @@ describe("game update intent priority", () => {
     });
     expect(reusedState.leaderIntent).toMatchObject({
       type: "move",
-      targetPosition: guideAfterFirstTick?.position,
     });
+    expect(reusedState.leaderIntent?.targetPosition).not.toEqual(
+      guideAfterFirstTick?.position,
+    );
+    expect(
+      getDistance(
+        reusedState.leaderIntent?.targetPosition,
+        guideAfterFirstTick?.position,
+      ),
+    ).toBeLessThanOrEqual(1.5);
   });
 
   it("spawns the guide during the active Map 1 quest flow and waits for contact", () => {
@@ -690,9 +704,10 @@ describe("game update intent priority", () => {
       category: "npc",
       targetEntityId: QUEST_GUIDE_NPC_ID,
     });
-    expect(nextState.leaderIntent).toMatchObject({
-      targetPosition: guide.position,
-    });
+    expect(nextState.leaderIntent?.targetPosition).not.toEqual(guide.position);
+    expect(
+      getDistance(nextState.leaderIntent?.targetPosition, guide.position),
+    ).toBeLessThanOrEqual(1.5);
     expect(nextState.leaderIntent?.type).not.toBe("attack");
     expect(nextState.entities[leader.id]).not.toMatchObject({
       state: "attack",
@@ -5246,4 +5261,15 @@ function markObjectiveCompleted(
     currentCount,
     completed: true,
   };
+}
+
+function getDistance(
+  first: Position | null | undefined,
+  second: Position | null | undefined,
+): number {
+  if (!first || !second) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.hypot(second.x - first.x, second.y - first.y);
 }

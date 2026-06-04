@@ -12,6 +12,7 @@ import {
 import { createCompanion, createEnemy, createNpc, createResource } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import { selectPoiTarget } from "./poiTargetSelection";
+import { QUEST_REPAIR_RANGE } from "./questGuideSystem";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { createInitialQuestStates } from "./questSystem";
@@ -85,11 +86,14 @@ describe("POI target selection", () => {
     );
 
     expect(selection.localTarget?.poiId).toBe(npcIds[1]);
+    expect(selection.localTarget?.interactionRange).toBe(1.5);
     expect(selection.consideredTargets.map((target) => target.poiId)).toEqual([
       npcIds[1],
       npcIds[0],
       "hub-idle-city-point",
     ]);
+    expect(selection.consideredTargets[0].interactionRange).toBe(1.5);
+    expect(selection.consideredTargets[1].interactionRange).toBe(2);
     expect(selection.consideredTargets.map((target) => target.priority)).toEqual([
       10,
       30,
@@ -118,6 +122,37 @@ describe("POI target selection", () => {
       poiId: "hub-to-map-1",
       category: "teleport",
       reason: "world route toward map-4",
+    });
+  });
+
+  it("preserves repair and defend objective interaction ranges on local targets", () => {
+    const leader = createLeader({ x: 99, y: 25 });
+    const state = createGameState(MAP_TWO_ID, [leader], {
+      partyLeaderId: leader.id,
+      quests: createQuestStates({
+        hold_the_field_cache: "active",
+      }),
+    });
+
+    const selection = selectPoiTarget(
+      state,
+      {
+        type: "complete_current_quest",
+        questId: "hold_the_field_cache",
+        objectiveId: "defend_old_grove_cache",
+        reason: "active quest objective",
+      },
+      createEmptyReservations(),
+    );
+
+    expect(selection.localTarget).toMatchObject({
+      poiId: "old-grove-field-cache",
+      category: "exploration",
+      interactionRange: QUEST_REPAIR_RANGE,
+    });
+    expect(selection.consideredTargets[0]).toMatchObject({
+      poiId: "old-grove-field-cache",
+      interactionRange: QUEST_REPAIR_RANGE,
     });
   });
 
@@ -338,7 +373,7 @@ function createLeader(position: Position, role: "fighter" | "gatherer" = "fighte
 }
 
 function createGameState(
-  mapId: typeof HUB_MAP_ID | typeof MAP_ONE_ID,
+  mapId: typeof HUB_MAP_ID | typeof MAP_ONE_ID | typeof MAP_TWO_ID,
   entities: GameEntity[],
   overrides: Partial<GameState> = {},
 ): GameState {

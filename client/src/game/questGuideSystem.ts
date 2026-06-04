@@ -29,7 +29,7 @@ export const QUEST_GUIDE_OBJECTIVE_ID = "escort_lower_shore_worker";
 
 const QUEST_GUIDE_CONTACT_RANGE = 1.5;
 const QUEST_GUIDE_COMPLETION_RANGE = 1.5;
-const QUEST_REPAIR_RANGE = 2;
+export const QUEST_REPAIR_RANGE = 2;
 const QUEST_RESCUE_SAFE_RANGE = 8;
 const QUEST_DEFENSE_DEFAULT_RADIUS = 14;
 

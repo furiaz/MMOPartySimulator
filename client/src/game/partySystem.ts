@@ -45,13 +45,13 @@ export function getOrderedPartyMembers(state: GameState): PartyMember[] {
 
 export function getOrderedFormationMembers(state: GameState): PartyMember[] {
   return getOrderedPartyMembers(state).filter(
-    (entity) => !isGathererBusy(state, entity),
+    (entity) => !isPartyMemberBusyGatheringResource(state, entity),
   );
 }
 
 export function getRequiredFormationMembers(state: GameState): PartyMember[] {
   return getOrderedPartyMembers(state).filter(
-    (entity) => entity.role !== "gatherer" || !isGathererBusy(state, entity),
+    (entity) => !isPartyMemberBusyGatheringResource(state, entity),
   );
 }
 
@@ -60,6 +60,21 @@ export function isGathererBusy(
   entity: PartyMember,
 ): boolean {
   if (entity.role !== "gatherer" || entity.state !== "gather") {
+    return false;
+  }
+
+  const target = entity.currentTargetId
+    ? getEntityById(state, entity.currentTargetId)
+    : undefined;
+
+  return isActiveResource(target);
+}
+
+export function isPartyMemberBusyGatheringResource(
+  state: GameState,
+  entity: PartyMember,
+): boolean {
+  if (entity.state !== "gather") {
     return false;
   }
 

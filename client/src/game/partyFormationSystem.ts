@@ -7,8 +7,8 @@ import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getPartyLeader,
   getPartyMembers,
-  isGathererBusy,
   isPartyMember,
+  isPartyMemberBusyGatheringResource,
   type PartyMember,
 } from "./partySystem";
 import { isPartyMemberRespondingToActiveThreat } from "./partyThreatSystem";
@@ -382,6 +382,7 @@ function moveLeaderTowardPoi(
   }
 
   if (
+    isLocalInteractionTargetReached(state, leader) ||
     getDistance(leader.position, plan.targetPosition) <=
     getPoiReachedDistance(state, plan)
   ) {
@@ -414,9 +415,11 @@ function getPoiReachedDistance(
   state: GameState,
   plan: PartyActivityPlan,
 ): number {
-  return isGatherPoiTarget(state, plan)
-    ? RESOURCE_INTERACTION_RANGE
-    : POI_REACHED_DISTANCE;
+  if (isGatherPoiTarget(state, plan)) {
+    return RESOURCE_INTERACTION_RANGE;
+  }
+
+  return POI_REACHED_DISTANCE;
 }
 
 function isGatherPoiTarget(
@@ -453,7 +456,7 @@ function moveFollowersTowardLeader(
       member.commandPriority === "direct" ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       isPartyMemberRespondingToActiveThreat(nextState, member) ||
-      isGathererBusy(nextState, member) ||
+      isPartyMemberBusyGatheringResource(nextState, member) ||
       movedEntityIds.has(member.id)
     ) {
       continue;
@@ -520,6 +523,7 @@ function maybeFinishReachedPoi(
   if (
     !leader ||
     !isPartyMember(leader) ||
+    !isLocalInteractionTargetReached(state, leader) &&
     getDistance(leader.position, plan.targetPosition) > POI_REACHED_DISTANCE
   ) {
     return state;
@@ -540,6 +544,21 @@ function maybeFinishReachedPoi(
   }
 
   return setPartyExecutionIntent(clearFormationTarget(state), null);
+}
+
+function isLocalInteractionTargetReached(
+  state: GameState,
+  leader: PartyMember,
+): boolean {
+  const localTarget = state.localPoiTarget;
+
+  return Boolean(
+    localTarget?.interactionRange &&
+      localTarget.category !== "teleport" &&
+      localTarget.category !== "combat" &&
+      localTarget.category !== "resource" &&
+      getDistance(leader.position, localTarget.position) <= localTarget.interactionRange,
+  );
 }
 
 function isActiveGuidePoi(state: GameState): boolean {
