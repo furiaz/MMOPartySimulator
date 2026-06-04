@@ -24,7 +24,8 @@ import { addItemToInventoryState } from "./inventory";
 import { createInitialQuestStates } from "./questSystem";
 import {
   QUEST_GUIDE_NPC_ID,
-  QUEST_GUIDE_ESCORT_RANGE,
+  QUEST_GUIDE_COMPANION_ESCORT_RANGE,
+  QUEST_GUIDE_ENEMY_PAUSE_RANGE,
   QUEST_GUIDE_MOVE_SPEED_MULTIPLIER,
   QUEST_GUIDE_START_POSITION,
   QUEST_GUIDE_TARGET_POSITION,
@@ -456,6 +457,75 @@ describe("game update intent priority", () => {
     ).toBeLessThanOrEqual(1.5);
   });
 
+  it("holds Map 2 escort party movement near the active guide", () => {
+    const leader = createLeader({ x: 8.5, y: 29 });
+    const follower = {
+      ...createCompanion("escort-follower", { x: 8, y: 30 }, leader.id),
+      state: "follow" as const,
+      currentTargetId: leader.id,
+    };
+    const guide = {
+      ...createNpc(
+        "map-2-causeway-worker",
+        { x: 8, y: 29 },
+        "Causeway Worker",
+        "quest_guide",
+      ),
+      state: "follow" as const,
+    };
+
+    const nextState = updateGame(
+      createMapTwoState([leader, follower, guide], {
+        partyLeaderId: leader.id,
+        quests: createActiveCausewayGuideQuestStates(),
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "npc",
+      targetEntityId: "map-2-causeway-worker",
+      objectiveId: "escort_causeway_worker",
+    });
+    expect(nextState.entities[leader.id]?.position).toEqual(leader.position);
+    expect(nextState.entities[follower.id]?.position).toEqual(follower.position);
+  });
+
+  it("keeps the Map 2 guide objective active and catches up past escort resume distance", () => {
+    const leader = createLeader({ x: 4, y: 29 });
+    const guide = {
+      ...createNpc(
+        "map-2-causeway-worker",
+        { x: 8, y: 29 },
+        "Causeway Worker",
+        "quest_guide",
+      ),
+      state: "follow" as const,
+    };
+
+    const nextState = updateGame(
+      createMapTwoState([leader, guide], {
+        partyLeaderId: leader.id,
+        quests: createActiveCausewayGuideQuestStates(),
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      category: "npc",
+      targetEntityId: "map-2-causeway-worker",
+      objectiveId: "escort_causeway_worker",
+    });
+    expect(nextState.partyFormation).toMatchObject({
+      phase: "traveling",
+    });
+    expect(nextState.entities[leader.id]?.position.x).toBeGreaterThan(
+      leader.position.x,
+    );
+  });
+
   it("spawns the guide during the active Map 1 quest flow and waits for contact", () => {
     const leader = createLeader({ x: 7, y: 29 });
     const earlyState = updateGame(
@@ -484,6 +554,47 @@ describe("game update intent priority", () => {
       kind: "npc",
       npcRole: "quest_guide",
       state: "follow",
+    });
+  });
+
+  it("starts the guide when the leader is within the contact range", () => {
+    const leader = createLeader({
+      x: QUEST_GUIDE_START_POSITION.x - 2.4,
+      y: QUEST_GUIDE_START_POSITION.y,
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        quests: createActiveGuideQuestStates(),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.entities[QUEST_GUIDE_NPC_ID]).toMatchObject({
+      state: "follow",
+    });
+  });
+
+  it("keeps the guide waiting when the leader is outside the contact range", () => {
+    const leader = createLeader({
+      x: QUEST_GUIDE_START_POSITION.x - 2.6,
+      y: QUEST_GUIDE_START_POSITION.y,
+    });
+
+    const nextState = updateGame(
+      createMapOneState([leader], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        quests: createActiveGuideQuestStates(),
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.entities[QUEST_GUIDE_NPC_ID]).toMatchObject({
+      state: "idle",
+      position: QUEST_GUIDE_START_POSITION,
     });
   });
 
@@ -561,7 +672,7 @@ describe("game update intent priority", () => {
 
   it("pauses the guide when all companions are outside escort range", () => {
     const leader = createLeader({
-      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_ESCORT_RANGE - 1,
+      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_COMPANION_ESCORT_RANGE - 1,
       y: QUEST_GUIDE_START_POSITION.y,
     });
     const guide = {
@@ -587,7 +698,7 @@ describe("game update intent priority", () => {
 
   it("resumes guide movement when a companion is inside escort range", () => {
     const leader = createLeader({
-      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_ESCORT_RANGE + 1,
+      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_COMPANION_ESCORT_RANGE + 1,
       y: QUEST_GUIDE_START_POSITION.y,
     });
     const guide = {
@@ -608,6 +719,132 @@ describe("game update intent priority", () => {
 
     expect(nextState.entities[QUEST_GUIDE_NPC_ID]?.position.x).toBeGreaterThan(
       QUEST_GUIDE_START_POSITION.x,
+    );
+  });
+
+  it("keeps the guide moving past non-targeting enemies outside escort pause range", () => {
+    const leader = createLeader({
+      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_COMPANION_ESCORT_RANGE + 1,
+      y: QUEST_GUIDE_START_POSITION.y,
+    });
+    const guide = {
+      ...createQuestGuideNpc(),
+      state: "follow" as const,
+    };
+    const idleEnemy = {
+      ...createEnemy(
+        "idle-outside-escort-pause",
+        {
+          x: QUEST_GUIDE_START_POSITION.x + QUEST_GUIDE_ENEMY_PAUSE_RANGE + 1,
+          y: QUEST_GUIDE_START_POSITION.y,
+        },
+        "passive",
+        {
+          enemyTypeId: "forest_spider",
+          subzoneId: "lower-shore",
+        },
+      ),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, guide, idleEnemy], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        quests: createActiveGuideQuestStates(),
+        map: undefined,
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.entities[QUEST_GUIDE_NPC_ID]?.position.x).toBeGreaterThan(
+      QUEST_GUIDE_START_POSITION.x,
+    );
+  });
+
+  it("pauses the guide for enemies inside escort pause range", () => {
+    const leader = createLeader({
+      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_COMPANION_ESCORT_RANGE + 1,
+      y: QUEST_GUIDE_START_POSITION.y,
+    });
+    const guide = {
+      ...createQuestGuideNpc(),
+      state: "follow" as const,
+    };
+    const nearbyEnemy = {
+      ...createEnemy(
+        "idle-inside-escort-pause",
+        {
+          x: QUEST_GUIDE_START_POSITION.x + QUEST_GUIDE_ENEMY_PAUSE_RANGE - 0.25,
+          y: QUEST_GUIDE_START_POSITION.y,
+        },
+        "passive",
+        {
+          enemyTypeId: "forest_spider",
+          subzoneId: "lower-shore",
+        },
+      ),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, guide, nearbyEnemy], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        quests: createActiveGuideQuestStates(),
+        map: undefined,
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.entities[QUEST_GUIDE_NPC_ID]?.position).toEqual(
+      QUEST_GUIDE_START_POSITION,
+    );
+  });
+
+  it("pauses the guide when an enemy is actively targeting the party", () => {
+    const leader = createLeader({
+      x: QUEST_GUIDE_START_POSITION.x - QUEST_GUIDE_COMPANION_ESCORT_RANGE + 1,
+      y: QUEST_GUIDE_START_POSITION.y,
+    });
+    const guide = {
+      ...createQuestGuideNpc(),
+      state: "follow" as const,
+    };
+    const activeThreat = {
+      ...createEnemy(
+        "party-targeting-escort-threat",
+        {
+          x: QUEST_GUIDE_START_POSITION.x + QUEST_GUIDE_ENEMY_PAUSE_RANGE + 4,
+          y: QUEST_GUIDE_START_POSITION.y,
+        },
+        "aggressive",
+        {
+          enemyTypeId: "forest_spider",
+          subzoneId: "lower-shore",
+        },
+      ),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, guide, activeThreat], {
+        autoModeEnabled: false,
+        partyLeaderId: leader.id,
+        quests: createActiveGuideQuestStates(),
+        map: undefined,
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.entities[QUEST_GUIDE_NPC_ID]?.position).toEqual(
+      QUEST_GUIDE_START_POSITION,
     );
   });
 
@@ -741,6 +978,9 @@ describe("game update intent priority", () => {
       type: "attack",
       targetId: escortThreat.id,
     });
+    expect(nextState.partyFormation).toMatchObject({
+      phase: "combat",
+    });
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: escortThreat.id,
@@ -814,6 +1054,170 @@ describe("game update intent priority", () => {
     expect(nextState.entities[defender.id]).not.toMatchObject({
       state: "attack",
       currentTargetId: outsideThreat.id,
+    });
+  });
+
+  it("holds repair POI formation while repair progress is incomplete", () => {
+    const leader = createLeader(QUEST_GUIDE_TARGET_POSITION);
+    const follower = {
+      ...createCompanion("repair-follower", { x: 154, y: 29 }, leader.id),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+    const repairState = updateGame(
+      createMapOneState([leader, follower], {
+        partyLeaderId: leader.id,
+        quests: createActiveRepairQuestStates(),
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+    const heldState = updateGame(repairState, { deltaMs: 100 });
+
+    expect(heldState.localPoiTarget).toMatchObject({
+      category: "exploration",
+      objectiveId: "repair_lower_shore_blockage",
+    });
+    expect(getPartyExecutionIntent(heldState)).toMatchObject({
+      type: "explore",
+    });
+    expect(
+      getDistance(
+        getPartyExecutionIntent(heldState)?.targetPosition,
+        QUEST_GUIDE_TARGET_POSITION,
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(heldState.partyFormation).toMatchObject({
+      phase: "traveling",
+    });
+    expect(heldState.entities[follower.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+    expect(repairState.entities[leader.id]?.position).toEqual(leader.position);
+    expect(repairState.entities[follower.id]?.position).toEqual(follower.position);
+    expect(heldState.entities[leader.id]?.position).toEqual(leader.position);
+    expect(heldState.entities[follower.id]?.position).toEqual(follower.position);
+    expect(
+      heldState.quests.break_lower_shore_blockage.runtime
+        ?.repairProgressMsByObjectiveId?.repair_lower_shore_blockage,
+    ).toBeGreaterThan(0);
+    expect(
+      heldState.quests.break_lower_shore_blockage.objectiveProgress
+        .repair_lower_shore_blockage.completed,
+    ).toBe(false);
+  });
+
+  it("holds defend-area POI formation while defense progress is incomplete", () => {
+    const targetPosition = { x: 100, y: 25 };
+    const leader = createLeader(targetPosition);
+    const follower = {
+      ...createCompanion("defense-follower", { x: 99, y: 25 }, leader.id),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+    const defenseState = updateGame(
+      createMapTwoState([leader, follower], {
+        partyLeaderId: leader.id,
+        quests: createActiveDefendQuestStates(),
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+    const heldState = updateGame(defenseState, { deltaMs: 100 });
+
+    expect(heldState.localPoiTarget).toMatchObject({
+      category: "exploration",
+      objectiveId: "defend_old_grove_cache",
+    });
+    expect(getPartyExecutionIntent(heldState)).toMatchObject({
+      type: "explore",
+    });
+    expect(
+      getDistance(getPartyExecutionIntent(heldState)?.targetPosition, targetPosition),
+    ).toBeLessThanOrEqual(1);
+    expect(heldState.partyFormation).toMatchObject({
+      phase: "traveling",
+    });
+    expect(heldState.entities[follower.id]).toMatchObject({
+      state: "follow",
+      currentTargetId: leader.id,
+    });
+    expect(defenseState.entities[leader.id]?.position).toEqual(leader.position);
+    expect(defenseState.entities[follower.id]?.position).toEqual(follower.position);
+    expect(heldState.entities[leader.id]?.position).toEqual(leader.position);
+    expect(heldState.entities[follower.id]?.position).toEqual(follower.position);
+    expect(
+      heldState.quests.hold_the_field_cache.runtime
+        ?.repairProgressMsByObjectiveId?.defend_old_grove_cache,
+    ).toBeGreaterThan(0);
+    expect(
+      heldState.quests.hold_the_field_cache.objectiveProgress
+        .defend_old_grove_cache.completed,
+    ).toBe(false);
+  });
+
+  it("still completes repair POIs after the required progress", () => {
+    const leader = createLeader(QUEST_GUIDE_TARGET_POSITION);
+
+    const nextState = advanceGameTicks(
+      createMapOneState([leader], {
+        partyLeaderId: leader.id,
+        quests: createActiveRepairQuestStates(),
+      }),
+      80,
+    );
+
+    expect(
+      nextState.quests.break_lower_shore_blockage.objectiveProgress
+        .repair_lower_shore_blockage.completed,
+    ).toBe(true);
+
+    const resumedState = updateGame(nextState, {
+      nowMs: 8_100,
+      deltaMs: 100,
+    });
+
+    expect(resumedState.localPoiTarget?.objectiveId).not.toBe(
+      "repair_lower_shore_blockage",
+    );
+  });
+
+  it("switches to combat instead of holding a reached repair POI", () => {
+    const leader = createLeader(QUEST_GUIDE_TARGET_POSITION);
+    const follower = {
+      ...createCompanion("repair-threat-follower", { x: 154, y: 29 }, leader.id),
+      state: "idle" as const,
+      currentTargetId: null,
+    };
+    const attacker = {
+      ...createEnemy("repair-poi-attacker", { x: 152, y: 29 }, "aggressive", {
+        enemyTypeId: "forest_spider",
+        subzoneId: "lower-shore",
+      }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+
+    const nextState = updateGame(
+      createMapOneState([leader, follower, attacker], {
+        partyLeaderId: leader.id,
+        quests: createActiveRepairQuestStates(),
+        simulationDeltaMs: 100,
+      }),
+      { deltaMs: 100 },
+    );
+
+    expect(nextState.localPoiTarget).toMatchObject({
+      objectiveId: "repair_lower_shore_blockage",
+    });
+    expect(nextState.partyFormation).toMatchObject({
+      phase: "combat",
+      targetId: attacker.id,
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: attacker.id,
     });
   });
 
@@ -5201,6 +5605,31 @@ function createActiveGuideQuestStates() {
   );
 
   return quests;
+}
+
+function createActiveRepairQuestStates() {
+  const quests = createActiveGuideQuestStates();
+
+  markObjectiveCompleted(
+    quests,
+    "break_lower_shore_blockage",
+    "escort_lower_shore_worker",
+    1,
+  );
+
+  return quests;
+}
+
+function createActiveDefendQuestStates() {
+  return createQuestStates({
+    hold_the_field_cache: "active",
+  });
+}
+
+function createActiveCausewayGuideQuestStates() {
+  return createQuestStates({
+    open_wolf_causeway: "active",
+  });
 }
 
 function createPostGuideQuestStates() {

@@ -312,6 +312,7 @@ export type FullRenderSignatureInput = {
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   visualMovementByEntityId: Record<string, FullRenderVisualMovement>;
 };
@@ -897,6 +898,7 @@ export function getFullRenderSignature({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  suppressMovePoiRing,
   teleportWorkingById,
   visualMovementByEntityId,
 }: FullRenderSignatureInput): string {
@@ -941,6 +943,7 @@ export function getFullRenderSignature({
     getEventSignature(dropVisualEvents, getDropVisualSignature),
     getRecordSignature(enemyAoeChannelsByCasterId, getEnemyAoeChannelSignature),
     getEventSignature(skillVisualEvents, getSkillVisualSignature),
+    suppressMovePoiRing ? "move-ring-suppressed" : "move-ring-visible",
     getRecordSignature(skillBindsByEnemyId, getSkillBindSignature),
     getRecordSignature(skillMarksByEnemyId, getSkillMarkSignature),
     getRecordSignature(skillShieldBlocksById, getSkillShieldBlockSignature),

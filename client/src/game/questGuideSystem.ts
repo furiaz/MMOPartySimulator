@@ -23,11 +23,12 @@ export const QUEST_GUIDE_NPC_ID = "map-1-route-worker";
 export const QUEST_GUIDE_START_POSITION: Position = { x: 110, y: 29 };
 export const QUEST_GUIDE_TARGET_POI_ID = "lower-shore-route-blockage";
 export const QUEST_GUIDE_TARGET_POSITION: Position = { x: 153, y: 29 };
-export const QUEST_GUIDE_ESCORT_RANGE = 7;
-export const QUEST_GUIDE_MOVE_SPEED_MULTIPLIER = 0.7;
+export const QUEST_GUIDE_COMPANION_ESCORT_RANGE = 3;
+export const QUEST_GUIDE_ENEMY_PAUSE_RANGE = 3;
+export const QUEST_GUIDE_MOVE_SPEED_MULTIPLIER = 1;
 export const QUEST_GUIDE_OBJECTIVE_ID = "escort_lower_shore_worker";
 
-const QUEST_GUIDE_CONTACT_RANGE = 1.5;
+const QUEST_GUIDE_CONTACT_RANGE = 2.5;
 const QUEST_GUIDE_COMPLETION_RANGE = 1.5;
 export const QUEST_REPAIR_RANGE = 2;
 const QUEST_RESCUE_SAFE_RANGE = 8;
@@ -131,6 +132,26 @@ export function isQuestGuideObjectiveRelevant(state: GameState): boolean {
   return Boolean(context && isQuestNpcObjective(context.objective));
 }
 
+export function getActiveQuestGuideObjectiveId(state: GameState): string | null {
+  const context = getActiveObjectiveContext(state);
+
+  return context?.objective.type === "guide_npc_to_poi"
+    ? context.objective.id
+    : null;
+}
+
+export function isActiveRepairOrDefenseObjectiveRelevant(state: GameState): boolean {
+  const context = getActiveObjectiveContext(state);
+
+  return Boolean(
+    context &&
+      context.objective.targetMapId === state.currentMapId &&
+      state.localPoiTarget?.objectiveId === context.objective.id &&
+      (context.objective.type === "repair_poi" ||
+        context.objective.type === "defend_area"),
+  );
+}
+
 function updateEscortObjective(
   state: GameState,
   context: ActiveObjectiveContext,
@@ -172,7 +193,7 @@ function updateEscortObjective(
 
   if (
     guide.state !== "follow" ||
-    hasNearbyLivingEnemies(nextState, guide.position, QUEST_GUIDE_ESCORT_RANGE) ||
+    hasEscortGuideThreat(nextState, guide) ||
     !isAnyCompanionWithinEscortRange(nextState, guide.position)
   ) {
     return nextState;
@@ -597,6 +618,25 @@ function hasNearbyLivingEnemies(
   );
 }
 
+function hasEscortGuideThreat(state: GameState, guide: NpcEntity): boolean {
+  const livingPartyMemberIds = new Set(
+    getPartyMembers(state)
+      .filter((member) => member.state !== "dead")
+      .map((member) => member.id),
+  );
+
+  return Object.values(state.entities).some(
+    (entity) =>
+      entity.kind === "enemy" &&
+      entity.state !== "dead" &&
+      (getDistance(entity.position, guide.position) <=
+        QUEST_GUIDE_ENEMY_PAUSE_RANGE ||
+        entity.currentTargetId === guide.id ||
+        (entity.currentTargetId !== null &&
+          livingPartyMemberIds.has(entity.currentTargetId))),
+  );
+}
+
 function isEntityTargetedByEnemy(state: GameState, entityId: string): boolean {
   return Object.values(state.entities).some(
     (entity) =>
@@ -613,7 +653,8 @@ function isAnyCompanionWithinEscortRange(
   return getPartyMembers(state).some(
     (member) =>
       member.state !== "dead" &&
-      getDistance(member.position, position) <= QUEST_GUIDE_ESCORT_RANGE,
+      getDistance(member.position, position) <=
+        QUEST_GUIDE_COMPANION_ESCORT_RANGE,
   );
 }
 

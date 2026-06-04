@@ -25,7 +25,7 @@ import {
 } from "./roleSystem";
 import {
   getActiveQuestGuide,
-  QUEST_GUIDE_ESCORT_RANGE,
+  QUEST_GUIDE_ENEMY_PAUSE_RANGE,
 } from "./questGuideSystem";
 import { getActivePartyThreatTarget } from "./partyThreatSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
@@ -334,7 +334,8 @@ function isRelevantGuideEscortThreat(
 
   return (
     !guide ||
-    getGridDistance(enemy.position, guide.position) <= QUEST_GUIDE_ESCORT_RANGE
+    getGridDistance(enemy.position, guide.position) <=
+      QUEST_GUIDE_ENEMY_PAUSE_RANGE
   );
 }
 

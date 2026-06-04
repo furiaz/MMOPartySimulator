@@ -1066,6 +1066,32 @@ function getPerformanceMemorySnapshot(): PerformanceMemorySnapshot | null {
   return (performance as BrowserPerformance).memory ?? null;
 }
 
+function shouldSuppressEscortGuideMovePoiRing(state: GameState): boolean {
+  const target = state.localPoiTarget;
+  const activeQuest = getActiveQuest(state);
+
+  if (
+    !target ||
+    target.category !== "npc" ||
+    target.reason !== "active quest guide objective" ||
+    state.partyIntent?.source !== "ai" ||
+    state.partyIntent.executionIntent?.type !== "move" ||
+    state.partyIntent.executionIntent.source !== "ai" ||
+    !activeQuest ||
+    activeQuest.status !== "active" ||
+    activeQuest.questId !== target.questId ||
+    !target.objectiveId
+  ) {
+    return false;
+  }
+
+  return (
+    QUEST_DEFINITIONS[activeQuest.questId].objectives.find(
+      (objective) => objective.id === target.objectiveId,
+    )?.type === "guide_npc_to_poi"
+  );
+}
+
 function bytesToMegabytes(bytes: number): number {
   return bytes / 1024 / 1024;
 }
@@ -1985,6 +2011,8 @@ function App() {
       ? selectedQuestId
       : activeQuestIds[0] ?? null;
   const questGiverHasWork = hasQuestGiverWork(gameState);
+  const suppressEscortGuideMovePoiRing =
+    shouldSuppressEscortGuideMovePoiRing(gameState);
   const questInspectMarkers = useMemo(() => {
     const activeQuest = getActiveQuest(gameState);
 
@@ -3454,6 +3482,7 @@ function App() {
               skillMarksByEnemyId={skillMarksByEnemyId}
               skillShieldBlocksById={skillShieldBlocksById}
               skillVisualEvents={skillVisualEvents}
+              suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}
               visualMovementByEntityId={visualMovementByEntityId}
@@ -3478,6 +3507,7 @@ function App() {
               mode="preview"
               onFloorClick={commandPartyToMoveFromMinimapPosition}
               onPerformanceSample={handleRendererPerformanceSample}
+              suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}
             />

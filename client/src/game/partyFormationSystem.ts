@@ -14,8 +14,10 @@ import {
 import { isPartyMemberRespondingToActiveThreat } from "./partyThreatSystem";
 import { isTeleportWorking } from "./teleportState";
 import {
-  QUEST_GUIDE_OBJECTIVE_ID,
+  getActiveQuestGuide,
+  getActiveQuestGuideObjectiveId,
   isQuestGuideObjectiveRelevant,
+  isActiveRepairOrDefenseObjectiveRelevant,
 } from "./questGuideSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import {
@@ -62,6 +64,8 @@ export {
 
 const LEADER_COHESION_SLOW_SPEED_MULTIPLIER = 0.45;
 const FOLLOWER_CATCH_UP_SPEED_MULTIPLIER = 1.8;
+const ESCORT_GUIDE_HOLD_DISTANCE = 0.75;
+const ESCORT_GUIDE_RESUME_DISTANCE = 1.25;
 
 type PartyTravelCohesion = {
   canMoveLeader: boolean;
@@ -112,24 +116,80 @@ export function updatePartyFormationSystem(
 
   nextState = assignPartyTravelTargets(nextState, leader, plan);
 
-  const handoffActive = isLeaderHandoffActive(nextState, leader);
-  const travelCohesion = getPartyTravelCohesion(nextState, leader);
+  const smallObjectiveHoldActive = isSmallObjectiveHoldActive(
+    nextState,
+    leader.id,
+    plan,
+  );
 
-  if (travelCohesion.canMoveLeader || handoffActive) {
-    nextState = moveLeaderTowardPoi(
+  if (smallObjectiveHoldActive) {
+    markSmallObjectiveHoldMembers(nextState, movedEntityIds);
+  } else {
+    const handoffActive = isLeaderHandoffActive(nextState, leader);
+    const travelCohesion = getPartyTravelCohesion(nextState, leader);
+
+    if (travelCohesion.canMoveLeader || handoffActive) {
+      nextState = moveLeaderTowardPoi(
+        nextState,
+        leader.id,
+        plan,
+        movedEntityIds,
+        handoffActive ? 1 : travelCohesion.leaderSpeedMultiplier,
+      );
+    }
+
+    nextState = moveFollowersTowardLeader(
       nextState,
       leader.id,
-      plan,
       movedEntityIds,
-      handoffActive ? 1 : travelCohesion.leaderSpeedMultiplier,
+      plan,
     );
   }
-
-  nextState = moveFollowersTowardLeader(nextState, leader.id, movedEntityIds);
 
   return consumeLeaderHandoffTick(
     maybeFinishReachedPoi(nextState, leader.id, plan),
     leader.id,
+  );
+}
+
+function markSmallObjectiveHoldMembers(
+  state: GameState,
+  movedEntityIds: Set<string>,
+): void {
+  for (const member of getPartyMembers(state)) {
+    if (
+      member.state === "dead" ||
+      member.commandPriority === "direct" ||
+      isCompanionAssignedToResurrectionRecovery(state, member.id) ||
+      isPartyMemberRespondingToActiveThreat(state, member) ||
+      isPartyMemberBusyGatheringResource(state, member)
+    ) {
+      continue;
+    }
+
+    movedEntityIds.add(member.id);
+  }
+}
+
+function isSmallObjectiveHoldActive(
+  state: GameState,
+  leaderId: string,
+  plan: PartyActivityPlan,
+): boolean {
+  if (
+    plan.phase !== "traveling" ||
+    plan.target ||
+    !isActiveRepairOrDefenseObjectiveRelevant(state)
+  ) {
+    return false;
+  }
+
+  const leader = getEntityById(state, leaderId);
+
+  return Boolean(
+    leader &&
+      isPartyMember(leader) &&
+      isLocalInteractionTargetReached(state, leader),
   );
 }
 
@@ -381,6 +441,18 @@ function moveLeaderTowardPoi(
     return state;
   }
 
+  const escortGuide = getActiveEscortGuide(state);
+
+  if (
+    escortGuide &&
+    plan.phase === "traveling" &&
+    canHoldNearEscortGuide(state, leader) &&
+    getDistance(leader.position, escortGuide.position) <=
+      ESCORT_GUIDE_RESUME_DISTANCE
+  ) {
+    return state;
+  }
+
   if (
     isLocalInteractionTargetReached(state, leader) ||
     getDistance(leader.position, plan.targetPosition) <=
@@ -442,9 +514,12 @@ function moveFollowersTowardLeader(
   state: GameState,
   leaderId: string,
   movedEntityIds: Set<string>,
+  plan: PartyActivityPlan,
 ): GameState {
   let nextState = state;
   const leader = getEntityById(nextState, leaderId);
+  const escortGuide =
+    plan.phase === "traveling" ? getActiveEscortGuide(nextState) : null;
 
   if (!leader || !isPartyMember(leader)) {
     return nextState;
@@ -462,16 +537,31 @@ function moveFollowersTowardLeader(
       continue;
     }
 
-    if (
-      getDistance(member.position, leader.position) <= FOLLOW_DISTANCE &&
-      !isStackedWithPartyMember(nextState, member)
-    ) {
-      continue;
-    }
-
     const currentMember = getEntityById(nextState, member.id);
 
     if (!currentMember || !isPartyMember(currentMember)) {
+      continue;
+    }
+
+    if (escortGuide && canHoldNearEscortGuide(nextState, currentMember)) {
+      const escortGuideDistance = getDistance(
+        currentMember.position,
+        escortGuide.position,
+      );
+
+      if (
+        shouldHoldNearEscortGuide(escortGuideDistance) &&
+        !isStackedWithPartyMember(nextState, currentMember)
+      ) {
+        movedEntityIds.add(currentMember.id);
+        continue;
+      }
+    }
+
+    if (
+      getDistance(currentMember.position, leader.position) <= FOLLOW_DISTANCE &&
+      !isStackedWithPartyMember(nextState, currentMember)
+    ) {
       continue;
     }
 
@@ -543,6 +633,10 @@ function maybeFinishReachedPoi(
     return state;
   }
 
+  if (isActiveRepairOrDefenseObjectiveRelevant(state)) {
+    return state;
+  }
+
   return setPartyExecutionIntent(clearFormationTarget(state), null);
 }
 
@@ -564,8 +658,34 @@ function isLocalInteractionTargetReached(
 function isActiveGuidePoi(state: GameState): boolean {
   return (
     isQuestGuideObjectiveRelevant(state) &&
-    state.localPoiTarget?.objectiveId === QUEST_GUIDE_OBJECTIVE_ID
+    state.localPoiTarget?.objectiveId === getActiveQuestGuideObjectiveId(state)
   );
+}
+
+function getActiveEscortGuide(state: GameState): GameEntity | null {
+  if (!isActiveGuidePoi(state)) {
+    return null;
+  }
+
+  return getActiveQuestGuide(state);
+}
+
+function canHoldNearEscortGuide(state: GameState, member: PartyMember): boolean {
+  return (
+    member.state !== "dead" &&
+    member.commandPriority !== "direct" &&
+    !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
+    !isPartyMemberBusyGatheringResource(state, member) &&
+    !isPartyMemberRespondingToActiveThreat(state, member)
+  );
+}
+
+function shouldHoldNearEscortGuide(distance: number): boolean {
+  if (distance <= ESCORT_GUIDE_HOLD_DISTANCE) {
+    return true;
+  }
+
+  return distance <= ESCORT_GUIDE_RESUME_DISTANCE;
 }
 
 function clearFinishedCombat(state: GameState): GameState {

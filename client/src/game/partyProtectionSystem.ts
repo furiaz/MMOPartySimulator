@@ -2,7 +2,7 @@ import { isWithinFollowLeash } from "./followSystem";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getActiveQuestGuide,
-  QUEST_GUIDE_ESCORT_RANGE,
+  QUEST_GUIDE_ENEMY_PAUSE_RANGE,
 } from "./questGuideSystem";
 import {
   updateEntity,
@@ -77,7 +77,7 @@ function isRelevantGuideEscortAttack(
 
   return (
     getGridDistance(attacker.position, guide.position) <=
-      QUEST_GUIDE_ESCORT_RANGE
+      QUEST_GUIDE_ENEMY_PAUSE_RANGE
   );
 }
 

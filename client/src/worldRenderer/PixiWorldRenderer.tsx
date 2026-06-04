@@ -177,6 +177,7 @@ type PixiWorldRendererProps = {
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillVisualEvents?: SkillVisualEvent[];
+  suppressMovePoiRing?: boolean;
   teleportWorkingById?: Record<string, boolean>;
   viewportSize?: ViewportSize;
   visualMovementByEntityId?: Record<string, EntityVisualMovement>;
@@ -352,6 +353,7 @@ type DrawWorldOptions = {
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
   fullHadTimedWorkRef: { current: boolean };
@@ -4587,6 +4589,7 @@ function drawFullMap({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  suppressMovePoiRing,
   teleportWorkingById,
   textureCache,
   visualMovementByEntityId,
@@ -4617,6 +4620,7 @@ function drawFullMap({
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
@@ -4886,7 +4890,11 @@ function drawFullMap({
     ? entities.find((entity) => entity.id === leaderIntent.targetId)
     : undefined;
 
-  if (leaderIntent?.type === "move" && leaderIntent.targetPosition) {
+  if (
+    leaderIntent?.type === "move" &&
+    leaderIntent.targetPosition &&
+    !suppressMovePoiRing
+  ) {
     drawPoiRing(overlayGraphics, leaderIntent.targetPosition, transform, 0xfacc15);
   } else if (targetEntity) {
     drawPoiRing(overlayGraphics, targetEntity.position, transform, 0xf97316);
@@ -4931,6 +4939,7 @@ function drawWorld({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  suppressMovePoiRing,
   teleportWorkingById,
   textureCache,
   viewportSize,
@@ -4973,6 +4982,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      suppressMovePoiRing,
       teleportWorkingById,
       visualMovementByEntityId,
     });
@@ -5021,6 +5031,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      suppressMovePoiRing,
       teleportWorkingById,
       textureCache,
       visualMovementByEntityId,
@@ -5164,6 +5175,7 @@ export function PixiWorldRenderer({
   skillMarksByEnemyId = {},
   skillShieldBlocksById = {},
   skillVisualEvents = [],
+  suppressMovePoiRing = false,
   teleportWorkingById = {},
   viewportSize,
   visualMovementByEntityId = {},
@@ -5206,6 +5218,7 @@ export function PixiWorldRenderer({
   const latestSkillMarksByEnemyIdRef = useRef(skillMarksByEnemyId);
   const latestSkillShieldBlocksByIdRef = useRef(skillShieldBlocksById);
   const latestSkillVisualEventsRef = useRef(skillVisualEvents);
+  const latestSuppressMovePoiRingRef = useRef(suppressMovePoiRing);
   const latestTeleportWorkingByIdRef = useRef(teleportWorkingById);
   const latestVisualMovementByEntityIdRef = useRef(visualMovementByEntityId);
   const companionDragStateRef = useRef<CompanionDragState | null>(null);
@@ -5254,6 +5267,7 @@ export function PixiWorldRenderer({
     latestSkillMarksByEnemyIdRef.current = skillMarksByEnemyId;
     latestSkillShieldBlocksByIdRef.current = skillShieldBlocksById;
     latestSkillVisualEventsRef.current = skillVisualEvents;
+    latestSuppressMovePoiRingRef.current = suppressMovePoiRing;
     latestTeleportWorkingByIdRef.current = teleportWorkingById;
     latestVisualMovementByEntityIdRef.current = visualMovementByEntityId;
   }, [
@@ -5279,6 +5293,7 @@ export function PixiWorldRenderer({
     skillMarksByEnemyId,
     skillShieldBlocksById,
     skillVisualEvents,
+    suppressMovePoiRing,
     teleportWorkingById,
     sortedEntities,
     viewportSize,
@@ -5383,6 +5398,7 @@ export function PixiWorldRenderer({
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
         skillVisualEvents: latestSkillVisualEventsRef.current,
+        suppressMovePoiRing: latestSuppressMovePoiRingRef.current,
         teleportWorkingById: latestTeleportWorkingByIdRef.current,
         textureCache: textureCacheRef.current,
         viewportSize: latestViewportSizeRef.current,

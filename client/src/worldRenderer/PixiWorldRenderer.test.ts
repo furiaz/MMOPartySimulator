@@ -378,6 +378,7 @@ function createFullRenderSignatureInput(
     skillMarksByEnemyId: {},
     skillShieldBlocksById: {},
     skillVisualEvents: [],
+    suppressMovePoiRing: false,
     teleportWorkingById: {},
     visualMovementByEntityId: {},
     ...overrides,
@@ -459,6 +460,12 @@ describe("getFullRenderSignature", () => {
       getFullRenderSignature({
         ...input,
         renderSize: { width: 640, height: 360 },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        suppressMovePoiRing: true,
       }),
     ).not.toBe(baseSignature);
     expect(
