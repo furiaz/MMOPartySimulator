@@ -499,7 +499,7 @@ describe("texture lifetime classification", () => {
     expect(durableSources.has(enemySpottedAlertSrc)).toBe(true);
     expect(durableSources.has(MAP_OBJECT_ICON_SRC.teleportGood)).toBe(false);
     expect(
-      [...durableSources].some((src) => src.includes("/Asserts/Characters/Beginner/")),
+      [...durableSources].some((src) => src.includes("/assets/Characters/Beginner/")),
     ).toBe(true);
   });
 

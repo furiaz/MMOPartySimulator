@@ -188,7 +188,7 @@ const gameVersion = "0.01";
 const currencyGainFeedbackDurationMs = 1200;
 const directCommandFeedbackDurationMs = 1400;
 const currencyGainBurstSrc =
-  "Asserts/Generated/prototype-vfx/sprites/currency-gain-burst.png";
+  "assets/Generated/prototype-vfx/sprites/currency-gain-burst.png";
 const mapConstructionCellPixelSize = 32;
 const visualMovementGraceMs = 180;
 const visualMovementEnemyViewportMarginTiles = 6;

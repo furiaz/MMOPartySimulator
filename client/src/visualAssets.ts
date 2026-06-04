@@ -63,15 +63,15 @@ export type MapTileVisualAsset = {
   className: string;
 };
 
-const testCharacterBasePath = "/Asserts/Characters/Test-Character";
-const beginnerCharacterBasePath = "/Asserts/Characters/Beginner";
-const testEnemyBasePath = "/Asserts/Characters/Test-Enemy";
-const testEnemyTwoBasePath = "/Asserts/Characters/Test-Enemy2";
-const prototypeEnemyBasePath = "/Asserts/Characters/Prototype-Enemies";
-const slimewardDungeonAssetPath = "/Asserts/Generated/Dungeon Generation";
-const bossSlimeTestAssetPath = "/Asserts/Characters/BossSlimeTest";
-const testNpcBasePath = "/Asserts/Characters/Test-NPC";
-const classPortraitBasePath = "/Asserts/Generated/class-portraits";
+const testCharacterBasePath = "/assets/Characters/Test-Character";
+const beginnerCharacterBasePath = "/assets/Characters/Beginner";
+const testEnemyBasePath = "/assets/Characters/Test-Enemy";
+const testEnemyTwoBasePath = "/assets/Characters/Test-Enemy2";
+const prototypeEnemyBasePath = "/assets/Characters/Prototype-Enemies";
+const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
+const bossSlimeTestAssetPath = "/assets/Characters/BossSlimeTest";
+const testNpcBasePath = "/assets/Characters/Test-NPC";
+const classPortraitBasePath = "/assets/Generated/class-portraits";
 const defaultFrameDurationMs = 100;
 
 function createFrames(

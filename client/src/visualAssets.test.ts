@@ -28,7 +28,7 @@ describe("entity visual assets", () => {
     const eastRunAnimation = getSpriteAnimation(visualAsset, true, "east");
 
     expect(idleAnimation.frames).toEqual([
-      "/Asserts/Characters/Test-Character/Idle/Idle_000.png",
+      "/assets/Characters/Test-Character/Idle/Idle_000.png",
     ]);
     expect(eastRunAnimation.frames).toHaveLength(8);
     expect(eastRunAnimation.frames.every((frame) => frame.includes("/Run/"))).toBe(

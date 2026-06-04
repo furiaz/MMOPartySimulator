@@ -56,7 +56,7 @@ export const MIN_RENDER_FRAME_MS = 1000 / MAX_RENDER_FPS;
 const wildernessMapIds = new Set(["map-1", "map-2", "map-3", "map-4"]);
 const aggressiveEnemyNameplateColor = 0xdc2626;
 const passiveEnemyNameplateColor = 0x1f2937;
-const prototypeVfxSpritePath = "Asserts/Generated/prototype-vfx/sprites";
+const prototypeVfxSpritePath = "assets/Generated/prototype-vfx/sprites";
 
 export const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 export const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;

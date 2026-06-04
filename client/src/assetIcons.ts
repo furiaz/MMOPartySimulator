@@ -7,15 +7,15 @@ import type {
   SkillId,
 } from "./game";
 
-const nowAssetPackPath = "/Asserts/Generated/now-pack";
-const wildernessMapAssetPath = "/Asserts/Generated/map-wilderness";
-const hubFloorAssetPath = "/Asserts/Generated/hub-floors";
-const hubCastleWallAssetPath = "/Asserts/Generated/hub-castle-walls";
-const hubStructureAssetPath = "/Asserts/Generated/hub-structures/256";
-const teleportAssetPath = "/Asserts/Generated/teleports";
-const passageBlockerAssetPath = "/Asserts/Generated/passage-blockers";
-const slimewardDungeonAssetPath = "/Asserts/Generated/Dungeon Generation";
-const beginnerSkillEffectsPath = "/Asserts/Generated/beginner-skill-effects-50/sprites";
+const nowAssetPackPath = "/assets/Generated/now-pack";
+const wildernessMapAssetPath = "/assets/Generated/map-wilderness";
+const hubFloorAssetPath = "/assets/Generated/hub-floors";
+const hubCastleWallAssetPath = "/assets/Generated/hub-castle-walls";
+const hubStructureAssetPath = "/assets/Generated/hub-structures/256";
+const teleportAssetPath = "/assets/Generated/teleports";
+const passageBlockerAssetPath = "/assets/Generated/passage-blockers";
+const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
+const beginnerSkillEffectsPath = "/assets/Generated/beginner-skill-effects-50/sprites";
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
