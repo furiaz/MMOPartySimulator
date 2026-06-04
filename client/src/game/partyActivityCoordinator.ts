@@ -18,7 +18,7 @@ import {
   type PartyMember,
 } from "./partySystem";
 import {
-  isActivePartyThreat,
+  getCommittedPartyThreatTarget,
   isPartyMemberRespondingToActiveThreat,
 } from "./partyThreatSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
@@ -74,9 +74,13 @@ export function resolvePartyActivityPlan(
     };
   }
 
-  const nearbyThreatTarget = getNearbyPartyThreatTarget(state, combatBreakDistance);
   const intentTarget = getPartyCombatTarget(state);
-  const target = nearbyThreatTarget ?? intentTarget;
+  const target =
+    getCommittedPartyThreatTarget(state, {
+      currentTarget: intentTarget,
+      includeDirectPersonalAttackers: true,
+      range: combatBreakDistance,
+    }) ?? intentTarget;
 
   return {
     phase:
@@ -214,30 +218,6 @@ export function canUseAutonomousRoleBehavior(
   }
 
   return Boolean(followTarget && isWithinFollowLeash(state, entity, followTarget));
-}
-
-function getNearbyPartyThreatTarget(
-  state: GameState,
-  combatBreakDistance: number,
-): Enemy | null {
-  return (
-    Object.values(state.entities)
-      .filter((entity): entity is Enemy => isActivePartyThreat(state, entity))
-      .filter((enemy) =>
-        getPartyMembers(state).some(
-          (member) =>
-            member.commandPriority !== "direct" &&
-            !isCompanionInDirectCommandGrace(state, member.id) &&
-            getDistance(member.position, enemy.position) <= combatBreakDistance,
-        ),
-      )
-      .sort(
-        (first, second) =>
-          getNearestPartyDistance(state, first) -
-            getNearestPartyDistance(state, second) ||
-          first.id.localeCompare(second.id),
-      )[0] ?? null
-  );
 }
 
 function isWithinPartyCombatDistance(

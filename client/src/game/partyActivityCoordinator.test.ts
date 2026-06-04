@@ -42,6 +42,40 @@ describe("party activity coordinator", () => {
     });
   });
 
+  it("keeps direct player attack intent locked on the selected target", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const selectedTarget = {
+      ...createEnemy("selected-target", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const closerThreat = {
+      ...createEnemy("closer-threat", { x: 1, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [selectedTarget.id]: selectedTarget,
+        [closerThreat.id]: closerThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: selectedTarget.id,
+        targetPosition: selectedTarget.position,
+        source: "player",
+      },
+    });
+
+    const plan = resolvePartyActivityPlan(state, leader);
+
+    expect(plan.phase).toBe("combat");
+    expect(plan.target?.id).toBe(selectedTarget.id);
+    expect(plan.targetPosition).toEqual(selectedTarget.position);
+  });
+
   it("lets AI travel intent be interrupted by close active party threats", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const closeThreat = {
@@ -68,6 +102,180 @@ describe("party activity coordinator", () => {
     expect(plan.phase).toBe("combat");
     expect(plan.target?.id).toBe(closeThreat.id);
     expect(plan.targetPosition).toEqual(closeThreat.position);
+  });
+
+  it("keeps the current AI combat threat when another nearby threat is slightly closer", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const currentThreat = {
+      ...createEnemy("current-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const closerThreat = {
+      ...createEnemy("closer-threat", { x: 1, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [currentThreat.id]: currentThreat,
+        [closerThreat.id]: closerThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: currentThreat.id,
+        targetPosition: currentThreat.position,
+        source: "ai",
+      },
+    });
+
+    const plan = resolvePartyActivityPlan(state, leader);
+
+    expect(plan.phase).toBe("combat");
+    expect(plan.target?.id).toBe(currentThreat.id);
+  });
+
+  it("switches AI combat commitment when the current threat is dead", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const deadThreat = {
+      ...createEnemy("dead-threat", { x: 1, y: 0 }, "aggressive"),
+      state: "dead" as const,
+      health: 0,
+      currentTargetId: leader.id,
+    };
+    const liveThreat = {
+      ...createEnemy("live-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [deadThreat.id]: deadThreat,
+        [liveThreat.id]: liveThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: deadThreat.id,
+        targetPosition: deadThreat.position,
+        source: "ai",
+      },
+    });
+
+    const plan = resolvePartyActivityPlan(state, leader);
+
+    expect(plan.phase).toBe("combat");
+    expect(plan.target?.id).toBe(liveThreat.id);
+  });
+
+  it("switches AI combat commitment when the current threat leaves combat range", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const distantThreat = {
+      ...createEnemy("distant-threat", { x: 5, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const closeThreat = {
+      ...createEnemy("close-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [distantThreat.id]: distantThreat,
+        [closeThreat.id]: closeThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: distantThreat.id,
+        targetPosition: distantThreat.position,
+        source: "ai",
+      },
+    });
+
+    const plan = resolvePartyActivityPlan(state, leader);
+
+    expect(plan.phase).toBe("combat");
+    expect(plan.target?.id).toBe(closeThreat.id);
+  });
+
+  it("lets a movement blocker override the current AI combat commitment", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const currentThreat = {
+      ...createEnemy("current-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const blocker = createEnemy("blocker", { x: 1, y: 0 }, "passive");
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [currentThreat.id]: currentThreat,
+        [blocker.id]: blocker,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: currentThreat.id,
+        targetPosition: currentThreat.position,
+        source: "ai",
+      },
+      movementFailuresByEntityId: {
+        [leader.id]: {
+          blockerId: blocker.id,
+          blockerKind: "enemy",
+          intendedPosition: blocker.position,
+        },
+      },
+    });
+
+    const plan = resolvePartyActivityPlan(state, leader);
+
+    expect(plan.phase).toBe("combat");
+    expect(plan.target?.id).toBe(blocker.id);
+  });
+
+  it("lets a direct companion's personal attacker override AI combat commitment", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const directCompanion = {
+      ...createCompanion("direct", { x: 0, y: 1 }, leader.id, "support"),
+      commandPriority: "direct" as const,
+    };
+    const currentThreat = {
+      ...createEnemy("current-threat", { x: 2, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const personalAttacker = {
+      ...createEnemy("personal-attacker", { x: 0, y: 2 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: directCompanion.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [directCompanion.id]: directCompanion,
+        [currentThreat.id]: currentThreat,
+        [personalAttacker.id]: personalAttacker,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: currentThreat.id,
+        targetPosition: currentThreat.position,
+        source: "ai",
+      },
+    });
+
+    const plan = resolvePartyActivityPlan(state, leader);
+
+    expect(plan.phase).toBe("combat");
+    expect(plan.target?.id).toBe(personalAttacker.id);
   });
 
   it("keeps direct-commanded companions out of autonomous travel combat and gather assignment", () => {

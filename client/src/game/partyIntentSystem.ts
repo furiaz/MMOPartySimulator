@@ -14,7 +14,7 @@ import {
   setPartyIntent,
 } from "./partyIntentState";
 import { canAssignSelfDefenseTarget } from "./partyActivityCoordinator";
-import { isActivePartyThreat } from "./partyThreatSystem";
+import { getCommittedPartyThreatTarget } from "./partyThreatSystem";
 import type {
   Companion,
   Enemy,
@@ -225,32 +225,19 @@ function getStuckNearEnemyTarget(state: GameState): Enemy | null {
 }
 
 function getCloseActiveThreatTarget(state: GameState): Enemy | null {
-  return (
-    Object.values(state.entities)
-      .filter((entity): entity is Enemy => isActivePartyThreat(state, entity))
-      .filter((enemy) =>
-        getPartyMembers(state).some(
-          (companion) =>
-            companion.commandPriority !== "direct" &&
-            getGridDistance(companion.position, enemy.position) <=
-              SELF_DEFENSE_THREAT_RADIUS,
-        ),
-      )
-      .sort(
-        (first, second) =>
-          getNearestCompanionDistance(state, first) -
-            getNearestCompanionDistance(state, second) ||
-          first.id.localeCompare(second.id),
-      )[0] ?? null
-  );
+  return getCommittedPartyThreatTarget(state, {
+    currentTarget: getCurrentExecutionEnemyTarget(state),
+    range: SELF_DEFENSE_THREAT_RADIUS,
+  });
 }
 
-function getNearestCompanionDistance(state: GameState, enemy: Enemy): number {
-  const distances = getPartyMembers(state)
-    .filter((companion) => companion.commandPriority !== "direct")
-    .map((companion) => getGridDistance(companion.position, enemy.position));
+function getCurrentExecutionEnemyTarget(state: GameState): Enemy | null {
+  const executionIntent = getPartyExecutionIntent(state);
+  const target = executionIntent?.targetId
+    ? getEntityById(state, executionIntent.targetId)
+    : undefined;
 
-  return distances.length > 0 ? Math.min(...distances) : Number.POSITIVE_INFINITY;
+  return isLivingEnemy(target) ? target : null;
 }
 
 function createAttackIntent(target: Enemy): PartyExecutionIntent {

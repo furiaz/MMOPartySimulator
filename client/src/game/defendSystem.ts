@@ -27,7 +27,7 @@ import {
   getActiveQuestGuide,
   QUEST_GUIDE_ENEMY_PAUSE_RANGE,
 } from "./questGuideSystem";
-import { getActivePartyThreatTarget } from "./partyThreatSystem";
+import { getCommittedPartyThreatTarget } from "./partyThreatSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
@@ -43,6 +43,7 @@ const DEFENDER_MAX_PREFERRED_LEADER_DISTANCE = 2;
 const DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE = 4;
 const DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE = 2;
 const DEFENDER_LEADER_MAX_ATTACK_SLOT_PATH_DISTANCE = 3;
+const DEFENDER_THREAT_SEARCH_RADIUS = 6;
 const DEFENDER_ANCHOR_SEARCH_RADIUS = 2;
 const DEFENDER_ANCHOR_MAX_PATH_DISTANCE = 6;
 
@@ -88,7 +89,7 @@ export function updateDefendSystem(
         )
       : null;
     const target = leader
-      ? getDefenderTarget(nextState)
+      ? getDefenderTarget(nextState, defender)
       : undefined;
     const shouldWaitForIntercept =
       target &&
@@ -312,18 +313,36 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
   );
 }
 
-function getDefenderTarget(state: GameState): Enemy | undefined {
+function getDefenderTarget(
+  state: GameState,
+  defender: Companion,
+): Enemy | undefined {
   const leaderTarget = getLeaderEnemyTarget(state);
 
   if (leaderTarget && isRelevantGuideEscortThreat(state, leaderTarget)) {
     return leaderTarget;
   }
 
-  const activeThreatTarget = getActivePartyThreatTarget(state);
+  const activeThreatTarget = getCommittedPartyThreatTarget(state, {
+    currentTarget: leaderTarget ?? getCurrentDefenderEnemyTarget(state, defender),
+    includeDirectPersonalAttackers: true,
+    range: DEFENDER_THREAT_SEARCH_RADIUS,
+  });
 
   return activeThreatTarget && isRelevantGuideEscortThreat(state, activeThreatTarget)
     ? activeThreatTarget
     : undefined;
+}
+
+function getCurrentDefenderEnemyTarget(
+  state: GameState,
+  defender: Companion,
+): Enemy | null {
+  const target = defender.currentTargetId
+    ? state.entities[defender.currentTargetId]
+    : undefined;
+
+  return target?.kind === "enemy" ? target : null;
 }
 
 function isRelevantGuideEscortThreat(

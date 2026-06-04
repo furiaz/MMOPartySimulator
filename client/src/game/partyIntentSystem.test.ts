@@ -137,6 +137,56 @@ describe("party intent self-defense", () => {
     });
   });
 
+  it("keeps self-defense committed to the current valid active threat", () => {
+    const leader = {
+      ...createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter"),
+      state: "attack" as const,
+      currentTargetId: "current-threat",
+    };
+    const currentThreat = {
+      ...createEnemy("current-threat", { x: 2, y: 0 }, "aggressive", {
+        maxHealth: 30,
+      }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const closerThreat = {
+      ...createEnemy("closer-threat", { x: 1, y: 0 }, "aggressive", {
+        maxHealth: 30,
+      }),
+      state: "attack" as const,
+      currentTargetId: leader.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [currentThreat.id]: currentThreat,
+        [closerThreat.id]: closerThreat,
+      },
+      partyLeaderId: leader.id,
+      leaderIntent: {
+        type: "attack",
+        targetId: currentThreat.id,
+        targetPosition: currentThreat.position,
+        source: "ai",
+      },
+    });
+
+    const nextState = updatePartyIntentSelfDefenseSystem(state);
+
+    expect(nextState.partyIntent).toMatchObject({
+      mode: "engage",
+      executionIntent: {
+        type: "attack",
+        targetId: currentThreat.id,
+      },
+    });
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: currentThreat.id,
+    });
+  });
+
   it("does not turn a direct companion's personal blockage into party-level intent", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const directCompanion = {

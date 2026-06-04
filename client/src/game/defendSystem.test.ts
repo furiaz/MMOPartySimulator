@@ -91,4 +91,45 @@ describe("defender real-time movement", () => {
     expect(nextTarget.health).toBe(target.health);
     expect(movedDefender.position).not.toEqual(defender.position);
   });
+
+  it("keeps a defender committed to its current active threat over a closer alternate", () => {
+    const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
+    const defender = {
+      ...createCompanion("defender", { x: 0, y: 1 }, leader.id, "defender"),
+      state: "defend" as const,
+      currentTargetId: "current-threat",
+    };
+    const currentThreat = {
+      ...createEnemy("current-threat", { x: 2, y: 1 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const closerThreat = {
+      ...createEnemy("closer-threat", { x: 1, y: 1 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [defender.id]: defender,
+        [currentThreat.id]: currentThreat,
+        [closerThreat.id]: closerThreat,
+      },
+      partyLeaderId: leader.id,
+      simulationDeltaMs: 100,
+    });
+
+    const nextState = updateDefendSystem(state, new Set(), {
+      nowMs: 0,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+
+    expect(nextState.entities[defender.id]).toMatchObject({
+      state: "defend",
+      currentTargetId: currentThreat.id,
+    });
+  });
 });
