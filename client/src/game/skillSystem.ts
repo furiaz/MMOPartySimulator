@@ -9,6 +9,7 @@ import {
   resolveSkillEffect,
   type SkillUse,
 } from "./skillEffectResolution";
+import { isBeginnerFirstAidSelfHealPriorityUse } from "./skillBehavior";
 import { getSkillTarget } from "./skillTargeting";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
@@ -25,6 +26,7 @@ export { updateSkillShieldBlockPositions } from "./skillEffectResolution";
 const SKILL_COOLDOWN_MS = 5000;
 const LOW_HEALTH_BUFFER = 1;
 const OPENING_LUNGE_SCORE_BONUS = 10;
+const BEGINNER_FIRST_AID_SELF_HEAL_SCORE_BONUS = 20;
 const NORMAL_SKILL_SELECTION_PRIORITY = 0;
 const EMERGENCY_SKILL_SELECTION_PRIORITY = 1;
 
@@ -267,12 +269,13 @@ function chooseSkillUse(
       }
 
       const roleScore = getSkillRoleScore(caster.role, skill.tags);
+      const score = getSkillSelectionScore(caster, skill, target, roleScore);
 
-      if (roleScore <= 0) {
+      if (score <= 0) {
         nextState = recordSkillTelemetry(nextState, caster, {
           type: "skill_skipped",
           skill,
-          score: roleScore,
+          score,
           reason: "non_positive_role_score",
         });
         return null;
@@ -281,7 +284,7 @@ function chooseSkillUse(
       return {
         skill,
         target,
-        score: getSkillSelectionScore(caster, skill, target, roleScore),
+        score,
         selectionPriority: getSkillSelectionPriority(skill),
       };
     })
@@ -313,9 +316,20 @@ function getSkillSelectionScore(
   target: Enemy | Companion | undefined,
   roleScore: number,
 ): number {
-  return isOpeningLungeSkillUse(caster, skill, target)
-    ? roleScore + OPENING_LUNGE_SCORE_BONUS
-    : roleScore;
+  let score = roleScore;
+
+  if (isOpeningLungeSkillUse(caster, skill, target)) {
+    score += OPENING_LUNGE_SCORE_BONUS;
+  }
+
+  if (
+    target?.kind === "companion" &&
+    isBeginnerFirstAidSelfHealPriorityUse(caster, skill, target)
+  ) {
+    score += BEGINNER_FIRST_AID_SELF_HEAL_SCORE_BONUS;
+  }
+
+  return score;
 }
 
 function getSkillSelectionPriority(skill: SkillDefinition): number {

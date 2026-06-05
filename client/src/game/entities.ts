@@ -24,6 +24,7 @@ import {
   createEmptyCompanionConsumables,
   createDefaultCompanionConsumableBehavior,
 } from "./consumables";
+import { createDefaultCompanionSkillBehavior } from "./skillBehavior";
 import { getEnemyArchetype, getEnemyType } from "./enemyArchetypes";
 import { getScaledEnemyStats } from "./enemyScaling";
 import { applyEnemyVariantStats } from "./enemyVariants";
@@ -185,6 +186,7 @@ export function createCompanion(
     consumables: createEmptyCompanionConsumables(),
     consumableBuffs: createEmptyCompanionConsumableBuffs(),
     consumableBehavior: createDefaultCompanionConsumableBehavior(),
+    skillBehavior: createDefaultCompanionSkillBehavior(),
   });
 }
 

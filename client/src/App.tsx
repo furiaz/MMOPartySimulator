@@ -119,10 +119,12 @@ import {
   unequipFlaskFromCompanion,
   updateEntity,
   updateCompanionConsumableBehavior,
+  updateCompanionSkillBehavior,
   type Companion,
   type DirectCompanionCommand,
   type CompanionDirectCommandInput,
   type ConsumableBehaviorUpdate,
+  type SkillBehaviorUpdate,
   type DebugMapId,
   type DirectCompanionCommandResultCode,
   type DropVisualEvent,
@@ -2869,6 +2871,15 @@ function App() {
     );
   }
 
+  function changeSkillBehavior(
+    companionId: string,
+    update: SkillBehaviorUpdate,
+  ) {
+    setGameState((state) =>
+      updateCompanionSkillBehavior(state, companionId, update),
+    );
+  }
+
   function allocateStatPoint(companionId: string, statId: PrimaryStatId) {
     setGameState((state) => {
       const companion = state.entities[companionId];
@@ -3816,6 +3827,7 @@ function App() {
               onChangeRole={changePartyMemberRole}
               onAssignFood={assignFood}
               onChangeConsumableBehavior={changeConsumableBehavior}
+              onChangeSkillBehavior={changeSkillBehavior}
               onEquipEquipment={equipEquipment}
               onEquipFlask={equipFlask}
               onOpenEquipmentManagement={openEquipmentManagementFromInventory}

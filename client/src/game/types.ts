@@ -447,6 +447,10 @@ export type CompanionConsumableBehavior = {
   autoFlaskHpThresholdPercent: number;
 };
 
+export type CompanionSkillBehavior = {
+  beginnerFirstAidSelfHealHpThresholdPercent: number;
+};
+
 export type ConsumableUseState = {
   companionId: string;
   itemId: ConsumableItemId;
@@ -1552,6 +1556,7 @@ export type Companion = LivingEntity & {
   consumables: CompanionConsumables;
   consumableBuffs: CompanionConsumableBuffs;
   consumableBehavior: CompanionConsumableBehavior;
+  skillBehavior: CompanionSkillBehavior;
 };
 
 export type ResourceEntity = BaseEntity & {

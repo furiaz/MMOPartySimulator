@@ -16,6 +16,7 @@ import { getGridDistance } from "./positionUtils";
 import { getEntityById, type GameState } from "./state";
 import { getPartyExecutionIntent } from "./partyIntentState";
 import { getPartyCombatTarget } from "./partyTargetSystem";
+import { isBeginnerFirstAidSelfHealPriorityActive } from "./skillBehavior";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
 const LOW_HEALTH_BUFFER = 1;
@@ -41,7 +42,10 @@ export function getSkillTarget(
       return undefined;
     }
 
-    return findHealingTarget(state, caster, skill.range);
+    return isBeginnerFirstAidSelfHealPriorityActive(caster, skill) &&
+      getGridDistance(caster.position, caster.position) <= skill.range
+      ? caster
+      : findHealingTarget(state, caster, skill.range);
   }
 
   if (skill.effect.type === "selfBuff") {

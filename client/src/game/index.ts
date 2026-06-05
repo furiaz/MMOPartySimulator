@@ -10,6 +10,7 @@ export type {
   CompanionConsumableBuffs,
   CompanionConsumableBehavior,
   CompanionConsumables,
+  CompanionSkillBehavior,
   CompanionRole,
   CombatFeedbackEvent,
   CombatFeedbackType,
@@ -298,6 +299,12 @@ export {
   type ConsumableMutationResult,
   type ConsumableMutationStatus,
 } from "./consumables";
+export {
+  DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  createDefaultCompanionSkillBehavior,
+  updateCompanionSkillBehavior,
+  type SkillBehaviorUpdate,
+} from "./skillBehavior";
 export {
   STARTING_INVENTORY_CAPACITY,
   addItemToInventoryState,

@@ -534,6 +534,7 @@ export function PartyManagementPanel({
   totalPartyLevel,
   onChangeLeader,
   onChangeConsumableBehavior,
+  onChangeSkillBehavior,
   onChangeRole,
   onSelectCompanion,
   onSelectSection,
@@ -548,6 +549,10 @@ export function PartyManagementPanel({
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
+  ) => void;
+  onChangeSkillBehavior: (
+    companionId: string,
+    update: Partial<Companion["skillBehavior"]>,
   ) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onSelectCompanion: (companionId: string) => void;
@@ -603,6 +608,7 @@ export function PartyManagementPanel({
             members={orderedMembers}
             onChangeLeader={onChangeLeader}
             onChangeConsumableBehavior={onChangeConsumableBehavior}
+            onChangeSkillBehavior={onChangeSkillBehavior}
             onChangeRole={onChangeRole}
             onMovePartyOrder={onMovePartyOrder}
           />
@@ -659,6 +665,7 @@ function PartyManagementSectionPanel({
   members,
   onChangeLeader,
   onChangeConsumableBehavior,
+  onChangeSkillBehavior,
   onChangeRole,
   onMovePartyOrder,
 }: {
@@ -670,6 +677,10 @@ function PartyManagementSectionPanel({
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
+  ) => void;
+  onChangeSkillBehavior: (
+    companionId: string,
+    update: Partial<Companion["skillBehavior"]>,
   ) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
@@ -695,6 +706,7 @@ function PartyManagementSectionPanel({
       <BehaviorSettingsSection
         member={member}
         onChangeConsumableBehavior={onChangeConsumableBehavior}
+        onChangeSkillBehavior={onChangeSkillBehavior}
       />
     );
   }
@@ -1252,14 +1264,22 @@ function RoleSelectSection({
 function BehaviorSettingsSection({
   member,
   onChangeConsumableBehavior,
+  onChangeSkillBehavior,
 }: {
   member: Companion;
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
   ) => void;
+  onChangeSkillBehavior: (
+    companionId: string,
+    update: Partial<Companion["skillBehavior"]>,
+  ) => void;
 }) {
   const threshold = member.consumableBehavior.autoFlaskHpThresholdPercent;
+  const firstAidThreshold =
+    member.skillBehavior.beginnerFirstAidSelfHealHpThresholdPercent;
+  const isBeginner = member.classId === "beginner";
 
   return (
     <section className="management-section-card" aria-label="Behavior Settings">
@@ -1303,6 +1323,38 @@ function BehaviorSettingsSection({
           />
           <strong>{threshold}%</strong>
         </label>
+        {isBeginner ? (
+          <label className="behavior-range-row">
+            <span>First Aid Self-Heal Threshold</span>
+            <input
+              max={100}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  beginnerFirstAidSelfHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="range"
+              value={firstAidThreshold}
+            />
+            <input
+              max={100}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  beginnerFirstAidSelfHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="number"
+              value={firstAidThreshold}
+            />
+            <strong>{firstAidThreshold}%</strong>
+          </label>
+        ) : null}
       </div>
     </section>
   );
