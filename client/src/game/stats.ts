@@ -10,6 +10,7 @@ import {
   getCompanionConsumablePrimaryStatModifiers,
   getCompanionConsumableStatModifiers,
 } from "./consumables";
+import { getCompanionRoleBonusModifiers } from "./roleBonus";
 import type {
   ClassId,
   Companion,
@@ -198,9 +199,13 @@ export function getCompanionDerivedStats(
     options.temporaryStatModifiers,
     options.equipmentPrimaryStatModifiers,
   );
-  const equipmentStatModifiers = addEquipmentStatModifiers(
+  const equipmentAndConsumableModifiers = addEquipmentStatModifiers(
     options.equipmentStatModifiers ?? getCompanionEquipmentStatModifiers(companion),
     getCompanionConsumableStatModifiers(companion),
+  );
+  const equipmentStatModifiers = addEquipmentStatModifiers(
+    equipmentAndConsumableModifiers,
+    getCompanionRoleBonusModifiers(companion).statModifiers,
   );
 
   return {

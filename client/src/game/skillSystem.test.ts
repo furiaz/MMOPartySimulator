@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createResource } from "./entities";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { updateGatherSystem } from "./gatherSystem";
+import { getHealingAmount } from "./combatResolver";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
-import { getCompanionDerivedStats } from "./stats";
+import { createPendingRoleBonusState } from "./roleBonus";
 import { updateSkillSystem } from "./skillSystem";
 import type { Companion, GameEntity, GameMap, Position } from "./types";
 
@@ -416,7 +417,9 @@ describe("beginner skill system", () => {
 
   it("uses Kick as a clear-path lunge and damage skill", () => {
     const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
-    const enemy = createEnemy("enemy", { x: 6, y: 1 });
+    const enemy = createEnemy("enemy", { x: 6, y: 1 }, undefined, {
+      maxHealth: 100,
+    });
     const state = startDebugTelemetryRecording(
       createSkillState([fighter, enemy], {
         map: createSkillMap(),
@@ -554,7 +557,10 @@ describe("beginner skill system", () => {
       health: enemy.health,
     });
     expect(nextState.entities.ally).toMatchObject({
-      health: ally.health + getCompanionDerivedStats(support).healingPower * 5,
+      health: Math.min(
+        ally.maxHealth,
+        ally.health + getHealingAmount(support, 5),
+      ),
     });
     expect(
       nextState.debugTelemetry?.events.some(
@@ -564,6 +570,54 @@ describe("beginner skill system", () => {
           event.healingMultiplier === 5,
       ),
     ).toBe(true);
+  });
+
+  it("uses active Support role bonus when resolving First Aid healing", () => {
+    const activeSupport = createBeginner("active-support", "support", { x: 1, y: 1 });
+    const pendingSupport = {
+      ...createBeginner("pending-support", "support", { x: 1, y: 1 }),
+      roleBonus: createPendingRoleBonusState("support", 1000),
+    };
+    const activeAlly = {
+      ...createBeginner("active-ally", "fighter", { x: 1, y: 2 }),
+      health: 1,
+      maxHealth: 200,
+    };
+    const pendingAlly = {
+      ...createBeginner("pending-ally", "fighter", { x: 1, y: 2 }),
+      health: 1,
+      maxHealth: 200,
+    };
+
+    const activeState = updateSkillSystem(
+      createSkillState([activeSupport, activeAlly], {
+        map: createSkillMap(),
+      }),
+      1000,
+    );
+    const pendingState = updateSkillSystem(
+      createSkillState([pendingSupport, pendingAlly], {
+        map: createSkillMap(),
+      }),
+      1000,
+    );
+    const healedActiveAlly = activeState.entities["active-ally"];
+    const healedPendingAlly = pendingState.entities["pending-ally"];
+
+    if (
+      healedActiveAlly?.kind !== "companion" ||
+      healedPendingAlly?.kind !== "companion"
+    ) {
+      throw new Error("Expected healed allies in Support role bonus First Aid test.");
+    }
+
+    expect(healedActiveAlly).toMatchObject({
+      health: Math.min(
+        activeAlly.maxHealth,
+        activeAlly.health + getHealingAmount(activeSupport, 5),
+      ),
+    });
+    expect(healedActiveAlly.health).toBeGreaterThan(healedPendingAlly.health);
   });
 
   it("prioritizes Beginner First Aid on self at the configured low-health threshold", () => {
@@ -585,7 +639,10 @@ describe("beginner skill system", () => {
     const nextState = updateSkillSystem(state, 1000);
 
     expect(nextState.entities.support).toMatchObject({
-      health: support.health + getCompanionDerivedStats(support).healingPower * 5,
+      health: Math.min(
+        support.maxHealth,
+        support.health + getHealingAmount(support, 5),
+      ),
     });
     expect(nextState.entities.ally).toMatchObject({
       health: ally.health,
@@ -617,7 +674,10 @@ describe("beginner skill system", () => {
       health: support.health,
     });
     expect(nextState.entities.ally).toMatchObject({
-      health: ally.health + getCompanionDerivedStats(support).healingPower * 5,
+      health: Math.min(
+        ally.maxHealth,
+        ally.health + getHealingAmount(support, 5),
+      ),
     });
     expect(
       nextState.skillCooldownsByCompanionId?.support?.first_aid?.skillId,
@@ -646,7 +706,10 @@ describe("beginner skill system", () => {
     const nextState = updateSkillSystem(state, 1000);
 
     expect(nextState.entities.fighter).toMatchObject({
-      health: fighter.health + getCompanionDerivedStats(fighter).healingPower * 5,
+      health: Math.min(
+        fighter.maxHealth,
+        fighter.health + getHealingAmount(fighter, 5),
+      ),
     });
     expect(nextState.entities.ally).toMatchObject({
       health: ally.health,

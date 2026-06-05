@@ -20,6 +20,7 @@ import {
   getCompanionEquipmentStatModifiers,
   getCompanionActualStats,
   getCompanionDerivedStats,
+  getCompanionEffectiveGatherSpeed,
   getDefenseReductionPercent,
   getItemDefinition,
   getRoleBonusDisplayState,
@@ -1244,6 +1245,10 @@ function formatModifier(value: number): string {
   return `${value > 0 ? "+" : ""}${value}`;
 }
 
+function formatGatherSpeed(value: number): string {
+  return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+}
+
 function RoleSelectSection({
   currentTime,
   member,
@@ -1449,6 +1454,7 @@ function StatsSection({
 }) {
   const actualStats = getCompanionActualStats(member);
   const derivedStats = getCompanionDerivedStats(member);
+  const effectiveGatherSpeed = getCompanionEffectiveGatherSpeed(member);
 
   return (
     <section className="management-section-card" aria-label="Stats">
@@ -1565,7 +1571,7 @@ function StatsSection({
         </div>
         <div title={derivedStatDescriptions.gatherSpeed}>
           <dt>Gather Speed</dt>
-          <dd>{member.gatherSpeed}</dd>
+          <dd>{formatGatherSpeed(effectiveGatherSpeed)}</dd>
         </div>
       </dl>
     </section>

@@ -207,8 +207,11 @@ export {
   createEmptyRoleBonusState,
   createPendingRoleBonusState,
   getActiveRoleBonusRole,
+  getCompanionEffectiveGatherSpeed,
+  getCompanionRoleBonusModifiers,
   getRoleBonusDisplayState,
   updateRoleBonusAssignments,
+  type CompanionRoleBonusModifiers,
   type RoleBonusDisplayState,
 } from "./roleBonus";
 export {

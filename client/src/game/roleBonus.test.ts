@@ -4,6 +4,8 @@ import {
   createCompanion,
   createPendingRoleBonusState,
   getActiveRoleBonusRole,
+  getCompanionEffectiveGatherSpeed,
+  getCompanionRoleBonusModifiers,
   getRoleBonusDisplayState,
   setPartyMemberRole,
   updateGame,
@@ -228,5 +230,72 @@ describe("role bonus assignment timing", () => {
       label: "Role Bonus Assigned",
       activeRole: "support",
     });
+  });
+
+  it("returns no value modifiers without an active role bonus", () => {
+    const noneRole = createCompanion("none", { x: 0, y: 0 }, "none");
+    const pendingRole = {
+      ...createCompanion("pending", { x: 0, y: 0 }, "pending", "fighter"),
+      roleBonus: createPendingRoleBonusState("fighter", 1000),
+    };
+
+    expect(getCompanionRoleBonusModifiers(noneRole)).toEqual({
+      statModifiers: {},
+      gatherSpeed: 0,
+    });
+    expect(getCompanionRoleBonusModifiers(pendingRole)).toEqual({
+      statModifiers: {},
+      gatherSpeed: 0,
+    });
+  });
+
+  it("returns level-banded flat role bonus modifiers", () => {
+    const levelOneDefender = createCompanion(
+      "defender",
+      { x: 0, y: 0 },
+      "defender",
+      "defender",
+    );
+    const levelTenFighter = {
+      ...createCompanion("fighter", { x: 0, y: 0 }, "fighter", "fighter"),
+      characterLevel: 10,
+    };
+    const levelTwentySupport = {
+      ...createCompanion("support", { x: 0, y: 0 }, "support", "support"),
+      characterLevel: 20,
+    };
+
+    expect(getCompanionRoleBonusModifiers(levelOneDefender)).toEqual({
+      statModifiers: { defense: 10, block: 5 },
+      gatherSpeed: 0,
+    });
+    expect(getCompanionRoleBonusModifiers(levelTenFighter)).toEqual({
+      statModifiers: { attack: 20, magicPower: 20 },
+      gatherSpeed: 0,
+    });
+    expect(getCompanionRoleBonusModifiers(levelTwentySupport)).toEqual({
+      statModifiers: { healingPower: 20 },
+      gatherSpeed: 0,
+    });
+  });
+
+  it("adds Gatherer role bonus to effective gather speed", () => {
+    const gatherer = createCompanion(
+      "gatherer",
+      { x: 0, y: 0 },
+      "gatherer",
+      "gatherer",
+    );
+    const highLevelGatherer = {
+      ...gatherer,
+      characterLevel: 10,
+      roleBonus: {
+        ...gatherer.roleBonus,
+        activeRole: "gatherer" as const,
+      },
+    };
+
+    expect(getCompanionEffectiveGatherSpeed(gatherer)).toBeCloseTo(1.1);
+    expect(getCompanionEffectiveGatherSpeed(highLevelGatherer)).toBeCloseTo(1.2);
   });
 });

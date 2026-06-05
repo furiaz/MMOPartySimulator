@@ -2226,9 +2226,16 @@ describe("game update intent priority", () => {
       commandPriority: "direct",
     });
     expect(nextState.entities[resource.id]).toMatchObject({
-      durability: 4,
       quantity: resource.quantity,
     });
+    const nextResource = nextState.entities[resource.id];
+
+    expect(nextResource?.kind).toBe("resource");
+    if (nextResource?.kind !== "resource") {
+      return;
+    }
+
+    expect(nextResource.durability).toBeCloseTo(3.9);
   });
 
   it("uses combat skills for direct attack commands when Auto Mode is off", () => {
@@ -2395,7 +2402,7 @@ describe("game update intent priority", () => {
       lastGatherAt: 0,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 9, y: 4 }),
+      ...createDurableEnemy("attacking-enemy", { x: 9, y: 4 }),
       state: "attack" as const,
       currentTargetId: collector.id,
     };
@@ -2720,7 +2727,7 @@ describe("game update intent priority", () => {
 
   it("uses Kick during AI attack approach before normal combat distance", () => {
     const leader = createLeader({ x: 4, y: 4 });
-    const enemy = createEnemy("approach-enemy", { x: 9, y: 4 });
+    const enemy = createDurableEnemy("approach-enemy", { x: 9, y: 4 });
     const nextState = updateGame(
       createMapOneState([leader, enemy], {
         partyLeaderId: leader.id,
@@ -3383,8 +3390,8 @@ describe("game update intent priority", () => {
 
   it("skips unreachable POIs and chooses the next reachable target", () => {
     const leader = createLeader({ x: 2, y: 2 });
-    const unreachableEnemy = createEnemy("blocked-enemy", { x: 10, y: 10 });
-    const reachableEnemy = createEnemy("reachable-enemy", { x: 4, y: 2 });
+    const unreachableEnemy = createDurableEnemy("blocked-enemy", { x: 10, y: 10 });
+    const reachableEnemy = createDurableEnemy("reachable-enemy", { x: 4, y: 2 });
 
     const nextState = updateGame(
       createMapOneState([leader, unreachableEnemy, reachableEnemy], {
@@ -3409,8 +3416,8 @@ describe("game update intent priority", () => {
 
   it("tie-breaks same-priority POIs by shortest viable path distance", () => {
     const leader = createLeader({ x: 2, y: 2 });
-    const farEnemy = createEnemy("far-enemy", { x: 10, y: 2 });
-    const nearEnemy = createEnemy("near-enemy", { x: 5, y: 2 });
+    const farEnemy = createDurableEnemy("far-enemy", { x: 10, y: 2 });
+    const nearEnemy = createDurableEnemy("near-enemy", { x: 5, y: 2 });
 
     const nextState = updateGame(
       createMapOneState([leader, farEnemy, nearEnemy], {
@@ -3528,7 +3535,7 @@ describe("game update intent priority", () => {
   it("switches from a resource POI to a much better enemy fallback", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const resource = createResource("fallback-resource", { x: 12, y: 2 });
-    const enemy = createEnemy("fallback-enemy", { x: 4, y: 2 });
+    const enemy = createDurableEnemy("fallback-enemy", { x: 4, y: 2 });
 
     const nextState = updateGame(
       createMapOneState([leader, resource, enemy], {
@@ -3577,7 +3584,7 @@ describe("game update intent priority", () => {
 
   it("uses weighted fallback so a nearby enemy beats a farther resource", () => {
     const leader = createLeader({ x: 2, y: 2 });
-    const enemy = createEnemy("near-enemy", { x: 4, y: 2 });
+    const enemy = createDurableEnemy("near-enemy", { x: 4, y: 2 });
     const resource = createResource("far-resource", { x: 10, y: 2 });
 
     const nextState = updateGame(
@@ -3599,7 +3606,7 @@ describe("game update intent priority", () => {
   it("skips unreachable resources before weighted fallback selection", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const blockedResource = createResource("blocked-resource", { x: 10, y: 10 });
-    const reachableEnemy = createEnemy("reachable-enemy", { x: 4, y: 2 });
+    const reachableEnemy = createDurableEnemy("reachable-enemy", { x: 4, y: 2 });
 
     const nextState = updateGame(
       createMapOneState([leader, blockedResource, reachableEnemy], {
@@ -4723,7 +4730,7 @@ describe("game update intent priority", () => {
 
   it("Zone Only blocks autonomous cross-map quest routing and chooses a local fallback", () => {
     const leader = createLeader({ x: 2, y: 2 });
-    const localEnemy = createEnemy("zone-local-enemy", { x: 4, y: 2 });
+    const localEnemy = createDurableEnemy("zone-local-enemy", { x: 4, y: 2 });
 
     const nextState = updateGame(
       createMapOneState([leader, localEnemy], {
@@ -4744,7 +4751,7 @@ describe("game update intent priority", () => {
 
   it("Stay in Subzone blocks cross-map quest delivery and chooses a local fallback", () => {
     const leader = createLeader({ x: 2, y: 2 });
-    const localEnemy = createEnemy("local-enemy", { x: 4, y: 2 });
+    const localEnemy = createDurableEnemy("local-enemy", { x: 4, y: 2 });
 
     const nextState = updateGame(
       createMapOneState([leader, localEnemy], {
@@ -4764,7 +4771,7 @@ describe("game update intent priority", () => {
 
   it("Stay in Subzone still allows same-subzone active quest objectives", () => {
     const leader = createLeader({ x: 2, y: 2 });
-    const questEnemy = createEnemy("quest-enemy", { x: 4, y: 2 }, undefined, {
+    const questEnemy = createDurableEnemy("quest-enemy", { x: 4, y: 2 }, {
       enemyTypeId: "slime",
       subzoneId: "shore-fringe",
     });
@@ -5308,6 +5315,17 @@ function createLeader(position: { x: number; y: number }) {
     state: "idle" as const,
     currentTargetId: null,
   };
+}
+
+function createDurableEnemy(
+  id: string,
+  position: Position,
+  options: Parameters<typeof createEnemy>[3] = {},
+) {
+  return createEnemy(id, position, undefined, {
+    maxHealth: 100,
+    ...options,
+  });
 }
 
 function getForwardMapOneTeleport() {

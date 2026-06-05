@@ -22,6 +22,7 @@ import { addItemToInventoryState } from "./inventory";
 import { getItemDefinitionForResourceType } from "./items";
 import { recordResourceGatheredForQuests } from "./questSystem";
 import { ROLE_TUNING } from "./roleProfiles";
+import { getCompanionEffectiveGatherSpeed } from "./roleBonus";
 import { getPrototypeGatherAmountBonus } from "./skillRuntime";
 import { isResourceTargetInRange } from "./targetSelection";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
@@ -434,7 +435,7 @@ function getGatherAmount(state: GameState, gatherer: AutonomousEntity): number {
       ? getPrototypeGatherAmountBonus(state, gatherer)
       : 0;
 
-  return Math.max(0, gatherer.gatherSpeed + skillBonus);
+  return Math.max(0, getCompanionEffectiveGatherSpeed(gatherer) + skillBonus);
 }
 
 function getReachableSearchLimit(state: GameState): number {

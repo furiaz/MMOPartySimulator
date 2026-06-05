@@ -13,6 +13,7 @@ import {
   PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK,
   PRIMARY_STAT_IDS,
 } from "./stats";
+import { createPendingRoleBonusState } from "./roleBonus";
 import type { CompanionPrimaryStats } from "./types";
 
 describe("prototype companion stats", () => {
@@ -118,6 +119,57 @@ describe("prototype companion stats", () => {
       healingPower: 8,
       block: 3,
     });
+  });
+
+  it("adds active Defender role bonuses to derived defense and block", () => {
+    const defender = createCompanion(
+      "defender",
+      { x: 0, y: 0 },
+      "defender",
+      "defender",
+    );
+    const noRoleBonus = {
+      ...defender,
+      roleBonus: createPendingRoleBonusState("defender", 1000),
+    };
+
+    expect(getCompanionDerivedStats(defender)).toMatchObject({
+      defense: getCompanionDerivedStats(noRoleBonus).defense + 10,
+      block: getCompanionDerivedStats(noRoleBonus).block + 5,
+    });
+  });
+
+  it("adds active Fighter role bonuses to derived attack and magic power", () => {
+    const fighter = {
+      ...createCompanion("fighter", { x: 0, y: 0 }, "fighter", "fighter"),
+      characterLevel: 10,
+    };
+    const noRoleBonus = {
+      ...fighter,
+      roleBonus: createPendingRoleBonusState("fighter", 1000),
+    };
+
+    expect(getCompanionDerivedStats(fighter)).toMatchObject({
+      attack: getCompanionDerivedStats(noRoleBonus).attack + 20,
+      magicPower: getCompanionDerivedStats(noRoleBonus).magicPower + 20,
+    });
+  });
+
+  it("adds active Support role bonuses to derived healing power", () => {
+    const support = createCompanion(
+      "support",
+      { x: 0, y: 0 },
+      "support",
+      "support",
+    );
+    const noRoleBonus = {
+      ...support,
+      roleBonus: createPendingRoleBonusState("support", 1000),
+    };
+
+    expect(getCompanionDerivedStats(support).healingPower).toBe(
+      getCompanionDerivedStats(noRoleBonus).healingPower + 10,
+    );
   });
 
   it("defines 5-point base class growth profiles", () => {

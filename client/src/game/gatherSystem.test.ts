@@ -37,6 +37,39 @@ describe("gather system interaction range", () => {
     });
   });
 
+  it("uses active Gatherer role bonus speed when gathering", () => {
+    const resource = createResource("resource", { x: 5, y: 5 });
+    const gatherer = {
+      ...createCompanion(
+        "gatherer",
+        { x: 5 - RESOURCE_INTERACTION_RANGE, y: 5 },
+        "gatherer",
+        "gatherer",
+      ),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "direct" as const,
+      lastGatherAt: 0,
+    };
+    const state = createTestGameState({
+      entities: {
+        [gatherer.id]: gatherer,
+        [resource.id]: resource,
+      },
+      partyLeaderId: gatherer.id,
+    });
+
+    const nextState = updateGatherSystem(state, new Set(), 1_000);
+    const nextResource = nextState.entities[resource.id];
+
+    expect(nextResource?.kind).toBe("resource");
+    if (nextResource?.kind !== "resource") {
+      return;
+    }
+
+    expect(nextResource.durability).toBeCloseTo(resource.durability - 1.1);
+  });
+
   it("moves a collector toward the resource when outside interaction range", () => {
     const resource = createResource("resource", { x: 5, y: 5 });
     const collector = {

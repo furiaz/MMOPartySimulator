@@ -1,7 +1,18 @@
 import type { GameState } from "./state";
-import type { Companion, GameEntity, PartyMemberRole, RoleBonusState } from "./types";
+import type {
+  Companion,
+  EquipmentStatModifiers,
+  GameEntity,
+  PartyMemberRole,
+  RoleBonusState,
+} from "./types";
 
 export const ROLE_BONUS_ASSIGNMENT_DELAY_MS = 5000;
+
+export type CompanionRoleBonusModifiers = {
+  statModifiers: EquipmentStatModifiers;
+  gatherSpeed: number;
+};
 
 export type RoleBonusDisplayState =
   | {
@@ -27,6 +38,59 @@ export type RoleBonusDisplayState =
     };
 
 type BonusRole = Exclude<PartyMemberRole, "none">;
+
+const EMPTY_ROLE_BONUS_MODIFIERS: CompanionRoleBonusModifiers = {
+  statModifiers: {},
+  gatherSpeed: 0,
+};
+
+const ROLE_BONUS_LEVEL_BANDS: Array<{
+  minLevel: number;
+  modifiersByRole: Record<BonusRole, CompanionRoleBonusModifiers>;
+}> = [
+  {
+    minLevel: 0,
+    modifiersByRole: {
+      defender: {
+        statModifiers: { defense: 10, block: 5 },
+        gatherSpeed: 0,
+      },
+      fighter: {
+        statModifiers: { attack: 10, magicPower: 10 },
+        gatherSpeed: 0,
+      },
+      support: {
+        statModifiers: { healingPower: 10 },
+        gatherSpeed: 0,
+      },
+      gatherer: {
+        statModifiers: {},
+        gatherSpeed: 0.1,
+      },
+    },
+  },
+  {
+    minLevel: 10,
+    modifiersByRole: {
+      defender: {
+        statModifiers: { defense: 15, block: 10 },
+        gatherSpeed: 0,
+      },
+      fighter: {
+        statModifiers: { attack: 20, magicPower: 20 },
+        gatherSpeed: 0,
+      },
+      support: {
+        statModifiers: { healingPower: 20 },
+        gatherSpeed: 0,
+      },
+      gatherer: {
+        statModifiers: {},
+        gatherSpeed: 0.2,
+      },
+    },
+  },
+];
 
 export function createAssignedRoleBonusState(
   role: PartyMemberRole,
@@ -74,6 +138,27 @@ export function getActiveRoleBonusRole(
   return isBonusRole(companion.roleBonus.activeRole)
     ? companion.roleBonus.activeRole
     : null;
+}
+
+export function getCompanionRoleBonusModifiers(
+  companion: Companion,
+): CompanionRoleBonusModifiers {
+  const activeRole = getActiveRoleBonusRole(companion);
+
+  if (!activeRole) {
+    return EMPTY_ROLE_BONUS_MODIFIERS;
+  }
+
+  return getRoleBonusLevelBand(companion.characterLevel).modifiersByRole[
+    activeRole
+  ];
+}
+
+export function getCompanionEffectiveGatherSpeed(companion: Companion): number {
+  return Math.max(
+    0,
+    companion.gatherSpeed + getCompanionRoleBonusModifiers(companion).gatherSpeed,
+  );
 }
 
 export function getRoleBonusDisplayState(
@@ -224,4 +309,17 @@ function isSameRoleBonusState(
 
 function isBonusRole(role: PartyMemberRole | null): role is BonusRole {
   return role !== null && role !== "none";
+}
+
+function getRoleBonusLevelBand(level: number) {
+  const safeLevel = Math.max(0, level);
+  let selectedBand = ROLE_BONUS_LEVEL_BANDS[0];
+
+  for (const band of ROLE_BONUS_LEVEL_BANDS) {
+    if (band.minLevel <= safeLevel) {
+      selectedBand = band;
+    }
+  }
+
+  return selectedBand;
 }
