@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { clearFrameMovementPlanning } from "./movementState";
-import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
+import {
+  clearMapTransitionRuntimeState,
+  pruneMissingEntityRuntimeState,
+} from "./mapRuntimeCleanup";
 import { clearExpiredSkillRuntimeState } from "./state";
 import { createCompanion, createEnemy } from "./entities";
 import { addEntity, updateEntity } from "./state";
@@ -106,6 +109,74 @@ describe("runtime cleanup", () => {
     expect(nextState.skillVisualEvents).toEqual([activeVisual]);
   });
 
+  it("removes expired nested skill cooldown maps and keeps active entries", () => {
+    const state = createTestGameState({
+      skillCooldownsByCompanionId: {
+        "companion-1": {
+          kick: {
+            companionId: "companion-1",
+            skillId: "kick",
+            expiresAt: 2000,
+          },
+          throw_rock: {
+            companionId: "companion-1",
+            skillId: "throw_rock",
+            expiresAt: 900,
+          },
+        },
+        "companion-2": {
+          field_hands: {
+            companionId: "companion-2",
+            skillId: "field_hands",
+            expiresAt: 900,
+          },
+        },
+      },
+    });
+
+    const nextState = clearExpiredSkillRuntimeState(state, 1000);
+
+    expect(nextState.skillCooldownsByCompanionId).toEqual({
+      "companion-1": {
+        kick: {
+          companionId: "companion-1",
+          skillId: "kick",
+          expiresAt: 2000,
+        },
+      },
+    });
+  });
+
+  it("keeps skill cooldowns and clears global cooldowns on map transition", () => {
+    const state = createTestGameState({
+      skillCooldownsByCompanionId: {
+        leader: {
+          kick: {
+            companionId: "leader",
+            skillId: "kick",
+            expiresAt: 6000,
+          },
+        },
+      },
+      globalCooldownsByCompanionId: {
+        leader: {
+          companionId: "leader",
+          source: "skill",
+          skillId: "kick",
+          startedAt: 1000,
+          expiresAt: 3000,
+        },
+      },
+    });
+
+    const nextState = clearMapTransitionRuntimeState(state);
+
+    expect(nextState.skillCooldownsByCompanionId).toEqual(
+      state.skillCooldownsByCompanionId,
+    );
+    expect(nextState.globalCooldownsByCompanionId).toEqual({});
+  });
+
   it("preserves the state reference when updating the same entity reference", () => {
     const companion = createCompanion("companion-1", { x: 1, y: 1 }, "Companion");
     const state = addEntity(createTestGameState(), companion);
@@ -157,6 +228,37 @@ describe("runtime cleanup", () => {
           targetId: enemy.id,
         },
       },
+      skillCooldownsByCompanionId: {
+        [companion.id]: {
+          kick: {
+            companionId: companion.id,
+            skillId: "kick",
+            expiresAt: 2000,
+          },
+        },
+        [enemy.id]: {
+          throw_rock: {
+            companionId: enemy.id,
+            skillId: "throw_rock",
+            expiresAt: 2000,
+          },
+        },
+      },
+      globalCooldownsByCompanionId: {
+        [companion.id]: {
+          companionId: companion.id,
+          source: "basic_attack",
+          startedAt: 1000,
+          expiresAt: 3000,
+        },
+        [enemy.id]: {
+          companionId: enemy.id,
+          source: "skill",
+          skillId: "throw_rock",
+          startedAt: 1000,
+          expiresAt: 3000,
+        },
+      },
       flaskRechargeCountedEnemyDefeats: {
         [enemy.id]: 1_000,
       },
@@ -170,6 +272,23 @@ describe("runtime cleanup", () => {
       },
     });
     expect(nextState.skillMarksByEnemyId).toEqual({});
+    expect(nextState.skillCooldownsByCompanionId).toEqual({
+      [companion.id]: {
+        kick: {
+          companionId: companion.id,
+          skillId: "kick",
+          expiresAt: 2000,
+        },
+      },
+    });
+    expect(nextState.globalCooldownsByCompanionId).toEqual({
+      [companion.id]: {
+        companionId: companion.id,
+        source: "basic_attack",
+        startedAt: 1000,
+        expiresAt: 3000,
+      },
+    });
     expect(nextState.flaskRechargeCountedEnemyDefeats).toEqual({});
   });
 });

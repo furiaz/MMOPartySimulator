@@ -37,6 +37,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     defenderBlockedTicksByEntityId: {},
     defenderWaitMsByLeaderId: {},
     defenderBlockedMsByEntityId: {},
+    globalCooldownsByCompanionId: {},
     skillVisualEvents: [],
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
@@ -94,6 +95,14 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   );
   const skillMarksByEnemyId = pruneRecordById(state.skillMarksByEnemyId, currentEntityIds);
   const skillBindsByEnemyId = pruneRecordById(state.skillBindsByEnemyId, currentEntityIds);
+  const skillCooldownsByCompanionId = pruneRecordById(
+    state.skillCooldownsByCompanionId,
+    currentEntityIds,
+  );
+  const globalCooldownsByCompanionId = pruneRecordById(
+    state.globalCooldownsByCompanionId,
+    currentEntityIds,
+  );
   const enemyAoeCooldownsByCasterId = pruneRecordById(
     state.enemyAoeCooldownsByCasterId,
     currentEntityIds,
@@ -133,6 +142,8 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     lastPositionsByEntityId === state.lastPositionsByEntityId &&
     skillMarksByEnemyId === state.skillMarksByEnemyId &&
     skillBindsByEnemyId === state.skillBindsByEnemyId &&
+    skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
+    globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
     enemyAoeCooldownsByCasterId === state.enemyAoeCooldownsByCasterId &&
     flaskRechargeCountedEnemyDefeats === state.flaskRechargeCountedEnemyDefeats &&
     lastHealthRegenAtByCompanionId === state.lastHealthRegenAtByCompanionId &&
@@ -158,6 +169,8 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     lastPositionsByEntityId,
     skillMarksByEnemyId,
     skillBindsByEnemyId,
+    skillCooldownsByCompanionId,
+    globalCooldownsByCompanionId,
     enemyAoeCooldownsByCasterId,
     flaskRechargeCountedEnemyDefeats,
     lastHealthRegenAtByCompanionId,

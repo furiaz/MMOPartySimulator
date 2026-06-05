@@ -17,6 +17,7 @@ export type {
   CompanionEquipment,
   CompanionPrimaryStatModifiers,
   CompanionPrimaryStats,
+  CompanionGlobalCooldownState,
   DebugMovementResult,
   DebugMapId,
   DebugTeleportPoint,
@@ -108,6 +109,7 @@ export type {
   ResurrectionRecoveryAssignmentState,
   SkillBindState,
   SkillCooldownState,
+  SkillCooldownsBySkillId,
   SkillDefinition,
   SkillGatherBuffState,
   SkillId,
@@ -480,6 +482,11 @@ export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
 export { updateSkillSystem } from "./skillSystem";
+export {
+  COMPANION_GLOBAL_COOLDOWN_MS,
+  getCompanionGlobalCooldownProgress,
+  getCompanionGlobalCooldownRemainingMs,
+} from "./companionCooldowns";
 export {
   closeSlimewardDungeonChestUi,
   continueSlimewardDungeonChest,

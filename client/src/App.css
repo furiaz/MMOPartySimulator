@@ -445,6 +445,7 @@
 }
 
 .companion-vitals-card {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(48px, 34%) minmax(0, 1fr);
   width: 20vw;
@@ -461,6 +462,27 @@
   box-shadow: var(--main-menu-panel-shadow);
   backdrop-filter: blur(10px);
   pointer-events: auto;
+}
+
+.companion-vitals-gcd-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+
+.companion-vitals-gcd-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  background: #f59e0b;
+  transition: width 120ms linear;
 }
 
 .companion-vitals-card-beginner,

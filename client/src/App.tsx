@@ -3832,7 +3832,11 @@ function App() {
             />
           </Suspense>
         ) : null}
-        <CompanionVitalsPanel currentTime={currentTime} members={partyMembers} />
+        <CompanionVitalsPanel
+          currentTime={currentTime}
+          globalCooldownsByCompanionId={gameState.globalCooldownsByCompanionId}
+          members={partyMembers}
+        />
         <QuestTrackerPanel
           isHidden={isQuestTrackerHidden}
           onShow={() => setIsQuestTrackerHidden(false)}

@@ -22,6 +22,13 @@ describe("beginner skill system", () => {
       skillId: "throw_rock",
       type: "projectile",
     });
+    expect(nextState.globalCooldownsByCompanionId?.defender).toMatchObject({
+      companionId: defender.id,
+      source: "skill",
+      skillId: "throw_rock",
+      startedAt: 1000,
+      expiresAt: 3000,
+    });
   });
 
   it("does not use Throw Rock on an enemy already targeting the caster", () => {
@@ -48,9 +55,9 @@ describe("beginner skill system", () => {
       1000,
     );
 
-    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).not.toBe(
-      "throw_rock",
-    );
+    expect(
+      nextState.skillCooldownsByCompanionId?.defender?.throw_rock,
+    ).toBeUndefined();
     expect(
       nextState.skillVisualEvents?.some(
         (event) => event.skillId === "throw_rock" && event.type === "projectile",
@@ -93,7 +100,7 @@ describe("beginner skill system", () => {
       state: "attack",
       currentTargetId: defender.id,
     });
-    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.throw_rock?.skillId).toBe(
       "throw_rock",
     );
   });
@@ -115,7 +122,7 @@ describe("beginner skill system", () => {
 
     expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.bonusGatherSpeed).toBe(1);
     expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.expiresAt).toBe(10000);
-    expect(buffedState.skillCooldownsByCompanionId?.[gatherer.id]).toMatchObject({
+    expect(buffedState.skillCooldownsByCompanionId?.[gatherer.id]?.field_hands).toMatchObject({
       skillId: "field_hands",
       expiresAt: 11000,
     });
@@ -177,6 +184,83 @@ describe("beginner skill system", () => {
           event.type === "skill_skipped" &&
           event.skillId === "throw_rock" &&
           event.reason === "no_target",
+      ),
+    ).toBe(true);
+  });
+
+  it("skips skill selection during companion global cooldown", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 0, y: 0 });
+    const enemy = createEnemy("enemy", { x: 5, y: 0 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([fighter, enemy], {
+        globalCooldownsByCompanionId: {
+          fighter: {
+            companionId: fighter.id,
+            source: "basic_attack",
+            startedAt: 1000,
+            expiresAt: 3000,
+          },
+        },
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 2000);
+
+    expect(nextState.skillCooldownsByCompanionId?.fighter).toBeUndefined();
+    expect(nextState.globalCooldownsByCompanionId?.fighter?.expiresAt).toBe(3000);
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.entityId === fighter.id &&
+          event.reason === "global_cooldown",
+      ),
+    ).toBe(true);
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) => event.type === "skill_selected" && event.entityId === fighter.id,
+      ),
+    ).toBe(false);
+  });
+
+  it("records individual skill cooldown skips without blocking other skills", () => {
+    const defender = createBeginner("defender", "defender", { x: 1, y: 1 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const state = startDebugTelemetryRecording(
+      createSkillState([defender, enemy], {
+        map: createSkillMap(),
+        skillCooldownsByCompanionId: {
+          defender: {
+            throw_rock: {
+              companionId: defender.id,
+              skillId: "throw_rock",
+              expiresAt: 5000,
+            },
+          },
+        },
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.defender?.throw_rock).toMatchObject({
+      skillId: "throw_rock",
+      expiresAt: 5000,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.defender?.guard_up).toMatchObject({
+      skillId: "guard_up",
+      expiresAt: 11000,
+    });
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "throw_rock" &&
+          event.reason === "skill_cooldown",
       ),
     ).toBe(true);
   });
@@ -373,10 +457,10 @@ describe("beginner skill system", () => {
 
     const nextState = updateSkillSystem(state, 1000);
 
-    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.throw_rock?.skillId).toBe(
       "throw_rock",
     );
-    expect(nextState.skillCooldownsByCompanionId?.defender?.expiresAt).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.throw_rock?.expiresAt).toBe(
       11000,
     );
     expect(nextState.entities.defender.position).toEqual(defender.position);
@@ -398,10 +482,10 @@ describe("beginner skill system", () => {
 
     const nextState = updateSkillSystem(state, 1000);
 
-    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.kick?.skillId).toBe(
       "kick",
     );
-    expect(nextState.skillCooldownsByCompanionId?.defender?.expiresAt).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.kick?.expiresAt).toBe(
       11000,
     );
     expect(
@@ -426,10 +510,10 @@ describe("beginner skill system", () => {
 
     const nextState = updateSkillSystem(state, 1000);
 
-    expect(nextState.skillCooldownsByCompanionId?.defender?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.guard_up?.skillId).toBe(
       "guard_up",
     );
-    expect(nextState.skillCooldownsByCompanionId?.defender?.expiresAt).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.defender?.guard_up?.expiresAt).toBe(
       11000,
     );
     expect(
@@ -459,10 +543,10 @@ describe("beginner skill system", () => {
 
     const nextState = updateSkillSystem(state, 1000);
 
-    expect(nextState.skillCooldownsByCompanionId?.support?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.support?.first_aid?.skillId).toBe(
       "first_aid",
     );
-    expect(nextState.skillCooldownsByCompanionId?.support?.expiresAt).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.support?.first_aid?.expiresAt).toBe(
       11000,
     );
     expect(nextState.entities.support.position).toEqual(support.position);
@@ -519,10 +603,10 @@ describe("beginner skill system", () => {
     expect(nextState.entities.fighter.position.x).toBeGreaterThan(
       fighter.position.x,
     );
-    expect(nextState.skillCooldownsByCompanionId?.fighter?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.fighter?.quick_step?.skillId).toBe(
       "quick_step",
     );
-    expect(nextState.skillCooldownsByCompanionId?.fighter?.expiresAt).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.fighter?.quick_step?.expiresAt).toBe(
       11000,
     );
   });
@@ -537,7 +621,7 @@ describe("beginner skill system", () => {
 
     const nextState = updateSkillSystem(createSkillState([blade, enemy]), 1000);
 
-    expect(nextState.skillCooldownsByCompanionId?.blade).toMatchObject({
+    expect(nextState.skillCooldownsByCompanionId?.blade?.sweeping_strike).toMatchObject({
       skillId: "sweeping_strike",
       expiresAt: 6000,
     });
@@ -569,14 +653,14 @@ describe("beginner skill system", () => {
       1000,
     );
 
-    expect(deepBreathState.skillCooldownsByCompanionId?.fighter).toMatchObject({
+    expect(deepBreathState.skillCooldownsByCompanionId?.fighter?.deep_breath).toMatchObject({
       skillId: "deep_breath",
       expiresAt: 11000,
     });
     expect(deepBreathState.skillSelfBuffsByCompanionId?.fighter?.expiresAt).toBe(
       10000,
     );
-    expect(rallyState.skillCooldownsByCompanionId?.support).toMatchObject({
+    expect(rallyState.skillCooldownsByCompanionId?.support?.rally_call).toMatchObject({
       skillId: "rally_call",
       expiresAt: 11000,
     });
@@ -604,7 +688,7 @@ describe("beginner skill system", () => {
       expect(nextState.entities.companion.position.x).toBeLessThan(
         companion.position.x,
       );
-      expect(nextState.skillCooldownsByCompanionId?.companion?.skillId).toBe(
+      expect(nextState.skillCooldownsByCompanionId?.companion?.quick_step?.skillId).toBe(
         "quick_step",
       );
     },
@@ -630,7 +714,7 @@ describe("beginner skill system", () => {
       support.position.x,
     );
     expect(nextState.entities.support.position.y).not.toBe(support.position.y);
-    expect(nextState.skillCooldownsByCompanionId?.support?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.support?.quick_step?.skillId).toBe(
       "quick_step",
     );
   });
@@ -662,6 +746,7 @@ describe("beginner skill system", () => {
 
     expect(nextState.entities.support.position).toEqual(support.position);
     expect(nextState.skillCooldownsByCompanionId?.support).toBeUndefined();
+    expect(nextState.globalCooldownsByCompanionId?.support).toBeUndefined();
   });
 });
 

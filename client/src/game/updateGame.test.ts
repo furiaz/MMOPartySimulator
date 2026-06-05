@@ -2258,15 +2258,23 @@ describe("game update intent priority", () => {
       { nowMs: 1_000, deltaMs: 100 },
     );
     const currentEnemy = nextState.entities[chosenEnemy.id];
+    const currentLeader = nextState.entities[leader.id];
 
-    if (currentEnemy.kind !== "enemy") {
+    if (currentEnemy.kind !== "enemy" || currentLeader.kind !== "companion") {
       throw new Error("Expected chosen enemy in direct attack skill test");
     }
 
-    expect(nextState.skillCooldownsByCompanionId?.[leader.id]?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.[leader.id]?.kick?.skillId).toBe(
       "kick",
     );
-    expect(nextState.entities[leader.id].position.x).toBeGreaterThan(
+    expect(nextState.globalCooldownsByCompanionId?.[leader.id]).toMatchObject({
+      source: "skill",
+      skillId: "kick",
+      startedAt: 1000,
+      expiresAt: 3000,
+    });
+    expect(currentLeader.lastAttackAt).toBe(0);
+    expect(currentLeader.position.x).toBeGreaterThan(
       leader.position.x,
     );
     expect(currentEnemy.health).toBeLessThan(chosenEnemy.health);
@@ -2313,7 +2321,7 @@ describe("game update intent priority", () => {
       throw new Error("Expected enemies in direct target preservation test");
     }
 
-    expect(nextState.skillCooldownsByCompanionId?.[leader.id]?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.[leader.id]?.kick?.skillId).toBe(
       "kick",
     );
     expect(currentChosenEnemy.health).toBeLessThan(chosenEnemy.health);
@@ -2422,7 +2430,7 @@ describe("game update intent priority", () => {
       currentTargetId: attacker.id,
       commandPriority: "direct",
     });
-    expect(nextState.skillCooldownsByCompanionId?.[collector.id]?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.[collector.id]?.kick?.skillId).toBe(
       "kick",
     );
     expect(nextState.entities[ally.id]).toMatchObject({
@@ -2748,7 +2756,7 @@ describe("game update intent priority", () => {
       targetId: enemy.id,
       source: "ai",
     });
-    expect(nextState.skillCooldownsByCompanionId?.leader?.skillId).toBe(
+    expect(nextState.skillCooldownsByCompanionId?.leader?.kick?.skillId).toBe(
       "kick",
     );
     expect(nextState.entities.leader.position.x).toBeGreaterThan(

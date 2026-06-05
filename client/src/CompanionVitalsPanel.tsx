@@ -8,6 +8,7 @@ import {
   getItemDefinition,
   type ClassPath,
   type Companion,
+  type CompanionGlobalCooldownState,
 } from "./game";
 import { CLASS_PORTRAIT_SRC } from "./visualAssets";
 
@@ -33,9 +34,11 @@ function getActiveFoodRemainingSeconds(
 
 export function CompanionVitalsPanel({
   currentTime,
+  globalCooldownsByCompanionId,
   members,
 }: {
   currentTime: number;
+  globalCooldownsByCompanionId?: Record<string, CompanionGlobalCooldownState>;
   members: Companion[];
 }) {
   if (members.length === 0) {
@@ -95,12 +98,37 @@ export function CompanionVitalsPanel({
         const displayedFoodIconSrc = displayedFoodDefinition
           ? INVENTORY_ITEM_ICON_SRC[displayedFoodDefinition.id]
           : null;
+        const globalCooldown = globalCooldownsByCompanionId?.[member.id];
+        const globalCooldownRemainingMs =
+          globalCooldown && globalCooldown.expiresAt > currentTime
+            ? globalCooldown.expiresAt - currentTime
+            : 0;
+        const globalCooldownDurationMs = globalCooldown
+          ? Math.max(1, globalCooldown.expiresAt - globalCooldown.startedAt)
+          : 1;
+        const globalCooldownPercent = Math.min(
+          100,
+          Math.max(
+            0,
+            (globalCooldownRemainingMs / globalCooldownDurationMs) * 100,
+          ),
+        );
 
         return (
           <article
             key={member.id}
             className={`companion-vitals-card companion-vitals-card-${pathClassName}`}
           >
+            {globalCooldownRemainingMs > 0 ? (
+              <span
+                className="companion-vitals-gcd-bar"
+                title={`Global cooldown ${Math.ceil(
+                  globalCooldownRemainingMs / 1000,
+                )}s`}
+              >
+                <span style={{ width: `${globalCooldownPercent}%` }} />
+              </span>
+            ) : null}
             <div className="companion-vitals-portrait-frame">
               <img
                 alt=""

@@ -12,6 +12,12 @@ import {
 import { getSkillTarget } from "./skillTargeting";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
+import {
+  isCompanionGlobalCooldownActive,
+  isSkillCooldownActive,
+  startCompanionGlobalCooldown,
+  startSkillCooldown,
+} from "./companionCooldowns";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
 export { updateSkillShieldBlockPositions } from "./skillEffectResolution";
@@ -23,6 +29,7 @@ const NORMAL_SKILL_SELECTION_PRIORITY = 0;
 const EMERGENCY_SKILL_SELECTION_PRIORITY = 1;
 
 type SkillUseOptions = {
+  now: number;
   combatOnly?: boolean;
   forcedEnemyTargetId?: string | null;
 };
@@ -32,23 +39,23 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
 
   for (const entity of Object.values(state.entities)) {
     const caster = nextState.entities[entity.id];
-    const cooldownSkill =
-      isLivingCompanion(caster) && isSkillOnCooldown(nextState, caster, now)
-        ? getCooldownSkill(nextState, caster)
-        : undefined;
 
-    if (!canUsePrototypeSkill(nextState, caster, now)) {
-      if (isLivingCompanion(caster) && cooldownSkill) {
-        nextState = recordSkillTelemetry(nextState, caster, {
-          type: "skill_skipped",
-          skill: cooldownSkill,
-          reason: "cooldown",
-        });
-      }
+    if (
+      isLivingCompanion(caster) &&
+      isCompanionGlobalCooldownActive(nextState, caster.id, now)
+    ) {
+      nextState = recordSkillTelemetry(nextState, caster, {
+        type: "skill_skipped",
+        reason: "global_cooldown",
+      });
       continue;
     }
 
-    const result = chooseSkillUse(nextState, caster);
+    if (!canUsePrototypeSkill(nextState, caster)) {
+      continue;
+    }
+
+    const result = chooseSkillUse(nextState, caster, { now });
     nextState = result.state;
     const skillUse = result.skillUse;
 
@@ -70,23 +77,26 @@ export function updateCombatSkillSystem(
 
   for (const entity of Object.values(state.entities)) {
     const caster = nextState.entities[entity.id];
-    const cooldownSkill =
-      isLivingCompanion(caster) && isSkillOnCooldown(nextState, caster, now)
-        ? getCooldownSkill(nextState, caster)
-        : undefined;
 
-    if (!canUsePrototypeCombatSkill(nextState, caster, now)) {
-      if (isLivingCompanion(caster) && cooldownSkill) {
+    if (
+      isLivingCompanion(caster) &&
+      isCompanionGlobalCooldownActive(nextState, caster.id, now)
+    ) {
+      if (hasCombatSkillContext(nextState, caster)) {
         nextState = recordSkillTelemetry(nextState, caster, {
           type: "skill_skipped",
-          skill: cooldownSkill,
-          reason: "cooldown",
+          reason: "global_cooldown",
         });
       }
       continue;
     }
 
+    if (!canUsePrototypeCombatSkill(nextState, caster)) {
+      continue;
+    }
+
     const result = chooseSkillUse(nextState, caster, {
+      now,
       combatOnly: true,
       forcedEnemyTargetId: getForcedDirectAttackTargetId(nextState, caster),
     });
@@ -106,30 +116,26 @@ export function updateCombatSkillSystem(
 function canUsePrototypeCombatSkill(
   state: GameState,
   entity: GameEntity | undefined,
-  now: number,
 ): entity is Companion {
   return Boolean(
     entity &&
       entity.kind === "companion" &&
       entity.state !== "dead" &&
       entity.health > 0 &&
-      hasCombatSkillContext(state, entity) &&
-      !isSkillOnCooldown(state, entity, now),
+      hasCombatSkillContext(state, entity),
   );
 }
 
 function canUsePrototypeSkill(
-  state: GameState,
+  _state: GameState,
   entity: GameEntity | undefined,
-  now: number,
 ): entity is Companion {
   return Boolean(
     entity &&
       entity.kind === "companion" &&
       entity.state !== "dead" &&
       entity.health > 0 &&
-      entity.commandPriority !== "direct" &&
-      !isSkillOnCooldown(state, entity, now),
+      entity.commandPriority !== "direct",
   );
 }
 
@@ -181,26 +187,6 @@ function isPersonalThreat(
   );
 }
 
-function isSkillOnCooldown(
-  state: GameState,
-  entity: Companion,
-  now: number,
-): boolean {
-  const cooldown = state.skillCooldownsByCompanionId?.[entity.id];
-  return Boolean(cooldown && cooldown.expiresAt > now);
-}
-
-function getCooldownSkill(
-  state: GameState,
-  entity: Companion,
-): SkillDefinition | undefined {
-  const cooldown = state.skillCooldownsByCompanionId?.[entity.id];
-
-  return cooldown
-    ? getSkillsForClass(entity.classId).find((skill) => skill.id === cooldown.skillId)
-    : undefined;
-}
-
 function getSkillTargetSkipReason(
   state: GameState,
   caster: Companion,
@@ -243,12 +229,21 @@ function getSkillTargetSkipReason(
 function chooseSkillUse(
   state: GameState,
   caster: Companion,
-  options: SkillUseOptions = {},
+  options: SkillUseOptions,
 ): { state: GameState; skillUse: SkillUse | null } {
   let nextState = state;
   const skillUses = getSkillsForClass(caster.classId)
     .filter((skill) => !options.combatOnly || isCombatSkill(skill))
     .map((skill): SkillUse | null => {
+      if (isSkillCooldownActive(state, caster.id, skill.id, options.now)) {
+        nextState = recordSkillTelemetry(nextState, caster, {
+          type: "skill_skipped",
+          skill,
+          reason: "skill_cooldown",
+        });
+        return null;
+      }
+
       const target = getSkillTarget(state, caster, skill, {
         forcedEnemyTargetId: options.forcedEnemyTargetId,
       });
@@ -395,31 +390,27 @@ function applySkill(
     return result.state;
   }
 
-  return startSkillCooldown(
-    recordSkillApplied(result.state, caster, skillUse, result.appliedTargetId),
+  const appliedState = recordSkillApplied(
+    result.state,
     caster,
+    skillUse,
+    result.appliedTargetId,
+  );
+  const cooldownState = startSkillCooldown(
+    appliedState,
+    caster.id,
     skill,
     now,
+    getSkillCooldownMs(skill),
   );
-}
 
-function startSkillCooldown(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-  now: number,
-): GameState {
-  return {
-    ...state,
-    skillCooldownsByCompanionId: {
-      ...(state.skillCooldownsByCompanionId ?? {}),
-      [caster.id]: {
-        companionId: caster.id,
-        skillId: skill.id,
-        expiresAt: now + getSkillCooldownMs(skill),
-      },
-    },
-  };
+  return startCompanionGlobalCooldown(
+    cooldownState,
+    caster.id,
+    now,
+    "skill",
+    skill.id,
+  );
 }
 
 function isCombatSkill(skill: SkillDefinition): boolean {

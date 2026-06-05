@@ -55,6 +55,11 @@ import {
   DEFAULT_COMPANION_ATTACK_RANGE,
   getCompanionAttackRange,
 } from "./companionCombat";
+import {
+  COMPANION_GLOBAL_COOLDOWN_MS,
+  isCompanionGlobalCooldownActive,
+  startCompanionGlobalCooldown,
+} from "./companionCooldowns";
 import type {
   CombatEntity,
   Enemy,
@@ -189,7 +194,7 @@ export function updateAttackSystem(
         continue;
       }
 
-      if (!canAttack(currentAttacker, now)) {
+      if (!canAttack(nextState, currentAttacker, now)) {
         nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;
       }
@@ -262,6 +267,15 @@ export function updateAttackSystem(
 
       if (isEnemy(windupReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
         nextState = protectPartyMember(nextState, updatedTarget, windupReadyAttacker);
+      }
+
+      if (isPartyCombatEntity(windupReadyAttacker)) {
+        nextState = startCompanionGlobalCooldown(
+          nextState,
+          windupReadyAttacker.id,
+          now,
+          "basic_attack",
+        );
       }
 
       const currentUpdatedAttacker = getEntityById(nextState, updatedAttacker.id);
@@ -514,14 +528,22 @@ function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
   );
 }
 
-function canAttack(entity: CombatEntity, now: number): boolean {
+function canAttack(
+  state: GameState,
+  entity: CombatEntity,
+  now: number,
+): boolean {
+  if (isPartyCombatEntity(entity)) {
+    return !isCompanionGlobalCooldownActive(state, entity.id, now);
+  }
+
   return now - entity.lastAttackAt >= getAttackCooldownMs(entity);
 }
 
 export function getAttackCooldownMs(entity: CombatEntity): number {
   return entity.kind === "enemy"
     ? entity.attackCooldownMs ?? ATTACK_COOLDOWN_MS
-    : ATTACK_COOLDOWN_MS;
+    : COMPANION_GLOBAL_COOLDOWN_MS;
 }
 
 function updateTargetAfterDamage(

@@ -5,6 +5,7 @@ import type {
   CombatFeedbackEvent,
   CombatFeedbackType,
   ClassId,
+  CompanionGlobalCooldownState,
   ConsumableUseState,
   DebugNavigationReason,
   DebugTelemetryState,
@@ -26,7 +27,7 @@ import type {
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
   SkillBindState,
-  SkillCooldownState,
+  SkillCooldownsBySkillId,
   SkillGatherBuffState,
   SkillMarkState,
   ResurrectionProgressState,
@@ -38,6 +39,10 @@ import type {
   TeleportRuntimeState,
   WorldWipeRecoveryState,
 } from "./types";
+import {
+  filterExpiredGlobalCooldowns,
+  filterExpiredSkillCooldownsByCompanion,
+} from "./companionCooldowns";
 import type {
   GlobalPoiIntent,
   LocalPoiTarget,
@@ -170,7 +175,8 @@ export type GameState = {
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillBindsByEnemyId?: Record<string, SkillBindState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
-  skillCooldownsByCompanionId?: Record<string, SkillCooldownState>;
+  skillCooldownsByCompanionId?: Record<string, SkillCooldownsBySkillId>;
+  globalCooldownsByCompanionId?: Record<string, CompanionGlobalCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   enemyAoeCooldownsByCasterId?: Record<string, EnemyAoeCooldownState>;
@@ -347,8 +353,12 @@ export function clearExpiredSkillRuntimeState(
     state.skillShieldBlocksById,
     now,
   );
-  const skillCooldownsByCompanionId = filterExpiredRecord(
+  const skillCooldownsByCompanionId = filterExpiredSkillCooldownsByCompanion(
     state.skillCooldownsByCompanionId,
+    now,
+  );
+  const globalCooldownsByCompanionId = filterExpiredGlobalCooldowns(
+    state.globalCooldownsByCompanionId,
     now,
   );
   const skillVisualEvents = filterExpiredEvents(state.skillVisualEvents, now);
@@ -360,6 +370,7 @@ export function clearExpiredSkillRuntimeState(
     skillBindsByEnemyId === state.skillBindsByEnemyId &&
     skillShieldBlocksById === state.skillShieldBlocksById &&
     skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
+    globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
     skillVisualEvents === state.skillVisualEvents
   ) {
     return state;
@@ -373,6 +384,7 @@ export function clearExpiredSkillRuntimeState(
     skillBindsByEnemyId,
     skillShieldBlocksById,
     skillCooldownsByCompanionId,
+    globalCooldownsByCompanionId,
     skillVisualEvents,
   };
 }

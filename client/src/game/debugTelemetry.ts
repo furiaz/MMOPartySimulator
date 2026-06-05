@@ -997,9 +997,16 @@ function getActiveCooldownSkillId(
   state: GameState,
   entity: GameEntity,
 ) {
-  return entity.kind === "companion"
-    ? state.skillCooldownsByCompanionId?.[entity.id]?.skillId
+  if (entity.kind !== "companion") {
+    return undefined;
+  }
+
+  const cooldownsBySkillId = state.skillCooldownsByCompanionId?.[entity.id];
+  const activeCooldown = cooldownsBySkillId
+    ? Object.values(cooldownsBySkillId)[0]
     : undefined;
+
+  return activeCooldown?.skillId;
 }
 
 function getHealth(entity: GameEntity): number | null {

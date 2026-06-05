@@ -92,6 +92,7 @@ export function createInitialGameState(): GameState {
     skillBindsByEnemyId: {},
     skillShieldBlocksById: {},
     skillCooldownsByCompanionId: {},
+    globalCooldownsByCompanionId: {},
     skillVisualEvents: [],
     dropVisualEvents: [],
   });

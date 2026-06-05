@@ -1,6 +1,5 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
-import { setLastAttackAt } from "./entities";
 import {
   isLivingCompanion,
   isLivingEnemy,
@@ -67,53 +66,64 @@ export function resolveSkillEffect(
   const { skill, target } = skillUse;
 
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyDamageSkill(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "lungeDamage" && isLivingEnemy(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyLungeDamageSkill(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "sweepingDamage" && isLivingEnemy(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applySweepingStrike(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "taunt" && isLivingEnemy(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyTaunt(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "mark" && isLivingEnemy(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyMarkTarget(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "selfBuff") {
-    return consumeSkillEffect(applySelfBuff(state, caster, skill, now), caster.id);
+    return resolveAppliedSkillEffect(
+      state,
+      applySelfBuff(state, caster, skill, now),
+      caster.id,
+    );
   }
 
   if (skill.effect.type === "allyBuff" && isLivingCompanion(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyAllyBuff(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "gatherBuff") {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyGatherBuff(state, caster, skill, now),
       caster.id,
     );
@@ -130,21 +140,24 @@ export function resolveSkillEffect(
   }
 
   if (skill.effect.type === "shieldBlock") {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyShieldBlock(state, caster, skill, now),
       caster.id,
     );
   }
 
   if (skill.effect.type === "bind" && isLivingEnemy(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyBind(state, caster, target, skill, now),
       target.id,
     );
   }
 
   if (skill.effect.type === "heal" && isLivingCompanion(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyHeal(
         state,
         caster,
@@ -159,7 +172,8 @@ export function resolveSkillEffect(
   }
 
   if (skill.effect.type === "selfCostHeal" && isLivingCompanion(target)) {
-    return consumeSkillEffect(
+    return resolveAppliedSkillEffect(
+      state,
       applyHeal(
         state,
         caster,
@@ -210,6 +224,16 @@ function consumeSkillEffect(
   };
 }
 
+function resolveAppliedSkillEffect(
+  originalState: GameState,
+  appliedState: GameState,
+  appliedTargetId: string,
+): SkillEffectResolutionResult {
+  return appliedState === originalState
+    ? skipSkillEffect(originalState)
+    : consumeSkillEffect(appliedState, appliedTargetId);
+}
+
 function skipSkillEffect(state: GameState): SkillEffectResolutionResult {
   return {
     state,
@@ -248,7 +272,7 @@ function applyDamageSkill(
     durationMs: VISUAL_DURATION_MS,
   });
 
-  return updateCasterLastAttackAt(nextState, caster.id, now);
+  return nextState;
 }
 
 function applyLungeDamageSkill(
@@ -311,7 +335,7 @@ function applyLungeDamageSkill(
     durationMs: VISUAL_DURATION_MS,
   });
 
-  return updateCasterLastAttackAt(nextState, caster.id, now);
+  return nextState;
 }
 
 function applySweepingStrike(
@@ -370,7 +394,7 @@ function applySweepingStrike(
     durationMs: VISUAL_DURATION_MS,
   });
 
-  return updateCasterLastAttackAt(nextState, caster.id, now);
+  return nextState;
 }
 
 function applyTaunt(
@@ -423,7 +447,7 @@ function applyTaunt(
     durationMs: VISUAL_DURATION_MS,
   });
 
-  return updateCasterLastAttackAt(nextState, caster.id, now);
+  return nextState;
 }
 
 function applyMarkTarget(
@@ -457,7 +481,7 @@ function applyMarkTarget(
     now,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return nextState;
 }
 
 function applySelfBuff(
@@ -504,7 +528,7 @@ function applySelfBuff(
     now,
   });
 
-  return updateEntity(nextState, setLastAttackAt(damagedCaster, now));
+  return nextState;
 }
 
 function applyAllyBuff(
@@ -548,7 +572,7 @@ function applyAllyBuff(
     now,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return nextState;
 }
 
 function applyGatherBuff(
@@ -590,7 +614,7 @@ function applyGatherBuff(
     now,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return nextState;
 }
 
 function applyQuickStep(
@@ -647,7 +671,7 @@ function applyQuickStep(
     now,
   });
 
-  return updateEntity(nextState, setLastAttackAt({ ...caster, position }, now));
+  return nextState;
 }
 
 function applyShieldBlock(
@@ -694,7 +718,7 @@ function applyShieldBlock(
     durationMs: 600,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return nextState;
 }
 
 function applyBind(
@@ -727,7 +751,7 @@ function applyBind(
     now,
   });
 
-  return updateEntity(nextState, setLastAttackAt(caster, now));
+  return nextState;
 }
 
 function applyHeal(
@@ -796,11 +820,7 @@ function applyHeal(
     skillId,
   });
 
-  const currentCaster = nextState.entities[caster.id];
-
-  return isLivingCompanion(currentCaster)
-    ? updateEntity(nextState, setLastAttackAt(currentCaster, now))
-    : nextState;
+  return nextState;
 }
 
 function damageEnemy(
@@ -847,18 +867,6 @@ function damageEnemy(
   }
 
   return nextState;
-}
-
-function updateCasterLastAttackAt(
-  state: GameState,
-  casterId: string,
-  now: number,
-): GameState {
-  const currentCaster = state.entities[casterId];
-
-  return isLivingCompanion(currentCaster)
-    ? updateEntity(state, setLastAttackAt(currentCaster, now))
-    : state;
 }
 
 function getUpdatedShieldBlock(

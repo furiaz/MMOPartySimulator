@@ -267,6 +267,24 @@ describe("world wipe recovery", () => {
               expiresAt: 10000,
             },
           ],
+          skillCooldownsByCompanionId: {
+            leader: {
+              kick: {
+                companionId: "leader",
+                skillId: "kick",
+                expiresAt: 10000,
+              },
+            },
+          },
+          globalCooldownsByCompanionId: {
+            leader: {
+              companionId: "leader",
+              source: "skill",
+              skillId: "kick",
+              startedAt: 0,
+              expiresAt: 2000,
+            },
+          },
           dropVisualEvents: [
             {
               id: "drop",
@@ -341,6 +359,8 @@ describe("world wipe recovery", () => {
     expect(nextState.interruptedPoiTarget).toBeNull();
     expect(nextState.combatFeedbackEvents).toEqual([]);
     expect(nextState.skillVisualEvents).toEqual([]);
+    expect(nextState.skillCooldownsByCompanionId).toEqual({});
+    expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.dropVisualEvents).toEqual([]);
     expect(nextState.moveIntentsByEntityId).toEqual({});
     expect(nextState.movementFailureMsByEntityId).toEqual({});

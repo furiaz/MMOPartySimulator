@@ -812,6 +812,20 @@ export type SkillCooldownState = {
   expiresAt: number;
 };
 
+export type SkillCooldownsBySkillId = Partial<
+  Record<SkillId, SkillCooldownState>
+>;
+
+export type CompanionGlobalCooldownSource = "skill" | "basic_attack";
+
+export type CompanionGlobalCooldownState = {
+  companionId: string;
+  source: CompanionGlobalCooldownSource;
+  skillId?: SkillId;
+  startedAt: number;
+  expiresAt: number;
+};
+
 export type SkillVisualType =
   | "slash"
   | "projectile"

@@ -68,6 +68,67 @@ describe("enemy attack leash movement", () => {
     expect(nextEnemy.currentTargetId).toBe(companion.id);
   });
 
+  it("starts companion global cooldown when a basic attack lands", () => {
+    const companion = {
+      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      maxHealth: 20,
+    });
+
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+
+    expect(nextState.globalCooldownsByCompanionId?.leader).toMatchObject({
+      companionId: "leader",
+      source: "basic_attack",
+      startedAt: 1000,
+      expiresAt: 3000,
+    });
+  });
+
+  it("uses companion global cooldown to gate basic attacks", () => {
+    const companion = {
+      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      maxHealth: 20,
+    });
+
+    const nextState = updateAttackSystem(
+      {
+        ...createState([companion, enemy]),
+        globalCooldownsByCompanionId: {
+          leader: {
+            companionId: "leader",
+            source: "skill",
+            skillId: "kick",
+            startedAt: 1000,
+            expiresAt: 3000,
+          },
+        },
+      },
+      new Set(),
+      2000,
+    );
+    const nextEnemy = nextState.entities.enemy as Enemy;
+
+    expect(nextEnemy.health).toBe(enemy.health);
+    expect(nextState.globalCooldownsByCompanionId?.leader).toMatchObject({
+      source: "skill",
+      expiresAt: 3000,
+    });
+  });
+
   it("keeps target dummies alive and non-retaliatory when attacked", () => {
     const companion = {
       ...createIdleCompanion("leader", { x: 1, y: 0 }),
