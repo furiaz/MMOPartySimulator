@@ -108,6 +108,7 @@ export type {
   ResurrectionCancelReason,
   ResurrectionProgressState,
   ResurrectionRecoveryAssignmentState,
+  RoleBonusState,
   SkillBindState,
   SkillCooldownState,
   SkillCooldownsBySkillId,
@@ -199,6 +200,17 @@ export {
   type EntityCollisionShape,
   type PoiSearchScope,
 } from "./state";
+export {
+  ROLE_BONUS_ASSIGNMENT_DELAY_MS,
+  assignCurrentRoleBonuses,
+  createAssignedRoleBonusState,
+  createEmptyRoleBonusState,
+  createPendingRoleBonusState,
+  getActiveRoleBonusRole,
+  getRoleBonusDisplayState,
+  updateRoleBonusAssignments,
+  type RoleBonusDisplayState,
+} from "./roleBonus";
 export {
   clearPartyIntent,
   getPartyExecutionIntent,

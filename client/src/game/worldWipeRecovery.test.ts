@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createDebugMap, createEnemy } from "./index";
+import {
+  createCompanion,
+  createDebugMap,
+  createEnemy,
+  createPendingRoleBonusState,
+} from "./index";
 import {
   hubCompanionStartPositions,
   HUB_MAP_ID,
@@ -206,6 +211,7 @@ describe("world wipe recovery", () => {
       characterLevel: 12,
       characterXp: 34,
       role: "fighter" as const,
+      roleBonus: createPendingRoleBonusState("fighter", 1000),
       commandPriority: "direct" as const,
       currentTargetId: "enemy",
       defendPosition: { x: 5, y: 5 },
@@ -351,6 +357,12 @@ describe("world wipe recovery", () => {
       commandPriority: "autonomous",
       currentTargetId: null,
       defendPosition: null,
+      roleBonus: {
+        activeRole: "fighter",
+        pendingRole: null,
+        changedAt: null,
+        activatesAt: null,
+      },
     });
     expect(nextState.activeTeleport).toBeNull();
     expect(nextState.leaderIntent).toBeNull();

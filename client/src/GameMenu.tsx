@@ -163,6 +163,7 @@ export function GameMenu({
               ) : activeTab === "partyManagement" ? (
                 <PartyManagementPanel
                   activeSection={activeManagementSection}
+                  currentTime={currentTime}
                   leaderId={leaderId}
                   members={members}
                   selectedCompanionId={selectedCompanionId}

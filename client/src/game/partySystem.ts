@@ -1,4 +1,5 @@
 import { getEntityById, updateEntity, type GameState } from "./state";
+import { createPendingRoleBonusState } from "./roleBonus";
 import { getRolePriority } from "./roleProfiles";
 import { isActiveResource } from "./entityGuards";
 import type {
@@ -105,6 +106,7 @@ export function setPartyMemberRole(
   state: GameState,
   entityId: string,
   role: PartyMemberRole,
+  nowMs = Date.now(),
 ): GameState {
   const entity = getEntityById(state, entityId);
 
@@ -112,9 +114,14 @@ export function setPartyMemberRole(
     return state;
   }
 
+  if (entity.role === role) {
+    return state;
+  }
+
   return updateEntity(state, {
     ...entity,
     role,
+    roleBonus: createPendingRoleBonusState(role, nowMs),
   });
 }
 

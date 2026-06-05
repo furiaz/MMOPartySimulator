@@ -46,6 +46,7 @@ import {
   clearMapTransitionRuntimeState,
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
+import { assignCurrentRoleBonuses } from "./roleBonus";
 import {
   updateEntity,
   type GameState,
@@ -367,6 +368,8 @@ function completeTeleport(state: GameState, nowMs: number): GameState {
       commandPriority: "autonomous",
     });
   }
+
+  nextState = assignCurrentRoleBonuses(nextState);
 
   const leader = nextState.entities[nextState.partyLeaderId];
   const positionsAfterTransition = getEntityPositions(nextState.entities);

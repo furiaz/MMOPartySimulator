@@ -2182,6 +2182,30 @@
   color: #ffffff;
 }
 
+.role-bonus-status {
+  justify-self: start;
+  padding: 5px 8px;
+  border: 1px solid rgba(58, 90, 96, 0.78);
+  background: rgba(9, 18, 21, 0.28);
+  color: #c8dadd;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.role-bonus-status-assigned {
+  border-color: rgba(126, 181, 138, 0.84);
+  color: #d8f0dc;
+}
+
+.role-bonus-status-pending {
+  border-color: rgba(221, 179, 93, 0.78);
+  color: #f0dfb8;
+}
+
+.role-bonus-status-none {
+  color: #9fb3b7;
+}
+
 .role-pill {
   display: inline-flex;
   align-items: center;

@@ -42,6 +42,7 @@ import { createResourceWorkContext } from "./gathererResourceReservation";
 import { updateResurrectionSystem } from "./resurrectionSystem";
 import { getPartyMembers } from "./partySystem";
 import { updateRoleSystem } from "./roleSystem";
+import { updateRoleBonusAssignments } from "./roleBonus";
 import {
   updateCombatSkillSystem,
   updateSkillShieldBlockPositions,
@@ -87,6 +88,7 @@ export function updateGame(
   );
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = clearExpiredHubDepartureFoodWarning(nextState, timing.nowMs);
+  nextState = updateRoleBonusAssignments(nextState, timing.nowMs);
   const movedEntityIds = new Set<string>();
   const attackSlotPathDistanceCache = createAttackSlotPathDistanceCache();
   const mapIdBeforeTeleport = nextState.currentMapId;

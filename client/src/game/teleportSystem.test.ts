@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { HUB_DEPARTURE_FOOD_WARNING_DURATION_MS } from "./consumables";
-import { createCompanion, createDebugMap } from "./index";
-import { HUB_MAP_ID, MAP_ONE_ID } from "./debugMap";
+import {
+  createCompanion,
+  createDebugMap,
+  createPendingRoleBonusState,
+} from "./index";
+import { companionIds, HUB_MAP_ID, MAP_ONE_ID } from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
@@ -65,20 +69,55 @@ describe("teleport system", () => {
     expect(nextState.movementPathsByEntityId).toEqual({});
     expect(nextState.attackSlotCacheByEntityId).toEqual({});
   });
+
+  it("immediately assigns current role bonuses after teleport completion", () => {
+    const state = createHubTeleportReadyState();
+    const companionId = companionIds[0];
+    const leader = state.entities[companionId];
+
+    if (leader?.kind !== "companion") {
+      throw new Error("Missing companion leader in teleport test state.");
+    }
+
+    const nextState = updateTeleportSystem(
+      {
+        ...state,
+        entities: {
+          ...state.entities,
+          [companionId]: {
+            ...leader,
+            roleBonus: createPendingRoleBonusState("fighter", 1000),
+          },
+        },
+      },
+      new Set(),
+      2000,
+    );
+
+    expect(nextState.entities[companionId]).toMatchObject({
+      roleBonus: {
+        activeRole: "fighter",
+        pendingRole: null,
+        changedAt: null,
+        activatesAt: null,
+      },
+    });
+  });
 });
 
 function createHubTeleportReadyState(overrides: Partial<GameState> = {}) {
   const map = createDebugMap(HUB_MAP_ID);
   const teleport = map.teleports.find((candidate) => candidate.id === "hub-to-map-1");
+  const companionId = companionIds[0];
 
   if (!teleport) {
     throw new Error("Missing hub-to-map-1 teleport in test map.");
   }
 
   const baseLeader = createCompanion(
-    "leader",
+    companionId,
     teleport.position,
-    "leader",
+    companionId,
     "fighter",
     0,
   );

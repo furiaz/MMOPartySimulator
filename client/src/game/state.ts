@@ -43,6 +43,7 @@ import {
   filterExpiredGlobalCooldowns,
   filterExpiredSkillCooldownsByCompanion,
 } from "./companionCooldowns";
+import { createPendingRoleBonusState } from "./roleBonus";
 import type {
   GlobalPoiIntent,
   LocalPoiTarget,
@@ -478,8 +479,9 @@ export function setCompanionRole(
   state: GameState,
   companionId: string,
   role: PartyMemberRole,
+  nowMs = Date.now(),
 ): GameState {
-  return setPartyMemberRole(state, companionId, role);
+  return setPartyMemberRole(state, companionId, role, nowMs);
 }
 
 export function setPartyLeader(
@@ -528,6 +530,7 @@ export function setPartyMemberRole(
   state: GameState,
   entityId: string,
   role: PartyMemberRole,
+  nowMs = Date.now(),
 ): GameState {
   const partyMember = state.entities[entityId];
 
@@ -535,14 +538,15 @@ export function setPartyMemberRole(
     return state;
   }
 
+  if (partyMember.role === role) {
+    return state;
+  }
+
   const nextState = updateEntity(state, {
     ...partyMember,
     role,
+    roleBonus: createPendingRoleBonusState(role, nowMs),
   });
-
-  if (partyMember.role === role) {
-    return nextState;
-  }
 
   return appendDebugTelemetryEvent(nextState, {
     type: "role_changed",

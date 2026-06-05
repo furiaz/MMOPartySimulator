@@ -22,6 +22,7 @@ import {
   getCompanionDerivedStats,
   getDefenseReductionPercent,
   getItemDefinition,
+  getRoleBonusDisplayState,
   isFlaskItemDefinition,
   isFoodItemDefinition,
   getPartySizeUnlockRequirement,
@@ -528,6 +529,7 @@ function CompanionMenuList({
 
 export function PartyManagementPanel({
   activeSection,
+  currentTime,
   leaderId,
   members,
   selectedCompanionId,
@@ -541,6 +543,7 @@ export function PartyManagementPanel({
   onMovePartyOrder,
 }: {
   activeSection: PartyManagementSection;
+  currentTime: number;
   leaderId: string;
   members: Companion[];
   selectedCompanionId: string | null;
@@ -603,6 +606,7 @@ export function PartyManagementPanel({
         {selectedMember ? (
           <PartyManagementSectionPanel
             activeSection={activeSection}
+            currentTime={currentTime}
             leaderId={leaderId}
             member={selectedMember}
             members={orderedMembers}
@@ -660,6 +664,7 @@ function LeadershipHeaderAction({
 
 function PartyManagementSectionPanel({
   activeSection,
+  currentTime,
   leaderId,
   member,
   members,
@@ -670,6 +675,7 @@ function PartyManagementSectionPanel({
   onMovePartyOrder,
 }: {
   activeSection: PartyManagementSection;
+  currentTime: number;
   leaderId: string;
   member: Companion;
   members: Companion[];
@@ -686,7 +692,13 @@ function PartyManagementSectionPanel({
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
 }) {
   if (activeSection === "role") {
-    return <RoleSelectSection member={member} onChangeRole={onChangeRole} />;
+    return (
+      <RoleSelectSection
+        currentTime={currentTime}
+        member={member}
+        onChangeRole={onChangeRole}
+      />
+    );
   }
 
   if (activeSection === "partyOrder") {
@@ -1233,12 +1245,16 @@ function formatModifier(value: number): string {
 }
 
 function RoleSelectSection({
+  currentTime,
   member,
   onChangeRole,
 }: {
+  currentTime: number;
   member: Companion;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
 }) {
+  const roleBonusDisplay = getRoleBonusDisplayState(member, currentTime);
+
   return (
     <section className="management-section-card" aria-label="Role Select">
       <h3>Role Select</h3>
@@ -1257,6 +1273,11 @@ function RoleSelectSection({
           </button>
         ))}
       </div>
+      <span
+        className={`role-bonus-status role-bonus-status-${roleBonusDisplay.status}`}
+      >
+        {roleBonusDisplay.label}
+      </span>
     </section>
   );
 }

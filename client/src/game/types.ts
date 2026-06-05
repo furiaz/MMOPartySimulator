@@ -451,6 +451,13 @@ export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
 };
 
+export type RoleBonusState = {
+  activeRole: PartyMemberRole | null;
+  pendingRole: PartyMemberRole | null;
+  changedAt: number | null;
+  activatesAt: number | null;
+};
+
 export type ConsumableUseState = {
   companionId: string;
   itemId: ConsumableItemId;
@@ -1557,6 +1564,7 @@ export type Companion = LivingEntity & {
   consumableBuffs: CompanionConsumableBuffs;
   consumableBehavior: CompanionConsumableBehavior;
   skillBehavior: CompanionSkillBehavior;
+  roleBonus: RoleBonusState;
 };
 
 export type ResourceEntity = BaseEntity & {

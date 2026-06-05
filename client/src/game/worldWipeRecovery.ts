@@ -22,6 +22,7 @@ import {
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
 import { recordMapReachedForQuests } from "./questSystem";
+import { assignCurrentRoleBonuses } from "./roleBonus";
 import { updateEntity, type GameState } from "./state";
 import type {
   Companion,
@@ -276,6 +277,8 @@ function resetStateToRescueHub(
       commandPriority: "autonomous",
     });
   }
+
+  nextState = assignCurrentRoleBonuses(nextState);
 
   const leader = nextState.entities[nextState.partyLeaderId];
 
