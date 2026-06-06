@@ -52,6 +52,7 @@ Current game-logic implementation files include:
 - `combatResolver.ts`
 - `commands.ts`
 - `companionCombat.ts`
+- `companionCooldowns.ts`
 - `consumables.ts`
 - `createInitialGameState.ts`
 - `debugMap.ts`
@@ -116,9 +117,11 @@ Current game-logic implementation files include:
 - `questTypes.ts`
 - `resurrectionSystem.ts`
 - `resourceInteraction.ts`
+- `roleBonus.ts`
 - `roleProfiles.ts`
 - `roleSystem.ts`
 - `simulationTiming.ts`
+- `skillBehavior.ts`
 - `skillEffectResolution.ts`
 - `skillMovement.ts`
 - `skillRolePreferences.ts`
@@ -264,6 +267,8 @@ Party members currently support:
 - `consumables`
 - `consumableBuffs`
 - `consumableBehavior`
+- `skillBehavior`
+- `roleBonus`
 
 Shared party-member behavior is handled through `partySystem.ts`.
 
@@ -313,6 +318,40 @@ Party members have roles, and `CompanionRole` aliases `PartyMemberRole`.
 Role behavior is handled by `roleSystem.ts`, `roleProfiles.ts`, and role-specific systems such as `defendSystem.ts` and `gatherSystem.ts`.
 
 Roles define priorities. Classes define available capabilities.
+
+Role bonus assignment is handled by `roleBonus.ts`.
+
+Companions store:
+
+```ts
+roleBonus: RoleBonusState;
+```
+
+Current role bonus state tracks:
+
+- `activeRole`
+- `pendingRole`
+- `changedAt`
+- `activatesAt`
+
+`setPartyMemberRole` starts a pending role bonus for the newly assigned role.
+
+`updateRoleBonusAssignments` activates pending role bonuses after the prototype assignment delay.
+
+Current role bonus constants include:
+
+- `ROLE_BONUS_ASSIGNMENT_DELAY_MS = 5000`
+
+Active role bonuses contribute through stat and gathering helpers.
+
+Current role bonus effects include:
+
+- Defender: defense and block modifiers
+- Fighter: attack and magic power modifiers
+- Support: healing power modifier
+- Gatherer: effective gather speed modifier
+
+Role bonus code must not create new role values or change autonomous role priority behavior.
 
 ---
 
@@ -408,7 +447,7 @@ Current prototype drop and dungeon runtime fields include:
 - `dropVisualEvents`
 - `slimewardDungeon`
 
-Current prototype skill runtime fields include:
+Current prototype skill runtime and cooldown fields include:
 
 - `skillMarksByEnemyId`
 - `skillSelfBuffsByCompanionId`
@@ -416,6 +455,7 @@ Current prototype skill runtime fields include:
 - `skillBindsByEnemyId`
 - `skillShieldBlocksById`
 - `skillCooldownsByCompanionId`
+- `globalCooldownsByCompanionId`
 - `skillVisualEvents`
 
 Current enemy AoE runtime fields include:
@@ -595,9 +635,11 @@ Skills are simple class-based actions used to extend existing behavior.
 
 Skill definitions live in `skills.ts`.
 
-Skill selection, execution, and effect resolution live in:
+Skill selection, behavior settings, cooldowns, execution, and effect resolution live in:
 
 - `skillSystem.ts`
+- `skillBehavior.ts`
+- `companionCooldowns.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
 - `skillTargeting.ts`
@@ -607,6 +649,20 @@ Skill selection, execution, and effect resolution live in:
 Current skill runtime is prototype-only.
 
 It is not a full ability framework.
+
+Current companion skill behavior settings live in `skillBehavior.ts`.
+
+Companions store:
+
+```ts
+skillBehavior: CompanionSkillBehavior;
+```
+
+Current companion skill behavior settings include:
+
+- `beginnerFirstAidSelfHealHpThresholdPercent`
+
+Beginner First Aid self-heal threshold defaults to 20 percent and is clamped from 1 percent to 100 percent.
 
 Current skill ids include Beginner prototype skills and base class prototype skills:
 
@@ -665,8 +721,12 @@ Current skill rules:
 - skill movement helpers must validate map bounds, walls, active resources, and blocking entity collision before moving companions
 - direct-commanded companions do not use autonomous prototype skills
 - dead companions do not use skills
-- skills have a shared prototype cooldown
-- current shared prototype cooldown is 5000ms
+- skills may use individual per-skill cooldowns
+- skills without an explicit cooldown fall back to the shared prototype skill cooldown value
+- current fallback prototype skill cooldown is 5000ms
+- Beginner prototype skills currently use explicit 10000ms cooldowns
+- basic attacks and successful skill uses start a companion global cooldown
+- current companion global cooldown is 2000ms
 - skill ranges use numeric values
 - runtime skill effects expire through game-state cleanup
 - skill visuals are represented through temporary visual events
@@ -683,7 +743,7 @@ type SkillVisualType =
   | "heal";
 ```
 
-Current skill runtime state includes marks, self buffs, gather buffs, binds, shield blocks, cooldowns, and visual events.
+Current skill runtime state includes marks, self buffs, gather buffs, binds, shield blocks, per-skill cooldowns, companion global cooldowns, and visual events.
 
 Do not expand this into a full ability framework unless explicitly requested.
 
@@ -760,9 +820,11 @@ Unspent stat points represent available allocation points.
 
 Equipment and consumable buffs may provide primary stat modifiers or derived stat modifiers.
 
+Active role bonuses may provide derived stat modifiers or effective gather speed modifiers.
+
 Primary stat modifiers are included when calculating actual companion stats.
 
-Derived stat modifiers are included when calculating derived combat stats.
+Derived stat modifiers from equipment, consumables, and active role bonuses are included when calculating derived combat stats.
 
 Derived max health is synchronized onto companions when relevant state changes occur.
 
@@ -2451,7 +2513,7 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, Superior enemy spawning, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, quest drop visuals, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, direct command issue/rejection/replacement/completion/cancellation/grace events, resurrection target selection, resurrection participant assignment, resurrection area progress, resurrection participant removal, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, Superior enemy spawning, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, quest drop visuals, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, skill selection, skill usage, skill skips, skill effects, skill cooldown state, direct command issue/rejection/replacement/completion/cancellation/grace events, resurrection target selection, resurrection participant assignment, resurrection area progress, resurrection participant removal, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
 
 Party-order rejection telemetry currently uses `party_order_rejected` for invalid, blocked, or unreachable party orders.
 
@@ -2505,6 +2567,8 @@ Debug/testing helpers may exist for development:
 - debug telemetry recording/export
 - debug maps
 - direct companion command testing
+- role bonus assignment testing
+- skill behavior and cooldown testing
 - map runtime cleanup testing
 - Slimeward dungeon runtime and chest testing
 - enemy AoE channel testing
@@ -2527,7 +2591,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -2556,6 +2620,7 @@ React may:
 - call existing stat allocation helpers for supported stat allocation actions
 - call existing equipment helpers for supported equipment actions
 - call existing consumable helpers for supported flask, food, and auto-flask actions
+- call existing skill behavior helpers for supported prototype skill behavior settings
 - call existing merchant helpers for supported quick exchange and Merchant Buy actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
 - display placeholder sections for future systems
@@ -2592,7 +2657,7 @@ Current intended Party Management sections and controls:
 - Role Select
 - Party Order
 - Formation placeholder for UI only; automatic formation behavior lives in `partyFormationSystem.ts`
-- Behavior Settings for supported prototype auto-flask controls
+- Behavior Settings for supported prototype auto-flask and Beginner First Aid self-heal controls
 
 Role Select must use the existing `PartyMemberRole` values:
 

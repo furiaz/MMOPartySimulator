@@ -110,6 +110,30 @@ Fallback actions must never override higher-priority role actions.
 
 Direct commands always override autonomous role behavior unless the target is unable to act.
 
+### Role Bonuses
+
+Current prototype role bonuses give companions a small value bonus after they settle into a real role.
+
+Role bonuses:
+
+- apply only to Defender, Fighter, Support, and Gatherer
+- do not apply to None / Unassigned
+- are separate from role behavior priority
+- start as pending after a role change
+- become active after a short assignment delay
+- may use simple level-banded values
+- may affect derived combat stats or gathering speed
+- should stay lightweight prototype tuning, not final specialization, talents, mastery, or role progression
+
+Current prototype role bonus identities:
+
+- Defender improves defense and block
+- Fighter improves attack and magic power
+- Support improves healing power
+- Gatherer improves effective gather speed
+
+Role bonus assignment should not change leader identity, class, equipment, party order, or autonomous behavior rules.
+
 ### Gathering Terminology
 
 `Gatherer` refers only to the assigned Gatherer role.
@@ -1086,10 +1110,11 @@ Formation may appear as a UI placeholder only.
 
 The current simulation has lightweight automatic party formation behavior, but there is no player-facing formation editor yet.
 
-Behavior Settings currently supports prototype auto-flask controls:
+Behavior Settings currently supports prototype companion behavior controls:
 
 - Auto-use Flask toggle
 - Flask HP Threshold setting from 1 percent to 100 percent
+- Beginner First Aid Self-Heal Threshold setting from 1 percent to 100 percent
 
 Behavior Settings should not define new autonomous behavior outside supported game-logic settings.
 
@@ -1636,7 +1661,8 @@ Skills:
 
 - are defined by tags
 - use simple effects
-- may use a shared prototype cooldown
+- may use per-skill prototype cooldowns
+- may use a short companion global cooldown after basic attacks or skill use
 - do not yet use mana or advanced resource systems
 - are used as simple extensions of existing behavior
 - should be selected through role priorities and context instead of hardcoded class behavior
@@ -1648,7 +1674,8 @@ Skill usage is determined by:
 - current context such as combat, danger, gathering, and safety
 - target validity
 - range
-- cooldown availability
+- companion global cooldown availability
+- individual skill cooldown availability
 
 Current prototype skills may include:
 
@@ -1665,6 +1692,14 @@ Current prototype skills may include:
 - lunge movement and damage
 - gathering support
 - beginner fallback combat or survival tools
+
+Current prototype skill cooldown behavior:
+
+- Beginner prototype skills may have longer individual cooldowns than base class prototype skills
+- base class prototype skills may fall back to the shared prototype skill cooldown value
+- individual skill cooldowns should not block other ready skills
+- companion global cooldown prevents immediate repeated basic attacks or skill use
+- failed skill effects should not consume cooldown when no effect is applied
 
 Current prototype skills are not the full final ability system.
 
@@ -1696,6 +1731,8 @@ Kick is a simple opening lunge and melee fallback attack.
 Guard Up is a simple defensive survival skill.
 
 First Aid is a small emergency recovery skill.
+
+Beginner companions may prioritize First Aid on themselves when their health is at or below the configured First Aid self-heal threshold.
 
 Deep Breath is a simple self-buff.
 
@@ -2064,7 +2101,7 @@ Temporary debug tools may include:
 - restore party health
 - inspect AI decision reasons
 - inspect XP and level progression
-- inspect class and skill behavior
+- inspect role bonus assignment, class behavior, skill behavior, skill cooldowns, and First Aid self-heal settings
 - inspect movement/pathing issues, movement planning, path backoff, and navigation grid behavior
 - inspect direct companion command issue, rejection, replacement, completion, cancellation, and rejoin grace behavior
 - debug map transitions
