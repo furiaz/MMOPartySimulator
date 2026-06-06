@@ -48,6 +48,7 @@ import {
   debugAddCompanionToParty,
   debugAddPrototypeConsumablesToInventory,
   debugAddTestCrowns,
+  debugFinishCurrentQuest,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
   debugLevelUpAllCompanions,
@@ -59,6 +60,7 @@ import {
   debugToggleCompanionInfiniteHealth,
   debugToggleSuperExp,
   debugToggleSuperSpeed,
+  debugTurnInCurrentQuest,
   enemyIds,
   assignFoodToCompanion,
   equipItemToCompanion,
@@ -2813,6 +2815,18 @@ function App() {
     setGameState(debugAddPrototypeConsumablesToInventory);
   }
 
+  function finishCurrentQuestForDebug() {
+    setGameState((state) =>
+      debugFinishCurrentQuest(state, getDisplayQuest(state.quests)?.questId),
+    );
+  }
+
+  function turnInCurrentQuestForDebug() {
+    setGameState((state) =>
+      debugTurnInCurrentQuest(state, getDisplayQuest(state.quests)?.questId),
+    );
+  }
+
   function killOneCompanion() {
     setGameState(debugKillOneCompanion);
   }
@@ -3916,6 +3930,12 @@ function App() {
                   <button onClick={addTestCrowns}>+100 Crowns</button>
                   <button onClick={addPrototypeConsumables}>
                     Add Prototype Consumables
+                  </button>
+                  <button onClick={finishCurrentQuestForDebug}>
+                    Finish Current Quest
+                  </button>
+                  <button onClick={turnInCurrentQuestForDebug}>
+                    Turn In Current Quest
                   </button>
                   <button onClick={killOneCompanion}>Kill One Companion</button>
                   <button onClick={forceSuperiorEnemy}>

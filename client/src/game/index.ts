@@ -550,6 +550,7 @@ export {
   QUEST_ORDER,
   acceptQuestFromQuestGiver,
   createInitialQuestStates,
+  finishReadyQuestForQuestGiver,
   finishReadyQuestsForQuestGiver,
   getActiveQuest,
   getAvailableQuest,
@@ -621,6 +622,7 @@ export {
   debugAddPrototypeEquipmentToInventory,
   debugAddTestCrowns,
   debugAddTestWoodToInventory,
+  debugFinishCurrentQuest,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
   debugLevelUpAllCompanions,
@@ -636,6 +638,7 @@ export {
   debugToggleCompanionInfiniteHealth,
   debugToggleSuperExp,
   debugToggleSuperSpeed,
+  debugTurnInCurrentQuest,
 } from "./debugTools";
 export {
   appendDebugTelemetryEvent,

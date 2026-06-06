@@ -24,6 +24,13 @@ import {
   grantCharacterXpToCompanion,
 } from "./leveling";
 import {
+  completeQuestObjective,
+  finishReadyQuestForQuestGiver,
+  QUEST_DEFINITIONS,
+  QUEST_GIVER_POI_ID,
+  QUEST_ORDER,
+} from "./questSystem";
+import {
   addCurrencyToWalletState,
   removeCurrencyFromWalletState,
   setCurrencyBalanceForDebug,
@@ -41,6 +48,7 @@ import {
   isWallPosition,
 } from "./movementPlanning";
 import type { Companion, Enemy, GameEntity, Position, ResourceEntity } from "./types";
+import type { QuestId, QuestObjectiveDefinition } from "./questTypes";
 
 const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
@@ -248,6 +256,50 @@ export function debugLevelUpAllCompanions(
   }
 
   return nextState;
+}
+
+export function debugFinishCurrentQuest(
+  state: GameState,
+  questId?: QuestId | null,
+): GameState {
+  const targetQuestId = getDebugTargetQuestId(state, "active", questId);
+
+  if (!targetQuestId) {
+    return state;
+  }
+
+  let nextState = state;
+
+  for (const objective of QUEST_DEFINITIONS[targetQuestId].objectives) {
+    nextState = debugCompleteQuestObjectiveFully(
+      nextState,
+      targetQuestId,
+      objective,
+    );
+  }
+
+  return clearDebugQuestRuntime(nextState, targetQuestId);
+}
+
+export function debugTurnInCurrentQuest(
+  state: GameState,
+  questId?: QuestId | null,
+  now = Date.now(),
+): GameState {
+  const targetQuestId = getDebugTargetQuestId(
+    state,
+    "ready_to_turn_in",
+    questId,
+  );
+
+  return targetQuestId
+    ? finishReadyQuestForQuestGiver(
+        state,
+        QUEST_GIVER_POI_ID,
+        targetQuestId,
+        now,
+      )
+    : state;
 }
 
 export function debugApplyCompanionInfiniteHealth(state: GameState): GameState {
@@ -626,6 +678,142 @@ function ensurePartyLeader(state: GameState): GameState {
     ...state,
     partyLeaderId: getFallbackLeaderId(state.entities),
   };
+}
+
+function getDebugTargetQuestId(
+  state: GameState,
+  status: "active" | "ready_to_turn_in",
+  questId?: QuestId | null,
+): QuestId | null {
+  if (questId && state.quests[questId]?.status === status) {
+    return questId;
+  }
+
+  if (questId) {
+    return null;
+  }
+
+  return (
+    QUEST_ORDER.find((candidateQuestId) => {
+      return state.quests[candidateQuestId]?.status === status;
+    }) ?? null
+  );
+}
+
+function debugCompleteQuestObjectiveFully(
+  state: GameState,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+): GameState {
+  let nextState = state;
+  const requiredCount = objective.requiredCount ?? 1;
+
+  while (true) {
+    const progress = nextState.quests[questId]?.objectiveProgress[objective.id];
+
+    if (!progress || progress.completed || progress.currentCount >= requiredCount) {
+      return nextState;
+    }
+
+    const progressedState = completeQuestObjective(
+      nextState,
+      questId,
+      objective.id,
+    );
+
+    if (progressedState === nextState) {
+      return nextState;
+    }
+
+    nextState = progressedState;
+  }
+}
+
+function clearDebugQuestRuntime(state: GameState, questId: QuestId): GameState {
+  const entityIdsToRemove = getDebugQuestEntityIdsToRemove(state, questId);
+  const cleanedState = removeDebugQuestEntities(state, entityIdsToRemove);
+
+  return {
+    ...cleanedState,
+    quests: {
+      ...cleanedState.quests,
+      [questId]: {
+        ...cleanedState.quests[questId],
+        runtime: undefined,
+      },
+    },
+    globalPoiIntent:
+      cleanedState.globalPoiIntent?.questId === questId
+        ? null
+        : cleanedState.globalPoiIntent,
+    localPoiTarget:
+      cleanedState.localPoiTarget?.questId === questId
+        ? null
+        : cleanedState.localPoiTarget,
+    lastPoiDecision:
+      cleanedState.lastPoiDecision?.consideredTargets?.some(
+        (target) => target.questId === questId,
+      )
+        ? undefined
+        : cleanedState.lastPoiDecision,
+    partyIntent:
+      cleanedState.partyIntent?.globalPoiIntent?.questId === questId ||
+      cleanedState.partyIntent?.localPoiTarget?.questId === questId
+        ? null
+        : cleanedState.partyIntent,
+  };
+}
+
+function getDebugQuestEntityIdsToRemove(
+  state: GameState,
+  questId: QuestId,
+): string[] {
+  const objectiveNpcIds = new Set(
+    QUEST_DEFINITIONS[questId].objectives
+      .filter(isDebugQuestNpcObjective)
+      .map((objective) => objective.guideNpcId ?? `${objective.id}-npc`),
+  );
+
+  return Object.values(state.entities)
+    .filter((entity) => {
+      if (entity.kind === "enemy") {
+        return entity.questSpawn?.questId === questId;
+      }
+
+      return (
+        entity.kind === "npc" &&
+        entity.npcRole === "quest_guide" &&
+        objectiveNpcIds.has(entity.id)
+      );
+    })
+    .map((entity) => entity.id);
+}
+
+function isDebugQuestNpcObjective(objective: QuestObjectiveDefinition): boolean {
+  return objective.type === "guide_npc_to_poi" || objective.type === "rescue_npc";
+}
+
+function removeDebugQuestEntities(
+  state: GameState,
+  entityIds: string[],
+): GameState {
+  if (entityIds.length === 0) {
+    return state;
+  }
+
+  const entities = { ...state.entities };
+  const followTrailsByEntityId = { ...state.followTrailsByEntityId };
+
+  for (const entityId of entityIds) {
+    delete entities[entityId];
+    delete followTrailsByEntityId[entityId];
+  }
+
+  return pruneMissingEntityRuntimeState({
+    ...state,
+    entities,
+    followTrailsByEntityId,
+  });
 }
 
 function hasLivingSuperiorInSubzone(

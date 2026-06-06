@@ -891,6 +891,24 @@ export function finishReadyQuestsForQuestGiver(
   return nextState;
 }
 
+export function finishReadyQuestForQuestGiver(
+  state: GameState,
+  questGiverPoiId: string,
+  questId: QuestId,
+  now = Date.now(),
+): GameState {
+  const quest = state.quests[questId];
+
+  if (
+    quest?.status !== "ready_to_turn_in" ||
+    QUEST_DEFINITIONS[questId].questGiverPoiId !== questGiverPoiId
+  ) {
+    return state;
+  }
+
+  return claimQuestReward(state, questId, questGiverPoiId, { now });
+}
+
 export function isObjectiveCompleted(
   state: GameState,
   questId: QuestId,
