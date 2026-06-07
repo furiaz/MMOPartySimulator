@@ -29,6 +29,7 @@ describe("hub target dummy", () => {
       xpReward: 0,
       currentTargetId: null,
       state: "idle",
+      combatBodyRadius: 0.7,
     });
     expect(dummy.archetypeId).toBeUndefined();
     expect(dummy.enemyTypeId).toBeUndefined();

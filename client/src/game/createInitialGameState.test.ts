@@ -54,10 +54,12 @@ describe("createInitialGameState", () => {
     expect(state.entities[targetDummyId]).toMatchObject({
       kind: "enemy",
       isTargetDummy: true,
+      combatBodyRadius: 0.7,
     });
     expect(state.entities[aoeTargetDummyId]).toMatchObject({
       kind: "enemy",
       isTargetDummy: true,
+      combatBodyRadius: 0.7,
     });
   });
 

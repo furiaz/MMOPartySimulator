@@ -149,6 +149,7 @@ export function createTargetDummy(id: string, position: Position): Enemy {
     defense: 0,
     magicDefense: 0,
     evasion: 0,
+    combatBodyRadius: 0.7,
   });
 }
 
