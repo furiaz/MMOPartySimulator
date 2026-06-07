@@ -8,7 +8,7 @@ import { clearExpiredSkillRuntimeState } from "./state";
 import { createCompanion, createEnemy } from "./entities";
 import { addEntity, updateEntity } from "./state";
 import { createTestGameState } from "./testState";
-import type { SkillMarkState, SkillVisualEvent } from "./types";
+import type { ActiveCombatProjectile, SkillMarkState, SkillVisualEvent } from "./types";
 
 describe("runtime cleanup", () => {
   it("preserves the state reference when movement planning has no frame data", () => {
@@ -148,7 +148,21 @@ describe("runtime cleanup", () => {
   });
 
   it("keeps skill cooldowns and clears global cooldowns on map transition", () => {
+    const projectile: ActiveCombatProjectile = {
+      id: "projectile-1",
+      sourceId: "enemy-1",
+      targetId: "leader",
+      position: { x: 1, y: 1 },
+      targetFallbackPosition: { x: 2, y: 1 },
+      speed: 12,
+      impactRadius: 0.3,
+      visualProfileId: "goblin_thrower",
+      launchedAt: 1000,
+      damageType: "physical",
+      powerMultiplier: 1,
+    };
     const state = createTestGameState({
+      combatProjectiles: [projectile],
       skillCooldownsByCompanionId: {
         leader: {
           kick: {
@@ -175,6 +189,7 @@ describe("runtime cleanup", () => {
       state.skillCooldownsByCompanionId,
     );
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
+    expect(nextState.combatProjectiles).toEqual([]);
   });
 
   it("preserves the state reference when updating the same entity reference", () => {

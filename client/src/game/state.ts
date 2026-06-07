@@ -10,6 +10,7 @@ import type {
   DebugNavigationReason,
   DebugTelemetryState,
   DirectCompanionCommand,
+  ActiveCombatProjectile,
   ActiveTeleport,
   DebugMapId,
   GameMap,
@@ -171,6 +172,7 @@ export type GameState = {
   defenderBlockedMsByEntityId?: Record<string, number>;
   partyFormation?: PartyFormationState;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  combatProjectiles?: ActiveCombatProjectile[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;

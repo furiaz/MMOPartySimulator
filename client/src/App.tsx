@@ -58,6 +58,7 @@ import {
   debugResurrectEnemy,
   debugRestorePartyHealth,
   debugToggleCompanionInfiniteHealth,
+  debugToggleCompanionOneHunterClass,
   debugToggleSuperExp,
   debugToggleSuperSpeed,
   debugTurnInCurrentQuest,
@@ -122,6 +123,7 @@ import {
   updateEntity,
   updateCompanionConsumableBehavior,
   updateCompanionSkillBehavior,
+  type ActiveCombatProjectile,
   type Companion,
   type DirectCompanionCommand,
   type CompanionDirectCommandInput,
@@ -214,6 +216,7 @@ const poiSearchScopeCycle: PoiSearchScope[] = [
 ];
 const emptyDirectCompanionCommands: Record<string, DirectCompanionCommand> = {};
 const emptyDropVisualEvents: DropVisualEvent[] = [];
+const emptyCombatProjectiles: ActiveCombatProjectile[] = [];
 const emptyEnemyAoeChannels: Record<string, EnemyAoeChannelState> = {};
 const emptyResurrectionProgress: Record<string, ResurrectionProgressState> = {};
 const emptySkillBinds: Record<string, SkillBindState> = {};
@@ -2061,6 +2064,7 @@ function App() {
   );
   const directCompanionCommandsById =
     gameState.directCompanionCommandsById ?? emptyDirectCompanionCommands;
+  const combatProjectiles = gameState.combatProjectiles ?? emptyCombatProjectiles;
   const dropVisualEvents = gameState.dropVisualEvents ?? emptyDropVisualEvents;
   const enemyAoeChannelsByCasterId =
     gameState.enemyAoeChannelsByCasterId ?? emptyEnemyAoeChannels;
@@ -2807,6 +2811,10 @@ function App() {
     setGameState(debugToggleCompanionInfiniteHealth);
   }
 
+  function toggleCompanionOneHunterClass() {
+    setGameState(debugToggleCompanionOneHunterClass);
+  }
+
   function addTestCrowns() {
     setGameState(debugAddTestCrowns);
   }
@@ -3484,6 +3492,7 @@ function App() {
               cameraOffset={terrainCameraOffset}
               cellPixelSize={mapConstructionCellPixelSize}
               combatFeedbackEvents={gameState.combatFeedbackEvents}
+              combatProjectiles={combatProjectiles}
               directCompanionCommandsById={directCompanionCommandsById}
               dropVisualEvents={dropVisualEvents}
               enemyAoeChannelsByCasterId={enemyAoeChannelsByCasterId}
@@ -3913,6 +3922,9 @@ function App() {
                   <button onClick={restorePartyHealth}>Restore Party HP</button>
                   <button onClick={levelUpAllCompanions}>
                     Level Up All Companions
+                  </button>
+                  <button onClick={toggleCompanionOneHunterClass}>
+                    Toggle Companion 1 Hunter
                   </button>
                   <button
                     className={

@@ -29,6 +29,7 @@ export function createTestGameState(
     exploredTiles: {},
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
+    combatProjectiles: [],
     ...overrides,
   };
 }

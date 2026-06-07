@@ -21,6 +21,7 @@ import {
   WILDERNESS_MAP_TILE_SRC,
 } from "../assetIcons";
 import type {
+  ActiveCombatProjectile,
   ActiveTeleport,
   CombatFeedbackEvent,
   CompanionDirectCommandInput,
@@ -51,6 +52,7 @@ import {
   RESURRECTION_RANGE,
   SKILL_DEFINITIONS,
   aoeTargetDummyId,
+  targetDummyId,
 } from "../game";
 import {
   SUPERIOR_ENEMY_RENDER_SCALE,
@@ -105,6 +107,8 @@ const superiorEnemyAuraColor = 0xef4444;
 const enemyAoeFillColor = 0xdc2626;
 const enemyAoeStrokeColor = 0x7f1d1d;
 const prototypeVfxSpritePath = "assets/Generated/prototype-vfx/sprites";
+const combatProjectileSpritePath = "assets/Generated/combat-projectiles";
+const targetDummyDistanceMarkers = [5, 10, 20];
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
 const deathDownedPuffSrc = `${prototypeVfxSpritePath}/death-downed-puff.png`;
@@ -120,6 +124,42 @@ const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png`;
 const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
 const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
 const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
+
+const combatProjectileVisualProfiles: Record<
+  ActiveCombatProjectile["visualProfileId"],
+  { height: number; nativeAngleDegrees: number; src: string; width: number }
+> = {
+  hunter_arrow: {
+    height: 12,
+    nativeAngleDegrees: 0,
+    src: `${combatProjectileSpritePath}/hunter-arrow.png`,
+    width: 34,
+  },
+  slime_spitter: {
+    height: 22,
+    nativeAngleDegrees: 0,
+    src: `${combatProjectileSpritePath}/slime-spitter.png`,
+    width: 22,
+  },
+  goblin_thrower: {
+    height: 18,
+    nativeAngleDegrees: -45,
+    src: `${combatProjectileSpritePath}/goblin-thrower.png`,
+    width: 18,
+  },
+  bog_imp: {
+    height: 20,
+    nativeAngleDegrees: 135,
+    src: `${combatProjectileSpritePath}/bog-imp.png`,
+    width: 20,
+  },
+  ash_wisp: {
+    height: 24,
+    nativeAngleDegrees: 135,
+    src: `${combatProjectileSpritePath}/ash-wisp.png`,
+    width: 24,
+  },
+};
 const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
 const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
 const TELEPORT_OBJECT_SPRITE_ANCHOR_Y = 0.5;
@@ -150,6 +190,7 @@ type PixiWorldRendererProps = {
   cameraOffset?: Position;
   cellPixelSize?: number;
   combatFeedbackEvents?: CombatFeedbackEvent[];
+  combatProjectiles?: ActiveCombatProjectile[];
   currentTime?: number;
   directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
@@ -330,6 +371,7 @@ type DrawWorldOptions = {
   cameraOffset: Position;
   cellPixelSize: number;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  combatProjectiles: ActiveCombatProjectile[];
   companionDragPreview: CompanionDragPreview | null;
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
@@ -754,6 +796,7 @@ function collectDurableVisualTextureSrcs(): Set<string> {
     ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
       (src): src is string => Boolean(src),
     ),
+    ...Object.values(combatProjectileVisualProfiles).map((profile) => profile.src),
     blockImpactSrc,
     criticalHitBackingSrc,
     deathDownedPuffSrc,
@@ -1924,6 +1967,58 @@ function drawEnemyAggroRange(
   graphics
     .circle(center.x, center.y, radius)
     .stroke({ color: 0xef4444, alpha: 0.2, width: 2 });
+}
+
+function drawTargetDummyDistanceMarkers({
+  entities,
+  graphics,
+  layer,
+  managedState,
+  metrics,
+  transform,
+  visibleTileBounds,
+}: {
+  entities: GameEntity[];
+  graphics: Graphics;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  for (const entity of entities) {
+    if (
+      entity.kind !== "enemy" ||
+      (entity.id !== targetDummyId && entity.id !== aoeTargetDummyId) ||
+      !isPositionInTileBounds(entity.position, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const center = toFullPosition(entity.position, transform);
+
+    for (const markerDistance of targetDummyDistanceMarkers) {
+      const radius = markerDistance * transform.cellPixelSize;
+
+      graphics
+        .circle(center.x, center.y, radius)
+        .stroke({ color: 0x38bdf8, alpha: 0.5, width: 2 });
+      drawManagedFeedbackText({
+        alpha: 0.92,
+        color: 0x0ea5e9,
+        fontSize: 13,
+        key: `target-dummy-distance:${entity.id}:${markerDistance}`,
+        layer,
+        managedState,
+        metrics,
+        position: {
+          x: center.x + radius + transform.cellPixelSize * 0.35,
+          y: center.y,
+        },
+        text: String(markerDistance),
+      });
+    }
+  }
 }
 
 function drawBeginnerDebugHitbox(
@@ -3323,6 +3418,7 @@ function getEnemyAoeChannelProgress(
 function drawFullEffects({
   cache,
   combatFeedbackEvents,
+  combatProjectiles,
   currentTime,
   dropVisualEvents,
   entities,
@@ -3343,6 +3439,7 @@ function drawFullEffects({
 }: {
   cache: TextureCache;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  combatProjectiles: ActiveCombatProjectile[];
   currentTime: number;
   dropVisualEvents: DropVisualEvent[];
   entities: GameEntity[];
@@ -3401,6 +3498,40 @@ function drawFullEffects({
       .rect(position.x - 12, position.y - 5, 24, 10)
       .fill({ color: 0x7dd3fc, alpha: 0.34 })
       .stroke({ color: 0x38bdf8, alpha: 0.9, width: 2 });
+  }
+
+  for (const projectile of combatProjectiles) {
+    if (!isPositionInTileBounds(projectile.position, visibleTileBounds)) {
+      continue;
+    }
+
+    const profile = combatProjectileVisualProfiles[projectile.visualProfileId];
+    const target =
+      entitiesById.get(projectile.targetId)?.position ??
+      projectile.targetFallbackPosition;
+    const travelAngle = Math.atan2(
+      target.y - projectile.position.y,
+      target.x - projectile.position.x,
+    );
+    const rotation =
+      travelAngle - (profile.nativeAngleDegrees * Math.PI) / 180;
+    const position = toFullPosition(projectile.position, transform);
+
+    drawManagedImageSprite({
+      anchorX: 0.5,
+      anchorY: 0.5,
+      cache,
+      height: profile.height,
+      key: `combat-projectile:${projectile.id}`,
+      layer,
+      managedState,
+      metrics,
+      position,
+      requestRedraw,
+      rotation,
+      src: profile.src,
+      width: profile.width,
+    });
   }
 
   for (const event of skillVisualEvents) {
@@ -4567,6 +4698,7 @@ function drawFullMap({
   cameraOffset,
   cellPixelSize,
   combatFeedbackEvents,
+  combatProjectiles,
   companionDragPreview,
   currentTime,
   directCompanionCommandsById,
@@ -4598,6 +4730,7 @@ function drawFullMap({
   cameraOffset: Position;
   cellPixelSize: number;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  combatProjectiles: ActiveCombatProjectile[];
   companionDragPreview: CompanionDragPreview | null;
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
@@ -4719,6 +4852,7 @@ function drawFullMap({
   drawFullEffects({
     cache: textureCache,
     combatFeedbackEvents,
+    combatProjectiles,
     currentTime,
     dropVisualEvents,
     entities,
@@ -4844,6 +4978,16 @@ function drawFullMap({
         drawBeginnerDebugHitbox(overlayGraphics, entity, map, transform);
       }
     }
+
+    drawTargetDummyDistanceMarkers({
+      entities,
+      graphics: overlayGraphics,
+      layer: layers.effectsLayer,
+      managedState,
+      metrics,
+      transform,
+      visibleTileBounds,
+    });
   }
 
   if (activeTeleport && isPositionInTileBounds(activeTeleport.position, visibleTileBounds)) {
@@ -4912,6 +5056,7 @@ function drawWorld({
   cameraOffset,
   cellPixelSize,
   combatFeedbackEvents,
+  combatProjectiles,
   companionDragPreview,
   currentTime,
   directCompanionCommandsById,
@@ -4950,6 +5095,7 @@ function drawWorld({
     const hasTimedWork = hasActiveTimedRendererWork({
       activeTeleport,
       combatFeedbackEvents,
+      combatProjectiles,
       currentTime,
       dropVisualEvents,
       enemyAoeChannelsByCasterId,
@@ -4966,6 +5112,7 @@ function drawWorld({
       cameraOffset,
       cellPixelSize,
       combatFeedbackEvents,
+      combatProjectiles,
       directCompanionCommandsById,
       dropVisualEvents,
       enemyAoeChannelsByCasterId,
@@ -5009,6 +5156,7 @@ function drawWorld({
       cameraOffset,
       cellPixelSize,
       combatFeedbackEvents,
+      combatProjectiles,
       companionDragPreview,
       currentTime,
       directCompanionCommandsById,
@@ -5085,6 +5233,7 @@ function drawWorld({
 function hasActiveTimedRendererWork({
   activeTeleport,
   combatFeedbackEvents,
+  combatProjectiles,
   currentTime,
   dropVisualEvents,
   enemyAoeChannelsByCasterId,
@@ -5098,6 +5247,7 @@ function hasActiveTimedRendererWork({
 }: {
   activeTeleport: ActiveTeleport | null;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  combatProjectiles: ActiveCombatProjectile[];
   currentTime: number;
   dropVisualEvents: DropVisualEvent[];
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
@@ -5115,6 +5265,7 @@ function hasActiveTimedRendererWork({
 
   return (
     Boolean(activeTeleport) ||
+    combatProjectiles.length > 0 ||
     combatFeedbackEvents.some((event) => event.expiresAt > currentTime) ||
     dropVisualEvents.some((event) => event.expiresAt > currentTime) ||
     skillVisualEvents.some((event) => event.expiresAt > currentTime) ||
@@ -5151,6 +5302,7 @@ export function PixiWorldRenderer({
   cameraOffset = { x: 0, y: 0 },
   cellPixelSize = defaultCellPixelSize,
   combatFeedbackEvents = [],
+  combatProjectiles = [],
   currentTime,
   directCompanionCommandsById = {},
   dropVisualEvents = [],
@@ -5195,6 +5347,7 @@ export function PixiWorldRenderer({
   const latestCameraOffsetRef = useRef(cameraOffset);
   const latestCellPixelSizeRef = useRef(cellPixelSize);
   const latestCombatFeedbackEventsRef = useRef(combatFeedbackEvents);
+  const latestCombatProjectilesRef = useRef(combatProjectiles);
   const latestCurrentTimeRef = useRef(currentTime ?? 0);
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
@@ -5244,6 +5397,7 @@ export function PixiWorldRenderer({
     latestCameraOffsetRef.current = cameraOffset;
     latestCellPixelSizeRef.current = cellPixelSize;
     latestCombatFeedbackEventsRef.current = combatFeedbackEvents;
+    latestCombatProjectilesRef.current = combatProjectiles;
     if (currentTime !== undefined) {
       latestCurrentTimeRef.current = currentTime;
     }
@@ -5275,6 +5429,7 @@ export function PixiWorldRenderer({
     cameraOffset,
     cellPixelSize,
     combatFeedbackEvents,
+    combatProjectiles,
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
@@ -5343,6 +5498,7 @@ export function PixiWorldRenderer({
       return hasActiveTimedRendererWork({
         activeTeleport: latestActiveTeleportRef.current,
         combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
+        combatProjectiles: latestCombatProjectilesRef.current,
         currentTime: now,
         dropVisualEvents: latestDropVisualEventsRef.current,
         enemyAoeChannelsByCasterId:
@@ -5368,6 +5524,7 @@ export function PixiWorldRenderer({
         cameraOffset: latestCameraOffsetRef.current,
         cellPixelSize: latestCellPixelSizeRef.current,
         combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
+        combatProjectiles: latestCombatProjectilesRef.current,
         companionDragPreview: companionDragPreviewRef.current,
         currentTime: latestCurrentTimeRef.current,
         directCompanionCommandsById:
@@ -5520,6 +5677,7 @@ export function PixiWorldRenderer({
     cameraOffset,
     cellPixelSize,
     combatFeedbackEvents,
+    combatProjectiles,
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,

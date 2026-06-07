@@ -383,7 +383,7 @@ export function getEntityVisualAsset(
   currentMapId?: DebugMapId,
 ): EntityVisualAsset {
   if (entity.kind === "companion") {
-    if (entity.classId === "beginner") {
+    if (entity.classId === "beginner" || entity.classId === "hunter") {
       return entityVisualAssets.beginnerCharacter;
     }
 

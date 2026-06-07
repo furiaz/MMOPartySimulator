@@ -742,6 +742,27 @@ export type SkillTag =
 
 export type CombatDamageType = "physical" | "magic";
 
+export type CombatProjectileVisualProfileId =
+  | "hunter_arrow"
+  | "slime_spitter"
+  | "goblin_thrower"
+  | "bog_imp"
+  | "ash_wisp";
+
+export type ActiveCombatProjectile = {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  position: Position;
+  targetFallbackPosition: Position;
+  speed: number;
+  impactRadius: number;
+  visualProfileId: CombatProjectileVisualProfileId;
+  launchedAt: number;
+  damageType: CombatDamageType;
+  powerMultiplier: number;
+};
+
 export type SkillDefinition = {
   id: SkillId;
   classId: ClassId;

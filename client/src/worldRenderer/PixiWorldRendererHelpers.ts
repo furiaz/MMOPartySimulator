@@ -10,6 +10,7 @@ import {
   WILDERNESS_MAP_TILE_SRC,
 } from "../assetIcons";
 import type {
+  ActiveCombatProjectile,
   ActiveTeleport,
   CombatFeedbackEvent,
   DirectCompanionCommand,
@@ -296,6 +297,7 @@ export type FullRenderSignatureInput = {
   cameraOffset: Position;
   cellPixelSize: number;
   combatFeedbackEvents: CombatFeedbackEvent[];
+  combatProjectiles: ActiveCombatProjectile[];
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
@@ -882,6 +884,7 @@ export function getFullRenderSignature({
   cameraOffset,
   cellPixelSize,
   combatFeedbackEvents,
+  combatProjectiles,
   directCompanionCommandsById,
   dropVisualEvents,
   enemyAoeChannelsByCasterId,
@@ -940,6 +943,7 @@ export function getFullRenderSignature({
       isWorking ? "1" : "0",
     ),
     getEventSignature(combatFeedbackEvents, getCombatFeedbackSignature),
+    getEventSignature(combatProjectiles, getCombatProjectileSignature),
     getEventSignature(dropVisualEvents, getDropVisualSignature),
     getRecordSignature(enemyAoeChannelsByCasterId, getEnemyAoeChannelSignature),
     getEventSignature(skillVisualEvents, getSkillVisualSignature),
@@ -1138,6 +1142,18 @@ function getCombatFeedbackSignature(event: CombatFeedbackEvent): string {
     event.amount ?? "",
     event.createdAt,
     event.expiresAt,
+  ].join(":");
+}
+
+function getCombatProjectileSignature(projectile: ActiveCombatProjectile): string {
+  return [
+    projectile.sourceId,
+    projectile.targetId,
+    projectile.visualProfileId,
+    getPositionSignature(projectile.position),
+    getPositionSignature(projectile.targetFallbackPosition),
+    projectile.speed,
+    projectile.impactRadius,
   ].join(":");
 }
 

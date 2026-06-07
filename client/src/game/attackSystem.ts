@@ -11,8 +11,6 @@ import {
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
-import { grantCharacterXpToParty } from "./leveling";
-import { recordEnemyDefeatedForQuests } from "./questSystem";
 import {
   getEntityById,
   updateEntity,
@@ -23,10 +21,8 @@ import {
   moveEntityTowardPositionIfUnoccupied,
   reservePositionForFrame,
 } from "./movementPlanning";
-import { protectPartyMember } from "./partyProtectionSystem";
 import { getRolePriority } from "./roleProfiles";
 import { isEnemyBound } from "./skillRuntime";
-import { resolveAndApplyCombatDamage } from "./combatResolver";
 import {
   getEnemyAttackLeashDistance,
   getEnemyChaseSpeedMultiplier,
@@ -35,7 +31,6 @@ import {
   isEnemyAoeChanneling,
   isStompOnlyEnemy,
 } from "./enemyAoeChannelSystem";
-import { handleEnemyDefeatedDrops } from "./dropSystem";
 import {
   isCompanionAssignedToResurrectionRecovery,
   isPositionInActiveResurrectionArea,
@@ -46,7 +41,7 @@ import {
   getGridDistance,
 } from "./positionUtils";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
-import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
+import { isEnemyEntity } from "./entityGuards";
 import {
   getEnemyAttackRange,
   getEnemyCombatBodyRadius,
@@ -60,6 +55,13 @@ import {
   isCompanionGlobalCooldownActive,
   startCompanionGlobalCooldown,
 } from "./companionCooldowns";
+import { resolveBasicAttackImpact } from "./combatBasicAttackResolution";
+import { launchBasicCombatProjectile } from "./combatProjectileSystem";
+import {
+  getCompanionBasicProjectileProfile,
+  getEnemyBasicProjectileProfile,
+  type CombatProjectileProfile,
+} from "./combatProjectileProfiles";
 import type {
   CombatEntity,
   Enemy,
@@ -212,62 +214,45 @@ export function updateAttackSystem(
       }
 
       const windupReadyAttacker = windupResult.attacker;
+      const projectileProfile = getBasicAttackProjectileProfile(windupReadyAttacker);
 
-      const combatResult = resolveAndApplyCombatDamage(
-        nextState,
-        windupReadyAttacker,
-        target,
-        {
-          damageType: "physical",
-          powerMultiplier: 1,
-          allowEvasion: true,
-          allowPassiveBlock: true,
-          now,
-          label: "Attack",
-        },
-      );
-      nextState = combatResult.state;
-      const updatedTarget = updateTargetAfterDamage(
-        combatResult.target,
-        windupReadyAttacker,
-      );
       const updatedAttacker = clearAttackWindup(
         setLastAttackAt(windupReadyAttacker, now),
       );
 
-      nextState = updateEntity(nextState, updatedTarget);
-
-      if (
-        isPartyCombatEntity(windupReadyAttacker) &&
-        isEnemy(updatedTarget) &&
-        updatedTarget.state === "dead"
-      ) {
-        nextState = grantCharacterXpToParty(
+      if (projectileProfile) {
+        nextState = launchBasicCombatProjectile(
           nextState,
-          updatedTarget,
-          windupReadyAttacker.id,
+          windupReadyAttacker,
+          target,
+          projectileProfile,
           now,
         );
-        nextState = recordEnemyDefeatedForQuests(
-          nextState,
-          updatedTarget,
-          nextState.currentMapId,
-          Math.random,
-          now,
-        );
-        if (!updatedTarget.questSpawn?.suppressNormalDrops) {
-          nextState = handleEnemyDefeatedDrops(
+        if (isPartyCombatEntity(windupReadyAttacker)) {
+          nextState = startCompanionGlobalCooldown(
             nextState,
-            updatedTarget,
             windupReadyAttacker.id,
             now,
+            "basic_attack",
           );
         }
+
+        const currentUpdatedAttacker = getEntityById(nextState, updatedAttacker.id);
+        const finalUpdatedAttacker = isCombatEntity(currentUpdatedAttacker)
+          ? clearAttackWindup(setLastAttackAt(currentUpdatedAttacker, now))
+          : updatedAttacker;
+
+        nextState = updateEntity(nextState, finalUpdatedAttacker);
+        continue;
       }
 
-      if (isEnemy(windupReadyAttacker) && isPartyCombatEntity(updatedTarget)) {
-        nextState = protectPartyMember(nextState, updatedTarget, windupReadyAttacker);
-      }
+      const impactResult = resolveBasicAttackImpact(
+        nextState,
+        windupReadyAttacker,
+        target,
+        now,
+      );
+      nextState = impactResult.state;
 
       if (isPartyCombatEntity(windupReadyAttacker)) {
         nextState = startCompanionGlobalCooldown(
@@ -285,7 +270,7 @@ export function updateAttackSystem(
 
       nextState = updateEntity(
         nextState,
-        updatedTarget.state === "dead"
+        impactResult.target.state === "dead"
           ? finishAttack(nextState, finalUpdatedAttacker)
           : finalUpdatedAttacker,
       );
@@ -546,26 +531,6 @@ export function getAttackCooldownMs(entity: CombatEntity): number {
     : COMPANION_GLOBAL_COOLDOWN_MS;
 }
 
-function updateTargetAfterDamage(
-  target: CombatEntity,
-  attacker: CombatEntity,
-): CombatEntity {
-  if (
-    !isEnemy(target) ||
-    isTargetDummyEnemy(target) ||
-    target.state === "dead" ||
-    !isAutonomousEntity(attacker)
-  ) {
-    return target;
-  }
-
-  return {
-    ...target,
-    state: "attack",
-    currentTargetId: attacker.id,
-  };
-}
-
 function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
   if (!isAutonomousEntity(attacker) || !isPartyMember(attacker)) {
     return {
@@ -732,6 +697,14 @@ function getAttackRange(attacker: GameEntity): number {
   return attacker.kind === "companion"
     ? getCompanionAttackRange(attacker)
     : DEFAULT_COMPANION_ATTACK_RANGE;
+}
+
+function getBasicAttackProjectileProfile(
+  attacker: CombatEntity,
+): CombatProjectileProfile | null {
+  return isEnemy(attacker)
+    ? getEnemyBasicProjectileProfile(attacker)
+    : getCompanionBasicProjectileProfile(attacker);
 }
 
 function getEffectiveAttackRange(attacker: GameEntity, target: GameEntity): number {

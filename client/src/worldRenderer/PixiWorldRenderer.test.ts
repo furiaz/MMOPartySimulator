@@ -362,6 +362,7 @@ function createFullRenderSignatureInput(
     cameraOffset: { x: 0, y: 0 },
     cellPixelSize: 32,
     combatFeedbackEvents: [],
+    combatProjectiles: [],
     directCompanionCommandsById: {},
     dropVisualEvents: [],
     enemyAoeChannelsByCasterId: {},
@@ -478,6 +479,29 @@ describe("getFullRenderSignature", () => {
             id: "skill-visual",
             sourceId: companion.id,
             type: "slash",
+          },
+        ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        combatProjectiles: [
+          {
+            id: "projectile",
+            sourceId: companion.id,
+            targetId: "enemy",
+            position: { x: companion.position.x + 0.5, y: companion.position.y },
+            targetFallbackPosition: {
+              x: companion.position.x + 1,
+              y: companion.position.y,
+            },
+            speed: 12,
+            impactRadius: 0.3,
+            visualProfileId: "hunter_arrow",
+            launchedAt: 1000,
+            damageType: "physical",
+            powerMultiplier: 1,
           },
         ],
       }),

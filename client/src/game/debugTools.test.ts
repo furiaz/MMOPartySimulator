@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createCompanion, createEnemy, createNpc } from "./entities";
-import { createDebugMap, TELEPORTER_ID } from "./debugMap";
+import { companionIds, createDebugMap, TELEPORTER_ID } from "./debugMap";
 import {
   debugAddTestCrowns,
   debugApplyCompanionInfiniteHealth,
@@ -9,6 +9,7 @@ import {
   debugForceSuperiorEnemyInCurrentSubzone,
   debugLevelUpAllCompanions,
   debugToggleCompanionInfiniteHealth,
+  debugToggleCompanionOneHunterClass,
   debugTurnInCurrentQuest,
 } from "./debugTools";
 import { isSuperiorEnemy } from "./enemyVariants";
@@ -206,6 +207,35 @@ describe("companion debug test tools", () => {
       deadCompanion.maxHealth,
     );
     expect(restoredCompanion?.state).toBe("idle");
+  });
+
+  it("toggles companion 1 between Beginner and Hunter for ranged combat testing", () => {
+    const companion = createCompanion(
+      companionIds[0],
+      { x: 10, y: 10 },
+      companionIds[0],
+    );
+    const state = createTestGameState({
+      partyLeaderId: companion.id,
+      entities: {
+        [companion.id]: companion,
+      },
+    });
+
+    const hunterState = debugToggleCompanionOneHunterClass(state);
+    const beginnerState = debugToggleCompanionOneHunterClass(hunterState);
+    const hunterCompanion = hunterState.entities[companion.id];
+    const beginnerCompanion = beginnerState.entities[companion.id];
+
+    expect(hunterCompanion?.kind).toBe("companion");
+    expect(beginnerCompanion?.kind).toBe("companion");
+
+    if (hunterCompanion?.kind !== "companion" || beginnerCompanion?.kind !== "companion") {
+      throw new Error("Expected companion test entities");
+    }
+
+    expect(hunterCompanion.classId).toBe("hunter");
+    expect(beginnerCompanion.classId).toBe("beginner");
   });
 
   it("adds 100 Crowns through the debug wallet helper", () => {

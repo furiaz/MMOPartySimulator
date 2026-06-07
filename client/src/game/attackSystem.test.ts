@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createTargetDummy } from "./entities";
-import { DEFAULT_COMPANION_ATTACK_RANGE, getCompanionAttackRange } from "./companionCombat";
+import {
+  DEFAULT_COMPANION_ATTACK_RANGE,
+  HUNTER_BASIC_ATTACK_RANGE,
+  getCompanionAttackRange,
+} from "./companionCombat";
 import { ENEMY_ATTACK_WINDUP_MS, updateAttackSystem } from "./attackSystem";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
@@ -12,6 +16,13 @@ describe("enemy attack leash movement", () => {
 
     expect(getCompanionAttackRange(companion)).toBe(DEFAULT_COMPANION_ATTACK_RANGE);
     expect(getCompanionAttackRange(companion)).toBe(1);
+  });
+
+  it("starts Hunter basic attack range at four cells", () => {
+    const companion = createIdleCompanion("leader", { x: 0, y: 0 }, "hunter");
+
+    expect(getCompanionAttackRange(companion)).toBe(HUNTER_BASIC_ATTACK_RANGE);
+    expect(getCompanionAttackRange(companion)).toBe(4);
   });
 
   it("lets enemies pursue beyond roam leash while inside attack leash", () => {
@@ -148,7 +159,7 @@ describe("enemy attack leash movement", () => {
     expect(nextDummy.currentTargetId).toBeNull();
   });
 
-  it("winds up ranged enemy attacks from numeric range without closing to melee", () => {
+  it("winds up ranged enemy attacks and launches one projectile without immediate damage", () => {
     const companion = createIdleCompanion("leader", { x: 4, y: 0 });
     const enemy = {
       ...createEnemy("enemy", { x: 0, y: 0 }, undefined, {
@@ -186,8 +197,46 @@ describe("enemy attack leash movement", () => {
     expect(nextEnemy.position).toEqual(enemy.position);
     expect(nextEnemy.attackWindupStartedAt).toBeUndefined();
     expect(nextEnemy.attackWindupTargetId).toBeNull();
+    expect(nextState.combatProjectiles).toHaveLength(1);
+    expect(nextState.combatProjectiles?.[0]).toMatchObject({
+      sourceId: enemy.id,
+      targetId: companion.id,
+      visualProfileId: "goblin_thrower",
+      speed: 12,
+      impactRadius: 0.3,
+    });
     expect(nextCompanion).toMatchObject({
-      health: companion.health - enemy.attack,
+      health: companion.health,
+    });
+  });
+
+  it("lets Hunter basic attacks launch projectiles from four cells", () => {
+    const companion = {
+      ...createAttackingCompanion("leader", { x: 4, y: 0 }, 0, "hunter"),
+      lastAttackAt: -2000,
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      maxHealth: 20,
+    });
+
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBe(enemy.health);
+    expect(nextState.combatProjectiles).toHaveLength(1);
+    expect(nextState.combatProjectiles?.[0]).toMatchObject({
+      sourceId: companion.id,
+      targetId: enemy.id,
+      visualProfileId: "hunter_arrow",
+    });
+    expect(nextState.globalCooldownsByCompanionId?.leader).toMatchObject({
+      source: "basic_attack",
+      expiresAt: 3000,
     });
   });
 
@@ -210,6 +259,7 @@ describe("enemy attack leash movement", () => {
 
     expect(nextEnemy.health).toBeLessThan(enemy.health);
     expect(nextCompanion.position).toEqual(companion.position);
+    expect(nextState.combatProjectiles).toEqual([]);
   });
 
   it("lets Azure Mass attack from its combat body edge", () => {
@@ -242,6 +292,36 @@ describe("enemy attack leash movement", () => {
     const nextCompanion = nextState.entities[companion.id];
 
     expect(nextEnemy.position).toEqual(enemy.position);
+    expect(nextState.combatProjectiles).toEqual([]);
+    expect(nextCompanion).toMatchObject({
+      health: companion.health - enemy.attack,
+    });
+  });
+
+  it("keeps support-style ranged enemies non-projectile", () => {
+    const companion = createIdleCompanion("leader", { x: 3, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "goblin_shaman",
+      }),
+      state: "attack" as const,
+      currentTargetId: companion.id,
+      lastAttackAt: -2000,
+    };
+
+    const windupState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextState = updateAttackSystem(
+      windupState,
+      new Set(),
+      1000 + ENEMY_ATTACK_WINDUP_MS,
+    );
+    const nextCompanion = nextState.entities[companion.id];
+
+    expect(nextState.combatProjectiles).toEqual([]);
     expect(nextCompanion).toMatchObject({
       health: companion.health - enemy.attack,
     });
@@ -400,9 +480,13 @@ function createState(entities: GameEntity[]) {
   );
 }
 
-function createIdleCompanion(id: string, position: Position) {
+function createIdleCompanion(
+  id: string,
+  position: Position,
+  classId: Parameters<typeof createCompanion>[5] = "beginner",
+) {
   return {
-    ...createCompanion(id, position, id),
+    ...createCompanion(id, position, id, "none", 1, classId),
     state: "idle" as const,
     currentTargetId: null,
   };
@@ -412,9 +496,10 @@ function createAttackingCompanion(
   id: string,
   position: Position,
   partyOrder: number,
+  classId: Parameters<typeof createCompanion>[5] = "beginner",
 ) {
   return {
-    ...createCompanion(id, position, id, "fighter", partyOrder),
+    ...createCompanion(id, position, id, "fighter", partyOrder, classId),
     state: "attack" as const,
     currentTargetId: "enemy",
     lastAttackAt: 0,

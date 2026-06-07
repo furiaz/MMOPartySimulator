@@ -40,6 +40,7 @@ import {
   addEntity,
   getEntityById,
   PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+  setPartyMemberClass,
   updateEntity,
   type GameState,
 } from "./state";
@@ -220,6 +221,20 @@ export function debugToggleCompanionInfiniteHealth(state: GameState): GameState 
   return nextState.debugOptions.companionInfiniteHealthEnabled
     ? debugApplyCompanionInfiniteHealth(nextState)
     : nextState;
+}
+
+export function debugToggleCompanionOneHunterClass(state: GameState): GameState {
+  const companion = getEntityById(state, companionIds[0]);
+
+  if (companion?.kind !== "companion") {
+    return state;
+  }
+
+  return setPartyMemberClass(
+    state,
+    companion.id,
+    companion.classId === "hunter" ? "beginner" : "hunter",
+  );
 }
 
 export function debugLevelUpAllCompanions(
@@ -564,6 +579,7 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
     exploredTiles: {},
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
+    combatProjectiles: [],
     failedMoveByEntityId: {},
     movementFailuresByEntityId: {},
     moveIntentsByEntityId: {},

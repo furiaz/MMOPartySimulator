@@ -1,5 +1,6 @@
 import { updateAttackSystem } from "./attackSystem";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
+import { updateCombatProjectileSystem } from "./combatProjectileSystem";
 import {
   clearExpiredHubDepartureFoodWarning,
   clearExpiredConsumableBuffs,
@@ -190,6 +191,11 @@ export function updateGame(
     movedEntityIds,
     timing.nowMs,
     attackSlotPathDistanceCache,
+  );
+  nextState = updateCombatProjectileSystem(
+    nextState,
+    timing.nowMs,
+    timing.deltaMs,
   );
   nextState = updateFlaskRechargeFromEnemyKills(nextState, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);

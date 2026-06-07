@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createNpc } from "./game";
+import { createCompanion, createNpc } from "./game";
 import {
   entityVisualAssets,
   getEntityVisualAsset,
@@ -76,5 +76,27 @@ describe("entity visual assets", () => {
     expect(westAnimation.frames[0]).toContain("BeginnerWalkingWest");
     expect(nearNorthEastAnimation.frames[0]).toContain("BeginnerWalkingEast");
     expect(nearNorthWestAnimation.frames[0]).toContain("BeginnerWalkingWest");
+  });
+
+  it("keeps Hunter companions on the Beginner sprite for now", () => {
+    const beginner = createCompanion(
+      "beginner",
+      { x: 0, y: 0 },
+      "beginner",
+      "fighter",
+      0,
+      "beginner",
+    );
+    const hunter = createCompanion(
+      "hunter",
+      { x: 0, y: 0 },
+      "hunter",
+      "fighter",
+      0,
+      "hunter",
+    );
+
+    expect(getEntityVisualAsset(beginner)).toBe(entityVisualAssets.beginnerCharacter);
+    expect(getEntityVisualAsset(hunter)).toBe(entityVisualAssets.beginnerCharacter);
   });
 });

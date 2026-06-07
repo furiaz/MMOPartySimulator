@@ -87,6 +87,7 @@ export function createInitialGameState(): GameState {
     },
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
+    combatProjectiles: [],
     skillMarksByEnemyId: {},
     skillSelfBuffsByCompanionId: {},
     skillBindsByEnemyId: {},
