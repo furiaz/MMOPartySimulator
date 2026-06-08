@@ -109,6 +109,8 @@ export const MAP_VISUAL_OBJECT_SRC: Record<MapVisualObjectId, string> = {
   hub_dock_shore_connector: `${hubStructureAssetPath}/hub_dock_shore_connector.png`,
   passage_gate_closed: `${passageBlockerAssetPath}/passage_gate_closed_edge_v2_100x350.png`,
   passage_gate_open: `${passageBlockerAssetPath}/passage_gate_open_faces_v2_100x350.png`,
+  passage_blocker_collapsed_column: `${passageBlockerAssetPath}/passage_blocker_collapsed_column_100x350.png`,
+  passage_blocker_repaired_column: `${passageBlockerAssetPath}/passage_blocker_repaired_column_100x350.png`,
   slime_covered_stone: `${slimewardDungeonAssetPath}/slime-covered-stone-64.png`,
   azure_slime_rock_cluster: `${slimewardDungeonAssetPath}/azure-slime-rock-cluster-128.png`,
 };

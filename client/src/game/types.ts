@@ -1429,6 +1429,8 @@ export type MapVisualObjectId =
   | "hub_dock_shore_connector"
   | "passage_gate_closed"
   | "passage_gate_open"
+  | "passage_blocker_collapsed_column"
+  | "passage_blocker_repaired_column"
   | "slime_covered_stone"
   | "azure_slime_rock_cluster";
 

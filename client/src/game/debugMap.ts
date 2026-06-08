@@ -1012,9 +1012,18 @@ export type EnemyStartData = {
 
 type DebugMapCreationOptions = {
   secureLandingGateOpen?: boolean;
+  oldGrovePassageOpen?: boolean;
 };
 
-type DebugMapQuestStates = Partial<Record<string, { status?: string }>>;
+type DebugMapQuestStates = Partial<
+  Record<
+    string,
+    {
+      status?: string;
+      objectiveProgress?: Record<string, { completed?: boolean }>;
+    }
+  >
+>;
 
 export const SECURE_LANDING_PASSAGE_GATE_ID = "map-1-shore-fringe-passage-gate";
 export const SECURE_LANDING_PASSAGE_GATE_POSITION: Position = { x: 52, y: 29 };
@@ -1026,6 +1035,27 @@ const SECURE_LANDING_PASSAGE_GATE_VISUAL: MapVisualObject = {
   widthCells: 100 / 32,
   heightCells: 525 / 32,
   anchorY: 0.5,
+};
+export const OLD_GROVE_PASSAGE_BLOCKER_ID = "map-2-old-grove-passage-blocker";
+export const OLD_GROVE_PASSAGE_BLOCKER_POSITION: Position = { x: 105, y: 29 };
+export const OLD_GROVE_REPAIRED_COLUMN_ID = "map-2-old-grove-repaired-column";
+export const OLD_GROVE_REPAIRED_COLUMN_POSITION: Position = { x: 105, y: 24 };
+const OLD_GROVE_PASSAGE_BLOCKER_COLLISION_WALLS = createVerticalWall(105, 24, 34, []);
+const OLD_GROVE_PASSAGE_BLOCKER_VISUAL: MapVisualObject = {
+  id: OLD_GROVE_PASSAGE_BLOCKER_ID,
+  visualId: "passage_blocker_collapsed_column",
+  position: OLD_GROVE_PASSAGE_BLOCKER_POSITION,
+  widthCells: 200 / 32,
+  heightCells: 700 / 32,
+  anchorY: 0.5,
+};
+const OLD_GROVE_REPAIRED_COLUMN_VISUAL: MapVisualObject = {
+  id: OLD_GROVE_REPAIRED_COLUMN_ID,
+  visualId: "passage_blocker_repaired_column",
+  position: OLD_GROVE_REPAIRED_COLUMN_POSITION,
+  widthCells: 100 / 32,
+  heightCells: 350 / 32,
+  anchorY: 1,
 };
 
 const HUB_VISUAL_OBJECTS: MapVisualObject[] = [
@@ -1485,6 +1515,7 @@ export function createDebugMapForQuestState(
 ): GameMap {
   return createDebugMap(mapId, {
     secureLandingGateOpen: isSecureLandingPassageGateOpen(quests),
+    oldGrovePassageOpen: isOldGrovePassageOpen(quests),
   });
 }
 
@@ -1492,6 +1523,15 @@ export function isSecureLandingPassageGateOpen(
   quests: DebugMapQuestStates = {},
 ): boolean {
   return quests.clear_the_shore?.status === "completed";
+}
+
+export function isOldGrovePassageOpen(
+  quests: DebugMapQuestStates = {},
+): boolean {
+  return Boolean(
+    quests.rescue_the_grove_runner?.objectiveProgress?.repair_old_grove_cache
+      ?.completed,
+  );
 }
 
 export function getDebugMapDefinition(mapId: DebugMapId) {
@@ -1509,30 +1549,51 @@ function getDebugMapCollisionWalls(
   definition: (typeof debugMapDefinitions)[DebugMapId],
   options: DebugMapCreationOptions,
 ): Position[] | undefined {
-  if (definition.id !== MAP_ONE_ID || options.secureLandingGateOpen) {
+  if (definition.id === MAP_ONE_ID && !options.secureLandingGateOpen) {
+    return SECURE_LANDING_PASSAGE_GATE_COLLISION_WALLS;
+  }
+
+  if (definition.id === MAP_TWO_ID && !options.oldGrovePassageOpen) {
+    return OLD_GROVE_PASSAGE_BLOCKER_COLLISION_WALLS;
+  }
+
+  if (definition.id !== MAP_ONE_ID && definition.id !== MAP_TWO_ID) {
     return undefined;
   }
 
-  return SECURE_LANDING_PASSAGE_GATE_COLLISION_WALLS;
+  return undefined;
 }
 
 function getDebugMapVisualObjects(
   definition: (typeof debugMapDefinitions)[DebugMapId],
   options: DebugMapCreationOptions,
 ): MapVisualObject[] | undefined {
-  if (definition.id !== MAP_ONE_ID) {
-    return definition.visualObjects;
+  if (definition.id === MAP_ONE_ID) {
+    return [
+      ...(definition.visualObjects ?? []),
+      {
+        ...SECURE_LANDING_PASSAGE_GATE_VISUAL,
+        visualId: options.secureLandingGateOpen
+          ? "passage_gate_open"
+          : "passage_gate_closed",
+      },
+    ];
   }
 
-  return [
-    ...(definition.visualObjects ?? []),
-    {
-      ...SECURE_LANDING_PASSAGE_GATE_VISUAL,
-      visualId: options.secureLandingGateOpen
-        ? "passage_gate_open"
-        : "passage_gate_closed",
-    },
-  ];
+  if (definition.id === MAP_TWO_ID) {
+    return [
+      ...(definition.visualObjects ?? []),
+      options.oldGrovePassageOpen
+        ? OLD_GROVE_REPAIRED_COLUMN_VISUAL
+        : OLD_GROVE_PASSAGE_BLOCKER_VISUAL,
+    ];
+  }
+
+  if (!definition.visualObjects) {
+    return undefined;
+  }
+
+  return definition.visualObjects;
 }
 
 function createVerticalWall(

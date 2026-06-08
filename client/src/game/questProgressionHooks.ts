@@ -1,4 +1,8 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import {
+  MAP_TWO_ID,
+  createDebugMapForQuestState,
+} from "./debugMap";
 import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
 import { getItemDefinition } from "./items";
 import {
@@ -535,9 +539,35 @@ function updateObjectiveProgress(
     if (objective.routeTeleportId) {
       nextState = setTeleportWorking(nextState, objective.routeTeleportId, true);
     }
+
+    nextState = refreshCurrentMapForQuestObjectiveCompletion(
+      nextState,
+      questId,
+      objective.id,
+    );
   }
 
   return maybeMarkQuestReadyToTurnIn(nextState, questId);
+}
+
+function refreshCurrentMapForQuestObjectiveCompletion(
+  state: GameState,
+  questId: QuestId,
+  objectiveId: string,
+): GameState {
+  if (
+    questId !== "rescue_the_grove_runner" ||
+    objectiveId !== "repair_old_grove_cache" ||
+    state.currentMapId !== MAP_TWO_ID ||
+    !state.map
+  ) {
+    return state;
+  }
+
+  return {
+    ...state,
+    map: createDebugMapForQuestState(MAP_TWO_ID, state.quests),
+  };
 }
 
 function maybeMarkQuestReadyToTurnIn(state: GameState, questId: QuestId): GameState {

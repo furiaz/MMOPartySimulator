@@ -4,9 +4,11 @@ import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debug
 import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
 import {
   createDebugMap,
+  MAP_TWO_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_ONE_ID,
+  OLD_GROVE_PASSAGE_BLOCKER_POSITION,
   SECURE_LANDING_PASSAGE_GATE_ID,
   SECURE_LANDING_PASSAGE_GATE_POSITION,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
@@ -918,6 +920,58 @@ describe("prototype quest system", () => {
       completed: true,
     });
     expect(isTeleportWorking(state, TELEPORTER_ID)).toBe(true);
+  });
+
+  it("opens the Old Grove passage blocker immediately when the cache repair completes", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_TWO_ID,
+      map: createDebugMap(MAP_TWO_ID),
+      quests: createQuestStates({
+        rescue_the_grove_runner: "active",
+      }),
+    });
+
+    expect(
+      isNavigationCellWalkable(state.map!, OLD_GROVE_PASSAGE_BLOCKER_POSITION),
+    ).toBe(false);
+
+    state = completeQuestObjective(
+      state,
+      "rescue_the_grove_runner",
+      "reach_grove_runner",
+    );
+    state = completeQuestObjective(
+      state,
+      "rescue_the_grove_runner",
+      "rescue_grove_runner",
+    );
+    state = recordQuestRepairProgress(
+      state,
+      "rescue_the_grove_runner",
+      "repair_old_grove_cache",
+      3000,
+    );
+
+    expect(
+      isNavigationCellWalkable(state.map!, OLD_GROVE_PASSAGE_BLOCKER_POSITION),
+    ).toBe(false);
+
+    state = recordQuestRepairProgress(
+      state,
+      "rescue_the_grove_runner",
+      "repair_old_grove_cache",
+      6000,
+    );
+
+    expect(
+      state.quests.rescue_the_grove_runner.objectiveProgress.repair_old_grove_cache,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(
+      isNavigationCellWalkable(state.map!, OLD_GROVE_PASSAGE_BLOCKER_POSITION),
+    ).toBe(true);
   });
 
   it("filters Map 1 gathering quest progress by resource type and subzone", () => {

@@ -30,6 +30,10 @@ import {
   mapOneSubzoneNameLabels,
   mapOneResourceStartData,
   mapOneSubzones,
+  OLD_GROVE_PASSAGE_BLOCKER_ID,
+  OLD_GROVE_PASSAGE_BLOCKER_POSITION,
+  OLD_GROVE_REPAIRED_COLUMN_ID,
+  OLD_GROVE_REPAIRED_COLUMN_POSITION,
   SECURE_LANDING_PASSAGE_GATE_ID,
   SECURE_LANDING_PASSAGE_GATE_POSITION,
   mapThreeEnemyStartPositions,
@@ -88,6 +92,13 @@ const wildernessMaps = [
 
 const secureLandingCompleteQuestStates = {
   clear_the_shore: { status: "completed" },
+  rescue_the_grove_runner: {
+    objectiveProgress: {
+      repair_old_grove_cache: {
+        completed: true,
+      },
+    },
+  },
 };
 
 describe("debug maps", () => {
@@ -249,6 +260,44 @@ describe("debug maps", () => {
     expect(getNavigationDistance(openMap, { x: 50, y: 29 }, { x: 54, y: 29 }, 80)).not.toBeNull();
   });
 
+  it("quest-gates the Old Grove to Wolf Causeway passage for the Grove Runner repair", () => {
+    const closedMap = createDebugMap(MAP_TWO_ID);
+    const openMap = createDebugMapForQuestState(
+      MAP_TWO_ID,
+      secureLandingCompleteQuestStates,
+    );
+    const closedBlocker = closedMap.visualObjects?.find(
+      (visualObject) => visualObject.id === OLD_GROVE_PASSAGE_BLOCKER_ID,
+    );
+    const repairedColumn = openMap.visualObjects?.find(
+      (visualObject) => visualObject.id === OLD_GROVE_REPAIRED_COLUMN_ID,
+    );
+
+    expect(closedBlocker).toMatchObject({
+      visualId: "passage_blocker_collapsed_column",
+      position: OLD_GROVE_PASSAGE_BLOCKER_POSITION,
+      widthCells: 200 / 32,
+      heightCells: 700 / 32,
+    });
+    expect(repairedColumn).toMatchObject({
+      visualId: "passage_blocker_repaired_column",
+      position: OLD_GROVE_REPAIRED_COLUMN_POSITION,
+      anchorY: 1,
+    });
+    expect(
+      openMap.visualObjects?.some(
+        (visualObject) => visualObject.id === OLD_GROVE_PASSAGE_BLOCKER_ID,
+      ),
+    ).toBe(false);
+    expect(closedMap.walls).not.toContainEqual(OLD_GROVE_PASSAGE_BLOCKER_POSITION);
+    expect(closedMap.collisionWalls).toContainEqual(OLD_GROVE_PASSAGE_BLOCKER_POSITION);
+    expect(openMap.collisionWalls).toBeUndefined();
+    expect(isNavigationCellWalkable(closedMap, OLD_GROVE_PASSAGE_BLOCKER_POSITION)).toBe(false);
+    expect(isNavigationCellWalkable(openMap, OLD_GROVE_PASSAGE_BLOCKER_POSITION)).toBe(true);
+    expect(getNavigationDistance(closedMap, { x: 100, y: 29 }, { x: 110, y: 29 }, 80)).toBeNull();
+    expect(getNavigationDistance(openMap, { x: 100, y: 29 }, { x: 110, y: 29 }, 80)).not.toBeNull();
+  });
+
   it("keeps authored subzones, passages, encounter areas, and resource locations valid", () => {
     for (const wildernessMap of wildernessMaps) {
       assertSubzones(wildernessMap.mapId, wildernessMap.subzones);
@@ -401,7 +450,10 @@ describe("debug maps", () => {
 
   it("lays out map two with full-height subzone barriers and tuned enemy density", () => {
     const mapTwoDefinition = debugMapDefinitions[MAP_TWO_ID];
-    const mapTwo = createDebugMap(MAP_TWO_ID);
+    const mapTwo = createDebugMapForQuestState(
+      MAP_TWO_ID,
+      secureLandingCompleteQuestStates,
+    );
     const returnEntry = mapTwoDefinition.teleports.find(
       (teleport) => teleport.targetMapId === MAP_ONE_ID,
     );
