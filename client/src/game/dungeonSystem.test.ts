@@ -26,6 +26,7 @@ import {
 import { createCompanion, createEnemy } from "./entities";
 import { createEmptyPartyInventory } from "./inventory";
 import { isNavigationCellWalkable } from "./navigation";
+import { createInitialQuestStates } from "./questSystem";
 import { isTeleportWorking } from "./teleportState";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, GameMap, Position } from "./types";
@@ -207,6 +208,22 @@ describe("Slimeward dungeon prototype", () => {
     expect(isTeleportWorking(withChest, SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID)).toBe(true);
   });
 
+  it("completes the Azure Trial chest objective when boss chest loot is fully collected", () => {
+    const state = {
+      ...createFloorTwoBossDeadState(),
+      quests: createAzureTrialChestQuestStates(),
+    };
+    const withChest = updateSlimewardDungeonSystem(state, 1_000);
+
+    expect(
+      withChest.quests.azure_trial.objectiveProgress.collect_slimeward_boss_chest,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(withChest.quests.azure_trial.status).toBe("ready_to_turn_in");
+  });
+
   it("keeps a fully collected chest closed after Continue", () => {
     const state = createFloorTwoBossDeadState();
     const withChest = updateSlimewardDungeonSystem(state, 1_000);
@@ -230,6 +247,23 @@ describe("Slimeward dungeon prototype", () => {
     expect(withChest.slimewardDungeon?.chest?.inventoryFull).toBe(true);
     expect(withChest.slimewardDungeon?.chest?.autoContinueAtMs).toBeUndefined();
     expect(isTeleportWorking(withChest, SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID)).toBe(false);
+  });
+
+  it("does not complete the Azure Trial chest objective when boss chest loot is pending", () => {
+    const state = {
+      ...createFloorTwoBossDeadState(),
+      inventory: createEmptyPartyInventory(0),
+      quests: createAzureTrialChestQuestStates(),
+    };
+    const withChest = updateSlimewardDungeonSystem(state, 1_000);
+
+    expect(
+      withChest.quests.azure_trial.objectiveProgress.collect_slimeward_boss_chest,
+    ).toMatchObject({
+      currentCount: 0,
+      completed: false,
+    });
+    expect(withChest.quests.azure_trial.status).toBe("active");
   });
 
   it("resets runtime and returns an in-dungeon party to Slimeward Camp", () => {
@@ -271,6 +305,29 @@ function createFloorTwoBossDeadState() {
     partyLeaderId: companion.id,
     entities,
   });
+}
+
+function createAzureTrialChestQuestStates() {
+  const quests = createInitialQuestStates();
+  quests.azure_trial = {
+    ...quests.azure_trial,
+    status: "active",
+    objectiveProgress: {
+      ...quests.azure_trial.objectiveProgress,
+      enter_slimeward_floor_one: {
+        objectiveId: "enter_slimeward_floor_one",
+        currentCount: 1,
+        completed: true,
+      },
+      defeat_azure_mass: {
+        objectiveId: "defeat_azure_mass",
+        currentCount: 1,
+        completed: true,
+      },
+    },
+  };
+
+  return quests;
 }
 
 function assertCompleteFloorBlocks(map: GameMap, blockSize: number) {

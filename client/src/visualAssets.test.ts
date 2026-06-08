@@ -50,6 +50,30 @@ describe("entity visual assets", () => {
     expect(getEntityVisualAsset(testBlade)).toBe(entityVisualAssets.testBlade);
   });
 
+  it("uses the generated Class Mentor icon for class mentor NPCs", () => {
+    const classMentor = createNpc(
+      "class-mentor",
+      { x: 0, y: 0 },
+      "Class Mentor",
+      "class_mentor",
+    );
+    const visualAsset = getEntityVisualAsset(classMentor);
+
+    expect(visualAsset).toBe(entityVisualAssets.classMentor);
+
+    if (visualAsset.kind !== "image") {
+      throw new Error("Class Mentor visual should be an image asset.");
+    }
+
+    expect(visualAsset.naturalSize).toEqual({ width: 144, height: 144 });
+    expect(visualAsset.contentBounds).toEqual({
+      x: 40,
+      y: 14,
+      width: 65,
+      height: 111,
+    });
+  });
+
   it("uses narrow vertical angle bands for Beginner four-direction movement", () => {
     const visualAsset = entityVisualAssets.beginnerCharacter;
 

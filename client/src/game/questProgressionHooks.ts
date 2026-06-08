@@ -41,6 +41,7 @@ export function recordEnemyDefeatedForQuests(
       objective.type === "defeat_enemy_count" &&
       objective.enemyMapId === mapId &&
       matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) &&
+      matchesOptionalEnemyType(objective, defeatedEnemy.enemyTypeId) &&
       matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId) &&
       matchesOptionalEnemyVariant(objective, defeatedEnemy),
     1,
@@ -129,6 +130,25 @@ export function recordQuestPoiReachedForQuests(
         objective.type === "reach_poi") &&
       objective.targetMapId === mapId &&
       objective.targetPoiId === poiId,
+    1,
+  );
+}
+
+export function recordDungeonChestCollectedForQuests(
+  state: GameState,
+  chestId: string,
+  mapId: DebugMapId | undefined,
+): GameState {
+  if (!mapId) {
+    return state;
+  }
+
+  return updateMatchingQuestObjectives(
+    state,
+    (objective) =>
+      objective.type === "collect_dungeon_chest" &&
+      objective.targetMapId === mapId &&
+      objective.targetPoiId === chestId,
     1,
   );
 }
@@ -288,6 +308,13 @@ function matchesOptionalEnemyArchetype(
   archetypeId: Enemy["archetypeId"],
 ): boolean {
   return !objective.enemyArchetypeId || objective.enemyArchetypeId === archetypeId;
+}
+
+function matchesOptionalEnemyType(
+  objective: QuestObjectiveDefinition,
+  enemyTypeId: Enemy["enemyTypeId"],
+): boolean {
+  return !objective.enemyTypeId || objective.enemyTypeId === enemyTypeId;
 }
 
 function matchesOptionalEnemyVariant(

@@ -125,7 +125,10 @@ function isPlayerNpcInteractionIntent(state: GameState): boolean {
 }
 
 function getNpcInteractionRange(entity: GameEntity): number {
-  return entity.kind === "npc" && entity.npcRole === "quest_giver" ? 2 : 1.5;
+  return entity.kind === "npc" &&
+    (entity.npcRole === "quest_giver" || entity.npcRole === "class_mentor")
+    ? 2
+    : 1.5;
 }
 
 function isResourceInteraction(

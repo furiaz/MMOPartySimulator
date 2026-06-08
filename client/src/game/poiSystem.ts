@@ -29,6 +29,8 @@ import {
   getAvailableQuest,
   getFirstIncompleteObjective,
   getIncompleteObjectives,
+  getQuestGiverAvailableQuests,
+  getQuestGiverReadyQuests,
   hasQuestGiverWork,
   isMerchantUnlockedForQuests,
   matchesObjectiveSubzoneAtPosition,
@@ -392,20 +394,30 @@ function updateReachedPoiInteractions(state: GameState): GameState {
     return quickExchangeParts(nextState, merchant.id).state;
   }
 
-  const questGiver = Object.values(nextState.entities).find(
-    (entity) => entity.kind === "npc" && entity.npcRole === "quest_giver",
+  const questSource = Object.values(nextState.entities).find(
+    (entity) =>
+      entity.kind === "npc" &&
+      (entity.npcRole === "quest_giver" || entity.npcRole === "class_mentor") &&
+      getQuestSourceHasWork(nextState, entity.id),
   );
 
   if (
     !leader ||
-    !questGiver ||
-    getDistance(leader.position, questGiver.position) > QUEST_GIVER_INTERACTION_RANGE ||
+    !questSource ||
+    getDistance(leader.position, questSource.position) > QUEST_GIVER_INTERACTION_RANGE ||
     !hasQuestGiverWork(nextState)
   ) {
     return nextState;
   }
 
-  return updateQuestGiverInteraction(nextState);
+  return updateQuestGiverInteraction(nextState, questSource.id);
+}
+
+function getQuestSourceHasWork(state: GameState, questGiverPoiId: string): boolean {
+  return (
+    getQuestGiverReadyQuests(state, questGiverPoiId).length > 0 ||
+    getQuestGiverAvailableQuests(state, questGiverPoiId).length > 0
+  );
 }
 
 function updateReachedQuestInspectInteraction(state: GameState): GameState {

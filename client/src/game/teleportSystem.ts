@@ -22,7 +22,7 @@ import {
   aoeTargetDummyPosition,
   createDebugMapForQuestState,
   debugMapDefinitions,
-  hubNpcStartData,
+  getHubNpcStartDataForQuestState,
   HUB_MAP_ID,
   SLIMEWARD_CAMP_ID,
   SLIMEWARD_CHEST_ID,
@@ -424,7 +424,9 @@ function getMapEntities(
 
   if (mapId === HUB_MAP_ID || mapId === SLIMEWARD_CAMP_ID) {
     const npcStartData =
-      mapId === HUB_MAP_ID ? hubNpcStartData : slimewardCampNpcStartData;
+      mapId === HUB_MAP_ID
+        ? getHubNpcStartDataForQuestState(state.quests)
+        : slimewardCampNpcStartData;
 
     for (const npc of npcStartData) {
       entities[npc.id] = createNpc(

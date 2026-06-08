@@ -9,8 +9,8 @@ import {
   aoeTargetDummyPosition,
   companionIds,
   createDebugMap,
+  getHubNpcStartDataForQuestState,
   hubCompanionStartPositions,
-  hubNpcStartData,
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
@@ -47,7 +47,7 @@ export function createInitialGameState(): GameState {
     state: "idle",
     currentTargetId: null,
   };
-  const npcs = hubNpcStartData.map((npc) =>
+  const npcs = getHubNpcStartDataForQuestState().map((npc) =>
     createNpc(npc.id, npc.position, npc.displayName, npc.npcRole),
   );
 

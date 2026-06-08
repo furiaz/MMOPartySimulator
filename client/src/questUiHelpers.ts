@@ -246,6 +246,10 @@ export function getObjectiveLabel(
     return "Defeat Elite";
   }
 
+  if (objective.type === "collect_dungeon_chest") {
+    return "Collect Dungeon Chest";
+  }
+
   if (objective.type === "return_to_poi") {
     return "Return to Quest Giver";
   }

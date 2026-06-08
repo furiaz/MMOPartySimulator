@@ -3,8 +3,8 @@ import {
   aoeTargetDummyPosition,
   createDebugMapForQuestState,
   debugMapDefinitions,
+  getHubNpcStartDataForQuestState,
   hubCompanionStartPositions,
-  hubNpcStartData,
   HUB_MAP_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
@@ -315,7 +315,7 @@ function getRescueHubEntities(
   );
 
   if (choice.mapId === HUB_MAP_ID) {
-    for (const npc of hubNpcStartData) {
+    for (const npc of getHubNpcStartDataForQuestState(state.quests)) {
       entities[npc.id] = createNpc(
         npc.id,
         npc.position,

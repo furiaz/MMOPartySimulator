@@ -71,6 +71,7 @@ export const RESOURCE_ICON_SRC = {
 
 export const NPC_ICON_SRC: Partial<Record<NpcEntity["npcRole"], string>> = {
   quest_giver: `${nowAssetPackPath}/quest-giver.png`,
+  class_mentor: `${nowAssetPackPath}/class-mentor.png`,
   merchant: `${nowAssetPackPath}/merchant.png`,
   smith: `${nowAssetPackPath}/smith.png`,
   dog: `${nowAssetPackPath}/dog.png`,

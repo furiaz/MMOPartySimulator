@@ -7,11 +7,14 @@ import {
 } from "./npcInteractionRange";
 
 describe("NPC interaction ranges", () => {
-  it("uses wider interaction ranges for merchant and quest giver NPCs", () => {
+  it("uses wider interaction ranges for merchant and quest source NPCs", () => {
     expect(getNpcInteractionRange({ npcRole: "merchant" })).toBe(
       merchantInteractionRange,
     );
     expect(getNpcInteractionRange({ npcRole: "quest_giver" })).toBe(
+      questGiverInteractionRange,
+    );
+    expect(getNpcInteractionRange({ npcRole: "class_mentor" })).toBe(
       questGiverInteractionRange,
     );
     expect(merchantInteractionRange).toBe(2);

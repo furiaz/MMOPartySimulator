@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialQuestStates, type QuestState } from "./game";
-import { getQuestRuntimeProgressDisplay } from "./questUiHelpers";
+import { getObjectiveLabel, getQuestRuntimeProgressDisplay } from "./questUiHelpers";
 
 function activateQuest(quest: QuestState): QuestState {
   return {
@@ -39,5 +39,14 @@ describe("quest UI helpers", () => {
     const quest = activateQuest(quests.break_lower_shore_blockage);
 
     expect(getQuestRuntimeProgressDisplay(quest)).toBeNull();
+  });
+
+  it("renders the dungeon chest objective label", () => {
+    expect(
+      getObjectiveLabel({
+        id: "collect_slimeward_boss_chest",
+        type: "collect_dungeon_chest",
+      }),
+    ).toBe("Collect Dungeon Chest");
   });
 });

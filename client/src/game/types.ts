@@ -1606,6 +1606,7 @@ export type NpcEntity = BaseEntity & {
   displayName: string;
   npcRole:
     | "quest_giver"
+    | "class_mentor"
     | "merchant"
     | "smith"
     | "dog"

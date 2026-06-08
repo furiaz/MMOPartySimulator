@@ -14,12 +14,14 @@ import {
   WILDERNESS_MAP_COLUMNS,
   WILDERNESS_MAP_ROWS,
   aoeTargetDummyPosition,
+  CLASS_MENTOR_NPC_ID,
   createDebugMap,
   createDebugMapForQuestState,
   debugMapDefinitions,
   hubCompanionStartPositions,
   hubHealingFountains,
   hubNpcStartData,
+  getHubNpcStartDataForQuestState,
   mapFourEnemyStartPositions,
   mapFourEnemyStartData,
   mapFourSubzoneNameLabels,
@@ -157,6 +159,24 @@ describe("debug maps", () => {
       hubTeleport.position,
       ...hubTeleport.arrivalPositions,
     ]);
+  });
+
+  it("adds the Class Mentor to quest-aware hub NPC data after Slimeward Trail", () => {
+    expect(
+      getHubNpcStartDataForQuestState().map((npc) => npc.id),
+    ).not.toContain(CLASS_MENTOR_NPC_ID);
+
+    expect(
+      getHubNpcStartDataForQuestState({
+        find_slimeward_camp: { status: "completed" },
+      }),
+    ).toContainEqual(
+      expect.objectContaining({
+        id: CLASS_MENTOR_NPC_ID,
+        displayName: "Class Mentor",
+        npcRole: "class_mentor",
+      }),
+    );
   });
 
   it("keeps wilderness enemies and resources on reachable open floor", () => {

@@ -4,6 +4,7 @@ import { createDebugTelemetryState, startDebugTelemetryRecording } from "./debug
 import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
 import {
   createDebugMap,
+  CLASS_MENTOR_NPC_ID,
   MAP_TWO_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
@@ -23,6 +24,7 @@ import {
   completeQuestObjective,
   createInitialQuestStates,
   finishReadyQuestsForQuestGiver,
+  finishReadyQuestForQuestGiver,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
@@ -154,6 +156,59 @@ describe("prototype quest system", () => {
     ).toBe(true);
   });
 
+  it("unlocks The Azure Trial and spawns the Class Mentor after Slimeward Trail", () => {
+    let state = createStateWithParty({
+      currentMapId: "hub",
+      map: createDebugMap("hub"),
+      quests: createQuestStates({
+        find_slimeward_camp: "ready_to_turn_in",
+      }),
+    });
+
+    expect(state.quests.azure_trial.status).toBe("locked");
+    expect(state.entities[CLASS_MENTOR_NPC_ID]).toBeUndefined();
+
+    state = finishReadyQuestForQuestGiver(
+      state,
+      QUEST_GIVER_POI_ID,
+      "find_slimeward_camp",
+      1_000,
+    );
+
+    expect(state.quests.find_slimeward_camp.status).toBe("completed");
+    expect(state.quests.azure_trial.status).toBe("available");
+    expect(state.entities[CLASS_MENTOR_NPC_ID]).toMatchObject({
+      kind: "npc",
+      displayName: "Class Mentor",
+      npcRole: "class_mentor",
+    });
+    expect(
+      getQuestGiverAvailableQuests(state, CLASS_MENTOR_NPC_ID).map(
+        (quest) => quest.questId,
+      ),
+    ).toEqual(["azure_trial"]);
+  });
+
+  it("turns in The Azure Trial through the Class Mentor rewards", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({
+        azure_trial: "ready_to_turn_in",
+      }),
+    });
+
+    const nextState = finishReadyQuestForQuestGiver(
+      state,
+      CLASS_MENTOR_NPC_ID,
+      "azure_trial",
+      1_000,
+    );
+
+    expect(nextState.quests.azure_trial.status).toBe("completed");
+    expect(nextState.wallet.balancesByCurrencyId.crowns).toBe(100);
+    expect(getCompanion(nextState, "companion-1").lastCharacterXpGained).toBe(1500);
+    expect(getCompanion(nextState, "companion-2").lastCharacterXpGained).toBe(1500);
+  });
+
   it("creates level-up feedback when quest XP levels companions", () => {
     let state = createStateWithParty({
       quests: createQuestStates({
@@ -197,6 +252,7 @@ describe("prototype quest system", () => {
       "broken_thicket_survey",
       "crawler_shelf_report",
       "find_slimeward_camp",
+      "azure_trial",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");
@@ -204,6 +260,7 @@ describe("prototype quest system", () => {
     expect(quests.broken_thicket_survey.status).toBe("locked");
     expect(quests.crawler_shelf_report.status).toBe("locked");
     expect(quests.find_slimeward_camp.status).toBe("locked");
+    expect(quests.azure_trial.status).toBe("locked");
   });
 
   it("unlocks the Third Wild Zone bridge quests before Slimeward Trail", () => {

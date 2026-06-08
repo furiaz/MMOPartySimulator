@@ -21,7 +21,6 @@ import {
 } from "./state";
 import {
   QUEST_DEFINITIONS,
-  QUEST_GIVER_POI_ID,
   getActiveQuest,
   getIncompleteObjectives,
   getQuestTargetMapId,
@@ -298,6 +297,7 @@ function isCompletedActiveQuestDefeatEnemyPoi(
       objective.type === "defeat_enemy_count" &&
       Boolean(activeQuest.objectiveProgress[objective.id]?.completed) &&
       objective.enemyMapId === state.currentMapId &&
+      (!objective.enemyTypeId || entity.enemyTypeId === objective.enemyTypeId) &&
       (!objective.enemyArchetypeId ||
         entity.archetypeId === objective.enemyArchetypeId) &&
       (!objective.targetSubzoneId ||
@@ -319,6 +319,7 @@ function isQuestCombatPoi(
   return (
     entity?.kind === "enemy" &&
     entity.state !== "dead" &&
+    (!objective.enemyTypeId || entity.enemyTypeId === objective.enemyTypeId) &&
     (!objective.enemyArchetypeId ||
       entity.archetypeId === objective.enemyArchetypeId) &&
     (!objective.targetSubzoneId ||
@@ -412,7 +413,9 @@ function getQuestTargetOptions(
   }
 
   if (quest.status === "ready_to_turn_in" || globalPoiIntent.type === "get_new_quest") {
-    const questGiverPoi = candidates.find((poi) => poi.id === QUEST_GIVER_POI_ID);
+    const questGiverPoi = candidates.find(
+      (poi) => poi.id === QUEST_DEFINITIONS[questId].questGiverPoiId,
+    );
     return questGiverPoi
       ? [
           {
@@ -537,7 +540,8 @@ function getQuestObjectiveTargetOptions(
     objective.type === "repair_poi" ||
     objective.type === "defend_area" ||
     objective.type === "rescue_npc" ||
-    objective.type === "unlock_route"
+    objective.type === "unlock_route" ||
+    objective.type === "collect_dungeon_chest"
   ) {
     return [
       {
@@ -1157,12 +1161,15 @@ function getNpcPois(state: GameState): PointOfInterest[] {
     .filter((entity) => entity.kind === "npc")
     .map((npc) => ({
       id: npc.id,
-      category: npc.npcRole === "quest_giver" ? "quest" : "npc",
+      category:
+        npc.npcRole === "quest_giver" || npc.npcRole === "class_mentor"
+          ? "quest"
+          : "npc",
       mapId: state.currentMapId ?? HUB_MAP_ID,
       displayName: npc.displayName,
       position: npc.position,
       interactionRange:
-        npc.npcRole === "quest_giver"
+        npc.npcRole === "quest_giver" || npc.npcRole === "class_mentor"
           ? QUEST_GIVER_INTERACTION_RANGE
           : DEFAULT_POI_INTERACTION_RANGE,
       targetEntityId: npc.id,

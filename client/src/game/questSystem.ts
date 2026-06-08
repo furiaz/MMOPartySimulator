@@ -1,15 +1,22 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import {
+  CLASS_MENTOR_NPC_ID,
   HUB_MAP_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+  SLIMEWARD_CHEST_ID,
+  SLIMEWARD_CHEST_POSITION,
+  SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
+  classMentorNpcStartData,
   MAP_TWO_ID,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
   createDebugMapForQuestState,
   npcIds,
 } from "./debugMap";
+import { createNpc } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
 import {
@@ -44,6 +51,7 @@ export {
   completeQuestObjective,
   getSubzoneIdAtPosition,
   matchesObjectiveSubzoneAtPosition,
+  recordDungeonChestCollectedForQuests,
   recordEnemyDefeatedForQuests,
   recordEquippedItemObjectivesForQuests,
   recordMapReachedForQuests,
@@ -68,6 +76,7 @@ export const QUEST_ORDER: QuestId[] = [
   "broken_thicket_survey",
   "crawler_shelf_report",
   "find_slimeward_camp",
+  "azure_trial",
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -559,6 +568,42 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
       crowns: 25,
       characterXp: 10,
     },
+    unlocksQuestIds: ["azure_trial"],
+  },
+  azure_trial: {
+    id: "azure_trial",
+    displayName: "The Azure Trial",
+    sourceType: "npc",
+    objectiveFlow: "sequential",
+    questGiverPoiId: CLASS_MENTOR_NPC_ID,
+    objectives: [
+      {
+        id: "enter_slimeward_floor_one",
+        type: "reach_poi",
+        targetMapId: SLIMEWARD_FLOOR_ONE_ID,
+        requiredCount: 1,
+      },
+      {
+        id: "defeat_azure_mass",
+        type: "defeat_enemy_count",
+        enemyMapId: SLIMEWARD_FLOOR_TWO_ID,
+        targetSubzoneId: "f2-boss-room",
+        enemyTypeId: "azure_mass",
+        requiredCount: 1,
+      },
+      {
+        id: "collect_slimeward_boss_chest",
+        type: "collect_dungeon_chest",
+        targetMapId: SLIMEWARD_FLOOR_TWO_ID,
+        targetPoiId: SLIMEWARD_CHEST_ID,
+        targetPosition: SLIMEWARD_CHEST_POSITION,
+        requiredCount: 1,
+      },
+    ],
+    rewards: {
+      crowns: 100,
+      characterXp: 1500,
+    },
   },
 };
 
@@ -764,27 +809,34 @@ export function recordMerchantLockedForQuest(
 
 export function updateQuestGiverInteraction(
   state: GameState,
+  questGiverPoiIdOrNow: string | number = QUEST_GIVER_POI_ID,
   now = Date.now(),
 ): GameState {
+  const questGiverPoiId =
+    typeof questGiverPoiIdOrNow === "number"
+      ? QUEST_GIVER_POI_ID
+      : questGiverPoiIdOrNow;
+  const interactionNow =
+    typeof questGiverPoiIdOrNow === "number" ? questGiverPoiIdOrNow : now;
   const nextState = appendDebugTelemetryEvent(state, {
     type: "quest_dialog_opened",
-    entityId: QUEST_GIVER_POI_ID,
+    entityId: questGiverPoiId,
     currentMapId: state.currentMapId,
     currentMapDisplayName: state.map?.displayName,
     currentMapDebugName: state.map?.debugName,
   });
-  const readyQuest = getQuestByStatuses(state, ["ready_to_turn_in"]);
+  const readyQuest = getQuestGiverReadyQuests(state, questGiverPoiId)[0];
 
   if (readyQuest) {
-    return claimQuestReward(nextState, readyQuest.questId, QUEST_GIVER_POI_ID, {
-      now,
+    return claimQuestReward(nextState, readyQuest.questId, questGiverPoiId, {
+      now: interactionNow,
     });
   }
 
-  const availableQuest = getAvailableQuest(nextState);
+  const availableQuest = getQuestGiverAvailableQuests(nextState, questGiverPoiId)[0];
 
   return availableQuest
-    ? acceptQuestFromQuestGiver(nextState, QUEST_GIVER_POI_ID, availableQuest.questId)
+    ? acceptQuestFromQuestGiver(nextState, questGiverPoiId, availableQuest.questId)
     : nextState;
 }
 
@@ -1106,14 +1158,30 @@ function claimQuestReward(
 }
 
 function refreshCurrentMapForQuestState(state: GameState): GameState {
-  if (state.currentMapId !== MAP_ONE_ID || !state.map) {
-    return state;
+  if (state.currentMapId === MAP_ONE_ID && state.map) {
+    return {
+      ...state,
+      map: createDebugMapForQuestState(MAP_ONE_ID, state.quests),
+    };
   }
 
-  return {
-    ...state,
-    map: createDebugMapForQuestState(MAP_ONE_ID, state.quests),
-  };
+  if (
+    state.currentMapId === HUB_MAP_ID &&
+    state.quests.find_slimeward_camp?.status === "completed" &&
+    !state.entities[CLASS_MENTOR_NPC_ID]
+  ) {
+    return updateEntity(
+      state,
+      createNpc(
+        classMentorNpcStartData.id,
+        classMentorNpcStartData.position,
+        classMentorNpcStartData.displayName,
+        classMentorNpcStartData.npcRole,
+      ),
+    );
+  }
+
+  return state;
 }
 
 function validateQuestRewards(

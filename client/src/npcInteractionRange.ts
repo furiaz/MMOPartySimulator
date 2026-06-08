@@ -7,7 +7,7 @@ export const defaultNpcInteractionRange = 1.5;
 export function getNpcInteractionRange(
   npc: Pick<NpcEntity, "npcRole">,
 ): number {
-  if (npc.npcRole === "quest_giver") {
+  if (npc.npcRole === "quest_giver" || npc.npcRole === "class_mentor") {
     return questGiverInteractionRange;
   }
 

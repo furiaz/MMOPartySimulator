@@ -16,6 +16,7 @@ import {
 import { createNpc } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import { getPartyLeader } from "./partySystem";
+import { recordDungeonChestCollectedForQuests } from "./questSystem";
 import { setTeleportWorking } from "./teleportState";
 import { updateEntity, type GameState } from "./state";
 import type {
@@ -150,6 +151,14 @@ export function openSlimewardDungeonChest(
       nextState,
       SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
       true,
+    );
+  }
+
+  if (isFullyCollected) {
+    nextState = recordDungeonChestCollectedForQuests(
+      nextState,
+      SLIMEWARD_CHEST_ID,
+      state.currentMapId,
     );
   }
 

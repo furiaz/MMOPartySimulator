@@ -21,7 +21,8 @@ export type QuestId =
   | "open_wolf_causeway"
   | "broken_thicket_survey"
   | "crawler_shelf_report"
-  | "find_slimeward_camp";
+  | "find_slimeward_camp"
+  | "azure_trial";
 
 export type QuestStatus =
   | "locked"
@@ -46,6 +47,7 @@ export type QuestObjectiveType =
   | "guide_npc_to_poi"
   | "unlock_route"
   | "defeat_elite"
+  | "collect_dungeon_chest"
   | "return_to_poi";
 
 export type QuestSpawnEnemyDefinition = {
@@ -67,6 +69,7 @@ export type QuestObjectiveDefinition = {
   guideStartPosition?: Position;
   guideTargetPosition?: Position;
   enemyMapId?: DebugMapId;
+  enemyTypeId?: EnemyTypeId;
   enemyArchetypeId?: EnemyArchetypeId;
   enemyVariant?: EnemyVariant;
   resourceType?: ResourceType;

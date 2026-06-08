@@ -1339,6 +1339,7 @@ function canPassThroughStaticNpcForPartyMovement(
 function isStaticPassiveNpcRole(npcRole: string): boolean {
   return (
     npcRole === "quest_giver" ||
+    npcRole === "class_mentor" ||
     npcRole === "merchant" ||
     npcRole === "smith" ||
     npcRole === "dog" ||

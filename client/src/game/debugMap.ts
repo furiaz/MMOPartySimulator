@@ -53,6 +53,7 @@ export const SLIMEWARD_BOSS_ID = "slimeward-azure-mass";
 export const SLIMEWARD_CHEST_ID = "slimeward-boss-chest";
 export const SLIMEWARD_CHEST_POSITION: Position = { x: 138, y: 22 };
 export const SLIMEWARD_EXIT_POSITION: Position = { x: 144, y: 22 };
+export const CLASS_MENTOR_NPC_ID = "hub-class-mentor";
 
 export const companionIds = [
   "test-companion-1",
@@ -253,6 +254,13 @@ export const hubNpcStartData = [
     npcRole: "test_blade",
   },
 ] as const;
+
+export const classMentorNpcStartData = {
+  id: CLASS_MENTOR_NPC_ID,
+  position: { x: 65, y: 35 },
+  displayName: "Class Mentor",
+  npcRole: "class_mentor",
+} as const;
 
 export const slimewardCampNpcStartData = [
   {
@@ -1025,6 +1033,14 @@ type DebugMapQuestStates = Partial<
   >
 >;
 
+export function getHubNpcStartDataForQuestState(
+  quests: DebugMapQuestStates = {},
+) {
+  return isClassMentorAvailable(quests)
+    ? [...hubNpcStartData, classMentorNpcStartData]
+    : hubNpcStartData;
+}
+
 export const SECURE_LANDING_PASSAGE_GATE_ID = "map-1-shore-fringe-passage-gate";
 export const SECURE_LANDING_PASSAGE_GATE_POSITION: Position = { x: 52, y: 29 };
 const SECURE_LANDING_PASSAGE_GATE_COLLISION_WALLS = createVerticalWall(52, 24, 34, []);
@@ -1532,6 +1548,12 @@ export function isOldGrovePassageOpen(
     quests.rescue_the_grove_runner?.objectiveProgress?.repair_old_grove_cache
       ?.completed,
   );
+}
+
+export function isClassMentorAvailable(
+  quests: DebugMapQuestStates = {},
+): boolean {
+  return quests.find_slimeward_camp?.status === "completed";
 }
 
 export function getDebugMapDefinition(mapId: DebugMapId) {

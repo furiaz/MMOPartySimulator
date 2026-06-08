@@ -332,6 +332,7 @@ const resourceTypeLabels: Record<ResourceEntity["resourceType"], string> = {
 const npcRoleLabels: Record<NpcEntity["npcRole"], string> = {
   merchant: "Merchant",
   quest_giver: "Quest Giver",
+  class_mentor: "Class Mentor",
   smith: "Smith",
   dog: "Dog",
   test_blade: "Test Blade",
@@ -498,7 +499,7 @@ function getNpcInteractionKind(npc: NpcEntity): NpcInteractionKind | null {
     return "merchant";
   }
 
-  if (npc.npcRole === "quest_giver") {
+  if (npc.npcRole === "quest_giver" || npc.npcRole === "class_mentor") {
     return "quest_giver";
   }
 
@@ -2310,9 +2311,12 @@ function App() {
   const activeQuestGiver =
     activeQuestGiverNpcId &&
     gameState.entities[activeQuestGiverNpcId]?.kind === "npc" &&
-    gameState.entities[activeQuestGiverNpcId].npcRole === "quest_giver"
+    (gameState.entities[activeQuestGiverNpcId].npcRole === "quest_giver" ||
+      gameState.entities[activeQuestGiverNpcId].npcRole === "class_mentor")
       ? gameState.entities[activeQuestGiverNpcId]
       : null;
+  const activeQuestGiverIsClassMentor =
+    activeQuestGiver?.npcRole === "class_mentor";
   const activeQuestGiverReadyQuests = activeQuestGiver
     ? getQuestGiverReadyQuests(gameState, activeQuestGiver.id)
     : [];
@@ -4150,6 +4154,11 @@ function App() {
               <button disabled type="button">
                 Talk
               </button>
+              {activeQuestGiverIsClassMentor ? (
+                <button disabled type="button">
+                  Class Change
+                </button>
+              ) : null}
               {activeQuestGiverPanel ? (
                 <>
                   <button

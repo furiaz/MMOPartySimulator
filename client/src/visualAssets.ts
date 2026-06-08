@@ -354,6 +354,20 @@ export const entityVisualAssets = {
       height: 59,
     },
   },
+  classMentor: {
+    kind: "image",
+    src: NPC_ICON_SRC.class_mentor ?? "/assets/Generated/now-pack/class-mentor.png",
+    naturalSize: {
+      width: 144,
+      height: 144,
+    },
+    contentBounds: {
+      x: 40,
+      y: 14,
+      width: 65,
+      height: 111,
+    },
+  },
 } satisfies {
   beginnerCharacter: SpriteVisualAsset;
   testCharacter: SpriteVisualAsset;
@@ -365,6 +379,7 @@ export const entityVisualAssets = {
   dog: PlaceholderVisualAsset;
   testBlade: ImageVisualAsset;
   testHunter: ImageVisualAsset;
+  classMentor: ImageVisualAsset;
 };
 
 export const mapTileVisualAssets = {
@@ -395,6 +410,10 @@ export function getEntityVisualAsset(
   }
 
   if (entity.kind === "npc") {
+    if (entity.npcRole === "class_mentor") {
+      return entityVisualAssets.classMentor;
+    }
+
     const npcIconSrc = NPC_ICON_SRC[entity.npcRole];
 
     if (npcIconSrc) {

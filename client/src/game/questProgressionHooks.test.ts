@@ -3,11 +3,15 @@ import { createCompanion, createEnemy, createResource } from "./entities";
 import {
   createDebugMap,
   MAP_ONE_ID,
+  SLIMEWARD_CHEST_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
   MAP_TWO_ID,
   TELEPORTER_ID,
 } from "./debugMap";
 import {
   completeQuestObjective,
+  recordDungeonChestCollectedForQuests,
   recordEnemyDefeatedForQuests,
   recordEquippedItemObjectivesForQuests,
   recordMapReachedForQuests,
@@ -109,6 +113,80 @@ describe("quest progression hooks", () => {
       objective!.targetPoiId = originalTargetPoiId;
       objective!.targetPosition = originalTargetPosition;
     }
+  });
+
+  it("records Azure Trial dungeon entry, boss defeat, and chest collection", () => {
+    let state = createStateWithParty({
+      currentMapId: SLIMEWARD_FLOOR_ONE_ID,
+      map: createDebugMap(SLIMEWARD_FLOOR_ONE_ID),
+      quests: createQuestStates({
+        azure_trial: "active",
+      }),
+    });
+
+    state = recordMapReachedForQuests(state, SLIMEWARD_FLOOR_ONE_ID);
+    expect(
+      state.quests.azure_trial.objectiveProgress.enter_slimeward_floor_one,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(state.quests.azure_trial.status).toBe("active");
+
+    state = {
+      ...state,
+      currentMapId: SLIMEWARD_FLOOR_TWO_ID,
+      map: createDebugMap(SLIMEWARD_FLOOR_TWO_ID),
+    };
+    state = recordEnemyDefeatedForQuests(
+      state,
+      {
+        ...createEnemy("normal-slime", { x: 0, y: 0 }, undefined, {
+          enemyTypeId: "slime",
+          archetypeId: "slime",
+          subzoneId: "f2-boss-room",
+        }),
+        state: "dead" as const,
+        health: 0,
+      },
+      SLIMEWARD_FLOOR_TWO_ID,
+    );
+    expect(
+      state.quests.azure_trial.objectiveProgress.defeat_azure_mass.currentCount,
+    ).toBe(0);
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      {
+        ...createEnemy("azure-mass", { x: 0, y: 0 }, undefined, {
+          enemyTypeId: "azure_mass",
+          archetypeId: "slime",
+          subzoneId: "f2-boss-room",
+        }),
+        state: "dead" as const,
+        health: 0,
+      },
+      SLIMEWARD_FLOOR_TWO_ID,
+    );
+    expect(
+      state.quests.azure_trial.objectiveProgress.defeat_azure_mass,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+
+    state = recordDungeonChestCollectedForQuests(
+      state,
+      SLIMEWARD_CHEST_ID,
+      SLIMEWARD_FLOOR_TWO_ID,
+    );
+    expect(
+      state.quests.azure_trial.objectiveProgress.collect_slimeward_boss_chest,
+    ).toMatchObject({
+      currentCount: 1,
+      completed: true,
+    });
+    expect(state.quests.azure_trial.status).toBe("ready_to_turn_in");
   });
 
   it("tracks repair progress and unlocks route teleports on completion", () => {
