@@ -6,7 +6,13 @@ import {
   hubCompanionStartPositions,
   hubNpcStartData,
   HUB_MAP_ID,
+  MAP_FOUR_ID,
+  MAP_ONE_ID,
+  MAP_THREE_ID,
+  MAP_TWO_ID,
   SLIMEWARD_CAMP_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
   slimewardCampArrivalPositions,
   slimewardCampNpcStartData,
   targetDummyId,
@@ -142,8 +148,12 @@ export function getWorldWipeRecoveryChoices(
     return [];
   }
 
-  if (isSlimewardDungeonFloorMapId(state.currentMapId)) {
-    return [createWorldWipeRecoveryChoice(SLIMEWARD_CAMP_RESCUE_HUB, 0)];
+  const sourceMapId = state.currentMapId as DebugMapId;
+
+  if (isSlimewardDungeonFloorMapId(sourceMapId)) {
+    return [
+      createWorldWipeRecoveryChoice(sourceMapId, SLIMEWARD_CAMP_RESCUE_HUB, 0),
+    ];
   }
 
   const hubs = (options.rescueHubs ?? DEFAULT_RESCUE_HUBS).filter(
@@ -152,7 +162,7 @@ export function getWorldWipeRecoveryChoices(
   const reachableHubs = hubs
     .map((hub) => ({
       hub,
-      hopDistance: getMapHopDistance(state.currentMapId as DebugMapId, hub.mapId),
+      hopDistance: getMapHopDistance(sourceMapId, hub.mapId),
     }))
     .filter(
       (entry): entry is { hub: RescueHubDefinition; hopDistance: number } =>
@@ -169,7 +179,7 @@ export function getWorldWipeRecoveryChoices(
   return reachableHubs
     .filter((entry) => entry.hopDistance === closestDistance)
     .map(({ hub, hopDistance }) =>
-      createWorldWipeRecoveryChoice(hub, hopDistance),
+      createWorldWipeRecoveryChoice(sourceMapId, hub, hopDistance),
     );
 }
 
@@ -335,6 +345,7 @@ function getRescueHubEntities(
 }
 
 function createWorldWipeRecoveryChoice(
+  sourceMapId: DebugMapId,
   hub: RescueHubDefinition,
   hopDistance: number,
 ): WorldWipeRecoveryChoice {
@@ -346,7 +357,7 @@ function createWorldWipeRecoveryChoice(
     rescueActorName: hub.rescueActorName,
     rescueLine: hub.rescueLine,
     hopDistance,
-    fee: getRescueFee(hopDistance),
+    fee: getRescueFeeForSourceMap(sourceMapId, hopDistance),
     arrivalPositions: hub.arrivalPositions,
   };
 }
@@ -366,6 +377,25 @@ function getCompanions(state: GameState): Companion[] {
 
 function getRescueFee(hopDistance: number): number {
   return RESCUE_BASE_FEE + RESCUE_FEE_PER_HOP * hopDistance;
+}
+
+function getRescueFeeForSourceMap(
+  sourceMapId: DebugMapId,
+  hopDistance: number,
+): number {
+  return isCurrentFreeRescueMap(sourceMapId) ? 0 : getRescueFee(hopDistance);
+}
+
+function isCurrentFreeRescueMap(mapId: DebugMapId): boolean {
+  return (
+    mapId === MAP_ONE_ID ||
+    mapId === MAP_TWO_ID ||
+    mapId === MAP_THREE_ID ||
+    mapId === MAP_FOUR_ID ||
+    mapId === SLIMEWARD_CAMP_ID ||
+    mapId === SLIMEWARD_FLOOR_ONE_ID ||
+    mapId === SLIMEWARD_FLOOR_TWO_ID
+  );
 }
 
 function getMapHopDistance(fromMapId: DebugMapId, toMapId: DebugMapId): number {

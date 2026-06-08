@@ -8,6 +8,7 @@ import {
 import {
   hubCompanionStartPositions,
   HUB_MAP_ID,
+  MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_TWO_ID,
   npcIds,
@@ -60,15 +61,16 @@ describe("world wipe recovery", () => {
     expect(nextState.currentMapId).toBe(HUB_MAP_ID);
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "rescued",
-      chargedFee: 15,
+      chargedFee: 0,
       selectedChoice: {
+        fee: 0,
         hubDisplayName: "Harbor Union Bastion",
         hopDistance: 1,
         rescueActorId: "hub-dog",
         rescueLine: "Careful now!",
       },
     });
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(85);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
     expect(nextState.entities.leader).toMatchObject({
       state: "follow",
       position: hubCompanionStartPositions[0],
@@ -108,8 +110,9 @@ describe("world wipe recovery", () => {
     expect(nextState.currentMapId).toBe(SLIMEWARD_CAMP_ID);
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "rescued",
-      chargedFee: 5,
+      chargedFee: 0,
       selectedChoice: {
+        fee: 0,
         hubDisplayName: "Slimeward Camp",
         hopDistance: 0,
         rescueActorId: "slimeward-camp-dog",
@@ -126,10 +129,10 @@ describe("world wipe recovery", () => {
     expect(
       isTeleportWorking(nextState, SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID),
     ).toBe(false);
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(95);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
   });
 
-  it("charges a higher route-hop fee from map-2", () => {
+  it("rescues a map-2 full wipe for free", () => {
     const state = setCurrencyBalanceForDebug(
       createMapTwoState([createDeadCompanion("leader")], {
         partyLeaderId: "leader",
@@ -142,12 +145,35 @@ describe("world wipe recovery", () => {
 
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "rescued",
-      chargedFee: 25,
+      chargedFee: 0,
       selectedChoice: {
+        fee: 0,
         hopDistance: 2,
       },
     });
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(75);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
+  });
+
+  it("rescues a map-4 full wipe for free", () => {
+    const state = setCurrencyBalanceForDebug(
+      createMapFourState([createDeadCompanion("leader")], {
+        partyLeaderId: "leader",
+      }),
+      "crowns",
+      100,
+    ).state;
+
+    const nextState = updateGame(state, { nowMs: 1000 });
+
+    expect(nextState.worldWipeRecovery).toMatchObject({
+      status: "rescued",
+      chargedFee: 0,
+      selectedChoice: {
+        fee: 0,
+        hopDistance: 4,
+      },
+    });
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
   });
 
   it("does not trigger when any party member is still alive", () => {
@@ -167,7 +193,7 @@ describe("world wipe recovery", () => {
     expect(nextState.worldWipeRecovery).toBeUndefined();
   });
 
-  it("charges only once for a recovered wipe", () => {
+  it("rescues only once for a recovered wipe", () => {
     const state = setCurrencyBalanceForDebug(
       createMapOneState([createDeadCompanion("leader")], {
         partyLeaderId: "leader",
@@ -179,14 +205,14 @@ describe("world wipe recovery", () => {
     const recoveredState = updateGame(state, { nowMs: 1000 });
     const nextState = updateGame(recoveredState, { nowMs: 1100 });
 
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(85);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "rescued",
-      chargedFee: 15,
+      chargedFee: 0,
     });
   });
 
-  it("charges available Crowns and still rescues when the full fee is unaffordable", () => {
+  it("does not drain available Crowns during free current-map rescue", () => {
     const state = setCurrencyBalanceForDebug(
       createMapOneState([createDeadCompanion("leader")], {
         partyLeaderId: "leader",
@@ -200,9 +226,9 @@ describe("world wipe recovery", () => {
     expect(nextState.currentMapId).toBe(HUB_MAP_ID);
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "rescued",
-      chargedFee: 7,
+      chargedFee: 0,
     });
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(0);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(7);
   });
 
   it("clears wild-map chaos while preserving party progress and inventory", () => {
@@ -395,8 +421,8 @@ describe("world wipe recovery", () => {
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "pending_choice",
       choices: [
-        expect.objectContaining({ hubId: "first-hub", fee: 15 }),
-        expect.objectContaining({ hubId: "second-hub", fee: 15 }),
+        expect.objectContaining({ hubId: "first-hub", fee: 0 }),
+        expect.objectContaining({ hubId: "second-hub", fee: 0 }),
       ],
     });
   });
@@ -422,13 +448,13 @@ describe("world wipe recovery", () => {
     expect(nextState.currentMapId).toBe(HUB_MAP_ID);
     expect(nextState.worldWipeRecovery).toMatchObject({
       status: "rescued",
-      chargedFee: 15,
+      chargedFee: 0,
       selectedChoice: {
         hubId: "second-hub",
         hubDisplayName: "Second Test Hub",
       },
     });
-    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(15);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(30);
     expect(nextState.entities.leader).toMatchObject({
       position: { x: 9, y: 20 },
     });
@@ -474,6 +500,22 @@ function createMapTwoState(
     createTestGameState({
       currentMapId: MAP_TWO_ID,
       map: createDebugMap(MAP_TWO_ID),
+      activeTeleport: null,
+      quests: createInitialQuestStates(),
+      ...overrides,
+    }),
+  );
+}
+
+function createMapFourState(
+  entities: GameEntity[],
+  overrides: Partial<GameState>,
+): GameState {
+  return entities.reduce(
+    addEntity,
+    createTestGameState({
+      currentMapId: MAP_FOUR_ID,
+      map: createDebugMap(MAP_FOUR_ID),
       activeTeleport: null,
       quests: createInitialQuestStates(),
       ...overrides,
