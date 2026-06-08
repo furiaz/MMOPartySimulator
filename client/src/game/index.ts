@@ -400,8 +400,11 @@ export {
   getPositionKey,
 } from "./positionUtils";
 export {
+  buildNavigationClickAccessibility,
+  isNavigationClickAccessible,
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
+  type NavigationClickAccessibility,
 } from "./navigationClick";
 export { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 export {

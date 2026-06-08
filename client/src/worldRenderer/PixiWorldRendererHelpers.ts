@@ -19,6 +19,7 @@ import type {
   GameEntity,
   GameMap,
   LeaderIntent,
+  NavigationClickAccessibility,
   PartyIntent,
   Position,
   ResurrectionProgressState,
@@ -286,6 +287,13 @@ export type QuestInspectMarker = {
   position: Position;
 };
 
+export type MovementClickFeedbackEvent = {
+  id: string;
+  position: Position;
+  createdAt: number;
+  expiresAt: number;
+};
+
 export type FullRenderVisualMovement = {
   direction: SpriteDirection;
   angleDegrees?: number;
@@ -304,6 +312,7 @@ export type FullRenderSignatureInput = {
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
   map: GameMap;
+  movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   partyIntent: PartyIntent | null;
   questGiverHasWork: boolean;
   questInspectMarkers: QuestInspectMarker[];
@@ -805,12 +814,16 @@ export function getPreviewRenderSignature({
   cellPixelSize,
   entities,
   map,
+  movementClickFeedbackEvents = [],
+  navigationClickAccessibility = null,
   viewportSize,
 }: {
   cameraOffset: Position;
   cellPixelSize: number;
   entities: GameEntity[];
   map: GameMap;
+  movementClickFeedbackEvents?: MovementClickFeedbackEvent[];
+  navigationClickAccessibility?: NavigationClickAccessibility | null;
   viewportSize?: ViewportSize;
 }): string {
   const wallSignature = map.walls
@@ -856,6 +869,11 @@ export function getPreviewRenderSignature({
     fountainSignature,
     subzoneSignature,
     entitySignature,
+    getNavigationClickAccessibilitySignature(navigationClickAccessibility),
+    getEventSignature(
+      movementClickFeedbackEvents,
+      getMovementClickFeedbackSignature,
+    ),
     cameraOffset.x,
     cameraOffset.y,
     cellPixelSize,
@@ -891,6 +909,7 @@ export function getFullRenderSignature({
   entities,
   leaderIntent,
   map,
+  movementClickFeedbackEvents,
   partyIntent,
   questGiverHasWork,
   questInspectMarkers,
@@ -936,6 +955,10 @@ export function getFullRenderSignature({
     renderSize.width,
     renderSize.height,
     visibleEntitySignature,
+    getEventSignature(
+      movementClickFeedbackEvents,
+      getMovementClickFeedbackSignature,
+    ),
     getIntentSignature(leaderIntent),
     getPartyRenderSignature(partyIntent),
     getActiveTeleportSignature(activeTeleport),
@@ -1120,6 +1143,20 @@ function getRecordSignature<T>(
     .join(";");
 }
 
+function getNavigationClickAccessibilitySignature(
+  accessibility: NavigationClickAccessibility | null | undefined,
+): string {
+  if (!accessibility) {
+    return "";
+  }
+
+  return [
+    accessibility.columns,
+    accessibility.rows,
+    [...accessibility.reachableCellKeys].sort().join(";"),
+  ].join(":");
+}
+
 function getEventSignature<T extends { id: string }>(
   events: T[] | null | undefined,
   getValueSignature: (event: T) => string,
@@ -1129,6 +1166,16 @@ function getEventSignature<T extends { id: string }>(
     .map((event) => `${event.id}:${getValueSignature(event)}`)
     .sort()
     .join(";");
+}
+
+function getMovementClickFeedbackSignature(
+  event: MovementClickFeedbackEvent,
+): string {
+  return [
+    getPositionSignature(event.position),
+    event.createdAt,
+    event.expiresAt,
+  ].join(":");
 }
 
 function getCombatFeedbackSignature(event: CombatFeedbackEvent): string {

@@ -108,6 +108,7 @@ import {
   recordMerchantMenuSelected,
   resourceIds,
   restoreGameStateFromSave,
+  buildNavigationClickAccessibility,
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
   resolveWorldWipeRecoveryChoice,
@@ -146,6 +147,7 @@ import {
   type MerchantBuyFailureReason,
   type MerchantStockEntry,
   type MerchantStockGroup,
+  type NavigationClickAccessibility,
   type NpcEntity,
   type OfflineFarmingSummary,
   type PartyMemberRole,
@@ -206,6 +208,7 @@ const debugMap = createDebugMap();
 const gameVersion = "0.01";
 const currencyGainFeedbackDurationMs = 1200;
 const directCommandFeedbackDurationMs = 1400;
+const movementClickFeedbackDurationMs = 900;
 const currencyGainBurstSrc =
   "assets/Generated/prototype-vfx/sprites/currency-gain-burst.png";
 const mapConstructionCellPixelSize = 32;
@@ -248,6 +251,13 @@ function getNextPoiSearchScope(scope: PoiSearchScope): PoiSearchScope {
 type EntityVisualMovement = {
   direction: SpriteDirection;
   angleDegrees: number;
+  expiresAt: number;
+};
+
+type MovementClickFeedbackEvent = {
+  id: string;
+  position: Position;
+  createdAt: number;
   expiresAt: number;
 };
 
@@ -2047,6 +2057,9 @@ function App() {
     text: string;
     expiresAt: number;
   } | null>(null);
+  const [movementClickFeedbackEvents, setMovementClickFeedbackEvents] = useState<
+    MovementClickFeedbackEvent[]
+  >([]);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -2084,6 +2097,10 @@ function App() {
   const allEntities = useMemo(
     () => Object.values(gameState.entities),
     [gameState.entities],
+  );
+  const navigationClickAccessibility = useMemo(
+    () => buildNavigationClickAccessibility(gameState),
+    [gameState],
   );
   const handleRendererPerformanceSample = useCallback(
     (sample: PixiRendererPerformanceSample) => {
@@ -2341,6 +2358,9 @@ function App() {
     directCommandFeedback && directCommandFeedback.expiresAt > currentTime
       ? directCommandFeedback
       : null;
+  const activeMovementClickFeedbackEvents = movementClickFeedbackEvents.filter(
+    (event) => event.expiresAt > currentTime,
+  );
   const activeDirectCommandCount = Object.keys(
     directCompanionCommandsById,
   ).length;
@@ -3612,6 +3632,45 @@ function App() {
     );
   }
 
+  function addMovementClickFeedback(position: Position) {
+    const now = Date.now();
+
+    setMovementClickFeedbackEvents((currentEvents) => [
+      ...currentEvents.filter((event) => event.expiresAt > now),
+      {
+        id: `movement-click-blocked-${now}`,
+        position: { ...position },
+        createdAt: now,
+        expiresAt: now + movementClickFeedbackDurationMs,
+      },
+    ]);
+  }
+
+  function commandPartyToMoveFromNavigationClick(
+    clickedPosition: Position,
+    accessibility?: NavigationClickAccessibility | null,
+  ) {
+    const clickAccessibility =
+      accessibility ?? buildNavigationClickAccessibility(gameState);
+    const resolvedPosition = resolveNavigationClickTarget(
+      gameState,
+      clickedPosition,
+      clickAccessibility,
+    );
+
+    if (!resolvedPosition) {
+      addMovementClickFeedback(clickedPosition);
+      return;
+    }
+
+    setGameState((state) => {
+      return issuePartyOrder(state, {
+        type: "move",
+        targetPosition: resolvedPosition,
+      });
+    });
+  }
+
   function commandCompanionByDrag(command: CompanionDirectCommandInput) {
     const now = Date.now();
     let resultCode: DirectCompanionCommandResultCode | null = null;
@@ -3632,26 +3691,19 @@ function App() {
   }
 
   function commandPartyToMoveFromFloorPosition(targetPosition: Position) {
-    if (!isValidFloorPosition(targetPosition)) {
+    if (!isPositionInsideCurrentMap(targetPosition)) {
+      addMovementClickFeedback(targetPosition);
       return;
     }
 
-    commandPartyToMoveToPosition(targetPosition);
+    commandPartyToMoveFromNavigationClick(targetPosition);
   }
 
   function commandPartyToMoveFromMinimapPosition(clickedPosition: Position) {
-    setGameState((state) => {
-      const resolvedPosition = resolveNavigationClickTarget(state, clickedPosition);
-
-      if (!resolvedPosition) {
-        return state;
-      }
-
-      return issuePartyOrder(state, {
-        type: "move",
-        targetPosition: resolvedPosition,
-      });
-    });
+    commandPartyToMoveFromNavigationClick(
+      clickedPosition,
+      navigationClickAccessibility,
+    );
   }
 
   function commandPartyToInteractWithNpc(npcId: string) {
@@ -3737,15 +3789,12 @@ function App() {
     }
   }
 
-  function isValidFloorPosition(position: Position): boolean {
+  function isPositionInsideCurrentMap(position: Position): boolean {
     return (
       position.x >= 0 &&
       position.x < currentMap.columns &&
       position.y >= 0 &&
-      position.y < currentMap.rows &&
-      !currentMap.walls.some(
-        (wall) => wall.x === position.x && wall.y === position.y,
-      )
+      position.y < currentMap.rows
     );
   }
 
@@ -3949,6 +3998,7 @@ function App() {
               cellPixelSize={mapConstructionCellPixelSize}
               combatFeedbackEvents={gameState.combatFeedbackEvents}
               combatProjectiles={combatProjectiles}
+              currentTime={currentTime}
               directCompanionCommandsById={directCompanionCommandsById}
               dropVisualEvents={dropVisualEvents}
               enemyAoeChannelsByCasterId={enemyAoeChannelsByCasterId}
@@ -3956,6 +4006,8 @@ function App() {
               leaderIntent={gameState.leaderIntent}
               map={currentMap}
               mode="full"
+              movementClickFeedbackEvents={activeMovementClickFeedbackEvents}
+              navigationClickAccessibility={navigationClickAccessibility}
               onCompanionDragCommand={commandCompanionByDrag}
               onEnemyClick={commandPartyToTargetEnemy}
               onEntityHover={updateEntityHoverTooltip}
@@ -3991,10 +4043,13 @@ function App() {
               activeTeleport={activeTeleport}
               cameraOffset={terrainCameraOffset}
               cellPixelSize={mapConstructionCellPixelSize}
+              currentTime={currentTime}
               entities={allEntities}
               leaderIntent={gameState.leaderIntent}
               map={currentMap}
               mode="preview"
+              movementClickFeedbackEvents={activeMovementClickFeedbackEvents}
+              navigationClickAccessibility={navigationClickAccessibility}
               onFloorClick={commandPartyToMoveFromMinimapPosition}
               onPerformanceSample={handleRendererPerformanceSample}
               suppressMovePoiRing={suppressEscortGuideMovePoiRing}

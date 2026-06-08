@@ -33,6 +33,7 @@ import type {
   GameMap,
   LeaderIntent,
   MapVisualObject,
+  NavigationClickAccessibility,
   PartyIntent,
   Position,
   ResurrectionProgressState,
@@ -73,6 +74,7 @@ import {
   getPreviewRenderSignature,
   isStaticMapSpriteKey,
   shouldSkipStableRendererFrame,
+  type MovementClickFeedbackEvent,
   type PixiRendererPerformanceSample,
 } from "./PixiWorldRendererHelpers";
 
@@ -199,6 +201,8 @@ type PixiWorldRendererProps = {
   leaderIntent?: LeaderIntent | null;
   map: GameMap;
   mode?: PixiRendererMode;
+  movementClickFeedbackEvents?: MovementClickFeedbackEvent[];
+  navigationClickAccessibility?: NavigationClickAccessibility | null;
   onEnemyClick?: (enemyId: string) => void;
   onCompanionDragCommand?: (command: CompanionDirectCommandInput) => void;
   onEntityHover?: (
@@ -383,6 +387,8 @@ type DrawWorldOptions = {
   map: GameMap;
   managedState: ManagedRendererState;
   mode: PixiRendererMode;
+  movementClickFeedbackEvents: MovementClickFeedbackEvent[];
+  navigationClickAccessibility: NavigationClickAccessibility | null;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
   questInspectMarkers: QuestInspectMarker[];
@@ -4590,6 +4596,100 @@ function drawQuestGiverMarker(
   });
 }
 
+function drawPreviewInaccessibleCells(
+  graphics: Graphics,
+  map: GameMap,
+  transform: PreviewTransform,
+  accessibility: NavigationClickAccessibility | null,
+) {
+  if (
+    !accessibility ||
+    accessibility.columns !== map.columns ||
+    accessibility.rows !== map.rows
+  ) {
+    return;
+  }
+
+  const wallKeys = new Set(
+    [...map.walls, ...(map.collisionWalls ?? [])].map(
+      (position) => `${position.x},${position.y}`,
+    ),
+  );
+
+  for (let y = 0; y < map.rows; y += 1) {
+    let runStartX: number | null = null;
+
+    for (let x = 0; x <= map.columns; x += 1) {
+      const key = `${x},${y}`;
+      const cell = map.navigationGrid?.cellsByKey[key];
+      const isInsideRow = x < map.columns;
+      const isWalkable = isInsideRow
+        ? (cell?.walkable ?? !wallKeys.has(key))
+        : false;
+      const shouldDim =
+        isInsideRow && isWalkable && !accessibility.reachableCellKeys.has(key);
+
+      if (shouldDim && runStartX === null) {
+        runStartX = x;
+        continue;
+      }
+
+      if ((!shouldDim || !isInsideRow) && runStartX !== null) {
+        const runWidth = x - runStartX;
+
+        graphics
+          .rect(
+            transform.xOffset + runStartX * transform.scale,
+            transform.yOffset + y * transform.scale,
+            runWidth * transform.scale,
+            transform.scale,
+          )
+          .fill({ color: 0x020617, alpha: 0.48 });
+        runStartX = null;
+      }
+    }
+  }
+}
+
+function drawMovementClickFeedbackEvents({
+  currentTime,
+  events,
+  getCenterPosition,
+  graphics,
+  markerRadius,
+}: {
+  currentTime: number;
+  events: MovementClickFeedbackEvent[];
+  getCenterPosition: (position: Position) => Position;
+  graphics: Graphics;
+  markerRadius: number;
+}) {
+  for (const event of events) {
+    if (event.expiresAt <= currentTime) {
+      continue;
+    }
+
+    const duration = Math.max(1, event.expiresAt - event.createdAt);
+    const progress = Math.min(
+      1,
+      Math.max(0, (currentTime - event.createdAt) / duration),
+    );
+    const alpha = Math.max(0, 1 - progress);
+    const center = getCenterPosition(event.position);
+    const radius = markerRadius * (1 + progress * 0.18);
+    const slashOffset = radius * 0.6;
+
+    graphics
+      .circle(center.x, center.y, radius)
+      .fill({ color: 0x7f1d1d, alpha: 0.42 * alpha })
+      .stroke({ color: 0xf8fafc, alpha, width: Math.max(1, radius * 0.18) });
+    graphics
+      .moveTo(center.x - slashOffset, center.y + slashOffset)
+      .lineTo(center.x + slashOffset, center.y - slashOffset)
+      .stroke({ color: 0xf8fafc, alpha, width: Math.max(1, radius * 0.2) });
+  }
+}
+
 function drawPreviewMap(
   graphics: Graphics,
   map: GameMap,
@@ -4597,10 +4697,16 @@ function drawPreviewMap(
   {
     cameraOffset,
     cellPixelSize,
+    currentTime,
+    movementClickFeedbackEvents,
+    navigationClickAccessibility,
     viewportSize,
   }: {
     cameraOffset: Position;
     cellPixelSize: number;
+    currentTime: number;
+    movementClickFeedbackEvents: MovementClickFeedbackEvent[];
+    navigationClickAccessibility: NavigationClickAccessibility | null;
     viewportSize?: ViewportSize;
   },
 ) {
@@ -4625,6 +4731,8 @@ function drawPreviewMap(
       )
       .stroke({ color: 0xd9f99d, alpha: 0.55, width: 1 });
   }
+
+  drawPreviewInaccessibleCells(graphics, map, transform, navigationClickAccessibility);
 
   for (const wall of map.walls) {
     const wallPosition = toPreviewPosition(wall, transform);
@@ -4661,6 +4769,21 @@ function drawPreviewMap(
       .circle(entityPosition.x, entityPosition.y, entityRadius)
       .fill(getEntityColor(entity));
   }
+
+  drawMovementClickFeedbackEvents({
+    currentTime,
+    events: movementClickFeedbackEvents,
+    graphics,
+    getCenterPosition: (position) => {
+      const previewPosition = toPreviewPosition(position, transform);
+
+      return {
+        x: previewPosition.x + transform.scale / 2,
+        y: previewPosition.y + transform.scale / 2,
+      };
+    },
+    markerRadius: Math.max(5, transform.scale * 2.2),
+  });
 
   if (viewportSize) {
     const mapLeft = transform.xOffset;
@@ -4709,6 +4832,7 @@ function drawFullMap({
   layers,
   map,
   managedState,
+  movementClickFeedbackEvents,
   onPerformanceSample,
   partyIntent,
   questInspectMarkers,
@@ -4741,6 +4865,7 @@ function drawFullMap({
   layers: PixiRenderLayers;
   map: GameMap;
   managedState: ManagedRendererState;
+  movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
   questInspectMarkers: QuestInspectMarker[];
@@ -4908,6 +5033,13 @@ function drawFullMap({
     visibleTileBounds,
     questGiverHasWork,
   );
+  drawMovementClickFeedbackEvents({
+    currentTime,
+    events: movementClickFeedbackEvents,
+    graphics: overlayGraphics,
+    getCenterPosition: (position) => toFullPosition(position, transform),
+    markerRadius: Math.max(8, transform.cellPixelSize * 0.28),
+  });
   drawCompanionDragPreview(
     overlayGraphics,
     entities,
@@ -5068,6 +5200,8 @@ function drawWorld({
   map,
   managedState,
   mode,
+  movementClickFeedbackEvents,
+  navigationClickAccessibility,
   onPerformanceSample,
   partyIntent,
   fullHadTimedWorkRef,
@@ -5100,6 +5234,7 @@ function drawWorld({
       dropVisualEvents,
       enemyAoeChannelsByCasterId,
       entities,
+      movementClickFeedbackEvents,
       mode,
       skillBindsByEnemyId,
       skillMarksByEnemyId,
@@ -5119,6 +5254,7 @@ function drawWorld({
       entities,
       leaderIntent,
       map,
+      movementClickFeedbackEvents,
       partyIntent,
       questGiverHasWork,
       questInspectMarkers,
@@ -5167,6 +5303,7 @@ function drawWorld({
       layers,
       map,
       managedState,
+      movementClickFeedbackEvents,
       onPerformanceSample,
       partyIntent,
       questInspectMarkers,
@@ -5189,11 +5326,16 @@ function drawWorld({
 
   fullHadTimedWorkRef.current = false;
   fullSignatureRef.current = null;
+  const hasPreviewTimedWork = movementClickFeedbackEvents.some(
+    (event) => event.expiresAt > currentTime,
+  );
   const previewSignature = getPreviewRenderSignature({
     cameraOffset,
     cellPixelSize,
     entities,
     map,
+    movementClickFeedbackEvents,
+    navigationClickAccessibility,
     viewportSize,
   });
 
@@ -5201,8 +5343,8 @@ function drawWorld({
 
   if (
     shouldSkipStableRendererFrame({
-      hadTimedWork: false,
-      hasTimedWork: false,
+      hadTimedWork: movementClickFeedbackEvents.length > 0,
+      hasTimedWork: hasPreviewTimedWork,
       lastDrawnTextureRevision: lastDrawnTextureRevisionRef.current,
       signatureUnchanged: previewSignatureRef.current === previewSignature,
       textureRevision,
@@ -5221,6 +5363,9 @@ function drawWorld({
   drawPreviewMap(layers.overlayGraphics, map, entities, {
     cameraOffset,
     cellPixelSize,
+    currentTime,
+    movementClickFeedbackEvents,
+    navigationClickAccessibility,
     viewportSize,
   });
   finishPixiDrawMetrics(metrics, managedState, textureCache);
@@ -5238,6 +5383,7 @@ function hasActiveTimedRendererWork({
   dropVisualEvents,
   enemyAoeChannelsByCasterId,
   entities,
+  movementClickFeedbackEvents,
   mode,
   skillBindsByEnemyId,
   skillMarksByEnemyId,
@@ -5252,6 +5398,7 @@ function hasActiveTimedRendererWork({
   dropVisualEvents: DropVisualEvent[];
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
+  movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   mode: PixiRendererMode;
   skillBindsByEnemyId: Record<string, SkillBindState>;
   skillMarksByEnemyId: Record<string, SkillMarkState>;
@@ -5259,12 +5406,17 @@ function hasActiveTimedRendererWork({
   skillVisualEvents: SkillVisualEvent[];
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }): boolean {
+  const hasActiveMovementClickFeedback = movementClickFeedbackEvents.some(
+    (event) => event.expiresAt > currentTime,
+  );
+
   if (mode !== "full") {
-    return false;
+    return hasActiveMovementClickFeedback;
   }
 
   return (
     Boolean(activeTeleport) ||
+    hasActiveMovementClickFeedback ||
     combatProjectiles.length > 0 ||
     combatFeedbackEvents.some((event) => event.expiresAt > currentTime) ||
     dropVisualEvents.some((event) => event.expiresAt > currentTime) ||
@@ -5311,6 +5463,8 @@ export function PixiWorldRenderer({
   leaderIntent = null,
   map,
   mode = "preview",
+  movementClickFeedbackEvents = [],
+  navigationClickAccessibility = null,
   onCompanionDragCommand,
   onEnemyClick,
   onEntityHover,
@@ -5356,6 +5510,12 @@ export function PixiWorldRenderer({
   const latestMapRef = useRef(map);
   const latestEntitiesRef = useRef<GameEntity[]>(entities);
   const latestLeaderIntentRef = useRef<LeaderIntent | null>(leaderIntent);
+  const latestMovementClickFeedbackEventsRef = useRef(
+    movementClickFeedbackEvents,
+  );
+  const latestNavigationClickAccessibilityRef = useRef(
+    navigationClickAccessibility,
+  );
   const latestModeRef = useRef(mode);
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
@@ -5407,6 +5567,8 @@ export function PixiWorldRenderer({
     latestMapRef.current = map;
     latestEntitiesRef.current = sortedEntities;
     latestLeaderIntentRef.current = leaderIntent;
+    latestMovementClickFeedbackEventsRef.current = movementClickFeedbackEvents;
+    latestNavigationClickAccessibilityRef.current = navigationClickAccessibility;
     latestModeRef.current = mode;
     latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestPartyIntentRef.current = partyIntent;
@@ -5437,6 +5599,8 @@ export function PixiWorldRenderer({
     leaderIntent,
     map,
     mode,
+    movementClickFeedbackEvents,
+    navigationClickAccessibility,
     onPerformanceSample,
     partyIntent,
     questInspectMarkers,
@@ -5504,6 +5668,8 @@ export function PixiWorldRenderer({
         enemyAoeChannelsByCasterId:
           latestEnemyAoeChannelsByCasterIdRef.current,
         entities: latestEntitiesRef.current,
+        movementClickFeedbackEvents:
+          latestMovementClickFeedbackEventsRef.current,
         mode: latestModeRef.current,
         skillBindsByEnemyId: latestSkillBindsByEnemyIdRef.current,
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
@@ -5538,6 +5704,10 @@ export function PixiWorldRenderer({
         map: latestMapRef.current,
         managedState: managedStateRef.current,
         mode: latestModeRef.current,
+        movementClickFeedbackEvents:
+          latestMovementClickFeedbackEventsRef.current,
+        navigationClickAccessibility:
+          latestNavigationClickAccessibilityRef.current,
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
         fullHadTimedWorkRef,
@@ -5685,6 +5855,8 @@ export function PixiWorldRenderer({
     leaderIntent,
     map,
     mode,
+    movementClickFeedbackEvents,
+    navigationClickAccessibility,
     onPerformanceSample,
     partyIntent,
     questInspectMarkers,

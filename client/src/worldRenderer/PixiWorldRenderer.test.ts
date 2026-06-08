@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CombatFeedbackEvent, GameMap } from "../game";
+import type {
+  CombatFeedbackEvent,
+  GameMap,
+  NavigationClickAccessibility,
+} from "../game";
 import { createCompanion, createEnemy, createNpc, createResource, createTargetDummy } from "../game";
 import {
   collectCurrentMapScopedVisualTextureSrcs,
@@ -161,6 +165,60 @@ describe("getPreviewRenderSignature", () => {
       getPreviewRenderSignature({
         ...baseInput,
         cellPixelSize: 16,
+      }),
+    ).not.toBe(baseSignature);
+  });
+
+  it("changes when navigation click accessibility changes", () => {
+    const map = createWideMap();
+    const accessibility: NavigationClickAccessibility = {
+      columns: map.columns,
+      rows: map.rows,
+      reachableCellKeys: new Set(["1,1"]),
+    };
+    const baseInput = {
+      cameraOffset: { x: 0, y: 0 },
+      cellPixelSize: 32,
+      entities: [],
+      map,
+      navigationClickAccessibility: accessibility,
+      viewportSize: { width: 800, height: 600 },
+    };
+    const baseSignature = getPreviewRenderSignature(baseInput);
+
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        navigationClickAccessibility: {
+          ...accessibility,
+          reachableCellKeys: new Set(["1,1", "2,1"]),
+        },
+      }),
+    ).not.toBe(baseSignature);
+  });
+
+  it("changes while rejected movement-click feedback is active", () => {
+    const map = createWideMap();
+    const baseInput = {
+      cameraOffset: { x: 0, y: 0 },
+      cellPixelSize: 32,
+      entities: [],
+      map,
+      viewportSize: { width: 800, height: 600 },
+    };
+    const baseSignature = getPreviewRenderSignature(baseInput);
+
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        movementClickFeedbackEvents: [
+          {
+            id: "blocked-click",
+            position: { x: 4, y: 4 },
+            createdAt: 1000,
+            expiresAt: 1900,
+          },
+        ],
       }),
     ).not.toBe(baseSignature);
   });
@@ -369,6 +427,7 @@ function createFullRenderSignatureInput(
     entities: [companion],
     leaderIntent: null,
     map: createWideMap(),
+    movementClickFeedbackEvents: [],
     partyIntent: null,
     questGiverHasWork: false,
     questInspectMarkers: [],
@@ -467,6 +526,19 @@ describe("getFullRenderSignature", () => {
       getFullRenderSignature({
         ...input,
         suppressMovePoiRing: true,
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        movementClickFeedbackEvents: [
+          {
+            id: "blocked-click",
+            position: { x: 4, y: 4 },
+            createdAt: 1000,
+            expiresAt: 1900,
+          },
+        ],
       }),
     ).not.toBe(baseSignature);
     expect(

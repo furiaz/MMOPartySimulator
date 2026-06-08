@@ -7,10 +7,18 @@ import {
   createResource,
 } from ".";
 import {
+  createDebugMap,
+  createDebugMapForQuestState,
+  MAP_ONE_ID,
+} from "./debugMap";
+import {
+  buildNavigationClickAccessibility,
+  isNavigationClickAccessible,
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
 } from "./navigationClick";
 import { isActiveResourcePosition } from "./movementPlanning";
+import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import { createTestGameState } from "./testState";
 import type { GameMap, Position } from "./types";
 
@@ -87,6 +95,23 @@ describe("resolveNavigationClickTarget", () => {
     });
   });
 
+  it("does not snap distant unreachable clicks back to reachable floor", () => {
+    const state = createState({
+      map: createMap({
+        columns: 8,
+        walls: [
+          { x: 2, y: 0 },
+          { x: 2, y: 1 },
+          { x: 2, y: 2 },
+          { x: 2, y: 3 },
+          { x: 2, y: 4 },
+        ],
+      }),
+    });
+
+    expect(resolveNavigationClickTarget(state, { x: 6, y: 2 })).toBeNull();
+  });
+
   it("does not return occupied resources, live entities, or NPC positions", () => {
     const blockedPositions = [
       { x: 3, y: 2 },
@@ -133,6 +158,49 @@ describe("resolveNavigationClickTarget", () => {
     expect(resolveNavigationClickTarget(noLeaderState, { x: 1, y: 1 })).toBeNull();
     expect(resolveNavigationClickTarget(noMapState, { x: 1, y: 1 })).toBeNull();
     expect(resolveNavigationClickTarget(surroundedState, { x: 4, y: 3 })).toBeNull();
+  });
+
+  it("rejects map one Lower Shore clicks while the Secure the Landing gate is closed", () => {
+    const state = createState({
+      leaderPosition: { x: 7, y: 29 },
+      map: createDebugMap(MAP_ONE_ID),
+    });
+    const accessibility = buildNavigationClickAccessibility(state);
+
+    consumeGamePerformanceMetrics();
+
+    expect(isNavigationClickAccessible(accessibility, { x: 110, y: 29 })).toBe(
+      false,
+    );
+    expect(
+      resolveNavigationClickTarget(
+        state,
+        { x: 110, y: 29 },
+        accessibility,
+      ),
+    ).toBeNull();
+    expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(0);
+  });
+
+  it("allows map one Lower Shore clicks after the Secure the Landing gate opens", () => {
+    const state = createState({
+      leaderPosition: { x: 7, y: 29 },
+      map: createDebugMapForQuestState(MAP_ONE_ID, {
+        clear_the_shore: { status: "completed" },
+      }),
+    });
+    const accessibility = buildNavigationClickAccessibility(state);
+
+    expect(isNavigationClickAccessible(accessibility, { x: 110, y: 29 })).toBe(
+      true,
+    );
+    expect(
+      resolveNavigationClickTarget(
+        state,
+        { x: 110, y: 29 },
+        accessibility,
+      ),
+    ).toEqual({ x: 110, y: 29 });
   });
 });
 
