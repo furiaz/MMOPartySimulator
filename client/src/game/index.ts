@@ -154,6 +154,20 @@ export type {
 } from "./questTypes";
 export type { GameState } from "./state";
 export { createInitialGameState } from "./createInitialGameState";
+export {
+  SAVE_VERSION,
+  MAX_OFFLINE_FARMING_MS,
+  applyOfflineFarmingProgress,
+  createSavedGame,
+  restoreGameStateFromSave,
+  sanitizeGameStateForSave,
+  validateSavedGame,
+  type OfflineFarmingResourceSummary,
+  type OfflineFarmingSummary,
+  type RestoreSaveResult,
+  type SavedGame,
+  type SaveValidationResult,
+} from "./saveGame";
 
 export {
   createCompanion,

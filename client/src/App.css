@@ -15,6 +15,60 @@
   color: #1f2937;
 }
 
+.start-game-page {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(rgba(9, 18, 21, 0.42), rgba(9, 18, 21, 0.42)),
+    #6c982e;
+}
+
+.start-game-panel {
+  display: grid;
+  gap: 18px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--main-menu-panel-border);
+  background: rgba(9, 18, 21, 0.92);
+  color: var(--main-menu-panel-text);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.start-game-panel h1 {
+  margin: 0;
+  color: var(--main-menu-panel-accent-text);
+  font-size: 24px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.start-game-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.start-game-actions button {
+  min-height: 52px;
+  border-color: #3a5a60;
+  background: rgba(26, 42, 47, 0.72);
+  color: #e6f0f2;
+  font-weight: 900;
+}
+
+.start-game-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.save-status-text {
+  margin: 0;
+  color: var(--main-menu-panel-muted-text);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .game-panel {
   width: 100%;
   height: 100%;
@@ -171,6 +225,47 @@
   font-weight: 900;
   text-align: center;
   pointer-events: none;
+}
+
+.offline-summary-toast {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 12;
+  display: grid;
+  gap: 7px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--main-menu-panel-border);
+  background: rgba(9, 18, 21, 0.94);
+  color: var(--main-menu-panel-text);
+  box-shadow: var(--main-menu-panel-shadow);
+}
+
+.offline-summary-toast div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.offline-summary-toast strong {
+  color: var(--main-menu-panel-accent-text);
+  font-size: 14px;
+}
+
+.offline-summary-toast span,
+.offline-summary-toast p {
+  margin: 0;
+  color: var(--main-menu-panel-muted-text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.offline-summary-toast button {
+  justify-self: end;
+  min-width: 76px;
+  padding: 7px 10px;
 }
 
 .map-debug-toggle-controls {
@@ -901,7 +996,7 @@
 
 .game-menu-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid #3a5a60;
@@ -909,8 +1004,11 @@
 
 .game-menu-tabs button {
   min-width: 0;
+  min-height: 54px;
   padding: 9px 8px;
   overflow-wrap: anywhere;
+  font-weight: 800;
+  line-height: 1.12;
 }
 
 .game-menu-tabs button.active {
@@ -925,6 +1023,52 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px;
+}
+
+.options-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 220px;
+}
+
+.options-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.options-actions button,
+.import-save-button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 54px;
+  padding: 9px 8px;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.58);
+  color: #e6f0f2;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.12;
+  text-align: center;
+  cursor: pointer;
+}
+
+.import-save-button:hover {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+}
+
+.import-save-button input {
+  display: none;
+}
+
+.options-save-status {
+  margin: 0;
+  color: var(--main-menu-panel-muted-text);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .merchant-interaction {
@@ -2519,6 +2663,7 @@ button {
   }
 
   .game-menu-tabs,
+  .options-actions,
   .menu-split-layout,
   .compact-stat-grid,
   .full-stat-grid,

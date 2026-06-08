@@ -3,7 +3,8 @@ export type GameMenuTab =
   | "partyManagement"
   | "inventory"
   | "quests"
-  | "world";
+  | "world"
+  | "options";
 
 export type PartyMenuSection =
   | "stats"

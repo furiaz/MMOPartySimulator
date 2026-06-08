@@ -85,7 +85,9 @@ import {
   EQUIPMENT_TYPE_LABELS,
   QUEST_DEFINITIONS,
   acceptQuestFromQuestGiver,
+  applyOfflineFarmingProgress,
   finishReadyQuestsForQuestGiver,
+  createSavedGame,
   getPartyLeader,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
@@ -105,6 +107,7 @@ import {
   recordMerchantLockedForQuest,
   recordMerchantMenuSelected,
   resourceIds,
+  restoreGameStateFromSave,
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
   resolveWorldWipeRecoveryChoice,
@@ -144,6 +147,7 @@ import {
   type MerchantStockEntry,
   type MerchantStockGroup,
   type NpcEntity,
+  type OfflineFarmingSummary,
   type PartyMemberRole,
   type PrimaryStatId,
   type PoiConsideration,
@@ -160,6 +164,15 @@ import {
   type WorldWipeRecoveryChoice,
 } from "./game";
 import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
+import {
+  deleteLocalSave,
+  downloadSavedGame,
+  hasStoredSaveFile,
+  parseSavedGameText,
+  readLocalSave,
+  writeLocalSave,
+  writeLocalSaveFile,
+} from "./saveStorage";
 import {
   consumeGamePerformanceMetrics,
   type GamePerformanceMetrics,
@@ -1867,8 +1880,121 @@ function getDirectCommandFeedbackText(
   return "Direct command rejected.";
 }
 
+type AppMode = "start" | "playing";
+
+function StartScreen({
+  hasSaveFile,
+  statusMessage,
+  onContinue,
+  onNewGame,
+  onDeleteSave,
+}: {
+  hasSaveFile: boolean;
+  statusMessage: string | null;
+  onContinue: () => void;
+  onNewGame: () => void;
+  onDeleteSave: () => void;
+}) {
+  return (
+    <main className="game-page start-game-page">
+      <section className="start-game-panel" aria-label="Start game">
+        <h1>MMO Party Simulator</h1>
+        <div className="start-game-actions">
+          <button
+            disabled={!hasSaveFile}
+            onClick={onContinue}
+            type="button"
+          >
+            Continue
+          </button>
+          <button onClick={onNewGame} type="button">
+            New Game
+          </button>
+          <button
+            disabled={!hasSaveFile}
+            onClick={onDeleteSave}
+            type="button"
+          >
+            Delete Save File
+          </button>
+        </div>
+        {statusMessage ? (
+          <p className="save-status-text" role="status">
+            {statusMessage}
+          </p>
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+function OfflineSummaryToast({
+  summary,
+  onClose,
+}: {
+  summary: OfflineFarmingSummary;
+  onClose: () => void;
+}) {
+  const resourceText =
+    summary.resourcesAdded.length > 0
+      ? summary.resourcesAdded
+          .map((resource) => {
+            const item = getItemDefinition(resource.itemId);
+
+            return `${item.displayName} x${resource.quantity}`;
+          })
+          .join(", ")
+      : "None";
+
+  return (
+    <section className="offline-summary-toast" role="status">
+      <div>
+        <strong>Continue Summary</strong>
+        <span>{formatOfflineDuration(summary.creditedMs)}</span>
+      </div>
+      <p>{summary.subzoneName ?? "Saved subzone"}</p>
+      <p>
+        Enemies defeated: {summary.enemyKills}
+      </p>
+      <p>XP earned: {summary.xpGranted}</p>
+      <p>Gathered: {resourceText}</p>
+      {summary.skippedReason ? <p>{summary.skippedReason}</p> : null}
+      <button aria-label="Close Continue summary" onClick={onClose} type="button">
+        Close
+      </button>
+    </section>
+  );
+}
+
+function formatOfflineDuration(durationMs: number): string {
+  const minutes = Math.floor(durationMs / 60_000);
+  const seconds = Math.floor((durationMs % 60_000) / 1000);
+
+  if (minutes <= 0) {
+    return `${seconds}s credited`;
+  }
+
+  return `${minutes}m ${seconds}s credited`;
+}
+
+function getQuestStatuses(state: GameState): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(state.quests).map(([questId, quest]) => [
+      questId,
+      quest.status,
+    ]),
+  );
+}
+
 function App() {
+  const [appMode, setAppMode] = useState<AppMode>("start");
   const [gameState, setGameState] = useState<GameState>(createInitialGameState);
+  const [hasLocalSaveFile, setHasLocalSaveFile] = useState(hasStoredSaveFile);
+  const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(
+    null,
+  );
+  const [offlineSummary, setOfflineSummary] =
+    useState<OfflineFarmingSummary | null>(null);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(false);
   const [entityHoverTooltip, setEntityHoverTooltip] =
@@ -1930,6 +2056,10 @@ function App() {
     setVisualMovementByEntityId,
   ] = useState<Record<string, EntityVisualMovement>>({});
   const stopLoopRef = useRef<(() => void) | null>(null);
+  const latestGameStateRef = useRef(gameState);
+  const pendingSaveReasonRef = useRef<string | null>(null);
+  const previousSavedMapIdRef = useRef(gameState.currentMapId ?? HUB_MAP_ID);
+  const previousQuestStatusesRef = useRef(getQuestStatuses(gameState));
   const activeGuidePopupIdRef = useRef<GuidePopupId | null>(null);
   const viewedGuidePopupIdsRef = useRef(new Set<GuidePopupId>());
   const queuedGuidePopupIdsRef = useRef<GuidePopupId[]>([]);
@@ -1970,6 +2100,85 @@ function App() {
     setVisualMovementByEntityId({});
     setRendererResetNonce((currentValue) => currentValue + 1);
   }, []);
+  const writeCurrentSave = useCallback(
+    (
+      reason: string,
+      state: GameState = latestGameStateRef.current,
+      savedAtMs = Date.now(),
+    ) => {
+      const result = writeLocalSave(state, savedAtMs);
+
+      if (result.ok) {
+        setHasLocalSaveFile(true);
+        setSaveStatusMessage(
+          `${reason} at ${new Date(result.savedAtMs).toLocaleTimeString()}.`,
+        );
+        return true;
+      }
+
+      setSaveStatusMessage(`${reason} failed: ${result.reason}`);
+      return false;
+    },
+    [],
+  );
+  const queueSaveAfterStateChange = useCallback(
+    (reason: string) => {
+      if (appMode !== "playing") {
+        return;
+      }
+
+      pendingSaveReasonRef.current = reason;
+    },
+    [appMode],
+  );
+
+  useEffect(() => {
+    latestGameStateRef.current = gameState;
+
+    if (appMode !== "playing" || !pendingSaveReasonRef.current) {
+      return;
+    }
+
+    const reason = pendingSaveReasonRef.current;
+    pendingSaveReasonRef.current = null;
+    writeCurrentSave(reason, gameState);
+  }, [appMode, gameState, writeCurrentSave]);
+
+  useEffect(() => {
+    if (appMode !== "playing") {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      writeCurrentSave("Autosaved");
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [appMode, writeCurrentSave]);
+
+  useEffect(() => {
+    if (appMode !== "playing") {
+      return;
+    }
+
+    function saveBeforeSleep() {
+      writeCurrentSave("Autosaved before tab sleep");
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        saveBeforeSleep();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", saveBeforeSleep);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", saveBeforeSleep);
+    };
+  }, [appMode, writeCurrentSave]);
 
   const partyMembers = useMemo(
     () =>
@@ -2214,6 +2423,7 @@ function App() {
 
     const remainingMs = activeDungeonChest.autoContinueAtMs - Date.now();
     const timeoutId = window.setTimeout(() => {
+      queueSaveAfterStateChange("Dungeon chest continued");
       setGameState(continueSlimewardDungeonChest);
     }, Math.max(0, remainingMs));
 
@@ -2221,6 +2431,7 @@ function App() {
   }, [
     activeDungeonChest?.autoContinueAtMs,
     activeDungeonChest?.inventoryFull,
+    queueSaveAfterStateChange,
   ]);
   const previousInteractionMapIdRef = useRef(currentMap.id);
   const equipmentTutorialQuestStatus =
@@ -2255,6 +2466,180 @@ function App() {
     stopLoopRef.current = null;
     setIsSimulationRunning(false);
   }, []);
+
+  function resetUiForLoadedGame() {
+    setIsGameMenuOpen(false);
+    setActiveGameMenuTab(null);
+    setActiveMerchantNpcId(null);
+    setActiveMerchantPanel(null);
+    setMerchantResultMessage(null);
+    setActiveQuestGiverNpcId(null);
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+    setPendingNpcInteractionId(null);
+    setEntityHoverTooltip(null);
+    setDirectCommandFeedback(null);
+    releaseRendererCache();
+  }
+
+  function enterGameState(state: GameState) {
+    latestGameStateRef.current = state;
+    previousSavedMapIdRef.current = state.currentMapId ?? HUB_MAP_ID;
+    previousQuestStatusesRef.current = getQuestStatuses(state);
+    setGameState(state);
+    setAppMode("playing");
+    resetUiForLoadedGame();
+  }
+
+  function continueSavedGame() {
+    const loadedSave = readLocalSave();
+
+    if (!loadedSave.ok) {
+      setSaveStatusMessage(`Continue failed: ${loadedSave.reason}`);
+      setHasLocalSaveFile(false);
+      return;
+    }
+
+    const restored = restoreGameStateFromSave(loadedSave.save);
+
+    if (!restored.ok) {
+      setSaveStatusMessage(`Continue failed: ${restored.reason}`);
+      return;
+    }
+
+    const now = Date.now();
+    const offlineResult = loadedSave.save.offlineFarmingBlockedReason
+      ? {
+          state: restored.state,
+          summary: {
+            didApply: false,
+            creditedMs: Math.min(Math.max(0, now - restored.savedAtMs), 30 * 60_000),
+            enemyKills: 0,
+            xpGranted: 0,
+            resourcesAdded: [],
+            skippedReason: loadedSave.save.offlineFarmingBlockedReason,
+          },
+        }
+      : applyOfflineFarmingProgress(restored.state, restored.savedAtMs, now);
+    const saved = writeLocalSave(offlineResult.state, now);
+
+    if (!saved.ok) {
+      setSaveStatusMessage(`Continue save failed: ${saved.reason}`);
+      return;
+    }
+
+    stopSimulationLoop();
+    setOfflineSummary(offlineResult.summary);
+    setHasLocalSaveFile(true);
+    setSaveStatusMessage("Save loaded.");
+    enterGameState(offlineResult.state);
+  }
+
+  function startNewGame() {
+    if (
+      hasLocalSaveFile &&
+      !window.confirm("Start a new game and overwrite the current save file?")
+    ) {
+      return;
+    }
+
+    const nextState = createInitialGameState();
+    const saved = writeLocalSave(nextState, Date.now());
+
+    if (!saved.ok) {
+      setSaveStatusMessage(`New game save failed: ${saved.reason}`);
+      return;
+    }
+
+    stopSimulationLoop();
+    setOfflineSummary(null);
+    setHasLocalSaveFile(true);
+    setSaveStatusMessage("New game started.");
+    enterGameState(nextState);
+  }
+
+  function deleteSavedGame() {
+    if (!window.confirm("Delete the browser save file?")) {
+      return;
+    }
+
+    const result = deleteLocalSave();
+
+    if (!result.ok) {
+      setSaveStatusMessage(`Delete failed: ${result.reason}`);
+      return;
+    }
+
+    setHasLocalSaveFile(false);
+    setOfflineSummary(null);
+    setSaveStatusMessage("Save file deleted.");
+  }
+
+  function manualSave() {
+    writeCurrentSave("Manual save");
+  }
+
+  function exportSave() {
+    const now = Date.now();
+    const save = createSavedGame(latestGameStateRef.current, now);
+    const written = writeLocalSaveFile(save);
+
+    if (!written.ok) {
+      setSaveStatusMessage(`Export save failed: ${written.reason}`);
+      return;
+    }
+
+    downloadSavedGame(save);
+    setHasLocalSaveFile(true);
+    setSaveStatusMessage(
+      `Save exported at ${new Date(written.savedAtMs).toLocaleTimeString()}.`,
+    );
+  }
+
+  async function importSaveFile(file: File) {
+    try {
+      const importedText = await file.text();
+      const parsedSave = parseSavedGameText(importedText);
+
+      if (!parsedSave.ok) {
+        setSaveStatusMessage(`Import failed: ${parsedSave.reason}`);
+        return;
+      }
+
+      if (
+        appMode === "playing" &&
+        !window.confirm("Import this save and replace current progress?")
+      ) {
+        return;
+      }
+
+      const restored = restoreGameStateFromSave(parsedSave.save);
+
+      if (!restored.ok) {
+        setSaveStatusMessage(`Import failed: ${restored.reason}`);
+        return;
+      }
+
+      const now = Date.now();
+      const saved = writeLocalSave(restored.state, now);
+
+      if (!saved.ok) {
+        setSaveStatusMessage(`Import save failed: ${saved.reason}`);
+        return;
+      }
+
+      stopSimulationLoop();
+      setOfflineSummary(null);
+      setHasLocalSaveFile(true);
+      setSaveStatusMessage("Save imported.");
+      enterGameState(restored.state);
+    } catch (error) {
+      setSaveStatusMessage(
+        `Import failed: ${error instanceof Error ? error.message : "File could not be read."}`,
+      );
+    }
+  }
 
   const queueGuidePopup = useCallback((guidePopupId: GuidePopupId) => {
     if (
@@ -2352,6 +2737,42 @@ function App() {
     currentMap.id,
     pendingNpcInteractionId,
   ]);
+
+  useEffect(() => {
+    const mapId = gameState.currentMapId ?? currentMap.id ?? HUB_MAP_ID;
+    const previousMapId = previousSavedMapIdRef.current;
+    previousSavedMapIdRef.current = mapId;
+
+    if (appMode === "playing" && previousMapId !== mapId) {
+      writeCurrentSave("Map transition saved", gameState);
+    }
+  }, [appMode, currentMap.id, gameState, writeCurrentSave]);
+
+  useEffect(() => {
+    const nextQuestStatuses = getQuestStatuses(gameState);
+    const previousQuestStatuses = previousQuestStatusesRef.current;
+    previousQuestStatusesRef.current = nextQuestStatuses;
+
+    if (appMode !== "playing") {
+      return;
+    }
+
+    const shouldSaveQuestProgress = Object.entries(nextQuestStatuses).some(
+      ([questId, status]) => {
+        const previousStatus = previousQuestStatuses[questId];
+
+        return (
+          previousStatus &&
+          previousStatus !== status &&
+          (status === "ready_to_turn_in" || status === "completed")
+        );
+      },
+    );
+
+    if (shouldSaveQuestProgress) {
+      writeCurrentSave("Quest progress saved", gameState);
+    }
+  }, [appMode, gameState, writeCurrentSave]);
 
   useEffect(() => {
     if (!activeMerchantNpcId && !activeQuestGiverNpcId) {
@@ -2730,10 +3151,12 @@ function App() {
     entityId: string,
     role: PartyMemberRole,
   ) {
+    queueSaveAfterStateChange("Party role saved");
     setGameState((state) => setPartyMemberRole(state, entityId, role));
   }
 
   function changePartyLeader(companionId: string) {
+    queueSaveAfterStateChange("Party leader saved");
     setGameState((state) => {
       const companion = state.entities[companionId];
 
@@ -2852,6 +3275,7 @@ function App() {
     itemId: ItemId,
     targetSlot: EquipmentSlot,
   ) {
+    queueSaveAfterStateChange("Equipment saved");
     setGameState((state) =>
       equipItemToCompanion(state, companionId, itemId, targetSlot).state,
     );
@@ -2861,24 +3285,28 @@ function App() {
     companionId: string,
     targetSlot: EquipmentSlot,
   ) {
+    queueSaveAfterStateChange("Equipment saved");
     setGameState((state) =>
       unequipItemFromCompanion(state, companionId, targetSlot).state,
     );
   }
 
   function equipFlask(companionId: string, itemId: ItemId) {
+    queueSaveAfterStateChange("Flask saved");
     setGameState((state) =>
       equipFlaskToCompanion(state, companionId, itemId).state,
     );
   }
 
   function unequipFlask(companionId: string) {
+    queueSaveAfterStateChange("Flask saved");
     setGameState((state) =>
       unequipFlaskFromCompanion(state, companionId).state,
     );
   }
 
   function assignFood(companionId: string, itemId: ItemId | null) {
+    queueSaveAfterStateChange("Food assignment saved");
     setGameState((state) =>
       assignFoodToCompanion(state, companionId, itemId).state,
     );
@@ -2888,6 +3316,7 @@ function App() {
     companionId: string,
     update: ConsumableBehaviorUpdate,
   ) {
+    queueSaveAfterStateChange("Consumable behavior saved");
     setGameState((state) =>
       updateCompanionConsumableBehavior(state, companionId, update),
     );
@@ -2897,12 +3326,14 @@ function App() {
     companionId: string,
     update: SkillBehaviorUpdate,
   ) {
+    queueSaveAfterStateChange("Skill behavior saved");
     setGameState((state) =>
       updateCompanionSkillBehavior(state, companionId, update),
     );
   }
 
   function allocateStatPoint(companionId: string, statId: PrimaryStatId) {
+    queueSaveAfterStateChange("Stats saved");
     setGameState((state) => {
       const companion = state.entities[companionId];
 
@@ -2963,12 +3394,14 @@ function App() {
   }
 
   function setWorldTravelRoute(targetMapId: DebugMapId) {
+    queueSaveAfterStateChange("World travel route saved");
     setGameState((state) =>
       setAutoModeEnabled(setWorldTravelTargetMapId(state, targetMapId), true),
     );
   }
 
   function clearWorldTravelRoute() {
+    queueSaveAfterStateChange("World travel route saved");
     setGameState((state) => setWorldTravelTargetMapId(state, null));
   }
 
@@ -2982,6 +3415,7 @@ function App() {
     companionId: string,
     direction: "up" | "down",
   ) {
+    queueSaveAfterStateChange("Party order saved");
     setGameState((state) => {
       const orderedMembers = companionIds
         .map((id) => state.entities[id] as Companion | undefined)
@@ -3067,6 +3501,7 @@ function App() {
     const exchange = quickExchangeParts(selectedState, activeMerchantNpcId);
 
     if (exchange.result.status === "success") {
+      queueSaveAfterStateChange("Merchant exchange saved");
       setMerchantResultMessage(
         `Exchanged junk for ${exchange.result.totalExchangeValue} Crowns`,
       );
@@ -3087,6 +3522,7 @@ function App() {
     const purchase = buyMerchantItem(gameState, activeMerchantNpcId, itemId);
 
     if (purchase.result.status === "success") {
+      queueSaveAfterStateChange("Merchant purchase saved");
       setMerchantResultMessage(
         `Bought ${purchase.result.displayName} for ${purchase.result.priceCrowns} Crowns`,
       );
@@ -3122,6 +3558,7 @@ function App() {
         ? `Finished ${completedCount} quest${completedCount === 1 ? "" : "s"}`
         : "Inventory too full for quest rewards",
     );
+    queueSaveAfterStateChange("Quest rewards saved");
     setGameState(nextState);
   }
 
@@ -3130,6 +3567,7 @@ function App() {
       return;
     }
 
+    queueSaveAfterStateChange("Quest accepted saved");
     setGameState((state) =>
       acceptQuestFromQuestGiver(state, activeQuestGiverNpcId, questId),
     );
@@ -3142,9 +3580,15 @@ function App() {
   }
 
   function chooseWorldWipeRecoveryHub(hubId: string) {
+    queueSaveAfterStateChange("Recovery choice saved");
     setGameState((state) =>
       resolveWorldWipeRecoveryChoice(state, hubId, Date.now()),
     );
+  }
+
+  function closeDungeonChest() {
+    queueSaveAfterStateChange("Dungeon chest continued");
+    setGameState(closeSlimewardDungeonChestUi);
   }
 
   function toggleGameMenu() {
@@ -3417,6 +3861,18 @@ function App() {
     mapPixelWidth,
     viewportSize,
   ]);
+
+  if (appMode === "start") {
+    return (
+      <StartScreen
+        hasSaveFile={hasLocalSaveFile}
+        statusMessage={saveStatusMessage}
+        onContinue={continueSavedGame}
+        onDeleteSave={deleteSavedGame}
+        onNewGame={startNewGame}
+      />
+    );
+  }
 
   return (
     <main className="game-page">
@@ -3802,7 +4258,7 @@ function App() {
               </div>
               <button
                 className="dungeon-chest-continue"
-                onClick={() => setGameState(closeSlimewardDungeonChestUi)}
+                onClick={closeDungeonChest}
                 type="button"
               >
                 {activeDungeonChest.inventoryFull ? "Back" : "Continue"}
@@ -3864,8 +4320,18 @@ function App() {
               onUnequipEquipment={unequipEquipment}
               onUnequipFlask={unequipFlask}
               onMovePartyOrder={movePartyMemberOrder}
+              saveStatusMessage={saveStatusMessage}
+              onExportSave={exportSave}
+              onImportSaveFile={importSaveFile}
+              onManualSave={manualSave}
             />
           </Suspense>
+        ) : null}
+        {offlineSummary ? (
+          <OfflineSummaryToast
+            summary={offlineSummary}
+            onClose={() => setOfflineSummary(null)}
+          />
         ) : null}
         <CompanionVitalsPanel
           currentTime={currentTime}

@@ -57,6 +57,10 @@ export function GameMenu({
   onUnequipEquipment,
   onUnequipFlask,
   onMovePartyOrder,
+  saveStatusMessage,
+  onExportSave,
+  onImportSaveFile,
+  onManualSave,
 }: {
   activeTab: GameMenuTab | null;
   activeManagementSection: PartyManagementSection;
@@ -101,6 +105,10 @@ export function GameMenu({
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
   onUnequipFlask: (companionId: string) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
+  saveStatusMessage: string | null;
+  onExportSave: () => void;
+  onImportSaveFile: (file: File) => void | Promise<void>;
+  onManualSave: () => void;
 }) {
   return (
     <aside className="game-menu-panel" aria-label="Game menu">
@@ -139,6 +147,13 @@ export function GameMenu({
               type="button"
             >
               World Travel
+            </button>
+            <button
+              className={activeTab === "options" ? "active" : ""}
+              onClick={() => onSelectTab("options")}
+              type="button"
+            >
+              Options
             </button>
           </nav>
           {activeTab ? (
@@ -189,16 +204,67 @@ export function GameMenu({
                   selectedQuestId={selectedQuestId}
                   onSelectQuest={onSelectQuest}
                 />
-              ) : (
+              ) : activeTab === "world" ? (
                 <WorldPanel
                   currentMapId={currentMapId}
                   worldTravelTargetMapId={worldTravelTargetMapId}
                   onClearRoute={onClearWorldTravelRoute}
                   onSetRoute={onSetWorldTravelRoute}
                 />
+              ) : (
+                <OptionsPanel
+                  saveStatusMessage={saveStatusMessage}
+                  onExportSave={onExportSave}
+                  onImportSaveFile={onImportSaveFile}
+                  onManualSave={onManualSave}
+                />
               )}
             </div>
           ) : null}
     </aside>
+  );
+}
+
+function OptionsPanel({
+  saveStatusMessage,
+  onExportSave,
+  onImportSaveFile,
+  onManualSave,
+}: {
+  saveStatusMessage: string | null;
+  onExportSave: () => void;
+  onImportSaveFile: (file: File) => void | Promise<void>;
+  onManualSave: () => void;
+}) {
+  return (
+    <section className="options-panel" aria-label="Options">
+      <div className="options-actions">
+        <button onClick={onManualSave} type="button">
+          Manual Save
+        </button>
+        <button onClick={onExportSave} type="button">
+          Export Save
+        </button>
+        <label className="import-save-button">
+          Import Save
+          <input
+            accept="application/json,.json"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+
+              if (file) {
+                void onImportSaveFile(file);
+              }
+
+              event.currentTarget.value = "";
+            }}
+            type="file"
+          />
+        </label>
+      </div>
+      <p className="options-save-status">
+        {saveStatusMessage ?? "Autosave ready."}
+      </p>
+    </section>
   );
 }
