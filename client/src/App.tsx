@@ -2503,6 +2503,18 @@ function App() {
     releaseRendererCache();
   }
 
+  function resetGuidePopupState() {
+    activeGuidePopupIdRef.current = null;
+    viewedGuidePopupIdsRef.current = new Set();
+    queuedGuidePopupIdsRef.current = [];
+    isGuideSequenceActiveRef.current = false;
+    shouldResumeAfterGuideSequenceRef.current = false;
+    setActiveGuidePopupId(null);
+    setActiveGuidePanelIndex(0);
+    setViewedGuidePopupIds([]);
+    setQueuedGuidePopupIds([]);
+  }
+
   function enterGameState(state: GameState) {
     latestGameStateRef.current = state;
     previousSavedMapIdRef.current = state.currentMapId ?? HUB_MAP_ID;
@@ -2577,6 +2589,8 @@ function App() {
     setHasLocalSaveFile(true);
     setSaveStatusMessage("New game started.");
     enterGameState(nextState);
+    resetGuidePopupState();
+    queueGuidePopup("welcome");
   }
 
   function deleteSavedGame() {
@@ -2713,10 +2727,6 @@ function App() {
 
     return () => window.clearTimeout(timeoutId);
   }, [activeGuidePopupId, queuedGuidePopupIds, stopSimulationLoop]);
-
-  useEffect(() => {
-    queueGuidePopup("welcome");
-  }, [queueGuidePopup]);
 
   useEffect(() => {
     const previousStatus = previousEquipmentTutorialQuestStatusRef.current;
