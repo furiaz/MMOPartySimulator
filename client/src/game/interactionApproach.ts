@@ -59,6 +59,20 @@ export function resolveInteractionStandPosition(
   return null;
 }
 
+export function isInteractionStandPositionUsable(
+  state: GameState,
+  actor: GameEntity,
+  targetPosition: Position,
+  position: Position,
+  range: number,
+): boolean {
+  return (
+    getEuclideanDistance(position, targetPosition) <= range &&
+    isPositionAvailable(state, position, { ignoredEntityId: actor.id }) &&
+    !isReservedPosition(state, position, actor.id)
+  );
+}
+
 function getInteractionStandCandidates(
   state: GameState,
   actor: GameEntity,
@@ -71,8 +85,13 @@ function getInteractionStandCandidates(
 
   const candidates: Position[] = [];
 
-  for (let y = 0; y < state.map.rows; y += 1) {
-    for (let x = 0; x < state.map.columns; x += 1) {
+  const minX = Math.max(0, Math.floor(targetPosition.x - range));
+  const maxX = Math.min(state.map.columns - 1, Math.ceil(targetPosition.x + range));
+  const minY = Math.max(0, Math.floor(targetPosition.y - range));
+  const maxY = Math.min(state.map.rows - 1, Math.ceil(targetPosition.y + range));
+
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
       const position = { x, y };
 
       if (getEuclideanDistance(position, targetPosition) <= range) {
@@ -112,13 +131,14 @@ function isInteractionStandPositionReachable(
   options: InteractionStandOptions,
   maxDistance = state.map ? state.map.columns * state.map.rows * 2 : Number.POSITIVE_INFINITY,
 ): boolean {
-  if (getEuclideanDistance(position, targetPosition) > options.range) {
-    return false;
-  }
-
   if (
-    !isPositionAvailable(state, position, { ignoredEntityId: options.ignoredEntityId }) ||
-    isReservedPosition(state, position, options.ignoredEntityId)
+    !isInteractionStandPositionUsable(
+      state,
+      actor,
+      targetPosition,
+      position,
+      options.range,
+    )
   ) {
     return false;
   }

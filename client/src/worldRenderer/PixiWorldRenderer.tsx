@@ -412,8 +412,23 @@ type DrawWorldOptions = {
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 };
 
+type PreviewInaccessibleCellRun = {
+  width: number;
+  x: number;
+  y: number;
+};
+
+type PreviewInaccessibleCellRunCache = {
+  runs: PreviewInaccessibleCellRun[];
+  signature: string;
+};
+
 const fullModeInteractionRadius = 1.5;
 const staticMapRenderCacheByMap = new WeakMap<GameMap, StaticMapRenderCache>();
+const previewInaccessibleCellRunCacheByMap = new WeakMap<
+  GameMap,
+  PreviewInaccessibleCellRunCache
+>();
 const visibleFloorChunkCache = new Map<string, Position[]>();
 
 function getStaticMapRenderCache(map: GameMap): StaticMapRenderCache {
@@ -4602,12 +4617,34 @@ function drawPreviewInaccessibleCells(
   transform: PreviewTransform,
   accessibility: NavigationClickAccessibility | null,
 ) {
+  for (const run of getPreviewInaccessibleCellRuns(map, accessibility)) {
+    graphics
+      .rect(
+        transform.xOffset + run.x * transform.scale,
+        transform.yOffset + run.y * transform.scale,
+        run.width * transform.scale,
+        transform.scale,
+      )
+      .fill({ color: 0x020617, alpha: 0.48 });
+  }
+}
+
+function getPreviewInaccessibleCellRuns(
+  map: GameMap,
+  accessibility: NavigationClickAccessibility | null,
+): PreviewInaccessibleCellRun[] {
   if (
     !accessibility ||
     accessibility.columns !== map.columns ||
     accessibility.rows !== map.rows
   ) {
-    return;
+    return [];
+  }
+
+  const cached = previewInaccessibleCellRunCacheByMap.get(map);
+
+  if (cached?.signature === accessibility.signature) {
+    return cached.runs;
   }
 
   const wallKeys = new Set(
@@ -4615,6 +4652,7 @@ function drawPreviewInaccessibleCells(
       (position) => `${position.x},${position.y}`,
     ),
   );
+  const runs: PreviewInaccessibleCellRun[] = [];
 
   for (let y = 0; y < map.rows; y += 1) {
     let runStartX: number | null = null;
@@ -4635,20 +4673,22 @@ function drawPreviewInaccessibleCells(
       }
 
       if ((!shouldDim || !isInsideRow) && runStartX !== null) {
-        const runWidth = x - runStartX;
-
-        graphics
-          .rect(
-            transform.xOffset + runStartX * transform.scale,
-            transform.yOffset + y * transform.scale,
-            runWidth * transform.scale,
-            transform.scale,
-          )
-          .fill({ color: 0x020617, alpha: 0.48 });
+        runs.push({
+          width: x - runStartX,
+          x: runStartX,
+          y,
+        });
         runStartX = null;
       }
     }
   }
+
+  previewInaccessibleCellRunCacheByMap.set(map, {
+    runs,
+    signature: accessibility.signature,
+  });
+
+  return runs;
 }
 
 function drawMovementClickFeedbackEvents({

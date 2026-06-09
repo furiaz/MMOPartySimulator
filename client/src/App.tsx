@@ -109,6 +109,7 @@ import {
   resourceIds,
   restoreGameStateFromSave,
   buildNavigationClickAccessibility,
+  getNavigationClickCellKey,
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
   resolveWorldWipeRecoveryChoice,
@@ -141,6 +142,7 @@ import {
   type EquipmentSlot,
   type EquipmentStatModifiers,
   type GameEntity,
+  type GameMap,
   type GameState,
   type ItemDefinition,
   type ItemId,
@@ -259,6 +261,12 @@ type MovementClickFeedbackEvent = {
   position: Position;
   createdAt: number;
   expiresAt: number;
+};
+
+type NavigationClickAccessibilityCache = {
+  accessibility: NavigationClickAccessibility;
+  leaderId: string;
+  map: GameMap;
 };
 
 type MerchantPanel = "buy" | "sell";
@@ -2091,17 +2099,49 @@ function App() {
   });
   const rendererPerformanceRef = useRef(createRendererPerformanceAccumulator());
   const cameraMapIdRef = useRef<string | undefined>(undefined);
+  const navigationClickAccessibilityCacheRef =
+    useRef<NavigationClickAccessibilityCache | null>(null);
   const previousCameraFocusRef = useRef<Position | null>(null);
   const currentCrownBalance = getCurrencyBalance(gameState.wallet, "crowns");
   const previousCrownBalanceRef = useRef(currentCrownBalance);
   const currentMap = gameState.map ?? debugMap;
+  const navigationLeader = getPartyLeader(gameState);
+  const navigationLeaderCellKey = navigationLeader
+    ? getNavigationClickCellKey(navigationLeader.position)
+    : null;
+  const cachedNavigationClickAccessibility =
+    navigationClickAccessibilityCacheRef.current;
+  const navigationClickAccessibility =
+    cachedNavigationClickAccessibility &&
+    navigationLeader &&
+    navigationLeaderCellKey &&
+    cachedNavigationClickAccessibility.map === currentMap &&
+    cachedNavigationClickAccessibility.leaderId === navigationLeader.id &&
+    cachedNavigationClickAccessibility.accessibility.reachableCellKeys.has(
+      navigationLeaderCellKey,
+    )
+      ? cachedNavigationClickAccessibility.accessibility
+      : buildNavigationClickAccessibility(gameState);
+
+  if (
+    navigationClickAccessibility &&
+    navigationLeader &&
+    (!cachedNavigationClickAccessibility ||
+      cachedNavigationClickAccessibility.accessibility !==
+        navigationClickAccessibility)
+  ) {
+    navigationClickAccessibilityCacheRef.current = {
+      accessibility: navigationClickAccessibility,
+      leaderId: navigationLeader.id,
+      map: currentMap,
+    };
+  } else if (!navigationClickAccessibility || !navigationLeader) {
+    navigationClickAccessibilityCacheRef.current = null;
+  }
+
   const allEntities = useMemo(
     () => Object.values(gameState.entities),
     [gameState.entities],
-  );
-  const navigationClickAccessibility = useMemo(
-    () => buildNavigationClickAccessibility(gameState),
-    [gameState],
   );
   const handleRendererPerformanceSample = useCallback(
     (sample: PixiRendererPerformanceSample) => {
@@ -2211,7 +2251,7 @@ function App() {
     ? selectedCompanionId
     : partyMembers[0]?.id ?? null;
   const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
-  const leader = getPartyLeader(gameState);
+  const leader = navigationLeader;
   const hasPartyLeader = Boolean(leader);
   const enemies = useMemo(
     () =>
@@ -4012,7 +4052,6 @@ function App() {
               cellPixelSize={mapConstructionCellPixelSize}
               combatFeedbackEvents={gameState.combatFeedbackEvents}
               combatProjectiles={combatProjectiles}
-              currentTime={currentTime}
               directCompanionCommandsById={directCompanionCommandsById}
               dropVisualEvents={dropVisualEvents}
               enemyAoeChannelsByCasterId={enemyAoeChannelsByCasterId}
@@ -4057,7 +4096,6 @@ function App() {
               activeTeleport={activeTeleport}
               cameraOffset={terrainCameraOffset}
               cellPixelSize={mapConstructionCellPixelSize}
-              currentTime={currentTime}
               entities={allEntities}
               leaderIntent={gameState.leaderIntent}
               map={currentMap}

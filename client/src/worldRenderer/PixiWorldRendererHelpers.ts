@@ -1146,15 +1146,7 @@ function getRecordSignature<T>(
 function getNavigationClickAccessibilitySignature(
   accessibility: NavigationClickAccessibility | null | undefined,
 ): string {
-  if (!accessibility) {
-    return "";
-  }
-
-  return [
-    accessibility.columns,
-    accessibility.rows,
-    [...accessibility.reachableCellKeys].sort().join(";"),
-  ].join(":");
+  return accessibility?.signature ?? "";
 }
 
 function getEventSignature<T extends { id: string }>(

@@ -401,6 +401,7 @@ export {
 } from "./positionUtils";
 export {
   buildNavigationClickAccessibility,
+  getNavigationClickCellKey,
   isNavigationClickAccessible,
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,

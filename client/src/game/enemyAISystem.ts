@@ -55,6 +55,7 @@ const ROAM_TARGET_REACHED_DISTANCE = 0.1;
 const QUEST_PRESSURE_TARGET_REACHED_DISTANCE = 1;
 const ENEMY_WANDER_ATTEMPTS = 5;
 const WILD_ZONE_BACKGROUND_ACTIVITY_RADIUS = 28;
+const ENEMY_TARGET_REACHABILITY_CACHE_MS = 250;
 const WILD_ZONE_MAP_IDS = new Set([MAP_ONE_ID, MAP_TWO_ID, MAP_THREE_ID, MAP_FOUR_ID]);
 
 type TargetSearchResult = {
@@ -101,11 +102,16 @@ export function updateEnemyAISystem(
       ? getEntityById(nextState, entity.currentTargetId)
       : undefined;
 
-    if (
-      currentTarget &&
-      isValidEnemyTarget(currentTarget) &&
-      canKeepCurrentTarget(nextState, entity, currentTarget)
-    ) {
+    const targetRetention =
+      currentTarget && isValidEnemyTarget(currentTarget)
+        ? canKeepCurrentTarget(nextState, entity, currentTarget, timing.nowMs)
+        : null;
+
+    if (targetRetention) {
+      nextState = targetRetention.state;
+    }
+
+    if (currentTarget && targetRetention?.canKeep) {
       if (entity.state === "attack") {
         continue;
       }
@@ -735,22 +741,70 @@ function canKeepCurrentTarget(
   state: GameState,
   enemy: Enemy,
   target: AutonomousEntity,
-): boolean {
+  nowMs: number,
+): { canKeep: boolean; state: GameState } {
   if (
     !isInsideAttackLeash(enemy, target.position) &&
     getDistance(enemy.position, target.position) > ENEMY_COMBAT_RETAIN_RANGE
   ) {
-    return false;
+    return { canKeep: false, state };
   }
 
-  return (
-    getBoundedPathDistance(
-      state,
-      enemy,
-      target.position,
-      getTargetRetainPathDistance(state, enemy),
-    ) !== null
-  );
+  const maxDistance = getTargetRetainPathDistance(state, enemy);
+  const cacheKey = getTargetReachabilityCacheKey(state, enemy, target, maxDistance);
+  const cachedReachability =
+    state.enemyTargetReachabilityCacheByEnemyId?.[enemy.id];
+
+  if (
+    cachedReachability?.cacheKey === cacheKey &&
+    cachedReachability.expiresAtMs > nowMs
+  ) {
+    return { canKeep: cachedReachability.reachable, state };
+  }
+
+  const reachable =
+    getBoundedPathDistance(state, enemy, target.position, maxDistance) !== null;
+
+  return {
+    canKeep: reachable,
+    state: setEnemyTargetReachabilityCache(state, enemy.id, {
+      cacheKey,
+      expiresAtMs: nowMs + ENEMY_TARGET_REACHABILITY_CACHE_MS,
+      reachable,
+    }),
+  };
+}
+
+function setEnemyTargetReachabilityCache(
+  state: GameState,
+  enemyId: string,
+  cacheEntry: NonNullable<
+    GameState["enemyTargetReachabilityCacheByEnemyId"]
+  >[string],
+): GameState {
+  return {
+    ...state,
+    enemyTargetReachabilityCacheByEnemyId: {
+      ...(state.enemyTargetReachabilityCacheByEnemyId ?? {}),
+      [enemyId]: cacheEntry,
+    },
+  };
+}
+
+function getTargetReachabilityCacheKey(
+  state: GameState,
+  enemy: Enemy,
+  target: AutonomousEntity,
+  maxDistance: number,
+): string {
+  return [
+    state.map?.id ?? state.map?.debugName ?? state.currentMapId ?? "no-map",
+    enemy.id,
+    target.id,
+    getPositionPathKey(enemy.position),
+    getPositionPathKey(target.position),
+    maxDistance,
+  ].join(":");
 }
 
 function getTargetRetainPathDistance(state: GameState, enemy: Enemy): number {

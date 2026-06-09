@@ -156,6 +156,9 @@ export type LocalPoiTarget = {
   mapId: DebugMapId;
   position: Position;
   interactionRange?: number;
+  interactionStandActorId?: string;
+  interactionStandPosition?: Position;
+  interactionStandTargetPosition?: Position;
   targetEntityId?: string;
   questId?: QuestId;
   objectiveId?: string;

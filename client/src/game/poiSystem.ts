@@ -2,7 +2,10 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getSlimewardDungeonPoiTarget } from "./dungeonSystem";
 import { HUB_MAP_ID } from "./debugMap";
 import { getQuickExchangeItems, quickExchangeParts } from "./merchant";
-import { resolveInteractionStandPosition } from "./interactionApproach";
+import {
+  isInteractionStandPositionUsable,
+  resolveInteractionStandPosition,
+} from "./interactionApproach";
 import {
   getPartyLeader,
   hasDeadPartyMembers,
@@ -108,26 +111,34 @@ export function updatePoiSystem(
     return applyLocalTargetToPartyIntent(nextState, dungeonPoiTarget);
   }
 
+  let interactionState = clearReachedWorldTravelTarget(
+    updateReachedPoiInteractions(state),
+  );
+  interactionState = recordLockedMerchantPoiIfNeeded(interactionState);
+
+  const interactionLeader = getPartyLeader(interactionState);
   const gathererReservations = createGathererResourceReservations(
-    state,
+    interactionState,
     resourceWorkContext,
   );
 
-  if (canReuseWildPoiSelection(state, leader, gathererReservations)) {
-    const localPoiTarget = refreshLocalPoiTarget(state, state.localPoiTarget);
+  if (
+    interactionLeader &&
+    canReusePoiSelection(interactionState, interactionLeader, gathererReservations)
+  ) {
+    const localPoiTarget = refreshLocalPoiTarget(
+      interactionState,
+      interactionState.localPoiTarget,
+    );
     return applyLocalTargetToPartyIntent(
       {
-        ...state,
+        ...interactionState,
         localPoiTarget,
       },
       localPoiTarget,
     );
   }
 
-  let interactionState = clearReachedWorldTravelTarget(
-    updateReachedPoiInteractions(state),
-  );
-  interactionState = recordLockedMerchantPoiIfNeeded(interactionState);
   const globalPoiIntent = getGlobalPoiIntent(interactionState);
   const selection = selectPoiTarget(
     interactionState,
@@ -166,13 +177,17 @@ export function updatePoiSystem(
   return recordSkippedPois(nextState, selection.skippedReasons);
 }
 
-function canReuseWildPoiSelection(
+function canReusePoiSelection(
   state: GameState,
   leader: { position: Position },
   gathererReservations: GathererResourceReservations,
 ): state is GameState & { localPoiTarget: LocalPoiTarget } {
-  if (state.currentMapId === HUB_MAP_ID || !state.localPoiTarget) {
+  if (!state.localPoiTarget) {
     return false;
+  }
+
+  if (state.currentMapId === HUB_MAP_ID) {
+    return canReuseHubInteractionPoiSelection(state, state.localPoiTarget, leader);
   }
 
   const evaluatedAtMs = state.lastPoiDecision?.evaluatedAtMs;
@@ -224,6 +239,29 @@ function canReuseWildPoiSelection(
   return (
     getDistance(leader.position, state.localPoiTarget.position) >
     getLocalTargetInteractionRange(state.localPoiTarget)
+  );
+}
+
+function canReuseHubInteractionPoiSelection(
+  state: GameState,
+  target: LocalPoiTarget,
+  leader: { position: Position },
+): boolean {
+  return (
+    isInteractionPoiTarget(target) &&
+    isLocalPoiTargetStillValid(state, target) &&
+    isQuestLinkedPoiStillRelevant(state, target) &&
+    getDistance(leader.position, target.position) >
+      getLocalTargetInteractionRange(target)
+  );
+}
+
+function isInteractionPoiTarget(target: LocalPoiTarget): boolean {
+  return (
+    target.category !== "combat" &&
+    target.category !== "resource" &&
+    target.category !== "teleport" &&
+    Boolean(target.interactionRange)
   );
 }
 
@@ -542,21 +580,23 @@ function applyLocalTargetToPartyIntent(
     ? getEntityById(state, localTarget.targetEntityId)
     : undefined;
   const baseTargetPosition = targetEntity?.position ?? localTarget.position;
-  const targetPosition = leader
-    ? getLocalTargetMovementPosition(
+  const movementTarget = leader
+    ? getLocalTargetMovementTarget(
         state,
         leader,
         localTarget,
         baseTargetPosition,
       )
-    : baseTargetPosition;
+    : { localTarget, position: baseTargetPosition };
+  const resolvedLocalTarget = movementTarget.localTarget;
   const executionIntent = {
-    type: getPoiExecutionIntentType(localTarget.category),
+    type: getPoiExecutionIntentType(resolvedLocalTarget.category),
     targetId:
-      localTarget.category === "combat" || localTarget.category === "resource"
-        ? localTarget.targetEntityId ?? null
+      resolvedLocalTarget.category === "combat" ||
+      resolvedLocalTarget.category === "resource"
+        ? resolvedLocalTarget.targetEntityId ?? null
         : null,
-    targetPosition,
+    targetPosition: movementTarget.position,
     source: "ai" as const,
   };
   const nextState = setPartyIntent(state, {
@@ -564,7 +604,7 @@ function applyLocalTargetToPartyIntent(
     source: "ai",
     executionIntent,
     globalPoiIntent: state.globalPoiIntent,
-    localPoiTarget: localTarget,
+    localPoiTarget: resolvedLocalTarget,
     worldTravelTargetMapId: state.worldTravelTargetMapId,
     lastPoiDecision: state.lastPoiDecision,
     queuedIntent: state.partyIntent?.queuedIntent ?? null,
@@ -587,38 +627,68 @@ function applyLocalTargetToPartyIntent(
 
   return updateEntity(nextState, {
     ...currentLeader,
-    state: localTarget.category === "combat" ? "attack" : "follow",
+    state: resolvedLocalTarget.category === "combat" ? "attack" : "follow",
     currentTargetId:
-      localTarget.category === "combat"
-        ? localTarget.targetEntityId ?? null
+      resolvedLocalTarget.category === "combat"
+        ? resolvedLocalTarget.targetEntityId ?? null
         : null,
     commandPriority: "autonomous",
   });
 }
 
-function getLocalTargetMovementPosition(
+function getLocalTargetMovementTarget(
   state: GameState,
   leader: GameEntity,
   localTarget: LocalPoiTarget,
   targetPosition: Position,
-): Position {
-  if (
-    localTarget.category === "combat" ||
-    localTarget.category === "resource" ||
-    localTarget.category === "teleport" ||
-    !localTarget.interactionRange
-  ) {
-    return targetPosition;
+): { localTarget: LocalPoiTarget; position: Position } {
+  const interactionRange = localTarget.interactionRange;
+
+  if (!isInteractionPoiTarget(localTarget) || interactionRange === undefined) {
+    return { localTarget, position: targetPosition };
   }
 
-  return (
-    resolveInteractionStandPosition(
+  if (
+    localTarget.interactionStandActorId === leader.id &&
+    localTarget.interactionStandPosition &&
+    localTarget.interactionStandTargetPosition &&
+    arePositionsEqual(localTarget.interactionStandTargetPosition, targetPosition) &&
+    isInteractionStandPositionUsable(
       state,
       leader,
       targetPosition,
-      localTarget.interactionRange,
-    ) ?? targetPosition
+      localTarget.interactionStandPosition,
+      interactionRange,
+    )
+  ) {
+    return {
+      localTarget,
+      position: localTarget.interactionStandPosition,
+    };
+  }
+
+  const interactionStandPosition = resolveInteractionStandPosition(
+    state,
+    leader,
+    targetPosition,
+    interactionRange,
   );
+
+  if (!interactionStandPosition) {
+    return { localTarget, position: targetPosition };
+  }
+
+  const resolvedLocalTarget = {
+    ...localTarget,
+    interactionStandActorId: leader.id,
+    interactionStandPosition,
+    interactionStandTargetPosition: targetPosition,
+  };
+
+  return {
+    localTarget: resolvedLocalTarget,
+    position: interactionStandPosition,
+  };
 }
 
 function applyActivePartyThreatToPartyIntent(
@@ -803,4 +873,8 @@ function clearAiPoiSelectionForResurrection(state: GameState): GameState {
 
 function getDistance(first: Position, second: Position): number {
   return Math.hypot(first.x - second.x, first.y - second.y);
+}
+
+function arePositionsEqual(first: Position, second: Position): boolean {
+  return first.x === second.x && first.y === second.y;
 }

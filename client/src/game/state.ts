@@ -87,6 +87,12 @@ type AttackSlotCacheEntry = {
   usesPartyPassThrough: boolean;
 };
 
+type EnemyTargetReachabilityCacheEntry = {
+  cacheKey: string;
+  expiresAtMs: number;
+  reachable: boolean;
+};
+
 export type InterruptedPoiTarget = {
   interruptedByEnemyId: string;
   mapId?: DebugMapId;
@@ -165,6 +171,10 @@ export type GameState = {
   reservedPositionsByEntityId?: Record<string, Position>;
   movementPathsByEntityId?: Record<string, MovementPath>;
   attackSlotCacheByEntityId?: Record<string, AttackSlotCacheEntry>;
+  enemyTargetReachabilityCacheByEnemyId?: Record<
+    string,
+    EnemyTargetReachabilityCacheEntry
+  >;
   movementDecisionsByEntityId?: Record<string, DebugNavigationReason>;
   defenderWaitTicksByLeaderId?: Record<string, number>;
   defenderBlockedTicksByEntityId?: Record<string, number>;

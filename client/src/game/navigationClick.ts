@@ -21,11 +21,16 @@ export type NavigationClickAccessibility = {
   columns: number;
   rows: number;
   reachableCellKeys: Set<string>;
+  signature: string;
 };
 
 export type NavigationClickResolveOptions = {
   fallbackRadius?: number;
 };
+
+export function getNavigationClickCellKey(position: Position): string {
+  return getNavigationPositionKey(toNavigationNode(position));
+}
 
 export function buildNavigationClickAccessibility(
   state: GameState,
@@ -44,6 +49,11 @@ export function buildNavigationClickAccessibility(
       columns: map.columns,
       rows: map.rows,
       reachableCellKeys: new Set(),
+      signature: getNavigationClickAccessibilitySignature(
+        map.columns,
+        map.rows,
+        new Set(),
+      ),
     };
   }
 
@@ -80,7 +90,20 @@ export function buildNavigationClickAccessibility(
     columns: map.columns,
     rows: map.rows,
     reachableCellKeys,
+    signature: getNavigationClickAccessibilitySignature(
+      map.columns,
+      map.rows,
+      reachableCellKeys,
+    ),
   };
+}
+
+function getNavigationClickAccessibilitySignature(
+  columns: number,
+  rows: number,
+  reachableCellKeys: Set<string>,
+): string {
+  return `${columns}x${rows}:${[...reachableCellKeys].sort().join(";")}`;
 }
 
 export function isNavigationClickAccessible(

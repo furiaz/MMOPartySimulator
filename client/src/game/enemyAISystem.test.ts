@@ -13,6 +13,7 @@ import {
   PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
   type GameState,
 } from "./state";
+import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, GameMap, Position } from "./types";
 
@@ -119,6 +120,124 @@ describe("enemy AI aggro and roaming", () => {
       targetDecisionReason: "unreachable",
     });
     expect(nextState.combatFeedbackEvents).toHaveLength(0);
+  });
+
+  it("reuses current-target reachability across short retention ticks", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 2 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 2 }, "aggressive"),
+      currentTargetId: leader.id,
+      state: "attack" as const,
+    };
+    const state = createState([leader, enemy], {
+      map: createAggroTestMap([]),
+    });
+
+    consumeGamePerformanceMetrics();
+    const firstState = updateEnemyAISystem(state, {
+      nowMs: 1_000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+    const firstMetrics = consumeGamePerformanceMetrics();
+
+    const secondState = updateEnemyAISystem(firstState, {
+      nowMs: 1_100,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 2,
+    });
+    const secondMetrics = consumeGamePerformanceMetrics();
+
+    expect(firstMetrics.pathDistanceQueries).toBe(1);
+    expect(secondMetrics.pathDistanceQueries).toBe(0);
+    expect(secondState.entities[enemy.id]).toMatchObject({
+      currentTargetId: leader.id,
+      state: "attack",
+    });
+  });
+
+  it("invalidates current-target reachability when the enemy cell changes", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 2 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 2 }, "aggressive"),
+      currentTargetId: leader.id,
+      state: "attack" as const,
+    };
+    const state = createState([leader, enemy], {
+      map: createAggroTestMap([]),
+    });
+    const firstState = updateEnemyAISystem(state, {
+      nowMs: 1_000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+    const movedEnemyState = {
+      ...firstState,
+      entities: {
+        ...firstState.entities,
+        [enemy.id]: {
+          ...firstState.entities[enemy.id],
+          position: { x: 2, y: 2 },
+        },
+      },
+    };
+
+    consumeGamePerformanceMetrics();
+    updateEnemyAISystem(movedEnemyState, {
+      nowMs: 1_100,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 2,
+    });
+
+    expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(1);
+  });
+
+  it("expires current-target reachability so blocked targets can clear", () => {
+    const leader = createIdleCompanion("leader", { x: 3, y: 2 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 2 }, "aggressive"),
+      currentTargetId: leader.id,
+      state: "attack" as const,
+    };
+    const state = createState([leader, enemy], {
+      map: createAggroTestMap([]),
+    });
+    const firstState = updateEnemyAISystem(state, {
+      nowMs: 1_000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+    const blockedState = {
+      ...firstState,
+      map: createAggroTestMap(createVerticalWall(2, 0, 4)),
+    };
+
+    const cachedState = updateEnemyAISystem(blockedState, {
+      nowMs: 1_100,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 2,
+    });
+    const expiredState = updateEnemyAISystem(cachedState, {
+      nowMs: 1_300,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 3,
+    });
+
+    expect(cachedState.entities[enemy.id]).toMatchObject({
+      currentTargetId: leader.id,
+      state: "attack",
+    });
+    expect(expiredState.entities[enemy.id]).toMatchObject({
+      currentTargetId: null,
+      state: "idle",
+    });
   });
 
   it("acquires a companion through a reachable corridor inside detection range", () => {

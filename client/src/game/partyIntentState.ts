@@ -215,6 +215,12 @@ function cloneLocalPoiTarget(
     ? {
         ...localPoiTarget,
         position: { ...localPoiTarget.position },
+        interactionStandPosition: localPoiTarget.interactionStandPosition
+          ? { ...localPoiTarget.interactionStandPosition }
+          : undefined,
+        interactionStandTargetPosition: localPoiTarget.interactionStandTargetPosition
+          ? { ...localPoiTarget.interactionStandTargetPosition }
+          : undefined,
       }
     : null;
 }

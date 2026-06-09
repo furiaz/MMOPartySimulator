@@ -202,6 +202,37 @@ describe("resolveNavigationClickTarget", () => {
       ),
     ).toEqual({ x: 110, y: 29 });
   });
+
+  it("builds stable accessibility signatures that change when gate reachability changes", () => {
+    const closedGateState = createState({
+      leaderPosition: { x: 7, y: 29 },
+      map: createDebugMap(MAP_ONE_ID),
+    });
+    const sameClosedGateState = createState({
+      leaderPosition: { x: 7, y: 29 },
+      map: createDebugMap(MAP_ONE_ID),
+    });
+    const openedGateState = createState({
+      leaderPosition: { x: 7, y: 29 },
+      map: createDebugMapForQuestState(MAP_ONE_ID, {
+        clear_the_shore: { status: "completed" },
+      }),
+    });
+
+    const closedAccessibility =
+      buildNavigationClickAccessibility(closedGateState);
+    const sameClosedAccessibility =
+      buildNavigationClickAccessibility(sameClosedGateState);
+    const openedAccessibility =
+      buildNavigationClickAccessibility(openedGateState);
+
+    expect(closedAccessibility?.signature).toBe(
+      sameClosedAccessibility?.signature,
+    );
+    expect(openedAccessibility?.signature).not.toBe(
+      closedAccessibility?.signature,
+    );
+  });
 });
 
 describe("resolveNpcInteractionApproachTarget", () => {

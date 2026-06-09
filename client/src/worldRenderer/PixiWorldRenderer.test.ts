@@ -175,6 +175,7 @@ describe("getPreviewRenderSignature", () => {
       columns: map.columns,
       rows: map.rows,
       reachableCellKeys: new Set(["1,1"]),
+      signature: "160x30:1,1",
     };
     const baseInput = {
       cameraOffset: { x: 0, y: 0 },
@@ -191,7 +192,17 @@ describe("getPreviewRenderSignature", () => {
         ...baseInput,
         navigationClickAccessibility: {
           ...accessibility,
+          reachableCellKeys: new Set(["9,9"]),
+        },
+      }),
+    ).toBe(baseSignature);
+    expect(
+      getPreviewRenderSignature({
+        ...baseInput,
+        navigationClickAccessibility: {
+          ...accessibility,
           reachableCellKeys: new Set(["1,1", "2,1"]),
+          signature: "160x30:1,1;2,1",
         },
       }),
     ).not.toBe(baseSignature);
