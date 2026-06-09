@@ -173,9 +173,91 @@ describe("beginner skill system", () => {
     ).toBe(true);
   });
 
-  it("records skipped skills with reasons while recording is active", () => {
+  it("suppresses out-of-context attack no-target skips while keeping utility skips", () => {
     const fighter = createBeginner("fighter", "fighter", { x: 0, y: 0 });
     const state = startDebugTelemetryRecording(createSkillState([fighter]));
+
+    const nextState = updateSkillSystem(state, 1000);
+    const events = nextState.debugTelemetry?.events ?? [];
+
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "throw_rock" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(false);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "kick" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(false);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "first_aid" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "guard_up" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "deep_breath" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "rally_call" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "field_hands" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "skill_skipped" &&
+          event.skillId === "quick_step" &&
+          event.reason === "no_target",
+      ),
+    ).toBe(true);
+  });
+
+  it("records attack no-target skips when enemy context exists", () => {
+    const defender = createBeginner("defender", "defender", { x: 0, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: defender.id,
+    };
+    const state = startDebugTelemetryRecording(
+      createSkillState([defender, enemy], {
+        ...createActiveShield(defender.id),
+      }),
+    );
 
     const nextState = updateSkillSystem(state, 1000);
 
@@ -216,7 +298,7 @@ describe("beginner skill system", () => {
           event.entityId === fighter.id &&
           event.reason === "global_cooldown",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       nextState.debugTelemetry?.events.some(
         (event) => event.type === "skill_selected" && event.entityId === fighter.id,
@@ -277,7 +359,7 @@ describe("beginner skill system", () => {
         (event) =>
           event.type === "skill_skipped" &&
           event.entityId === fighter.id &&
-          event.skillId === "throw_rock" &&
+          event.skillId === "quick_step" &&
           event.reason === "no_target",
       ) ?? [];
 

@@ -13,6 +13,7 @@ import { isBeginnerFirstAidSelfHealPriorityUse } from "./skillBehavior";
 import { getSkillTarget } from "./skillTargeting";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
+import { getPartyCombatTarget } from "./partyTargetSystem";
 import {
   isCompanionGlobalCooldownActive,
   isSkillCooldownActive,
@@ -29,6 +30,7 @@ const OPENING_LUNGE_SCORE_BONUS = 10;
 const BEGINNER_FIRST_AID_SELF_HEAL_SCORE_BONUS = 20;
 const NORMAL_SKILL_SELECTION_PRIORITY = 0;
 const EMERGENCY_SKILL_SELECTION_PRIORITY = 1;
+const ATTACK_SKILL_TELEMETRY_CONTEXT_RANGE = 5;
 
 type SkillUseOptions = {
   now: number;
@@ -46,10 +48,6 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
       isLivingCompanion(caster) &&
       isCompanionGlobalCooldownActive(nextState, caster.id, now)
     ) {
-      nextState = recordSkillTelemetry(nextState, caster, {
-        type: "skill_skipped",
-        reason: "global_cooldown",
-      });
       continue;
     }
 
@@ -84,12 +82,6 @@ export function updateCombatSkillSystem(
       isLivingCompanion(caster) &&
       isCompanionGlobalCooldownActive(nextState, caster.id, now)
     ) {
-      if (hasCombatSkillContext(nextState, caster)) {
-        nextState = recordSkillTelemetry(nextState, caster, {
-          type: "skill_skipped",
-          reason: "global_cooldown",
-        });
-      }
       continue;
     }
 
@@ -251,11 +243,17 @@ function chooseSkillUse(
       });
 
       if (!target) {
-        nextState = recordSkillTelemetry(nextState, caster, {
-          type: "skill_skipped",
-          skill,
-          reason: getSkillTargetSkipReason(state, caster, skill),
-        });
+        const reason = getSkillTargetSkipReason(state, caster, skill);
+
+        if (
+          !shouldSuppressSkillSkipTelemetry(state, caster, skill, reason, options)
+        ) {
+          nextState = recordSkillTelemetry(nextState, caster, {
+            type: "skill_skipped",
+            skill,
+            reason,
+          });
+        }
         return null;
       }
 
@@ -429,6 +427,69 @@ function applySkill(
 
 function isCombatSkill(skill: SkillDefinition): boolean {
   return skill.effect.type !== "gatherBuff";
+}
+
+function shouldSuppressSkillSkipTelemetry(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  reason: string,
+  options: SkillUseOptions,
+): boolean {
+  return (
+    reason === "no_target" &&
+    isAttackRelatedEnemySkill(skill) &&
+    !hasAttackSkillTelemetryContext(state, caster, skill, options)
+  );
+}
+
+function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
+  switch (skill.effect.type) {
+    case "damage":
+    case "lungeDamage":
+    case "sweepingDamage":
+    case "taunt":
+    case "mark":
+    case "bind":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function hasAttackSkillTelemetryContext(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillUseOptions,
+): boolean {
+  const currentTarget = caster.currentTargetId
+    ? state.entities[caster.currentTargetId]
+    : undefined;
+
+  if (isLivingEnemy(currentTarget)) {
+    return true;
+  }
+
+  const forcedTarget = options.forcedEnemyTargetId
+    ? state.entities[options.forcedEnemyTargetId]
+    : undefined;
+
+  if (isLivingEnemy(forcedTarget)) {
+    return true;
+  }
+
+  if (getPartyCombatTarget(state)) {
+    return true;
+  }
+
+  const nearbyRange = Math.max(skill.range, ATTACK_SKILL_TELEMETRY_CONTEXT_RANGE);
+
+  return Object.values(state.entities).some(
+    (entity) =>
+      isLivingEnemy(entity) &&
+      getGridDistance(caster.position, entity.position) <= nearbyRange,
+  );
 }
 
 function getSkillCooldownMs(skill: SkillDefinition): number {
