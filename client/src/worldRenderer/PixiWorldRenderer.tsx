@@ -594,13 +594,33 @@ function getMapTrackedTextureSourceCount(textureCache: TextureCache): number {
   return sources.size;
 }
 
+function destroyManagedTextEntry(entry: ManagedTextEntry) {
+  entry.text.parent?.removeChild(entry.text);
+
+  try {
+    entry.text.destroy();
+  } catch {
+    // Pixi can throw while returning canvas text textures; keep the frame alive.
+  }
+}
+
+function destroyPixiApplication(app: Application) {
+  app.canvas.parentElement?.removeChild(app.canvas);
+
+  try {
+    app.destroy(true, { children: true });
+  } catch {
+    // Pixi can throw while tearing down its canvas text system.
+  }
+}
+
 function destroyManagedRendererState(state: ManagedRendererState) {
   for (const entry of state.sprites.values()) {
     entry.sprite.destroy();
   }
 
   for (const entry of state.texts.values()) {
-    entry.text.destroy();
+    destroyManagedTextEntry(entry);
   }
 
   state.sprites.clear();
@@ -638,8 +658,8 @@ function endManagedFrame(state: ManagedRendererState) {
 
   for (const [key, entry] of state.texts) {
     if (!state.activeTextKeys.has(key)) {
-      entry.text.destroy();
       state.texts.delete(key);
+      destroyManagedTextEntry(entry);
     }
   }
 }
@@ -2713,8 +2733,8 @@ function drawManagedFeedbackText({
   }
 
   if (existingEntry) {
-    existingEntry.text.destroy();
     managedState.texts.delete(key);
+    destroyManagedTextEntry(existingEntry);
   }
 
   const label = createFeedbackText({ color, fontSize, text });
@@ -5825,7 +5845,7 @@ export function PixiWorldRenderer({
       isInitialized = true;
 
       if (isDisposed || !hostRef.current) {
-        app.destroy(true, { children: true });
+        destroyPixiApplication(app);
         return;
       }
 
@@ -5858,10 +5878,10 @@ export function PixiWorldRenderer({
       fullHadTimedWorkRef.current = false;
       fullSignatureRef.current = null;
       lastDrawnTextureRevisionRef.current = null;
-      if (isInitialized) {
-        app.destroy(true, { children: true });
-      }
       destroyManagedRendererState(managedState);
+      if (isInitialized) {
+        destroyPixiApplication(app);
+      }
     };
   }, []);
 
