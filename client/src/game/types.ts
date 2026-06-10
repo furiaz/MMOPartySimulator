@@ -447,8 +447,12 @@ export type CompanionConsumableBehavior = {
   autoFlaskHpThresholdPercent: number;
 };
 
+export type SupportFocus = "lowest_hp" | "leader" | "defender";
+
 export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
+  beginnerFirstAidAllyHealHpThresholdPercent: number;
+  supportFocus: SupportFocus;
 };
 
 export type RoleBonusState = {

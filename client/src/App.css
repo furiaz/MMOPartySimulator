@@ -2076,7 +2076,8 @@
 }
 
 .behavior-toggle-row,
-.behavior-range-row {
+.behavior-range-row,
+.behavior-choice-row {
   display: grid;
   gap: 8px;
   align-items: center;
@@ -2100,6 +2101,30 @@
   width: 64px;
   min-width: 0;
   box-sizing: border-box;
+}
+
+.behavior-choice-row {
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+}
+
+.behavior-choice-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.behavior-choice-group button {
+  flex: 1 1 88px;
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.behavior-choice-group button.active {
+  border-color: rgba(147, 197, 253, 0.96);
+  background: rgba(37, 99, 235, 0.82);
+  color: #f8fafc;
 }
 
 .party-submenu-tabs,

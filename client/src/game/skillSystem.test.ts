@@ -106,6 +106,43 @@ describe("beginner skill system", () => {
     );
   });
 
+  it("prefers Throw Rock against enemies attacking Support or low-health allies", () => {
+    const defender = createBeginner("defender", "defender", { x: 0, y: 0 });
+    const support = createBeginner("support", "support", { x: 0, y: 1 });
+    const supportAttacker = {
+      ...createEnemy("support-attacker", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: support.id,
+    };
+    const lowHealthAlly = {
+      ...createBeginner("low-health-ally", "fighter", { x: 0, y: 2 }),
+      health: 6,
+      maxHealth: 20,
+    };
+    const lowHealthAttacker = {
+      ...createEnemy("low-health-attacker", { x: 2, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: lowHealthAlly.id,
+    };
+    const nextState = updateSkillSystem(
+      createSkillState(
+        [defender, support, supportAttacker, lowHealthAlly, lowHealthAttacker],
+        {
+          map: createSkillMap(),
+          ...createActiveShield(defender.id),
+        },
+      ),
+      1000,
+    );
+
+    expect(nextState.entities["support-attacker"]).toMatchObject({
+      currentTargetId: defender.id,
+    });
+    expect(
+      nextState.skillCooldownsByCompanionId?.defender?.throw_rock?.skillId,
+    ).toBe("throw_rock");
+  });
+
   it("uses Field Hands to improve gathering temporarily", () => {
     const gatherer = {
       ...createBeginner("gatherer", "gatherer", { x: 0, y: 0 }),
@@ -134,6 +171,50 @@ describe("beginner skill system", () => {
       isDepleted: true,
       durability: 0,
     });
+  });
+
+  it("only uses Field Hands for the current resource target within 5 units", () => {
+    const nearbyCollector = {
+      ...createBeginner("nearby-collector", "gatherer", { x: 0, y: 0 }),
+      state: "gather" as const,
+      currentTargetId: "nearby-wood",
+    };
+    const farCollector = {
+      ...createBeginner("far-collector", "gatherer", { x: 0, y: 0 }),
+      state: "gather" as const,
+      currentTargetId: "far-wood",
+    };
+    const idleCollector = createBeginner("idle-collector", "gatherer", {
+      x: 0,
+      y: 0,
+    });
+    const nearbyWood = createResource("nearby-wood", { x: 5, y: 0 });
+    const farWood = createResource("far-wood", { x: 6, y: 0 });
+    const unrelatedWood = createResource("unrelated-wood", { x: 1, y: 0 });
+
+    const nearbyState = updateSkillSystem(
+      createSkillState([nearbyCollector, nearbyWood]),
+      1000,
+    );
+    const farState = updateSkillSystem(
+      createSkillState([farCollector, farWood]),
+      1000,
+    );
+    const idleState = updateSkillSystem(
+      createSkillState([idleCollector, unrelatedWood]),
+      1000,
+    );
+
+    expect(
+      nearbyState.skillCooldownsByCompanionId?.["nearby-collector"]
+        ?.field_hands?.skillId,
+    ).toBe("field_hands");
+    expect(
+      farState.skillCooldownsByCompanionId?.["far-collector"]?.field_hands,
+    ).toBeUndefined();
+    expect(
+      idleState.skillCooldownsByCompanionId?.["idle-collector"]?.field_hands,
+    ).toBeUndefined();
   });
 
   it("does not stack duplicate self or ally damage buffs", () => {
@@ -396,8 +477,8 @@ describe("beginner skill system", () => {
           createBeginner("support", "support", { x: 0, y: 0 }),
           {
             ...createBeginner("ally", "fighter", { x: 1, y: 0 }),
-            health: 2,
-            maxHealth: 3,
+            health: 1,
+            maxHealth: 4,
           },
         ],
       },
@@ -579,6 +660,112 @@ describe("beginner skill system", () => {
       ),
     ).toBe(true);
   });
+
+  it("does not give Kick opening priority when the leader is already attacking the enemy", () => {
+    const leader = {
+      ...createBeginner("leader", "fighter", { x: 1, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: "enemy",
+      commandPriority: "direct" as const,
+    };
+    const defender = createBeginner("defender", "defender", { x: 1, y: 2 });
+    const enemy = createEnemy("enemy", { x: 5, y: 1 });
+    const state = startDebugTelemetryRecording(
+      createSkillState([leader, defender, enemy], {
+        map: createSkillMap(),
+        partyLeaderId: leader.id,
+        ...createActiveSelfBuff(leader.id),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(
+      nextState.skillCooldownsByCompanionId?.defender?.throw_rock?.skillId,
+    ).toBe("throw_rock");
+    expect(
+      nextState.debugTelemetry?.events.some(
+        (event) =>
+          event.type === "skill_used" &&
+          event.entityId === "defender" &&
+          event.skillId === "kick",
+      ),
+    ).toBe(false);
+  });
+
+  it("prefers Kick against reachable enemies attacking Support", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
+    const support = createBeginner("support", "support", { x: 4, y: 2 });
+    const supportAttacker = {
+      ...createEnemy("support-attacker", { x: 5, y: 1 }, undefined, {
+        maxHealth: 100,
+      }),
+      state: "attack" as const,
+      currentTargetId: support.id,
+    };
+    const otherEnemy = createEnemy("other-enemy", { x: 4, y: 2 }, undefined, {
+      maxHealth: 100,
+    });
+    const state = startDebugTelemetryRecording(
+      createSkillState([fighter, support, supportAttacker, otherEnemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(fighter.id),
+      }),
+    );
+
+    const nextState = updateSkillSystem(state, 1000);
+
+    expect(
+      nextState.skillCooldownsByCompanionId?.fighter?.kick?.skillId,
+    ).toBe("kick");
+    expect(nextState.entities["support-attacker"]).toMatchObject({
+      currentTargetId: fighter.id,
+    });
+  });
+
+  it.each<Companion["role"]>(["support", "gatherer"])(
+    "only lets %s Kick when attacked by a reachable enemy",
+    (role) => {
+      const idleCompanion = createBeginner("idle-companion", role, { x: 1, y: 1 });
+      const idleEnemy = createEnemy("idle-enemy", { x: 5, y: 1 });
+      const attackedCompanion = createBeginner("attacked-companion", role, {
+        x: 1,
+        y: 1,
+      });
+      const attacker = {
+        ...createEnemy("attacker", { x: 5, y: 1 }, undefined, {
+          maxHealth: 100,
+        }),
+        state: "attack" as const,
+        currentTargetId: attackedCompanion.id,
+      };
+
+      const idleState = updateSkillSystem(
+        createSkillState([idleCompanion, idleEnemy], {
+          map: createSkillMap(),
+          ...createActiveSelfBuff(idleCompanion.id),
+          ...createActiveShield(idleCompanion.id),
+        }),
+        1000,
+      );
+      const attackedState = updateSkillSystem(
+        createSkillState([attackedCompanion, attacker], {
+          map: createSkillMap(),
+          ...createActiveSelfBuff(attackedCompanion.id),
+          ...createActiveShield(attackedCompanion.id),
+        }),
+        1000,
+      );
+
+      expect(
+        idleState.skillCooldownsByCompanionId?.["idle-companion"]?.kick,
+      ).toBeUndefined();
+      expect(
+        attackedState.skillCooldownsByCompanionId?.["attacked-companion"]?.kick
+          ?.skillId,
+      ).toBe("kick");
+    },
+  );
 
   it("keeps Guard Up ahead of opening Kick when party danger is present", () => {
     const defender = createBeginner("defender", "defender", { x: 1, y: 1 });
@@ -810,6 +997,351 @@ describe("beginner skill system", () => {
     ).toBe(false);
   });
 
+  it.each<Companion["role"]>(["defender", "fighter", "support", "gatherer", "none"])(
+    "keeps combat First Aid self-use enabled for %s",
+    (role) => {
+      const companion = {
+        ...createBeginner("companion", role, { x: 1, y: 1 }),
+        health: 4,
+        maxHealth: 20,
+      };
+      const enemy = {
+        ...createEnemy("enemy", { x: 5, y: 1 }),
+        state: "attack" as const,
+        currentTargetId: companion.id,
+      };
+      const nextState = updateSkillSystem(
+        createSkillState([companion, enemy], {
+          map: createSkillMap(),
+          ...createActiveShield(companion.id),
+        }),
+        1000,
+      );
+
+      expect(nextState.entities.companion).toMatchObject({
+        health: Math.min(
+          companion.maxHealth,
+          companion.health + getHealingAmount(companion, 5),
+        ),
+      });
+      expect(
+        nextState.skillCooldownsByCompanionId?.companion?.first_aid?.skillId,
+      ).toBe("first_aid");
+    },
+  );
+
+  it("keeps combat ally First Aid focused on Support roles", () => {
+    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
+    const support = createBeginner("support", "support", { x: 1, y: 1 });
+    const ally = {
+      ...createBeginner("ally", "fighter", { x: 1, y: 2 }),
+      commandPriority: "direct" as const,
+      health: 2,
+      maxHealth: 20,
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: ally.id,
+    };
+
+    const fighterState = updateSkillSystem(
+      createSkillState([fighter, ally, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(fighter.id),
+        ...createActiveShield(fighter.id),
+      }),
+      1000,
+    );
+    const supportState = updateSkillSystem(
+      createSkillState([support, ally, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(fighterState.entities.ally).toMatchObject({ health: ally.health });
+    expect(
+      fighterState.skillCooldownsByCompanionId?.fighter?.first_aid,
+    ).toBeUndefined();
+    expect(supportState.entities.ally).toMatchObject({
+      health: Math.min(ally.maxHealth, ally.health + getHealingAmount(support, 5)),
+    });
+    expect(
+      supportState.skillCooldownsByCompanionId?.support?.first_aid?.skillId,
+    ).toBe("first_aid");
+  });
+
+  it("does not use ally First Aid above the configured ally threshold", () => {
+    const support = {
+      ...createBeginner("support", "support", { x: 1, y: 1 }),
+      skillBehavior: {
+        ...createBeginner("support", "support", { x: 1, y: 1 }).skillBehavior,
+        beginnerFirstAidAllyHealHpThresholdPercent: 35,
+      },
+    };
+    const ally = {
+      ...createBeginner("ally", "fighter", { x: 1, y: 2 }),
+      commandPriority: "direct" as const,
+      health: 8,
+      maxHealth: 20,
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: ally.id,
+    };
+
+    const nextState = updateSkillSystem(
+      createSkillState([support, ally, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.ally).toMatchObject({ health: ally.health });
+    expect(
+      nextState.skillCooldownsByCompanionId?.support?.first_aid,
+    ).toBeUndefined();
+  });
+
+  it("uses the configured ally First Aid threshold", () => {
+    const support = createBeginner("support", "support", { x: 1, y: 1 });
+    const tunedSupport = {
+      ...support,
+      skillBehavior: {
+        ...support.skillBehavior,
+        beginnerFirstAidAllyHealHpThresholdPercent: 45,
+      },
+    };
+    const ally = {
+      ...createBeginner("ally", "fighter", { x: 1, y: 2 }),
+      commandPriority: "direct" as const,
+      health: 8,
+      maxHealth: 20,
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: ally.id,
+    };
+
+    const nextState = updateSkillSystem(
+      createSkillState([tunedSupport, ally, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.ally).toMatchObject({
+      health: Math.min(ally.maxHealth, ally.health + getHealingAmount(support, 5)),
+    });
+    expect(
+      nextState.skillCooldownsByCompanionId?.support?.first_aid?.skillId,
+    ).toBe("first_aid");
+  });
+
+  it("lets Support Focus prefer an injured leader", () => {
+    const support = createBeginner("support", "support", { x: 1, y: 1 });
+    const focusedSupport = {
+      ...support,
+      skillBehavior: {
+        ...support.skillBehavior,
+        supportFocus: "leader" as const,
+      },
+    };
+    const leader = {
+      ...createBeginner("leader", "fighter", { x: 1, y: 2 }),
+      health: 13,
+      maxHealth: 20,
+    };
+    const urgentAlly = {
+      ...createBeginner("urgent-ally", "fighter", { x: 1, y: 3 }),
+      commandPriority: "direct" as const,
+      health: 2,
+      maxHealth: 20,
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: urgentAlly.id,
+    };
+
+    const nextState = updateSkillSystem(
+      createSkillState([focusedSupport, leader, urgentAlly, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.leader).toMatchObject({
+      health: Math.min(
+        leader.maxHealth,
+        leader.health + getHealingAmount(support, 5),
+      ),
+    });
+    expect(nextState.entities["urgent-ally"]).toMatchObject({
+      health: urgentAlly.health,
+    });
+  });
+
+  it("falls back from leader Support Focus when the leader is healthy enough", () => {
+    const support = createBeginner("support", "support", { x: 1, y: 1 });
+    const focusedSupport = {
+      ...support,
+      skillBehavior: {
+        ...support.skillBehavior,
+        supportFocus: "leader" as const,
+      },
+    };
+    const leader = {
+      ...createBeginner("leader", "fighter", { x: 1, y: 2 }),
+      health: 16,
+      maxHealth: 20,
+    };
+    const urgentAlly = {
+      ...createBeginner("urgent-ally", "fighter", { x: 1, y: 3 }),
+      commandPriority: "direct" as const,
+      health: 2,
+      maxHealth: 20,
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: urgentAlly.id,
+    };
+
+    const nextState = updateSkillSystem(
+      createSkillState([focusedSupport, leader, urgentAlly, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.leader).toMatchObject({ health: leader.health });
+    expect(nextState.entities["urgent-ally"]).toMatchObject({
+      health: Math.min(
+        urgentAlly.maxHealth,
+        urgentAlly.health + getHealingAmount(support, 5),
+      ),
+    });
+  });
+
+  it("lets Support Focus prefer the lowest-health injured Defender-role companion", () => {
+    const support = createBeginner("support", "support", { x: 1, y: 1 });
+    const focusedSupport = {
+      ...support,
+      skillBehavior: {
+        ...support.skillBehavior,
+        supportFocus: "defender" as const,
+      },
+    };
+    const injuredDefender = {
+      ...createBeginner("injured-defender", "defender", { x: 1, y: 2 }),
+      health: 10,
+      maxHealth: 20,
+    };
+    const healthierDefender = {
+      ...createBeginner("healthier-defender", "defender", { x: 1, y: 3 }),
+      health: 13,
+      maxHealth: 20,
+    };
+    const urgentAlly = {
+      ...createBeginner("urgent-ally", "fighter", { x: 2, y: 1 }),
+      commandPriority: "direct" as const,
+      health: 1,
+      maxHealth: 20,
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 5, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: urgentAlly.id,
+    };
+
+    const nextState = updateSkillSystem(
+      createSkillState(
+        [focusedSupport, injuredDefender, healthierDefender, urgentAlly, enemy],
+        {
+          map: createSkillMap(),
+          ...createActiveSelfBuff(support.id),
+          ...createActiveShield(support.id),
+        },
+      ),
+      1000,
+    );
+
+    expect(nextState.entities["injured-defender"]).toMatchObject({
+      health: Math.min(
+        injuredDefender.maxHealth,
+        injuredDefender.health + getHealingAmount(support, 5),
+      ),
+    });
+    expect(nextState.entities["healthier-defender"]).toMatchObject({
+      health: healthierDefender.health,
+    });
+    expect(nextState.entities["urgent-ally"]).toMatchObject({
+      health: urgentAlly.health,
+    });
+  });
+
+  it("reserves out-of-combat First Aid ally targets for one update", () => {
+    const firstFighter = createBeginner("first-fighter", "fighter", { x: 1, y: 1 });
+    const secondFighter = createBeginner("second-fighter", "fighter", {
+      x: 1,
+      y: 1,
+    });
+    const firstAlly = {
+      ...createBeginner("first-ally", "support", { x: 1, y: 2 }),
+      commandPriority: "direct" as const,
+      health: 1,
+      maxHealth: 40,
+    };
+    const secondAlly = {
+      ...createBeginner("second-ally", "support", { x: 1, y: 3 }),
+      commandPriority: "direct" as const,
+      health: 2,
+      maxHealth: 40,
+    };
+
+    const nextState = updateSkillSystem(
+      createSkillState([firstFighter, secondFighter, firstAlly, secondAlly], {
+        map: createSkillMap(),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities["first-ally"]).toMatchObject({
+      health: Math.min(
+        firstAlly.maxHealth,
+        firstAlly.health + getHealingAmount(firstFighter, 5),
+      ),
+    });
+    expect(nextState.entities["second-ally"]).toMatchObject({
+      health: Math.min(
+        secondAlly.maxHealth,
+        secondAlly.health + getHealingAmount(secondFighter, 5),
+      ),
+    });
+    expect(
+      nextState.skillCooldownsByCompanionId?.["first-fighter"]?.first_aid
+        ?.skillId,
+    ).toBe("first_aid");
+    expect(
+      nextState.skillCooldownsByCompanionId?.["second-fighter"]?.first_aid
+        ?.skillId,
+    ).toBe("first_aid");
+  });
+
   it("does not use Kick through active resources", () => {
     const fighter = createBeginner("fighter", "fighter", { x: 1, y: 1 });
     const enemy = createEnemy("enemy", { x: 6, y: 1 });
@@ -909,6 +1441,34 @@ describe("beginner skill system", () => {
       expiresAt: 11000,
     });
     expect(rallyState.skillSelfBuffsByCompanionId?.ally?.expiresAt).toBe(10000);
+  });
+
+  it("prioritizes Rally Call targets by role", () => {
+    const support = createBeginner("support", "support", { x: 0, y: 0 });
+    const defender = createBeginner("defender", "defender", { x: 1, y: 0 });
+    const fighter = createBeginner("fighter", "fighter", { x: 2, y: 0 });
+    const gatherer = createBeginner("gatherer", "gatherer", { x: 0, y: 1 });
+    const enemy = createEnemy("enemy", { x: 3, y: 0 });
+
+    const nextState = updateSkillSystem(
+      createSkillState([support, defender, fighter, gatherer, enemy], {
+        skillSelfBuffsByCompanionId: {
+          support: {
+            companionId: "support",
+            bonusDamage: 1,
+            expiresAt: 5000,
+          },
+        },
+      }),
+      1000,
+    );
+
+    expect(nextState.skillSelfBuffsByCompanionId?.fighter?.expiresAt).toBe(
+      10000,
+    );
+    expect(nextState.skillCooldownsByCompanionId?.support?.rally_call).toMatchObject({
+      skillId: "rally_call",
+    });
   });
 
   it.each<Companion["role"]>(["support", "gatherer", "none"])(

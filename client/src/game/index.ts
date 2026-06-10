@@ -122,6 +122,7 @@ export type {
   SkillTag,
   SkillVisualEvent,
   SkillVisualType,
+  SupportFocus,
   DropVisualEvent,
   WorldWipeRecoveryChoice,
   WorldWipeRecoveryState,
@@ -330,8 +331,11 @@ export {
   type ConsumableMutationStatus,
 } from "./consumables";
 export {
+  DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_SUPPORT_FOCUS,
   createDefaultCompanionSkillBehavior,
+  getCompanionSkillBehavior,
   updateCompanionSkillBehavior,
   type SkillBehaviorUpdate,
 } from "./skillBehavior";

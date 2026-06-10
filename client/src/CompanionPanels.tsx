@@ -10,6 +10,9 @@ import type {
 import {
   ARMOR_FAMILY_LABELS,
   CLASS_DEFINITIONS,
+  DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_SUPPORT_FOCUS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_SLOTS,
@@ -40,6 +43,7 @@ import {
   type PartyMemberRole,
   type PrimaryStatId,
   type SkillDefinition,
+  type SupportFocus,
 } from "./game";
 export type {
   GameMenuTab,
@@ -93,6 +97,14 @@ const partyManagementSections: PartyManagementSection[] = [
 ];
 
 const partyCompanionSlotCount = 5;
+
+const supportFocusOptions: SupportFocus[] = ["lowest_hp", "leader", "defender"];
+
+const supportFocusLabels: Record<SupportFocus, string> = {
+  lowest_hp: "Lowest HP",
+  leader: "Leader",
+  defender: "Defender",
+};
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
   strength: "Strength",
@@ -1303,9 +1315,15 @@ function BehaviorSettingsSection({
   ) => void;
 }) {
   const threshold = member.consumableBehavior.autoFlaskHpThresholdPercent;
-  const firstAidThreshold =
-    member.skillBehavior.beginnerFirstAidSelfHealHpThresholdPercent;
+  const firstAidSelfThreshold =
+    member.skillBehavior.beginnerFirstAidSelfHealHpThresholdPercent ??
+    DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT;
+  const firstAidAllyThreshold =
+    member.skillBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
+    DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT;
+  const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
   const isBeginner = member.classId === "beginner";
+  const isSupport = member.role === "support";
 
   return (
     <section className="management-section-card" aria-label="Behavior Settings">
@@ -1350,36 +1368,94 @@ function BehaviorSettingsSection({
           <strong>{threshold}%</strong>
         </label>
         {isBeginner ? (
-          <label className="behavior-range-row">
-            <span>First Aid Self-Heal Threshold</span>
-            <input
-              max={100}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  beginnerFirstAidSelfHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="range"
-              value={firstAidThreshold}
-            />
-            <input
-              max={100}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  beginnerFirstAidSelfHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="number"
-              value={firstAidThreshold}
-            />
-            <strong>{firstAidThreshold}%</strong>
-          </label>
+          <>
+            <label className="behavior-range-row">
+              <span>First Aid Self-Heal Threshold</span>
+              <input
+                max={100}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    beginnerFirstAidSelfHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="range"
+                value={firstAidSelfThreshold}
+              />
+              <input
+                max={100}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    beginnerFirstAidSelfHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="number"
+                value={firstAidSelfThreshold}
+              />
+              <strong>{firstAidSelfThreshold}%</strong>
+            </label>
+            <label className="behavior-range-row">
+              <span>First Aid Ally-Heal Threshold</span>
+              <input
+                max={100}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    beginnerFirstAidAllyHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="range"
+                value={firstAidAllyThreshold}
+              />
+              <input
+                max={100}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    beginnerFirstAidAllyHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="number"
+                value={firstAidAllyThreshold}
+              />
+              <strong>{firstAidAllyThreshold}%</strong>
+            </label>
+          </>
+        ) : null}
+        {isSupport ? (
+          <div className="behavior-choice-row">
+            <span>Support Focus</span>
+            <div
+              aria-label="Support Focus"
+              className="behavior-choice-group"
+              role="group"
+            >
+              {supportFocusOptions.map((option) => (
+                <button
+                  aria-pressed={supportFocus === option}
+                  className={supportFocus === option ? "active" : ""}
+                  key={option}
+                  onClick={() =>
+                    onChangeSkillBehavior(member.id, {
+                      supportFocus: option,
+                    })
+                  }
+                  type="button"
+                >
+                  {supportFocusLabels[option]}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
       </div>
     </section>

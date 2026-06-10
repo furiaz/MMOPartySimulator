@@ -10,7 +10,13 @@ import {
   type SkillUse,
 } from "./skillEffectResolution";
 import { isBeginnerFirstAidSelfHealPriorityUse } from "./skillBehavior";
-import { getSkillTarget } from "./skillTargeting";
+import {
+  getSkillTarget,
+  hasPartyCombatContext,
+  isLeaderOpeningKickSkillUse,
+  isProtectiveTauntSkillUse,
+  isSupportAttackerKickSkillUse,
+} from "./skillTargeting";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
 import { getPartyCombatTarget } from "./partyTargetSystem";
@@ -26,8 +32,11 @@ export { updateSkillShieldBlockPositions } from "./skillEffectResolution";
 
 const SKILL_COOLDOWN_MS = 5000;
 const LOW_HEALTH_BUFFER = 1;
-const OPENING_LUNGE_SCORE_BONUS = 10;
 const BEGINNER_FIRST_AID_SELF_HEAL_SCORE_BONUS = 20;
+const PROTECTIVE_THROW_ROCK_SCORE_BONUS = 5;
+const SUPPORT_ATTACKER_KICK_SCORE_BONUS = 12;
+const LEADER_OPENING_KICK_SCORE_BONUS = 10;
+const OUT_OF_COMBAT_FIRST_AID_ALLY_SCORE_BONUS = 7;
 const NORMAL_SKILL_SELECTION_PRIORITY = 0;
 const EMERGENCY_SKILL_SELECTION_PRIORITY = 1;
 const ATTACK_SKILL_TELEMETRY_CONTEXT_RANGE = 5;
@@ -36,10 +45,12 @@ type SkillUseOptions = {
   now: number;
   combatOnly?: boolean;
   forcedEnemyTargetId?: string | null;
+  firstAidReservedTargetIds?: Set<string>;
 };
 
 export function updateSkillSystem(state: GameState, now = Date.now()): GameState {
   let nextState = state;
+  const firstAidReservedTargetIds = new Set<string>();
 
   for (const entity of Object.values(state.entities)) {
     const caster = nextState.entities[entity.id];
@@ -55,7 +66,10 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
       continue;
     }
 
-    const result = chooseSkillUse(nextState, caster, { now });
+    const result = chooseSkillUse(nextState, caster, {
+      now,
+      firstAidReservedTargetIds,
+    });
     nextState = result.state;
     const skillUse = result.skillUse;
 
@@ -63,6 +77,12 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
       continue;
     }
 
+    reserveOutOfCombatFirstAidTarget(
+      nextState,
+      caster,
+      skillUse,
+      firstAidReservedTargetIds,
+    );
     nextState = applySkill(nextState, caster, skillUse, now);
   }
 
@@ -240,6 +260,7 @@ function chooseSkillUse(
 
       const target = getSkillTarget(state, caster, skill, {
         forcedEnemyTargetId: options.forcedEnemyTargetId,
+        firstAidReservedTargetIds: options.firstAidReservedTargetIds,
       });
 
       if (!target) {
@@ -267,7 +288,13 @@ function chooseSkillUse(
       }
 
       const roleScore = getSkillRoleScore(caster.role, skill.tags);
-      const score = getSkillSelectionScore(caster, skill, target, roleScore);
+      const score = getSkillSelectionScore(
+        state,
+        caster,
+        skill,
+        target,
+        roleScore,
+      );
 
       if (score <= 0) {
         nextState = recordSkillTelemetry(nextState, caster, {
@@ -309,6 +336,7 @@ function chooseSkillUse(
 }
 
 function getSkillSelectionScore(
+  state: GameState,
   caster: Companion,
   skill: SkillDefinition,
   target: Enemy | Companion | undefined,
@@ -316,8 +344,16 @@ function getSkillSelectionScore(
 ): number {
   let score = roleScore;
 
-  if (isOpeningLungeSkillUse(caster, skill, target)) {
-    score += OPENING_LUNGE_SCORE_BONUS;
+  if (isProtectiveTauntSkillUse(state, skill, target)) {
+    score += PROTECTIVE_THROW_ROCK_SCORE_BONUS;
+  }
+
+  if (isSupportAttackerKickSkillUse(state, skill, target)) {
+    score += SUPPORT_ATTACKER_KICK_SCORE_BONUS;
+  }
+
+  if (isLeaderOpeningKickSkillUse(state, caster, skill, target)) {
+    score += LEADER_OPENING_KICK_SCORE_BONUS;
   }
 
   if (
@@ -325,6 +361,10 @@ function getSkillSelectionScore(
     isBeginnerFirstAidSelfHealPriorityUse(caster, skill, target)
   ) {
     score += BEGINNER_FIRST_AID_SELF_HEAL_SCORE_BONUS;
+  }
+
+  if (isOutOfCombatFirstAidAllyUse(state, caster, skill, target)) {
+    score += OUT_OF_COMBAT_FIRST_AID_ALLY_SCORE_BONUS;
   }
 
   return score;
@@ -370,19 +410,6 @@ function isRecoveryAreaSkillUseAllowed(
   );
 }
 
-function isOpeningLungeSkillUse(
-  caster: Companion,
-  skill: SkillDefinition,
-  target: Enemy | Companion | undefined,
-): target is Enemy {
-  return (
-    skill.effect.type === "lungeDamage" &&
-    isLivingEnemy(target) &&
-    getGridDistance(caster.position, target.position) >
-      getCompanionAttackRange(caster)
-  );
-}
-
 function applySkill(
   state: GameState,
   caster: Companion,
@@ -422,6 +449,41 @@ function applySkill(
     now,
     "skill",
     skill.id,
+  );
+}
+
+function reserveOutOfCombatFirstAidTarget(
+  state: GameState,
+  caster: Companion,
+  skillUse: SkillUse,
+  reservedTargetIds: Set<string>,
+): void {
+  const target = skillUse.target;
+
+  if (
+    skillUse.skill.id !== "first_aid" ||
+    !target ||
+    target.kind !== "companion" ||
+    target.id === caster.id ||
+    hasPartyCombatContext(state, caster)
+  ) {
+    return;
+  }
+
+  reservedTargetIds.add(target.id);
+}
+
+function isOutOfCombatFirstAidAllyUse(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  target: Enemy | Companion | undefined,
+): target is Companion {
+  return (
+    skill.id === "first_aid" &&
+    target?.kind === "companion" &&
+    target.id !== caster.id &&
+    !hasPartyCombatContext(state, caster)
   );
 }
 
