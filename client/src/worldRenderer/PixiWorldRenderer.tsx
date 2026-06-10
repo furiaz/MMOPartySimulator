@@ -212,6 +212,7 @@ type PixiWorldRendererProps = {
   onFloorClick?: (position: Position) => void;
   onNpcClick?: (npcId: string) => void;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
+  onCursorPositionChange?: (position: Position | null) => void;
   onResourceClick?: (resourceId: string) => void;
   partyIntent?: PartyIntent | null;
   questInspectMarkers?: QuestInspectMarker[];
@@ -5511,6 +5512,7 @@ export function PixiWorldRenderer({
   onFloorClick,
   onNpcClick,
   onPerformanceSample,
+  onCursorPositionChange,
   onResourceClick,
   partyIntent = null,
   questInspectMarkers = [],
@@ -5948,7 +5950,54 @@ export function PixiWorldRenderer({
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
+  function getBoundedFullCursorPosition(
+    clientPosition: Position,
+    bounds: DOMRect,
+  ): Position | null {
+    const mapPosition = getFullMapPosition(clientPosition, bounds, {
+      cameraOffset,
+      cellPixelSize,
+    });
+    const floorPosition = getFloorPosition(mapPosition);
+
+    if (
+      floorPosition.x < 0 ||
+      floorPosition.x >= map.columns ||
+      floorPosition.y < 0 ||
+      floorPosition.y >= map.rows
+    ) {
+      return null;
+    }
+
+    return floorPosition;
+  }
+
   function handleRendererPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (mode === "preview") {
+      if (!onCursorPositionChange) {
+        return;
+      }
+
+      const bounds =
+        appRef.current?.canvas.getBoundingClientRect() ??
+        event.currentTarget.getBoundingClientRect();
+      const mapPosition = getPreviewMapPosition(
+        { x: event.clientX, y: event.clientY },
+        bounds,
+        map,
+      );
+
+      onCursorPositionChange(mapPosition);
+      return;
+    }
+
+    onCursorPositionChange?.(
+      getBoundedFullCursorPosition(
+        { x: event.clientX, y: event.clientY },
+        event.currentTarget.getBoundingClientRect(),
+      ),
+    );
+
     const dragState = companionDragStateRef.current;
 
     if (!dragState || dragState.pointerId !== event.pointerId) {
@@ -6118,7 +6167,7 @@ export function PixiWorldRenderer({
   }
 
   function handleRendererMouseMove(event: MouseEvent<HTMLDivElement>) {
-    if (mode !== "full" || !onEntityHover) {
+    if (mode !== "full") {
       return;
     }
 
@@ -6131,6 +6180,17 @@ export function PixiWorldRenderer({
         cellPixelSize,
       },
     );
+    onCursorPositionChange?.(
+      getBoundedFullCursorPosition(
+        { x: event.clientX, y: event.clientY },
+        bounds,
+      ),
+    );
+
+    if (!onEntityHover) {
+      return;
+    }
+
     const entity = getNearestHoverEntity({
       cellPixelSize,
       entities: sortedEntities,
@@ -6147,6 +6207,7 @@ export function PixiWorldRenderer({
   function handleRendererMouseLeave() {
     companionDragPreviewRef.current = null;
     requestRedrawRef.current();
+    onCursorPositionChange?.(null);
     onEntityHover?.(null);
   }
 

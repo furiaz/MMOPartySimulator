@@ -311,6 +311,29 @@
   pointer-events: auto;
 }
 
+.minimap-coordinate-readout {
+  position: fixed;
+  top: 14px;
+  right: min(278px, calc(100vw - 148px));
+  z-index: 10;
+  display: grid;
+  width: 132px;
+  box-sizing: border-box;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.78);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  color: #f8fafc;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.25;
+  pointer-events: none;
+  text-align: left;
+  white-space: nowrap;
+}
+
 .pixi-world-renderer-full {
   position: fixed;
   inset: 0;

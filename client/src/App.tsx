@@ -2016,6 +2016,8 @@ function App() {
     useState<OfflineFarmingSummary | null>(null);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(false);
+  const [mapCursorPosition, setMapCursorPosition] =
+    useState<Position | null>(null);
   const [entityHoverTooltip, setEntityHoverTooltip] =
     useState<EntityHoverTooltipState | null>(null);
   const [showDebugTools, setShowDebugTools] = useState(false);
@@ -2149,6 +2151,27 @@ function App() {
     },
     [],
   );
+  const updateMapCursorPosition = useCallback(
+    (position: Position | null) => {
+      setMapCursorPosition((currentPosition) => {
+        if (!currentPosition && !position) {
+          return currentPosition;
+        }
+
+        if (
+          currentPosition &&
+          position &&
+          currentPosition.x === position.x &&
+          currentPosition.y === position.y
+        ) {
+          return currentPosition;
+        }
+
+        return position;
+      });
+    },
+    [],
+  );
   const releaseRendererCache = useCallback(() => {
     latestAnimatedEntityPositionsRef.current = {};
     latestTrackedVisualMovementEntityIdsRef.current.clear();
@@ -2253,6 +2276,12 @@ function App() {
   const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
   const leader = navigationLeader;
   const hasPartyLeader = Boolean(leader);
+  const leaderCoordinateText = leader
+    ? `${leader.position.x.toFixed(1)}, ${leader.position.y.toFixed(1)}`
+    : "--, --";
+  const mapCursorCoordinateText = mapCursorPosition
+    ? `${mapCursorPosition.x}, ${mapCursorPosition.y}`
+    : "--, --";
   const enemies = useMemo(
     () =>
       allEntities.filter(
@@ -4067,6 +4096,7 @@ function App() {
               onFloorClick={commandPartyToMoveFromFloorPosition}
               onNpcClick={commandPartyToInteractWithNpc}
               onPerformanceSample={handleRendererPerformanceSample}
+              onCursorPositionChange={updateMapCursorPosition}
               onResourceClick={commandCompanionsToGatherResource}
               partyIntent={gameState.partyIntent}
               questInspectMarkers={questInspectMarkers}
@@ -4090,6 +4120,10 @@ function App() {
               viewportSize={viewportSize}
             />
           ) : null}
+          <div className="minimap-coordinate-readout" aria-label="Minimap coordinates">
+            <span>Leader: {leaderCoordinateText}</span>
+            <span>Cursor: {mapCursorCoordinateText}</span>
+          </div>
           <Suspense fallback={<PixiWorldRendererFallback mode="preview" />}>
             <LazyPixiWorldRenderer
               key={`preview-${currentMap.id ?? currentMap.debugName}-${rendererResetNonce}`}
@@ -4104,6 +4138,7 @@ function App() {
               navigationClickAccessibility={navigationClickAccessibility}
               onFloorClick={commandPartyToMoveFromMinimapPosition}
               onPerformanceSample={handleRendererPerformanceSample}
+              onCursorPositionChange={updateMapCursorPosition}
               suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}
