@@ -414,9 +414,11 @@ Combat flow:
 9. Defeated enemies grant XP to eligible living party members.
 10. The party regroups, recovers, resumes gathering, or continues exploration.
 
-Current basic party attacks are mostly melee.
+Current basic attacks include melee attacks and a lightweight prototype projectile layer.
 
-Prototype combat supports numeric skill ranges and enemy attack ranges. Some prototype enemy archetypes and enemy types may attack from range.
+Prototype combat supports numeric skill ranges, enemy attack ranges, enemy attack windup timing, and basic projectile travel. Hunter basic attacks may use arrow projectiles. Ranged enemy combat styles may use simple projectile visuals such as thrown weapons, slime shots, wisps, or imp magic.
+
+Projectile travel and enemy attack windup are prototype readability layers for current basic attacks. They should not be treated as the final ranged combat system, ammunition system, projectile physics model, advanced targeting framework, or production combat telegraph system.
 
 Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, and passive health regeneration.
 
@@ -781,7 +783,7 @@ Current merchant behavior:
 - full selling rules are not implemented
 - this is prototype merchant behavior, not a full shop economy
 
-This is not the full inventory, wallet, equipment economy, shop, crafting, trading, bank, loot, or persistence system.
+This is not the full inventory, wallet, equipment economy, shop, crafting, trading, bank, loot, backend persistence, cloud save, account save, or cross-device persistence system.
 
 Do not implement these unless explicitly requested:
 
@@ -792,7 +794,6 @@ Do not implement these unless explicitly requested:
 - advanced consumable systems beyond current prototype flasks, food assignment, auto-flask behavior, hub food behavior, and temporary buffs
 - crafting
 - trading
-- save/load
 - backend persistence
 - full wallet UI
 - full equipment economy
@@ -1071,7 +1072,15 @@ Skills may show the selected companion's current class skills.
 
 Current class tabs may show only the companion's current class until class-history or multi-class progression data exists.
 
-Skill Preferences may appear as a placeholder only until a supported skill-preference system exists.
+Skill Preferences may show supported prototype skill behavior settings.
+
+Current supported Skill Preferences may include:
+
+- Beginner First Aid Self-Heal Threshold from 1 percent to 100 percent
+- Beginner First Aid Ally-Heal Threshold from 1 percent to 100 percent
+- Support Focus selection for lowest-health ally, leader, or Defender
+
+Skill Preferences must remain backed by game-logic behavior settings and should not define skill targeting, healing rules, or support behavior inside React UI.
 
 The Party menu is not the primary place for whole-party decisions such as role assignment, party order, formation, or behavior settings.
 
@@ -1114,7 +1123,8 @@ Behavior Settings currently supports prototype companion behavior controls:
 
 - Auto-use Flask toggle
 - Flask HP Threshold setting from 1 percent to 100 percent
-- Beginner First Aid Self-Heal Threshold setting from 1 percent to 100 percent
+
+Prototype skill behavior settings such as First Aid thresholds and Support Focus may live in companion Skill Preferences instead of whole-party Behavior Settings.
 
 Behavior Settings should not define new autonomous behavior outside supported game-logic settings.
 
@@ -1734,6 +1744,8 @@ First Aid is a small emergency recovery skill.
 
 Beginner companions may prioritize First Aid on themselves when their health is at or below the configured First Aid self-heal threshold.
 
+Support-role Beginner companions may use First Aid on allies when supported targeting context and the configured ally-heal threshold allow it.
+
 Deep Breath is a simple self-buff.
 
 Rally Call is a simple ally buff.
@@ -2087,6 +2099,52 @@ The game should reward observation and planning more than constant clicking.
 
 ---
 
+## Prototype Save, Offline Progress, and Guide Popups
+
+Current prototype browser persistence includes local save support.
+
+Current prototype save behavior:
+
+- the start screen may offer Continue, New Game, and Delete Save File
+- saves are stored in browser local storage
+- the game may autosave periodically during play
+- the game may autosave before tab sleep or page unload
+- map transitions may trigger a save
+- major quest status changes may trigger a save
+- the player may manually save
+- the player may export a save file
+- the player may import a save file
+- imported saves replace current progress only after confirmation while playing
+- starting a new game over an existing save asks for confirmation
+- deleting a save asks for confirmation
+- save files use a prototype save version
+- invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
+- restored saves rebuild the current prototype map from saved quest state
+- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, and debug telemetry
+
+Current prototype offline progress:
+
+- may apply when continuing a valid save
+- is capped to a short prototype duration
+- only applies in configured wild-map subzones
+- may grant estimated enemy kills, XP, and gathered resources
+- uses simple role-weighted combat, safety, and gathering efficiency
+- can be skipped when the saved state was in active travel, recovery, resurrection, an open dungeon chest interaction, an unsupported map, an unsupported subzone, a defeated-party state, or another unsafe transient state
+- is a lightweight idle-progression approximation, not a full offline simulation
+
+Current prototype guide popups:
+
+- may appear when starting a new game
+- may appear when the equipment tutorial quest becomes active
+- may appear after the first world-wipe rescue
+- pause the simulation while active
+- are UI guidance only
+- do not define simulation behavior, quest rules, AI behavior, balance, or final tutorial structure
+
+Prototype save, offline progress, and guide popups are browser-prototype systems. They are not backend persistence, account persistence, cloud save, cross-device save, production offline economy, final tutorial design, or final onboarding flow.
+
+---
+
 ## Debug / Development Tools
 
 Temporary debug tools may include:
@@ -2101,7 +2159,7 @@ Temporary debug tools may include:
 - restore party health
 - inspect AI decision reasons
 - inspect XP and level progression
-- inspect role bonus assignment, class behavior, skill behavior, skill cooldowns, and First Aid self-heal settings
+- inspect role bonus assignment, class behavior, skill behavior, skill cooldowns, First Aid thresholds, and Support Focus settings
 - inspect movement/pathing issues, movement planning, path backoff, and navigation grid behavior
 - inspect direct companion command issue, rejection, replacement, completion, cancellation, and rejoin grace behavior
 - debug map transitions
@@ -2142,7 +2200,7 @@ Do not implement these unless explicitly requested:
 - advanced targeting system
 - advanced support mechanics
 - advanced aggro/threat mechanics
-- full ranged combat beyond current prototype skill and enemy attack ranges
+- full ranged combat beyond current prototype skill ranges, enemy attack ranges, and basic projectile visuals
 - backend persistence
 - networking/server authority
 - production asset pipeline

@@ -49,6 +49,9 @@ Current game-logic implementation files include:
 - `attackSlots.ts`
 - `attackSystem.ts`
 - `classes.ts`
+- `combatBasicAttackResolution.ts`
+- `combatProjectileProfiles.ts`
+- `combatProjectileSystem.ts`
 - `combatResolver.ts`
 - `commands.ts`
 - `companionCombat.ts`
@@ -120,6 +123,7 @@ Current game-logic implementation files include:
 - `roleBonus.ts`
 - `roleProfiles.ts`
 - `roleSystem.ts`
+- `saveGame.ts`
 - `simulationTiming.ts`
 - `skillBehavior.ts`
 - `skillEffectResolution.ts`
@@ -381,7 +385,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, defender wait/blocking state, party formation state, combat feedback, prototype skill runtime state, prototype skill visual events, enemy AoE runtime state, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, prototype skill runtime state, prototype skill visual events, enemy AoE runtime state, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -393,6 +397,7 @@ Current movement planning fields include:
 - `reservedPositionsByEntityId`
 - `movementPathsByEntityId`
 - `attackSlotCacheByEntityId`
+- `enemyTargetReachabilityCacheByEnemyId`
 - `movementDecisionsByEntityId`
 - `lastPositionsByEntityId`
 
@@ -447,6 +452,16 @@ Current prototype drop and dungeon runtime fields include:
 - `dropVisualEvents`
 - `slimewardDungeon`
 
+Current basic combat projectile runtime fields include:
+
+- `combatProjectiles`
+
+Basic combat projectile runtime is owned by `combatProjectileSystem.ts` and projectile visual/profile selection is owned by `combatProjectileProfiles.ts`.
+
+Basic projectile runtime supports current Hunter basic attack arrows and ranged enemy basic attack projectile visuals.
+
+Projectile runtime is cleared by save sanitization and map-local runtime cleanup where appropriate.
+
 Current prototype skill runtime and cooldown fields include:
 
 - `skillMarksByEnemyId`
@@ -478,6 +493,7 @@ Current debug option fields include:
 
 - `superSpeedEnabled`
 - `superExpEnabled`
+- `companionInfiniteHealthEnabled`
 - `deepNavigationTelemetryEnabled`
 
 State helpers should remain low-level and safe.
@@ -499,6 +515,49 @@ Current initial prototype state includes:
 - one Training Sword added to shared inventory as prototype/debug setup
 
 ---
+
+## Prototype Save and Offline Farming
+
+Browser-local save logic is split between game logic and React-facing storage helpers.
+
+Game-logic save helpers live in `saveGame.ts`.
+
+React-facing browser storage helpers live in `client/src/saveStorage.ts`.
+
+Current save game behavior:
+
+- `SAVE_VERSION` is currently `1`
+- saved data includes `saveVersion`, `savedAtMs`, optional `offlineFarmingBlockedReason`, and sanitized `GameState`
+- validation rejects malformed saves, unsupported save versions, missing entities, invalid inventory, invalid wallet, invalid quest state, invalid leader id, and invalid current map id
+- restore rebuilds the current debug map from saved quest state
+- save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, skill runtime, enemy AoE runtime, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, and debug telemetry
+- companion save sanitization keeps dead companions dead and returns living companions to idle or follow state
+- enemy save sanitization keeps dead enemies dead and returns living enemies to idle state
+- Slimeward dungeon chest UI state is closed during save sanitization
+
+Current browser storage behavior:
+
+- local saves use `window.localStorage`
+- current storage key is `mmo-party-simulator.save.v1`
+- the UI can read, write, delete, export, import, and download save files
+- exported save files are JSON
+- imported save text is parsed, validated, restored, and then written to local storage
+
+Current offline farming behavior:
+
+- offline farming is applied when continuing a valid save unless the saved state recorded an offline-farming block reason
+- offline farming credit is capped by `MAX_OFFLINE_FARMING_MS`
+- current cap is 30 minutes
+- offline farming requires at least one minute offline
+- offline farming currently applies only to configured wild-map subzone profiles
+- offline farming estimates enemy kills, XP, and gathered resources from simple profile rates
+- role-weighted combat, safety, and gathering scores affect estimates
+- resource grants stop when inventory cannot accept more items
+- offline farming can be skipped for active travel, active recovery, resurrection, open dungeon chest loot, unsupported maps, unsupported subzones, missing living leader, or defeated party state
+
+This is prototype browser-local persistence and lightweight offline reward approximation.
+
+It is not backend persistence, cloud save, account save, cross-device save, full offline simulation, or a production idle economy.
 
 ## Classes
 
@@ -661,8 +720,20 @@ skillBehavior: CompanionSkillBehavior;
 Current companion skill behavior settings include:
 
 - `beginnerFirstAidSelfHealHpThresholdPercent`
+- `beginnerFirstAidAllyHealHpThresholdPercent`
+- `supportFocus`
 
 Beginner First Aid self-heal threshold defaults to 20 percent and is clamped from 1 percent to 100 percent.
+
+Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+
+Current Support Focus values are:
+
+```ts
+type SupportFocus = "lowest_hp" | "leader" | "defender";
+```
+
+Support Focus is a prototype targeting preference for supported skill behavior. It must not create new role values or move support targeting rules into React UI.
 
 Current skill ids include Beginner prototype skills and base class prototype skills:
 
@@ -1473,6 +1544,12 @@ Aegis shield-block skill behavior is handled by the prototype skill system, not 
 
 `attackSystem.ts` owns combat execution.
 
+`combatBasicAttackResolution.ts` owns applying basic attack impact effects such as damage, XP, quest defeat progress, drops, fight-back state, and party protection triggers.
+
+`combatProjectileSystem.ts` owns active basic combat projectile travel and delayed projectile impact resolution.
+
+`combatProjectileProfiles.ts` owns current basic projectile profile selection for Hunter companions and ranged enemy combat styles.
+
 `attackSlots.ts` supports selecting attack slots around a target.
 
 `companionCombat.ts` and `defenderCombat.ts` provide companion-facing combat helpers.
@@ -1484,8 +1561,11 @@ Current attack behavior:
 - attackers can select attack slots around a target
 - attackers attack when in range and cooldown is ready
 - companion basic attacks use the prototype attack range
+- Hunter basic attacks currently use a longer prototype range and launch basic arrow projectiles
+- ranged enemy combat styles currently launch basic projectile visuals
 - enemies may use archetype or entity-specific attack ranges
 - enemies may use entity-specific attack cooldowns
+- enemies use a short basic attack windup before impact or projectile launch
 - attackers can take a small final positioning step when just outside range
 - damage is resolved through `combatResolver.ts` using derived combat stats, mitigation, evasion, block, critical hits, and prototype skill damage modifiers
 - prototype skill damage modifiers can increase damage
@@ -1501,6 +1581,9 @@ Current attack behavior:
 Current basic attack constants and helpers:
 
 - `DEFAULT_COMPANION_ATTACK_RANGE = 1`
+- `HUNTER_BASIC_ATTACK_RANGE = 4`
+- `BASIC_PROJECTILE_SPEED = 12`
+- `BASIC_PROJECTILE_IMPACT_RADIUS = 0.3`
 - `ATTACK_COOLDOWN_MS = 2000`
 - `ENEMY_ATTACK_WINDUP_MS = 500`
 - `TARGET_SWITCH_DISTANCE = 6`
@@ -1911,7 +1994,7 @@ The Merchant Sell panel is currently a UI placeholder only.
 
 Full selling rules, dynamic shop inventory, shop restocking, price simulation, and a full shop economy are not implemented.
 
-This prototype inventory/wallet/consumable/drop/merchant layer does not include bank storage, persistent ground loot, full selling, dynamic shops, crafting, trading, save/load, backend persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
+This prototype inventory/wallet/consumable/drop/merchant layer does not include bank storage, persistent ground loot, full selling, dynamic shops, crafting, trading, backend persistence, cloud save, account save, cross-device persistence, full wallet UI, full equipment economy, rarity, affixes, upgrades, durability, sockets, set bonuses, or item comparison.
 
 
 
@@ -2563,6 +2646,7 @@ Debug/testing helpers may exist for development:
 - set current leader
 - reset health
 - reset resources
+- toggle companion infinite health
 - randomize positions
 - debug telemetry recording/export
 - debug maps
@@ -2591,7 +2675,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Support Focus settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, guide popup overlays, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, Options save controls, start screen save controls, offline progress summary, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -2599,7 +2683,7 @@ UI should remain a consumer/controller of game state, not the owner of simulatio
 
 ## Menu UI Technical Structure
 
-The React UI may include a main menu and submenu system for party overview, party management, prototype inventory display, prototype quest display, and prototype world travel.
+The React UI may include a main menu and submenu system for party overview, party management, prototype inventory display, prototype quest display, prototype world travel, and prototype options/save controls.
 
 Menu UI must remain in React components under `client/src/`.
 
@@ -2614,6 +2698,8 @@ React may:
 - track selected Party Management section UI state
 - track selected quest UI state
 - track selected World Travel destination UI state
+- track guide popup queue, active popup, and viewed popup UI state
+- track save status and offline summary UI state
 - render UI-facing enemy and NPC name labels
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
@@ -2623,6 +2709,7 @@ React may:
 - call existing skill behavior helpers for supported prototype skill behavior settings
 - call existing merchant helpers for supported quick exchange and Merchant Buy actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
+- call browser save storage helpers for supported local save, import, export, continue, delete, and new-game actions
 - display placeholder sections for future systems
 
 React must not:
@@ -2648,7 +2735,7 @@ Current intended Party sections and controls:
 - Stats
 - Equipment
 - Skills
-- Skill Preferences placeholder
+- Skill Preferences for supported prototype skill behavior settings
 
 Current intended Party Management sections and controls:
 
@@ -2657,7 +2744,7 @@ Current intended Party Management sections and controls:
 - Role Select
 - Party Order
 - Formation placeholder for UI only; automatic formation behavior lives in `partyFormationSystem.ts`
-- Behavior Settings for supported prototype auto-flask and Beginner First Aid self-heal controls
+- Behavior Settings for supported prototype auto-flask controls
 
 Role Select must use the existing `PartyMemberRole` values:
 
@@ -2721,7 +2808,7 @@ Do not implement unless requested:
 - casting system
 - advanced targeting system
 - advanced aggro/threat systems
-- advanced ranged combat
+- advanced ranged combat beyond current basic projectile visuals and enemy attack windup
 - advanced support mechanics
 - production asset pipeline
 - final world content pipeline
