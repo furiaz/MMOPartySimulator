@@ -3,7 +3,9 @@ import { getSlimewardDungeonPoiTarget } from "./dungeonSystem";
 import { HUB_MAP_ID } from "./debugMap";
 import { getQuickExchangeItems, quickExchangeParts } from "./merchant";
 import {
+  isInteractionPoiTarget,
   isInteractionStandPositionUsable,
+  isInteractionTargetReached,
   resolveInteractionStandPosition,
 } from "./interactionApproach";
 import {
@@ -11,6 +13,7 @@ import {
   hasDeadPartyMembers,
 } from "./partySystem";
 import {
+  getCommittedPartyThreatTarget,
   getPartyMembersRespondingToActiveThreat,
   isPartyMemberRespondingToActiveThreat,
 } from "./partyThreatSystem";
@@ -67,6 +70,7 @@ const QUEST_GIVER_INTERACTION_RANGE = 2;
 const DEFAULT_POI_INTERACTION_RANGE = 1.5;
 const WILD_POI_REEVALUATE_INTERVAL_MS = 4000;
 const QUEST_RESOURCE_POI_COMMITMENT_MS = 4000;
+const POI_THREAT_PRESERVATION_DISTANCE = 3;
 
 export function updatePoiSystem(
   state: GameState,
@@ -179,7 +183,7 @@ export function updatePoiSystem(
 
 function canReusePoiSelection(
   state: GameState,
-  leader: { position: Position },
+  leader: GameEntity,
   gathererReservations: GathererResourceReservations,
 ): state is GameState & { localPoiTarget: LocalPoiTarget } {
   if (!state.localPoiTarget) {
@@ -245,23 +249,13 @@ function canReusePoiSelection(
 function canReuseHubInteractionPoiSelection(
   state: GameState,
   target: LocalPoiTarget,
-  leader: { position: Position },
+  leader: GameEntity,
 ): boolean {
   return (
     isInteractionPoiTarget(target) &&
     isLocalPoiTargetStillValid(state, target) &&
     isQuestLinkedPoiStillRelevant(state, target) &&
-    getDistance(leader.position, target.position) >
-      getLocalTargetInteractionRange(target)
-  );
-}
-
-function isInteractionPoiTarget(target: LocalPoiTarget): boolean {
-  return (
-    target.category !== "combat" &&
-    target.category !== "resource" &&
-    target.category !== "teleport" &&
-    Boolean(target.interactionRange)
+    !isInteractionTargetReached(state, leader, target)
   );
 }
 
@@ -426,7 +420,12 @@ function updateReachedPoiInteractions(state: GameState): GameState {
   if (
     leader &&
     merchant &&
-    getDistance(leader.position, merchant.position) <= DEFAULT_POI_INTERACTION_RANGE &&
+    isReachedHubInteraction(
+      nextState,
+      leader,
+      merchant,
+      DEFAULT_POI_INTERACTION_RANGE,
+    ) &&
     getQuickExchangeItems(nextState).length > 0
   ) {
     return quickExchangeParts(nextState, merchant.id).state;
@@ -442,13 +441,36 @@ function updateReachedPoiInteractions(state: GameState): GameState {
   if (
     !leader ||
     !questSource ||
-    getDistance(leader.position, questSource.position) > QUEST_GIVER_INTERACTION_RANGE ||
+    !isReachedHubInteraction(
+      nextState,
+      leader,
+      questSource,
+      QUEST_GIVER_INTERACTION_RANGE,
+    ) ||
     !hasQuestGiverWork(nextState)
   ) {
     return nextState;
   }
 
   return updateQuestGiverInteraction(nextState, questSource.id);
+}
+
+function isReachedHubInteraction(
+  state: GameState,
+  leader: GameEntity,
+  targetEntity: GameEntity,
+  fallbackRange: number,
+): boolean {
+  const localTarget = state.localPoiTarget;
+
+  if (
+    localTarget?.targetEntityId === targetEntity.id &&
+    isInteractionTargetReached(state, leader, localTarget)
+  ) {
+    return true;
+  }
+
+  return getDistance(leader.position, targetEntity.position) <= fallbackRange;
 }
 
 function getQuestSourceHasWork(state: GameState, questGiverPoiId: string): boolean {
@@ -567,12 +589,9 @@ function applyLocalTargetToPartyIntent(
   localTarget: LocalPoiTarget,
 ): GameState {
   const leader = getPartyLeader(state);
-  const activeThreatResponder = getPartyMembersRespondingToActiveThreat(state)[0];
-  const activeThreatTarget = activeThreatResponder?.currentTargetId
-    ? getEntityById(state, activeThreatResponder.currentTargetId)
-    : undefined;
+  const activeThreatTarget = getPreservedPartyThreatTarget(state, localTarget);
 
-  if (localTarget.category === "resource" && activeThreatTarget?.kind === "enemy") {
+  if (activeThreatTarget) {
     return applyActivePartyThreatToPartyIntent(state, activeThreatTarget);
   }
 
@@ -634,6 +653,89 @@ function applyLocalTargetToPartyIntent(
         : null,
     commandPriority: "autonomous",
   });
+}
+
+function getPreservedPartyThreatTarget(
+  state: GameState,
+  localTarget: LocalPoiTarget,
+): Enemy | null {
+  if (!shouldPreserveActiveThreatForPoi(state, localTarget)) {
+    return null;
+  }
+
+  const currentTarget = getCurrentExecutionEnemyTarget(state);
+
+  if (currentTarget) {
+    return getCommittedPartyThreatTarget(state, {
+      currentTarget,
+      range: POI_THREAT_PRESERVATION_DISTANCE,
+    });
+  }
+
+  const respondingTarget = getRespondingPartyThreatTarget(state);
+
+  if (respondingTarget) {
+    return getCommittedPartyThreatTarget(state, {
+      currentTarget: respondingTarget,
+      range: POI_THREAT_PRESERVATION_DISTANCE,
+    });
+  }
+
+  if (localTarget.category === "resource") {
+    return null;
+  }
+
+  return getCommittedPartyThreatTarget(state, {
+    range: POI_THREAT_PRESERVATION_DISTANCE,
+  });
+}
+
+function shouldPreserveActiveThreatForPoi(
+  state: GameState,
+  localTarget: LocalPoiTarget,
+): boolean {
+  if (localTarget.category === "resource") {
+    return true;
+  }
+
+  if (!localTarget.questId || !localTarget.objectiveId) {
+    return false;
+  }
+
+  const activeQuest = getActiveQuest(state);
+
+  if (
+    activeQuest?.questId !== localTarget.questId ||
+    activeQuest.status !== "active"
+  ) {
+    return false;
+  }
+
+  const objective = getQuestObjective(localTarget.questId, localTarget.objectiveId);
+
+  return objective?.type === "repair_poi" || objective?.type === "defend_area";
+}
+
+function getCurrentExecutionEnemyTarget(state: GameState): Enemy | null {
+  const executionIntent = getPartyExecutionIntent(state);
+  const target = executionIntent?.targetId
+    ? getEntityById(state, executionIntent.targetId)
+    : undefined;
+
+  return target?.kind === "enemy" && target.state !== "dead" && target.health > 0
+    ? target
+    : null;
+}
+
+function getRespondingPartyThreatTarget(state: GameState): Enemy | null {
+  const responder = getPartyMembersRespondingToActiveThreat(state)[0];
+  const target = responder?.currentTargetId
+    ? getEntityById(state, responder.currentTargetId)
+    : undefined;
+
+  return target?.kind === "enemy" && target.state !== "dead" && target.health > 0
+    ? target
+    : null;
 }
 
 function getLocalTargetMovementTarget(

@@ -172,6 +172,111 @@ describe("chooseAttackSlot", () => {
     expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(0);
   });
 
+  it("reuses a recently remembered valid slot after tiny target movement", () => {
+    const movedTarget = {
+      ...target,
+      position: { x: 5.2, y: 5 },
+    };
+    const state = rememberAttackSlot(
+      createTestGameState({
+        entities: {
+          [attacker.id]: attacker,
+          [movedTarget.id]: movedTarget,
+        },
+        map: testMap,
+        simulationTimeMs: 1000,
+      }),
+      attacker,
+      target.position,
+      1,
+      { x: 5, y: 4 },
+      {
+        nowMs: 1000,
+        targetId: target.id,
+      },
+    );
+    consumeGamePerformanceMetrics();
+
+    expect(
+      chooseAttackSlot(state, attacker, movedTarget.position, 1, {
+        maxPathDistance: 6,
+        nowMs: 1100,
+        targetId: target.id,
+      }),
+    ).toEqual({ x: 5, y: 4 });
+
+    expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(0);
+  });
+
+  it("does not reuse a remembered slot after meaningful target movement", () => {
+    const movedTarget = {
+      ...target,
+      position: { x: 5.5, y: 5 },
+    };
+    const state = rememberAttackSlot(
+      createTestGameState({
+        entities: {
+          [attacker.id]: attacker,
+          [movedTarget.id]: movedTarget,
+        },
+        map: testMap,
+        simulationTimeMs: 1000,
+      }),
+      attacker,
+      target.position,
+      1,
+      { x: 5, y: 4 },
+      {
+        nowMs: 1000,
+        targetId: target.id,
+      },
+    );
+
+    expect(
+      chooseAttackSlot(state, attacker, movedTarget.position, 1, {
+        maxPathDistance: 6,
+        nowMs: 1100,
+        targetId: target.id,
+      }),
+    ).not.toEqual({ x: 5, y: 4 });
+  });
+
+  it("does not reuse a remembered slot when the cached slot becomes blocked", () => {
+    const movedTarget = {
+      ...target,
+      position: { x: 5.2, y: 5 },
+    };
+    const state = rememberAttackSlot(
+      createTestGameState({
+        entities: {
+          [attacker.id]: attacker,
+          [movedTarget.id]: movedTarget,
+        },
+        map: {
+          ...testMap,
+          walls: [{ x: 5, y: 4 }],
+        },
+        simulationTimeMs: 1000,
+      }),
+      attacker,
+      target.position,
+      1,
+      { x: 5, y: 4 },
+      {
+        nowMs: 1000,
+        targetId: target.id,
+      },
+    );
+
+    expect(
+      chooseAttackSlot(state, attacker, movedTarget.position, 1, {
+        maxPathDistance: 6,
+        nowMs: 1100,
+        targetId: target.id,
+      }),
+    ).not.toEqual({ x: 5, y: 4 });
+  });
+
   it("prefers a different combat slot when the nearest slot is too close to a living companion", () => {
     const combatAttacker = createCombatCompanion("attacker", { x: 3, y: 5 });
     const combatTarget = createEnemy("target", { x: 5, y: 5 });

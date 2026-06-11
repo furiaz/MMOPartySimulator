@@ -11,11 +11,14 @@ import {
 } from "./positionUtils";
 import type { GameState } from "./state";
 import type { GameEntity, Position } from "./types";
+import type { LocalPoiTarget } from "./questTypes";
 
 type InteractionStandOptions = {
   range: number;
   ignoredEntityId: string;
 };
+
+const INTERACTION_STAND_REACHED_DISTANCE = 1;
 
 export function resolveInteractionStandPosition(
   state: GameState,
@@ -73,6 +76,41 @@ export function isInteractionStandPositionUsable(
   );
 }
 
+export function isInteractionTargetReached(
+  state: GameState,
+  actor: GameEntity,
+  target: LocalPoiTarget,
+): boolean {
+  const range = target.interactionRange;
+
+  if (!range || !isInteractionPoiTarget(target)) {
+    return false;
+  }
+
+  const targetPosition = getInteractionTargetPosition(state, target);
+
+  if (getEuclideanDistance(actor.position, targetPosition) <= range) {
+    return true;
+  }
+
+  return isCachedInteractionStandReached(
+    state,
+    actor,
+    target,
+    targetPosition,
+    range,
+  );
+}
+
+export function isInteractionPoiTarget(target: LocalPoiTarget): boolean {
+  return (
+    target.category !== "combat" &&
+    target.category !== "resource" &&
+    target.category !== "teleport" &&
+    Boolean(target.interactionRange)
+  );
+}
+
 function getInteractionStandCandidates(
   state: GameState,
   actor: GameEntity,
@@ -123,6 +161,41 @@ function getInteractionStandCandidates(
   });
 }
 
+function isCachedInteractionStandReached(
+  state: GameState,
+  actor: GameEntity,
+  target: LocalPoiTarget,
+  targetPosition: Position,
+  range: number,
+): boolean {
+  return Boolean(
+    target.interactionStandActorId === actor.id &&
+      target.interactionStandPosition &&
+      target.interactionStandTargetPosition &&
+      arePositionsEqual(target.interactionStandTargetPosition, targetPosition) &&
+      getEuclideanDistance(actor.position, target.interactionStandPosition) <=
+        INTERACTION_STAND_REACHED_DISTANCE &&
+      isInteractionStandPositionUsable(
+        state,
+        actor,
+        targetPosition,
+        target.interactionStandPosition,
+        range,
+      ),
+  );
+}
+
+function getInteractionTargetPosition(
+  state: GameState,
+  target: LocalPoiTarget,
+): Position {
+  const entity = target.targetEntityId
+    ? state.entities[target.targetEntityId]
+    : undefined;
+
+  return entity?.position ?? target.position;
+}
+
 function isInteractionStandPositionReachable(
   state: GameState,
   actor: GameEntity,
@@ -152,7 +225,11 @@ function isInteractionStandPositionReachable(
       actor.id,
       { allowPartyPassThrough: true },
     ) !== null
-  );
+    );
+}
+
+function arePositionsEqual(first: Position, second: Position): boolean {
+  return first.x === second.x && first.y === second.y;
 }
 
 function isReservedPosition(

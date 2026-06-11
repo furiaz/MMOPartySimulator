@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   createCompanion,
   createEnemy,
+  createNpc,
   createResource,
   getMovementStepDistance,
 } from "./entities";
 import { issuePartyOrder } from "./commands";
+import { HUB_MAP_ID } from "./debugMap";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 import { createTestGameState } from "./testState";
@@ -382,6 +384,50 @@ describe("party formation real-time cohesion", () => {
       state: "follow",
       currentTargetId: leader.id,
     });
+  });
+
+  it("finishes an interaction POI when the leader is near the cached stand position", () => {
+    const leader = createCompanion("leader", { x: 3.2, y: 5 }, "leader", "fighter");
+    const follower = createCompanion("follower", { x: 2, y: 5 }, leader.id, "support");
+    const merchant = createNpc("merchant", { x: 5, y: 5 }, "Merchant", "merchant");
+    const state = createTestGameState({
+      currentMapId: HUB_MAP_ID,
+      entities: {
+        [leader.id]: leader,
+        [follower.id]: follower,
+        [merchant.id]: merchant,
+      },
+      localPoiTarget: {
+        poiId: merchant.id,
+        category: "npc",
+        mapId: HUB_MAP_ID,
+        position: merchant.position,
+        interactionRange: 1.5,
+        targetEntityId: merchant.id,
+        reason: "merchant quick exchange",
+        interactionStandActorId: leader.id,
+        interactionStandPosition: { x: 4, y: 5 },
+        interactionStandTargetPosition: merchant.position,
+      },
+      leaderIntent: {
+        type: "move",
+        targetId: null,
+        targetPosition: merchant.position,
+        source: "ai",
+      },
+      map: {
+        ...createOpenTestMap(),
+        id: HUB_MAP_ID,
+      },
+      partyLeaderId: leader.id,
+      simulationDeltaMs: 100,
+    });
+
+    const nextState = updatePartyFormationSystem(state);
+
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.entities[leader.id].position).toEqual(leader.position);
   });
 
   it("stops the leader at resource interaction range for gather POIs", () => {

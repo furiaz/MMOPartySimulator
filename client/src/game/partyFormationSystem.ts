@@ -1,6 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
+import { isInteractionTargetReached } from "./interactionApproach";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import { getPartyExecutionIntentReachability } from "./partyOrderReachability";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
@@ -646,13 +647,9 @@ function isLocalInteractionTargetReached(
 ): boolean {
   const localTarget = state.localPoiTarget;
 
-  return Boolean(
-    localTarget?.interactionRange &&
-      localTarget.category !== "teleport" &&
-      localTarget.category !== "combat" &&
-      localTarget.category !== "resource" &&
-      getDistance(leader.position, localTarget.position) <= localTarget.interactionRange,
-  );
+  return localTarget
+    ? isInteractionTargetReached(state, leader, localTarget)
+    : false;
 }
 
 function isActiveGuidePoi(state: GameState): boolean {

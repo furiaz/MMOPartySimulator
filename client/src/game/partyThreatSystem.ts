@@ -157,7 +157,7 @@ function getDirectPersonalAttacker(
   );
 }
 
-function isRetainableActivePartyThreat(
+export function isRetainableActivePartyThreat(
   state: GameState,
   enemy: Enemy,
   range: number,

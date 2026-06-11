@@ -8,6 +8,7 @@ import type { GameState } from "./state";
 import { recordAttackSlotCheck } from "./performanceMetrics";
 import {
   arePositionsEqual,
+  getEuclideanDistance,
   getGridDistance,
   getManhattanDistance,
 } from "./positionUtils";
@@ -45,6 +46,7 @@ export type AttackSlotPartySpacingMode = NonNullable<
 >;
 
 const DEFAULT_ATTACK_SLOT_REUSE_MS = 250;
+const TARGET_POSITION_REUSE_DISTANCE = 0.35;
 
 export function createAttackSlotPathDistanceCache(): AttackSlotPathDistanceCache {
   return new Map<string, number>();
@@ -214,7 +216,9 @@ function getReusableCachedAttackSlot(
     cachedSlot.targetId !== options.targetId ||
     cachedSlot.attackRange !== attackRange ||
     cachedSlot.usesPartyPassThrough !== Boolean(options.allowPartyPassThrough) ||
-    !arePositionsEqual(cachedSlot.targetPosition, targetPosition) ||
+    getEuclideanDistance(cachedSlot.targetPosition, targetPosition) >
+      TARGET_POSITION_REUSE_DISTANCE ||
+    getGridDistance(cachedSlot.attackSlot, targetPosition) > attackRange ||
     (state.movementFailureMsByEntityId?.[attacker.id] ?? 0) >= reuseMs
   ) {
     return null;
