@@ -99,6 +99,14 @@ Debugging / Fixing:
 - Work in small steps
 - One system at a time
 - Test frequently
+- When browser/manual verification uses the production preview client:
+  - Always run the build from `client/` first:
+    - `npm run build`
+  - Always restart the production preview on port 4173 after rebuilding:
+    - `npm run preview -- --host 127.0.0.1 --port 4173`
+  - Verify `http://127.0.0.1:4173/` responds before telling the user to test it.
+  - Do not rely on an already-running preview server after a rebuild unless it has been confirmed to be serving the fresh `dist/` output.
+  - If port 4173 is occupied by an unrelated process, stop and ask before using another port.
 - Build systems before UI when possible
 
 ---
