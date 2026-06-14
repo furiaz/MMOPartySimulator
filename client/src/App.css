@@ -1205,6 +1205,37 @@
   flex: 1;
 }
 
+.class-mentor-panel {
+  width: 320px;
+}
+
+.class-mentor-choice-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.class-mentor-choice-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px;
+  text-align: left;
+}
+
+.class-mentor-choice-card strong,
+.class-mentor-choice-card span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.class-mentor-choice-card span {
+  color: #aec6ca;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .merchant-buy-panel {
   width: min(700px, calc(100vw - var(--npc-interaction-left) - 254px));
 }
@@ -1855,6 +1886,14 @@
   padding: 8px;
   border: 1px solid rgba(58, 90, 96, 0.78);
   background: rgba(9, 18, 21, 0.24);
+}
+
+.full-stat-grid .first-class-ready-stat {
+  border-color: rgba(126, 181, 138, 0.84);
+}
+
+.full-stat-grid .first-class-ready-stat dd {
+  color: #b8f0c6;
 }
 
 .compact-stat-grid dt,
@@ -2698,7 +2737,8 @@ button {
   }
 
   .quest-giver-list-panel,
-  .quest-giver-detail-panel {
+  .quest-giver-detail-panel,
+  .class-mentor-panel {
     width: min(100%, calc(100vw - 32px));
   }
 

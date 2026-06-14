@@ -420,7 +420,20 @@ export {
   isLivingEnemy,
   isResourceGameEntity,
 } from "./entityGuards";
-export { CLASS_DEFINITIONS } from "./classes";
+export {
+  CLASS_DEFINITIONS,
+  FIRST_CLASS_IDS,
+  isFirstClassId,
+  type FirstClassId,
+} from "./classes";
+export {
+  canCompanionEnterFirstClassSelection,
+  selectFirstClass,
+  validateFirstClassSelection,
+  type FirstClassSelectionFailureReason,
+  type FirstClassSelectionResult,
+  type FirstClassSelectionValidation,
+} from "./classSelection";
 export { SKILL_DEFINITIONS, getSkillsForClass } from "./skills";
 export {
   SKILL_ROLE_PREFERENCES,

@@ -19,6 +19,7 @@ import {
   EQUIPMENT_TYPE_LABELS,
   getConsumableCooldownRemainingMs,
   getCharacterXpProgress,
+  canCompanionEnterFirstClassSelection,
   getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
   getCompanionActualStats,
@@ -1577,6 +1578,12 @@ function StatsSection({
           <dt>Class</dt>
           <dd>{CLASS_DEFINITIONS[member.classId].displayName}</dd>
         </div>
+        {canCompanionEnterFirstClassSelection(member) ? (
+          <div className="first-class-ready-stat">
+            <dt>Class Path</dt>
+            <dd>Ready for first class</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Role</dt>
           <dd>{partyMemberRoleLabels[member.role]}</dd>

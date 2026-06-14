@@ -37,6 +37,7 @@ import {
   allocateCompanionStatPoint,
   ARMOR_FAMILY_LABELS,
   buyMerchantItem,
+  canCompanionEnterFirstClassSelection,
   CLASS_DEFINITIONS,
   companionIds,
   companionStartPositions,
@@ -116,6 +117,7 @@ import {
   setAutoModeEnabled,
   setPartyLeader,
   setPartyMemberRole,
+  selectFirstClass,
   setPartyOrder,
   setPoiSearchScope,
   setWorldTravelTargetMapId,
@@ -129,6 +131,7 @@ import {
   updateCompanionConsumableBehavior,
   updateCompanionSkillBehavior,
   type ActiveCombatProjectile,
+  type ClassPath,
   type Companion,
   type DirectCompanionCommand,
   type CompanionDirectCommandInput,
@@ -141,6 +144,8 @@ import {
   type EnemyAoeChannelState,
   type EquipmentSlot,
   type EquipmentStatModifiers,
+  type FirstClassId,
+  type FirstClassSelectionResult,
   type GameEntity,
   type GameMap,
   type GameState,
@@ -272,6 +277,11 @@ type NavigationClickAccessibilityCache = {
 type MerchantPanel = "buy" | "sell";
 type QuestGiverPanel = "available" | "current";
 type NpcInteractionKind = "merchant" | "quest_giver";
+type ClassMentorFlowScreen =
+  | { type: "companions" }
+  | { type: "paths"; companionId: string }
+  | { type: "classes"; companionId: string; path: ClassPath }
+  | { type: "confirm"; companionId: string; classId: FirstClassId };
 
 type MerchantBuyFilter = "all" | MerchantStockGroup;
 
@@ -305,6 +315,49 @@ const merchantBuyFilters: MerchantBuyFilter[] = [
   "plate",
   "accessories",
 ];
+
+const classPathOptions: {
+  path: ClassPath;
+  label: string;
+  description: string;
+  classIds: FirstClassId[];
+}[] = [
+  {
+    path: "honor",
+    label: "Honor Path",
+    description: "Disciplined frontline and weapon mastery.",
+    classIds: ["blade", "aegis"],
+  },
+  {
+    path: "primal",
+    label: "Primal Path",
+    description: "Instinct, mobility, beasts, and wilderness combat.",
+    classIds: ["hunter", "beast"],
+  },
+  {
+    path: "arcane",
+    label: "Arcane Path",
+    description: "Magic, control, elemental force, and runes.",
+    classIds: ["elementalist", "runecaster"],
+  },
+  {
+    path: "holy",
+    label: "Holy Path",
+    description: "Healing, sacrifice, protection, and faith-based power.",
+    classIds: ["lightbearer", "penitent"],
+  },
+];
+
+const firstClassDescriptions: Record<FirstClassId, string> = {
+  blade: "Weapon-focused attacker built around direct damage.",
+  aegis: "Defensive frontline class built around guarding and protection.",
+  hunter: "Ranged attacker with mark-based target pressure.",
+  beast: "Aggressive close-range class with feral self-buff identity.",
+  elementalist: "Direct magic damage through elemental attacks.",
+  runecaster: "Control-focused magic using binding and defensive runes.",
+  lightbearer: "Supportive healer and stabilizer.",
+  penitent: "Self-cost holy combat and support hybrid.",
+};
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
   strength: "Strength",
@@ -1636,6 +1689,196 @@ function QuestGiverDetailPanel({
   );
 }
 
+function ClassMentorFlowPanel({
+  screen,
+  eligibleCompanions,
+  partyMembers,
+  onSelectCompanion,
+  onSelectPath,
+  onSelectClass,
+  onConfirm,
+  onBack,
+}: {
+  screen: ClassMentorFlowScreen;
+  eligibleCompanions: Companion[];
+  partyMembers: Companion[];
+  onSelectCompanion: (companionId: string) => void;
+  onSelectPath: (path: ClassPath) => void;
+  onSelectClass: (classId: FirstClassId) => void;
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  if (screen.type === "companions") {
+    return (
+      <aside className="merchant-detail-panel class-mentor-panel">
+        <div className="menu-section-heading">
+          <span>Choose First Class</span>
+          <span>{eligibleCompanions.length}</span>
+        </div>
+        {eligibleCompanions.length > 0 ? (
+          <div className="class-mentor-choice-list">
+            {eligibleCompanions.map((companion) => (
+              <button
+                key={companion.id}
+                className="class-mentor-choice-card"
+                onClick={() => onSelectCompanion(companion.id)}
+                type="button"
+              >
+                <strong>{companion.id}</strong>
+                <span>
+                  Level {companion.characterLevel}{" "}
+                  {CLASS_DEFINITIONS[companion.classId].displayName}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="placeholder-box">
+            No companions are ready to choose a first class.
+          </div>
+        )}
+        <ClassMentorBackButton onBack={onBack} />
+      </aside>
+    );
+  }
+
+  const companion = partyMembers.find((member) => member.id === screen.companionId);
+
+  if (!companion) {
+    return (
+      <aside className="merchant-detail-panel class-mentor-panel">
+        <div className="menu-section-heading">
+          <span>Choose First Class</span>
+        </div>
+        <div className="placeholder-box">Selected companion is unavailable.</div>
+        <ClassMentorBackButton onBack={onBack} />
+      </aside>
+    );
+  }
+
+  if (screen.type === "paths") {
+    return (
+      <aside className="merchant-detail-panel class-mentor-panel">
+        <div className="menu-section-heading">
+          <span>{companion.id}</span>
+          <span>Path</span>
+        </div>
+        <div className="class-mentor-choice-list">
+          {classPathOptions.map((option) => (
+            <button
+              key={option.path}
+              className="class-mentor-choice-card"
+              onClick={() => onSelectPath(option.path)}
+              type="button"
+            >
+              <strong>{option.label}</strong>
+              <span>{option.description}</span>
+            </button>
+          ))}
+        </div>
+        <ClassMentorBackButton onBack={onBack} />
+      </aside>
+    );
+  }
+
+  if (screen.type === "classes") {
+    const pathOption = classPathOptions.find((option) => option.path === screen.path);
+
+    return (
+      <aside className="merchant-detail-panel class-mentor-panel">
+        <div className="menu-section-heading">
+          <span>{pathOption?.label ?? "Class Path"}</span>
+          <span>{companion.id}</span>
+        </div>
+        {pathOption ? (
+          <>
+            <p>{pathOption.description}</p>
+            <div className="class-mentor-choice-list">
+              {pathOption.classIds.map((classId) => (
+                <button
+                  key={classId}
+                  className="class-mentor-choice-card"
+                  onClick={() => onSelectClass(classId)}
+                  type="button"
+                >
+                  <strong>{CLASS_DEFINITIONS[classId].displayName}</strong>
+                  <span>{firstClassDescriptions[classId]}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="placeholder-box">Selected path is unavailable.</div>
+        )}
+        <ClassMentorBackButton onBack={onBack} />
+      </aside>
+    );
+  }
+
+  const classDefinition = CLASS_DEFINITIONS[screen.classId];
+
+  return (
+    <aside className="merchant-detail-panel class-mentor-panel">
+      <div className="menu-section-heading">
+        <span>Confirm First Class</span>
+        <span>{companion.id}</span>
+      </div>
+      <div className="placeholder-box">
+        {companion.id} will become a {classDefinition.displayName}.
+      </div>
+      <p>{firstClassDescriptions[screen.classId]}</p>
+      <div className="quest-giver-detail-actions">
+        <button onClick={onConfirm} type="button">
+          Confirm
+        </button>
+        <button onClick={onBack} type="button">
+          Back
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function ClassMentorBackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="quest-giver-detail-actions">
+      <button onClick={onBack} type="button">
+        Back
+      </button>
+    </div>
+  );
+}
+
+function getFirstClassSelectionFailureMessage(
+  result: FirstClassSelectionResult,
+): string {
+  if (result.status === "success") {
+    return "Class selected.";
+  }
+
+  if (result.reason === "incompatible_equipment") {
+    return "Remove incompatible equipment first.";
+  }
+
+  if (result.reason === "level_too_low") {
+    return "Companion must be level 10.";
+  }
+
+  if (result.reason === "not_beginner") {
+    return "Only Beginners can choose a first class.";
+  }
+
+  if (result.reason === "companion_dead") {
+    return "Dead companions cannot choose a first class.";
+  }
+
+  if (result.reason === "invalid_class") {
+    return "Choose a valid first class.";
+  }
+
+  return "Companion is unavailable.";
+}
+
 function getMerchantBuyBlockReason(
   entry: MerchantStockEntry,
   state: GameState,
@@ -2058,6 +2301,11 @@ function App() {
     useState<QuestId | null>(null);
   const [questGiverResultMessage, setQuestGiverResultMessage] =
     useState<string | null>(null);
+  const [classMentorFlow, setClassMentorFlow] = useState<
+    ClassMentorFlowScreen[]
+  >([]);
+  const [classMentorResultMessage, setClassMentorResultMessage] =
+    useState<string | null>(null);
   const [pendingNpcInteractionId, setPendingNpcInteractionId] = useState<
     string | null
   >(null);
@@ -2273,6 +2521,12 @@ function App() {
   )
     ? selectedCompanionId
     : partyMembers[0]?.id ?? null;
+  const eligibleFirstClassCompanions = useMemo(
+    () => partyMembers.filter(canCompanionEnterFirstClassSelection),
+    [partyMembers],
+  );
+  const activeClassMentorFlowScreen =
+    classMentorFlow[classMentorFlow.length - 1] ?? null;
   const totalPartyLevel = getTotalPartyCharacterLevel(gameState);
   const leader = navigationLeader;
   const hasPartyLeader = Boolean(leader);
@@ -2448,6 +2702,8 @@ function App() {
     setActiveQuestGiverPanel(null);
     setSelectedQuestGiverQuestId(null);
     setQuestGiverResultMessage(null);
+    setClassMentorFlow([]);
+    setClassMentorResultMessage(null);
     setActiveMerchantNpcId(npc.id);
     setActiveMerchantPanel(null);
     setMerchantResultMessage(
@@ -2471,6 +2727,8 @@ function App() {
     setActiveQuestGiverPanel(null);
     setSelectedQuestGiverQuestId(null);
     setQuestGiverResultMessage(null);
+    setClassMentorFlow([]);
+    setClassMentorResultMessage(null);
   }, []);
 
   const openNpcInteraction = useCallback((npc: NpcEntity) => {
@@ -2497,6 +2755,8 @@ function App() {
     setActiveQuestGiverPanel(null);
     setSelectedQuestGiverQuestId(null);
     setQuestGiverResultMessage(null);
+    setClassMentorFlow([]);
+    setClassMentorResultMessage(null);
 
     if (!merchantNpcId) {
       return;
@@ -3640,6 +3900,56 @@ function App() {
     setActiveQuestGiverPanel(panel);
     setSelectedQuestGiverQuestId(null);
     setQuestGiverResultMessage(null);
+    setClassMentorFlow([]);
+    setClassMentorResultMessage(null);
+  }
+
+  function openFirstClassSelectionFlow() {
+    setActiveQuestGiverPanel(null);
+    setSelectedQuestGiverQuestId(null);
+    setQuestGiverResultMessage(null);
+    setClassMentorResultMessage(null);
+    setClassMentorFlow([{ type: "companions" }]);
+  }
+
+  function pushClassMentorFlowScreen(screen: ClassMentorFlowScreen) {
+    setClassMentorFlow((currentFlow) => [...currentFlow, screen]);
+    setClassMentorResultMessage(null);
+  }
+
+  function goBackInClassMentorFlow() {
+    setClassMentorFlow((currentFlow) =>
+      currentFlow.length <= 1 ? [] : currentFlow.slice(0, -1),
+    );
+    setClassMentorResultMessage(null);
+  }
+
+  function confirmFirstClassSelection() {
+    if (activeClassMentorFlowScreen?.type !== "confirm") {
+      return;
+    }
+
+    const selection = selectFirstClass(
+      gameState,
+      activeClassMentorFlowScreen.companionId,
+      activeClassMentorFlowScreen.classId,
+    );
+
+    if (selection.result.status === "success") {
+      const className = CLASS_DEFINITIONS[selection.result.classId].displayName;
+
+      queueSaveAfterStateChange("Class selection saved");
+      setGameState(selection.state);
+      setClassMentorFlow([]);
+      setClassMentorResultMessage(
+        `${selection.result.companionId} is now a ${className}.`,
+      );
+      return;
+    }
+
+    setClassMentorResultMessage(
+      getFirstClassSelectionFailureMessage(selection.result),
+    );
   }
 
   function finishQuestGiverQuests() {
@@ -4228,8 +4538,12 @@ function App() {
                 Talk
               </button>
               {activeQuestGiverIsClassMentor ? (
-                <button disabled type="button">
-                  Class Change
+                <button
+                  className={activeClassMentorFlowScreen ? "active" : ""}
+                  onClick={openFirstClassSelectionFlow}
+                  type="button"
+                >
+                  Choose First Class
                 </button>
               ) : null}
               {activeQuestGiverPanel ? (
@@ -4267,7 +4581,49 @@ function App() {
                   {questGiverResultMessage}
                 </p>
               ) : null}
+              {classMentorResultMessage ? (
+                <p className="merchant-result-message">
+                  {classMentorResultMessage}
+                </p>
+              ) : null}
             </div>
+            {activeClassMentorFlowScreen ? (
+              <ClassMentorFlowPanel
+                eligibleCompanions={eligibleFirstClassCompanions}
+                partyMembers={partyMembers}
+                screen={activeClassMentorFlowScreen}
+                onBack={goBackInClassMentorFlow}
+                onConfirm={confirmFirstClassSelection}
+                onSelectClass={(classId) => {
+                  if (activeClassMentorFlowScreen.type !== "classes") {
+                    return;
+                  }
+
+                  pushClassMentorFlowScreen({
+                    type: "confirm",
+                    companionId: activeClassMentorFlowScreen.companionId,
+                    classId,
+                  });
+                }}
+                onSelectCompanion={(companionId) =>
+                  pushClassMentorFlowScreen({
+                    type: "paths",
+                    companionId,
+                  })
+                }
+                onSelectPath={(path) => {
+                  if (activeClassMentorFlowScreen.type !== "paths") {
+                    return;
+                  }
+
+                  pushClassMentorFlowScreen({
+                    type: "classes",
+                    companionId: activeClassMentorFlowScreen.companionId,
+                    path,
+                  });
+                }}
+              />
+            ) : null}
             {activeQuestGiverPanel ? (
               <aside className="merchant-detail-panel quest-giver-list-panel">
                 <div className="menu-section-heading">
