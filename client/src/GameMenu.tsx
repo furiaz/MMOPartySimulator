@@ -179,6 +179,7 @@ export function GameMenu({
                   totalPartyLevel={totalPartyLevel}
                   onAllocateStatPoint={onAllocateStatPoint}
                   onAssignFood={onAssignFood}
+                  onChangeSkillBehavior={onChangeSkillBehavior}
                   onEquipEquipment={onEquipEquipment}
                   onEquipFlask={onEquipFlask}
                   onSetLegacySkillEnabled={onSetLegacySkillEnabled}
@@ -197,7 +198,6 @@ export function GameMenu({
                   totalPartyLevel={totalPartyLevel}
                   onChangeLeader={onChangeLeader}
                   onChangeConsumableBehavior={onChangeConsumableBehavior}
-                  onChangeSkillBehavior={onChangeSkillBehavior}
                   onChangeRole={onChangeRole}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectManagementSection}

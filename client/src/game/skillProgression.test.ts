@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { addEntity } from "./state";
+import { addEntity, setPartyMemberClass } from "./state";
 import { addItemToInventoryState, countInventoryItem } from "./inventory";
 import { createCompanion } from "./entities";
 import { sanitizeGameStateForSave } from "./saveGame";
 import {
   getActiveSkillsForCompanion,
   getCompanionSkillRank,
+  getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
   getSkillMaxRank,
   getSkillRankMultiplier,
@@ -134,6 +135,59 @@ describe("skill progression", () => {
     expect(getActiveSkillsForCompanion(enabledCompanion).map((skill) => skill.id)).toEqual([
       "sweeping_strike",
       "kick",
+    ]);
+  });
+
+  it("groups learned skills by current class lineage, then Beginner", () => {
+    const companion = withSkillRanks(
+      createCompanion("companion", { x: 0, y: 0 }, "companion", "fighter", 1, "hunter"),
+      {
+        kick: 3,
+        first_aid: 2,
+        sweeping_strike: 4,
+      },
+    );
+
+    const groups = getLearnedSkillGroupsForCompanion(companion);
+
+    expect(groups.map((group) => group.classId)).toEqual([
+      "hunter",
+      "beginner",
+    ]);
+    expect(groups[0].skills.map((skill) => skill.id)).toEqual(["mark_target"]);
+    expect(groups[1].skills.map((skill) => skill.id)).toEqual([
+      "kick",
+      "first_aid",
+    ]);
+  });
+
+  it("drops skills outside the current class line after a class reset", () => {
+    const blade = withSkillRanks(
+      createCompanion("companion", { x: 0, y: 0 }, "companion", "fighter", 1, "blade"),
+      {
+        kick: 3,
+        sweeping_strike: 5,
+      },
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: blade.id }),
+      blade,
+    );
+
+    state = setPartyMemberClass(state, blade.id, "beginner");
+    state = setPartyMemberClass(state, blade.id, "hunter");
+
+    const hunter = state.entities[blade.id] as Companion;
+
+    expect(hunter.skillProgression?.ranksBySkillId).not.toHaveProperty(
+      "sweeping_strike",
+    );
+    expect(getLearnedSkillGroupsForCompanion(hunter).map((group) => group.classId)).toEqual([
+      "hunter",
+      "beginner",
+    ]);
+    expect(getActiveSkillsForCompanion(hunter).map((skill) => skill.id)).toEqual([
+      "mark_target",
     ]);
   });
 

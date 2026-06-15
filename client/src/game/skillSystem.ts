@@ -1,6 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getSkillRoleScore } from "./skillRolePreferences";
 import { getActiveSkillsForCompanion } from "./skillProgression";
+import { getSkillCooldownMs } from "./skills";
 import { type GameState } from "./state";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getCompanionAttackRange } from "./companionCombat";
@@ -30,7 +31,6 @@ import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
 export { updateSkillShieldBlockPositions } from "./skillEffectResolution";
 
-const SKILL_COOLDOWN_MS = 5000;
 const LOW_HEALTH_BUFFER = 1;
 const BEGINNER_FIRST_AID_SELF_HEAL_SCORE_BONUS = 20;
 const PROTECTIVE_THROW_ROCK_SCORE_BONUS = 5;
@@ -552,10 +552,6 @@ function hasAttackSkillTelemetryContext(
       isLivingEnemy(entity) &&
       getGridDistance(caster.position, entity.position) <= nearbyRange,
   );
-}
-
-function getSkillCooldownMs(skill: SkillDefinition): number {
-  return skill.cooldownMs ?? SKILL_COOLDOWN_MS;
 }
 
 function recordSkillApplied(

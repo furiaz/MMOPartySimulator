@@ -436,7 +436,12 @@ export {
   type FirstClassSelectionResult,
   type FirstClassSelectionValidation,
 } from "./classSelection";
-export { SKILL_DEFINITIONS, getSkillsForClass } from "./skills";
+export {
+  DEFAULT_SKILL_COOLDOWN_MS,
+  SKILL_DEFINITIONS,
+  getSkillCooldownMs,
+  getSkillsForClass,
+} from "./skills";
 export {
   BEGINNER_SKILL_MAX_RANK,
   CLASS_SKILL_MAX_RANK,
@@ -448,6 +453,7 @@ export {
   getActiveSkillsForCompanion,
   getCompanionSkillRank,
   getLegacySkillCandidatesForCompanion,
+  getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
   getSkillBookReadCandidates,
   getSkillBookSkillId,
@@ -462,6 +468,7 @@ export {
   setCompanionLegacySkillEnabled,
   type ReadSkillBookFailureReason,
   type ReadSkillBookResult,
+  type LearnedSkillGroup,
 } from "./skillProgression";
 export {
   SKILL_ROLE_PREFERENCES,

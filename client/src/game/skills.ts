@@ -2,6 +2,7 @@ import type { ClassId, SkillDefinition } from "./types";
 
 const BEGINNER_SKILL_COOLDOWN_MS = 10000;
 const BEGINNER_BUFF_DURATION_MS = 9000;
+export const DEFAULT_SKILL_COOLDOWN_MS = 5000;
 
 export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> = {
   throw_rock: {
@@ -196,4 +197,8 @@ export function getSkillsForClass(classId: ClassId): SkillDefinition[] {
   return Object.values(SKILL_DEFINITIONS).filter(
     (skill) => skill.classId === classId,
   );
+}
+
+export function getSkillCooldownMs(skill: SkillDefinition): number {
+  return skill.cooldownMs ?? DEFAULT_SKILL_COOLDOWN_MS;
 }

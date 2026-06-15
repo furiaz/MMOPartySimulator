@@ -67,6 +67,11 @@ export type ReadSkillBookResult =
       reason: ReadSkillBookFailureReason;
     };
 
+export type LearnedSkillGroup = {
+  classId: ClassId;
+  skills: SkillDefinition[];
+};
+
 export function createCompanionSkillProgressionForClass(
   classId: ClassId,
 ): CompanionSkillProgression {
@@ -157,6 +162,21 @@ export function getLegacySkillCandidatesForCompanion(
   );
 }
 
+export function getLearnedSkillGroupsForCompanion(
+  companion: Companion,
+): LearnedSkillGroup[] {
+  const classIds = getLearnedClassIdsForCompanion(companion);
+
+  return classIds
+    .map((classId) => ({
+      classId,
+      skills: getSkillsForClass(classId).filter(
+        (skill) => skill.classId === companion.classId || hasCompanionLearnedSkill(companion, skill.id),
+      ),
+    }))
+    .filter((group) => group.skills.length > 0);
+}
+
 export function isLegacySkillEnabledForCompanion(
   companion: Companion,
   skillId: SkillId,
@@ -170,7 +190,12 @@ export function isLegacySkillEligibleForCompanion(
 ): boolean {
   const skill = SKILL_DEFINITIONS[skillId];
 
-  if (!skill || skill.classId === companion.classId || skill.canLegacyCarry === false) {
+  if (
+    !skill ||
+    skill.classId === companion.classId ||
+    skill.canLegacyCarry === false ||
+    !isSkillInCompanionClassLineage(companion, skill)
+  ) {
     return false;
   }
 
@@ -537,7 +562,13 @@ export function sanitizeCompanionSkillProgression(
       continue;
     }
 
-    ranksBySkillId[skillId] = clampRank(rank, getSkillMaxRank(SKILL_DEFINITIONS[skillId]));
+    const skill = SKILL_DEFINITIONS[skillId];
+
+    if (!isSkillInCompanionClassLineage(companion, skill)) {
+      continue;
+    }
+
+    ranksBySkillId[skillId] = clampRank(rank, getSkillMaxRank(skill));
   }
 
   for (const skill of getSkillsForClass(companion.classId)) {
@@ -575,10 +606,41 @@ function hasCompanionLearnedSkill(companion: Companion, skillId: SkillId): boole
     return false;
   }
 
+  if (!isSkillInCompanionClassLineage(companion, skill)) {
+    return false;
+  }
+
   return (
     skill.classId === companion.classId ||
     companion.skillProgression?.ranksBySkillId?.[skillId] !== undefined
   );
+}
+
+function getLearnedClassIdsForCompanion(companion: Companion): ClassId[] {
+  const learnedClassIds = new Set<ClassId>();
+
+  for (const skill of Object.values(SKILL_DEFINITIONS)) {
+    if (hasCompanionLearnedSkill(companion, skill.id)) {
+      learnedClassIds.add(skill.classId);
+    }
+  }
+
+  return getCompanionClassLineageIds(companion).filter((classId) =>
+    learnedClassIds.has(classId),
+  );
+}
+
+function getCompanionClassLineageIds(companion: Companion): ClassId[] {
+  return companion.classId === "beginner"
+    ? ["beginner"]
+    : [companion.classId, "beginner"];
+}
+
+function isSkillInCompanionClassLineage(
+  companion: Companion,
+  skill: SkillDefinition,
+): boolean {
+  return getCompanionClassLineageIds(companion).includes(skill.classId);
 }
 
 function isKnownSkillId(skillId: string): skillId is SkillId {

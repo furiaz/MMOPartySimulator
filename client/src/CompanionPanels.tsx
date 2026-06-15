@@ -30,12 +30,14 @@ import {
   getActiveSkillsForCompanion,
   getCompanionSkillRank,
   getLegacySkillCandidatesForCompanion,
+  getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
   getRoleBonusDisplayState,
   isFlaskItemDefinition,
   isFoodItemDefinition,
   getPartySizeUnlockRequirement,
   getSkillRoleScore,
+  getSkillCooldownMs,
   getSkillMaxRank,
   isLegacySkillEnabledForCompanion,
   validateEquipmentItemForCompanion,
@@ -194,6 +196,7 @@ export function PartyMenuPanel({
   totalPartyLevel,
   onAllocateStatPoint,
   onAssignFood,
+  onChangeSkillBehavior,
   onEquipEquipment,
   onEquipFlask,
   onSetLegacySkillEnabled,
@@ -210,6 +213,10 @@ export function PartyMenuPanel({
   totalPartyLevel: number;
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onAssignFood: (companionId: string, itemId: ItemId | null) => void;
+  onChangeSkillBehavior: (
+    companionId: string,
+    update: Partial<Companion["skillBehavior"]>,
+  ) => void;
   onEquipEquipment: (
     companionId: string,
     itemId: ItemId,
@@ -262,6 +269,7 @@ export function PartyMenuPanel({
             member={selectedMember}
             onAllocateStatPoint={onAllocateStatPoint}
             onAssignFood={onAssignFood}
+            onChangeSkillBehavior={onChangeSkillBehavior}
             onEquipEquipment={onEquipEquipment}
             onEquipFlask={onEquipFlask}
             onSetLegacySkillEnabled={onSetLegacySkillEnabled}
@@ -284,6 +292,7 @@ function PartyMenuSectionPanel({
   onEquipEquipment,
   onAllocateStatPoint,
   onAssignFood,
+  onChangeSkillBehavior,
   onEquipFlask,
   onSetLegacySkillEnabled,
   onUnequipEquipment,
@@ -300,6 +309,10 @@ function PartyMenuSectionPanel({
   ) => void;
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onAssignFood: (companionId: string, itemId: ItemId | null) => void;
+  onChangeSkillBehavior: (
+    companionId: string,
+    update: Partial<Companion["skillBehavior"]>,
+  ) => void;
   onEquipFlask: (companionId: string, itemId: ItemId) => void;
   onSetLegacySkillEnabled: (
     companionId: string,
@@ -334,9 +347,14 @@ function PartyMenuSectionPanel({
   }
 
   if (activeSection === "skills") {
+    return <PartySkillsSection member={member} />;
+  }
+
+  if (activeSection === "skillPreferences") {
     return (
-      <PartySkillsSection
+      <SkillPreferencesSection
         member={member}
+        onChangeSkillBehavior={onChangeSkillBehavior}
         onSetLegacySkillEnabled={onSetLegacySkillEnabled}
       />
     );
@@ -353,9 +371,13 @@ function PartyMenuSectionPanel({
 function CompanionSkillSummary({
   member,
   skills,
+  title,
+  showRoleScore = true,
 }: {
   member: Companion;
   skills: SkillDefinition[];
+  title: string;
+  showRoleScore?: boolean;
 }) {
   const orderedSkills = skills
     .map((skill, index) => ({
@@ -368,7 +390,7 @@ function CompanionSkillSummary({
 
   return (
     <div className="companion-skill-summary" aria-label="Companion skills">
-      <span className="equipment-section-label">Skills</span>
+      <span className="equipment-section-label">{title}</span>
       {skills.length > 0 ? (
         <div className="companion-skill-list">
           {orderedSkills.map(({ score, skill, scaledSkill }) => (
@@ -386,12 +408,18 @@ function CompanionSkillSummary({
                   </dd>
                 </div>
                 <div>
+                  <dt>Cooldown</dt>
+                  <dd>{formatSkillCooldown(getSkillCooldownMs(skill))}</dd>
+                </div>
+                {showRoleScore ? (
+                  <div>
+                    <dt>Role Score</dt>
+                    <dd>{score}</dd>
+                  </div>
+                ) : null}
+                <div>
                   <dt>Range</dt>
                   <dd>{skill.range}</dd>
-                </div>
-                <div>
-                  <dt>Role Score</dt>
-                  <dd>{score}</dd>
                 </div>
               </dl>
               <span className="companion-skill-tags">
@@ -461,6 +489,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power at ${effect.hpCost} HP cost.`;
+}
+
+function formatSkillCooldown(cooldownMs: number): string {
+  return `${Math.round(cooldownMs / 1000)}s`;
 }
 
 function CompanionMenuList({
@@ -582,7 +614,6 @@ export function PartyManagementPanel({
   totalPartyLevel,
   onChangeLeader,
   onChangeConsumableBehavior,
-  onChangeSkillBehavior,
   onChangeRole,
   onSelectCompanion,
   onSelectSection,
@@ -598,10 +629,6 @@ export function PartyManagementPanel({
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
-  ) => void;
-  onChangeSkillBehavior: (
-    companionId: string,
-    update: Partial<Companion["skillBehavior"]>,
   ) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onSelectCompanion: (companionId: string) => void;
@@ -658,7 +685,6 @@ export function PartyManagementPanel({
             members={orderedMembers}
             onChangeLeader={onChangeLeader}
             onChangeConsumableBehavior={onChangeConsumableBehavior}
-            onChangeSkillBehavior={onChangeSkillBehavior}
             onChangeRole={onChangeRole}
             onMovePartyOrder={onMovePartyOrder}
           />
@@ -716,7 +742,6 @@ function PartyManagementSectionPanel({
   members,
   onChangeLeader,
   onChangeConsumableBehavior,
-  onChangeSkillBehavior,
   onChangeRole,
   onMovePartyOrder,
 }: {
@@ -729,10 +754,6 @@ function PartyManagementSectionPanel({
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
-  ) => void;
-  onChangeSkillBehavior: (
-    companionId: string,
-    update: Partial<Companion["skillBehavior"]>,
   ) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
@@ -764,7 +785,6 @@ function PartyManagementSectionPanel({
       <BehaviorSettingsSection
         member={member}
         onChangeConsumableBehavior={onChangeConsumableBehavior}
-        onChangeSkillBehavior={onChangeSkillBehavior}
       />
     );
   }
@@ -1335,28 +1355,14 @@ function RoleSelectSection({
 function BehaviorSettingsSection({
   member,
   onChangeConsumableBehavior,
-  onChangeSkillBehavior,
 }: {
   member: Companion;
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
   ) => void;
-  onChangeSkillBehavior: (
-    companionId: string,
-    update: Partial<Companion["skillBehavior"]>,
-  ) => void;
 }) {
   const threshold = member.consumableBehavior.autoFlaskHpThresholdPercent;
-  const firstAidSelfThreshold =
-    member.skillBehavior.beginnerFirstAidSelfHealHpThresholdPercent ??
-    DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT;
-  const firstAidAllyThreshold =
-    member.skillBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
-    DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT;
-  const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
-  const isBeginner = member.classId === "beginner";
-  const isSupport = member.role === "support";
 
   return (
     <section className="management-section-card" aria-label="Behavior Settings">
@@ -1400,7 +1406,46 @@ function BehaviorSettingsSection({
           />
           <strong>{threshold}%</strong>
         </label>
-        {isBeginner ? (
+      </div>
+    </section>
+  );
+}
+
+function SkillPreferencesSection({
+  member,
+  onChangeSkillBehavior,
+  onSetLegacySkillEnabled,
+}: {
+  member: Companion;
+  onChangeSkillBehavior: (
+    companionId: string,
+    update: Partial<Companion["skillBehavior"]>,
+  ) => void;
+  onSetLegacySkillEnabled: (
+    companionId: string,
+    skillId: SkillId,
+    enabled: boolean,
+  ) => void;
+}) {
+  const firstAidSelfThreshold =
+    member.skillBehavior.beginnerFirstAidSelfHealHpThresholdPercent ??
+    DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT;
+  const firstAidAllyThreshold =
+    member.skillBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
+    DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT;
+  const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
+  const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
+  const hasFirstAid = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "first_aid"),
+  );
+  const isSupport = member.role === "support";
+  const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
+
+  return (
+    <section className="management-section-card" aria-label="Skill Preferences">
+      <h3>Skill Preferences</h3>
+      <div className="behavior-settings-list">
+        {hasFirstAid ? (
           <>
             <label className="behavior-range-row">
               <span>First Aid Self-Heal Threshold</span>
@@ -1489,6 +1534,43 @@ function BehaviorSettingsSection({
               ))}
             </div>
           </div>
+        ) : null}
+        {legacyCandidates.length > 0 ? (
+          <div className="companion-skill-summary" aria-label="Legacy skill toggles">
+            <span className="equipment-section-label">Legacy Skills</span>
+            <div className="companion-skill-list">
+              {legacyCandidates.map((skill) => {
+                const enabled = isLegacySkillEnabledForCompanion(member, skill.id);
+
+                return (
+                  <div key={skill.id} className="companion-skill-row">
+                    <div>
+                      <strong>{skill.displayName}</strong>
+                      <span>
+                        {CLASS_DEFINITIONS[skill.classId].displayName} | Rank{" "}
+                        {getCompanionSkillRank(member, skill.id)}/
+                        {getSkillMaxRank(skill)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        onSetLegacySkillEnabled(member.id, skill.id, !enabled)
+                      }
+                      type="button"
+                    >
+                      {enabled ? "Disable" : "Enable"}
+                    </button>
+                    <span className="companion-skill-tags">
+                      {skill.tags.join(", ")}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        {!hasFirstAid && !isSupport && legacyCandidates.length === 0 ? (
+          <span className="party-menu-empty">No skill preferences available</span>
         ) : null}
       </div>
     </section>
@@ -1693,20 +1775,10 @@ function StatsSection({
   );
 }
 
-function PartySkillsSection({
-  member,
-  onSetLegacySkillEnabled,
-}: {
-  member: Companion;
-  onSetLegacySkillEnabled: (
-    companionId: string,
-    skillId: SkillId,
-    enabled: boolean,
-  ) => void;
-}) {
+function PartySkillsSection({ member }: { member: Companion }) {
   const classDefinition = CLASS_DEFINITIONS[member.classId];
   const skills = getActiveSkillsForCompanion(member);
-  const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
+  const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
 
   return (
     <section className="management-section-card" aria-label="Skills">
@@ -1716,41 +1788,20 @@ function PartySkillsSection({
           {classDefinition.displayName}
         </button>
       </nav>
-      <CompanionSkillSummary member={member} skills={skills} />
-      {legacyCandidates.length > 0 ? (
-        <div className="companion-skill-summary" aria-label="Legacy skills">
-          <span className="equipment-section-label">Legacy</span>
-          <div className="companion-skill-list">
-            {legacyCandidates.map((skill) => {
-              const enabled = isLegacySkillEnabledForCompanion(member, skill.id);
-
-              return (
-                <div key={skill.id} className="companion-skill-row">
-                  <div>
-                    <strong>{skill.displayName}</strong>
-                    <span>
-                      {CLASS_DEFINITIONS[skill.classId].displayName} | Rank{" "}
-                      {getCompanionSkillRank(member, skill.id)}/
-                      {getSkillMaxRank(skill)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      onSetLegacySkillEnabled(member.id, skill.id, !enabled)
-                    }
-                    type="button"
-                  >
-                    {enabled ? "Disable" : "Enable"}
-                  </button>
-                  <span className="companion-skill-tags">
-                    {skill.tags.join(", ")}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+      <CompanionSkillSummary
+        member={member}
+        skills={skills}
+        title="Skill Usage Lineup"
+      />
+      {learnedSkillGroups.map((group) => (
+        <CompanionSkillSummary
+          key={group.classId}
+          member={member}
+          skills={group.skills}
+          title={`Learned ${CLASS_DEFINITIONS[group.classId].displayName} Skills`}
+          showRoleScore={false}
+        />
+      ))}
     </section>
   );
 }
