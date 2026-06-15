@@ -27,12 +27,17 @@ import {
   getCompanionEffectiveGatherSpeed,
   getDefenseReductionPercent,
   getItemDefinition,
+  getActiveSkillsForCompanion,
+  getCompanionSkillRank,
+  getLegacySkillCandidatesForCompanion,
+  getScaledSkillDefinitionForCompanion,
   getRoleBonusDisplayState,
   isFlaskItemDefinition,
   isFoodItemDefinition,
   getPartySizeUnlockRequirement,
   getSkillRoleScore,
-  getSkillsForClass,
+  getSkillMaxRank,
+  isLegacySkillEnabledForCompanion,
   validateEquipmentItemForCompanion,
   type Companion,
   type CompanionPrimaryStatModifiers,
@@ -44,6 +49,7 @@ import {
   type PartyMemberRole,
   type PrimaryStatId,
   type SkillDefinition,
+  type SkillId,
   type SupportFocus,
 } from "./game";
 export type {
@@ -190,6 +196,7 @@ export function PartyMenuPanel({
   onAssignFood,
   onEquipEquipment,
   onEquipFlask,
+  onSetLegacySkillEnabled,
   onSelectCompanion,
   onSelectSection,
   onUnequipEquipment,
@@ -209,6 +216,11 @@ export function PartyMenuPanel({
     targetSlot: EquipmentSlot,
   ) => void;
   onEquipFlask: (companionId: string, itemId: ItemId) => void;
+  onSetLegacySkillEnabled: (
+    companionId: string,
+    skillId: SkillId,
+    enabled: boolean,
+  ) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectSection: (section: PartyMenuSection) => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
@@ -252,6 +264,7 @@ export function PartyMenuPanel({
             onAssignFood={onAssignFood}
             onEquipEquipment={onEquipEquipment}
             onEquipFlask={onEquipFlask}
+            onSetLegacySkillEnabled={onSetLegacySkillEnabled}
             onUnequipEquipment={onUnequipEquipment}
             onUnequipFlask={onUnequipFlask}
           />
@@ -272,6 +285,7 @@ function PartyMenuSectionPanel({
   onAllocateStatPoint,
   onAssignFood,
   onEquipFlask,
+  onSetLegacySkillEnabled,
   onUnequipEquipment,
   onUnequipFlask,
 }: {
@@ -287,6 +301,11 @@ function PartyMenuSectionPanel({
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onAssignFood: (companionId: string, itemId: ItemId | null) => void;
   onEquipFlask: (companionId: string, itemId: ItemId) => void;
+  onSetLegacySkillEnabled: (
+    companionId: string,
+    skillId: SkillId,
+    enabled: boolean,
+  ) => void;
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
   onUnequipFlask: (companionId: string) => void;
 }) {
@@ -315,7 +334,12 @@ function PartyMenuSectionPanel({
   }
 
   if (activeSection === "skills") {
-    return <PartySkillsSection member={member} />;
+    return (
+      <PartySkillsSection
+        member={member}
+        onSetLegacySkillEnabled={onSetLegacySkillEnabled}
+      />
+    );
   }
 
   return (
@@ -338,6 +362,7 @@ function CompanionSkillSummary({
       index,
       score: getSkillRoleScore(member.role, skill.tags),
       skill,
+      scaledSkill: getScaledSkillDefinitionForCompanion(member, skill),
     }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
@@ -346,13 +371,20 @@ function CompanionSkillSummary({
       <span className="equipment-section-label">Skills</span>
       {skills.length > 0 ? (
         <div className="companion-skill-list">
-          {orderedSkills.map(({ score, skill }) => (
+          {orderedSkills.map(({ score, skill, scaledSkill }) => (
             <div key={skill.id} className="companion-skill-row">
               <div>
                 <strong>{skill.displayName}</strong>
-                <span>{getSkillEffectSummary(skill)}</span>
+                <span>{getSkillEffectSummary(scaledSkill)}</span>
               </div>
               <dl>
+                <div>
+                  <dt>Rank</dt>
+                  <dd>
+                    {getCompanionSkillRank(member, skill.id)}/
+                    {getSkillMaxRank(skill)}
+                  </dd>
+                </div>
                 <div>
                   <dt>Range</dt>
                   <dd>{skill.range}</dd>
@@ -1661,9 +1693,20 @@ function StatsSection({
   );
 }
 
-function PartySkillsSection({ member }: { member: Companion }) {
+function PartySkillsSection({
+  member,
+  onSetLegacySkillEnabled,
+}: {
+  member: Companion;
+  onSetLegacySkillEnabled: (
+    companionId: string,
+    skillId: SkillId,
+    enabled: boolean,
+  ) => void;
+}) {
   const classDefinition = CLASS_DEFINITIONS[member.classId];
-  const skills = getSkillsForClass(member.classId);
+  const skills = getActiveSkillsForCompanion(member);
+  const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
 
   return (
     <section className="management-section-card" aria-label="Skills">
@@ -1674,6 +1717,40 @@ function PartySkillsSection({ member }: { member: Companion }) {
         </button>
       </nav>
       <CompanionSkillSummary member={member} skills={skills} />
+      {legacyCandidates.length > 0 ? (
+        <div className="companion-skill-summary" aria-label="Legacy skills">
+          <span className="equipment-section-label">Legacy</span>
+          <div className="companion-skill-list">
+            {legacyCandidates.map((skill) => {
+              const enabled = isLegacySkillEnabledForCompanion(member, skill.id);
+
+              return (
+                <div key={skill.id} className="companion-skill-row">
+                  <div>
+                    <strong>{skill.displayName}</strong>
+                    <span>
+                      {CLASS_DEFINITIONS[skill.classId].displayName} | Rank{" "}
+                      {getCompanionSkillRank(member, skill.id)}/
+                      {getSkillMaxRank(skill)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      onSetLegacySkillEnabled(member.id, skill.id, !enabled)
+                    }
+                    type="button"
+                  >
+                    {enabled ? "Disable" : "Enable"}
+                  </button>
+                  <span className="companion-skill-tags">
+                    {skill.tags.join(", ")}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

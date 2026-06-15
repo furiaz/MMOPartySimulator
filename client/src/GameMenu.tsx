@@ -21,6 +21,7 @@ import type {
   QuestId,
   DebugMapId,
   PrimaryStatId,
+  SkillId,
 } from "./game";
 
 export function GameMenu({
@@ -34,6 +35,7 @@ export function GameMenu({
   currentTime,
   quests,
   currentMapId,
+  skillBookReadMessage,
   worldTravelTargetMapId,
   selectedCompanionId,
   selectedQuestId,
@@ -47,6 +49,8 @@ export function GameMenu({
   onEquipEquipment,
   onEquipFlask,
   onOpenEquipmentManagement,
+  onReadSkillBook,
+  onSetLegacySkillEnabled,
   onSelectCompanion,
   onSelectManagementSection,
   onSelectPartySection,
@@ -72,6 +76,7 @@ export function GameMenu({
   currentTime: number;
   quests: GameState["quests"];
   currentMapId?: DebugMapId;
+  skillBookReadMessage?: string | null;
   worldTravelTargetMapId: DebugMapId | null;
   selectedCompanionId: string | null;
   selectedQuestId: QuestId | null;
@@ -95,6 +100,12 @@ export function GameMenu({
   ) => void;
   onEquipFlask: (companionId: string, itemId: ItemId) => void;
   onOpenEquipmentManagement: () => void;
+  onReadSkillBook: (companionId: string, itemId: ItemId) => void;
+  onSetLegacySkillEnabled: (
+    companionId: string,
+    skillId: SkillId,
+    enabled: boolean,
+  ) => void;
   onSelectCompanion: (companionId: string) => void;
   onSelectManagementSection: (section: PartyManagementSection) => void;
   onSelectPartySection: (section: PartyMenuSection) => void;
@@ -170,6 +181,7 @@ export function GameMenu({
                   onAssignFood={onAssignFood}
                   onEquipEquipment={onEquipEquipment}
                   onEquipFlask={onEquipFlask}
+                  onSetLegacySkillEnabled={onSetLegacySkillEnabled}
                   onSelectCompanion={onSelectCompanion}
                   onSelectSection={onSelectPartySection}
                   onUnequipEquipment={onUnequipEquipment}
@@ -194,8 +206,11 @@ export function GameMenu({
               ) : activeTab === "inventory" ? (
                 <InventoryPanel
                   inventory={inventory}
+                  members={members}
                   quests={quests}
+                  skillBookReadMessage={skillBookReadMessage}
                   wallet={wallet}
+                  onReadSkillBook={onReadSkillBook}
                   onOpenEquipmentManagement={onOpenEquipmentManagement}
                 />
               ) : activeTab === "quests" ? (

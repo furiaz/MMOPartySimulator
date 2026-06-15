@@ -45,6 +45,7 @@ import {
   filterExpiredSkillCooldownsByCompanion,
 } from "./companionCooldowns";
 import { createPendingRoleBonusState } from "./roleBonus";
+import { ensureCompanionSkillProgressionForClass } from "./skillProgression";
 import type {
   GlobalPoiIntent,
   LocalPoiTarget,
@@ -579,10 +580,11 @@ export function setPartyMemberClass(
     return state;
   }
 
-  const nextState = updateEntity(state, {
-    ...partyMember,
+  const nextPartyMember = ensureCompanionSkillProgressionForClass(
+    ensureCompanionSkillProgressionForClass(partyMember),
     classId,
-  });
+  );
+  const nextState = updateEntity(state, nextPartyMember);
 
   if (partyMember.classId === classId) {
     return nextState;

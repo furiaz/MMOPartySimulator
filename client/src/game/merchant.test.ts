@@ -153,6 +153,11 @@ describe("merchant buy", () => {
           group: "food",
         }),
         expect.objectContaining({
+          itemId: "first_aid_skill_book",
+          priceCrowns: 25,
+          group: "books",
+        }),
+        expect.objectContaining({
           itemId: "training_sword",
           priceCrowns: 12,
           group: "weapons",
@@ -235,6 +240,27 @@ describe("merchant buy", () => {
     });
     expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(70);
     expect(countInventoryItem(nextState.inventory, "minor_recovery_flask")).toBe(1);
+  });
+
+  it("buys skill books into shared inventory for Crowns", () => {
+    let state = createMerchantState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const { state: nextState, result } = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "first_aid_skill_book",
+    );
+
+    expect(result).toMatchObject({
+      status: "success",
+      itemId: "first_aid_skill_book",
+      priceCrowns: 25,
+      previousCrowns: 100,
+      newCrowns: 75,
+    });
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(75);
+    expect(countInventoryItem(nextState.inventory, "first_aid_skill_book")).toBe(1);
   });
 
   it("does not mutate state when Crowns are insufficient", () => {

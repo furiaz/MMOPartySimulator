@@ -35,6 +35,7 @@ export type MerchantMenuSelection = "buy" | "sell" | "quick_exchange_parts" | "l
 export type MerchantStockGroup =
   | "flasks"
   | "food"
+  | "books"
   | "weapons"
   | "offhands"
   | "cloth"
@@ -146,6 +147,22 @@ const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "soldiers_recovery_flask", priceCrowns: 45, group: "flasks" },
   { itemId: "hearty_trail_rations", priceCrowns: 15, group: "food" },
   { itemId: "skirmisher_rations", priceCrowns: 15, group: "food" },
+  { itemId: "throw_rock_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "kick_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "guard_up_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "first_aid_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "deep_breath_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "rally_call_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "field_hands_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "quick_step_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "sweeping_strike_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "guard_wall_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "mark_target_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "feral_surge_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "elemental_bolt_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "binding_rune_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "light_mend_skill_book", priceCrowns: 60, group: "books" },
+  { itemId: "penitents_gift_skill_book", priceCrowns: 60, group: "books" },
   { itemId: "training_sword", priceCrowns: 12, group: "weapons" },
   { itemId: "iron_sword", priceCrowns: 60, group: "weapons" },
   { itemId: "guard_mace", priceCrowns: 60, group: "weapons" },
@@ -286,6 +303,10 @@ export function isMerchantStockEntryCompatibleWithParty(
     return true;
   }
 
+  if (itemDefinition.category === "skill_book") {
+    return true;
+  }
+
   if (itemDefinition.category !== "equipment") {
     return false;
   }
@@ -349,7 +370,9 @@ export function buyMerchantItem(
 
   if (
     !itemDefinition ||
-    (itemDefinition.category !== "equipment" && itemDefinition.category !== "consumable")
+    (itemDefinition.category !== "equipment" &&
+      itemDefinition.category !== "consumable" &&
+      itemDefinition.category !== "skill_book")
   ) {
     return createMerchantBuyFailure(
       state,

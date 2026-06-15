@@ -23,6 +23,7 @@ import {
   getDirectionToward,
   getSkillDashPosition,
 } from "./skillMovement";
+import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
 import { getCompanionDerivedStats } from "./stats";
 import {
@@ -63,7 +64,8 @@ export function resolveSkillEffect(
   skillUse: SkillUse,
   now: number,
 ): SkillEffectResolutionResult {
-  const { skill, target } = skillUse;
+  const { target } = skillUse;
+  const skill = getScaledSkillDefinitionForCompanion(caster, skillUse.skill);
 
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(

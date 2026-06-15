@@ -1,6 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getSkillRoleScore } from "./skillRolePreferences";
-import { getSkillsForClass } from "./skills";
+import { getActiveSkillsForCompanion } from "./skillProgression";
 import { type GameState } from "./state";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getCompanionAttackRange } from "./companionCombat";
@@ -246,7 +246,7 @@ function chooseSkillUse(
   options: SkillUseOptions,
 ): { state: GameState; skillUse: SkillUse | null } {
   let nextState = state;
-  const skillUses = getSkillsForClass(caster.classId)
+  const skillUses = getActiveSkillsForCompanion(caster)
     .filter((skill) => !options.combatOnly || isCombatSkill(skill))
     .map((skill): SkillUse | null => {
       if (isSkillCooldownActive(state, caster.id, skill.id, options.now)) {

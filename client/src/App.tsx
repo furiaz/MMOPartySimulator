@@ -85,6 +85,7 @@ import {
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   QUEST_DEFINITIONS,
+  SKILL_DEFINITIONS,
   acceptQuestFromQuestGiver,
   applyOfflineFarmingProgress,
   finishReadyQuestsForQuestGiver,
@@ -108,6 +109,7 @@ import {
   recordMerchantLockedForQuest,
   recordMerchantMenuSelected,
   resourceIds,
+  readSkillBook,
   restoreGameStateFromSave,
   buildNavigationClickAccessibility,
   getNavigationClickCellKey,
@@ -116,6 +118,7 @@ import {
   resolveWorldWipeRecoveryChoice,
   setAutoModeEnabled,
   setPartyLeader,
+  setCompanionLegacySkillEnabled,
   setPartyMemberRole,
   selectFirstClass,
   setPartyOrder,
@@ -164,9 +167,11 @@ import {
   type Position,
   type QuestId,
   type QuestState,
+  type ReadSkillBookFailureReason,
   type ResourceEntity,
   type ResurrectionProgressState,
   type SkillBindState,
+  type SkillId,
   type SkillMarkState,
   type SkillShieldBlockState,
   type SkillVisualEvent,
@@ -294,6 +299,7 @@ const merchantBuyFilterLabels: Record<MerchantBuyFilter, string> = {
   all: "All",
   flasks: "Flasks",
   food: "Food",
+  books: "Books",
   weapons: "Weapons",
   offhands: "Offhands",
   cloth: "Cloth",
@@ -307,6 +313,7 @@ const merchantBuyFilters: MerchantBuyFilter[] = [
   "all",
   "flasks",
   "food",
+  "books",
   "weapons",
   "offhands",
   "cloth",
@@ -423,6 +430,17 @@ const merchantBuyFailureMessages: Record<MerchantBuyFailureReason, string> = {
   inventory_add_failed: "Inventory could not receive the item",
   currency_remove_failed: "Crowns could not be spent",
   merchant_locked_for_quest: "Merchant unlocks during Outfit the Expedition",
+};
+
+const skillBookFailureMessages: Record<ReadSkillBookFailureReason, string> = {
+  invalid_companion: "Companion unavailable",
+  invalid_item: "Book unavailable",
+  not_skill_book: "Item cannot be read",
+  book_not_in_inventory: "Book is not in inventory",
+  unknown_skill: "Skill is unknown",
+  skill_unavailable: "Companion has not learned this skill",
+  skill_maxed: "Skill is already maxed",
+  inventory_remove_failed: "Book could not be consumed",
 };
 
 type ViewportSize = {
@@ -1930,6 +1948,10 @@ function getMerchantItemTagText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantSlotText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.category === "skill_book") {
+    return "Skill Book";
+  }
+
   if (itemDefinition.consumableKind === "flask") {
     return "Flask Slot";
   }
@@ -1948,6 +1970,10 @@ function getMerchantSlotText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantTypeText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.category === "skill_book" && itemDefinition.skillBookSkillId) {
+    return SKILL_DEFINITIONS[itemDefinition.skillBookSkillId].displayName;
+  }
+
   if (itemDefinition.consumableKind === "flask") {
     return "Flask";
   }
@@ -1962,6 +1988,12 @@ function getMerchantTypeText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantRequirementText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.category === "skill_book" && itemDefinition.skillBookSkillId) {
+    const skill = SKILL_DEFINITIONS[itemDefinition.skillBookSkillId];
+
+    return CLASS_DEFINITIONS[skill.classId].displayName;
+  }
+
   const levelText = itemDefinition.levelRequirement
     ? `Level ${itemDefinition.levelRequirement}+`
     : "No level requirement";
@@ -1976,6 +2008,12 @@ function getMerchantRequirementText(itemDefinition: ItemDefinition): string {
 }
 
 function getMerchantModifierText(itemDefinition: ItemDefinition): string {
+  if (itemDefinition.category === "skill_book" && itemDefinition.skillBookSkillId) {
+    const skill = SKILL_DEFINITIONS[itemDefinition.skillBookSkillId];
+
+    return `Raises ${skill.displayName} by 1 rank when read.`;
+  }
+
   const consumableEffects = [
     itemDefinition.healPercent
       ? `Heals ${Math.round(itemDefinition.healPercent * 100)}% max HP`
@@ -2291,6 +2329,8 @@ function App() {
   const [activeMerchantPanel, setActiveMerchantPanel] =
     useState<MerchantPanel | null>(null);
   const [merchantResultMessage, setMerchantResultMessage] =
+    useState<string | null>(null);
+  const [inventoryResultMessage, setInventoryResultMessage] =
     useState<string | null>(null);
   const [activeQuestGiverNpcId, setActiveQuestGiverNpcId] = useState<
     string | null
@@ -3695,6 +3735,32 @@ function App() {
     );
   }
 
+  function readInventorySkillBook(companionId: string, itemId: ItemId) {
+    const bookRead = readSkillBook(gameState, companionId, itemId);
+
+    if (bookRead.result.status === "success") {
+      queueSaveAfterStateChange("Skill rank saved");
+      setInventoryResultMessage(
+        `${bookRead.result.displayName} rank ${bookRead.result.newRank}/${bookRead.result.maxRank}`,
+      );
+    } else {
+      setInventoryResultMessage(skillBookFailureMessages[bookRead.result.reason]);
+    }
+
+    setGameState(bookRead.state);
+  }
+
+  function setLegacySkillEnabled(
+    companionId: string,
+    skillId: SkillId,
+    enabled: boolean,
+  ) {
+    queueSaveAfterStateChange("Legacy skill saved");
+    setGameState((state) =>
+      setCompanionLegacySkillEnabled(state, companionId, skillId, enabled),
+    );
+  }
+
   function allocateStatPoint(companionId: string, statId: PrimaryStatId) {
     queueSaveAfterStateChange("Stats saved");
     setGameState((state) => {
@@ -4800,6 +4866,7 @@ function App() {
               currentTime={currentTime}
               quests={gameState.quests}
               currentMapId={gameState.currentMapId}
+              skillBookReadMessage={inventoryResultMessage}
               worldTravelTargetMapId={gameState.worldTravelTargetMapId}
               selectedCompanionId={selectedMenuCompanionId}
               selectedQuestId={selectedMenuQuestId}
@@ -4813,6 +4880,8 @@ function App() {
               onEquipEquipment={equipEquipment}
               onEquipFlask={equipFlask}
               onOpenEquipmentManagement={openEquipmentManagementFromInventory}
+              onReadSkillBook={readInventorySkillBook}
+              onSetLegacySkillEnabled={setLegacySkillEnabled}
               onSelectCompanion={setSelectedCompanionId}
               onSelectManagementSection={setActivePartyManagementSection}
               onSelectPartySection={setActivePartyMenuSection}

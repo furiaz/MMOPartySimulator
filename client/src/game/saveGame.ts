@@ -7,6 +7,7 @@ import {
   grantCharacterXpToCompanion,
 } from "./leveling";
 import { getPartyLeader } from "./partySystem";
+import { sanitizeProgressionForCompanion } from "./skillProgression";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import type { GameState } from "./state";
 import type {
@@ -528,8 +529,10 @@ function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity
   if (entity.kind === "companion") {
     const isLeader = entity.id === leaderId;
 
+    const sanitizedCompanion = sanitizeProgressionForCompanion(entity);
+
     return {
-      ...entity,
+      ...sanitizedCompanion,
       state: entity.state === "dead" ? "dead" : isLeader ? "idle" : "follow",
       currentTargetId: entity.state === "dead" || isLeader ? null : leaderId,
       commandPriority: "autonomous",

@@ -7,14 +7,20 @@ import {
   getItemDefinition,
   getQuestItemInventoryEntries,
   formatCurrencyDisplay,
+  getCompanionSkillRank,
+  getSkillBookReadCandidates,
+  getSkillMaxRank,
   getUsedInventorySlots,
   ITEM_DEFINITIONS,
+  SKILL_DEFINITIONS,
+  type Companion,
   type ItemCategory,
   type ItemDefinition,
   type ItemId,
   type PartyInventory,
   type PartyWallet,
   type PrimaryStatId,
+  type SkillDefinition,
   type GameState,
 } from "./game";
 
@@ -48,13 +54,19 @@ function formatCategoryLabel(category: ItemCategory): string {
 
 export function InventoryPanel({
   inventory,
+  members,
   quests,
+  skillBookReadMessage,
   wallet,
+  onReadSkillBook,
   onOpenEquipmentManagement,
 }: {
   inventory: PartyInventory;
+  members: Companion[];
   quests: GameState["quests"];
+  skillBookReadMessage?: string | null;
   wallet: PartyWallet;
+  onReadSkillBook: (companionId: string, itemId: ItemId) => void;
   onOpenEquipmentManagement: () => void;
 }) {
   const [activeCategory, setActiveCategory] = useState<
@@ -90,6 +102,17 @@ export function InventoryPanel({
   const selectedItemDefinition = selectedSlot
     ? getItemDefinition(selectedSlot.itemId)
     : null;
+  const selectedSkillBookSkillId =
+    selectedItemDefinition?.category === "skill_book"
+      ? selectedItemDefinition.skillBookSkillId ?? null
+      : null;
+  const selectedSkillBookSkill = selectedSkillBookSkillId
+    ? SKILL_DEFINITIONS[selectedSkillBookSkillId]
+    : null;
+  const skillBookReadCandidates =
+    selectedSlot && selectedItemDefinition?.category === "skill_book"
+      ? getSkillBookReadCandidates(members, selectedSlot.itemId)
+      : [];
   const selectedQuestItem =
     activeCategory === "questItems"
       ? questItemEntries.find((entry) => selectedItemKey === entry.key) ?? null
@@ -160,13 +183,44 @@ export function InventoryPanel({
         <div className="inventory-item-action-panel">
           <div>
             <strong>{selectedItemDefinition.displayName}</strong>
-            <span>{getEquipmentDetailText(selectedItemDefinition)}</span>
-            <span>{getItemModifierText(selectedItemDefinition)}</span>
+            <span>
+              {selectedItemDefinition.category === "skill_book" &&
+              selectedSkillBookSkill
+                ? getSkillBookDetailText(selectedSkillBookSkill)
+                : getEquipmentDetailText(selectedItemDefinition)}
+            </span>
+            <span>
+              {selectedItemDefinition.category === "skill_book" &&
+              selectedSkillBookSkill
+                ? "Read to raise this skill by one rank."
+                : getItemModifierText(selectedItemDefinition)}
+            </span>
+            {skillBookReadMessage ? <span>{skillBookReadMessage}</span> : null}
           </div>
           {selectedItemDefinition.category === "equipment" ? (
             <button onClick={onOpenEquipmentManagement} type="button">
               Equip
             </button>
+          ) : selectedItemDefinition.category === "skill_book" &&
+            selectedSlot &&
+            selectedSkillBookSkill ? (
+            <div className="inventory-skill-book-actions">
+              {skillBookReadCandidates.length > 0 ? (
+                skillBookReadCandidates.map((member) => (
+                  <button
+                    key={member.id}
+                    onClick={() => onReadSkillBook(member.id, selectedSlot.itemId)}
+                    type="button"
+                  >
+                    Read: {member.id}{" "}
+                    {getCompanionSkillRank(member, selectedSkillBookSkill.id)}/
+                    {getSkillMaxRank(selectedSkillBookSkill)}
+                  </button>
+                ))
+              ) : (
+                <span>No eligible companion</span>
+              )}
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -226,6 +280,7 @@ export function InventoryPanel({
           const itemDefinition = getItemDefinition(slot.itemId);
           const itemKey = `${index}-${slot.itemId}`;
           const isEquipment = itemDefinition.category === "equipment";
+          const isSkillBook = itemDefinition.category === "skill_book";
           const isSelected = selectedItemKey === itemKey;
           const iconSrc = INVENTORY_ITEM_ICON_SRC[slot.itemId];
 
@@ -234,7 +289,9 @@ export function InventoryPanel({
               key={index}
               className={`inventory-slot filled${isSelected ? " selected" : ""}`}
               onClick={() =>
-                setSelectedItemKey(isEquipment && !isSelected ? itemKey : null)
+                setSelectedItemKey(
+                  (isEquipment || isSkillBook) && !isSelected ? itemKey : null,
+                )
               }
               title={getInventorySlotTitle(slot)}
             >
@@ -287,6 +344,10 @@ function getEquipmentDetailText(itemDefinition: ItemDefinition): string {
   ]
     .filter(Boolean)
     .join(" | ");
+}
+
+function getSkillBookDetailText(skill: SkillDefinition): string {
+  return `${skill.displayName} | Max rank ${getSkillMaxRank(skill)}`;
 }
 
 function getItemModifierText(itemDefinition: ItemDefinition): string {

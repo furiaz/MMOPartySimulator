@@ -25,6 +25,7 @@ import {
   createDefaultCompanionConsumableBehavior,
 } from "./consumables";
 import { createDefaultCompanionSkillBehavior } from "./skillBehavior";
+import { createCompanionSkillProgressionForClass } from "./skillProgression";
 import { createAssignedRoleBonusState } from "./roleBonus";
 import { getEnemyArchetype, getEnemyType } from "./enemyArchetypes";
 import { getScaledEnemyStats } from "./enemyScaling";
@@ -189,6 +190,7 @@ export function createCompanion(
     consumableBuffs: createEmptyCompanionConsumableBuffs(),
     consumableBehavior: createDefaultCompanionConsumableBehavior(),
     skillBehavior: createDefaultCompanionSkillBehavior(),
+    skillProgression: createCompanionSkillProgressionForClass(classId),
     roleBonus: createAssignedRoleBonusState(role),
   });
 }

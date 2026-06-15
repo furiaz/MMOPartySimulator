@@ -188,6 +188,7 @@ export type ResourceItemId =
 export type ItemCategory =
   | "material"
   | "consumable"
+  | "skill_book"
   | "equipment"
   | "quest"
   | "event"
@@ -373,11 +374,30 @@ export type ConsumableItemId =
   | "hearty_trail_rations"
   | "skirmisher_rations";
 
+export type SkillBookItemId =
+  | "throw_rock_skill_book"
+  | "kick_skill_book"
+  | "guard_up_skill_book"
+  | "first_aid_skill_book"
+  | "deep_breath_skill_book"
+  | "rally_call_skill_book"
+  | "field_hands_skill_book"
+  | "quick_step_skill_book"
+  | "sweeping_strike_skill_book"
+  | "guard_wall_skill_book"
+  | "mark_target_skill_book"
+  | "feral_surge_skill_book"
+  | "elemental_bolt_skill_book"
+  | "binding_rune_skill_book"
+  | "light_mend_skill_book"
+  | "penitents_gift_skill_book";
+
 export type ItemId =
   | ResourceItemId
   | JunkItemId
   | EquipmentItemId
-  | ConsumableItemId;
+  | ConsumableItemId
+  | SkillBookItemId;
 
 export type ItemRarity =
   | "common"
@@ -407,6 +427,7 @@ export type ItemDefinition = {
   chargeCost?: number;
   healPercent?: number;
   buffDurationMs?: number;
+  skillBookSkillId?: SkillId;
   equipmentSlot?: EquipmentSlot;
   equipmentKind?: EquipmentKind;
   equipmentType?: EquipmentType;
@@ -453,6 +474,11 @@ export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
   beginnerFirstAidAllyHealHpThresholdPercent: number;
   supportFocus: SupportFocus;
+};
+
+export type CompanionSkillProgression = {
+  ranksBySkillId: Partial<Record<SkillId, number>>;
+  legacyEnabledSkillIds: SkillId[];
 };
 
 export type RoleBonusState = {
@@ -527,6 +553,7 @@ export type InventoryMutationSource =
   | "quest_reward"
   | "merchant"
   | "consumable"
+  | "skill_book"
   | "chest"
   | "unknown";
 
@@ -775,6 +802,7 @@ export type SkillDefinition = {
   type: "active";
   range: number;
   cooldownMs?: number;
+  canLegacyCarry?: boolean;
   effect:
     | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
     | {
@@ -1591,6 +1619,7 @@ export type Companion = LivingEntity & {
   consumableBuffs: CompanionConsumableBuffs;
   consumableBehavior: CompanionConsumableBehavior;
   skillBehavior: CompanionSkillBehavior;
+  skillProgression?: CompanionSkillProgression;
   roleBonus: RoleBonusState;
 };
 
