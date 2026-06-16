@@ -20,7 +20,13 @@ import {
   getCompanionSkillBehavior,
   isBeginnerFirstAidSelfHealPriorityActive,
 } from "./skillBehavior";
-import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
+import type {
+  Companion,
+  Enemy,
+  GameEntity,
+  ResourceType,
+  SkillDefinition,
+} from "./types";
 
 const LOW_HEALTH_BUFFER = 1;
 const DEFAULT_ENEMY_CONTEXT_RANGE = 5;
@@ -31,6 +37,7 @@ const BEGINNER_FIELD_HANDS_RESOURCE_RANGE = 5;
 const SUPPORT_FOCUS_HP_THRESHOLD_PERCENT = 70;
 
 export type SkillTargetOptions = {
+  now?: number;
   forcedEnemyTargetId?: string | null;
   enemyFilter?: (enemy: Enemy) => boolean;
   firstAidReservedTargetIds?: ReadonlySet<string>;
@@ -42,6 +49,10 @@ export function getSkillTarget(
   skill: SkillDefinition,
   options: SkillTargetOptions = {},
 ): Enemy | Companion | undefined {
+  if (skill.effect.type === "selfPercentHeal") {
+    return isSelfPercentHealPriorityActive(caster, skill) ? caster : undefined;
+  }
+
   if (isHealingSkill(skill)) {
     if (
       skill.effect.type === "selfCostHeal" &&
@@ -61,7 +72,22 @@ export function getSkillTarget(
   if (skill.effect.type === "selfBuff") {
     return hasValidEnemyContext(state, caster, options) &&
       canPayHpCost(caster, skill.effect.hpCost) &&
-      !state.skillSelfBuffsByCompanionId?.[caster.id]
+      canUseRefreshableRuntimeState(
+        state.skillSelfBuffsByCompanionId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "partyBuff") {
+    return hasValidEnemyContext(state, caster, options) &&
+      canUseRefreshableRuntimeState(
+        state.skillPartyBuffsBySourceId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
       ? caster
       : undefined;
   }
@@ -73,8 +99,12 @@ export function getSkillTarget(
   }
 
   if (skill.effect.type === "gatherBuff") {
-    return hasGatherBuffResourceContext(state, caster) &&
-      !state.skillGatherBuffsByCompanionId?.[caster.id]
+    return hasGatherBuffResourceContext(state, caster, skill.effect.resourceType) &&
+      canUseRefreshableRuntimeState(
+        state.skillGatherBuffsByCompanionId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
       ? caster
       : undefined;
   }
@@ -85,6 +115,12 @@ export function getSkillTarget(
 
   if (skill.effect.type === "shieldBlock") {
     return hasPartyDanger(state, caster) && !hasActiveShield(state, caster)
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "damageMitigation") {
+    return hasPartyDanger(state, caster) && !hasActiveDamageMitigation(state, caster)
       ? caster
       : undefined;
   }
@@ -640,7 +676,7 @@ function findQuickStepTarget(
   distance: number,
   options: SkillTargetOptions,
 ): Enemy | undefined {
-  if (isFrontlineQuickStepRole(caster)) {
+  if (getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive") {
     const enemy = findEnemyTarget(state, caster, 6, options);
 
     return enemy &&
@@ -669,10 +705,6 @@ function findQuickStepTarget(
     : undefined;
 }
 
-function isFrontlineQuickStepRole(caster: Companion): boolean {
-  return caster.role === "defender" || caster.role === "fighter";
-}
-
 function findQuickStepThreat(
   state: GameState,
   caster: Companion,
@@ -694,13 +726,18 @@ function findQuickStepThreat(
     )[0];
 }
 
-function hasGatherBuffResourceContext(state: GameState, caster: Companion): boolean {
+function hasGatherBuffResourceContext(
+  state: GameState,
+  caster: Companion,
+  resourceType?: ResourceType,
+): boolean {
   const currentTarget = caster.currentTargetId
     ? getEntityById(state, caster.currentTargetId)
     : undefined;
 
   return Boolean(
     isActiveResource(currentTarget) &&
+      (!resourceType || currentTarget.resourceType === resourceType) &&
       getGridDistance(caster.position, currentTarget.position) <=
         BEGINNER_FIELD_HANDS_RESOURCE_RANGE,
   );
@@ -722,8 +759,33 @@ function hasActiveShield(state: GameState, caster: Companion): boolean {
   );
 }
 
+function hasActiveDamageMitigation(state: GameState, caster: Companion): boolean {
+  return Boolean(state.skillDamageMitigationsByCompanionId?.[caster.id]);
+}
+
 function isHealingSkill(skill: SkillDefinition): boolean {
   return skill.effect.type === "heal" || skill.effect.type === "selfCostHeal";
+}
+
+function isSelfPercentHealPriorityActive(
+  caster: Companion,
+  skill: SkillDefinition,
+): boolean {
+  return (
+    skill.id === "second_wind" &&
+    caster.maxHealth > 0 &&
+    caster.health < caster.maxHealth &&
+    (caster.health / caster.maxHealth) * 100 <=
+      getCompanionSkillBehavior(caster).secondWindSelfHealHpThresholdPercent
+  );
+}
+
+function canUseRefreshableRuntimeState(
+  expiresAt: number | undefined,
+  refreshWindowMs = 0,
+  now = Date.now(),
+): boolean {
+  return expiresAt === undefined || expiresAt - now <= refreshWindowMs;
 }
 
 function canPayHpCost(caster: Companion, hpCost: number): boolean {

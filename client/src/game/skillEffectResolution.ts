@@ -5,6 +5,7 @@ import {
   isLivingEnemy,
   isTargetDummyEnemy,
 } from "./entityGuards";
+import { getPartyMembers } from "./partySystem";
 import { grantCharacterXpToParty } from "./leveling";
 import { getGridDistance } from "./positionUtils";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
@@ -23,6 +24,7 @@ import {
   getDirectionToward,
   getSkillDashPosition,
 } from "./skillMovement";
+import { getCompanionSkillBehavior } from "./skillBehavior";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
 import { getCompanionDerivedStats } from "./stats";
@@ -115,6 +117,14 @@ export function resolveSkillEffect(
     );
   }
 
+  if (skill.effect.type === "partyBuff") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyPartyBuff(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
   if (skill.effect.type === "allyBuff" && isLivingCompanion(target)) {
     return resolveAppliedSkillEffect(
       state,
@@ -149,6 +159,14 @@ export function resolveSkillEffect(
     );
   }
 
+  if (skill.effect.type === "damageMitigation") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyDamageMitigation(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
   if (skill.effect.type === "bind" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
@@ -169,6 +187,14 @@ export function resolveSkillEffect(
         skill.id,
         now,
       ),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "selfPercentHeal" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applySelfPercentHeal(state, caster, target, skill, now),
       target.id,
     );
   }
@@ -494,7 +520,11 @@ function applySelfBuff(
 ): GameState {
   if (
     skill.effect.type !== "selfBuff" ||
-    state.skillSelfBuffsByCompanionId?.[caster.id] ||
+    !canApplyRefreshableRuntimeState(
+      state.skillSelfBuffsByCompanionId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    ) ||
     caster.health <= skill.effect.hpCost + LOW_HEALTH_BUFFER
   ) {
     return state;
@@ -528,6 +558,59 @@ function applySelfBuff(
     entityId: caster.id,
     text: skill.displayName,
     now,
+  });
+
+  return nextState;
+}
+
+function applyPartyBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "partyBuff" ||
+    !canApplyRefreshableRuntimeState(
+      state.skillPartyBuffsBySourceId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillPartyBuffsBySourceId: {
+      ...(state.skillPartyBuffsBySourceId ?? {}),
+      [caster.id]: {
+        sourceId: caster.id,
+        bonusDamage: skill.effect.bonusDamage,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  for (const member of getPartyMembers(nextState)) {
+    if (!isLivingCompanion(member)) {
+      continue;
+    }
+
+    nextState = addCombatFeedback(nextState, {
+      type: "attack",
+      entityId: member.id,
+      text: skill.displayName,
+      now,
+    });
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
   });
 
   return nextState;
@@ -585,7 +668,11 @@ function applyGatherBuff(
 ): GameState {
   if (
     skill.effect.type !== "gatherBuff" ||
-    state.skillGatherBuffsByCompanionId?.[caster.id]
+    !canApplyRefreshableRuntimeState(
+      state.skillGatherBuffsByCompanionId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
   ) {
     return state;
   }
@@ -598,6 +685,7 @@ function applyGatherBuff(
         companionId: caster.id,
         bonusGatherSpeed: skill.effect.bonusGatherSpeed,
         expiresAt: now + skill.effect.durationMs,
+        resourceType: skill.effect.resourceType,
       },
     },
   };
@@ -619,6 +707,49 @@ function applyGatherBuff(
   return nextState;
 }
 
+function applyDamageMitigation(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "damageMitigation") {
+    return state;
+  }
+
+  const mitigationId = `${caster.id}-${skill.id}`;
+  let nextState: GameState = {
+    ...state,
+    skillDamageMitigationsByCompanionId: {
+      ...(state.skillDamageMitigationsByCompanionId ?? {}),
+      [caster.id]: {
+        id: mitigationId,
+        ownerId: caster.id,
+        expiresAt: now + skill.effect.durationMs,
+        remainingProcs: skill.effect.procs,
+        mitigationPercent: skill.effect.mitigationPercent,
+        mitigatedDamageTypes: skill.effect.mitigatedDamageTypes ?? ["physical"],
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
 function applyQuickStep(
   state: GameState,
   caster: Companion,
@@ -631,7 +762,7 @@ function applyQuickStep(
   }
 
   const direction =
-    caster.role === "defender" || caster.role === "fighter"
+    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
       ? getDirectionToward(caster, target)
       : getDirectionAwayFrom(caster, target);
   const position = getSkillDashPosition(
@@ -823,6 +954,67 @@ function applyHeal(
   });
 
   return nextState;
+}
+
+function applySelfPercentHeal(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "selfPercentHeal" ||
+    target.id !== caster.id ||
+    target.health >= target.maxHealth
+  ) {
+    return state;
+  }
+
+  const amount = Math.max(
+    1,
+    Math.round(target.maxHealth * (skill.effect.healPercent / 100)),
+  );
+  const healedTarget = {
+    ...target,
+    health: Math.min(target.maxHealth, target.health + amount),
+  };
+  let nextState = updateEntity(state, healedTarget);
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: 1000,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "heal",
+    entityId: target.id,
+    text: `+${healedTarget.health - target.health} HP`,
+    now,
+  });
+  nextState = appendDebugTelemetryEvent(nextState, {
+    type: "healing_resolved",
+    entityId: caster.id,
+    targetId: target.id,
+    healingMultiplier: skill.effect.healPercent / 100,
+    healingAmount: healedTarget.health - target.health,
+    previousHealth: target.health,
+    nextHealth: healedTarget.health,
+    skillId: skill.id,
+  });
+
+  return nextState;
+}
+
+function canApplyRefreshableRuntimeState(
+  expiresAt: number | undefined,
+  refreshWindowMs = 0,
+  now: number,
+): boolean {
+  return expiresAt === undefined || expiresAt - now <= refreshWindowMs;
 }
 
 function damageEnemy(

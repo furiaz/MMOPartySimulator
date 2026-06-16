@@ -17,6 +17,17 @@ import { SKILL_DEFINITIONS } from "./skills";
 import { createTestGameState } from "./testState";
 import type { Companion, SkillId } from "./types";
 
+const BLADE_SKILL_IDS: SkillId[] = [
+  "duelist_challenge",
+  "second_wind",
+  "blade_parry",
+  "edge_focus",
+  "press_the_opening",
+  "woodcutter_rhythm",
+  "flash_step",
+  "sweeping_strike",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -33,6 +44,10 @@ describe("skill progression", () => {
     const companion = withSkillRanks(createCompanion("companion", { x: 0, y: 0 }, "companion"), {
       kick: 3,
       guard_up: 3,
+      second_wind: 5,
+      blade_parry: 5,
+      press_the_opening: 5,
+      woodcutter_rhythm: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -43,12 +58,44 @@ describe("skill progression", () => {
       companion,
       SKILL_DEFINITIONS.guard_up,
     );
+    const secondWind = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.second_wind,
+    );
+    const bladeParry = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.blade_parry,
+    );
+    const pressTheOpening = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.press_the_opening,
+    );
+    const woodcutterRhythm = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.woodcutter_rhythm,
+    );
 
     expect(kick.effect.type).toBe("lungeDamage");
     if (kick.effect.type === "lungeDamage") {
       expect(kick.effect.powerMultiplier).toBeCloseTo(1.1);
     }
     expect(guardUp.effect).toEqual(SKILL_DEFINITIONS.guard_up.effect);
+    expect(secondWind.effect.type).toBe("selfPercentHeal");
+    if (secondWind.effect.type === "selfPercentHeal") {
+      expect(secondWind.effect.healPercent).toBeCloseTo(24);
+    }
+    expect(bladeParry.effect.type).toBe("damageMitigation");
+    if (bladeParry.effect.type === "damageMitigation") {
+      expect(bladeParry.effect.mitigationPercent).toBeCloseTo(60);
+    }
+    expect(pressTheOpening.effect.type).toBe("partyBuff");
+    if (pressTheOpening.effect.type === "partyBuff") {
+      expect(pressTheOpening.effect.bonusDamage).toBeCloseTo(1.2);
+    }
+    expect(woodcutterRhythm.effect.type).toBe("gatherBuff");
+    if (woodcutterRhythm.effect.type === "gatherBuff") {
+      expect(woodcutterRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+    }
   });
 
   it("reads a skill book, consumes one item, and increments rank", () => {
@@ -71,6 +118,39 @@ describe("skill progression", () => {
     });
     expect(countInventoryItem(result.state.inventory, "first_aid_skill_book")).toBe(1);
     expect(getCompanionSkillRank(nextCompanion, "first_aid")).toBe(2);
+  });
+
+  it("reads new Blade skill books for eligible Blade companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "blade",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "flash_step_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "flash_step_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "flash_step",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "flash_step")).toBe(2);
   });
 
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
@@ -121,7 +201,7 @@ describe("skill progression", () => {
     );
 
     expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
-      "sweeping_strike",
+      ...BLADE_SKILL_IDS,
     ]);
 
     const enabledState = setCompanionLegacySkillEnabled(
@@ -133,7 +213,7 @@ describe("skill progression", () => {
     const enabledCompanion = enabledState.entities[companion.id] as Companion;
 
     expect(getActiveSkillsForCompanion(enabledCompanion).map((skill) => skill.id)).toEqual([
-      "sweeping_strike",
+      ...BLADE_SKILL_IDS,
       "kick",
     ]);
   });

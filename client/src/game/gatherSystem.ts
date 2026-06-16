@@ -161,7 +161,7 @@ export function updateGatherSystem(
       continue;
     }
 
-    const gatherAmount = getGatherAmount(nextState, gatherer);
+    const gatherAmount = getGatherAmount(nextState, gatherer, resource);
     const didYieldResource =
       resource.quantity > 0 &&
       resource.durability > 0 &&
@@ -429,10 +429,14 @@ function canGather(entity: AutonomousEntity, now: number): boolean {
   return now - entity.lastGatherAt >= GATHER_COOLDOWN_MS;
 }
 
-function getGatherAmount(state: GameState, gatherer: AutonomousEntity): number {
+function getGatherAmount(
+  state: GameState,
+  gatherer: AutonomousEntity,
+  resource: ResourceEntity,
+): number {
   const skillBonus =
     gatherer.kind === "companion"
-      ? getPrototypeGatherAmountBonus(state, gatherer)
+      ? getPrototypeGatherAmountBonus(state, gatherer, resource)
       : 0;
 
   return Math.max(0, getCompanionEffectiveGatherSpeed(gatherer) + skillBonus);
