@@ -101,6 +101,22 @@ export function resolveSkillEffect(
     );
   }
 
+  if (skill.effect.type === "multiTaunt" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyMultiTaunt(state, caster, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "shockwave" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyShockwave(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
   if (skill.effect.type === "mark" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
@@ -159,10 +175,34 @@ export function resolveSkillEffect(
     );
   }
 
+  if (skill.effect.type === "absorbShield") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyAbsorbShield(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
   if (skill.effect.type === "damageMitigation") {
     return resolveAppliedSkillEffect(
       state,
       applyDamageMitigation(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "selfMitigationBuff") {
+    return resolveAppliedSkillEffect(
+      state,
+      applySelfMitigationBuff(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "partyMitigationBuff") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyPartyMitigationBuff(state, caster, skill, now),
       caster.id,
     );
   }
@@ -478,6 +518,136 @@ function applyTaunt(
   return nextState;
 }
 
+function applyMultiTaunt(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "multiTaunt") {
+    return state;
+  }
+
+  const targets = getLivingEnemiesInRange(state, caster, skill.range)
+    .sort(
+      (a, b) =>
+        getGridDistance(caster.position, a.position) -
+          getGridDistance(caster.position, b.position) ||
+        (a.currentTargetId === caster.id ? 1 : 0) -
+          (b.currentTargetId === caster.id ? 1 : 0),
+    )
+    .slice(0, skill.effect.maxTargets);
+
+  if (targets.length === 0) {
+    return state;
+  }
+
+  let nextState = addCombatFeedback(state, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  for (const target of targets) {
+    const currentTarget = nextState.entities[target.id];
+
+    if (isLivingEnemy(currentTarget) && !isTargetDummyEnemy(currentTarget)) {
+      nextState = updateEntity(nextState, {
+        ...currentTarget,
+        state: "attack",
+        currentTargetId: caster.id,
+      });
+    }
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: targets[0]?.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return nextState;
+}
+
+function applyShockwave(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "shockwave") {
+    return state;
+  }
+
+  const targets = getLivingEnemiesInRange(state, caster, skill.effect.radius);
+
+  if (targets.length === 0) {
+    return state;
+  }
+
+  let nextState = addCombatFeedback(state, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  for (const target of targets) {
+    const currentTarget = nextState.entities[target.id];
+
+    if (!isLivingEnemy(currentTarget)) {
+      continue;
+    }
+
+    nextState = damageEnemy(
+      nextState,
+      caster,
+      currentTarget,
+      skill.displayName,
+      now,
+      skill.effect.damageType,
+      skill.effect.powerMultiplier,
+      skill.effect.damageType !== "magic",
+    );
+
+    const damagedTarget = nextState.entities[target.id];
+
+    if (isLivingEnemy(damagedTarget) && !isTargetDummyEnemy(damagedTarget)) {
+      nextState = updateEntity(nextState, {
+        ...damagedTarget,
+        state: "attack",
+        currentTargetId: caster.id,
+      });
+      nextState = {
+        ...nextState,
+        skillBindsByEnemyId: {
+          ...(nextState.skillBindsByEnemyId ?? {}),
+          [damagedTarget.id]: {
+            sourceId: caster.id,
+            targetId: damagedTarget.id,
+            expiresAt: now + skill.effect.bindDurationMs,
+          },
+        },
+      };
+    }
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "slash",
+    skillId: skill.id,
+    sourceId: caster.id,
+    position: caster.position,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return nextState;
+}
+
 function applyMarkTarget(
   state: GameState,
   caster: Companion,
@@ -739,6 +909,158 @@ function applyDamageMitigation(
     text: skill.displayName,
     now,
   });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyAbsorbShield(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "absorbShield" ||
+    state.skillAbsorbShieldsByCompanionId?.[caster.id]
+  ) {
+    return state;
+  }
+
+  const maxAbsorb = Math.max(
+    1,
+    Math.round(caster.maxHealth * (skill.effect.absorbPercentMaxHealth / 100)),
+  );
+  let nextState: GameState = {
+    ...state,
+    skillAbsorbShieldsByCompanionId: {
+      ...(state.skillAbsorbShieldsByCompanionId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        ownerId: caster.id,
+        remainingAbsorb: maxAbsorb,
+        maxAbsorb,
+        expiresAt: now + skill.effect.durationMs,
+        absorbedDamageTypes: skill.effect.absorbedDamageTypes,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applySelfMitigationBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "selfMitigationBuff" ||
+    !canApplyRefreshableRuntimeState(
+      state.skillSelfMitigationBuffsByCompanionId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillSelfMitigationBuffsByCompanionId: {
+      ...(state.skillSelfMitigationBuffsByCompanionId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        sourceId: caster.id,
+        mitigationPercent: skill.effect.mitigationPercent,
+        expiresAt: now + skill.effect.durationMs,
+        mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyPartyMitigationBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "partyMitigationBuff" ||
+    !canApplyRefreshableRuntimeState(
+      state.skillPartyMitigationBuffsBySourceId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillPartyMitigationBuffsBySourceId: {
+      ...(state.skillPartyMitigationBuffsBySourceId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        sourceId: caster.id,
+        mitigationPercent: skill.effect.mitigationPercent,
+        expiresAt: now + skill.effect.durationMs,
+        mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
+      },
+    },
+  };
+
+  for (const member of getPartyMembers(nextState)) {
+    if (!isLivingCompanion(member)) {
+      continue;
+    }
+
+    nextState = addCombatFeedback(nextState, {
+      type: "attack",
+      entityId: member.id,
+      text: skill.displayName,
+      now,
+    });
+  }
+
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
     skillId: skill.id,
@@ -1015,6 +1337,18 @@ function canApplyRefreshableRuntimeState(
   now: number,
 ): boolean {
   return expiresAt === undefined || expiresAt - now <= refreshWindowMs;
+}
+
+function getLivingEnemiesInRange(
+  state: GameState,
+  caster: Companion,
+  range: number,
+): Enemy[] {
+  return Object.values(state.entities).filter(
+    (entity): entity is Enemy =>
+      isLivingEnemy(entity) &&
+      getGridDistance(caster.position, entity.position) <= range,
+  );
 }
 
 function damageEnemy(

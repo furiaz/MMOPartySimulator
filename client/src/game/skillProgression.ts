@@ -33,7 +33,14 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   woodcutter_rhythm: "woodcutter_rhythm_skill_book",
   flash_step: "flash_step_skill_book",
   sweeping_strike: "sweeping_strike_skill_book",
+  shield_challenge: "shield_challenge_skill_book",
+  hold_fast: "hold_fast_skill_book",
   guard_wall: "guard_wall_skill_book",
+  iron_stance: "iron_stance_skill_book",
+  shield_formation: "shield_formation_skill_book",
+  stonebreaker_rhythm: "stonebreaker_rhythm_skill_book",
+  shield_rush: "shield_rush_skill_book",
+  shield_shockwave: "shield_shockwave_skill_book",
   mark_target: "mark_target_skill_book",
   feral_surge: "feral_surge_skill_book",
   elemental_bolt: "elemental_bolt_skill_book",
@@ -342,6 +349,39 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         mitigationPercent: effect.mitigationPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "absorbShield") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        absorbPercentMaxHealth: effect.absorbPercentMaxHealth * multiplier,
+      },
+    };
+  }
+
+  if (
+    effect.type === "selfMitigationBuff" ||
+    effect.type === "partyMitigationBuff"
+  ) {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        mitigationPercent: effect.mitigationPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "shockwave") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        powerMultiplier: effect.powerMultiplier * multiplier,
       },
     };
   }

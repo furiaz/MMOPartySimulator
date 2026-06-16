@@ -148,6 +148,163 @@ describe("skill effect resolution", () => {
     expect(skipped.state.entities.ally).toMatchObject({ health: 10 });
   });
 
+  it("applies Hold Fast as a self-only percent heal", () => {
+    const caster = {
+      ...createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis"),
+      health: 10,
+      maxHealth: 100,
+    };
+    const ally = {
+      ...createSkillCompanion("ally", "defender", { x: 1, y: 0 }, "aegis"),
+      health: 10,
+      maxHealth: 100,
+    };
+    const healed = resolveSkillEffect(
+      createSkillState([caster, ally]),
+      caster,
+      createSkillUse("hold_fast", caster),
+      1000,
+    );
+    const skipped = resolveSkillEffect(
+      createSkillState([caster, ally]),
+      caster,
+      createSkillUse("hold_fast", ally),
+      1000,
+    );
+
+    expect(healed.shouldConsumeCooldown).toBe(true);
+    expect(healed.state.entities.aegis).toMatchObject({ health: 28 });
+    expect(skipped.shouldConsumeCooldown).toBe(false);
+    expect(skipped.state.entities.ally).toMatchObject({ health: 10 });
+  });
+
+  it("taunts up to two nearest enemies with Shield Challenge", () => {
+    const caster = createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis");
+    const nearest = createSkillEnemy("nearest", { x: 1, y: 0 });
+    const tiedTargetingCaster = {
+      ...createSkillEnemy("tied-caster", { x: 2, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: caster.id,
+    };
+    const tiedOther = createSkillEnemy("tied-other", { x: 0, y: 2 });
+    const far = createSkillEnemy("far", { x: 3, y: 0 });
+    const result = resolveSkillEffect(
+      createSkillState([caster, nearest, tiedTargetingCaster, tiedOther, far]),
+      caster,
+      createSkillUse("shield_challenge", nearest),
+      1000,
+    );
+
+    expect(result.shouldConsumeCooldown).toBe(true);
+    expect(result.state.entities.nearest).toMatchObject({
+      state: "attack",
+      currentTargetId: caster.id,
+    });
+    expect(result.state.entities["tied-other"]).toMatchObject({
+      state: "attack",
+      currentTargetId: caster.id,
+    });
+    expect(result.state.entities.far).toMatchObject({
+      currentTargetId: null,
+    });
+  });
+
+  it("applies Guard Wall as an all-damage absorb pool after landed hits", () => {
+    const caster = {
+      ...createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis"),
+      maxHealth: 100,
+      health: 100,
+    };
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { attack: 20 });
+    const shieldState = resolveSkillEffect(
+      createSkillState([caster, enemy]),
+      caster,
+      createSkillUse("guard_wall", caster),
+      1000,
+    ).state;
+
+    expect(shieldState.skillAbsorbShieldsByCompanionId?.aegis).toMatchObject({
+      ownerId: caster.id,
+      remainingAbsorb: 15,
+      maxAbsorb: 15,
+      expiresAt: 11000,
+    });
+
+    const firstHit = resolveAndApplyCombatDamage(
+      shieldState,
+      enemy,
+      shieldState.entities.aegis as Companion,
+      {
+        damageType: "magic",
+        powerMultiplier: 0.5,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(firstHit.finalDamage).toBe(0);
+    expect(
+      firstHit.state.skillAbsorbShieldsByCompanionId?.aegis?.remainingAbsorb,
+    ).toBeLessThan(15);
+
+    const secondHit = resolveAndApplyCombatDamage(
+      firstHit.state,
+      enemy,
+      firstHit.state.entities.aegis as Companion,
+      {
+        damageType: "physical",
+        powerMultiplier: 2,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 3000,
+        rng: () => 1,
+      },
+    );
+
+    expect(secondHit.finalDamage).toBeGreaterThan(0);
+    expect(secondHit.state.skillAbsorbShieldsByCompanionId?.aegis).toBeUndefined();
+  });
+
+  it("does not consume Guard Wall on evaded hits", () => {
+    const caster = {
+      ...createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis"),
+      maxHealth: 100,
+      health: 100,
+      allocatedStats: {
+        ...createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis")
+          .allocatedStats,
+        dexterity: 200,
+      },
+    };
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { attack: 20 });
+    const shieldState = resolveSkillEffect(
+      createSkillState([caster, enemy]),
+      caster,
+      createSkillUse("guard_wall", caster),
+      1000,
+    ).state;
+    const evadedHit = resolveAndApplyCombatDamage(
+      shieldState,
+      enemy,
+      shieldState.entities.aegis as Companion,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: true,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 0,
+      },
+    );
+
+    expect(evadedHit.evaded).toBe(true);
+    expect(
+      evadedHit.state.skillAbsorbShieldsByCompanionId?.aegis?.remainingAbsorb,
+    ).toBe(15);
+  });
+
   it("applies Blade Parry mitigation procs to landed physical damage", () => {
     const caster = createSkillCompanion("blade", "defender", { x: 0, y: 0 }, "blade");
     const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { attack: 20 });
@@ -265,6 +422,90 @@ describe("skill effect resolution", () => {
     );
 
     expect(bladeHit.rawDamage).toBe(allyHit.rawDamage + 1);
+  });
+
+  it("stacks Iron Stance and Shield Formation mitigation for landed damage", () => {
+    const aegis = createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis");
+    const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "aegis");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 1 }, { attack: 30 });
+    const ironState = resolveSkillEffect(
+      createSkillState([aegis, ally, enemy]),
+      aegis,
+      createSkillUse("iron_stance", aegis),
+      1000,
+    ).state;
+    const formationState = resolveSkillEffect(
+      ironState,
+      ironState.entities.aegis as Companion,
+      createSkillUse("shield_formation", ironState.entities.aegis as Companion),
+      1000,
+    ).state;
+
+    expect(formationState.skillSelfMitigationBuffsByCompanionId?.aegis).toMatchObject({
+      mitigationPercent: 10,
+      expiresAt: 61000,
+    });
+    expect(formationState.skillPartyMitigationBuffsBySourceId?.aegis).toMatchObject({
+      mitigationPercent: 8,
+      expiresAt: 61000,
+    });
+
+    const aegisHit = resolveAndApplyCombatDamage(
+      formationState,
+      formationState.entities.enemy as Enemy,
+      formationState.entities.aegis as Companion,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+    const allyHit = resolveAndApplyCombatDamage(
+      formationState,
+      formationState.entities.enemy as Enemy,
+      formationState.entities.ally as Companion,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(aegisHit.finalDamage).toBeLessThan(allyHit.finalDamage);
+    expect(allyHit.finalDamage).toBeLessThan(allyHit.rawDamage);
+  });
+
+  it("applies Shield Shockwave damage, taunt, and bind in radius", () => {
+    const caster = createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis");
+    const near = createSkillEnemy("near", { x: 1, y: 0 }, { maxHealth: 100 });
+    const edge = createSkillEnemy("edge", { x: 0, y: 2 }, { maxHealth: 100 });
+    const far = createSkillEnemy("far", { x: 3, y: 0 }, { maxHealth: 100 });
+    const result = resolveSkillEffect(
+      createSkillState([caster, near, edge, far]),
+      caster,
+      createSkillUse("shield_shockwave", caster),
+      1000,
+    );
+
+    expect(result.shouldConsumeCooldown).toBe(true);
+    expect((result.state.entities.near as Enemy).health).toBeLessThan(near.health);
+    expect((result.state.entities.edge as Enemy).health).toBeLessThan(edge.health);
+    expect((result.state.entities.far as Enemy).health).toBe(far.health);
+    expect(result.state.entities.near).toMatchObject({
+      state: "attack",
+      currentTargetId: caster.id,
+    });
+    expect(result.state.skillBindsByEnemyId?.near).toMatchObject({
+      sourceId: caster.id,
+      targetId: near.id,
+      expiresAt: 2000,
+    });
   });
 
   it("applies taunt, mark, bind, buff, gather, and shield effects", () => {

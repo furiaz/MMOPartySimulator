@@ -5,7 +5,9 @@ import type {
   Companion,
   Enemy,
   ResourceEntity,
+  SkillAbsorbShieldState,
   SkillDamageMitigationState,
+  SkillMitigationBuffState,
   SkillShieldBlockState,
 } from "./types";
 
@@ -49,12 +51,25 @@ export function applyIncomingDamageMitigation(
   damageType: CombatDamageType,
 ): { state: GameState; mitigatedDamage: number; mitigationPercent: number } {
   const mitigation = getDamageMitigation(state, target, damageType);
+  const timedMitigationPercent = getTimedMitigationPercent(
+    state,
+    target,
+    damageType,
+  );
 
   if (!mitigation) {
+    if (timedMitigationPercent <= 0) {
+      return {
+        state,
+        mitigatedDamage: rawDamage,
+        mitigationPercent: 0,
+      };
+    }
+
     return {
       state,
-      mitigatedDamage: rawDamage,
-      mitigationPercent: 0,
+      mitigatedDamage: rawDamage * (1 - Math.min(100, timedMitigationPercent) / 100),
+      mitigationPercent: timedMitigationPercent,
     };
   }
 
@@ -72,13 +87,65 @@ export function applyIncomingDamageMitigation(
     delete skillDamageMitigationsByCompanionId[target.id];
   }
 
+  const totalMitigationPercent = Math.min(
+    100,
+    mitigation.mitigationPercent + timedMitigationPercent,
+  );
+
   return {
     state: {
       ...state,
       skillDamageMitigationsByCompanionId,
     },
-    mitigatedDamage: rawDamage * (1 - mitigation.mitigationPercent / 100),
-    mitigationPercent: mitigation.mitigationPercent,
+    mitigatedDamage: rawDamage * (1 - totalMitigationPercent / 100),
+    mitigationPercent: totalMitigationPercent,
+  };
+}
+
+export function applyIncomingDamageAbsorb(
+  state: GameState,
+  target: Companion,
+  rawDamage: number,
+  damageType: CombatDamageType,
+  now: number,
+): { state: GameState; remainingDamage: number; absorbedDamage: number } {
+  const absorbShield = getAbsorbShield(state, target, damageType);
+
+  if (!absorbShield || rawDamage <= 0) {
+    return { state, remainingDamage: rawDamage, absorbedDamage: 0 };
+  }
+
+  const absorbedDamage = Math.min(rawDamage, absorbShield.remainingAbsorb);
+  const remainingAbsorb = absorbShield.remainingAbsorb - absorbedDamage;
+  const skillAbsorbShieldsByCompanionId = {
+    ...(state.skillAbsorbShieldsByCompanionId ?? {}),
+  };
+
+  if (remainingAbsorb > 0) {
+    skillAbsorbShieldsByCompanionId[target.id] = {
+      ...absorbShield,
+      remainingAbsorb,
+    };
+  } else {
+    delete skillAbsorbShieldsByCompanionId[target.id];
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillAbsorbShieldsByCompanionId,
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: "Absorbed",
+    now,
+  });
+
+  return {
+    state: nextState,
+    remainingDamage: Math.max(0, rawDamage - absorbedDamage),
+    absorbedDamage,
   };
 }
 
@@ -153,6 +220,57 @@ function getDamageMitigation(
     (mitigation.mitigatedDamageTypes ?? ["physical"]).includes(damageType)
     ? mitigation
     : undefined;
+}
+
+function getTimedMitigationPercent(
+  state: GameState,
+  target: Companion,
+  damageType: CombatDamageType,
+): number {
+  const selfMitigation = state.skillSelfMitigationBuffsByCompanionId?.[target.id];
+  const selfPercent = doesMitigationApply(selfMitigation, damageType)
+    ? selfMitigation.mitigationPercent
+    : 0;
+  const partyPercent = Object.values(
+    state.skillPartyMitigationBuffsBySourceId ?? {},
+  ).reduce(
+    (total, buff) =>
+      doesMitigationApply(buff, damageType) ? total + buff.mitigationPercent : total,
+    0,
+  );
+
+  return selfPercent + partyPercent;
+}
+
+function getAbsorbShield(
+  state: GameState,
+  target: Companion,
+  damageType: CombatDamageType,
+): SkillAbsorbShieldState | undefined {
+  const shield = state.skillAbsorbShieldsByCompanionId?.[target.id];
+
+  return shield && doesAbsorbApply(shield, damageType) ? shield : undefined;
+}
+
+function doesMitigationApply(
+  mitigation: SkillMitigationBuffState | undefined,
+  damageType: CombatDamageType,
+): mitigation is SkillMitigationBuffState {
+  return Boolean(
+    mitigation &&
+      (mitigation.mitigatedDamageTypes === undefined ||
+        mitigation.mitigatedDamageTypes.includes(damageType)),
+  );
+}
+
+function doesAbsorbApply(
+  shield: SkillAbsorbShieldState,
+  damageType: CombatDamageType,
+): boolean {
+  return (
+    shield.absorbedDamageTypes === undefined ||
+    shield.absorbedDamageTypes.includes(damageType)
+  );
 }
 
 export function isEnemyBound(state: GameState, enemy: Enemy): boolean {

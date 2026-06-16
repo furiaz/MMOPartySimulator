@@ -28,6 +28,17 @@ const BLADE_SKILL_IDS: SkillId[] = [
   "sweeping_strike",
 ];
 
+const AEGIS_SKILL_IDS: SkillId[] = [
+  "shield_challenge",
+  "hold_fast",
+  "guard_wall",
+  "iron_stance",
+  "shield_formation",
+  "stonebreaker_rhythm",
+  "shield_rush",
+  "shield_shockwave",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -48,6 +59,12 @@ describe("skill progression", () => {
       blade_parry: 5,
       press_the_opening: 5,
       woodcutter_rhythm: 5,
+      hold_fast: 5,
+      guard_wall: 5,
+      iron_stance: 5,
+      shield_formation: 5,
+      stonebreaker_rhythm: 5,
+      shield_shockwave: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -74,6 +91,30 @@ describe("skill progression", () => {
       companion,
       SKILL_DEFINITIONS.woodcutter_rhythm,
     );
+    const holdFast = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.hold_fast,
+    );
+    const guardWall = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.guard_wall,
+    );
+    const ironStance = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.iron_stance,
+    );
+    const shieldFormation = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.shield_formation,
+    );
+    const stonebreakerRhythm = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.stonebreaker_rhythm,
+    );
+    const shieldShockwave = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.shield_shockwave,
+    );
 
     expect(kick.effect.type).toBe("lungeDamage");
     if (kick.effect.type === "lungeDamage") {
@@ -95,6 +136,30 @@ describe("skill progression", () => {
     expect(woodcutterRhythm.effect.type).toBe("gatherBuff");
     if (woodcutterRhythm.effect.type === "gatherBuff") {
       expect(woodcutterRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+    }
+    expect(holdFast.effect.type).toBe("selfPercentHeal");
+    if (holdFast.effect.type === "selfPercentHeal") {
+      expect(holdFast.effect.healPercent).toBeCloseTo(21.6);
+    }
+    expect(guardWall.effect.type).toBe("absorbShield");
+    if (guardWall.effect.type === "absorbShield") {
+      expect(guardWall.effect.absorbPercentMaxHealth).toBeCloseTo(18);
+    }
+    expect(ironStance.effect.type).toBe("selfMitigationBuff");
+    if (ironStance.effect.type === "selfMitigationBuff") {
+      expect(ironStance.effect.mitigationPercent).toBeCloseTo(12);
+    }
+    expect(shieldFormation.effect.type).toBe("partyMitigationBuff");
+    if (shieldFormation.effect.type === "partyMitigationBuff") {
+      expect(shieldFormation.effect.mitigationPercent).toBeCloseTo(9.6);
+    }
+    expect(stonebreakerRhythm.effect.type).toBe("gatherBuff");
+    if (stonebreakerRhythm.effect.type === "gatherBuff") {
+      expect(stonebreakerRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+    }
+    expect(shieldShockwave.effect.type).toBe("shockwave");
+    if (shieldShockwave.effect.type === "shockwave") {
+      expect(shieldShockwave.effect.powerMultiplier).toBeCloseTo(0.6);
     }
   });
 
@@ -151,6 +216,39 @@ describe("skill progression", () => {
       maxRank: 5,
     });
     expect(getCompanionSkillRank(nextCompanion, "flash_step")).toBe(2);
+  });
+
+  it("reads new Aegis skill books for eligible Aegis companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "defender",
+      1,
+      "aegis",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "shield_rush_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "shield_rush_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "shield_rush",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "shield_rush")).toBe(2);
   });
 
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
@@ -215,6 +313,21 @@ describe("skill progression", () => {
     expect(getActiveSkillsForCompanion(enabledCompanion).map((skill) => skill.id)).toEqual([
       ...BLADE_SKILL_IDS,
       "kick",
+    ]);
+  });
+
+  it("keeps Aegis current-class skills ordered in the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "defender",
+      1,
+      "aegis",
+    );
+
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...AEGIS_SKILL_IDS,
     ]);
   });
 

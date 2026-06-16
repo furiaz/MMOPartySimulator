@@ -3,6 +3,7 @@ import { damageEntity } from "./entities";
 import { getEnemyCombatStats } from "./enemyScaling";
 import { getCompanionDerivedStats } from "./stats";
 import {
+  applyIncomingDamageAbsorb,
   applyIncomingDamageMitigation,
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
@@ -147,11 +148,24 @@ export function resolveAndApplyCombatDamage(
       );
       nextState = mitigationResult.state;
       mitigatedDamage = mitigationResult.mitigatedDamage;
+
+      const absorbResult = applyIncomingDamageAbsorb(
+        nextState,
+        target,
+        mitigatedDamage,
+        options.damageType,
+        options.now,
+      );
+      nextState = absorbResult.state;
+      mitigatedDamage = absorbResult.remainingDamage;
     }
 
-    finalDamage = Math.max(1, Math.round(mitigatedDamage));
-    const damagedTarget = damageEntity(target, finalDamage);
-    nextState = updateEntity(nextState, damagedTarget);
+    finalDamage = mitigatedDamage > 0 ? Math.max(1, Math.round(mitigatedDamage)) : 0;
+
+    if (finalDamage > 0) {
+      const damagedTarget = damageEntity(target, finalDamage);
+      nextState = updateEntity(nextState, damagedTarget);
+    }
   }
 
   const updatedTarget = nextState.entities[target.id];

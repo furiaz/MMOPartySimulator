@@ -1462,6 +1462,61 @@ describe("beginner skill system", () => {
     expect(nextState.skillCooldownsByCompanionId?.blade?.second_wind).toBeUndefined();
   });
 
+  it("uses Hold Fast at the configured threshold and caps the heal threshold at 30 percent", () => {
+    const baseAegis = createCompanion(
+      "aegis",
+      { x: 0, y: 0 },
+      "leader",
+      "defender",
+      1,
+      "aegis",
+    );
+    const aegis = {
+      ...baseAegis,
+      health: 30,
+      maxHealth: 100,
+      skillBehavior: {
+        ...baseAegis.skillBehavior,
+        holdFastSelfHealHpThresholdPercent: 80,
+      },
+    };
+    const nextState = updateSkillSystem(createSkillState([aegis]), 1000);
+
+    expect(nextState.entities.aegis).toMatchObject({
+      health: 48,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.aegis?.hold_fast).toMatchObject({
+      skillId: "hold_fast",
+      expiresAt: 31000,
+    });
+  });
+
+  it("does not use Hold Fast above the capped threshold", () => {
+    const baseAegis = createCompanion(
+      "aegis",
+      { x: 0, y: 0 },
+      "leader",
+      "defender",
+      1,
+      "aegis",
+    );
+    const aegis = {
+      ...baseAegis,
+      health: 31,
+      maxHealth: 100,
+      skillBehavior: {
+        ...baseAegis.skillBehavior,
+        holdFastSelfHealHpThresholdPercent: 80,
+      },
+    };
+    const nextState = updateSkillSystem(createSkillState([aegis]), 1000);
+
+    expect(nextState.entities.aegis).toMatchObject({
+      health: 31,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.aegis?.hold_fast).toBeUndefined();
+  });
+
   it("uses Woodcutter Rhythm only for wood resources", () => {
     const woodcutter = {
       ...createCompanion("blade", { x: 0, y: 0 }, "leader", "gatherer", 1, "blade"),
@@ -1504,6 +1559,47 @@ describe("beginner skill system", () => {
     const nextState = updateSkillSystem(createSkillState([woodcutter, ore]), 1000);
 
     expect(nextState.skillGatherBuffsByCompanionId?.blade).toBeUndefined();
+  });
+
+  it("uses Stonebreaker Rhythm only for ore resources", () => {
+    const collector = {
+      ...createCompanion("aegis", { x: 0, y: 0 }, "leader", "gatherer", 1, "aegis"),
+      state: "gather" as const,
+      currentTargetId: "ore",
+    };
+    const ore = createResource("ore", { x: 0.5, y: 0 }, {
+      resourceType: "ore",
+      durability: 3,
+      maxDurability: 3,
+    });
+    const buffedState = updateSkillSystem(createSkillState([collector, ore]), 1000);
+    const gatheredState = updateGatherSystem(buffedState, new Set(), 2000);
+
+    expect(buffedState.skillGatherBuffsByCompanionId?.aegis).toMatchObject({
+      bonusGatherSpeed: 2,
+      resourceType: "ore",
+      expiresAt: 61000,
+    });
+    expect(gatheredState.entities.ore).toMatchObject({
+      durability: 3,
+      quantity: ore.quantity - 1,
+    });
+  });
+
+  it("does not apply Stonebreaker Rhythm to wood resources", () => {
+    const collector = {
+      ...createCompanion("aegis", { x: 0, y: 0 }, "leader", "gatherer", 1, "aegis"),
+      state: "gather" as const,
+      currentTargetId: "wood",
+    };
+    const wood = createResource("wood", { x: 0.5, y: 0 }, {
+      resourceType: "wood",
+      durability: 3,
+      maxDurability: 3,
+    });
+    const nextState = updateSkillSystem(createSkillState([collector, wood]), 1000);
+
+    expect(nextState.skillGatherBuffsByCompanionId?.aegis).toBeUndefined();
   });
 
   it("uses Flash Step according to the mobility preference", () => {
@@ -1600,7 +1696,73 @@ describe("beginner skill system", () => {
     ).toBe("flash_step");
   });
 
-  it("keeps non-Beginner skills on the shared prototype cooldown fallback", () => {
+  it("uses Shield Rush according to the mobility preference", () => {
+    const baseOffensiveAegis = createCompanion(
+      "aegis",
+      { x: 1, y: 3 },
+      "leader",
+      "none",
+      1,
+      "aegis",
+    );
+    const offensiveAegis = {
+      ...baseOffensiveAegis,
+      skillBehavior: {
+        ...baseOffensiveAegis.skillBehavior,
+        mobilitySkillUseMode: "offensive" as const,
+      },
+    };
+    const baseDefensiveAegis = createCompanion(
+      "defensive-aegis",
+      { x: 3, y: 3 },
+      "leader",
+      "none",
+      1,
+      "aegis",
+    );
+    const defensiveAegis = {
+      ...baseDefensiveAegis,
+      skillBehavior: {
+        ...baseDefensiveAegis.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+      },
+    };
+    const offensiveEnemy = createEnemy("offensive-enemy", { x: 7, y: 3 });
+    const defensiveEnemy = {
+      ...createEnemy("defensive-enemy", { x: 4, y: 3 }),
+      state: "attack" as const,
+      currentTargetId: defensiveAegis.id,
+    };
+    const offensiveState = updateSkillSystem(
+      createSkillState([offensiveAegis, offensiveEnemy], {
+        map: createSkillMap(),
+        ...createAegisEarlierSkillCooldowns("aegis"),
+      }),
+      1000,
+    );
+    const defensiveState = updateSkillSystem(
+      createSkillState([defensiveAegis, defensiveEnemy], {
+        map: createSkillMap(),
+        ...createAegisEarlierSkillCooldowns("defensive-aegis"),
+      }),
+      1000,
+    );
+
+    expect(offensiveState.entities.aegis.position.x).toBeGreaterThan(
+      offensiveAegis.position.x,
+    );
+    expect(offensiveState.skillCooldownsByCompanionId?.aegis?.shield_rush?.skillId).toBe(
+      "shield_rush",
+    );
+    expect(defensiveState.entities["defensive-aegis"].position.x).toBeLessThan(
+      defensiveAegis.position.x,
+    );
+    expect(
+      defensiveState.skillCooldownsByCompanionId?.["defensive-aegis"]?.shield_rush?.skillId,
+    ).toBe("shield_rush");
+  });
+
+  it("uses Guard Wall with its custom cooldown when Aegis protection is needed", () => {
     const aegis = {
       ...createCompanion("aegis", { x: 0, y: 0 }, "leader", "defender", 1, "aegis"),
       state: "attack" as const,
@@ -1612,10 +1774,27 @@ describe("beginner skill system", () => {
       currentTargetId: aegis.id,
     };
 
-    const nextState = updateSkillSystem(createSkillState([aegis, enemy]), 1000);
+    const nextState = updateSkillSystem(
+      createSkillState([aegis, enemy], {
+        skillCooldownsByCompanionId: {
+          aegis: {
+            shield_challenge: {
+              companionId: "aegis",
+              skillId: "shield_challenge",
+              expiresAt: 5000,
+            },
+          },
+        },
+      }),
+      1000,
+    );
 
     expect(nextState.skillCooldownsByCompanionId?.aegis?.guard_wall).toMatchObject({
       skillId: "guard_wall",
+      expiresAt: 16000,
+    });
+    expect(nextState.skillAbsorbShieldsByCompanionId?.aegis).toMatchObject({
+      maxAbsorb: expect.any(Number),
       expiresAt: 11000,
     });
   });
@@ -1848,6 +2027,35 @@ function createActiveShield(companionId: string): Partial<GameState> {
         rotationRadians: 0,
         expiresAt: 5000,
         remainingBlocks: 1,
+      },
+    },
+  };
+}
+
+function createAegisEarlierSkillCooldowns(companionId: string): Partial<GameState> {
+  return {
+    skillCooldownsByCompanionId: {
+      [companionId]: {
+        shield_challenge: {
+          companionId,
+          skillId: "shield_challenge",
+          expiresAt: 5000,
+        },
+        guard_wall: {
+          companionId,
+          skillId: "guard_wall",
+          expiresAt: 5000,
+        },
+        iron_stance: {
+          companionId,
+          skillId: "iron_stance",
+          expiresAt: 5000,
+        },
+        shield_formation: {
+          companionId,
+          skillId: "shield_formation",
+          expiresAt: 5000,
+        },
       },
     },
   };

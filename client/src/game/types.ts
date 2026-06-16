@@ -391,7 +391,14 @@ export type SkillBookItemId =
   | "woodcutter_rhythm_skill_book"
   | "flash_step_skill_book"
   | "sweeping_strike_skill_book"
+  | "shield_challenge_skill_book"
+  | "hold_fast_skill_book"
   | "guard_wall_skill_book"
+  | "iron_stance_skill_book"
+  | "shield_formation_skill_book"
+  | "stonebreaker_rhythm_skill_book"
+  | "shield_rush_skill_book"
+  | "shield_shockwave_skill_book"
   | "mark_target_skill_book"
   | "feral_surge_skill_book"
   | "elemental_bolt_skill_book"
@@ -482,6 +489,7 @@ export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
   beginnerFirstAidAllyHealHpThresholdPercent: number;
   secondWindSelfHealHpThresholdPercent: number;
+  holdFastSelfHealHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
   supportFocus: SupportFocus;
 };
@@ -747,7 +755,14 @@ export type SkillId =
   | "woodcutter_rhythm"
   | "flash_step"
   | "sweeping_strike"
+  | "shield_challenge"
+  | "hold_fast"
   | "guard_wall"
+  | "iron_stance"
+  | "shield_formation"
+  | "stonebreaker_rhythm"
+  | "shield_rush"
+  | "shield_shockwave"
   | "mark_target"
   | "feral_surge"
   | "elemental_bolt"
@@ -837,6 +852,14 @@ export type SkillDefinition = {
         splashRange: number;
       }
     | { type: "taunt"; damageType?: CombatDamageType; powerMultiplier?: number }
+    | { type: "multiTaunt"; maxTargets: number }
+    | {
+        type: "shockwave";
+        damageType: CombatDamageType;
+        powerMultiplier: number;
+        radius: number;
+        bindDurationMs: number;
+      }
     | { type: "mark"; bonusDamage: number; durationMs: number }
     | {
         type: "selfBuff";
@@ -867,6 +890,26 @@ export type SkillDefinition = {
         mitigationPercent: number;
         procs: number;
         mitigatedDamageTypes?: CombatDamageType[];
+      }
+    | {
+        type: "absorbShield";
+        durationMs: number;
+        absorbPercentMaxHealth: number;
+        absorbedDamageTypes?: CombatDamageType[];
+      }
+    | {
+        type: "selfMitigationBuff";
+        durationMs: number;
+        mitigationPercent: number;
+        mitigatedDamageTypes?: CombatDamageType[];
+        refreshWindowMs?: number;
+      }
+    | {
+        type: "partyMitigationBuff";
+        durationMs: number;
+        mitigationPercent: number;
+        mitigatedDamageTypes?: CombatDamageType[];
+        refreshWindowMs?: number;
       }
     | { type: "bind"; durationMs: number }
     | { type: "heal"; powerMultiplier: number }
@@ -900,6 +943,15 @@ export type SkillPartyBuffState = {
   expiresAt: number;
 };
 
+export type SkillAbsorbShieldState = {
+  id: string;
+  ownerId: string;
+  remainingAbsorb: number;
+  maxAbsorb: number;
+  expiresAt: number;
+  absorbedDamageTypes?: CombatDamageType[];
+};
+
 export type SkillBindState = {
   sourceId: string;
   targetId: string;
@@ -922,6 +974,14 @@ export type SkillDamageMitigationState = {
   expiresAt: number;
   remainingProcs: number;
   mitigationPercent: number;
+  mitigatedDamageTypes?: CombatDamageType[];
+};
+
+export type SkillMitigationBuffState = {
+  id: string;
+  sourceId: string;
+  mitigationPercent: number;
+  expiresAt: number;
   mitigatedDamageTypes?: CombatDamageType[];
 };
 
