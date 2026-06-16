@@ -5,7 +5,9 @@ import {
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_SUPPORT_FOCUS,
   createDefaultCompanionSkillBehavior,
   getCompanionSkillBehavior,
@@ -24,6 +26,8 @@ describe("companion skill behavior", () => {
         DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
       secondWindSelfHealHpThresholdPercent:
         DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      holdFastSelfHealHpThresholdPercent:
+        DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
       mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
       supportFocus: DEFAULT_SUPPORT_FOCUS,
     });
@@ -93,6 +97,31 @@ describe("companion skill behavior", () => {
     ).toBe(SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT);
   });
 
+  it("clamps Hold Fast threshold updates to the hard cap", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
+    const state = addEntity(createTestGameState(), companion);
+
+    const belowMinimum = updateCompanionSkillBehavior(state, companion.id, {
+      holdFastSelfHealHpThresholdPercent: -20,
+    });
+    const aboveMaximum = updateCompanionSkillBehavior(state, companion.id, {
+      holdFastSelfHealHpThresholdPercent: 80,
+    });
+
+    expect(
+      belowMinimum.entities.companion.kind === "companion"
+        ? belowMinimum.entities.companion.skillBehavior
+            .holdFastSelfHealHpThresholdPercent
+        : null,
+    ).toBe(1);
+    expect(
+      aboveMaximum.entities.companion.kind === "companion"
+        ? aboveMaximum.entities.companion.skillBehavior
+            .holdFastSelfHealHpThresholdPercent
+        : null,
+    ).toBe(HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT);
+  });
+
   it("normalizes invalid Support Focus updates", () => {
     const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
     const state = addEntity(createTestGameState(), companion);
@@ -137,6 +166,8 @@ describe("companion skill behavior", () => {
       beginnerFirstAidSelfHealHpThresholdPercent: 45,
       secondWindSelfHealHpThresholdPercent:
         DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      holdFastSelfHealHpThresholdPercent:
+        DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
       mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
       supportFocus: DEFAULT_SUPPORT_FOCUS,
     });

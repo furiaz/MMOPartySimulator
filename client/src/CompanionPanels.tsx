@@ -14,7 +14,9 @@ import {
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_SUPPORT_FOCUS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
@@ -470,6 +472,14 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
       : "Pulls enemy attention.";
   }
 
+  if (effect.type === "multiTaunt") {
+    return `Pulls attention from up to ${effect.maxTargets} enemies.`;
+  }
+
+  if (effect.type === "shockwave") {
+    return `Hits nearby enemies for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage and briefly binds them.`;
+  }
+
   if (effect.type === "mark") {
     return `Marks a target for +${effect.bonusDamage} damage.`;
   }
@@ -500,8 +510,20 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Blocks ${effect.blocks} hit.`;
   }
 
+  if (effect.type === "absorbShield") {
+    return `Absorbs ${Math.round(effect.absorbPercentMaxHealth)}% max HP damage.`;
+  }
+
   if (effect.type === "damageMitigation") {
     return `Mitigates ${Math.round(effect.mitigationPercent)}% damage for ${effect.procs} hits.`;
+  }
+
+  if (effect.type === "selfMitigationBuff") {
+    return `Self mitigates ${Math.round(effect.mitigationPercent)}% damage.`;
+  }
+
+  if (effect.type === "partyMitigationBuff") {
+    return `Party mitigates ${Math.round(effect.mitigationPercent)}% damage.`;
   }
 
   if (effect.type === "bind") {
@@ -1464,6 +1486,9 @@ function SkillPreferencesSection({
   const secondWindThreshold =
     member.skillBehavior.secondWindSelfHealHpThresholdPercent ??
     DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT;
+  const holdFastThreshold =
+    member.skillBehavior.holdFastSelfHealHpThresholdPercent ??
+    DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
@@ -1474,8 +1499,15 @@ function SkillPreferencesSection({
   const hasSecondWind = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "second_wind"),
   );
+  const hasHoldFast = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "hold_fast"),
+  );
   const hasMobilitySkill = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "quick_step" || skill.id === "flash_step"),
+    group.skills.some((skill) =>
+      skill.id === "quick_step" ||
+      skill.id === "flash_step" ||
+      skill.id === "shield_rush"
+    ),
   );
   const isSupport = member.role === "support";
   const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
@@ -1578,6 +1610,38 @@ function SkillPreferencesSection({
               value={secondWindThreshold}
             />
             <strong>{secondWindThreshold}%</strong>
+          </label>
+        ) : null}
+        {hasHoldFast ? (
+          <label className="behavior-range-row">
+            <span>Hold Fast Self-Heal Threshold</span>
+            <input
+              max={HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  holdFastSelfHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="range"
+              value={holdFastThreshold}
+            />
+            <input
+              max={HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  holdFastSelfHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="number"
+              value={holdFastThreshold}
+            />
+            <strong>{holdFastThreshold}%</strong>
           </label>
         ) : null}
         {hasMobilitySkill ? (

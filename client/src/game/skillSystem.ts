@@ -244,10 +244,41 @@ function getSkillTargetSkipReason(
   }
 
   if (
+    skill.effect.type === "selfMitigationBuff" &&
+    state.skillSelfMitigationBuffsByCompanionId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillSelfMitigationBuffsByCompanionId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
+    skill.effect.type === "partyMitigationBuff" &&
+    state.skillPartyMitigationBuffsBySourceId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillPartyMitigationBuffsBySourceId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
     skill.effect.type === "shieldBlock" &&
     Object.values(state.skillShieldBlocksById ?? {}).some(
       (shield) => shield.ownerId === caster.id,
     )
+  ) {
+    return "active_duplicate_shield";
+  }
+
+  if (
+    skill.effect.type === "absorbShield" &&
+    state.skillAbsorbShieldsByCompanionId?.[caster.id]
   ) {
     return "active_duplicate_shield";
   }
@@ -406,7 +437,10 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "selfPercentHeal" ||
     skill.effect.type === "selfCostHeal" ||
     skill.effect.type === "shieldBlock" ||
-    skill.effect.type === "damageMitigation"
+    skill.effect.type === "absorbShield" ||
+    skill.effect.type === "damageMitigation" ||
+    skill.effect.type === "selfMitigationBuff" ||
+    skill.effect.type === "partyMitigationBuff"
   );
 }
 
@@ -434,6 +468,9 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "selfBuff" ||
     skill.effect.type === "partyBuff" ||
     skill.effect.type === "damageMitigation" ||
+    skill.effect.type === "absorbShield" ||
+    skill.effect.type === "selfMitigationBuff" ||
+    skill.effect.type === "partyMitigationBuff" ||
     skill.effect.type === "allyBuff" ||
     skill.effect.type === "shieldBlock"
   );

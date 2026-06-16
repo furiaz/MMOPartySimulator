@@ -51,6 +51,25 @@ describe("skill role preferences", () => {
     ).toBeLessThanOrEqual(0);
   });
 
+  it("makes Aegis control and mitigation most desirable for Defenders", () => {
+    const defenderShockwaveScore = getSkillRoleScore(
+      "defender",
+      SKILL_DEFINITIONS.shield_shockwave.tags,
+    );
+
+    expect(defenderShockwaveScore).toBeGreaterThan(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.shield_shockwave.tags),
+    );
+    expect(defenderShockwaveScore).toBeGreaterThan(
+      getSkillRoleScore("support", SKILL_DEFINITIONS.shield_shockwave.tags),
+    );
+    expect(
+      getSkillRoleScore("defender", SKILL_DEFINITIONS.guard_wall.tags),
+    ).toBeGreaterThan(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.guard_wall.tags),
+    );
+  });
+
   it("keeps Beginner skills scoped to Beginner class lookup", () => {
     expect(getSkillsForClass("beginner").map((skill) => skill.id)).toEqual([
       "throw_rock",
@@ -71,6 +90,16 @@ describe("skill role preferences", () => {
       "woodcutter_rhythm",
       "flash_step",
       "sweeping_strike",
+    ]);
+    expect(getSkillsForClass("aegis").map((skill) => skill.id)).toEqual([
+      "shield_challenge",
+      "hold_fast",
+      "guard_wall",
+      "iron_stance",
+      "shield_formation",
+      "stonebreaker_rhythm",
+      "shield_rush",
+      "shield_shockwave",
     ]);
   });
 });

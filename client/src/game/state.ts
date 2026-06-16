@@ -27,11 +27,13 @@ import type {
   DropVisualEvent,
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
+  SkillAbsorbShieldState,
   SkillBindState,
   SkillCooldownsBySkillId,
   SkillDamageMitigationState,
   SkillGatherBuffState,
   SkillMarkState,
+  SkillMitigationBuffState,
   SkillPartyBuffState,
   ResurrectionProgressState,
   ResurrectionRecoveryAssignmentState,
@@ -191,6 +193,9 @@ export type GameState = {
   skillPartyBuffsBySourceId?: Record<string, SkillPartyBuffState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillDamageMitigationsByCompanionId?: Record<string, SkillDamageMitigationState>;
+  skillAbsorbShieldsByCompanionId?: Record<string, SkillAbsorbShieldState>;
+  skillSelfMitigationBuffsByCompanionId?: Record<string, SkillMitigationBuffState>;
+  skillPartyMitigationBuffsBySourceId?: Record<string, SkillMitigationBuffState>;
   skillBindsByEnemyId?: Record<string, SkillBindState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillCooldownsByCompanionId?: Record<string, SkillCooldownsBySkillId>;
@@ -371,6 +376,18 @@ export function clearExpiredSkillRuntimeState(
     state.skillDamageMitigationsByCompanionId,
     now,
   );
+  const skillAbsorbShieldsByCompanionId = filterExpiredRecord(
+    state.skillAbsorbShieldsByCompanionId,
+    now,
+  );
+  const skillSelfMitigationBuffsByCompanionId = filterExpiredRecord(
+    state.skillSelfMitigationBuffsByCompanionId,
+    now,
+  );
+  const skillPartyMitigationBuffsBySourceId = filterExpiredRecord(
+    state.skillPartyMitigationBuffsBySourceId,
+    now,
+  );
   const skillBindsByEnemyId = filterExpiredRecord(
     state.skillBindsByEnemyId,
     now,
@@ -395,6 +412,9 @@ export function clearExpiredSkillRuntimeState(
     skillPartyBuffsBySourceId === state.skillPartyBuffsBySourceId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
+    skillAbsorbShieldsByCompanionId === state.skillAbsorbShieldsByCompanionId &&
+    skillSelfMitigationBuffsByCompanionId === state.skillSelfMitigationBuffsByCompanionId &&
+    skillPartyMitigationBuffsBySourceId === state.skillPartyMitigationBuffsBySourceId &&
     skillBindsByEnemyId === state.skillBindsByEnemyId &&
     skillShieldBlocksById === state.skillShieldBlocksById &&
     skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
@@ -411,6 +431,9 @@ export function clearExpiredSkillRuntimeState(
     skillPartyBuffsBySourceId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
+    skillAbsorbShieldsByCompanionId,
+    skillSelfMitigationBuffsByCompanionId,
+    skillPartyMitigationBuffsBySourceId,
     skillBindsByEnemyId,
     skillShieldBlocksById,
     skillCooldownsByCompanionId,

@@ -11,6 +11,8 @@ export const DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT = 20;
 export const DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT = 35;
 export const DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT = 30;
 export const SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT = 30;
+export const DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT = 30;
+export const HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
 export const DEFAULT_SUPPORT_FOCUS: SupportFocus = "lowest_hp";
 
@@ -34,6 +36,8 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
       DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
     secondWindSelfHealHpThresholdPercent:
       DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+    holdFastSelfHealHpThresholdPercent:
+      DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
     mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
     supportFocus: DEFAULT_SUPPORT_FOCUS,
   };
@@ -60,6 +64,11 @@ export function getCompanionSkillBehavior(
       storedBehavior.secondWindSelfHealHpThresholdPercent ??
         DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
       SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    holdFastSelfHealHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.holdFastSelfHealHpThresholdPercent ??
+        DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
     ),
     mobilitySkillUseMode: normalizeMobilitySkillUseMode(
       storedBehavior.mobilitySkillUseMode,
@@ -102,6 +111,13 @@ export function updateCompanionSkillBehavior(
             getCompanionSkillBehavior(companion)
               .secondWindSelfHealHpThresholdPercent,
           SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      holdFastSelfHealHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.holdFastSelfHealHpThresholdPercent ??
+            getCompanionSkillBehavior(companion)
+              .holdFastSelfHealHpThresholdPercent,
+          HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
         ),
       mobilitySkillUseMode: normalizeMobilitySkillUseMode(
         update.mobilitySkillUseMode ??

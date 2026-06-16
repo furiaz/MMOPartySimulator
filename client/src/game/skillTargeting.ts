@@ -109,6 +109,21 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "multiTaunt") {
+    return (
+      findEnemyTarget(state, caster, skill.range, {
+        ...options,
+        enemyFilter: (targetEnemy) =>
+          targetEnemy.currentTargetId !== caster.id &&
+          (!options.enemyFilter || options.enemyFilter(targetEnemy)),
+      }) ?? findEnemyTarget(state, caster, skill.range, options)
+    );
+  }
+
+  if (skill.effect.type === "shockwave") {
+    return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
+  }
+
   if (skill.effect.type === "quickStep") {
     return findQuickStepTarget(state, caster, skill.effect.distance, options);
   }
@@ -119,8 +134,36 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "absorbShield") {
+    return hasPartyDanger(state, caster) && !hasActiveAbsorbShield(state, caster)
+      ? caster
+      : undefined;
+  }
+
   if (skill.effect.type === "damageMitigation") {
     return hasPartyDanger(state, caster) && !hasActiveDamageMitigation(state, caster)
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "selfMitigationBuff") {
+    return hasPartyDanger(state, caster) &&
+      canUseRefreshableRuntimeState(
+        state.skillSelfMitigationBuffsByCompanionId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "partyMitigationBuff") {
+    return hasPartyDanger(state, caster) &&
+      canUseRefreshableRuntimeState(
+        state.skillPartyMitigationBuffsBySourceId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
       ? caster
       : undefined;
   }
@@ -763,6 +806,10 @@ function hasActiveDamageMitigation(state: GameState, caster: Companion): boolean
   return Boolean(state.skillDamageMitigationsByCompanionId?.[caster.id]);
 }
 
+function hasActiveAbsorbShield(state: GameState, caster: Companion): boolean {
+  return Boolean(state.skillAbsorbShieldsByCompanionId?.[caster.id]);
+}
+
 function isHealingSkill(skill: SkillDefinition): boolean {
   return skill.effect.type === "heal" || skill.effect.type === "selfCostHeal";
 }
@@ -771,12 +818,30 @@ function isSelfPercentHealPriorityActive(
   caster: Companion,
   skill: SkillDefinition,
 ): boolean {
+  const thresholdPercent =
+    skill.id === "second_wind"
+      ? getCompanionSkillBehavior(caster).secondWindSelfHealHpThresholdPercent
+      : skill.id === "hold_fast"
+        ? getCompanionSkillBehavior(caster).holdFastSelfHealHpThresholdPercent
+        : null;
+
   return (
-    skill.id === "second_wind" &&
+    thresholdPercent !== null &&
     caster.maxHealth > 0 &&
     caster.health < caster.maxHealth &&
-    (caster.health / caster.maxHealth) * 100 <=
-      getCompanionSkillBehavior(caster).secondWindSelfHealHpThresholdPercent
+    (caster.health / caster.maxHealth) * 100 <= thresholdPercent
+  );
+}
+
+function hasEnemyInRange(
+  state: GameState,
+  caster: Companion,
+  range: number,
+): boolean {
+  return Object.values(state.entities).some(
+    (entity): entity is Enemy =>
+      isLivingEnemy(entity) &&
+      getGridDistance(caster.position, entity.position) <= range,
   );
 }
 
