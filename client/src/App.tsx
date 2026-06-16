@@ -47,6 +47,7 @@ import {
   closeSlimewardDungeonChestUi,
   continueSlimewardDungeonChest,
   debugAddCompanionToParty,
+  debugAddEnemiesToCurrentSubzone,
   debugAddPrototypeConsumablesToInventory,
   debugAddTestCrowns,
   debugFinishCurrentQuest,
@@ -55,6 +56,7 @@ import {
   debugLevelUpAllCompanions,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
+  debugRemoveDebugEnemies,
   debugResetSlimewardDungeon,
   debugResurrectEnemy,
   debugRestorePartyHealth,
@@ -3669,6 +3671,31 @@ function App() {
     setGameState(debugForceSuperiorEnemyInCurrentSubzone);
   }
 
+  function addEnemiesToCurrentSubzone() {
+    const enemyCountText = window.prompt(
+      "How many enemies should be added to the current subzone?",
+      "1",
+    );
+
+    if (enemyCountText === null) {
+      return;
+    }
+
+    const enemyCount = Number.parseInt(enemyCountText, 10);
+
+    if (Number.isNaN(enemyCount)) {
+      return;
+    }
+
+    setGameState((state) =>
+      debugAddEnemiesToCurrentSubzone(state, enemyCount),
+    );
+  }
+
+  function removeDebugEnemies() {
+    setGameState(debugRemoveDebugEnemies);
+  }
+
   function resetSlimewardDungeon() {
     setGameState(debugResetSlimewardDungeon);
   }
@@ -4990,6 +5017,12 @@ function App() {
                   <button onClick={killOneCompanion}>Kill One Companion</button>
                   <button onClick={forceSuperiorEnemy}>
                     Force Superior Enemy
+                  </button>
+                  <button onClick={addEnemiesToCurrentSubzone}>
+                    Add Enemies to Subzone
+                  </button>
+                  <button onClick={removeDebugEnemies}>
+                    Remove Debug Enemies
                   </button>
                   <button onClick={resetSlimewardDungeon}>
                     Reset Slimeward Dungeon

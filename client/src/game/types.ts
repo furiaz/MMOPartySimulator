@@ -1616,6 +1616,7 @@ export type Enemy = LivingEntity & {
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
   variant?: EnemyVariant;
+  debugSpawn?: true;
   isTargetDummy?: true;
   archetypeId?: EnemyArchetypeId;
   enemyTypeId?: EnemyTypeId;

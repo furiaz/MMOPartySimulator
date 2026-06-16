@@ -698,6 +698,7 @@ export {
 export {
   debugAddCompanion,
   debugAddCompanionToParty,
+  debugAddEnemiesToCurrentSubzone,
   debugApplyCompanionInfiniteHealth,
   debugAddPrototypeConsumablesToInventory,
   debugAddPrototypeEquipmentToInventory,
@@ -707,6 +708,7 @@ export {
   debugForceSuperiorEnemyInCurrentSubzone,
   debugKillOneCompanion,
   debugLevelUpAllCompanions,
+  debugRemoveDebugEnemies,
   debugResetSlimewardDungeon,
   debugRefreshResources,
   debugRandomizeLocations,

@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createNpc } from "./entities";
 import { companionIds, createDebugMap, TELEPORTER_ID } from "./debugMap";
 import {
+  DEBUG_ADD_ENEMIES_MAX_COUNT,
+  debugAddEnemiesToCurrentSubzone,
   debugAddTestCrowns,
   debugApplyCompanionInfiniteHealth,
   debugFinishCurrentQuest,
   debugForceSuperiorEnemyInCurrentSubzone,
   debugLevelUpAllCompanions,
+  debugRemoveDebugEnemies,
   debugToggleCompanionInfiniteHealth,
   debugToggleCompanionOneHunterClass,
   debugTurnInCurrentQuest,
@@ -17,9 +20,11 @@ import { MAX_CHARACTER_LEVEL } from "./leveling";
 import { createInitialQuestStates } from "./questSystem";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS } from "./state";
+import { isPositionInsideSubzone } from "./subzoneSystem";
 import { createTestGameState } from "./testState";
 import { isTeleportWorking } from "./teleportState";
 import { getCurrencyBalance } from "./wallet";
+import type { Enemy } from "./types";
 import type { QuestId, QuestState } from "./questTypes";
 
 describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
@@ -139,6 +144,160 @@ describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
     });
 
     expect(debugForceSuperiorEnemyInCurrentSubzone(state)).toBe(state);
+  });
+});
+
+describe("debugAddEnemiesToCurrentSubzone", () => {
+  it("adds enemies using the leader's current subzone setup", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const map = createDebugMap("map-1");
+    const state = createTestGameState({
+      currentMapId: "map-1",
+      map,
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+      },
+    });
+
+    const nextState = debugAddEnemiesToCurrentSubzone(state, 3);
+    const enemies = getDebugSubzoneEnemies(nextState);
+    const subzone = map.subzones?.find((candidate) => candidate.id === "shore-fringe");
+
+    expect(enemies).toHaveLength(3);
+    expect(subzone).toBeDefined();
+
+    for (const enemy of enemies) {
+      expect(enemy.debugSpawn).toBe(true);
+      expect(enemy.subzoneId).toBe("shore-fringe");
+      expect(enemy.enemyTypeId).toBe("slime");
+      expect(enemy.level).toBe(1);
+      expect(enemy.encounterAreaId).toBeTruthy();
+      expect(subzone && isPositionInsideSubzone(enemy.position, subzone)).toBe(true);
+    }
+  });
+
+  it("cycles current subzone enemy types and level range", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const state = createTestGameState({
+      currentMapId: "map-2",
+      map: createDebugMap("map-2"),
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+      },
+    });
+
+    const nextState = debugAddEnemiesToCurrentSubzone(state, 3);
+    const enemies = getDebugSubzoneEnemies(nextState);
+
+    expect(enemies.map((enemy) => enemy.enemyTypeId)).toEqual([
+      "forest_spider",
+      "goblin_scout",
+      "forest_spider",
+    ]);
+    expect(enemies.map((enemy) => enemy.level)).toEqual([3, 4, 3]);
+  });
+
+  it("ignores invalid counts and maps without a current subzone", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const state = createTestGameState({
+      currentMapId: "hub",
+      map: createDebugMap("hub"),
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+      },
+    });
+
+    expect(debugAddEnemiesToCurrentSubzone(state, Number.NaN)).toBe(state);
+    expect(debugAddEnemiesToCurrentSubzone(state, 2)).toBe(state);
+  });
+
+  it("clamps large debug enemy counts", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const state = createTestGameState({
+      currentMapId: "map-1",
+      map: createDebugMap("map-1"),
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+      },
+    });
+
+    const nextState = debugAddEnemiesToCurrentSubzone(
+      state,
+      DEBUG_ADD_ENEMIES_MAX_COUNT + 25,
+    );
+
+    expect(getDebugSubzoneEnemies(nextState)).toHaveLength(
+      DEBUG_ADD_ENEMIES_MAX_COUNT,
+    );
+  });
+
+  it("removes only debug-spawned enemies", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const normalEnemy = createEnemy(
+      "normal-enemy",
+      { x: 12, y: 10 },
+      "passive",
+      {
+        enemyTypeId: "slime",
+        subzoneId: "shore-fringe",
+      },
+    );
+    const legacyDebugEnemy = createEnemy(
+      "debug-subzone-enemy-999",
+      { x: 14, y: 10 },
+      "passive",
+      {
+        enemyTypeId: "slime",
+        subzoneId: "shore-fringe",
+      },
+    );
+    const state = createTestGameState({
+      currentMapId: "map-1",
+      map: createDebugMap("map-1"),
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+        [normalEnemy.id]: normalEnemy,
+        [legacyDebugEnemy.id]: legacyDebugEnemy,
+      },
+      followTrailsByEntityId: {
+        [leader.id]: [],
+        [normalEnemy.id]: [],
+        [legacyDebugEnemy.id]: [],
+      },
+    });
+    const stateWithDebugEnemies = debugAddEnemiesToCurrentSubzone(state, 2);
+
+    const nextState = debugRemoveDebugEnemies(stateWithDebugEnemies);
+
+    expect(nextState.entities[normalEnemy.id]).toEqual(normalEnemy);
+    expect(nextState.entities[legacyDebugEnemy.id]).toBeUndefined();
+    expect(getDebugSubzoneEnemies(nextState)).toHaveLength(0);
+    expect(nextState.followTrailsByEntityId[legacyDebugEnemy.id]).toBeUndefined();
   });
 });
 
@@ -457,4 +616,13 @@ function createQuestStates(statuses: Partial<Record<QuestId, QuestState["status"
   }
 
   return quests;
+}
+
+function getDebugSubzoneEnemies(state: ReturnType<typeof createTestGameState>): Enemy[] {
+  return Object.values(state.entities)
+    .filter(
+      (entity): entity is Enemy =>
+        entity.kind === "enemy" && entity.id.startsWith("debug-subzone-enemy-"),
+    )
+    .sort((first, second) => first.id.localeCompare(second.id));
 }

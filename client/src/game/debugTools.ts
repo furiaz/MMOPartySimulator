@@ -1,4 +1,10 @@
-import { createCompanion, createNpc, isResourceEntity, moveEntityTo } from "./entities";
+import {
+  createCompanion,
+  createEnemy,
+  createNpc,
+  isResourceEntity,
+  moveEntityTo,
+} from "./entities";
 import { PROTOTYPE_CONSUMABLE_ITEM_IDS } from "./consumables";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
@@ -37,6 +43,7 @@ import {
 } from "./wallet";
 import {
   addCombatFeedback,
+  addEnemy,
   addEntity,
   getEntityById,
   PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
@@ -48,8 +55,18 @@ import {
   findClosestAvailablePosition,
   isWallPosition,
 } from "./movementPlanning";
-import type { Companion, Enemy, GameEntity, Position, ResourceEntity } from "./types";
+import type {
+  Companion,
+  EncounterArea,
+  Enemy,
+  GameEntity,
+  Position,
+  ResourceEntity,
+  ZoneSubzone,
+} from "./types";
 import type { QuestId, QuestObjectiveDefinition } from "./questTypes";
+
+export const DEBUG_ADD_ENEMIES_MAX_COUNT = 50;
 
 const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
@@ -469,6 +486,77 @@ export function debugForceSuperiorEnemyInCurrentSubzone(
   });
 }
 
+export function debugAddEnemiesToCurrentSubzone(
+  state: GameState,
+  count: number,
+): GameState {
+  const enemyCount = normalizeDebugEnemyCount(count);
+
+  if (enemyCount <= 0) {
+    return state;
+  }
+
+  const leader = getPartyLeader(state);
+  const subzone = getSubzoneAtPosition(state.map, leader?.position);
+
+  if (!leader || !subzone || subzone.enemyTypeIds.length === 0) {
+    return state;
+  }
+
+  let nextState = state;
+  const firstEnemyIndex = getNextDebugSubzoneEnemyIndex(state);
+
+  for (let index = 0; index < enemyCount; index += 1) {
+    const encounterArea = getDebugSpawnEncounterArea(
+      subzone,
+      leader.position,
+      index,
+    );
+    const enemy = createEnemy(
+      `debug-subzone-enemy-${firstEnemyIndex + index}`,
+      getDebugEnemySpawnPosition(subzone, encounterArea, leader.position, index),
+      undefined,
+      {
+        enemyTypeId: subzone.enemyTypeIds[index % subzone.enemyTypeIds.length],
+        level: getDebugEnemySpawnLevel(subzone, index),
+        subzoneId: subzone.id,
+        encounterAreaId: encounterArea?.id,
+      },
+    );
+
+    nextState = addEnemy(nextState, {
+      ...enemy,
+      debugSpawn: true,
+    });
+  }
+
+  return nextState;
+}
+
+export function debugRemoveDebugEnemies(state: GameState): GameState {
+  const debugEnemyIds = Object.values(state.entities)
+    .filter(isDebugSpawnEnemy)
+    .map((enemy) => enemy.id);
+
+  if (debugEnemyIds.length === 0) {
+    return state;
+  }
+
+  const entities = { ...state.entities };
+  const followTrailsByEntityId = { ...state.followTrailsByEntityId };
+
+  for (const enemyId of debugEnemyIds) {
+    delete entities[enemyId];
+    delete followTrailsByEntityId[enemyId];
+  }
+
+  return pruneMissingEntityRuntimeState({
+    ...state,
+    entities,
+    followTrailsByEntityId,
+  });
+}
+
 export function debugAddTestWoodToInventory(state: GameState): GameState {
   return addItemToInventoryState(
     state,
@@ -844,6 +932,97 @@ function hasLivingSuperiorInSubzone(
       entity.subzoneId === subzoneId &&
       isSuperiorEnemy(entity),
   );
+}
+
+function isDebugSpawnEnemy(entity: GameEntity): entity is Enemy {
+  return (
+    entity.kind === "enemy" &&
+    (entity.debugSpawn === true || entity.id.startsWith("debug-subzone-enemy-"))
+  );
+}
+
+function normalizeDebugEnemyCount(count: number): number {
+  if (!Number.isFinite(count)) {
+    return 0;
+  }
+
+  return Math.min(
+    DEBUG_ADD_ENEMIES_MAX_COUNT,
+    Math.max(0, Math.floor(count)),
+  );
+}
+
+function getNextDebugSubzoneEnemyIndex(state: GameState): number {
+  return Object.keys(state.entities).reduce((highestIndex, entityId) => {
+    const match = /^debug-subzone-enemy-(\d+)$/.exec(entityId);
+
+    return match ? Math.max(highestIndex, Number(match[1]) + 1) : highestIndex;
+  }, 1);
+}
+
+function getDebugSpawnEncounterArea(
+  subzone: ZoneSubzone,
+  leaderPosition: Position,
+  spawnIndex: number,
+): EncounterArea | undefined {
+  if (subzone.encounterAreas.length === 0) {
+    return undefined;
+  }
+
+  const encounterAreas = [...subzone.encounterAreas].sort(
+    (first, second) =>
+      getEuclideanDistance(first.center, leaderPosition) -
+      getEuclideanDistance(second.center, leaderPosition),
+  );
+
+  return encounterAreas[spawnIndex % encounterAreas.length];
+}
+
+function getDebugEnemySpawnPosition(
+  subzone: ZoneSubzone,
+  encounterArea: EncounterArea | undefined,
+  leaderPosition: Position,
+  spawnIndex: number,
+): Position {
+  const center = encounterArea?.center ?? leaderPosition;
+  const angle = spawnIndex * 2.399963229728653;
+  const radius = encounterArea
+    ? Math.min(Math.max(1, encounterArea.radius * 0.35), 8)
+    : 2;
+
+  return clampPositionToSubzone(
+    {
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
+    },
+    subzone,
+  );
+}
+
+function clampPositionToSubzone(
+  position: Position,
+  subzone: ZoneSubzone,
+): Position {
+  const { bounds } = subzone;
+  const minX = bounds.x + 1;
+  const maxX = bounds.x + Math.max(1, bounds.width - 2);
+  const minY = bounds.y + 1;
+  const maxY = bounds.y + Math.max(1, bounds.height - 2);
+
+  return {
+    x: Math.min(maxX, Math.max(minX, position.x)),
+    y: Math.min(maxY, Math.max(minY, position.y)),
+  };
+}
+
+function getDebugEnemySpawnLevel(
+  subzone: ZoneSubzone,
+  spawnIndex: number,
+): number {
+  const minLevel = subzone.levelRange.min;
+  const maxLevel = Math.max(minLevel, subzone.levelRange.max);
+
+  return minLevel + (spawnIndex % (maxLevel - minLevel + 1));
 }
 
 function getRandomOpenPosition(
