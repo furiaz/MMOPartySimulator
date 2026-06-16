@@ -65,6 +65,7 @@ export type MapTileVisualAsset = {
 
 const testCharacterBasePath = "/assets/Characters/Test-Character";
 const beginnerCharacterBasePath = "/assets/Characters/Beginner";
+const firstClassCharacterBasePath = "/assets/Characters";
 const testEnemyBasePath = "/assets/Characters/Test-Enemy";
 const testEnemyTwoBasePath = "/assets/Characters/Test-Enemy2";
 const prototypeEnemyBasePath = "/assets/Characters/Prototype-Enemies";
@@ -73,6 +74,10 @@ const bossSlimeTestAssetPath = "/assets/Characters/BossSlimeTest";
 const testNpcBasePath = "/assets/Characters/Test-NPC";
 const classPortraitBasePath = "/assets/Generated/class-portraits";
 const defaultFrameDurationMs = 100;
+const companionCharacterNaturalSize = {
+  width: 172,
+  height: 172,
+};
 
 function createFrames(
   basePath: string,
@@ -142,6 +147,105 @@ function createDirectionalIdleFrames(
   ) as Record<CardinalSpriteDirection, SpriteAnimationAsset>;
 }
 
+const spriteDirectionAssetNames = {
+  north: "North",
+  northEast: "NorthEast",
+  east: "East",
+  southEast: "SouthEast",
+  south: "South",
+  southWest: "SouthWest",
+  west: "West",
+  northWest: "NorthWest",
+} satisfies Record<SpriteDirection, string>;
+
+const firstClassRunDirections = [
+  "north",
+  "east",
+  "south",
+  "west",
+] satisfies CardinalSpriteDirection[];
+
+type FirstClassCharacterVisualAssetId = Exclude<ClassId, "beginner">;
+
+type FirstClassCharacterAssetDefinition = {
+  folderName: string;
+  framePrefix: string;
+};
+
+const firstClassCharacterAssetDefinitions = {
+  blade: {
+    folderName: "Blade",
+    framePrefix: "Blade",
+  },
+  aegis: {
+    folderName: "Aegis",
+    framePrefix: "Aegis",
+  },
+  hunter: {
+    folderName: "Hunter",
+    framePrefix: "Hunter",
+  },
+  beast: {
+    folderName: "Beast",
+    framePrefix: "Beast",
+  },
+  elementalist: {
+    folderName: "Elementalist",
+    framePrefix: "Elementalist",
+  },
+  runecaster: {
+    folderName: "Runecaster",
+    framePrefix: "Runecaster",
+  },
+  lightbearer: {
+    folderName: "Lightbearer",
+    framePrefix: "Lightbearer",
+  },
+  penitent: {
+    folderName: "Penitent",
+    framePrefix: "Penitent",
+  },
+} satisfies Record<
+  FirstClassCharacterVisualAssetId,
+  FirstClassCharacterAssetDefinition
+>;
+
+function createFirstClassCharacterVisualAsset({
+  folderName,
+  framePrefix,
+}: FirstClassCharacterAssetDefinition): SpriteVisualAsset {
+  const basePath = `${firstClassCharacterBasePath}/${folderName}`;
+  const idle = Object.fromEntries(
+    Object.entries(spriteDirectionAssetNames).map(([direction, assetName]) => [
+      direction,
+      createSingleFrame(`${basePath}/${framePrefix}Idle_${assetName}.png`),
+    ]),
+  ) as Record<SpriteDirection, SpriteAnimationAsset>;
+  const run = Object.fromEntries(
+    firstClassRunDirections.map((direction) => [
+      direction,
+      {
+        frames: createFrames(
+          firstClassCharacterBasePath,
+          folderName,
+          `${framePrefix}Running_${spriteDirectionAssetNames[direction]}`,
+          7,
+        ),
+        frameDurationMs: defaultFrameDurationMs,
+      },
+    ]),
+  ) as Record<CardinalSpriteDirection, SpriteAnimationAsset>;
+
+  return {
+    kind: "sprite",
+    animations: {
+      idle,
+      run,
+    },
+    naturalSize: companionCharacterNaturalSize,
+  };
+}
+
 function createEnemyTwoDirectionalFrames() {
   return {
     north: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_North.png`),
@@ -158,6 +262,15 @@ function createEnemyTwoDirectionalFrames() {
 const enemyTwoDirectionalFrames = createEnemyTwoDirectionalFrames();
 const beginnerDirectionalFrames = createBeginnerDirectionalFrames();
 const beginnerIdleFrames = createDirectionalIdleFrames(beginnerDirectionalFrames);
+
+export const firstClassCharacterVisualAssets = Object.fromEntries(
+  Object.entries(firstClassCharacterAssetDefinitions).map(
+    ([classId, definition]) => [
+      classId,
+      createFirstClassCharacterVisualAsset(definition),
+    ],
+  ),
+) as Record<FirstClassCharacterVisualAssetId, SpriteVisualAsset>;
 
 function createStaticEnemySprite(
   src: string,
@@ -258,8 +371,7 @@ export const entityVisualAssets = {
       run: beginnerDirectionalFrames,
     },
     naturalSize: {
-      width: 172,
-      height: 172,
+      ...companionCharacterNaturalSize,
     },
   },
   testCharacter: testCharacterVisualAsset,
@@ -398,11 +510,14 @@ export function getEntityVisualAsset(
   currentMapId?: DebugMapId,
 ): EntityVisualAsset {
   if (entity.kind === "companion") {
-    if (entity.classId === "beginner" || entity.classId === "hunter") {
+    if (entity.classId === "beginner") {
       return entityVisualAssets.beginnerCharacter;
     }
 
-    return entityVisualAssets.testCharacter;
+    return (
+      firstClassCharacterVisualAssets[entity.classId] ??
+      entityVisualAssets.testCharacter
+    );
   }
 
   if (entity.kind === "resource") {

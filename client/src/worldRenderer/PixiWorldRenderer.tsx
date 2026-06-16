@@ -61,6 +61,7 @@ import {
 } from "../game/enemyVariants";
 import {
   entityVisualAssets,
+  firstClassCharacterVisualAssets,
   getEntityVisualAsset,
   getSpriteAnimation,
   type ImageVisualAsset,
@@ -857,6 +858,9 @@ function collectDurableVisualTextureSrcs(): Set<string> {
   ]);
 
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.beginnerCharacter);
+  for (const visualAsset of Object.values(firstClassCharacterVisualAssets)) {
+    addEntityVisualAssetTextureSrcs(sources, visualAsset);
+  }
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.testCharacter);
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.questGuideCharacter);
 
@@ -2063,34 +2067,18 @@ function drawTargetDummyDistanceMarkers({
   }
 }
 
-function drawBeginnerDebugHitbox(
+function drawCompanionDebugCollisionShape(
   graphics: Graphics,
   entity: GameEntity,
-  map: GameMap,
   transform: FullTransform,
 ) {
-  if (entity.kind !== "companion" || entity.classId !== "beginner") {
+  if (entity.kind !== "companion") {
     return;
   }
 
-  const visualAsset = getEntityVisualAsset(entity, map.id);
-  const layout = getEntitySpriteLayout(
-    entity,
-    transform.cellPixelSize,
-    visualAsset,
-  );
   const center = toFullPosition(entity.position, transform);
-  const spritePosition = {
-    x: center.x,
-    y: center.y + transform.cellPixelSize / 2,
-  };
-  const spriteLeft = spritePosition.x - layout.width * layout.anchorX;
-  const spriteTop = spritePosition.y - layout.height * layout.anchorY;
   const collisionShape = getEntityCollisionShape(entity);
 
-  graphics
-    .rect(spriteLeft, spriteTop, layout.width, layout.height)
-    .stroke({ color: 0xf472b6, alpha: 0.9, width: 2 });
   drawDebugCollisionShape(graphics, center, collisionShape, transform);
   graphics
     .circle(center.x, center.y, 4)
@@ -5168,7 +5156,7 @@ function drawFullMap({
       }
 
       if (isPositionInTileBounds(entity.position, visibleTileBounds)) {
-        drawBeginnerDebugHitbox(overlayGraphics, entity, map, transform);
+        drawCompanionDebugCollisionShape(overlayGraphics, entity, transform);
       }
     }
 

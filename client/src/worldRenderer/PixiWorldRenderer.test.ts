@@ -615,6 +615,11 @@ describe("texture lifetime classification", () => {
     expect(
       [...durableSources].some((src) => src.includes("/assets/Characters/Beginner/")),
     ).toBe(true);
+    expect(
+      [...durableSources].some((src) =>
+        src.includes("/assets/Characters/Hunter/HunterRunning_East_0000.png"),
+      ),
+    ).toBe(true);
   });
 
   it("classifies wild-map visual sources as current-map scoped", () => {

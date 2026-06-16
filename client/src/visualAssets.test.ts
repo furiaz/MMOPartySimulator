@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createNpc } from "./game";
+import { createCompanion, createNpc, FIRST_CLASS_IDS } from "./game";
 import {
   entityVisualAssets,
+  firstClassCharacterVisualAssets,
   getEntityVisualAsset,
   getSpriteAnimation,
 } from "./visualAssets";
@@ -102,7 +103,7 @@ describe("entity visual assets", () => {
     expect(nearNorthWestAnimation.frames[0]).toContain("BeginnerWalkingWest");
   });
 
-  it("keeps Hunter companions on the Beginner sprite for now", () => {
+  it("uses first-class character art after class selection", () => {
     const beginner = createCompanion(
       "beginner",
       { x: 0, y: 0 },
@@ -111,16 +112,68 @@ describe("entity visual assets", () => {
       0,
       "beginner",
     );
-    const hunter = createCompanion(
-      "hunter",
-      { x: 0, y: 0 },
-      "hunter",
-      "fighter",
-      0,
-      "hunter",
-    );
 
     expect(getEntityVisualAsset(beginner)).toBe(entityVisualAssets.beginnerCharacter);
-    expect(getEntityVisualAsset(hunter)).toBe(entityVisualAssets.beginnerCharacter);
+
+    for (const classId of FIRST_CLASS_IDS) {
+      const companion = createCompanion(
+        classId,
+        { x: 0, y: 0 },
+        classId,
+        "fighter",
+        0,
+        classId,
+      );
+
+      expect(getEntityVisualAsset(companion)).toBe(
+        firstClassCharacterVisualAssets[classId],
+      );
+    }
+  });
+
+  it("defines complete first-class idle and running sprite paths", () => {
+    for (const classId of FIRST_CLASS_IDS) {
+      const visualAsset = firstClassCharacterVisualAssets[classId];
+
+      expect(visualAsset.naturalSize).toEqual({ width: 172, height: 172 });
+
+      if (!("north" in visualAsset.animations.idle)) {
+        throw new Error(`${classId} should use directional idle frames.`);
+      }
+
+      expect(Object.keys(visualAsset.animations.idle)).toHaveLength(8);
+      expect(Object.keys(visualAsset.animations.run)).toEqual([
+        "north",
+        "east",
+        "south",
+        "west",
+      ]);
+
+      for (const animation of Object.values(visualAsset.animations.idle)) {
+        expect(animation?.frames).toHaveLength(1);
+        expect(animation?.frames[0]).toMatch(/Idle_(North|South|East|West)/);
+      }
+
+      for (const animation of Object.values(visualAsset.animations.run)) {
+        expect(animation?.frames).toHaveLength(7);
+        expect(animation?.frames[0]).toMatch(
+          /Running_(North|South|East|West)_0000\.png$/,
+        );
+      }
+    }
+  });
+
+  it("uses the Beginner cardinal movement fallback for first-class movement", () => {
+    const visualAsset = firstClassCharacterVisualAssets.blade;
+
+    const northAnimation = getSpriteAnimation(visualAsset, true, "northEast", 90);
+    const southAnimation = getSpriteAnimation(visualAsset, true, "southEast", 270);
+    const eastAnimation = getSpriteAnimation(visualAsset, true, "northEast", 45);
+    const westAnimation = getSpriteAnimation(visualAsset, true, "northWest", 180);
+
+    expect(northAnimation.frames[0]).toContain("BladeRunning_North");
+    expect(southAnimation.frames[0]).toContain("BladeRunning_South");
+    expect(eastAnimation.frames[0]).toContain("BladeRunning_East");
+    expect(westAnimation.frames[0]).toContain("BladeRunning_West");
   });
 });

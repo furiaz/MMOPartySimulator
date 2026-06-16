@@ -52,9 +52,9 @@ import type {
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const POSITION_EPSILON = 0.001;
 export const ENTITY_COLLISION_DISTANCE = 0.7;
-export const BEGINNER_COLLISION_CAPSULE_WIDTH_MULTIPLIER = 0.8;
-export const BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER = 1.6;
-export const BEGINNER_COLLISION_CAPSULE_ANCHOR_Y = 0.3;
+export const COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER = 0.8;
+export const COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER = 1.6;
+export const COMPANION_COLLISION_CAPSULE_ANCHOR_Y = 0.3;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
 const COMBAT_PATH_REFRESH_MS = 500;
@@ -66,17 +66,17 @@ const FOLLOW_TRAIL_LENGTH = 12;
 export function getEntityCollisionShape(
   entity: GameEntity,
 ): EntityCollisionShape {
-  if (entity.kind === "companion" && entity.classId === "beginner") {
+  if (entity.kind === "companion") {
     return {
       kind: "verticalCapsule",
       radius:
         ENTITY_COLLISION_DISTANCE *
-        BEGINNER_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
+        COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
       height:
         ENTITY_COLLISION_DISTANCE *
         2 *
-        BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
-      anchorY: BEGINNER_COLLISION_CAPSULE_ANCHOR_Y,
+        COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
+      anchorY: COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
     };
   }
 

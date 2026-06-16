@@ -40,6 +40,7 @@ import {
 } from "../game/enemyVariants";
 import {
   entityVisualAssets,
+  firstClassCharacterVisualAssets,
   getEntityVisualAsset,
   type ImageVisualAsset,
   type SpriteAnimationAsset,
@@ -465,6 +466,9 @@ export function collectDurableVisualTextureSrcs(): Set<string> {
   ]);
 
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.beginnerCharacter);
+  for (const visualAsset of Object.values(firstClassCharacterVisualAssets)) {
+    addEntityVisualAssetTextureSrcs(sources, visualAsset);
+  }
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.testCharacter);
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.questGuideCharacter);
 

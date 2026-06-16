@@ -210,7 +210,7 @@ export {
   setPoiSearchScope,
   setStayInMapEnabled,
   updateEntity,
-  BEGINNER_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
+  COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
   ENTITY_COLLISION_DISTANCE,
   getEntityCollisionShape,
   isEntitySeparationPositionAvailable,
