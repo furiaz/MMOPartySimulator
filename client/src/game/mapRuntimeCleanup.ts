@@ -50,6 +50,10 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     resurrectionChannelsByHelperId: {},
     skillBindsByEnemyId: {},
     skillMarksByEnemyId: {},
+    skillSelfBuffsByCompanionId: {},
+    skillPartyBuffsBySourceId: {},
+    skillGatherBuffsByCompanionId: {},
+    skillDamageMitigationsByCompanionId: {},
     skillShieldBlocksById: {},
     partyFormation: createIdlePartyFormation(),
   };
@@ -95,6 +99,22 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     currentEntityIds,
   );
   const skillMarksByEnemyId = pruneRecordById(state.skillMarksByEnemyId, currentEntityIds);
+  const skillSelfBuffsByCompanionId = pruneRecordById(
+    state.skillSelfBuffsByCompanionId,
+    currentEntityIds,
+  );
+  const skillPartyBuffsBySourceId = pruneRecordById(
+    state.skillPartyBuffsBySourceId,
+    currentEntityIds,
+  );
+  const skillGatherBuffsByCompanionId = pruneRecordById(
+    state.skillGatherBuffsByCompanionId,
+    currentEntityIds,
+  );
+  const skillDamageMitigationsByCompanionId = pruneRecordById(
+    state.skillDamageMitigationsByCompanionId,
+    currentEntityIds,
+  );
   const skillBindsByEnemyId = pruneRecordById(state.skillBindsByEnemyId, currentEntityIds);
   const skillCooldownsByCompanionId = pruneRecordById(
     state.skillCooldownsByCompanionId,
@@ -142,6 +162,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     movementDecisionsByEntityId === state.movementDecisionsByEntityId &&
     lastPositionsByEntityId === state.lastPositionsByEntityId &&
     skillMarksByEnemyId === state.skillMarksByEnemyId &&
+    skillSelfBuffsByCompanionId === state.skillSelfBuffsByCompanionId &&
+    skillPartyBuffsBySourceId === state.skillPartyBuffsBySourceId &&
+    skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
+    skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
     skillBindsByEnemyId === state.skillBindsByEnemyId &&
     skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
     globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
@@ -169,6 +193,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     movementDecisionsByEntityId,
     lastPositionsByEntityId,
     skillMarksByEnemyId,
+    skillSelfBuffsByCompanionId,
+    skillPartyBuffsBySourceId,
+    skillGatherBuffsByCompanionId,
+    skillDamageMitigationsByCompanionId,
     skillBindsByEnemyId,
     skillCooldownsByCompanionId,
     globalCooldownsByCompanionId,

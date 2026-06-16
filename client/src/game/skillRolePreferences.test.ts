@@ -42,6 +42,15 @@ describe("skill role preferences", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("lets Fighters value self-healing without valuing normal ally healing", () => {
+    expect(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.second_wind.tags),
+    ).toBeGreaterThan(0);
+    expect(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.first_aid.tags),
+    ).toBeLessThanOrEqual(0);
+  });
+
   it("keeps Beginner skills scoped to Beginner class lookup", () => {
     expect(getSkillsForClass("beginner").map((skill) => skill.id)).toEqual([
       "throw_rock",
@@ -54,6 +63,13 @@ describe("skill role preferences", () => {
       "quick_step",
     ]);
     expect(getSkillsForClass("blade").map((skill) => skill.id)).toEqual([
+      "duelist_challenge",
+      "second_wind",
+      "blade_parry",
+      "edge_focus",
+      "press_the_opening",
+      "woodcutter_rhythm",
+      "flash_step",
       "sweeping_strike",
     ]);
   });

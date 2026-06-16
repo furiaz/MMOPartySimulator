@@ -657,6 +657,7 @@ Current item categories:
 
 - material
 - consumable
+- skill book
 - equipment
 - quest
 - event
@@ -774,11 +775,11 @@ Current merchant behavior:
 - quick exchange removes eligible junk items from shared inventory
 - quick exchange adds Crowns to the shared wallet
 - the hub Merchant has a fixed prototype buy stock
-- Merchant Buy can purchase selected equipment and consumables for Crowns
-- Merchant Buy validates merchant identity, stock membership, price, wallet balance, and inventory capacity
+- Merchant Buy can purchase selected equipment, consumables, and skill books for Crowns
+- Merchant Buy validates merchant identity, quest unlock state, stock membership, price, wallet balance, item category, and inventory capacity
 - purchased items are added to shared party inventory
 - Merchant Buy may filter stock by group and party equipment compatibility
-- current Merchant Buy stock groups include flasks, food, weapons, offhands, cloth armor, leather armor, mail armor, plate armor, and accessories
+- current Merchant Buy stock groups include flasks, food, books, weapons, offhands, cloth armor, leather armor, mail armor, plate armor, and accessories
 - the Sell panel may be visible as a placeholder only
 - full selling rules are not implemented
 - this is prototype merchant behavior, not a full shop economy
@@ -1420,7 +1421,7 @@ Current leveling rules:
 - XP can be reduced when the enemy is much lower level than the party member
 - level-ups may occur immediately when enough XP is gained
 - level-ups may increase natural primary stats through prototype class growth
-- level-ups may grant unspent stat points after base class progression begins
+- level-ups may grant unspent stat points after first-class progression begins
 - player-assigned stat points are stored as companion stat data, not UI-only state
 
 Current max level:
@@ -1478,7 +1479,7 @@ Derived combat stats are the current prototype path for making class growth, all
 
 Beginner growth is broad and simple.
 
-Base class growth should express class identity using small automatic stat increases:
+First-class growth should express class identity using small automatic stat increases:
 
 - Blade emphasizes Strength and Dexterity
 - Aegis emphasizes Constitution and frontline durability
@@ -1545,11 +1546,18 @@ Party members may begin as:
 
 - Beginner
 
-Beginner is the starting class before choosing a class path.
+Beginner is the starting class before choosing a first class.
 
 Beginner should feel simple, flexible, and unfinished.
 
-Beginner party members become eligible to choose a base class at level 10.
+Current prototype first-class selection:
+
+- becomes available at level 10
+- is available only to living Beginner companions
+- allows choosing Blade, Aegis, Hunter, Beast, Elementalist, Runecaster, Lightbearer, or Penitent
+- rejects invalid class targets
+- rejects companions who already chose a first class
+- rejects choices when currently equipped items are incompatible with the selected class
 
 ---
 
@@ -1562,7 +1570,7 @@ There are four class paths:
 - Arcane Path
 - Holy Path
 
-Each path has two base classes.
+Each path has two first classes.
 
 Subclass progression is future-facing and should not be implemented until explicitly requested.
 
@@ -1577,7 +1585,7 @@ Theme:
 - control
 - technique
 
-Base classes:
+First classes:
 
 - Blade
 - Aegis
@@ -1597,7 +1605,7 @@ Theme:
 - natural power
 - adaptability
 
-Base classes:
+First classes:
 
 - Hunter
 - Beast
@@ -1615,7 +1623,7 @@ Theme:
 - learned magic
 - reality manipulation
 
-Base classes:
+First classes:
 
 - Elementalist
 - Runecaster
@@ -1634,7 +1642,7 @@ Theme:
 - devotion
 - divine power
 
-Base classes:
+First classes:
 
 - Lightbearer
 - Penitent
@@ -1653,7 +1661,7 @@ Weapons are gameplay-facing stat/data modifiers, not sprite identity.
 
 Class sprites already express the class fantasy visually, so equipment must not require visible weapon swaps, paper-doll rendering, weapon anchoring, or sprite attachment work during the prototype phase.
 
-Base class selection from Beginner may exist during prototype progression.
+First-class selection from Beginner exists during prototype progression.
 
 Subclass progression is future-facing and should not be implemented until explicitly requested.
 
@@ -1686,6 +1694,7 @@ Skill usage is determined by:
 - range
 - companion global cooldown availability
 - individual skill cooldown availability
+- companion skill behavior settings where supported
 
 Current prototype skills may include:
 
@@ -1694,9 +1703,12 @@ Current prototype skills may include:
 - marks
 - self-buffs
 - ally buffs
+- party buffs
 - shields
+- damage mitigation
 - binds
 - healing
+- self-healing
 - self-cost healing
 - mobility
 - lunge movement and damage
@@ -1705,11 +1717,24 @@ Current prototype skills may include:
 
 Current prototype skill cooldown behavior:
 
-- Beginner prototype skills may have longer individual cooldowns than base class prototype skills
-- base class prototype skills may fall back to the shared prototype skill cooldown value
+- Beginner prototype skills may have longer individual cooldowns than some first-class prototype skills
+- first-class prototype skills may define individual cooldowns or fall back to the shared prototype skill cooldown value
 - individual skill cooldowns should not block other ready skills
 - companion global cooldown prevents immediate repeated basic attacks or skill use
 - failed skill effects should not consume cooldown when no effect is applied
+
+Current prototype skill progression:
+
+- companions automatically know their current class skills at rank 1
+- Beginner skills can currently rank up to rank 3
+- first-class skills can currently rank up to rank 5
+- each skill rank currently increases supported effect values by a small prototype multiplier
+- skill books can raise an already learned skill by one rank
+- skill books are consumed only when the skill rank increase succeeds
+- a skill book cannot teach a skill outside the companion's current class lineage
+- maxed Beginner skills may be legacy-enabled after a companion chooses a first class
+- legacy-enabled Beginner skills are added to the active skill pool for eligible first-class companions
+- legacy skill carry-over is a prototype bridge, not a final multiclass, mastery, or subclass system
 
 Current prototype skills are not the full final ability system.
 
@@ -1719,11 +1744,11 @@ Skill logic should remain in game logic, not React UI.
 
 ## Prototype Beginner Skills
 
-Beginner may have simple prototype skills before choosing a base class.
+Beginner may have simple prototype skills before choosing a first class.
 
 Beginner skills should feel basic, flexible, and transitional.
 
-Current intended Beginner prototype skill identities:
+Current Beginner prototype skill identities:
 
 - Throw Rock
 - Kick
@@ -1754,7 +1779,7 @@ Field Hands is a simple gathering support skill.
 
 Quick Step is a simple mobility and escape skill.
 
-Beginner skills should not compete with base class identity.
+Beginner skills should not compete with first-class identity.
 
 Beginner skills exist to make early party members feel functional before level 10.
 
@@ -1762,13 +1787,23 @@ Beginner skills may be replaced, renamed, retuned, or removed later.
 
 ---
 
-## Prototype Base Class Skills
+## Prototype First-Class Skills
 
-Each base class may have a simple prototype skill.
+First classes currently have simple prototype skill sets.
 
-Current intended prototype skill identities:
+Current Blade prototype skill identities:
 
-- Blade: Sweeping Strike
+- Duelist Challenge
+- Second Wind
+- Blade Parry
+- Edge Focus
+- Press the Opening
+- Woodcutter Rhythm
+- Flash Step
+- Sweeping Strike
+
+Current other first-class prototype skill identities:
+
 - Aegis: Guard Wall
 - Hunter: Mark Target
 - Beast: Feral Surge
@@ -1777,9 +1812,29 @@ Current intended prototype skill identities:
 - Lightbearer: Light Mend
 - Penitent: Penitent's Gift
 
-These skills are placeholders for class identity and role interaction.
+These skills are placeholders for class identity, role interaction, and skill progression behavior.
 
 They may be replaced, renamed, retuned, or expanded later.
+
+The current Blade set is a prototype proving ground for first-class skill breadth and should not imply that every first class is complete or balanced.
+
+---
+
+## Skill Books
+
+Skill books are prototype inventory items used to raise skill ranks.
+
+Current skill book behavior:
+
+- skill books are stackable inventory items
+- each skill book maps to one current prototype skill
+- a companion can read a skill book only for a skill in their current class lineage
+- a skill book raises the matching learned skill by one rank
+- reading fails if the companion is invalid, the book is missing, the item is not a skill book, the skill is unknown, the skill is unavailable to that companion, the skill is already maxed, or inventory removal fails
+- failed reads do not consume the book
+- successful reads consume one book from shared party inventory
+
+Skill books are a prototype skill-rank item path, not a final training, tutor, talent, mastery, or respec system.
 
 ---
 
@@ -1836,6 +1891,7 @@ Cost:
 
 Prototype / Utility:
 
+- Self Healing
 - Self Buff
 - Light Damage
 
@@ -1844,6 +1900,8 @@ Important rules:
 - Roles determine preferred skill usage, not classes
 - Classes define available skills, not behavior
 - Beginner skills are temporary prototype tools, not a final class kit
+- First-class skills are prototype class identity tools, not final complete class kits
+- Skill ranks and legacy-enabled Beginner skills are prototype progression support, not final mastery or multiclass systems
 - Skills must remain simple during this phase
 - This is a prototype system, not a full ability system
 
@@ -1895,9 +1953,10 @@ Current prototype hub:
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
 - It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a healing fountain, decorative house/cabin/tent/dock-shore structure visuals, and a clear exit to the first wild zone.
-- Current placeholders may include Quest Giver, Merchant, Smith, Dog, Test Blade, a hub target dummy, and a hub AoE target dummy.
+- Current placeholders may include Quest Giver, Class Mentor, Merchant, Smith, Dog, Test Blade, a hub target dummy, and a hub AoE target dummy.
 - The Quest Giver supports the lightweight prototype quest chain only.
-- The Merchant supports prototype quick exchange of eligible junk items for Crowns and a fixed prototype buy stock for selected equipment and consumables.
+- The Class Mentor supports prototype first-class selection for eligible Beginner companions.
+- The Merchant supports prototype quick exchange of eligible junk items for Crowns and a fixed prototype buy stock for selected equipment, consumables, and skill books.
 - Hub target dummies are passive 100 HP debug enemies with no XP reward.
 - The standard hub target dummy can be manually attacked for combat testing, is not selected by autonomous POI behavior, and regenerates health over time.
 - The hub AoE target dummy is a debug combat-test enemy for prototype enemy AoE channel and telegraph behavior.
@@ -2120,7 +2179,8 @@ Current prototype save behavior:
 - save files use a prototype save version
 - invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
 - restored saves rebuild the current prototype map from saved quest state
-- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, and debug telemetry
+- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, consumable buffs, and debug telemetry
+- restored saves sanitize companion skill progression and preserve valid learned skill rank data
 
 Current prototype offline progress:
 
@@ -2158,8 +2218,8 @@ Temporary debug tools may include:
 - reset enemy and resource states
 - restore party health
 - inspect AI decision reasons
-- inspect XP and level progression
-- inspect role bonus assignment, class behavior, skill behavior, skill cooldowns, First Aid thresholds, and Support Focus settings
+- inspect XP, level progression, first-class eligibility, skill ranks, skill books, and legacy skill behavior
+- inspect role bonus assignment, class behavior, first-class selection, skill behavior, skill cooldowns, First Aid thresholds, Second Wind thresholds, mobility skill mode, and Support Focus settings
 - inspect movement/pathing issues, movement planning, path backoff, and navigation grid behavior
 - inspect direct companion command issue, rejection, replacement, completion, cancellation, and rejoin grace behavior
 - debug map transitions
@@ -2194,7 +2254,7 @@ Do not implement these unless explicitly requested:
 - full equipment economy beyond the current prototype equipment foundation
 - equipment visuals, weapon anchoring, paper-doll rendering, paper-doll equipment, or visible weapon swaps
 - full inventory/equipment economy beyond the current prototype shared party inventory
-- advanced ability framework
+- advanced ability framework beyond current prototype class skills, skill ranks, skill books, and legacy-enabled Beginner skill carry-over
 - mana or complex resource costs
 - casting system
 - advanced targeting system

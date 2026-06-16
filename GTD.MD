@@ -49,6 +49,7 @@ Current game-logic implementation files include:
 - `attackSlots.ts`
 - `attackSystem.ts`
 - `classes.ts`
+- `classSelection.ts`
 - `combatBasicAttackResolution.ts`
 - `combatProjectileProfiles.ts`
 - `combatProjectileSystem.ts`
@@ -128,6 +129,7 @@ Current game-logic implementation files include:
 - `skillBehavior.ts`
 - `skillEffectResolution.ts`
 - `skillMovement.ts`
+- `skillProgression.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
 - `skillSystem.ts`
@@ -170,7 +172,22 @@ The player is the manager/controller issuing intent and commands to party member
 
 NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, and dungeon chest presentation.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, Merchant quick exchange, fixed Merchant Buy stock, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
+
+Current NPC role values include:
+
+```ts
+type NpcRole =
+  | "quest_giver"
+  | "class_mentor"
+  | "merchant"
+  | "smith"
+  | "dog"
+  | "test_blade"
+  | "quest_guide"
+  | "dungeon_chest_closed"
+  | "dungeon_chest_open";
+```
 
 NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, crafting, recruitment, smithing, relationship behavior, or general follower behavior.
 
@@ -272,6 +289,7 @@ Party members currently support:
 - `consumableBuffs`
 - `consumableBehavior`
 - `skillBehavior`
+- `skillProgression`
 - `roleBonus`
 
 Shared party-member behavior is handled through `partySystem.ts`.
@@ -466,7 +484,9 @@ Current prototype skill runtime and cooldown fields include:
 
 - `skillMarksByEnemyId`
 - `skillSelfBuffsByCompanionId`
+- `skillPartyBuffsBySourceId`
 - `skillGatherBuffsByCompanionId`
+- `skillDamageMitigationsByCompanionId`
 - `skillBindsByEnemyId`
 - `skillShieldBlocksById`
 - `skillCooldownsByCompanionId`
@@ -531,7 +551,7 @@ Current save game behavior:
 - validation rejects malformed saves, unsupported save versions, missing entities, invalid inventory, invalid wallet, invalid quest state, invalid leader id, and invalid current map id
 - restore rebuilds the current debug map from saved quest state
 - save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, skill runtime, enemy AoE runtime, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, and debug telemetry
-- companion save sanitization keeps dead companions dead and returns living companions to idle or follow state
+- companion save sanitization keeps dead companions dead, returns living companions to idle or follow state, clears temporary consumable buffs, and sanitizes skill progression data
 - enemy save sanitization keeps dead enemies dead and returns living enemies to idle state
 - Slimeward dungeon chest UI state is closed during save sanitization
 
@@ -616,6 +636,19 @@ Current class implementation is lightweight and structural.
 
 Classes currently provide prototype skills through `skills.ts`.
 
+First-class selection from Beginner is handled by `classSelection.ts`.
+
+Current first-class selection validates:
+
+- target entity exists and is a companion
+- selected class is a first class, not Beginner
+- companion is living
+- companion is currently Beginner
+- companion level is at least `BEGINNER_CLASS_UNLOCK_LEVEL`
+- currently equipped items are compatible with the selected first class
+
+Successful first-class selection calls `setPartyMemberClass`, which updates class id and ensures class skill progression for the selected class.
+
 Subclass progression is not implemented.
 
 ---
@@ -660,7 +693,7 @@ Current leveling behavior:
 - companion XP rolls over through multiple level-ups if enough XP is gained
 - max-level companions have `characterXp` reset to 0
 - level-ups may apply automatic natural-stat growth
-- level-ups may grant unspent stat points after base class progression begins
+- level-ups may grant unspent stat points after first-class progression begins
 - debug telemetry records XP awarded, XP reduced, XP skipped, and level-up events
 
 Current level-gap XP modifier:
@@ -677,10 +710,12 @@ Current party size limit is based on total party character level:
 - total party level 30 or higher: 4 party members
 - total party level 60 or higher: 5 party members
 
-Beginner class eligibility is currently:
+Beginner first-class eligibility is currently:
 
 - companion class is `beginner`
+- companion is living
 - companion level is at least 10
+- currently equipped items are compatible with the selected first class
 
 Leveling is a prototype progression system.
 
@@ -721,11 +756,21 @@ Current companion skill behavior settings include:
 
 - `beginnerFirstAidSelfHealHpThresholdPercent`
 - `beginnerFirstAidAllyHealHpThresholdPercent`
+- `secondWindSelfHealHpThresholdPercent`
+- `mobilitySkillUseMode`
 - `supportFocus`
 
 Beginner First Aid self-heal threshold defaults to 20 percent and is clamped from 1 percent to 100 percent.
 
 Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+
+Second Wind self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
+
+Current mobility skill use mode values are:
+
+```ts
+type MobilitySkillUseMode = "offensive" | "defensive";
+```
 
 Current Support Focus values are:
 
@@ -733,28 +778,35 @@ Current Support Focus values are:
 type SupportFocus = "lowest_hp" | "leader" | "defender";
 ```
 
-Support Focus is a prototype targeting preference for supported skill behavior. It must not create new role values or move support targeting rules into React UI.
+Support Focus and mobility skill use mode are prototype targeting preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
 
-Current skill ids include Beginner prototype skills and base class prototype skills:
+Current skill ids include Beginner prototype skills and first-class prototype skills:
 
 ```ts
 type SkillId =
-  | "throw_rock"
-  | "kick"
-  | "guard_up"
-  | "first_aid"
-  | "deep_breath"
-  | "rally_call"
-  | "field_hands"
-  | "quick_step"
-  | "sweeping_strike"
-  | "guard_wall"
-  | "mark_target"
-  | "feral_surge"
-  | "elemental_bolt"
-  | "binding_rune"
-  | "light_mend"
-  | "penitents_gift";
+  | "throw_rock" // Beginner
+  | "kick" // Beginner
+  | "guard_up" // Beginner
+  | "first_aid" // Beginner
+  | "deep_breath" // Beginner
+  | "rally_call" // Beginner
+  | "field_hands" // Beginner
+  | "quick_step" // Beginner
+  | "duelist_challenge" // Blade
+  | "second_wind" // Blade
+  | "blade_parry" // Blade
+  | "edge_focus" // Blade
+  | "press_the_opening" // Blade
+  | "woodcutter_rhythm" // Blade
+  | "flash_step" // Blade
+  | "sweeping_strike" // Blade
+  | "guard_wall" // Aegis
+  | "mark_target" // Hunter
+  | "feral_surge" // Beast
+  | "elemental_bolt" // Elementalist
+  | "binding_rune" // Runecaster
+  | "light_mend" // Lightbearer
+  | "penitents_gift"; // Penitent
 ```
 
 Current Beginner prototype skills:
@@ -768,9 +820,19 @@ Current Beginner prototype skills:
 - Beginner: Field Hands
 - Beginner: Quick Step
 
-Current base class prototype skills:
+Current Blade prototype skills:
 
+- Blade: Duelist Challenge
+- Blade: Second Wind
+- Blade: Blade Parry
+- Blade: Edge Focus
+- Blade: Press the Opening
+- Blade: Woodcutter Rhythm
+- Blade: Flash Step
 - Blade: Sweeping Strike
+
+Current other first-class prototype skills:
+
 - Aegis: Guard Wall
 - Hunter: Mark Target
 - Beast: Feral Surge
@@ -779,9 +841,9 @@ Current base class prototype skills:
 - Lightbearer: Light Mend
 - Penitent: Penitent's Gift
 
-Current skill effects may include direct damage, lunge damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, gathering speed buff, quick-step movement, shield block, bind, heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
+Current skill effects may include direct damage, lunge damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, party damage buff, gathering speed buff, quick-step movement, shield block, damage mitigation, bind, heal, self-percent heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
 
-`skillEffectResolution.ts` owns applying current prototype skill effects after selection, including damage, lunge damage, sweeping damage, taunt, mark, self buff, ally buff, gather buff, quick step, shield block, bind, heal, self-cost heal, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
+`skillEffectResolution.ts` owns applying current prototype skill effects after selection, including damage, lunge damage, sweeping damage, taunt, mark, self buff, party buff, ally buff, gather buff, quick step, shield block, damage mitigation, bind, heal, self-percent heal, self-cost heal, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
 
 Current skill rules:
 
@@ -814,7 +876,20 @@ type SkillVisualType =
   | "heal";
 ```
 
-Current skill runtime state includes marks, self buffs, gather buffs, binds, shield blocks, per-skill cooldowns, companion global cooldowns, and visual events.
+Current skill runtime state includes marks, self buffs, party buffs, gather buffs, damage mitigations, binds, shield blocks, per-skill cooldowns, companion global cooldowns, and visual events.
+
+`skillProgression.ts` owns current prototype skill ranks, skill-book reading, active skill lookup, scaled skill definitions, and legacy-enabled Beginner skill carry-over.
+
+Current skill progression behavior:
+
+- companions automatically have rank 1 for current class skills
+- Beginner skills max at rank 3
+- first-class skills max at rank 5
+- each rank adds a small prototype multiplier to supported skill effect values
+- skill books raise matching learned skills by one rank
+- failed skill-book reads do not consume inventory
+- maxed eligible Beginner skills can be legacy-enabled on first-class companions
+- legacy-enabled skills are added to the active skill pool only when eligibility checks pass
 
 Do not expand this into a full ability framework unless explicitly requested.
 
@@ -1234,7 +1309,9 @@ Current systems and update helpers include:
 - Direct Companion Command System
 - Resurrection System
 - Role System
+- Class Selection helpers
 - Skill System
+- Skill Progression helpers
 - Skill Effect Resolution helpers
 - Party Activity Coordinator helpers
 - Party Formation System
@@ -1858,11 +1935,17 @@ Current item categories:
 type ItemCategory =
   | "material"
   | "consumable"
+  | "skill_book"
   | "equipment"
   | "quest"
   | "event"
   | "junk";
 ```
+Prototype skill book item ids are part of `ItemId`.
+
+Current skill book items map one inventory item to one `SkillId` through `skillBookSkillId`.
+
+Skill-book reading logic lives in `skillProgression.ts`, not in React UI or merchant logic.
 
 The shared prototype wallet is stored on `GameState` as `wallet`.
 
@@ -1972,16 +2055,18 @@ Current merchant behavior:
 - removes eligible quick-exchange junk items from shared inventory
 - adds Crowns to the shared wallet
 - exposes fixed prototype Merchant Buy stock
-- supports buying selected equipment and consumables for Crowns
+- supports buying selected equipment, consumables, and skill books for Crowns
 - validates merchant identity, stock membership, item category, price, wallet balance, inventory capacity, and quest gating
 - adds purchased items to shared inventory
 - supports stock filtering by group and party equipment compatibility
+- always allows consumable and skill-book stock entries through stock compatibility filtering
 - records merchant buy, quick exchange, inventory, wallet, and quest-gating telemetry
 
 Current Merchant Buy stock groups are:
 
 - `flasks`
 - `food`
+- `books`
 - `weapons`
 - `offhands`
 - `cloth`
@@ -2557,9 +2642,10 @@ Current resource visuals use generated image icons by resource type.
 
 Current NPC visuals:
 
-- Quest Giver, Merchant, Smith, and Dog may use generated image icons
+- Quest Giver, Class Mentor, Merchant, Smith, and Dog may use generated image icons
 - Test Blade may use Test-NPC image assets
 - quest guide NPCs may use temporary NPC visuals
+- dungeon chest NPCs may use temporary or placeholder presentation
 - unsupported NPC visuals fall back to placeholder classes
 
 Current map tile visuals:
@@ -2652,7 +2738,7 @@ Debug/testing helpers may exist for development:
 - debug maps
 - direct companion command testing
 - role bonus assignment testing
-- skill behavior and cooldown testing
+- skill behavior, skill progression, skill book, legacy skill, and cooldown testing
 - map runtime cleanup testing
 - Slimeward dungeon runtime and chest testing
 - enemy AoE channel testing
@@ -2675,7 +2761,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Support Focus settings, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, guide popup overlays, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, Options save controls, start screen save controls, offline progress summary, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, mobility skill use mode settings, Support Focus settings, learned skill summaries, legacy skill toggles, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, guide popup overlays, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, Options save controls, start screen save controls, offline progress summary, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -2704,9 +2790,11 @@ React may:
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
 - call existing stat allocation helpers for supported stat allocation actions
+- call existing class selection helpers for supported first-class selection actions
 - call existing equipment helpers for supported equipment actions
 - call existing consumable helpers for supported flask, food, and auto-flask actions
 - call existing skill behavior helpers for supported prototype skill behavior settings
+- call existing skill progression helpers for supported skill-book reading and legacy skill toggles
 - call existing merchant helpers for supported quick exchange and Merchant Buy actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
 - call browser save storage helpers for supported local save, import, export, continue, delete, and new-game actions
@@ -2735,6 +2823,8 @@ Current intended Party sections and controls:
 - Stats
 - Equipment
 - Skills
+- learned skill display
+- legacy skill toggles where eligible
 - Skill Preferences for supported prototype skill behavior settings
 
 Current intended Party Management sections and controls:
@@ -2756,6 +2846,11 @@ type PartyMemberRole =
   | "gatherer"
   | "none";
 ```
+First-class selection UI may present eligible living Beginner companions at level 10 or higher.
+
+First-class selection UI must call game-logic class selection helpers and display failure feedback from the returned result.
+
+React must not duplicate first-class selection validation, class equipment compatibility rules, or skill progression initialization logic.
 
 The Quests view may display prototype quest state and objective progress from game state.
 

@@ -1387,19 +1387,236 @@ describe("beginner skill system", () => {
     );
   });
 
-  it("keeps non-Beginner skills on the shared prototype cooldown fallback", () => {
+  it("uses Quick Step offensively by default even for non-frontline roles", () => {
+    const support = createBeginner("support", "support", { x: 1, y: 3 });
+    const enemy = createEnemy("enemy", { x: 7, y: 3 });
+    const nextState = updateSkillSystem(
+      createSkillState([support, enemy], {
+        map: createSkillMap(),
+        ...createActiveSelfBuff(support.id),
+        ...createActiveShield(support.id),
+      }),
+      1000,
+    );
+
+    expect(nextState.entities.support.position.x).toBeGreaterThan(
+      support.position.x,
+    );
+    expect(nextState.skillCooldownsByCompanionId?.support?.quick_step?.skillId).toBe(
+      "quick_step",
+    );
+  });
+
+  it("uses Second Wind at the configured threshold and caps the heal threshold at 30 percent", () => {
+    const baseBlade = createCompanion(
+      "blade",
+      { x: 0, y: 0 },
+      "leader",
+      "fighter",
+      1,
+      "blade",
+    );
     const blade = {
-      ...createCompanion("blade", { x: 0, y: 0 }, "leader", "fighter", 1, "blade"),
+      ...baseBlade,
+      health: 30,
+      maxHealth: 100,
+      skillBehavior: {
+        ...baseBlade.skillBehavior,
+        secondWindSelfHealHpThresholdPercent: 80,
+      },
+    };
+    const nextState = updateSkillSystem(createSkillState([blade]), 1000);
+
+    expect(nextState.entities.blade).toMatchObject({
+      health: 50,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.blade?.second_wind).toMatchObject({
+      skillId: "second_wind",
+      expiresAt: 31000,
+    });
+  });
+
+  it("does not use Second Wind above the capped threshold", () => {
+    const baseBlade = createCompanion(
+      "blade",
+      { x: 0, y: 0 },
+      "leader",
+      "fighter",
+      1,
+      "blade",
+    );
+    const blade = {
+      ...baseBlade,
+      health: 31,
+      maxHealth: 100,
+      skillBehavior: {
+        ...baseBlade.skillBehavior,
+        secondWindSelfHealHpThresholdPercent: 80,
+      },
+    };
+    const nextState = updateSkillSystem(createSkillState([blade]), 1000);
+
+    expect(nextState.entities.blade).toMatchObject({
+      health: 31,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.blade?.second_wind).toBeUndefined();
+  });
+
+  it("uses Woodcutter Rhythm only for wood resources", () => {
+    const woodcutter = {
+      ...createCompanion("blade", { x: 0, y: 0 }, "leader", "gatherer", 1, "blade"),
+      state: "gather" as const,
+      currentTargetId: "wood",
+    };
+    const wood = createResource("wood", { x: 0.5, y: 0 }, {
+      resourceType: "wood",
+      durability: 3,
+      maxDurability: 3,
+    });
+    const buffedState = updateSkillSystem(
+      createSkillState([woodcutter, wood]),
+      1000,
+    );
+    const gatheredState = updateGatherSystem(buffedState, new Set(), 2000);
+
+    expect(buffedState.skillGatherBuffsByCompanionId?.blade).toMatchObject({
+      bonusGatherSpeed: 2,
+      resourceType: "wood",
+      expiresAt: 61000,
+    });
+    expect(gatheredState.entities.wood).toMatchObject({
+      durability: 3,
+      quantity: wood.quantity - 1,
+    });
+  });
+
+  it("does not apply Woodcutter Rhythm to ore resources", () => {
+    const woodcutter = {
+      ...createCompanion("blade", { x: 0, y: 0 }, "leader", "gatherer", 1, "blade"),
+      state: "gather" as const,
+      currentTargetId: "ore",
+    };
+    const ore = createResource("ore", { x: 0.5, y: 0 }, {
+      resourceType: "ore",
+      durability: 3,
+      maxDurability: 3,
+    });
+    const nextState = updateSkillSystem(createSkillState([woodcutter, ore]), 1000);
+
+    expect(nextState.skillGatherBuffsByCompanionId?.blade).toBeUndefined();
+  });
+
+  it("uses Flash Step according to the mobility preference", () => {
+    const baseOffensiveBlade = createCompanion(
+      "blade",
+      { x: 1, y: 3 },
+      "leader",
+      "none",
+      1,
+      "blade",
+    );
+    const offensiveBlade = {
+      ...baseOffensiveBlade,
+      skillBehavior: {
+        ...baseOffensiveBlade.skillBehavior,
+        mobilitySkillUseMode: "offensive" as const,
+      },
+    };
+    const baseDefensiveBlade = createCompanion(
+      "defensive-blade",
+      { x: 3, y: 3 },
+      "leader",
+      "none",
+      1,
+      "blade",
+    );
+    const defensiveBlade = {
+      ...baseDefensiveBlade,
+      skillBehavior: {
+        ...baseDefensiveBlade.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+      },
+    };
+    const offensiveEnemy = createEnemy("offensive-enemy", { x: 7, y: 3 });
+    const defensiveEnemy = {
+      ...createEnemy("defensive-enemy", { x: 4, y: 3 }),
+      state: "attack" as const,
+      currentTargetId: defensiveBlade.id,
+    };
+    const offensiveState = updateSkillSystem(
+      createSkillState([offensiveBlade, offensiveEnemy], {
+        map: createSkillMap(),
+        skillSelfBuffsByCompanionId: {
+          blade: { companionId: "blade", bonusDamage: 1, expiresAt: 65000 },
+        },
+        skillPartyBuffsBySourceId: {
+          blade: { sourceId: "blade", bonusDamage: 1, expiresAt: 65000 },
+        },
+      }),
+      1000,
+    );
+    const defensiveState = updateSkillSystem(
+      createSkillState([defensiveBlade, defensiveEnemy], {
+        map: createSkillMap(),
+        skillSelfBuffsByCompanionId: {
+          "defensive-blade": {
+            companionId: "defensive-blade",
+            bonusDamage: 1,
+            expiresAt: 65000,
+          },
+        },
+        skillPartyBuffsBySourceId: {
+          "defensive-blade": {
+            sourceId: "defensive-blade",
+            bonusDamage: 1,
+            expiresAt: 65000,
+          },
+        },
+        skillDamageMitigationsByCompanionId: {
+          "defensive-blade": {
+            id: "defensive-blade-blade_parry",
+            ownerId: "defensive-blade",
+            expiresAt: 65000,
+            remainingProcs: 2,
+            mitigationPercent: 50,
+            mitigatedDamageTypes: ["physical"],
+          },
+        },
+      }),
+      1000,
+    );
+
+    expect(offensiveState.entities.blade.position.x).toBeGreaterThan(
+      offensiveBlade.position.x,
+    );
+    expect(offensiveState.skillCooldownsByCompanionId?.blade?.flash_step?.skillId).toBe(
+      "flash_step",
+    );
+    expect(defensiveState.entities["defensive-blade"].position.x).toBeLessThan(
+      defensiveBlade.position.x,
+    );
+    expect(
+      defensiveState.skillCooldownsByCompanionId?.["defensive-blade"]?.flash_step?.skillId,
+    ).toBe("flash_step");
+  });
+
+  it("keeps non-Beginner skills on the shared prototype cooldown fallback", () => {
+    const aegis = {
+      ...createCompanion("aegis", { x: 0, y: 0 }, "leader", "defender", 1, "aegis"),
       state: "attack" as const,
       currentTargetId: "enemy",
     };
-    const enemy = createEnemy("enemy", { x: 1, y: 0 });
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: aegis.id,
+    };
 
-    const nextState = updateSkillSystem(createSkillState([blade, enemy]), 1000);
+    const nextState = updateSkillSystem(createSkillState([aegis, enemy]), 1000);
 
-    expect(nextState.skillCooldownsByCompanionId?.blade?.sweeping_strike).toMatchObject({
-      skillId: "sweeping_strike",
-      expiresAt: 6000,
+    expect(nextState.skillCooldownsByCompanionId?.aegis?.guard_wall).toMatchObject({
+      skillId: "guard_wall",
+      expiresAt: 11000,
     });
   });
 
@@ -1475,6 +1692,10 @@ describe("beginner skill system", () => {
     "moves %s Quick Step away from an attacking enemy",
     (role) => {
       const companion = createBeginner("companion", role, { x: 3, y: 3 });
+      companion.skillBehavior = {
+        ...companion.skillBehavior,
+        mobilitySkillUseMode: "defensive",
+      };
       const enemy = {
         ...createEnemy("enemy", { x: 4, y: 3 }),
         state: "attack" as const,
@@ -1499,7 +1720,14 @@ describe("beginner skill system", () => {
   );
 
   it("tries angled Quick Step alternatives when the direct destination is blocked", () => {
-    const support = createBeginner("support", "support", { x: 3, y: 3 });
+    const baseSupport = createBeginner("support", "support", { x: 3, y: 3 });
+    const support = {
+      ...baseSupport,
+      skillBehavior: {
+        ...baseSupport.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+      },
+    };
     const enemy = {
       ...createEnemy("enemy", { x: 4, y: 3 }),
       state: "attack" as const,
@@ -1524,7 +1752,14 @@ describe("beginner skill system", () => {
   });
 
   it("does not start Quick Step cooldown when all candidate destinations are blocked", () => {
-    const support = createBeginner("support", "support", { x: 3, y: 3 });
+    const baseSupport = createBeginner("support", "support", { x: 3, y: 3 });
+    const support = {
+      ...baseSupport,
+      skillBehavior: {
+        ...baseSupport.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+      },
+    };
     const enemy = {
       ...createEnemy("enemy", { x: 9, y: 3 }),
       state: "attack" as const,

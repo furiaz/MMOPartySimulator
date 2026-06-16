@@ -205,17 +205,40 @@ function getSkillTargetSkipReason(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
+  now: number,
 ): string {
   if (
-    (skill.effect.type === "selfBuff" || skill.effect.type === "allyBuff") &&
-    state.skillSelfBuffsByCompanionId?.[caster.id]
+    skill.effect.type === "selfBuff" &&
+    state.skillSelfBuffsByCompanionId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillSelfBuffsByCompanionId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
+    skill.effect.type === "partyBuff" &&
+    state.skillPartyBuffsBySourceId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillPartyBuffsBySourceId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
   ) {
     return "active_duplicate_buff";
   }
 
   if (
     skill.effect.type === "gatherBuff" &&
-    state.skillGatherBuffsByCompanionId?.[caster.id]
+    state.skillGatherBuffsByCompanionId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillGatherBuffsByCompanionId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
   ) {
     return "active_duplicate_buff";
   }
@@ -259,12 +282,13 @@ function chooseSkillUse(
       }
 
       const target = getSkillTarget(state, caster, skill, {
+        now: options.now,
         forcedEnemyTargetId: options.forcedEnemyTargetId,
         firstAidReservedTargetIds: options.firstAidReservedTargetIds,
       });
 
       if (!target) {
-        const reason = getSkillTargetSkipReason(state, caster, skill);
+        const reason = getSkillTargetSkipReason(state, caster, skill, options.now);
 
         if (
           !shouldSuppressSkillSkipTelemetry(state, caster, skill, reason, options)
@@ -379,8 +403,10 @@ function getSkillSelectionPriority(skill: SkillDefinition): number {
 function isEmergencySkill(skill: SkillDefinition): boolean {
   return (
     skill.effect.type === "heal" ||
+    skill.effect.type === "selfPercentHeal" ||
     skill.effect.type === "selfCostHeal" ||
-    skill.effect.type === "shieldBlock"
+    skill.effect.type === "shieldBlock" ||
+    skill.effect.type === "damageMitigation"
   );
 }
 
@@ -403,8 +429,11 @@ function isRecoveryAreaSkillUseAllowed(
 
   return (
     skill.effect.type === "heal" ||
+    skill.effect.type === "selfPercentHeal" ||
     skill.effect.type === "selfCostHeal" ||
     skill.effect.type === "selfBuff" ||
+    skill.effect.type === "partyBuff" ||
+    skill.effect.type === "damageMitigation" ||
     skill.effect.type === "allyBuff" ||
     skill.effect.type === "shieldBlock"
   );
@@ -517,6 +546,14 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     default:
       return false;
   }
+}
+
+function canUseRefreshableRuntimeState(
+  expiresAt: number | undefined,
+  refreshWindowMs = 0,
+  now: number,
+): boolean {
+  return expiresAt === undefined || expiresAt - now <= refreshWindowMs;
 }
 
 function hasAttackSkillTelemetryContext(

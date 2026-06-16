@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import { MAP_ONE_ID } from "./debugMap";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
+import { resolveAndApplyCombatDamage } from "./combatResolver";
 import {
   resolveSkillEffect,
   updateSkillShieldBlockPositions,
@@ -27,7 +28,7 @@ describe("skill effect resolution", () => {
 
   it("applies damage skills and enemy aggro side effects", () => {
     const caster = createSkillCompanion("caster", "fighter", { x: 0, y: 0 }, "elementalist");
-    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 20 });
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 200 });
     const result = resolveSkillEffect(
       createSkillState([caster, enemy]),
       caster,
@@ -115,6 +116,155 @@ describe("skill effect resolution", () => {
       splash.health,
     );
     expect((result.state.entities.far as Enemy).health).toBe(far.health);
+  });
+
+  it("applies Second Wind as a self-only percent heal", () => {
+    const caster = {
+      ...createSkillCompanion("blade", "fighter", { x: 0, y: 0 }, "blade"),
+      health: 10,
+      maxHealth: 100,
+    };
+    const ally = {
+      ...createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "blade"),
+      health: 10,
+      maxHealth: 100,
+    };
+    const healed = resolveSkillEffect(
+      createSkillState([caster, ally]),
+      caster,
+      createSkillUse("second_wind", caster),
+      1000,
+    );
+    const skipped = resolveSkillEffect(
+      createSkillState([caster, ally]),
+      caster,
+      createSkillUse("second_wind", ally),
+      1000,
+    );
+
+    expect(healed.shouldConsumeCooldown).toBe(true);
+    expect(healed.state.entities.blade).toMatchObject({ health: 30 });
+    expect(skipped.shouldConsumeCooldown).toBe(false);
+    expect(skipped.state.entities.ally).toMatchObject({ health: 10 });
+  });
+
+  it("applies Blade Parry mitigation procs to landed physical damage", () => {
+    const caster = createSkillCompanion("blade", "defender", { x: 0, y: 0 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { attack: 20 });
+    const parryState = resolveSkillEffect(
+      createSkillState([caster, enemy]),
+      caster,
+      createSkillUse("blade_parry", caster),
+      1000,
+    ).state;
+
+    expect(parryState.skillDamageMitigationsByCompanionId?.blade).toMatchObject({
+      remainingProcs: 2,
+      mitigationPercent: 50,
+      expiresAt: 11000,
+    });
+
+    const firstHit = resolveAndApplyCombatDamage(
+      parryState,
+      enemy,
+      parryState.entities.blade as Companion,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(firstHit.finalDamage).toBeLessThan(firstHit.rawDamage);
+    expect(
+      firstHit.state.skillDamageMitigationsByCompanionId?.blade?.remainingProcs,
+    ).toBe(1);
+  });
+
+  it("does not consume Blade Parry on magic damage", () => {
+    const caster = createSkillCompanion("blade", "defender", { x: 0, y: 0 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { attack: 20 });
+    const parryState = resolveSkillEffect(
+      createSkillState([caster, enemy]),
+      caster,
+      createSkillUse("blade_parry", caster),
+      1000,
+    ).state;
+
+    const magicHit = resolveAndApplyCombatDamage(
+      parryState,
+      enemy,
+      parryState.entities.blade as Companion,
+      {
+        damageType: "magic",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(magicHit.state.skillDamageMitigationsByCompanionId?.blade?.remainingProcs).toBe(2);
+  });
+
+  it("stacks Edge Focus and Press the Opening damage bonuses", () => {
+    const blade = createSkillCompanion("blade", "fighter", { x: 0, y: 0 }, "blade");
+    const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 1 }, { maxHealth: 100 });
+    const edgeState = resolveSkillEffect(
+      createSkillState([blade, ally, enemy]),
+      blade,
+      createSkillUse("edge_focus", blade),
+      1000,
+    ).state;
+    const pressState = resolveSkillEffect(
+      edgeState,
+      edgeState.entities.blade as Companion,
+      createSkillUse("press_the_opening", edgeState.entities.blade as Companion),
+      1000,
+    ).state;
+
+    expect(pressState.skillSelfBuffsByCompanionId?.blade).toMatchObject({
+      bonusDamage: 1,
+      expiresAt: 61000,
+    });
+    expect(pressState.skillPartyBuffsBySourceId?.blade).toMatchObject({
+      bonusDamage: 1,
+      expiresAt: 61000,
+    });
+
+    const bladeHit = resolveAndApplyCombatDamage(
+      pressState,
+      pressState.entities.blade as Companion,
+      pressState.entities.enemy as Enemy,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+    const allyHit = resolveAndApplyCombatDamage(
+      pressState,
+      pressState.entities.ally as Companion,
+      pressState.entities.enemy as Enemy,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(bladeHit.rawDamage).toBe(allyHit.rawDamage + 1);
   });
 
   it("applies taunt, mark, bind, buff, gather, and shield effects", () => {
@@ -265,7 +415,14 @@ describe("skill effect resolution", () => {
   });
 
   it("returns no cooldown consumption when quick step cannot dash", () => {
-    const support = createSkillCompanion("support", "support", { x: 3, y: 3 });
+    const baseSupport = createSkillCompanion("support", "support", { x: 3, y: 3 });
+    const support = {
+      ...baseSupport,
+      skillBehavior: {
+        ...baseSupport.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+      },
+    };
     const enemy = {
       ...createSkillEnemy("enemy", { x: 9, y: 3 }),
       state: "attack" as const,

@@ -18,6 +18,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "DoT",
       "Summon - Attack",
       "Self Buff",
+      "Self Healing",
     ],
     secondary: ["Mobility", "Control"],
     fallback: [],
@@ -32,6 +33,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "Damage Mitigation",
       "Elemental Mitigation",
       "Control",
+      "Self Healing",
       "Summon - Defense",
     ],
     secondary: ["Mobility", "Damage"],
@@ -39,20 +41,20 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
     avoid: ["Gathering", "Self Cost - HP"],
   },
   support: {
-    primary: ["Heal", "Shield", "Buff", "Cleanse", "Safety", "Summon - Support"],
+    primary: ["Heal", "Self Healing", "Shield", "Buff", "Cleanse", "Safety", "Summon - Support"],
     secondary: ["Control", "Mobility", "Self Cost - HP"],
     fallback: ["Damage", "Single Target"],
     avoid: ["Aggro", "Taunt"],
   },
   gatherer: {
     primary: ["Gathering", "Resource Buff", "Tool Buff"],
-    secondary: ["Mobility", "Escape", "Safety"],
+    secondary: ["Mobility", "Escape", "Safety", "Self Healing"],
     fallback: ["Light Damage", "Single Target"],
     avoid: ["Aggro", "Taunt"],
   },
   none: {
     primary: [],
-    secondary: ["Safety", "Mobility"],
+    secondary: ["Safety", "Mobility", "Self Healing"],
     fallback: ["Damage", "Single Target"],
     avoid: ["Self Cost - HP"],
   },
@@ -68,7 +70,7 @@ export function getSkillRoleScore(
     countMatches(tags, preference.primary, 2) * 3 +
     countMatches(tags, preference.secondary, 1) * 2 +
     countMatches(tags, preference.fallback, 1) -
-    countMatches(tags, preference.avoid) * 6
+    countAvoidMatches(tags, preference.avoid) * 6
   );
 }
 
@@ -81,4 +83,15 @@ function countMatches(
     cap,
     tags.filter((tag) => preferredTags.includes(tag)).length,
   );
+}
+
+function countAvoidMatches(
+  tags: SkillTag[],
+  avoidedTags: SkillTag[],
+): number {
+  const effectiveAvoids = tags.includes("Self Healing")
+    ? avoidedTags.filter((tag) => tag !== "Heal")
+    : avoidedTags;
+
+  return tags.filter((tag) => effectiveAvoids.includes(tag)).length;
 }

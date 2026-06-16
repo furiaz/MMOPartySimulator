@@ -2,18 +2,26 @@ import { updateEntity, type GameState } from "./state";
 import type {
   Companion,
   CompanionSkillBehavior,
+  MobilitySkillUseMode,
   SkillDefinition,
   SupportFocus,
 } from "./types";
 
 export const DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT = 20;
 export const DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT = 35;
+export const DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT = 30;
+export const SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT = 30;
+export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
 export const DEFAULT_SUPPORT_FOCUS: SupportFocus = "lowest_hp";
 
 const SUPPORT_FOCUS_VALUES: ReadonlySet<SupportFocus> = new Set([
   "lowest_hp",
   "leader",
   "defender",
+]);
+const MOBILITY_SKILL_USE_MODE_VALUES: ReadonlySet<MobilitySkillUseMode> = new Set([
+  "offensive",
+  "defensive",
 ]);
 
 export type SkillBehaviorUpdate = Partial<CompanionSkillBehavior>;
@@ -24,6 +32,9 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
       DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
     beginnerFirstAidAllyHealHpThresholdPercent:
       DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+    secondWindSelfHealHpThresholdPercent:
+      DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+    mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
     supportFocus: DEFAULT_SUPPORT_FOCUS,
   };
 }
@@ -44,6 +55,14 @@ export function getCompanionSkillBehavior(
     beginnerFirstAidAllyHealHpThresholdPercent: clampHpThresholdPercent(
       storedBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
         DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+    ),
+    secondWindSelfHealHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.secondWindSelfHealHpThresholdPercent ??
+        DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    mobilitySkillUseMode: normalizeMobilitySkillUseMode(
+      storedBehavior.mobilitySkillUseMode,
     ),
     supportFocus: normalizeSupportFocus(storedBehavior.supportFocus),
   };
@@ -77,6 +96,17 @@ export function updateCompanionSkillBehavior(
             getCompanionSkillBehavior(companion)
               .beginnerFirstAidAllyHealHpThresholdPercent,
         ),
+      secondWindSelfHealHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.secondWindSelfHealHpThresholdPercent ??
+            getCompanionSkillBehavior(companion)
+              .secondWindSelfHealHpThresholdPercent,
+          SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      mobilitySkillUseMode: normalizeMobilitySkillUseMode(
+        update.mobilitySkillUseMode ??
+          getCompanionSkillBehavior(companion).mobilitySkillUseMode,
+      ),
       supportFocus: normalizeSupportFocus(
         update.supportFocus ?? getCompanionSkillBehavior(companion).supportFocus,
       ),
@@ -110,12 +140,19 @@ export function isBeginnerFirstAidSelfHealPriorityActive(
   );
 }
 
-function clampHpThresholdPercent(value: number): number {
-  return Math.min(100, Math.max(1, Math.round(value)));
+function clampHpThresholdPercent(value: number, maxPercent = 100): number {
+  return Math.min(maxPercent, Math.max(1, Math.round(value)));
 }
 
 function normalizeSupportFocus(value: unknown): SupportFocus {
   return typeof value === "string" && SUPPORT_FOCUS_VALUES.has(value as SupportFocus)
     ? (value as SupportFocus)
     : DEFAULT_SUPPORT_FOCUS;
+}
+
+function normalizeMobilitySkillUseMode(value: unknown): MobilitySkillUseMode {
+  return typeof value === "string" &&
+    MOBILITY_SKILL_USE_MODE_VALUES.has(value as MobilitySkillUseMode)
+    ? (value as MobilitySkillUseMode)
+    : DEFAULT_MOBILITY_SKILL_USE_MODE;
 }

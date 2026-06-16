@@ -12,6 +12,9 @@ import {
   CLASS_DEFINITIONS,
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_MOBILITY_SKILL_USE_MODE,
+  DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_SUPPORT_FOCUS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
@@ -52,6 +55,7 @@ import {
   type PrimaryStatId,
   type SkillDefinition,
   type SkillId,
+  type MobilitySkillUseMode,
   type SupportFocus,
 } from "./game";
 export type {
@@ -113,6 +117,16 @@ const supportFocusLabels: Record<SupportFocus, string> = {
   lowest_hp: "Lowest HP",
   leader: "Leader",
   defender: "Defender",
+};
+
+const mobilitySkillUseModeOptions: MobilitySkillUseMode[] = [
+  "offensive",
+  "defensive",
+];
+
+const mobilitySkillUseModeLabels: Record<MobilitySkillUseMode, string> = {
+  offensive: "Offensive",
+  defensive: "Defensive",
 };
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
@@ -468,8 +482,14 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Ally +${effect.bonusDamage} damage.`;
   }
 
+  if (effect.type === "partyBuff") {
+    return `Party +${effect.bonusDamage} damage.`;
+  }
+
   if (effect.type === "gatherBuff") {
-    return `Self +${effect.bonusGatherSpeed} gather speed.`;
+    return effect.resourceType
+      ? `Self +${effect.bonusGatherSpeed} ${effect.resourceType} gather speed.`
+      : `Self +${effect.bonusGatherSpeed} gather speed.`;
   }
 
   if (effect.type === "quickStep") {
@@ -480,12 +500,20 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Blocks ${effect.blocks} hit.`;
   }
 
+  if (effect.type === "damageMitigation") {
+    return `Mitigates ${Math.round(effect.mitigationPercent)}% damage for ${effect.procs} hits.`;
+  }
+
   if (effect.type === "bind") {
     return "Binds an enemy briefly.";
   }
 
   if (effect.type === "heal") {
     return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power.`;
+  }
+
+  if (effect.type === "selfPercentHeal") {
+    return `Heals self for ${Math.round(effect.healPercent)}% max HP.`;
   }
 
   return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power at ${effect.hpCost} HP cost.`;
@@ -1433,10 +1461,21 @@ function SkillPreferencesSection({
   const firstAidAllyThreshold =
     member.skillBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
     DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT;
+  const secondWindThreshold =
+    member.skillBehavior.secondWindSelfHealHpThresholdPercent ??
+    DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT;
+  const mobilitySkillUseMode =
+    member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
   const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
   const hasFirstAid = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "first_aid"),
+  );
+  const hasSecondWind = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "second_wind"),
+  );
+  const hasMobilitySkill = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "quick_step" || skill.id === "flash_step"),
   );
   const isSupport = member.role === "support";
   const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
@@ -1508,6 +1547,64 @@ function SkillPreferencesSection({
               <strong>{firstAidAllyThreshold}%</strong>
             </label>
           </>
+        ) : null}
+        {hasSecondWind ? (
+          <label className="behavior-range-row">
+            <span>Second Wind Self-Heal Threshold</span>
+            <input
+              max={SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  secondWindSelfHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="range"
+              value={secondWindThreshold}
+            />
+            <input
+              max={SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  secondWindSelfHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="number"
+              value={secondWindThreshold}
+            />
+            <strong>{secondWindThreshold}%</strong>
+          </label>
+        ) : null}
+        {hasMobilitySkill ? (
+          <div className="behavior-choice-row">
+            <span>Mobility Skill Use</span>
+            <div
+              aria-label="Mobility Skill Use"
+              className="behavior-choice-group"
+              role="group"
+            >
+              {mobilitySkillUseModeOptions.map((option) => (
+                <button
+                  aria-pressed={mobilitySkillUseMode === option}
+                  className={mobilitySkillUseMode === option ? "active" : ""}
+                  key={option}
+                  onClick={() =>
+                    onChangeSkillBehavior(member.id, {
+                      mobilitySkillUseMode: option,
+                    })
+                  }
+                  type="button"
+                >
+                  {mobilitySkillUseModeLabels[option]}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
         {isSupport ? (
           <div className="behavior-choice-row">

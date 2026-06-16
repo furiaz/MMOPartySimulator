@@ -2,7 +2,11 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { damageEntity } from "./entities";
 import { getEnemyCombatStats } from "./enemyScaling";
 import { getCompanionDerivedStats } from "./stats";
-import { blockIncomingAttackIfShielded, getPrototypeAttackDamage } from "./skillRuntime";
+import {
+  applyIncomingDamageMitigation,
+  blockIncomingAttackIfShielded,
+  getPrototypeAttackDamage,
+} from "./skillRuntime";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   CombatDamageType,
@@ -132,6 +136,17 @@ export function resolveAndApplyCombatDamage(
 
     if (critical) {
       mitigatedDamage *= attackerStats?.criticalDamage ?? 1;
+    }
+
+    if (target.kind === "companion") {
+      const mitigationResult = applyIncomingDamageMitigation(
+        nextState,
+        target,
+        mitigatedDamage,
+        options.damageType,
+      );
+      nextState = mitigationResult.state;
+      mitigatedDamage = mitigationResult.mitigatedDamage;
     }
 
     finalDamage = Math.max(1, Math.round(mitigatedDamage));

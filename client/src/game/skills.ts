@@ -2,7 +2,10 @@ import type { ClassId, SkillDefinition } from "./types";
 
 const BEGINNER_SKILL_COOLDOWN_MS = 10000;
 const BEGINNER_BUFF_DURATION_MS = 9000;
-export const DEFAULT_SKILL_COOLDOWN_MS = 5000;
+const FIRST_CLASS_LONG_BUFF_DURATION_MS = 60000;
+const FIRST_CLASS_LONG_BUFF_COOLDOWN_MS = 58000;
+const FIRST_CLASS_BUFF_REFRESH_WINDOW_MS = 2000;
+export const DEFAULT_SKILL_COOLDOWN_MS = 10000;
 
 export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> = {
   throw_rock: {
@@ -108,6 +111,99 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: { type: "quickStep", distance: 1 },
   },
+  duelist_challenge: {
+    id: "duelist_challenge",
+    classId: "blade",
+    displayName: "Duelist Challenge",
+    tags: ["Offensive", "Single Target", "Taunt"],
+    type: "active",
+    range: 4,
+    cooldownMs: 12000,
+    effect: { type: "taunt" },
+  },
+  second_wind: {
+    id: "second_wind",
+    classId: "blade",
+    displayName: "Second Wind",
+    tags: ["Heal", "Self Healing", "Safety"],
+    type: "active",
+    range: 0,
+    cooldownMs: 30000,
+    effect: { type: "selfPercentHeal", healPercent: 20 },
+  },
+  blade_parry: {
+    id: "blade_parry",
+    classId: "blade",
+    displayName: "Blade Parry",
+    tags: ["Defensive", "Safety", "Damage Mitigation"],
+    type: "active",
+    range: 0,
+    cooldownMs: 15000,
+    effect: {
+      type: "damageMitigation",
+      durationMs: 10000,
+      mitigationPercent: 50,
+      procs: 2,
+      mitigatedDamageTypes: ["physical"],
+    },
+  },
+  edge_focus: {
+    id: "edge_focus",
+    classId: "blade",
+    displayName: "Edge Focus",
+    tags: ["Offensive", "Buff", "Self Buff"],
+    type: "active",
+    range: 0,
+    cooldownMs: FIRST_CLASS_LONG_BUFF_COOLDOWN_MS,
+    effect: {
+      type: "selfBuff",
+      bonusDamage: 1,
+      durationMs: FIRST_CLASS_LONG_BUFF_DURATION_MS,
+      hpCost: 0,
+      refreshWindowMs: FIRST_CLASS_BUFF_REFRESH_WINDOW_MS,
+    },
+  },
+  press_the_opening: {
+    id: "press_the_opening",
+    classId: "blade",
+    displayName: "Press the Opening",
+    tags: ["Offensive", "Buff"],
+    type: "active",
+    range: 0,
+    cooldownMs: FIRST_CLASS_LONG_BUFF_COOLDOWN_MS,
+    effect: {
+      type: "partyBuff",
+      bonusDamage: 1,
+      durationMs: FIRST_CLASS_LONG_BUFF_DURATION_MS,
+      refreshWindowMs: FIRST_CLASS_BUFF_REFRESH_WINDOW_MS,
+    },
+  },
+  woodcutter_rhythm: {
+    id: "woodcutter_rhythm",
+    classId: "blade",
+    displayName: "Woodcutter Rhythm",
+    tags: ["Gathering", "Resource Buff", "Tool Buff"],
+    type: "active",
+    range: 0,
+    cooldownMs: FIRST_CLASS_LONG_BUFF_COOLDOWN_MS,
+    effect: {
+      type: "gatherBuff",
+      bonusGatherSpeed: 2,
+      durationMs: FIRST_CLASS_LONG_BUFF_DURATION_MS,
+      resourceType: "wood",
+      refreshWindowMs: FIRST_CLASS_BUFF_REFRESH_WINDOW_MS,
+    },
+  },
+  flash_step: {
+    id: "flash_step",
+    classId: "blade",
+    displayName: "Flash Step",
+    tags: ["Mobility", "Dash", "Escape"],
+    type: "active",
+    range: 0,
+    cooldownMs: 20000,
+    effect: { type: "quickStep", distance: 2 },
+  },
   sweeping_strike: {
     id: "sweeping_strike",
     classId: "blade",
@@ -115,6 +211,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Damage", "Single Target", "AoE"],
     type: "active",
     range: 1,
+    cooldownMs: 10000,
     effect: {
       type: "sweepingDamage",
       damageType: "physical",

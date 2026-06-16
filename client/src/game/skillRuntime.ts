@@ -4,6 +4,8 @@ import type {
   CombatEntity,
   Companion,
   Enemy,
+  ResourceEntity,
+  SkillDamageMitigationState,
   SkillShieldBlockState,
 } from "./types";
 
@@ -20,15 +22,64 @@ export function getPrototypeAttackDamage(
   const markBonus = state.skillMarksByEnemyId?.[target.id]?.bonusDamage ?? 0;
   const selfBuffBonus =
     state.skillSelfBuffsByCompanionId?.[attacker.id]?.bonusDamage ?? 0;
+  const partyBuffBonus = Object.values(state.skillPartyBuffsBySourceId ?? {})
+    .reduce((total, buff) => total + buff.bonusDamage, 0);
 
-  return baseDamage + markBonus + selfBuffBonus;
+  return baseDamage + markBonus + selfBuffBonus + partyBuffBonus;
 }
 
 export function getPrototypeGatherAmountBonus(
   state: GameState,
   companion: Companion,
+  resource?: ResourceEntity,
 ): number {
-  return state.skillGatherBuffsByCompanionId?.[companion.id]?.bonusGatherSpeed ?? 0;
+  const buff = state.skillGatherBuffsByCompanionId?.[companion.id];
+
+  if (!buff || (buff.resourceType && buff.resourceType !== resource?.resourceType)) {
+    return 0;
+  }
+
+  return buff.bonusGatherSpeed;
+}
+
+export function applyIncomingDamageMitigation(
+  state: GameState,
+  target: Companion,
+  rawDamage: number,
+  damageType: CombatDamageType,
+): { state: GameState; mitigatedDamage: number; mitigationPercent: number } {
+  const mitigation = getDamageMitigation(state, target, damageType);
+
+  if (!mitigation) {
+    return {
+      state,
+      mitigatedDamage: rawDamage,
+      mitigationPercent: 0,
+    };
+  }
+
+  const skillDamageMitigationsByCompanionId = {
+    ...(state.skillDamageMitigationsByCompanionId ?? {}),
+  };
+  const remainingProcs = mitigation.remainingProcs - 1;
+
+  if (remainingProcs > 0) {
+    skillDamageMitigationsByCompanionId[target.id] = {
+      ...mitigation,
+      remainingProcs,
+    };
+  } else {
+    delete skillDamageMitigationsByCompanionId[target.id];
+  }
+
+  return {
+    state: {
+      ...state,
+      skillDamageMitigationsByCompanionId,
+    },
+    mitigatedDamage: rawDamage * (1 - mitigation.mitigationPercent / 100),
+    mitigationPercent: mitigation.mitigationPercent,
+  };
 }
 
 export function blockIncomingAttackIfShielded(
@@ -89,6 +140,19 @@ function getBlockingShield(
       (getDistance(shield.position, target.position) <= 1.5 ||
         shield.ownerId === target.id),
   );
+}
+
+function getDamageMitigation(
+  state: GameState,
+  target: Companion,
+  damageType: CombatDamageType,
+): SkillDamageMitigationState | undefined {
+  const mitigation = state.skillDamageMitigationsByCompanionId?.[target.id];
+
+  return mitigation &&
+    (mitigation.mitigatedDamageTypes ?? ["physical"]).includes(damageType)
+    ? mitigation
+    : undefined;
 }
 
 export function isEnemyBound(state: GameState, enemy: Enemy): boolean {

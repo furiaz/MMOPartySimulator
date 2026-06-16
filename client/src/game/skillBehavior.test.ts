@@ -3,6 +3,9 @@ import { createCompanion } from "./entities";
 import {
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_MOBILITY_SKILL_USE_MODE,
+  DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_SUPPORT_FOCUS,
   createDefaultCompanionSkillBehavior,
   getCompanionSkillBehavior,
@@ -19,6 +22,9 @@ describe("companion skill behavior", () => {
         DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
       beginnerFirstAidSelfHealHpThresholdPercent:
         DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      secondWindSelfHealHpThresholdPercent:
+        DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
       supportFocus: DEFAULT_SUPPORT_FOCUS,
     });
   });
@@ -62,6 +68,31 @@ describe("companion skill behavior", () => {
     ).toBe(100);
   });
 
+  it("clamps Second Wind threshold updates to the hard cap", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
+    const state = addEntity(createTestGameState(), companion);
+
+    const belowMinimum = updateCompanionSkillBehavior(state, companion.id, {
+      secondWindSelfHealHpThresholdPercent: -20,
+    });
+    const aboveMaximum = updateCompanionSkillBehavior(state, companion.id, {
+      secondWindSelfHealHpThresholdPercent: 80,
+    });
+
+    expect(
+      belowMinimum.entities.companion.kind === "companion"
+        ? belowMinimum.entities.companion.skillBehavior
+            .secondWindSelfHealHpThresholdPercent
+        : null,
+    ).toBe(1);
+    expect(
+      aboveMaximum.entities.companion.kind === "companion"
+        ? aboveMaximum.entities.companion.skillBehavior
+            .secondWindSelfHealHpThresholdPercent
+        : null,
+    ).toBe(SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT);
+  });
+
   it("normalizes invalid Support Focus updates", () => {
     const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
     const state = addEntity(createTestGameState(), companion);
@@ -77,6 +108,21 @@ describe("companion skill behavior", () => {
     ).toBe(DEFAULT_SUPPORT_FOCUS);
   });
 
+  it("normalizes invalid mobility skill preference updates", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
+    const state = addEntity(createTestGameState(), companion);
+
+    const nextState = updateCompanionSkillBehavior(state, companion.id, {
+      mobilitySkillUseMode: "missing" as Companion["skillBehavior"]["mobilitySkillUseMode"],
+    });
+
+    expect(
+      nextState.entities.companion.kind === "companion"
+        ? nextState.entities.companion.skillBehavior.mobilitySkillUseMode
+        : null,
+    ).toBe(DEFAULT_MOBILITY_SKILL_USE_MODE);
+  });
+
   it("fills missing saved skill behavior fields with defaults", () => {
     const companion = {
       ...createCompanion("companion", { x: 0, y: 0 }, "leader"),
@@ -89,6 +135,9 @@ describe("companion skill behavior", () => {
       beginnerFirstAidAllyHealHpThresholdPercent:
         DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
       beginnerFirstAidSelfHealHpThresholdPercent: 45,
+      secondWindSelfHealHpThresholdPercent:
+        DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
       supportFocus: DEFAULT_SUPPORT_FOCUS,
     });
   });

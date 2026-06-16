@@ -25,6 +25,13 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   rally_call: "rally_call_skill_book",
   field_hands: "field_hands_skill_book",
   quick_step: "quick_step_skill_book",
+  duelist_challenge: "duelist_challenge_skill_book",
+  second_wind: "second_wind_skill_book",
+  blade_parry: "blade_parry_skill_book",
+  edge_focus: "edge_focus_skill_book",
+  press_the_opening: "press_the_opening_skill_book",
+  woodcutter_rhythm: "woodcutter_rhythm_skill_book",
+  flash_step: "flash_step_skill_book",
   sweeping_strike: "sweeping_strike_skill_book",
   guard_wall: "guard_wall_skill_book",
   mark_target: "mark_target_skill_book",
@@ -319,6 +326,30 @@ export function getScaledSkillDefinitionForCompanion(
         ...effect,
         bonusGatherSpeed: effect.bonusGatherSpeed * multiplier,
       },
+    };
+  }
+
+  if (effect.type === "partyBuff") {
+    return {
+      ...skill,
+      effect: { ...effect, bonusDamage: effect.bonusDamage * multiplier },
+    };
+  }
+
+  if (effect.type === "damageMitigation") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        mitigationPercent: effect.mitigationPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "selfPercentHeal") {
+    return {
+      ...skill,
+      effect: { ...effect, healPercent: effect.healPercent * multiplier },
     };
   }
 

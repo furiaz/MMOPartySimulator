@@ -383,6 +383,13 @@ export type SkillBookItemId =
   | "rally_call_skill_book"
   | "field_hands_skill_book"
   | "quick_step_skill_book"
+  | "duelist_challenge_skill_book"
+  | "second_wind_skill_book"
+  | "blade_parry_skill_book"
+  | "edge_focus_skill_book"
+  | "press_the_opening_skill_book"
+  | "woodcutter_rhythm_skill_book"
+  | "flash_step_skill_book"
   | "sweeping_strike_skill_book"
   | "guard_wall_skill_book"
   | "mark_target_skill_book"
@@ -469,10 +476,13 @@ export type CompanionConsumableBehavior = {
 };
 
 export type SupportFocus = "lowest_hp" | "leader" | "defender";
+export type MobilitySkillUseMode = "offensive" | "defensive";
 
 export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
   beginnerFirstAidAllyHealHpThresholdPercent: number;
+  secondWindSelfHealHpThresholdPercent: number;
+  mobilitySkillUseMode: MobilitySkillUseMode;
   supportFocus: SupportFocus;
 };
 
@@ -729,6 +739,13 @@ export type SkillId =
   | "rally_call"
   | "field_hands"
   | "quick_step"
+  | "duelist_challenge"
+  | "second_wind"
+  | "blade_parry"
+  | "edge_focus"
+  | "press_the_opening"
+  | "woodcutter_rhythm"
+  | "flash_step"
   | "sweeping_strike"
   | "guard_wall"
   | "mark_target"
@@ -768,6 +785,7 @@ export type SkillTag =
   | "Resource Buff"
   | "Tool Buff"
   | "Self Cost - HP"
+  | "Self Healing"
   | "Self Buff"
   | "Light Damage";
 
@@ -820,9 +838,22 @@ export type SkillDefinition = {
       }
     | { type: "taunt"; damageType?: CombatDamageType; powerMultiplier?: number }
     | { type: "mark"; bonusDamage: number; durationMs: number }
-    | { type: "selfBuff"; bonusDamage: number; durationMs: number; hpCost: number }
+    | {
+        type: "selfBuff";
+        bonusDamage: number;
+        durationMs: number;
+        hpCost: number;
+        refreshWindowMs?: number;
+      }
     | { type: "allyBuff"; bonusDamage: number; durationMs: number }
-    | { type: "gatherBuff"; bonusGatherSpeed: number; durationMs: number }
+    | { type: "partyBuff"; bonusDamage: number; durationMs: number; refreshWindowMs?: number }
+    | {
+        type: "gatherBuff";
+        bonusGatherSpeed: number;
+        durationMs: number;
+        resourceType?: ResourceType;
+        refreshWindowMs?: number;
+      }
     | { type: "quickStep"; distance: number }
     | {
         type: "shieldBlock";
@@ -830,8 +861,16 @@ export type SkillDefinition = {
         blocks: number;
         blockedDamageTypes?: CombatDamageType[];
       }
+    | {
+        type: "damageMitigation";
+        durationMs: number;
+        mitigationPercent: number;
+        procs: number;
+        mitigatedDamageTypes?: CombatDamageType[];
+      }
     | { type: "bind"; durationMs: number }
     | { type: "heal"; powerMultiplier: number }
+    | { type: "selfPercentHeal"; healPercent: number }
     | { type: "selfCostHeal"; powerMultiplier: number; hpCost: number };
 };
 
@@ -852,6 +891,13 @@ export type SkillGatherBuffState = {
   companionId: string;
   bonusGatherSpeed: number;
   expiresAt: number;
+  resourceType?: ResourceType;
+};
+
+export type SkillPartyBuffState = {
+  sourceId: string;
+  bonusDamage: number;
+  expiresAt: number;
 };
 
 export type SkillBindState = {
@@ -868,6 +914,15 @@ export type SkillShieldBlockState = {
   expiresAt: number;
   remainingBlocks: number;
   blockedDamageTypes?: CombatDamageType[];
+};
+
+export type SkillDamageMitigationState = {
+  id: string;
+  ownerId: string;
+  expiresAt: number;
+  remainingProcs: number;
+  mitigationPercent: number;
+  mitigatedDamageTypes?: CombatDamageType[];
 };
 
 export type SkillCooldownState = {
