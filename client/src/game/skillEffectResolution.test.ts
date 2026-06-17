@@ -819,10 +819,9 @@ describe("skill effect resolution", () => {
     expect(selfBuffState.skillSelfBuffsByCompanionId?.beast).toMatchObject({
       companionId: beast.id,
       bonusDamage: 1,
+      movementSpeedBonusPercent: 20,
     });
-    expect((selfBuffState.entities.beast as Companion).health).toBe(
-      beast.health - 1,
-    );
+    expect((selfBuffState.entities.beast as Companion).health).toBe(beast.health);
 
     const support = createSkillCompanion("support", "support", { x: 0, y: 0 });
     const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 });
@@ -863,6 +862,140 @@ describe("skill effect resolution", () => {
       ownerId: defender.id,
       remainingBlocks: 1,
     });
+  });
+
+  it("applies Beast lifesteal from final physical damage only", () => {
+    const beast = {
+      ...createSkillCompanion("beast", "fighter", { x: 0, y: 0 }, "beast"),
+      health: 5,
+      maxHealth: 30,
+    };
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 100 });
+    const buffState = resolveSkillEffect(
+      createSkillState([beast, enemy]),
+      beast,
+      createSkillUse("blood_feast", beast),
+      1000,
+    ).state;
+
+    expect(buffState.skillLifestealBuffsByCompanionId?.beast).toMatchObject({
+      companionId: beast.id,
+      lifestealPercent: 10,
+      expiresAt: 9000,
+    });
+
+    const physicalState = resolveAndApplyCombatDamage(
+      buffState,
+      beast,
+      enemy,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 1100,
+        label: "Test Hit",
+      },
+    ).state;
+
+    expect((physicalState.entities.beast as Companion).health).toBeGreaterThan(
+      beast.health,
+    );
+
+    const magicState = resolveAndApplyCombatDamage(
+      buffState,
+      beast,
+      enemy,
+      {
+        damageType: "magic",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 1100,
+        label: "Test Spell",
+      },
+    ).state;
+
+    expect((magicState.entities.beast as Companion).health).toBe(beast.health);
+  });
+
+  it("moves and damages with Pounce without consuming when blocked", () => {
+    const beast = createSkillCompanion("beast", "fighter", { x: 1, y: 1 }, "beast");
+    const enemy = createSkillEnemy("enemy", { x: 4, y: 1 }, { maxHealth: 50 });
+    const result = resolveSkillEffect(
+      createSkillState([beast, enemy], {
+        map: createSkillMap([], 8),
+      }),
+      beast,
+      createSkillUse("pounce", enemy),
+      1000,
+    );
+    const movedBeast = result.state.entities.beast as Companion;
+
+    expect(result.shouldConsumeCooldown).toBe(true);
+    expect(movedBeast.position.x).toBeGreaterThan(beast.position.x);
+    expect((result.state.entities.enemy as Enemy).health).toBeLessThan(enemy.health);
+    expect(result.state.skillVisualEvents?.at(-1)).toMatchObject({
+      skillId: "pounce",
+      type: "slash",
+    });
+
+    const blockedResult = resolveSkillEffect(
+      createSkillState([beast, enemy], {
+        map: createSkillMap(
+          [
+            { x: 2, y: 1 },
+            { x: 2, y: 0 },
+            { x: 2, y: 2 },
+            { x: 1, y: 0 },
+            { x: 1, y: 2 },
+          ],
+          8,
+        ),
+      }),
+      beast,
+      createSkillUse("pounce", enemy),
+      1000,
+    );
+
+    expect(blockedResult.shouldConsumeCooldown).toBe(false);
+    expect(blockedResult.state.entities.beast.position).toEqual(beast.position);
+  });
+
+  it("channels Maul Sweep damage and disarm", () => {
+    const beast = createSkillCompanion("beast", "fighter", { x: 0, y: 0 }, "beast");
+    const nearby = createSkillEnemy("nearby", { x: 1, y: 0 }, { maxHealth: 50 });
+    const far = createSkillEnemy("far", { x: 4, y: 0 }, { maxHealth: 50 });
+    const channelState = resolveSkillEffect(
+      createSkillState([beast, nearby, far]),
+      beast,
+      createSkillUse("maul_sweep", beast),
+      1000,
+    ).state;
+
+    expect(channelState.companionAoeChannelsByCasterId?.beast).toMatchObject({
+      abilityId: "maul_sweep",
+      casterId: beast.id,
+      disarmDurationMs: 1500,
+    });
+
+    const afterImpact = updateCompanionAoeChannelSystem(
+      channelState,
+      1000 + SHIELD_SHOCKWAVE_CHANNEL_MS,
+    );
+
+    expect((afterImpact.entities.nearby as Enemy).health).toBeLessThan(
+      nearby.health,
+    );
+    expect((afterImpact.entities.far as Enemy).health).toBe(far.health);
+    expect(Object.values(afterImpact.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "disarmed",
+        targetId: nearby.id,
+        sourceKey: "maul_sweep",
+      }),
+    );
+    expect(afterImpact.companionAoeChannelsByCasterId?.beast).toBeUndefined();
   });
 
   it("applies heal and self-cost heal effects with healing telemetry", () => {

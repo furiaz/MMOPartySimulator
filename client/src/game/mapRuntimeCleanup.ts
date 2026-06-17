@@ -54,6 +54,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     skillSelfBuffsByCompanionId: {},
     skillPartyBuffsBySourceId: {},
     skillPartyPoisonCoatingsBySourceId: {},
+    skillLifestealBuffsByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
     skillAbsorbShieldsByCompanionId: {},
@@ -115,6 +116,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   );
   const skillPartyPoisonCoatingsBySourceId = pruneRecordById(
     state.skillPartyPoisonCoatingsBySourceId,
+    currentEntityIds,
+  );
+  const skillLifestealBuffsByCompanionId = pruneRecordById(
+    state.skillLifestealBuffsByCompanionId,
     currentEntityIds,
   );
   const skillGatherBuffsByCompanionId = pruneRecordById(
@@ -196,6 +201,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillPartyBuffsBySourceId === state.skillPartyBuffsBySourceId &&
     skillPartyPoisonCoatingsBySourceId ===
       state.skillPartyPoisonCoatingsBySourceId &&
+    skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
     skillAbsorbShieldsByCompanionId === state.skillAbsorbShieldsByCompanionId &&
@@ -233,6 +239,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillSelfBuffsByCompanionId,
     skillPartyBuffsBySourceId,
     skillPartyPoisonCoatingsBySourceId,
+    skillLifestealBuffsByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
     skillAbsorbShieldsByCompanionId,

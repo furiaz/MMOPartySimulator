@@ -13,7 +13,10 @@ import {
   isCompanionAssignedToResurrectionRecovery,
   isPositionInActiveResurrectionArea,
 } from "./resurrectionSystem";
-import { startShieldShockwaveChannel } from "./companionAoeChannelSystem";
+import {
+  startMaulSweepChannel,
+  startShieldShockwaveChannel,
+} from "./companionAoeChannelSystem";
 import { getLeaderMovementDirection } from "./roleSystem";
 import {
   getHealingAmount,
@@ -119,6 +122,14 @@ export function resolveSkillEffect(
     );
   }
 
+  if (skill.effect.type === "maulSweep" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      startMaulSweepChannel(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
   if (skill.effect.type === "pinningShot" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
@@ -147,6 +158,14 @@ export function resolveSkillEffect(
     return resolveAppliedSkillEffect(
       state,
       applySelfBuff(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "lifestealBuff") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyLifestealBuff(state, caster, skill, now),
       caster.id,
     );
   }
@@ -195,6 +214,16 @@ export function resolveSkillEffect(
 
   if (skill.effect.type === "skirmishShot") {
     const appliedState = applySkirmishShot(state, caster, target, skill, now);
+
+    if (!appliedState) {
+      return skipSkillEffect(state);
+    }
+
+    return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
+  if (skill.effect.type === "pounce") {
+    const appliedState = applyPounce(state, caster, target, skill, now);
 
     if (!appliedState) {
       return skipSkillEffect(state);
@@ -802,6 +831,7 @@ function applySelfBuff(
       [caster.id]: {
         companionId: caster.id,
         bonusDamage: skill.effect.bonusDamage,
+        movementSpeedBonusPercent: skill.effect.movementSpeedBonusPercent,
         expiresAt: now + skill.effect.durationMs,
       },
     },
@@ -866,6 +896,45 @@ function applyPartyBuff(
     });
   }
 
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyLifestealBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "lifestealBuff") {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillLifestealBuffsByCompanionId: {
+      ...(state.skillLifestealBuffsByCompanionId ?? {}),
+      [caster.id]: {
+        companionId: caster.id,
+        lifestealPercent: skill.effect.lifestealPercent,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
     skillId: skill.id,
@@ -1409,6 +1478,79 @@ function applySkirmishShot(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applyPounce(
+  state: GameState,
+  caster: Companion,
+  target: Enemy | Companion | undefined,
+  skill: SkillDefinition,
+  now: number,
+): GameState | null {
+  if (skill.effect.type !== "pounce" || !isLivingEnemy(target)) {
+    return null;
+  }
+
+  const direction =
+    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
+  );
+
+  if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
+    return null;
+  }
+
+  const movedCaster = {
+    ...caster,
+    position,
+  };
+  let nextState = updateEntity(state, movedCaster);
+  const currentTarget = nextState.entities[target.id];
+
+  if (isLivingEnemy(currentTarget)) {
+    nextState = damageEnemy(
+      nextState,
+      movedCaster,
+      currentTarget,
+      skill.displayName,
+      now,
+      skill.effect.damageType,
+      skill.effect.powerMultiplier,
+      skill.effect.damageType !== "magic",
+    );
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "slash",
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,

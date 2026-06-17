@@ -407,7 +407,14 @@ export type SkillBookItemId =
   | "herbalist_rhythm_skill_book"
   | "skirmish_shot_skill_book"
   | "arrow_burst_skill_book"
+  | "threatening_roar_skill_book"
+  | "blood_feast_skill_book"
+  | "rugged_hide_skill_book"
   | "feral_surge_skill_book"
+  | "pack_frenzy_skill_book"
+  | "stoneclaw_rhythm_skill_book"
+  | "pounce_skill_book"
+  | "maul_sweep_skill_book"
   | "elemental_bolt_skill_book"
   | "binding_rune_skill_book"
   | "light_mend_skill_book"
@@ -498,6 +505,7 @@ export type CompanionSkillBehavior = {
   secondWindSelfHealHpThresholdPercent: number;
   holdFastUseHpThresholdPercent: number;
   fakeDeathUseHpThresholdPercent: number;
+  bloodFeastUseHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
   supportFocus: SupportFocus;
 };
@@ -779,7 +787,14 @@ export type SkillId =
   | "herbalist_rhythm"
   | "skirmish_shot"
   | "arrow_burst"
+  | "threatening_roar"
+  | "blood_feast"
+  | "rugged_hide"
   | "feral_surge"
+  | "pack_frenzy"
+  | "stoneclaw_rhythm"
+  | "pounce"
+  | "maul_sweep"
   | "elemental_bolt"
   | "binding_rune"
   | "light_mend"
@@ -889,6 +904,7 @@ export type SkillDefinition = {
         bonusDamage: number;
         durationMs: number;
         hpCost: number;
+        movementSpeedBonusPercent?: number;
         refreshWindowMs?: number;
       }
     | { type: "allyBuff"; bonusDamage: number; durationMs: number }
@@ -921,6 +937,24 @@ export type SkillDefinition = {
         damageType: CombatDamageType;
         powerMultiplier: number;
         radius: number;
+      }
+    | {
+        type: "lifestealBuff";
+        durationMs: number;
+        lifestealPercent: number;
+      }
+    | {
+        type: "pounce";
+        distance: number;
+        damageType: CombatDamageType;
+        powerMultiplier: number;
+      }
+    | {
+        type: "maulSweep";
+        damageType: CombatDamageType;
+        powerMultiplier: number;
+        radius: number;
+        disarmDurationMs: number;
       }
     | {
         type: "shieldBlock";
@@ -980,6 +1014,7 @@ export type SkillSelfBuffState = {
   companionId: string;
   bonusDamage: number;
   expiresAt: number;
+  movementSpeedBonusPercent?: number;
 };
 
 export type SkillGatherBuffState = {
@@ -1001,6 +1036,12 @@ export type SkillPartyPoisonCoatingState = {
   tickDamage: number;
   poisonDurationMs: number;
   poisonTickIntervalMs: number;
+  expiresAt: number;
+};
+
+export type SkillLifestealBuffState = {
+  companionId: string;
+  lifestealPercent: number;
   expiresAt: number;
 };
 
@@ -1177,7 +1218,7 @@ export type EnemyAoeCooldownState = {
   expiresAt: number;
 };
 
-export type CompanionAoeAbilityId = "shield_shockwave";
+export type CompanionAoeAbilityId = "shield_shockwave" | "maul_sweep";
 
 export type CompanionAoeChannelState = {
   id: string;
@@ -1187,7 +1228,8 @@ export type CompanionAoeChannelState = {
   visualIntent: AoeVisualIntent;
   damageType: CombatDamageType;
   powerMultiplier: number;
-  bindDurationMs: number;
+  bindDurationMs?: number;
+  disarmDurationMs?: number;
   startedAt: number;
   channelEndsAt: number;
 };

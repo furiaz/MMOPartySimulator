@@ -5,6 +5,7 @@ import { getCompanionDerivedStats } from "./stats";
 import {
   applyIncomingDamageAbsorb,
   applyIncomingDamageMitigation,
+  applyLifestealFromAttack,
   applyPartyPoisonCoatingFromAttack,
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
@@ -190,6 +191,13 @@ export function resolveAndApplyCombatDamage(
     if (finalDamage > 0) {
       const damagedTarget = damageEntity(target, finalDamage);
       nextState = updateEntity(nextState, damagedTarget);
+      nextState = applyLifestealFromAttack(
+        nextState,
+        attacker,
+        finalDamage,
+        options.damageType,
+        options.now,
+      );
       nextState = applyPartyPoisonCoatingFromAttack(
         nextState,
         attacker,

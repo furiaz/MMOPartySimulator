@@ -33,6 +33,7 @@ import type {
   SkillCooldownsBySkillId,
   SkillDamageMitigationState,
   SkillGatherBuffState,
+  SkillLifestealBuffState,
   SkillMarkState,
   SkillPartyPoisonCoatingState,
   SkillMitigationBuffState,
@@ -195,6 +196,7 @@ export type GameState = {
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
   skillPartyBuffsBySourceId?: Record<string, SkillPartyBuffState>;
   skillPartyPoisonCoatingsBySourceId?: Record<string, SkillPartyPoisonCoatingState>;
+  skillLifestealBuffsByCompanionId?: Record<string, SkillLifestealBuffState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillDamageMitigationsByCompanionId?: Record<string, SkillDamageMitigationState>;
   skillAbsorbShieldsByCompanionId?: Record<string, SkillAbsorbShieldState>;
@@ -378,6 +380,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillPartyPoisonCoatingsBySourceId,
     now,
   );
+  const skillLifestealBuffsByCompanionId = filterExpiredRecord(
+    state.skillLifestealBuffsByCompanionId,
+    now,
+  );
   const skillGatherBuffsByCompanionId = filterExpiredRecord(
     state.skillGatherBuffsByCompanionId,
     now,
@@ -426,6 +432,7 @@ export function clearExpiredSkillRuntimeState(
     skillPartyBuffsBySourceId === state.skillPartyBuffsBySourceId &&
     skillPartyPoisonCoatingsBySourceId ===
       state.skillPartyPoisonCoatingsBySourceId &&
+    skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
     skillAbsorbShieldsByCompanionId === state.skillAbsorbShieldsByCompanionId &&
@@ -447,6 +454,7 @@ export function clearExpiredSkillRuntimeState(
     skillSelfBuffsByCompanionId,
     skillPartyBuffsBySourceId,
     skillPartyPoisonCoatingsBySourceId,
+    skillLifestealBuffsByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
     skillAbsorbShieldsByCompanionId,

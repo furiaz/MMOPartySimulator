@@ -12,10 +12,12 @@ import {
   CLASS_DEFINITIONS,
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
@@ -495,7 +497,13 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   if (effect.type === "selfBuff") {
-    return `Self +${effect.bonusDamage} damage.`;
+    const parts = [`Self +${effect.bonusDamage} damage`];
+
+    if (effect.movementSpeedBonusPercent) {
+      parts.push(`+${Math.round(effect.movementSpeedBonusPercent)}% move speed`);
+    }
+
+    return `${parts.join(", ")}.`;
   }
 
   if (effect.type === "allyBuff") {
@@ -526,6 +534,18 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
   if (effect.type === "arrowBurst") {
     return `Hits enemies near the target for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
+  }
+
+  if (effect.type === "lifestealBuff") {
+    return `Self heals for ${Math.round(effect.lifestealPercent)}% of physical damage dealt.`;
+  }
+
+  if (effect.type === "pounce") {
+    return `Moves ${effect.distance} spaces and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
+  }
+
+  if (effect.type === "maulSweep") {
+    return `Hits nearby enemies for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage and disarms them briefly.`;
   }
 
   if (effect.type === "shieldBlock") {
@@ -1522,6 +1542,9 @@ function SkillPreferencesSection({
   const fakeDeathThreshold =
     member.skillBehavior.fakeDeathUseHpThresholdPercent ??
     DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT;
+  const bloodFeastThreshold =
+    member.skillBehavior.bloodFeastUseHpThresholdPercent ??
+    DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
@@ -1538,11 +1561,16 @@ function SkillPreferencesSection({
   const hasFakeDeath = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "fake_death"),
   );
+  const hasBloodFeast = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "blood_feast"),
+  );
   const hasMobilitySkill = learnedSkillGroups.some((group) =>
     group.skills.some((skill) =>
       skill.id === "quick_step" ||
       skill.id === "flash_step" ||
-      skill.id === "shield_rush"
+      skill.id === "shield_rush" ||
+      skill.id === "skirmish_shot" ||
+      skill.id === "pounce"
     ),
   );
   const isSupport = member.role === "support";
@@ -1702,6 +1730,34 @@ function SkillPreferencesSection({
               value={fakeDeathThreshold}
             />
             <strong>{fakeDeathThreshold}%</strong>
+          </label>
+        ) : null}
+        {hasBloodFeast ? (
+          <label className="behavior-range-row">
+            <span>Blood Feast Use Threshold</span>
+            <input
+              max={BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  bloodFeastUseHpThresholdPercent: Number(event.target.value),
+                })
+              }
+              type="range"
+              value={bloodFeastThreshold}
+            />
+            <input
+              max={BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  bloodFeastUseHpThresholdPercent: Number(event.target.value),
+                })
+              }
+              type="number"
+              value={bloodFeastThreshold}
+            />
+            <strong>{bloodFeastThreshold}%</strong>
           </label>
         ) : null}
         {hasMobilitySkill ? (
