@@ -49,7 +49,14 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   herbalist_rhythm: "herbalist_rhythm_skill_book",
   skirmish_shot: "skirmish_shot_skill_book",
   arrow_burst: "arrow_burst_skill_book",
+  threatening_roar: "threatening_roar_skill_book",
+  blood_feast: "blood_feast_skill_book",
+  rugged_hide: "rugged_hide_skill_book",
   feral_surge: "feral_surge_skill_book",
+  pack_frenzy: "pack_frenzy_skill_book",
+  stoneclaw_rhythm: "stoneclaw_rhythm_skill_book",
+  pounce: "pounce_skill_book",
+  maul_sweep: "maul_sweep_skill_book",
   elemental_bolt: "elemental_bolt_skill_book",
   binding_rune: "binding_rune_skill_book",
   light_mend: "light_mend_skill_book",
@@ -324,7 +331,13 @@ export function getScaledSkillDefinitionForCompanion(
   if (effect.type === "selfBuff") {
     return {
       ...skill,
-      effect: { ...effect, bonusDamage: effect.bonusDamage * multiplier },
+      effect: {
+        ...effect,
+        bonusDamage: effect.bonusDamage * multiplier,
+        movementSpeedBonusPercent: effect.movementSpeedBonusPercent
+          ? effect.movementSpeedBonusPercent * multiplier
+          : undefined,
+      },
     };
   }
 
@@ -385,6 +398,27 @@ export function getScaledSkillDefinitionForCompanion(
   }
 
   if (effect.type === "arrowBurst") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        powerMultiplier: effect.powerMultiplier * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "lifestealBuff") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        durationMs: effect.durationMs + (Math.max(1, Math.floor(rank)) - 1) * 500,
+        lifestealPercent: effect.lifestealPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "pounce" || effect.type === "maulSweep") {
     return {
       ...skill,
       effect: {

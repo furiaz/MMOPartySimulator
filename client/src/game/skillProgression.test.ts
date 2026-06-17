@@ -50,6 +50,17 @@ const HUNTER_SKILL_IDS: SkillId[] = [
   "arrow_burst",
 ];
 
+const BEAST_SKILL_IDS: SkillId[] = [
+  "threatening_roar",
+  "blood_feast",
+  "rugged_hide",
+  "feral_surge",
+  "pack_frenzy",
+  "stoneclaw_rhythm",
+  "pounce",
+  "maul_sweep",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -81,6 +92,13 @@ describe("skill progression", () => {
       poison_coating: 5,
       skirmish_shot: 5,
       arrow_burst: 5,
+      blood_feast: 5,
+      rugged_hide: 5,
+      feral_surge: 5,
+      pack_frenzy: 5,
+      stoneclaw_rhythm: 5,
+      pounce: 5,
+      maul_sweep: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -151,6 +169,34 @@ describe("skill progression", () => {
       companion,
       SKILL_DEFINITIONS.arrow_burst,
     );
+    const bloodFeast = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.blood_feast,
+    );
+    const ruggedHide = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.rugged_hide,
+    );
+    const feralSurge = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.feral_surge,
+    );
+    const packFrenzy = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.pack_frenzy,
+    );
+    const stoneclawRhythm = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.stoneclaw_rhythm,
+    );
+    const pounce = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.pounce,
+    );
+    const maulSweep = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.maul_sweep,
+    );
 
     expect(kick.effect.type).toBe("lungeDamage");
     if (kick.effect.type === "lungeDamage") {
@@ -218,6 +264,37 @@ describe("skill progression", () => {
     expect(arrowBurst.effect.type).toBe("arrowBurst");
     if (arrowBurst.effect.type === "arrowBurst") {
       expect(arrowBurst.effect.powerMultiplier).toBeCloseTo(1.32);
+    }
+    expect(bloodFeast.effect.type).toBe("lifestealBuff");
+    if (bloodFeast.effect.type === "lifestealBuff") {
+      expect(bloodFeast.effect.durationMs).toBe(10000);
+      expect(bloodFeast.effect.lifestealPercent).toBeCloseTo(12);
+    }
+    expect(ruggedHide.effect.type).toBe("selfMitigationBuff");
+    if (ruggedHide.effect.type === "selfMitigationBuff") {
+      expect(ruggedHide.effect.mitigationPercent).toBeCloseTo(24);
+    }
+    expect(feralSurge.effect.type).toBe("selfBuff");
+    if (feralSurge.effect.type === "selfBuff") {
+      expect(feralSurge.effect.bonusDamage).toBeCloseTo(1.2);
+      expect(feralSurge.effect.movementSpeedBonusPercent).toBeCloseTo(24);
+    }
+    expect(packFrenzy.effect.type).toBe("partyBuff");
+    if (packFrenzy.effect.type === "partyBuff") {
+      expect(packFrenzy.effect.bonusDamage).toBeCloseTo(1.2);
+    }
+    expect(stoneclawRhythm.effect.type).toBe("gatherBuff");
+    if (stoneclawRhythm.effect.type === "gatherBuff") {
+      expect(stoneclawRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+      expect(stoneclawRhythm.effect.resourceType).toBe("ore");
+    }
+    expect(pounce.effect.type).toBe("pounce");
+    if (pounce.effect.type === "pounce") {
+      expect(pounce.effect.powerMultiplier).toBeCloseTo(1.2);
+    }
+    expect(maulSweep.effect.type).toBe("maulSweep");
+    if (maulSweep.effect.type === "maulSweep") {
+      expect(maulSweep.effect.powerMultiplier).toBeCloseTo(1.08);
     }
   });
 
@@ -340,6 +417,39 @@ describe("skill progression", () => {
       maxRank: 5,
     });
     expect(getCompanionSkillRank(nextCompanion, "arrow_burst")).toBe(2);
+  });
+
+  it("reads new Beast skill books for eligible Beast companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "beast",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "maul_sweep_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "maul_sweep_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "maul_sweep",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "maul_sweep")).toBe(2);
   });
 
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
@@ -472,6 +582,21 @@ describe("skill progression", () => {
     ]);
     expect(getActiveSkillsForCompanion(hunter).map((skill) => skill.id)).toEqual([
       ...HUNTER_SKILL_IDS,
+    ]);
+  });
+
+  it("keeps Beast current-class skills ordered in the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "beast",
+    );
+
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...BEAST_SKILL_IDS,
     ]);
   });
 

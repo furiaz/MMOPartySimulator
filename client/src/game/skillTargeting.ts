@@ -93,6 +93,14 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "lifestealBuff") {
+    return hasPartyDanger(state, caster) &&
+      isBloodFeastUseThresholdActive(caster) &&
+      !hasActiveLifestealBuff(state, caster)
+      ? caster
+      : undefined;
+  }
+
   if (skill.effect.type === "partyPoisonCoating") {
     return hasValidEnemyContext(state, caster, options) &&
       canUseRefreshableRuntimeState(
@@ -142,6 +150,14 @@ export function getSkillTarget(
 
   if (skill.effect.type === "skirmishShot") {
     return findSkirmishShotTarget(state, caster, skill, options);
+  }
+
+  if (skill.effect.type === "pounce") {
+    return findPounceTarget(state, caster, skill, options);
+  }
+
+  if (skill.effect.type === "maulSweep") {
+    return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
   }
 
   if (skill.effect.type === "fakeDeath") {
@@ -851,6 +867,46 @@ function findSkirmishShotTarget(
     : undefined;
 }
 
+function findPounceTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "pounce") {
+    return undefined;
+  }
+
+  if (getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive") {
+    const enemy = findEnemyTarget(state, caster, skill.range, options);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        skill.effect.distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    isEnemyInRange(caster, threat, skill.range) &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      skill.effect.distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
 function hasGatherBuffResourceContext(
   state: GameState,
   caster: Companion,
@@ -892,6 +948,10 @@ function hasActiveAbsorbShield(state: GameState, caster: Companion): boolean {
   return Boolean(state.skillAbsorbShieldsByCompanionId?.[caster.id]);
 }
 
+function hasActiveLifestealBuff(state: GameState, caster: Companion): boolean {
+  return Boolean(state.skillLifestealBuffsByCompanionId?.[caster.id]);
+}
+
 function hasActiveHoldFast(
   state: GameState,
   caster: Companion,
@@ -926,6 +986,13 @@ function isFakeDeathUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
     getCompanionSkillBehavior(caster).fakeDeathUseHpThresholdPercent,
+  );
+}
+
+function isBloodFeastUseThresholdActive(caster: Companion): boolean {
+  return isCompanionAtOrBelowHpThreshold(
+    caster,
+    getCompanionSkillBehavior(caster).bloodFeastUseHpThresholdPercent,
   );
 }
 

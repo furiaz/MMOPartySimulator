@@ -972,9 +972,17 @@ function getMovementDeltaMs(
 ): number {
   const debugSpeedMultiplier =
     usesCompanionDebugSpeed(entity) && state.debugOptions?.superSpeedEnabled ? 5 : 1;
+  const skillSpeedMultiplier =
+    entity.kind === "companion"
+      ? 1 +
+        (state.skillSelfBuffsByCompanionId?.[entity.id]?.movementSpeedBonusPercent ??
+          0) /
+          100
+      : 1;
 
   return (state.simulationDeltaMs ?? GAME_LOOP_TICK_MS) *
     (options.speedMultiplier ?? 1) *
+    skillSpeedMultiplier *
     debugSpeedMultiplier;
 }
 

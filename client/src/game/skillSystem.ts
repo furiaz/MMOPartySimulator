@@ -247,6 +247,13 @@ function getSkillTargetSkipReason(
   }
 
   if (
+    skill.effect.type === "lifestealBuff" &&
+    state.skillLifestealBuffsByCompanionId?.[caster.id]
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
     skill.effect.type === "gatherBuff" &&
     state.skillGatherBuffsByCompanionId?.[caster.id] &&
     !canUseRefreshableRuntimeState(
@@ -466,6 +473,7 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "holdFast" ||
     skill.effect.type === "damageMitigation" ||
     skill.effect.type === "fakeDeath" ||
+    skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff"
@@ -496,6 +504,7 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "selfBuff" ||
     skill.effect.type === "partyBuff" ||
     skill.effect.type === "partyPoisonCoating" ||
+    skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "fakeDeath" ||
     skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "damageMitigation" ||
@@ -611,6 +620,8 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "taunt":
     case "pinningShot":
     case "skirmishShot":
+    case "pounce":
+    case "maulSweep":
     case "arrowBurst":
     case "bind":
       return true;

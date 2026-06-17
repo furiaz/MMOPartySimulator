@@ -97,6 +97,18 @@ describe("runtime cleanup", () => {
         "enemy-1": activeMark,
         "enemy-2": expiredMark,
       },
+      skillLifestealBuffsByCompanionId: {
+        "companion-1": {
+          companionId: "companion-1",
+          lifestealPercent: 10,
+          expiresAt: 2000,
+        },
+        "companion-2": {
+          companionId: "companion-2",
+          lifestealPercent: 10,
+          expiresAt: 900,
+        },
+      },
       skillVisualEvents: [activeVisual, expiredVisual],
     });
 
@@ -105,6 +117,13 @@ describe("runtime cleanup", () => {
     expect(nextState).not.toBe(state);
     expect(nextState.skillMarksByEnemyId).toEqual({
       "enemy-1": activeMark,
+    });
+    expect(nextState.skillLifestealBuffsByCompanionId).toEqual({
+      "companion-1": {
+        companionId: "companion-1",
+        lifestealPercent: 10,
+        expiresAt: 2000,
+      },
     });
     expect(nextState.skillVisualEvents).toEqual([activeVisual]);
   });
@@ -172,6 +191,13 @@ describe("runtime cleanup", () => {
           },
         },
       },
+      skillLifestealBuffsByCompanionId: {
+        leader: {
+          companionId: "leader",
+          lifestealPercent: 10,
+          expiresAt: 6000,
+        },
+      },
       globalCooldownsByCompanionId: {
         leader: {
           companionId: "leader",
@@ -206,6 +232,7 @@ describe("runtime cleanup", () => {
     expect(nextState.skillCooldownsByCompanionId).toEqual(
       state.skillCooldownsByCompanionId,
     );
+    expect(nextState.skillLifestealBuffsByCompanionId).toEqual({});
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.combatProjectiles).toEqual([]);
     expect(nextState.companionAoeChannelsByCasterId).toEqual({});
@@ -278,6 +305,18 @@ describe("runtime cleanup", () => {
           },
         },
       },
+      skillLifestealBuffsByCompanionId: {
+        [companion.id]: {
+          companionId: companion.id,
+          lifestealPercent: 10,
+          expiresAt: 2000,
+        },
+        [enemy.id]: {
+          companionId: enemy.id,
+          lifestealPercent: 10,
+          expiresAt: 2000,
+        },
+      },
       globalCooldownsByCompanionId: {
         [companion.id]: {
           companionId: companion.id,
@@ -347,6 +386,13 @@ describe("runtime cleanup", () => {
           skillId: "kick",
           expiresAt: 2000,
         },
+      },
+    });
+    expect(nextState.skillLifestealBuffsByCompanionId).toEqual({
+      [companion.id]: {
+        companionId: companion.id,
+        lifestealPercent: 10,
+        expiresAt: 2000,
       },
     });
     expect(nextState.globalCooldownsByCompanionId).toEqual({

@@ -15,6 +15,8 @@ export const DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT = 30;
 export const HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT = 100;
 export const DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT = 30;
 export const FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT = 30;
+export const DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT = 30;
+export const BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
 export const DEFAULT_SUPPORT_FOCUS: SupportFocus = "lowest_hp";
 
@@ -43,6 +45,7 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
       DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
     holdFastUseHpThresholdPercent: DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
     fakeDeathUseHpThresholdPercent: DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
+    bloodFeastUseHpThresholdPercent: DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
     mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
     supportFocus: DEFAULT_SUPPORT_FOCUS,
   };
@@ -80,6 +83,11 @@ export function getCompanionSkillBehavior(
       storedBehavior.fakeDeathUseHpThresholdPercent ??
         DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
       FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    bloodFeastUseHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.bloodFeastUseHpThresholdPercent ??
+        DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
+      BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
     ),
     mobilitySkillUseMode: normalizeMobilitySkillUseMode(
       storedBehavior.mobilitySkillUseMode,
@@ -134,6 +142,12 @@ export function updateCompanionSkillBehavior(
           update.fakeDeathUseHpThresholdPercent ??
             getCompanionSkillBehavior(companion).fakeDeathUseHpThresholdPercent,
           FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      bloodFeastUseHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.bloodFeastUseHpThresholdPercent ??
+            getCompanionSkillBehavior(companion).bloodFeastUseHpThresholdPercent,
+          BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
         ),
       mobilitySkillUseMode: normalizeMobilitySkillUseMode(
         update.mobilitySkillUseMode ??

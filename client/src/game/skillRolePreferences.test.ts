@@ -77,6 +77,22 @@ describe("skill role preferences", () => {
     );
   });
 
+  it("keeps Beast aggression strongest for Fighters and Defenders", () => {
+    expect(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.maul_sweep.tags),
+    ).toBeGreaterThan(
+      getSkillRoleScore("support", SKILL_DEFINITIONS.maul_sweep.tags),
+    );
+    expect(
+      getSkillRoleScore("defender", SKILL_DEFINITIONS.threatening_roar.tags),
+    ).toBeGreaterThan(
+      getSkillRoleScore("support", SKILL_DEFINITIONS.threatening_roar.tags),
+    );
+    expect(
+      getSkillRoleScore("gatherer", SKILL_DEFINITIONS.stoneclaw_rhythm.tags),
+    ).toBeGreaterThan(0);
+  });
+
   it("keeps Beginner skills scoped to Beginner class lookup", () => {
     expect(getSkillsForClass("beginner").map((skill) => skill.id)).toEqual([
       "throw_rock",
@@ -117,6 +133,16 @@ describe("skill role preferences", () => {
       "herbalist_rhythm",
       "skirmish_shot",
       "arrow_burst",
+    ]);
+    expect(getSkillsForClass("beast").map((skill) => skill.id)).toEqual([
+      "threatening_roar",
+      "blood_feast",
+      "rugged_hide",
+      "feral_surge",
+      "pack_frenzy",
+      "stoneclaw_rhythm",
+      "pounce",
+      "maul_sweep",
     ]);
   });
 });

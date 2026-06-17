@@ -4,6 +4,7 @@ import { grantCharacterXpToParty } from "./leveling";
 import { getEuclideanDistance } from "./positionUtils";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
+import { applyStatusEffect } from "./statusEffects";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   Companion,
@@ -71,6 +72,50 @@ export function startShieldShockwaveChannel(
   };
 }
 
+export function startMaulSweepChannel(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "maulSweep" ||
+    state.companionAoeChannelsByCasterId?.[caster.id]
+  ) {
+    return state;
+  }
+
+  const nextState = addCombatFeedback(state, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return {
+    ...nextState,
+    companionAoeChannelsByCasterId: {
+      ...(nextState.companionAoeChannelsByCasterId ?? {}),
+      [caster.id]: {
+        id: `maul_sweep:${caster.id}:${now}`,
+        abilityId: "maul_sweep",
+        casterId: caster.id,
+        shape: {
+          type: "circle",
+          center: caster.position,
+          radius: skill.effect.radius,
+        },
+        visualIntent: "partyOffensive",
+        damageType: skill.effect.damageType,
+        powerMultiplier: skill.effect.powerMultiplier,
+        disarmDurationMs: skill.effect.disarmDurationMs,
+        startedAt: now,
+        channelEndsAt: now + SHIELD_SHOCKWAVE_CHANNEL_MS,
+      },
+    },
+  };
+}
+
 function updateActiveChannel(
   state: GameState,
   channel: CompanionAoeChannelState,
@@ -90,7 +135,63 @@ function updateActiveChannel(
     return resolveShieldShockwaveImpact(state, channel, caster, now);
   }
 
+  if (channel.abilityId === "maul_sweep") {
+    return resolveMaulSweepImpact(state, channel, caster, now);
+  }
+
   return finishChannel(state, channel);
+}
+
+function resolveMaulSweepImpact(
+  state: GameState,
+  channel: CompanionAoeChannelState,
+  caster: Companion,
+  now: number,
+): GameState {
+  let nextState = state;
+
+  for (const enemy of Object.values(state.entities)) {
+    const currentEnemy = nextState.entities[enemy.id];
+
+    if (
+      !isLivingEnemy(currentEnemy) ||
+      !isInsideCircle(currentEnemy.position, channel.shape.center, channel.shape.radius)
+    ) {
+      continue;
+    }
+
+    nextState = damageEnemy(
+      nextState,
+      caster,
+      currentEnemy,
+      "Maul Sweep",
+      now,
+      channel.damageType,
+      channel.powerMultiplier,
+    );
+
+    const damagedTarget = nextState.entities[currentEnemy.id];
+
+    if (
+      isLivingEnemy(damagedTarget) &&
+      !isTargetDummyEnemy(damagedTarget) &&
+      channel.disarmDurationMs
+    ) {
+      nextState = applyStatusEffect(
+        nextState,
+        {
+          type: "disarmed",
+          targetId: damagedTarget.id,
+          durationMs: channel.disarmDurationMs,
+          sourceId: caster.id,
+          sourceKey: "maul_sweep",
+        },
+        now,
+      );
+    }
+  }
+
+  return finishChannel(nextState, channel);
 }
 
 function resolveShieldShockwaveImpact(
@@ -123,7 +224,11 @@ function resolveShieldShockwaveImpact(
 
     const damagedTarget = nextState.entities[currentEnemy.id];
 
-    if (isLivingEnemy(damagedTarget) && !isTargetDummyEnemy(damagedTarget)) {
+    if (
+      isLivingEnemy(damagedTarget) &&
+      !isTargetDummyEnemy(damagedTarget) &&
+      channel.bindDurationMs
+    ) {
       nextState = updateEntity(nextState, {
         ...damagedTarget,
         state: "attack",

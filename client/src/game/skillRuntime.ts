@@ -8,6 +8,7 @@ import type {
   ResourceEntity,
   SkillAbsorbShieldState,
   SkillDamageMitigationState,
+  SkillLifestealBuffState,
   SkillMitigationBuffState,
   SkillShieldBlockState,
 } from "./types";
@@ -79,6 +80,65 @@ export function applyPartyPoisonCoatingFromAttack(
       now,
     );
   }
+
+  return nextState;
+}
+
+export function applyLifestealFromAttack(
+  state: GameState,
+  attacker: CombatEntity,
+  finalDamage: number,
+  damageType: CombatDamageType,
+  now: number,
+): GameState {
+  if (
+    finalDamage <= 0 ||
+    damageType !== "physical" ||
+    attacker.kind !== "companion"
+  ) {
+    return state;
+  }
+
+  const currentAttacker = state.entities[attacker.id];
+
+  if (currentAttacker?.kind !== "companion") {
+    return state;
+  }
+
+  const lifesteal = getLifestealBuff(state, currentAttacker);
+
+  if (!lifesteal || currentAttacker.health >= currentAttacker.maxHealth) {
+    return state;
+  }
+
+  const healAmount = Math.max(
+    1,
+    Math.round(finalDamage * (lifesteal.lifestealPercent / 100)),
+  );
+  const nextHealth = Math.min(
+    currentAttacker.maxHealth,
+    currentAttacker.health + healAmount,
+  );
+  const appliedHeal = nextHealth - currentAttacker.health;
+
+  if (appliedHeal <= 0) {
+    return state;
+  }
+
+  let nextState = updateEntity(state, {
+    ...currentAttacker,
+    health: nextHealth,
+  });
+
+  nextState = addCombatFeedback(nextState, {
+    type: "heal",
+    entityId: attacker.id,
+    sourceEntityId: attacker.id,
+    targetEntityId: attacker.id,
+    amount: appliedHeal,
+    text: `+${appliedHeal} HP`,
+    now,
+  });
 
   return nextState;
 }
@@ -310,6 +370,13 @@ function doesAbsorbApply(
     shield.absorbedDamageTypes === undefined ||
     shield.absorbedDamageTypes.includes(damageType)
   );
+}
+
+function getLifestealBuff(
+  state: GameState,
+  attacker: Companion,
+): SkillLifestealBuffState | undefined {
+  return state.skillLifestealBuffsByCompanionId?.[attacker.id];
 }
 
 export function isEnemyBound(state: GameState, enemy: Enemy): boolean {
