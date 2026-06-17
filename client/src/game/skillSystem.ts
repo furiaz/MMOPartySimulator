@@ -27,6 +27,7 @@ import {
   startCompanionGlobalCooldown,
   startSkillCooldown,
 } from "./companionCooldowns";
+import { isSkillUseBlockedByStatus } from "./statusEffects";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
 export { updateSkillShieldBlockPositions } from "./skillEffectResolution";
@@ -136,12 +137,13 @@ function canUsePrototypeCombatSkill(
       entity.kind === "companion" &&
       entity.state !== "dead" &&
       entity.health > 0 &&
+      !isSkillUseBlockedByStatus(state, entity.id) &&
       hasCombatSkillContext(state, entity),
   );
 }
 
 function canUsePrototypeSkill(
-  _state: GameState,
+  state: GameState,
   entity: GameEntity | undefined,
 ): entity is Companion {
   return Boolean(
@@ -149,6 +151,7 @@ function canUsePrototypeSkill(
       entity.kind === "companion" &&
       entity.state !== "dead" &&
       entity.health > 0 &&
+      !isSkillUseBlockedByStatus(state, entity.id) &&
       entity.commandPriority !== "direct",
   );
 }

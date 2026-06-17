@@ -985,6 +985,57 @@ export type SkillMitigationBuffState = {
   mitigatedDamageTypes?: CombatDamageType[];
 };
 
+export type StatusEffectType =
+  | "immobilized"
+  | "incapacitated"
+  | "disarmed"
+  | "cursed"
+  | "forcedEvasion"
+  | "nextAttackDamageBonus"
+  | "poison"
+  | "defenseBuff";
+
+export type StatusEffectBase = {
+  id: string;
+  type: StatusEffectType;
+  targetId: string;
+  sourceId?: string;
+  sourceKey?: string;
+  appliedAt: number;
+  expiresAt: number;
+};
+
+export type SimpleStatusEffect = StatusEffectBase & {
+  type: "immobilized" | "incapacitated" | "disarmed" | "cursed" | "forcedEvasion";
+};
+
+export type NextAttackDamageBonusStatusEffect = StatusEffectBase & {
+  type: "nextAttackDamageBonus";
+  damageMultiplierBonus: number;
+  damageTypes?: CombatDamageType[];
+};
+
+export type PoisonStatusEffect = StatusEffectBase & {
+  type: "poison";
+  sourceKey: string;
+  tickDamage: number;
+  tickIntervalMs: number;
+  nextTickAt: number;
+  baseDurationMs: number;
+  maxDurationMs: number;
+};
+
+export type DefenseBuffStatusEffect = StatusEffectBase & {
+  type: "defenseBuff";
+  defenseBonusPercent: number;
+};
+
+export type StatusEffectState =
+  | SimpleStatusEffect
+  | NextAttackDamageBonusStatusEffect
+  | PoisonStatusEffect
+  | DefenseBuffStatusEffect;
+
 export type SkillCooldownState = {
   companionId: string;
   skillId: SkillId;

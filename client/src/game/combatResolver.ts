@@ -8,6 +8,12 @@ import {
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
 } from "./skillRuntime";
+import {
+  clearStatusEffectsForEntity,
+  consumeForcedEvasionStatus,
+  consumeNextAttackDamageBonus,
+  getStatusDefenseBonusPercent,
+} from "./statusEffects";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   CombatDamageType,
@@ -73,19 +79,37 @@ export function resolveAndApplyCombatDamage(
     attacker.kind === "companion" && target.kind === "enemy"
       ? getPrototypeAttackDamage(state, attacker, target, 0)
       : 0;
-  const rawDamage = basePower * options.powerMultiplier + bonusDamage;
   const attackerAccuracy = getAccuracy(attackerStats);
-  const targetDefense = targetStats.defense;
+  const baseTargetDefense = targetStats.defense;
   const targetMagicDefense = targetStats.magicDefense;
   const targetEvasion = targetStats.evasion;
   const targetBlock = targetStats.block;
+
+  let nextState = state;
+  const attackBonusResult = consumeNextAttackDamageBonus(
+    nextState,
+    attacker.id,
+    options.damageType,
+  );
+  nextState = attackBonusResult.state;
+  const rawDamage =
+    (basePower * options.powerMultiplier + bonusDamage) *
+    (1 + attackBonusResult.damageMultiplierBonus);
+  const targetDefense =
+    options.damageType === "physical"
+      ? baseTargetDefense *
+        (1 + getStatusDefenseBonusPercent(nextState, target.id) / 100)
+      : baseTargetDefense;
+  const forcedEvasionResult = consumeForcedEvasionStatus(nextState, target.id);
+  nextState = forcedEvasionResult.state;
   const evasionChance = options.allowEvasion
     ? getEvasionChance(targetEvasion, attackerAccuracy)
     : 0;
-  const evasionRoll = options.allowEvasion ? rng() : undefined;
-  const evaded = evasionRoll !== undefined && evasionRoll < evasionChance;
-
-  let nextState = state;
+  const evasionRoll =
+    options.allowEvasion && !forcedEvasionResult.consumed ? rng() : undefined;
+  const evaded =
+    forcedEvasionResult.consumed ||
+    (evasionRoll !== undefined && evasionRoll < evasionChance);
   let activeShieldBlocked = false;
   let passiveBlocked = false;
   let critical = false;
@@ -165,6 +189,9 @@ export function resolveAndApplyCombatDamage(
     if (finalDamage > 0) {
       const damagedTarget = damageEntity(target, finalDamage);
       nextState = updateEntity(nextState, damagedTarget);
+      if (damagedTarget.state === "dead" || damagedTarget.health <= 0) {
+        nextState = clearStatusEffectsForEntity(nextState, damagedTarget.id);
+      }
     }
   }
 

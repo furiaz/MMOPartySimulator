@@ -31,6 +31,7 @@ import {
   getManhattanDistance,
 } from "./positionUtils";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
+import { isMovementBlockedByStatus } from "./statusEffects";
 import type { GameState } from "./state";
 import type {
   DebugNavigationBlocker,
@@ -103,6 +104,10 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   target: GameEntity,
   options: MovementOptions = {},
 ): GameState {
+  if (isMovementBlockedByStatus(state, entity.id)) {
+    return markMoveFailed(state, entity.id, undefined, "blocked");
+  }
+
   const pathState = prepareMovementPath(state, entity, target, options);
   const moveResolution = getNextMoveResolution(
     pathState,

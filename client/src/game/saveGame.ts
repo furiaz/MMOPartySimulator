@@ -367,6 +367,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     skillPartyMitigationBuffsBySourceId: {},
     skillBindsByEnemyId: {},
     skillShieldBlocksById: {},
+    statusEffectsById: {},
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
     skillVisualEvents: [],
