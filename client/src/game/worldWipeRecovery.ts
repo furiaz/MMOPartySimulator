@@ -267,6 +267,7 @@ function resetStateToRescueHub(
     skillShieldBlocksById: {},
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
+    companionAoeChannelsByCasterId: {},
   };
 
   const companions = getCompanions(nextState).sort(

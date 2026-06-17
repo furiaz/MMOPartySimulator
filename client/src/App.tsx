@@ -138,6 +138,7 @@ import {
   type ActiveCombatProjectile,
   type ClassPath,
   type Companion,
+  type CompanionAoeChannelState,
   type DirectCompanionCommand,
   type CompanionDirectCommandInput,
   type ConsumableBehaviorUpdate,
@@ -247,6 +248,7 @@ const poiSearchScopeCycle: PoiSearchScope[] = [
 const emptyDirectCompanionCommands: Record<string, DirectCompanionCommand> = {};
 const emptyDropVisualEvents: DropVisualEvent[] = [];
 const emptyCombatProjectiles: ActiveCombatProjectile[] = [];
+const emptyCompanionAoeChannels: Record<string, CompanionAoeChannelState> = {};
 const emptyEnemyAoeChannels: Record<string, EnemyAoeChannelState> = {};
 const emptyResurrectionProgress: Record<string, ResurrectionProgressState> = {};
 const emptySkillBinds: Record<string, SkillBindState> = {};
@@ -2657,6 +2659,8 @@ function App() {
   const directCompanionCommandsById =
     gameState.directCompanionCommandsById ?? emptyDirectCompanionCommands;
   const combatProjectiles = gameState.combatProjectiles ?? emptyCombatProjectiles;
+  const companionAoeChannelsByCasterId =
+    gameState.companionAoeChannelsByCasterId ?? emptyCompanionAoeChannels;
   const dropVisualEvents = gameState.dropVisualEvents ?? emptyDropVisualEvents;
   const enemyAoeChannelsByCasterId =
     gameState.enemyAoeChannelsByCasterId ?? emptyEnemyAoeChannels;
@@ -4484,6 +4488,7 @@ function App() {
               cellPixelSize={mapConstructionCellPixelSize}
               combatFeedbackEvents={gameState.combatFeedbackEvents}
               combatProjectiles={combatProjectiles}
+              companionAoeChannelsByCasterId={companionAoeChannelsByCasterId}
               directCompanionCommandsById={directCompanionCommandsById}
               dropVisualEvents={dropVisualEvents}
               enemyAoeChannelsByCasterId={enemyAoeChannelsByCasterId}

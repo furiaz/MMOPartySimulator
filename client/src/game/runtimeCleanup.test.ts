@@ -181,6 +181,24 @@ describe("runtime cleanup", () => {
           expiresAt: 3000,
         },
       },
+      companionAoeChannelsByCasterId: {
+        leader: {
+          id: "shockwave",
+          abilityId: "shield_shockwave",
+          casterId: "leader",
+          shape: {
+            type: "circle",
+            center: { x: 1, y: 1 },
+            radius: 2,
+          },
+          visualIntent: "partyOffensive",
+          damageType: "physical",
+          powerMultiplier: 0.5,
+          bindDurationMs: 1000,
+          startedAt: 1000,
+          channelEndsAt: 1200,
+        },
+      },
     });
 
     const nextState = clearMapTransitionRuntimeState(state);
@@ -190,6 +208,7 @@ describe("runtime cleanup", () => {
     );
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.combatProjectiles).toEqual([]);
+    expect(nextState.companionAoeChannelsByCasterId).toEqual({});
   });
 
   it("preserves the state reference when updating the same entity reference", () => {
@@ -274,6 +293,40 @@ describe("runtime cleanup", () => {
           expiresAt: 3000,
         },
       },
+      companionAoeChannelsByCasterId: {
+        [companion.id]: {
+          id: "active-shockwave",
+          abilityId: "shield_shockwave",
+          casterId: companion.id,
+          shape: {
+            type: "circle",
+            center: companion.position,
+            radius: 2,
+          },
+          visualIntent: "partyOffensive",
+          damageType: "physical",
+          powerMultiplier: 0.5,
+          bindDurationMs: 1000,
+          startedAt: 1000,
+          channelEndsAt: 1200,
+        },
+        [enemy.id]: {
+          id: "stale-shockwave",
+          abilityId: "shield_shockwave",
+          casterId: enemy.id,
+          shape: {
+            type: "circle",
+            center: enemy.position,
+            radius: 2,
+          },
+          visualIntent: "partyOffensive",
+          damageType: "physical",
+          powerMultiplier: 0.5,
+          bindDurationMs: 1000,
+          startedAt: 1000,
+          channelEndsAt: 1200,
+        },
+      },
       flaskRechargeCountedEnemyDefeats: {
         [enemy.id]: 1_000,
       },
@@ -302,6 +355,24 @@ describe("runtime cleanup", () => {
         source: "basic_attack",
         startedAt: 1000,
         expiresAt: 3000,
+      },
+    });
+    expect(nextState.companionAoeChannelsByCasterId).toEqual({
+      [companion.id]: {
+        id: "active-shockwave",
+        abilityId: "shield_shockwave",
+        casterId: companion.id,
+        shape: {
+          type: "circle",
+          center: companion.position,
+          radius: 2,
+        },
+        visualIntent: "partyOffensive",
+        damageType: "physical",
+        powerMultiplier: 0.5,
+        bindDurationMs: 1000,
+        startedAt: 1000,
+        channelEndsAt: 1200,
       },
     });
     expect(nextState.flaskRechargeCountedEnemyDefeats).toEqual({});

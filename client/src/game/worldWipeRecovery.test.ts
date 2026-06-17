@@ -299,6 +299,24 @@ describe("world wipe recovery", () => {
               expiresAt: 10000,
             },
           ],
+          companionAoeChannelsByCasterId: {
+            leader: {
+              id: "shockwave",
+              abilityId: "shield_shockwave",
+              casterId: "leader",
+              shape: {
+                type: "circle",
+                center: { x: 5, y: 5 },
+                radius: 2,
+              },
+              visualIntent: "partyOffensive",
+              damageType: "physical",
+              powerMultiplier: 0.5,
+              bindDurationMs: 1000,
+              startedAt: 0,
+              channelEndsAt: 200,
+            },
+          },
           skillCooldownsByCompanionId: {
             leader: {
               kick: {
@@ -397,6 +415,7 @@ describe("world wipe recovery", () => {
     expect(nextState.interruptedPoiTarget).toBeNull();
     expect(nextState.combatFeedbackEvents).toEqual([]);
     expect(nextState.skillVisualEvents).toEqual([]);
+    expect(nextState.companionAoeChannelsByCasterId).toEqual({});
     expect(nextState.skillCooldownsByCompanionId).toEqual({});
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.dropVisualEvents).toEqual([]);

@@ -432,6 +432,7 @@ function createFullRenderSignatureInput(
     cellPixelSize: 32,
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    companionAoeChannelsByCasterId: {},
     directCompanionCommandsById: {},
     dropVisualEvents: [],
     enemyAoeChannelsByCasterId: {},
@@ -587,6 +588,29 @@ describe("getFullRenderSignature", () => {
             powerMultiplier: 1,
           },
         ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        companionAoeChannelsByCasterId: {
+          [companion.id]: {
+            id: "shockwave",
+            abilityId: "shield_shockwave",
+            casterId: companion.id,
+            shape: {
+              type: "circle",
+              center: companion.position,
+              radius: 2,
+            },
+            visualIntent: "partyOffensive",
+            damageType: "physical",
+            powerMultiplier: 0.5,
+            bindDurationMs: 1000,
+            startedAt: 1000,
+            channelEndsAt: 1200,
+          },
+        },
       }),
     ).not.toBe(baseSignature);
     expect(

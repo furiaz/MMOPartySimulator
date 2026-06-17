@@ -680,6 +680,7 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
     defenderWaitMsByLeaderId: {},
     defenderBlockedMsByEntityId: {},
     skillVisualEvents: [],
+    companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
     dropVisualEvents: [],

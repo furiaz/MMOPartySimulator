@@ -15,6 +15,7 @@ import type {
   CombatFeedbackEvent,
   DirectCompanionCommand,
   DropVisualEvent,
+  CompanionAoeChannelState,
   EnemyAoeChannelState,
   GameEntity,
   GameMap,
@@ -309,6 +310,7 @@ export type FullRenderSignatureInput = {
   combatProjectiles: ActiveCombatProjectile[];
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -909,6 +911,7 @@ export function getFullRenderSignature({
   combatProjectiles,
   directCompanionCommandsById,
   dropVisualEvents,
+  companionAoeChannelsByCasterId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -972,6 +975,7 @@ export function getFullRenderSignature({
     getEventSignature(combatFeedbackEvents, getCombatFeedbackSignature),
     getEventSignature(combatProjectiles, getCombatProjectileSignature),
     getEventSignature(dropVisualEvents, getDropVisualSignature),
+    getRecordSignature(companionAoeChannelsByCasterId, getCompanionAoeChannelSignature),
     getRecordSignature(enemyAoeChannelsByCasterId, getEnemyAoeChannelSignature),
     getEventSignature(skillVisualEvents, getSkillVisualSignature),
     suppressMovePoiRing ? "move-ring-suppressed" : "move-ring-visible",
@@ -1228,6 +1232,21 @@ function getEnemyAoeChannelSignature(
     channel.startedAt,
     channel.channelEndsAt,
     channel.windupEndsAt,
+  ].join(":");
+}
+
+function getCompanionAoeChannelSignature(
+  _casterId: string,
+  channel: CompanionAoeChannelState,
+): string {
+  return [
+    channel.id,
+    channel.abilityId,
+    channel.visualIntent,
+    getPositionSignature(channel.shape.center),
+    channel.shape.radius,
+    channel.startedAt,
+    channel.channelEndsAt,
   ].join(":");
 }
 

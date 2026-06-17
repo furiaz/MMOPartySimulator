@@ -13,6 +13,7 @@ import {
   isCompanionAssignedToResurrectionRecovery,
   isPositionInActiveResurrectionArea,
 } from "./resurrectionSystem";
+import { startShieldShockwaveChannel } from "./companionAoeChannelSystem";
 import { getLeaderMovementDirection } from "./roleSystem";
 import {
   getHealingAmount,
@@ -112,7 +113,7 @@ export function resolveSkillEffect(
   if (skill.effect.type === "shockwave" && isLivingCompanion(target)) {
     return resolveAppliedSkillEffect(
       state,
-      applyShockwave(state, caster, skill, now),
+      startShieldShockwaveChannel(state, caster, skill, now),
       caster.id,
     );
   }
@@ -566,81 +567,6 @@ function applyMultiTaunt(
     skillId: skill.id,
     sourceId: caster.id,
     targetId: targets[0]?.id,
-    now,
-    durationMs: VISUAL_DURATION_MS,
-  });
-
-  return nextState;
-}
-
-function applyShockwave(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-  now: number,
-): GameState {
-  if (skill.effect.type !== "shockwave") {
-    return state;
-  }
-
-  const targets = getLivingEnemiesInRange(state, caster, skill.effect.radius);
-
-  if (targets.length === 0) {
-    return state;
-  }
-
-  let nextState = addCombatFeedback(state, {
-    type: "attack",
-    entityId: caster.id,
-    text: skill.displayName,
-    now,
-  });
-
-  for (const target of targets) {
-    const currentTarget = nextState.entities[target.id];
-
-    if (!isLivingEnemy(currentTarget)) {
-      continue;
-    }
-
-    nextState = damageEnemy(
-      nextState,
-      caster,
-      currentTarget,
-      skill.displayName,
-      now,
-      skill.effect.damageType,
-      skill.effect.powerMultiplier,
-      skill.effect.damageType !== "magic",
-    );
-
-    const damagedTarget = nextState.entities[target.id];
-
-    if (isLivingEnemy(damagedTarget) && !isTargetDummyEnemy(damagedTarget)) {
-      nextState = updateEntity(nextState, {
-        ...damagedTarget,
-        state: "attack",
-        currentTargetId: caster.id,
-      });
-      nextState = {
-        ...nextState,
-        skillBindsByEnemyId: {
-          ...(nextState.skillBindsByEnemyId ?? {}),
-          [damagedTarget.id]: {
-            sourceId: caster.id,
-            targetId: damagedTarget.id,
-            expiresAt: now + skill.effect.bindDurationMs,
-          },
-        },
-      };
-    }
-  }
-
-  nextState = addSkillVisualEvent(nextState, {
-    type: "slash",
-    skillId: skill.id,
-    sourceId: caster.id,
-    position: caster.position,
     now,
     durationMs: VISUAL_DURATION_MS,
   });

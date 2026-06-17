@@ -1022,34 +1022,55 @@ export type SkillVisualEvent = {
   expiresAt: number;
 };
 
+export type AoeVisualIntent =
+  | "enemyOffensive"
+  | "partyOffensive"
+  | "partyHealing";
+
+export type AoeCircleShape = {
+  type: "circle";
+  center: Position;
+  radius: number;
+};
+
 export type EnemyAoeAbilityId = "aoe_dummy_stomp";
 
 export type EnemyAoeChannelPhase = "channeling" | "windup";
 
 export type EnemyAoeInterruptReason = "caster_dead" | "caster_bound" | "line_of_sight";
 
-export type EnemyAoeCircleShape = {
-  type: "circle";
-  center: Position;
-  radius: number;
-};
-
 export type EnemyAoeChannelState = {
   id: string;
   abilityId: EnemyAoeAbilityId;
   casterId: string;
-  shape: EnemyAoeCircleShape;
+  shape: AoeCircleShape;
   phase: EnemyAoeChannelPhase;
   startedAt: number;
   channelEndsAt: number;
   windupEndsAt: number;
   cooldownMs: number;
+  visualIntent?: AoeVisualIntent;
 };
 
 export type EnemyAoeCooldownState = {
   abilityId: EnemyAoeAbilityId;
   casterId: string;
   expiresAt: number;
+};
+
+export type CompanionAoeAbilityId = "shield_shockwave";
+
+export type CompanionAoeChannelState = {
+  id: string;
+  abilityId: CompanionAoeAbilityId;
+  casterId: string;
+  shape: AoeCircleShape;
+  visualIntent: AoeVisualIntent;
+  damageType: CombatDamageType;
+  powerMultiplier: number;
+  bindDurationMs: number;
+  startedAt: number;
+  channelEndsAt: number;
 };
 
 export type DropVisualEvent = {

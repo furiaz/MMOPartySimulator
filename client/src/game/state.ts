@@ -5,6 +5,7 @@ import type {
   CombatFeedbackEvent,
   CombatFeedbackType,
   ClassId,
+  CompanionAoeChannelState,
   CompanionGlobalCooldownState,
   ConsumableUseState,
   DebugNavigationReason,
@@ -201,6 +202,7 @@ export type GameState = {
   skillCooldownsByCompanionId?: Record<string, SkillCooldownsBySkillId>;
   globalCooldownsByCompanionId?: Record<string, CompanionGlobalCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
+  companionAoeChannelsByCasterId?: Record<string, CompanionAoeChannelState>;
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   enemyAoeCooldownsByCasterId?: Record<string, EnemyAoeCooldownState>;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;

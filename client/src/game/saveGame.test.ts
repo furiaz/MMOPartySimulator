@@ -56,6 +56,24 @@ describe("save game serialization", () => {
             waypoints: [{ x: 1, y: 1 }],
           },
         },
+        companionAoeChannelsByCasterId: {
+          "companion-1": {
+            id: "shockwave",
+            abilityId: "shield_shockwave",
+            casterId: "companion-1",
+            shape: {
+              type: "circle",
+              center: { x: 14, y: 29 },
+              radius: 2,
+            },
+            visualIntent: "partyOffensive",
+            damageType: "physical",
+            powerMultiplier: 0.5,
+            bindDurationMs: 1000,
+            startedAt: NOW_MS,
+            channelEndsAt: NOW_MS + 200,
+          },
+        },
         debugTelemetry: {
           ...createDebugTelemetryState(),
           isRecording: true,
@@ -77,6 +95,7 @@ describe("save game serialization", () => {
     expect(restored.state.activeTeleport).toBeNull();
     expect(restored.state.combatFeedbackEvents).toEqual([]);
     expect(restored.state.movementPathsByEntityId).toEqual({});
+    expect(restored.state.companionAoeChannelsByCasterId).toEqual({});
     expect(restored.state.debugTelemetry).toBeUndefined();
   });
 

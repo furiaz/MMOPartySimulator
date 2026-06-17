@@ -24,6 +24,7 @@ import type {
   ActiveCombatProjectile,
   ActiveTeleport,
   CombatFeedbackEvent,
+  CompanionAoeChannelState,
   CompanionDirectCommandInput,
   DirectCompanionCommand,
   DropVisualEvent,
@@ -109,6 +110,10 @@ const passiveEnemyNameplateColor = 0x1f2937;
 const superiorEnemyAuraColor = 0xef4444;
 const enemyAoeFillColor = 0xdc2626;
 const enemyAoeStrokeColor = 0x7f1d1d;
+const partyOffensiveAoeFillColor = 0x2563eb;
+const partyOffensiveAoeStrokeColor = 0x1d4ed8;
+const partyHealingAoeFillColor = 0x16a34a;
+const partyHealingAoeStrokeColor = 0x15803d;
 const prototypeVfxSpritePath = "assets/Generated/prototype-vfx/sprites";
 const combatProjectileSpritePath = "assets/Generated/combat-projectiles";
 const targetDummyDistanceMarkers = [5, 10, 20];
@@ -194,6 +199,7 @@ type PixiWorldRendererProps = {
   cellPixelSize?: number;
   combatFeedbackEvents?: CombatFeedbackEvent[];
   combatProjectiles?: ActiveCombatProjectile[];
+  companionAoeChannelsByCasterId?: Record<string, CompanionAoeChannelState>;
   currentTime?: number;
   directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
@@ -379,6 +385,7 @@ type DrawWorldOptions = {
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles: ActiveCombatProjectile[];
   companionDragPreview: CompanionDragPreview | null;
+  companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
@@ -3382,20 +3389,144 @@ function drawEnemyAoeChannels(
     const center = toFullPosition(channel.shape.center, transform);
     const channelProgress = getEnemyAoeChannelProgress(channel, currentTime);
     const dangerOpacity = channel.phase === "windup" ? 1 : channelProgress;
-    const fillAlpha = 0.16 + dangerOpacity * 0.84;
+
+    drawAoeCircle(graphics, {
+      center,
+      radiusPx: channel.shape.radius * transform.cellPixelSize,
+      intent: "enemyOffensive",
+      opacity: dangerOpacity,
+    });
+  }
+}
+
+function drawCompanionAoeChannels(
+  graphics: Graphics,
+  channelsByCasterId: Record<string, CompanionAoeChannelState>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const channel of Object.values(channelsByCasterId)) {
+    if (
+      channel.shape.type !== "circle" ||
+      !isPositionInTileBounds(channel.shape.center, visibleTileBounds) ||
+      channel.channelEndsAt <= currentTime
+    ) {
+      continue;
+    }
+
+    const center = toFullPosition(channel.shape.center, transform);
+    const duration = channel.channelEndsAt - channel.startedAt;
+    const progress =
+      duration <= 0
+        ? 1
+        : Math.max(0, Math.min(1, (currentTime - channel.startedAt) / duration));
+
+    drawAoeCircle(graphics, {
+      center,
+      radiusPx: channel.shape.radius * transform.cellPixelSize,
+      intent: channel.visualIntent,
+      opacity: 0.35 + progress * 0.65,
+    });
+  }
+}
+
+function drawAoeCircle(
+  graphics: Graphics,
+  options: {
+    center: { x: number; y: number };
+    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    opacity: number;
+    radiusPx: number;
+  },
+) {
+  if (options.intent === "enemyOffensive") {
+    drawSpikyAoeCircle(
+      graphics,
+      options.center,
+      options.radiusPx,
+      enemyAoeFillColor,
+      enemyAoeStrokeColor,
+      options.opacity,
+    );
+    return;
+  }
+
+  if (options.intent === "partyHealing") {
+    drawDottedAoeCircle(
+      graphics,
+      options.center,
+      options.radiusPx,
+      partyHealingAoeFillColor,
+      partyHealingAoeStrokeColor,
+      options.opacity,
+    );
+    return;
+  }
+
+  const alpha = Math.min(1, Math.max(0, options.opacity));
+
+  graphics
+    .circle(options.center.x, options.center.y, options.radiusPx)
+    .fill({ color: partyOffensiveAoeFillColor, alpha: 0.1 + alpha * 0.2 })
+    .stroke({
+      color: partyOffensiveAoeStrokeColor,
+      alpha: 0.5 + alpha * 0.42,
+      width: 3,
+    });
+}
+
+function drawSpikyAoeCircle(
+  graphics: Graphics,
+  center: { x: number; y: number },
+  radiusPx: number,
+  fillColor: number,
+  strokeColor: number,
+  opacity: number,
+) {
+  const alpha = Math.min(1, Math.max(0, opacity));
+  const spikeCount = 28;
+  const points: number[] = [];
+
+  for (let index = 0; index < spikeCount * 2; index += 1) {
+    const angle = (index / (spikeCount * 2)) * Math.PI * 2;
+    const radius = index % 2 === 0 ? radiusPx : radiusPx * 0.88;
+    points.push(center.x + Math.cos(angle) * radius);
+    points.push(center.y + Math.sin(angle) * radius);
+  }
+
+  graphics
+    .poly(points)
+    .fill({ color: fillColor, alpha: 0.13 + alpha * 0.5 })
+    .stroke({ color: strokeColor, alpha: 0.48 + alpha * 0.52, width: 3 });
+}
+
+function drawDottedAoeCircle(
+  graphics: Graphics,
+  center: { x: number; y: number },
+  radiusPx: number,
+  fillColor: number,
+  strokeColor: number,
+  opacity: number,
+) {
+  const alpha = Math.min(1, Math.max(0, opacity));
+  const dotCount = 24;
+  const dotRadius = Math.max(2, radiusPx * 0.035);
+
+  graphics
+    .circle(center.x, center.y, radiusPx)
+    .fill({ color: fillColor, alpha: 0.08 + alpha * 0.14 });
+
+  for (let index = 0; index < dotCount; index += 1) {
+    const angle = (index / dotCount) * Math.PI * 2;
 
     graphics
       .circle(
-        center.x,
-        center.y,
-        channel.shape.radius * transform.cellPixelSize,
+        center.x + Math.cos(angle) * radiusPx,
+        center.y + Math.sin(angle) * radiusPx,
+        dotRadius,
       )
-      .fill({ color: enemyAoeFillColor, alpha: fillAlpha })
-      .stroke({
-        color: enemyAoeStrokeColor,
-        alpha: 0.48 + dangerOpacity * 0.52,
-        width: 3,
-      });
+      .fill({ color: strokeColor, alpha: 0.54 + alpha * 0.36 });
   }
 }
 
@@ -4872,6 +5003,7 @@ function drawFullMap({
   combatFeedbackEvents,
   combatProjectiles,
   companionDragPreview,
+  companionAoeChannelsByCasterId,
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
@@ -4905,6 +5037,7 @@ function drawFullMap({
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles: ActiveCombatProjectile[];
   companionDragPreview: CompanionDragPreview | null;
+  companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
@@ -5019,6 +5152,13 @@ function drawFullMap({
   drawEnemyAoeChannels(
     effectsGraphics,
     enemyAoeChannelsByCasterId,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
+  drawCompanionAoeChannels(
+    effectsGraphics,
+    companionAoeChannelsByCasterId,
     currentTime,
     transform,
     visibleTileBounds,
@@ -5239,6 +5379,7 @@ function drawWorld({
   combatFeedbackEvents,
   combatProjectiles,
   companionDragPreview,
+  companionAoeChannelsByCasterId,
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
@@ -5279,6 +5420,7 @@ function drawWorld({
       activeTeleport,
       combatFeedbackEvents,
       combatProjectiles,
+      companionAoeChannelsByCasterId,
       currentTime,
       dropVisualEvents,
       enemyAoeChannelsByCasterId,
@@ -5297,6 +5439,7 @@ function drawWorld({
       cellPixelSize,
       combatFeedbackEvents,
       combatProjectiles,
+      companionAoeChannelsByCasterId,
       directCompanionCommandsById,
       dropVisualEvents,
       enemyAoeChannelsByCasterId,
@@ -5343,6 +5486,7 @@ function drawWorld({
       combatFeedbackEvents,
       combatProjectiles,
       companionDragPreview,
+      companionAoeChannelsByCasterId,
       currentTime,
       directCompanionCommandsById,
       dropVisualEvents,
@@ -5428,6 +5572,7 @@ function hasActiveTimedRendererWork({
   activeTeleport,
   combatFeedbackEvents,
   combatProjectiles,
+  companionAoeChannelsByCasterId,
   currentTime,
   dropVisualEvents,
   enemyAoeChannelsByCasterId,
@@ -5443,6 +5588,7 @@ function hasActiveTimedRendererWork({
   activeTeleport: ActiveTeleport | null;
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles: ActiveCombatProjectile[];
+  companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
   currentTime: number;
   dropVisualEvents: DropVisualEvent[];
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
@@ -5478,6 +5624,9 @@ function hasActiveTimedRendererWork({
     Object.values(skillShieldBlocksById).some(
       (shield) => shield.expiresAt > currentTime,
     ) ||
+    Object.values(companionAoeChannelsByCasterId).some(
+      (channel) => channel.channelEndsAt > currentTime,
+    ) ||
     Object.values(enemyAoeChannelsByCasterId).some(
       (channel) =>
         channel.channelEndsAt > currentTime ||
@@ -5504,6 +5653,7 @@ export function PixiWorldRenderer({
   cellPixelSize = defaultCellPixelSize,
   combatFeedbackEvents = [],
   combatProjectiles = [],
+  companionAoeChannelsByCasterId = {},
   currentTime,
   directCompanionCommandsById = {},
   dropVisualEvents = [],
@@ -5552,6 +5702,9 @@ export function PixiWorldRenderer({
   const latestCellPixelSizeRef = useRef(cellPixelSize);
   const latestCombatFeedbackEventsRef = useRef(combatFeedbackEvents);
   const latestCombatProjectilesRef = useRef(combatProjectiles);
+  const latestCompanionAoeChannelsByCasterIdRef = useRef(
+    companionAoeChannelsByCasterId,
+  );
   const latestCurrentTimeRef = useRef(currentTime ?? 0);
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
@@ -5608,6 +5761,8 @@ export function PixiWorldRenderer({
     latestCellPixelSizeRef.current = cellPixelSize;
     latestCombatFeedbackEventsRef.current = combatFeedbackEvents;
     latestCombatProjectilesRef.current = combatProjectiles;
+    latestCompanionAoeChannelsByCasterIdRef.current =
+      companionAoeChannelsByCasterId;
     if (currentTime !== undefined) {
       latestCurrentTimeRef.current = currentTime;
     }
@@ -5642,6 +5797,7 @@ export function PixiWorldRenderer({
     cellPixelSize,
     combatFeedbackEvents,
     combatProjectiles,
+    companionAoeChannelsByCasterId,
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
@@ -5713,6 +5869,8 @@ export function PixiWorldRenderer({
         activeTeleport: latestActiveTeleportRef.current,
         combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
         combatProjectiles: latestCombatProjectilesRef.current,
+        companionAoeChannelsByCasterId:
+          latestCompanionAoeChannelsByCasterIdRef.current,
         currentTime: now,
         dropVisualEvents: latestDropVisualEventsRef.current,
         enemyAoeChannelsByCasterId:
@@ -5742,6 +5900,8 @@ export function PixiWorldRenderer({
         combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
         combatProjectiles: latestCombatProjectilesRef.current,
         companionDragPreview: companionDragPreviewRef.current,
+        companionAoeChannelsByCasterId:
+          latestCompanionAoeChannelsByCasterIdRef.current,
         currentTime: latestCurrentTimeRef.current,
         directCompanionCommandsById:
           latestDirectCompanionCommandsByIdRef.current,
@@ -5898,6 +6058,7 @@ export function PixiWorldRenderer({
     cellPixelSize,
     combatFeedbackEvents,
     combatProjectiles,
+    companionAoeChannelsByCasterId,
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,

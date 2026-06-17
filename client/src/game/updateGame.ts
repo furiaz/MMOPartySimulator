@@ -1,5 +1,6 @@
 import { updateAttackSystem } from "./attackSystem";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
+import { updateCompanionAoeChannelSystem } from "./companionAoeChannelSystem";
 import { updateCombatProjectileSystem } from "./combatProjectileSystem";
 import {
   clearExpiredHubDepartureFoodWarning,
@@ -184,6 +185,7 @@ export function updateGame(
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
+  nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateCombatSkillSystem(nextState, timing.nowMs);
   nextState = updateAttackSystem(

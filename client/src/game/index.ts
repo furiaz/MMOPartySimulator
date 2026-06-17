@@ -32,11 +32,14 @@ export type {
   DirectCompanionCommand,
   DirectCompanionCommandResultCode,
   DirectCompanionCommandType,
+  AoeCircleShape,
+  AoeVisualIntent,
+  CompanionAoeAbilityId,
+  CompanionAoeChannelState,
   Enemy,
   EnemyAoeAbilityId,
   EnemyAoeChannelPhase,
   EnemyAoeChannelState,
-  EnemyAoeCircleShape,
   EnemyAoeCooldownState,
   EnemyAoeInterruptReason,
   EnemyAggressionMode,
@@ -585,6 +588,10 @@ export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
 export { updateSkillSystem } from "./skillSystem";
+export {
+  SHIELD_SHOCKWAVE_CHANNEL_MS,
+  updateCompanionAoeChannelSystem,
+} from "./companionAoeChannelSystem";
 export {
   COMPANION_GLOBAL_COOLDOWN_MS,
   getCompanionGlobalCooldownProgress,

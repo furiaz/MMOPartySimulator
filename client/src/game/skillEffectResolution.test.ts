@@ -4,12 +4,16 @@ import { MAP_ONE_ID } from "./debugMap";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
 import {
+  SHIELD_SHOCKWAVE_CHANNEL_MS,
+  updateCompanionAoeChannelSystem,
+} from "./companionAoeChannelSystem";
+import {
   resolveSkillEffect,
   updateSkillShieldBlockPositions,
   type SkillUse,
 } from "./skillEffectResolution";
 import { SKILL_DEFINITIONS } from "./skills";
-import { addEntity, type GameState } from "./state";
+import { addEntity, updateEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type {
   ClassId,
@@ -481,31 +485,109 @@ describe("skill effect resolution", () => {
     expect(allyHit.finalDamage).toBeLessThan(allyHit.rawDamage);
   });
 
-  it("applies Shield Shockwave damage, taunt, and bind in radius", () => {
+  it("channels Shield Shockwave before applying damage, taunt, and bind in radius", () => {
     const caster = createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis");
     const near = createSkillEnemy("near", { x: 1, y: 0 }, { maxHealth: 100 });
     const edge = createSkillEnemy("edge", { x: 0, y: 2 }, { maxHealth: 100 });
     const far = createSkillEnemy("far", { x: 3, y: 0 }, { maxHealth: 100 });
-    const result = resolveSkillEffect(
+    const started = resolveSkillEffect(
       createSkillState([caster, near, edge, far]),
       caster,
       createSkillUse("shield_shockwave", caster),
       1000,
     );
 
-    expect(result.shouldConsumeCooldown).toBe(true);
-    expect((result.state.entities.near as Enemy).health).toBeLessThan(near.health);
-    expect((result.state.entities.edge as Enemy).health).toBeLessThan(edge.health);
-    expect((result.state.entities.far as Enemy).health).toBe(far.health);
-    expect(result.state.entities.near).toMatchObject({
+    expect(started.shouldConsumeCooldown).toBe(true);
+    expect(started.state.companionAoeChannelsByCasterId?.aegis).toMatchObject({
+      abilityId: "shield_shockwave",
+      casterId: caster.id,
+      visualIntent: "partyOffensive",
+      shape: {
+        type: "circle",
+        center: caster.position,
+        radius: 2,
+      },
+      channelEndsAt: 1000 + SHIELD_SHOCKWAVE_CHANNEL_MS,
+    });
+    expect((started.state.entities.near as Enemy).health).toBe(near.health);
+
+    const beforeImpact = updateCompanionAoeChannelSystem(
+      started.state,
+      1000 + SHIELD_SHOCKWAVE_CHANNEL_MS - 1,
+    );
+
+    expect((beforeImpact.entities.near as Enemy).health).toBe(near.health);
+
+    const afterImpact = updateCompanionAoeChannelSystem(
+      beforeImpact,
+      1000 + SHIELD_SHOCKWAVE_CHANNEL_MS,
+    );
+
+    expect((afterImpact.entities.near as Enemy).health).toBeLessThan(near.health);
+    expect((afterImpact.entities.edge as Enemy).health).toBeLessThan(edge.health);
+    expect((afterImpact.entities.far as Enemy).health).toBe(far.health);
+    expect(afterImpact.entities.near).toMatchObject({
       state: "attack",
       currentTargetId: caster.id,
     });
-    expect(result.state.skillBindsByEnemyId?.near).toMatchObject({
+    expect(afterImpact.skillBindsByEnemyId?.near).toMatchObject({
       sourceId: caster.id,
       targetId: near.id,
-      expiresAt: 2000,
+      expiresAt: 1000 + SHIELD_SHOCKWAVE_CHANNEL_MS + 1000,
     });
+    expect(afterImpact.companionAoeChannelsByCasterId?.aegis).toBeUndefined();
+  });
+
+  it("uses Shield Shockwave's locked channel center even if the caster moves", () => {
+    const caster = createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis");
+    const originalAreaEnemy = createSkillEnemy("original-area", { x: 1, y: 0 }, { maxHealth: 100 });
+    const movedAreaEnemy = createSkillEnemy("moved-area", { x: 10, y: 0 }, { maxHealth: 100 });
+    const started = resolveSkillEffect(
+      createSkillState([caster, originalAreaEnemy, movedAreaEnemy]),
+      caster,
+      createSkillUse("shield_shockwave", caster),
+      1000,
+    ).state;
+    const movedState = updateEntity(started, {
+      ...(started.entities.aegis as Companion),
+      position: { x: 10, y: 0 },
+    });
+
+    const afterImpact = updateCompanionAoeChannelSystem(
+      movedState,
+      1000 + SHIELD_SHOCKWAVE_CHANNEL_MS,
+    );
+
+    expect((afterImpact.entities["original-area"] as Enemy).health).toBeLessThan(
+      originalAreaEnemy.health,
+    );
+    expect((afterImpact.entities["moved-area"] as Enemy).health).toBe(
+      movedAreaEnemy.health,
+    );
+  });
+
+  it("cancels Shield Shockwave without impact when the caster is no longer living", () => {
+    const caster = createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 100 });
+    const started = resolveSkillEffect(
+      createSkillState([caster, enemy]),
+      caster,
+      createSkillUse("shield_shockwave", caster),
+      1000,
+    ).state;
+    const deadCasterState = updateEntity(started, {
+      ...(started.entities.aegis as Companion),
+      health: 0,
+      state: "dead",
+    });
+
+    const afterImpact = updateCompanionAoeChannelSystem(
+      deadCasterState,
+      1000 + SHIELD_SHOCKWAVE_CHANNEL_MS,
+    );
+
+    expect((afterImpact.entities.enemy as Enemy).health).toBe(enemy.health);
+    expect(afterImpact.companionAoeChannelsByCasterId?.aegis).toBeUndefined();
   });
 
   it("applies taunt, mark, bind, buff, gather, and shield effects", () => {

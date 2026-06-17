@@ -101,6 +101,7 @@ export function createInitialGameState(): GameState {
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
     skillVisualEvents: [],
+    companionAoeChannelsByCasterId: {},
     dropVisualEvents: [],
   });
 

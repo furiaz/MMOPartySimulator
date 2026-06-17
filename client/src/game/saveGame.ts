@@ -370,6 +370,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
     skillVisualEvents: [],
+    companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
     consumableUsesByCompanionId: {},
