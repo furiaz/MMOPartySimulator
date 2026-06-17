@@ -131,6 +131,42 @@ describe("enemy AoE channel system", () => {
     );
   });
 
+  it("skips companions with active fake death when enemy AoE resolves", () => {
+    const hunter = createCompanion("hunter", { x: 55, y: 8 }, "leader", "fighter");
+    const ally = createCompanion("ally", { x: 55, y: 9 }, "leader", "fighter");
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
+    let state = setLeaderIntent(
+      createState([hunter, ally, dummy], {
+        statusEffectsById: {
+          "hunter-fakeDeath-fake_death": {
+            id: "hunter-fakeDeath-fake_death",
+            type: "fakeDeath",
+            targetId: hunter.id,
+            sourceId: hunter.id,
+            sourceKey: "fake_death",
+            appliedAt: 1000,
+            expiresAt: 4000,
+          },
+        },
+      }),
+      {
+        type: "attack",
+        targetId: dummy.id,
+        targetPosition: dummy.position,
+        source: "player",
+      },
+    );
+
+    state = updateEnemyAoeChannelSystem(state, 1000);
+    const afterImpact = updateEnemyAoeChannelSystem(
+      state,
+      1000 + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS,
+    );
+
+    expect(getHealth(afterImpact, hunter.id)).toBe(hunter.health);
+    expect(getHealth(afterImpact, ally.id)).toBe(ally.health - 1);
+  });
+
   it("cancels and starts cooldown when the caster is bound", () => {
     const leader = createCompanion("leader", { x: 54, y: 8 }, "leader", "fighter");
     const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);

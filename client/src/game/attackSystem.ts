@@ -59,6 +59,7 @@ import { resolveBasicAttackImpact } from "./combatBasicAttackResolution";
 import { launchBasicCombatProjectile } from "./combatProjectileSystem";
 import {
   isAttackBlockedByStatus,
+  isFakeDeathActive,
   isMovementBlockedByStatus,
 } from "./statusEffects";
 import {
@@ -454,7 +455,7 @@ function getValidTarget(
     ? getEntityById(state, attacker.currentTargetId)
     : undefined;
 
-  if (isLiveCombatTarget(currentTarget)) {
+  if (isLiveCombatTarget(currentTarget) && !isFakeDeathTarget(state, attacker, currentTarget)) {
     return currentTarget;
   }
 
@@ -513,6 +514,18 @@ function isLiveCombatTarget(
   entity: GameEntity | undefined,
 ): entity is CombatEntity {
   return isCombatEntity(entity) && entity.state !== "dead" && entity.health > 0;
+}
+
+function isFakeDeathTarget(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+): boolean {
+  return (
+    attacker.kind === "enemy" &&
+    target.kind === "companion" &&
+    isFakeDeathActive(state, target.id)
+  );
 }
 
 function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {

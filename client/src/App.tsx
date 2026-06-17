@@ -362,7 +362,7 @@ const classPathOptions: {
 const firstClassDescriptions: Record<FirstClassId, string> = {
   blade: "Weapon-focused attacker built around direct damage.",
   aegis: "Defensive frontline class built around guarding and protection.",
-  hunter: "Ranged attacker with mark-based target pressure.",
+  hunter: "Ranged attacker with control, poison, and mobile arrow pressure.",
   beast: "Aggressive close-range class with feral self-buff identity.",
   elementalist: "Direct magic damage through elemental attacks.",
   runecaster: "Control-focused magic using binding and defensive runes.",

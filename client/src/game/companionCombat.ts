@@ -1,7 +1,7 @@
 import type { Companion } from "./types";
 
 export const DEFAULT_COMPANION_ATTACK_RANGE = 1;
-export const HUNTER_BASIC_ATTACK_RANGE = 4;
+export const HUNTER_BASIC_ATTACK_RANGE = 5;
 
 const CLASS_BASIC_ATTACK_RANGE: Partial<Record<Companion["classId"], number>> = {
   hunter: HUNTER_BASIC_ATTACK_RANGE,

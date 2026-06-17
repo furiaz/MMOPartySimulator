@@ -13,7 +13,13 @@ export const POISON_MAX_DURATION_MULTIPLIER = 3;
 
 export type ApplyStatusEffectInput =
   | {
-      type: "immobilized" | "incapacitated" | "disarmed" | "cursed" | "forcedEvasion";
+      type:
+        | "immobilized"
+        | "incapacitated"
+        | "disarmed"
+        | "cursed"
+        | "fakeDeath"
+        | "forcedEvasion";
       targetId: string;
       durationMs: number;
       sourceId?: string;
@@ -173,6 +179,10 @@ export function isGatherBlockedByStatus(
   entityId: string,
 ): boolean {
   return hasActiveStatus(state, entityId, ["incapacitated"]);
+}
+
+export function isFakeDeathActive(state: GameState, entityId: string): boolean {
+  return hasActiveStatus(state, entityId, ["fakeDeath"]);
 }
 
 export function getStatusDefenseBonusPercent(

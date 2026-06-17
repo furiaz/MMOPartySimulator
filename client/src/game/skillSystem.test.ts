@@ -1553,6 +1553,72 @@ describe("beginner skill system", () => {
     expect(nextState.skillCooldownsByCompanionId?.aegis?.hold_fast).toBeUndefined();
   });
 
+  it("uses Fake Death during party danger at the configured HP threshold", () => {
+    const baseHunter = createCompanion(
+      "hunter",
+      { x: 0, y: 0 },
+      "leader",
+      "fighter",
+      1,
+      "hunter",
+    );
+    const hunter = {
+      ...baseHunter,
+      health: 30,
+      maxHealth: 100,
+      skillBehavior: {
+        ...baseHunter.skillBehavior,
+        fakeDeathUseHpThresholdPercent: 80,
+      },
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: hunter.id,
+    };
+    const nextState = updateSkillSystem(createSkillState([hunter, enemy]), 1000);
+
+    expect(nextState.statusEffectsById?.["hunter-fakeDeath-fake_death"]).toMatchObject({
+      expiresAt: 4000,
+    });
+    expect(nextState.statusEffectsById?.["hunter-incapacitated-fake_death"]).toMatchObject({
+      expiresAt: 4000,
+    });
+    expect(nextState.skillCooldownsByCompanionId?.hunter?.fake_death).toMatchObject({
+      skillId: "fake_death",
+      expiresAt: 31000,
+    });
+  });
+
+  it("does not use Fake Death above the capped threshold", () => {
+    const baseHunter = createCompanion(
+      "hunter",
+      { x: 0, y: 0 },
+      "leader",
+      "fighter",
+      1,
+      "hunter",
+    );
+    const hunter = {
+      ...baseHunter,
+      health: 31,
+      maxHealth: 100,
+      skillBehavior: {
+        ...baseHunter.skillBehavior,
+        fakeDeathUseHpThresholdPercent: 80,
+      },
+    };
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: hunter.id,
+    };
+    const nextState = updateSkillSystem(createSkillState([hunter, enemy]), 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.hunter?.fake_death).toBeUndefined();
+    expect(nextState.statusEffectsById?.["hunter-fakeDeath-fake_death"]).toBeUndefined();
+  });
+
   it("uses Woodcutter Rhythm only for wood resources", () => {
     const woodcutter = {
       ...createCompanion("blade", { x: 0, y: 0 }, "leader", "gatherer", 1, "blade"),

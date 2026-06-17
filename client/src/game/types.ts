@@ -399,7 +399,14 @@ export type SkillBookItemId =
   | "stonebreaker_rhythm_skill_book"
   | "shield_rush_skill_book"
   | "shield_shockwave_skill_book"
-  | "mark_target_skill_book"
+  | "pinning_shot_skill_book"
+  | "fake_death_skill_book"
+  | "evasive_instinct_skill_book"
+  | "hunters_focus_skill_book"
+  | "poison_coating_skill_book"
+  | "herbalist_rhythm_skill_book"
+  | "skirmish_shot_skill_book"
+  | "arrow_burst_skill_book"
   | "feral_surge_skill_book"
   | "elemental_bolt_skill_book"
   | "binding_rune_skill_book"
@@ -490,6 +497,7 @@ export type CompanionSkillBehavior = {
   beginnerFirstAidAllyHealHpThresholdPercent: number;
   secondWindSelfHealHpThresholdPercent: number;
   holdFastUseHpThresholdPercent: number;
+  fakeDeathUseHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
   supportFocus: SupportFocus;
 };
@@ -763,7 +771,14 @@ export type SkillId =
   | "stonebreaker_rhythm"
   | "shield_rush"
   | "shield_shockwave"
-  | "mark_target"
+  | "pinning_shot"
+  | "fake_death"
+  | "evasive_instinct"
+  | "hunters_focus"
+  | "poison_coating"
+  | "herbalist_rhythm"
+  | "skirmish_shot"
+  | "arrow_burst"
   | "feral_surge"
   | "elemental_bolt"
   | "binding_rune"
@@ -790,6 +805,7 @@ export type SkillTag =
   | "Taunt"
   | "Aggro"
   | "Buff"
+  | "Party Buff"
   | "Cleanse"
   | "Summon - Support"
   | "Mobility"
@@ -860,7 +876,14 @@ export type SkillDefinition = {
         radius: number;
         bindDurationMs: number;
       }
-    | { type: "mark"; bonusDamage: number; durationMs: number }
+    | { type: "pinningShot"; durationMs: number }
+    | {
+        type: "fakeDeath";
+        fakeDeathDurationMs: number;
+        nextAttackDamageMultiplierBonus: number;
+        nextAttackBonusDurationMs: number;
+      }
+    | { type: "forcedEvasion"; durationMs: number }
     | {
         type: "selfBuff";
         bonusDamage: number;
@@ -871,6 +894,15 @@ export type SkillDefinition = {
     | { type: "allyBuff"; bonusDamage: number; durationMs: number }
     | { type: "partyBuff"; bonusDamage: number; durationMs: number; refreshWindowMs?: number }
     | {
+        type: "partyPoisonCoating";
+        durationMs: number;
+        poisonDurationMs: number;
+        poisonTickIntervalMs: number;
+        poisonDamageAttackPowerPercent: number;
+        sourceKey: string;
+        refreshWindowMs?: number;
+      }
+    | {
         type: "gatherBuff";
         bonusGatherSpeed: number;
         durationMs: number;
@@ -878,6 +910,18 @@ export type SkillDefinition = {
         refreshWindowMs?: number;
       }
     | { type: "quickStep"; distance: number }
+    | {
+        type: "skirmishShot";
+        distance: number;
+        damageType: CombatDamageType;
+        powerMultiplier: number;
+      }
+    | {
+        type: "arrowBurst";
+        damageType: CombatDamageType;
+        powerMultiplier: number;
+        radius: number;
+      }
     | {
         type: "shieldBlock";
         durationMs: number;
@@ -951,6 +995,15 @@ export type SkillPartyBuffState = {
   expiresAt: number;
 };
 
+export type SkillPartyPoisonCoatingState = {
+  sourceId: string;
+  sourceKey: string;
+  tickDamage: number;
+  poisonDurationMs: number;
+  poisonTickIntervalMs: number;
+  expiresAt: number;
+};
+
 export type SkillAbsorbShieldState = {
   id: string;
   ownerId: string;
@@ -998,6 +1051,7 @@ export type StatusEffectType =
   | "incapacitated"
   | "disarmed"
   | "cursed"
+  | "fakeDeath"
   | "forcedEvasion"
   | "nextAttackDamageBonus"
   | "poison"
@@ -1014,7 +1068,13 @@ export type StatusEffectBase = {
 };
 
 export type SimpleStatusEffect = StatusEffectBase & {
-  type: "immobilized" | "incapacitated" | "disarmed" | "cursed" | "forcedEvasion";
+  type:
+    | "immobilized"
+    | "incapacitated"
+    | "disarmed"
+    | "cursed"
+    | "fakeDeath"
+    | "forcedEvasion";
 };
 
 export type NextAttackDamageBonusStatusEffect = StatusEffectBase & {

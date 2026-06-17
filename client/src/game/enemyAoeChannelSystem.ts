@@ -4,6 +4,7 @@ import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyMembers } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
 import { blockIncomingAttackIfShielded, isEnemyBound } from "./skillRuntime";
+import { isFakeDeathActive } from "./statusEffects";
 import { getCompanionDerivedStats } from "./stats";
 import {
   addCombatFeedback,
@@ -207,6 +208,7 @@ function resolveChannelImpact(
 
     if (
       !isLivingCompanion(currentMember) ||
+      isFakeDeathActive(nextState, currentMember.id) ||
       !isInsideCircle(currentMember.position, channel.shape.center, channel.shape.radius)
     ) {
       continue;

@@ -51,6 +51,13 @@ describe("skill role preferences", () => {
     ).toBeLessThanOrEqual(0);
   });
 
+  it("makes every role value self and party buffs", () => {
+    for (const role of ["fighter", "defender", "support", "gatherer", "none"] as const) {
+      expect(getSkillRoleScore(role, ["Self Buff"])).toBeGreaterThan(0);
+      expect(getSkillRoleScore(role, ["Party Buff"])).toBeGreaterThan(0);
+    }
+  });
+
   it("makes Aegis control and mitigation most desirable for Defenders", () => {
     const defenderShockwaveScore = getSkillRoleScore(
       "defender",
@@ -100,6 +107,16 @@ describe("skill role preferences", () => {
       "stonebreaker_rhythm",
       "shield_rush",
       "shield_shockwave",
+    ]);
+    expect(getSkillsForClass("hunter").map((skill) => skill.id)).toEqual([
+      "pinning_shot",
+      "fake_death",
+      "evasive_instinct",
+      "hunters_focus",
+      "poison_coating",
+      "herbalist_rhythm",
+      "skirmish_shot",
+      "arrow_burst",
     ]);
   });
 });

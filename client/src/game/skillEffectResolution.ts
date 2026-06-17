@@ -29,7 +29,7 @@ import { getCompanionSkillBehavior } from "./skillBehavior";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
 import { getCompanionDerivedStats } from "./stats";
-import { applyStatusEffect } from "./statusEffects";
+import { applyStatusEffect, dropAggroFromTarget } from "./statusEffects";
 import {
   addCombatFeedback,
   addSkillVisualEvent,
@@ -119,11 +119,27 @@ export function resolveSkillEffect(
     );
   }
 
-  if (skill.effect.type === "mark" && isLivingEnemy(target)) {
+  if (skill.effect.type === "pinningShot" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
-      applyMarkTarget(state, caster, target, skill, now),
+      applyPinningShot(state, caster, target, skill, now),
       target.id,
+    );
+  }
+
+  if (skill.effect.type === "fakeDeath") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyFakeDeath(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "forcedEvasion") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyForcedEvasion(state, caster, skill, now),
+      caster.id,
     );
   }
 
@@ -139,6 +155,14 @@ export function resolveSkillEffect(
     return resolveAppliedSkillEffect(
       state,
       applyPartyBuff(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "partyPoisonCoating") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyPartyPoisonCoating(state, caster, skill, now),
       caster.id,
     );
   }
@@ -167,6 +191,24 @@ export function resolveSkillEffect(
     }
 
     return consumeSkillEffect(appliedState, caster.id);
+  }
+
+  if (skill.effect.type === "skirmishShot") {
+    const appliedState = applySkirmishShot(state, caster, target, skill, now);
+
+    if (!appliedState) {
+      return skipSkillEffect(state);
+    }
+
+    return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
+  if (skill.effect.type === "arrowBurst" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyArrowBurst(state, caster, target, skill, now),
+      target.id,
+    );
   }
 
   if (skill.effect.type === "shieldBlock") {
@@ -587,35 +629,145 @@ function applyMultiTaunt(
   return nextState;
 }
 
-function applyMarkTarget(
+function applyPinningShot(
   state: GameState,
   caster: Companion,
   target: Enemy,
   skill: SkillDefinition,
   now: number,
 ): GameState {
-  if (skill.effect.type !== "mark") {
+  if (skill.effect.type !== "pinningShot") {
     return state;
   }
 
-  let nextState: GameState = {
-    ...state,
-    skillMarksByEnemyId: {
-      ...(state.skillMarksByEnemyId ?? {}),
-      [target.id]: {
-        sourceId: caster.id,
-        targetId: target.id,
-        bonusDamage: skill.effect.bonusDamage,
-        expiresAt: now + skill.effect.durationMs,
-      },
+  let nextState = applyStatusEffect(
+    state,
+    {
+      type: "immobilized",
+      targetId: target.id,
+      durationMs: skill.effect.durationMs,
+      sourceId: caster.id,
+      sourceKey: skill.id,
     },
-  };
+    now,
+  );
 
   nextState = addCombatFeedback(nextState, {
     type: "attack",
     entityId: target.id,
     text: skill.displayName,
     now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return nextState;
+}
+
+function applyFakeDeath(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "fakeDeath") {
+    return state;
+  }
+
+  let nextState = dropAggroFromTarget(state, caster.id);
+  nextState = applyStatusEffect(
+    nextState,
+    {
+      type: "fakeDeath",
+      targetId: caster.id,
+      durationMs: skill.effect.fakeDeathDurationMs,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+    },
+    now,
+  );
+  nextState = applyStatusEffect(
+    nextState,
+    {
+      type: "incapacitated",
+      targetId: caster.id,
+      durationMs: skill.effect.fakeDeathDurationMs,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+    },
+    now,
+  );
+  nextState = applyStatusEffect(
+    nextState,
+    {
+      type: "nextAttackDamageBonus",
+      targetId: caster.id,
+      durationMs:
+        skill.effect.fakeDeathDurationMs + skill.effect.nextAttackBonusDurationMs,
+      damageMultiplierBonus: skill.effect.nextAttackDamageMultiplierBonus,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+      damageTypes: ["physical"],
+    },
+    now,
+  );
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyForcedEvasion(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "forcedEvasion") {
+    return state;
+  }
+
+  let nextState = applyStatusEffect(
+    state,
+    {
+      type: "forcedEvasion",
+      targetId: caster.id,
+      durationMs: skill.effect.durationMs,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+    },
+    now,
+  );
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
   });
 
   return nextState;
@@ -696,6 +848,67 @@ function applyPartyBuff(
       [caster.id]: {
         sourceId: caster.id,
         bonusDamage: skill.effect.bonusDamage,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  for (const member of getPartyMembers(nextState)) {
+    if (!isLivingCompanion(member)) {
+      continue;
+    }
+
+    nextState = addCombatFeedback(nextState, {
+      type: "attack",
+      entityId: member.id,
+      text: skill.displayName,
+      now,
+    });
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyPartyPoisonCoating(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "partyPoisonCoating" ||
+    !canApplyRefreshableRuntimeState(
+      state.skillPartyPoisonCoatingsBySourceId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return state;
+  }
+
+  const tickDamage = Math.max(
+    1,
+    getCompanionDerivedStats(caster).attack *
+      (skill.effect.poisonDamageAttackPowerPercent / 100),
+  );
+  let nextState: GameState = {
+    ...state,
+    skillPartyPoisonCoatingsBySourceId: {
+      ...(state.skillPartyPoisonCoatingsBySourceId ?? {}),
+      [caster.id]: {
+        sourceId: caster.id,
+        sourceKey: skill.effect.sourceKey,
+        tickDamage,
+        poisonDurationMs: skill.effect.poisonDurationMs,
+        poisonTickIntervalMs: skill.effect.poisonTickIntervalMs,
         expiresAt: now + skill.effect.durationMs,
       },
     },
@@ -1135,6 +1348,140 @@ function applyQuickStep(
     entityId: caster.id,
     text: skill.displayName,
     now,
+  });
+
+  return nextState;
+}
+
+function applySkirmishShot(
+  state: GameState,
+  caster: Companion,
+  target: Enemy | Companion | undefined,
+  skill: SkillDefinition,
+  now: number,
+): GameState | null {
+  if (skill.effect.type !== "skirmishShot" || !isLivingEnemy(target)) {
+    return null;
+  }
+
+  const direction =
+    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
+  );
+
+  if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
+    return null;
+  }
+
+  const movedCaster = {
+    ...caster,
+    position,
+  };
+  let nextState = updateEntity(state, movedCaster);
+  const currentTarget = nextState.entities[target.id];
+
+  if (isLivingEnemy(currentTarget)) {
+    nextState = damageEnemy(
+      nextState,
+      movedCaster,
+      currentTarget,
+      skill.displayName,
+      now,
+      skill.effect.damageType,
+      skill.effect.powerMultiplier,
+      skill.effect.damageType !== "magic",
+    );
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applyArrowBurst(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "arrowBurst") {
+    return state;
+  }
+
+  let nextState = state;
+  const { damageType, powerMultiplier, radius } = skill.effect;
+  const targets = Object.values(state.entities)
+    .filter(
+      (entity): entity is Enemy =>
+        isLivingEnemy(entity) &&
+        getGridDistance(entity.position, target.position) <= radius,
+    )
+    .sort(
+      (a, b) =>
+        getGridDistance(target.position, a.position) -
+          getGridDistance(target.position, b.position) ||
+        a.id.localeCompare(b.id),
+    );
+
+  if (targets.length === 0) {
+    return state;
+  }
+
+  for (const burstTarget of targets) {
+    const currentTarget = nextState.entities[burstTarget.id];
+
+    if (!isLivingEnemy(currentTarget)) {
+      continue;
+    }
+
+    nextState = damageEnemy(
+      nextState,
+      caster,
+      currentTarget,
+      skill.displayName,
+      now,
+      damageType,
+      powerMultiplier,
+      damageType !== "magic",
+    );
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
   });
 
   return nextState;

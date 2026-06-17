@@ -12,9 +12,11 @@ import {
   CLASS_DEFINITIONS,
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_SUPPORT_FOCUS,
@@ -480,8 +482,16 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Hits nearby enemies for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage and briefly binds them.`;
   }
 
-  if (effect.type === "mark") {
-    return `Marks a target for +${effect.bonusDamage} damage.`;
+  if (effect.type === "pinningShot") {
+    return `Immobilizes one enemy for ${Math.round(effect.durationMs / 1000)}s.`;
+  }
+
+  if (effect.type === "fakeDeath") {
+    return `Drops enemy attention and empowers the next physical attack.`;
+  }
+
+  if (effect.type === "forcedEvasion") {
+    return "Avoids the next incoming damage source.";
   }
 
   if (effect.type === "selfBuff") {
@@ -496,6 +506,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Party +${effect.bonusDamage} damage.`;
   }
 
+  if (effect.type === "partyPoisonCoating") {
+    return `Party attacks apply poison for ${Math.round(effect.poisonDurationMs / 1000)}s.`;
+  }
+
   if (effect.type === "gatherBuff") {
     return effect.resourceType
       ? `Self +${effect.bonusGatherSpeed} ${effect.resourceType} gather speed.`
@@ -504,6 +518,14 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
   if (effect.type === "quickStep") {
     return `Moves ${effect.distance} space.`;
+  }
+
+  if (effect.type === "skirmishShot") {
+    return `Moves ${effect.distance} spaces and fires a normal shot.`;
+  }
+
+  if (effect.type === "arrowBurst") {
+    return `Hits enemies near the target for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
   }
 
   if (effect.type === "shieldBlock") {
@@ -542,7 +564,11 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Heals self for ${Math.round(effect.healPercent)}% max HP.`;
   }
 
-  return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power at ${effect.hpCost} HP cost.`;
+  if (effect.type === "selfCostHeal") {
+    return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power at ${effect.hpCost} HP cost.`;
+  }
+
+  return "Applies a skill effect.";
 }
 
 function formatSkillCooldown(cooldownMs: number): string {
@@ -1493,6 +1519,9 @@ function SkillPreferencesSection({
   const holdFastThreshold =
     member.skillBehavior.holdFastUseHpThresholdPercent ??
     DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT;
+  const fakeDeathThreshold =
+    member.skillBehavior.fakeDeathUseHpThresholdPercent ??
+    DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
@@ -1505,6 +1534,9 @@ function SkillPreferencesSection({
   );
   const hasHoldFast = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "hold_fast"),
+  );
+  const hasFakeDeath = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "fake_death"),
   );
   const hasMobilitySkill = learnedSkillGroups.some((group) =>
     group.skills.some((skill) =>
@@ -1642,6 +1674,34 @@ function SkillPreferencesSection({
               value={holdFastThreshold}
             />
             <strong>{holdFastThreshold}%</strong>
+          </label>
+        ) : null}
+        {hasFakeDeath ? (
+          <label className="behavior-range-row">
+            <span>Fake Death Use Threshold</span>
+            <input
+              max={FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  fakeDeathUseHpThresholdPercent: Number(event.target.value),
+                })
+              }
+              type="range"
+              value={fakeDeathThreshold}
+            />
+            <input
+              max={FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  fakeDeathUseHpThresholdPercent: Number(event.target.value),
+                })
+              }
+              type="number"
+              value={fakeDeathThreshold}
+            />
+            <strong>{fakeDeathThreshold}%</strong>
           </label>
         ) : null}
         {hasMobilitySkill ? (

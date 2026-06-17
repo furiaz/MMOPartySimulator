@@ -235,6 +235,18 @@ function getSkillTargetSkipReason(
   }
 
   if (
+    skill.effect.type === "partyPoisonCoating" &&
+    state.skillPartyPoisonCoatingsBySourceId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillPartyPoisonCoatingsBySourceId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
     skill.effect.type === "gatherBuff" &&
     state.skillGatherBuffsByCompanionId?.[caster.id] &&
     !canUseRefreshableRuntimeState(
@@ -453,6 +465,8 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "absorbShield" ||
     skill.effect.type === "holdFast" ||
     skill.effect.type === "damageMitigation" ||
+    skill.effect.type === "fakeDeath" ||
+    skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff"
   );
@@ -481,6 +495,9 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "selfCostHeal" ||
     skill.effect.type === "selfBuff" ||
     skill.effect.type === "partyBuff" ||
+    skill.effect.type === "partyPoisonCoating" ||
+    skill.effect.type === "fakeDeath" ||
+    skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "damageMitigation" ||
     skill.effect.type === "absorbShield" ||
     skill.effect.type === "holdFast" ||
@@ -592,7 +609,9 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "lungeDamage":
     case "sweepingDamage":
     case "taunt":
-    case "mark":
+    case "pinningShot":
+    case "skirmishShot":
+    case "arrowBurst":
     case "bind":
       return true;
     default:

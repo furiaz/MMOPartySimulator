@@ -39,6 +39,17 @@ const AEGIS_SKILL_IDS: SkillId[] = [
   "shield_shockwave",
 ];
 
+const HUNTER_SKILL_IDS: SkillId[] = [
+  "pinning_shot",
+  "fake_death",
+  "evasive_instinct",
+  "hunters_focus",
+  "poison_coating",
+  "herbalist_rhythm",
+  "skirmish_shot",
+  "arrow_burst",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -65,6 +76,11 @@ describe("skill progression", () => {
       shield_formation: 5,
       stonebreaker_rhythm: 5,
       shield_shockwave: 5,
+      pinning_shot: 5,
+      fake_death: 5,
+      poison_coating: 5,
+      skirmish_shot: 5,
+      arrow_burst: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -115,6 +131,26 @@ describe("skill progression", () => {
       companion,
       SKILL_DEFINITIONS.shield_shockwave,
     );
+    const pinningShot = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.pinning_shot,
+    );
+    const fakeDeath = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.fake_death,
+    );
+    const poisonCoating = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.poison_coating,
+    );
+    const skirmishShot = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.skirmish_shot,
+    );
+    const arrowBurst = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.arrow_burst,
+    );
 
     expect(kick.effect.type).toBe("lungeDamage");
     if (kick.effect.type === "lungeDamage") {
@@ -162,6 +198,26 @@ describe("skill progression", () => {
     expect(shieldShockwave.effect.type).toBe("shockwave");
     if (shieldShockwave.effect.type === "shockwave") {
       expect(shieldShockwave.effect.powerMultiplier).toBeCloseTo(0.6);
+    }
+    expect(pinningShot.effect.type).toBe("pinningShot");
+    if (pinningShot.effect.type === "pinningShot") {
+      expect(pinningShot.effect.durationMs).toBe(3500);
+    }
+    expect(fakeDeath.effect.type).toBe("fakeDeath");
+    if (fakeDeath.effect.type === "fakeDeath") {
+      expect(fakeDeath.effect.nextAttackDamageMultiplierBonus).toBeCloseTo(0.36);
+    }
+    expect(poisonCoating.effect.type).toBe("partyPoisonCoating");
+    if (poisonCoating.effect.type === "partyPoisonCoating") {
+      expect(poisonCoating.effect.poisonDamageAttackPowerPercent).toBeCloseTo(24);
+    }
+    expect(skirmishShot.effect.type).toBe("skirmishShot");
+    if (skirmishShot.effect.type === "skirmishShot") {
+      expect(skirmishShot.effect.powerMultiplier).toBeCloseTo(1.2);
+    }
+    expect(arrowBurst.effect.type).toBe("arrowBurst");
+    if (arrowBurst.effect.type === "arrowBurst") {
+      expect(arrowBurst.effect.powerMultiplier).toBeCloseTo(1.32);
     }
   });
 
@@ -251,6 +307,39 @@ describe("skill progression", () => {
       maxRank: 5,
     });
     expect(getCompanionSkillRank(nextCompanion, "shield_rush")).toBe(2);
+  });
+
+  it("reads new Hunter skill books for eligible Hunter companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "hunter",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "arrow_burst_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "arrow_burst_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "arrow_burst",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "arrow_burst")).toBe(2);
   });
 
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
@@ -349,7 +438,7 @@ describe("skill progression", () => {
       "hunter",
       "beginner",
     ]);
-    expect(groups[0].skills.map((skill) => skill.id)).toEqual(["mark_target"]);
+    expect(groups[0].skills.map((skill) => skill.id)).toEqual(HUNTER_SKILL_IDS);
     expect(groups[1].skills.map((skill) => skill.id)).toEqual([
       "kick",
       "first_aid",
@@ -382,7 +471,7 @@ describe("skill progression", () => {
       "beginner",
     ]);
     expect(getActiveSkillsForCompanion(hunter).map((skill) => skill.id)).toEqual([
-      "mark_target",
+      ...HUNTER_SKILL_IDS,
     ]);
   });
 

@@ -1,4 +1,5 @@
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
+import { applyStatusEffect } from "./statusEffects";
 import type {
   CombatDamageType,
   CombatEntity,
@@ -42,6 +43,44 @@ export function getPrototypeGatherAmountBonus(
   }
 
   return buff.bonusGatherSpeed;
+}
+
+export function applyPartyPoisonCoatingFromAttack(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+  finalDamage: number,
+  now: number,
+): GameState {
+  if (
+    finalDamage <= 0 ||
+    attacker.kind !== "companion" ||
+    target.kind !== "enemy"
+  ) {
+    return state;
+  }
+
+  let nextState = state;
+
+  for (const coating of Object.values(
+    state.skillPartyPoisonCoatingsBySourceId ?? {},
+  )) {
+    nextState = applyStatusEffect(
+      nextState,
+      {
+        type: "poison",
+        targetId: target.id,
+        durationMs: coating.poisonDurationMs,
+        tickDamage: coating.tickDamage,
+        sourceId: coating.sourceId,
+        sourceKey: coating.sourceKey,
+        tickIntervalMs: coating.poisonTickIntervalMs,
+      },
+      now,
+    );
+  }
+
+  return nextState;
 }
 
 export function applyIncomingDamageMitigation(

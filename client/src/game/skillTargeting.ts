@@ -20,6 +20,7 @@ import {
   getCompanionSkillBehavior,
   isBeginnerFirstAidSelfHealPriorityActive,
 } from "./skillBehavior";
+import { isFakeDeathActive } from "./statusEffects";
 import type {
   Companion,
   Enemy,
@@ -92,6 +93,17 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "partyPoisonCoating") {
+    return hasValidEnemyContext(state, caster, options) &&
+      canUseRefreshableRuntimeState(
+        state.skillPartyPoisonCoatingsBySourceId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
+      ? caster
+      : undefined;
+  }
+
   if (skill.effect.type === "allyBuff") {
     return hasValidEnemyContext(state, caster, options)
       ? findAllyBuffTarget(state, caster, skill.range)
@@ -126,6 +138,25 @@ export function getSkillTarget(
 
   if (skill.effect.type === "quickStep") {
     return findQuickStepTarget(state, caster, skill.effect.distance, options);
+  }
+
+  if (skill.effect.type === "skirmishShot") {
+    return findSkirmishShotTarget(state, caster, skill, options);
+  }
+
+  if (skill.effect.type === "fakeDeath") {
+    return hasPartyDanger(state, caster) &&
+      isFakeDeathUseThresholdActive(caster) &&
+      !isFakeDeathActive(state, caster.id)
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "forcedEvasion") {
+    return hasPartyDanger(state, caster) &&
+      !hasActiveStatusEffect(state, caster.id, skill.id)
+      ? caster
+      : undefined;
   }
 
   if (skill.effect.type === "shieldBlock") {
@@ -212,7 +243,10 @@ export function getSkillTarget(
       : undefined;
   }
 
-  if (skill.effect.type === "mark" && state.skillMarksByEnemyId?.[enemy.id]) {
+  if (
+    skill.effect.type === "pinningShot" &&
+    hasActiveStatusEffect(state, enemy.id, skill.id)
+  ) {
     return undefined;
   }
 
@@ -777,6 +811,46 @@ function findQuickStepThreat(
     )[0];
 }
 
+function findSkirmishShotTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "skirmishShot") {
+    return undefined;
+  }
+
+  if (getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive") {
+    const enemy = findEnemyTarget(state, caster, skill.range, options);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        skill.effect.distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    isEnemyInRange(caster, threat, skill.range) &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      skill.effect.distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
 function hasGatherBuffResourceContext(
   state: GameState,
   caster: Companion,
@@ -831,10 +905,27 @@ function hasActiveHoldFast(
   );
 }
 
+function hasActiveStatusEffect(
+  state: GameState,
+  targetId: string,
+  sourceKey: string,
+): boolean {
+  return Object.values(state.statusEffectsById ?? {}).some(
+    (status) => status.targetId === targetId && status.sourceKey === sourceKey,
+  );
+}
+
 function isHoldFastUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
     getCompanionSkillBehavior(caster).holdFastUseHpThresholdPercent,
+  );
+}
+
+function isFakeDeathUseThresholdActive(caster: Companion): boolean {
+  return isCompanionAtOrBelowHpThreshold(
+    caster,
+    getCompanionSkillBehavior(caster).fakeDeathUseHpThresholdPercent,
   );
 }
 

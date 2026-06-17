@@ -34,6 +34,7 @@ import type {
   SkillDamageMitigationState,
   SkillGatherBuffState,
   SkillMarkState,
+  SkillPartyPoisonCoatingState,
   SkillMitigationBuffState,
   SkillPartyBuffState,
   ResurrectionProgressState,
@@ -193,6 +194,7 @@ export type GameState = {
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
   skillPartyBuffsBySourceId?: Record<string, SkillPartyBuffState>;
+  skillPartyPoisonCoatingsBySourceId?: Record<string, SkillPartyPoisonCoatingState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillDamageMitigationsByCompanionId?: Record<string, SkillDamageMitigationState>;
   skillAbsorbShieldsByCompanionId?: Record<string, SkillAbsorbShieldState>;
@@ -372,6 +374,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillPartyBuffsBySourceId,
     now,
   );
+  const skillPartyPoisonCoatingsBySourceId = filterExpiredRecord(
+    state.skillPartyPoisonCoatingsBySourceId,
+    now,
+  );
   const skillGatherBuffsByCompanionId = filterExpiredRecord(
     state.skillGatherBuffsByCompanionId,
     now,
@@ -418,6 +424,8 @@ export function clearExpiredSkillRuntimeState(
     skillMarksByEnemyId === state.skillMarksByEnemyId &&
     skillSelfBuffsByCompanionId === state.skillSelfBuffsByCompanionId &&
     skillPartyBuffsBySourceId === state.skillPartyBuffsBySourceId &&
+    skillPartyPoisonCoatingsBySourceId ===
+      state.skillPartyPoisonCoatingsBySourceId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
     skillAbsorbShieldsByCompanionId === state.skillAbsorbShieldsByCompanionId &&
@@ -438,6 +446,7 @@ export function clearExpiredSkillRuntimeState(
     skillMarksByEnemyId,
     skillSelfBuffsByCompanionId,
     skillPartyBuffsBySourceId,
+    skillPartyPoisonCoatingsBySourceId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
     skillAbsorbShieldsByCompanionId,

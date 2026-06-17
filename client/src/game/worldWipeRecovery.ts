@@ -258,6 +258,7 @@ function resetStateToRescueHub(
     skillMarksByEnemyId: {},
     skillSelfBuffsByCompanionId: {},
     skillPartyBuffsBySourceId: {},
+    skillPartyPoisonCoatingsBySourceId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
     skillAbsorbShieldsByCompanionId: {},

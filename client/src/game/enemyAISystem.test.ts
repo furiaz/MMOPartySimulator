@@ -158,6 +158,32 @@ describe("enemy AI aggro and roaming", () => {
     });
   });
 
+  it("does not acquire companions with active fake death", () => {
+    const hunter = createIdleCompanion("hunter", { x: 2, y: 0 });
+    const ally = createIdleCompanion("ally", { x: 4, y: 0 });
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive");
+    const nextState = updateEnemyAISystem(
+      createState([hunter, ally, enemy], {
+        statusEffectsById: {
+          "hunter-fakeDeath-fake_death": {
+            id: "hunter-fakeDeath-fake_death",
+            type: "fakeDeath",
+            targetId: hunter.id,
+            sourceId: hunter.id,
+            sourceKey: "fake_death",
+            appliedAt: 1000,
+            expiresAt: 4000,
+          },
+        },
+      }),
+    );
+
+    expect(nextState.entities[enemy.id]).toMatchObject({
+      state: "attack",
+      currentTargetId: ally.id,
+    });
+  });
+
   it("invalidates current-target reachability when the enemy cell changes", () => {
     const leader = createIdleCompanion("leader", { x: 3, y: 2 });
     const enemy = {

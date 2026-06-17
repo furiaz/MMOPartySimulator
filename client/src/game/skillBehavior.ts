@@ -13,6 +13,8 @@ export const DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT = 30;
 export const SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT = 30;
 export const HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT = 100;
+export const DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT = 30;
+export const FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
 export const DEFAULT_SUPPORT_FOCUS: SupportFocus = "lowest_hp";
 
@@ -40,6 +42,7 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
     secondWindSelfHealHpThresholdPercent:
       DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
     holdFastUseHpThresholdPercent: DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
+    fakeDeathUseHpThresholdPercent: DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
     mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
     supportFocus: DEFAULT_SUPPORT_FOCUS,
   };
@@ -72,6 +75,11 @@ export function getCompanionSkillBehavior(
         storedBehavior.holdFastSelfHealHpThresholdPercent ??
         DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
       HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    fakeDeathUseHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.fakeDeathUseHpThresholdPercent ??
+        DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
+      FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
     ),
     mobilitySkillUseMode: normalizeMobilitySkillUseMode(
       storedBehavior.mobilitySkillUseMode,
@@ -120,6 +128,12 @@ export function updateCompanionSkillBehavior(
           update.holdFastUseHpThresholdPercent ??
             getCompanionSkillBehavior(companion).holdFastUseHpThresholdPercent,
           HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      fakeDeathUseHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.fakeDeathUseHpThresholdPercent ??
+            getCompanionSkillBehavior(companion).fakeDeathUseHpThresholdPercent,
+          FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
         ),
       mobilitySkillUseMode: normalizeMobilitySkillUseMode(
         update.mobilitySkillUseMode ??

@@ -122,6 +122,164 @@ describe("skill effect resolution", () => {
     expect((result.state.entities.far as Enemy).health).toBe(far.health);
   });
 
+  it("applies Hunter control, fake death, and forced evasion statuses", () => {
+    const hunter = createSkillCompanion("hunter", "fighter", { x: 0, y: 0 }, "hunter");
+    const enemy = {
+      ...createSkillEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: hunter.id,
+    };
+    const pinningResult = resolveSkillEffect(
+      createSkillState([hunter, enemy]),
+      hunter,
+      createSkillUse("pinning_shot", enemy),
+      1000,
+    );
+
+    expect(Object.values(pinningResult.state.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "immobilized",
+        targetId: enemy.id,
+        expiresAt: 4000,
+      }),
+    );
+
+    const fakeDeathResult = resolveSkillEffect(
+      createSkillState([hunter, enemy]),
+      hunter,
+      createSkillUse("fake_death", hunter),
+      1000,
+    );
+
+    expect(fakeDeathResult.state.entities.enemy).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+    expect(Object.values(fakeDeathResult.state.statusEffectsById ?? {})).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "fakeDeath", targetId: hunter.id }),
+        expect.objectContaining({ type: "incapacitated", targetId: hunter.id }),
+        expect.objectContaining({
+          type: "nextAttackDamageBonus",
+          targetId: hunter.id,
+          damageMultiplierBonus: 0.3,
+        }),
+      ]),
+    );
+
+    const evasionResult = resolveSkillEffect(
+      createSkillState([hunter, enemy]),
+      hunter,
+      createSkillUse("evasive_instinct", hunter),
+      1000,
+    );
+
+    expect(Object.values(evasionResult.state.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "forcedEvasion",
+        targetId: hunter.id,
+        expiresAt: 11000,
+      }),
+    );
+  });
+
+  it("applies Poison Coating from landed companion damage", () => {
+    const hunter = createSkillCompanion("hunter", "fighter", { x: 0, y: 0 }, "hunter");
+    const ally = createSkillCompanion("ally", "fighter", { x: 0, y: 1 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 200 });
+    const coatedState = resolveSkillEffect(
+      createSkillState([hunter, ally, enemy]),
+      hunter,
+      createSkillUse("poison_coating", hunter),
+      1000,
+    ).state;
+
+    expect(coatedState.skillPartyPoisonCoatingsBySourceId?.hunter).toMatchObject({
+      sourceId: hunter.id,
+      sourceKey: "poison_coating",
+      poisonDurationMs: 4000,
+    });
+
+    const damagedState = resolveAndApplyCombatDamage(coatedState, ally, enemy, {
+      damageType: "physical",
+      powerMultiplier: 1,
+      allowEvasion: false,
+      allowPassiveBlock: false,
+      now: 1500,
+    }).state;
+
+    expect(Object.values(damagedState.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "poison",
+        targetId: enemy.id,
+        sourceId: hunter.id,
+        sourceKey: "poison_coating",
+        tickIntervalMs: 2000,
+      }),
+    );
+  });
+
+  it("moves and attacks with Skirmish Shot only when a dash position exists", () => {
+    const hunter = createSkillCompanion("hunter", "fighter", { x: 1, y: 1 }, "hunter");
+    const enemy = createSkillEnemy("enemy", { x: 4, y: 1 }, { maxHealth: 200 });
+    const result = resolveSkillEffect(
+      createSkillState([hunter, enemy], {
+        map: createSkillMap([], 10),
+      }),
+      hunter,
+      createSkillUse("skirmish_shot", enemy),
+      1000,
+    );
+
+    expect(result.shouldConsumeCooldown).toBe(true);
+    expect((result.state.entities.hunter as Companion).position.x).toBeGreaterThan(
+      hunter.position.x,
+    );
+    expect((result.state.entities.enemy as Enemy).health).toBeLessThan(enemy.health);
+
+    const blocked = resolveSkillEffect(
+      createSkillState([hunter, enemy], {
+        map: createSkillMap(
+          [
+            { x: 2, y: 1 },
+            { x: 2, y: 0 },
+            { x: 2, y: 2 },
+            { x: 1, y: 0 },
+            { x: 1, y: 2 },
+          ],
+          10,
+        ),
+      }),
+      hunter,
+      createSkillUse("skirmish_shot", enemy),
+      1000,
+    );
+
+    expect(blocked.shouldConsumeCooldown).toBe(false);
+    expect(blocked.state.entities.hunter.position).toEqual(hunter.position);
+  });
+
+  it("hits enemies near the selected target with Arrow Burst", () => {
+    const hunter = createSkillCompanion("hunter", "fighter", { x: 0, y: 0 }, "hunter");
+    const primary = createSkillEnemy("primary", { x: 4, y: 0 }, { maxHealth: 200 });
+    const nearby = createSkillEnemy("nearby", { x: 5, y: 1 }, { maxHealth: 200 });
+    const far = createSkillEnemy("far", { x: 8, y: 0 }, { maxHealth: 200 });
+    const result = resolveSkillEffect(
+      createSkillState([hunter, primary, nearby, far]),
+      hunter,
+      createSkillUse("arrow_burst", primary),
+      1000,
+    );
+
+    expect((result.state.entities.primary as Enemy).health).toBeLessThan(
+      primary.health,
+    );
+    expect((result.state.entities.nearby as Enemy).health).toBeLessThan(
+      nearby.health,
+    );
+    expect((result.state.entities.far as Enemy).health).toBe(far.health);
+  });
+
   it("applies Second Wind as a self-only percent heal", () => {
     const caster = {
       ...createSkillCompanion("blade", "fighter", { x: 0, y: 0 }, "blade"),
@@ -604,7 +762,7 @@ describe("skill effect resolution", () => {
     expect(afterImpact.companionAoeChannelsByCasterId?.aegis).toBeUndefined();
   });
 
-  it("applies taunt, mark, bind, buff, gather, and shield effects", () => {
+  it("applies taunt, pinning, bind, buff, gather, and shield effects", () => {
     const taunter = createSkillCompanion("taunter", "defender", { x: 0, y: 0 });
     const tauntEnemy = createSkillEnemy("taunt-enemy", { x: 1, y: 0 });
     const taunted = resolveSkillEffect(
@@ -620,18 +778,21 @@ describe("skill effect resolution", () => {
     });
 
     const hunter = createSkillCompanion("hunter", "fighter", { x: 0, y: 0 }, "hunter");
-    const markedEnemy = createSkillEnemy("marked-enemy", { x: 1, y: 0 });
-    const markedState = resolveSkillEffect(
-      createSkillState([hunter, markedEnemy]),
+    const pinnedEnemy = createSkillEnemy("pinned-enemy", { x: 1, y: 0 });
+    const pinnedState = resolveSkillEffect(
+      createSkillState([hunter, pinnedEnemy]),
       hunter,
-      createSkillUse("mark_target", markedEnemy),
+      createSkillUse("pinning_shot", pinnedEnemy),
       1000,
     ).state;
 
-    expect(markedState.skillMarksByEnemyId?.["marked-enemy"]).toMatchObject({
-      sourceId: hunter.id,
-      targetId: markedEnemy.id,
-    });
+    expect(Object.values(pinnedState.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "immobilized",
+        sourceId: hunter.id,
+        targetId: pinnedEnemy.id,
+      }),
+    );
 
     const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
     const boundEnemy = createSkillEnemy("bound-enemy", { x: 1, y: 0 });

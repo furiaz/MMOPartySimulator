@@ -18,11 +18,11 @@ describe("enemy attack leash movement", () => {
     expect(getCompanionAttackRange(companion)).toBe(1);
   });
 
-  it("starts Hunter basic attack range at four cells", () => {
+  it("starts Hunter basic attack range at five cells", () => {
     const companion = createIdleCompanion("leader", { x: 0, y: 0 }, "hunter");
 
     expect(getCompanionAttackRange(companion)).toBe(HUNTER_BASIC_ATTACK_RANGE);
-    expect(getCompanionAttackRange(companion)).toBe(4);
+    expect(getCompanionAttackRange(companion)).toBe(5);
   });
 
   it("lets enemies pursue beyond roam leash while inside attack leash", () => {
@@ -210,7 +210,7 @@ describe("enemy attack leash movement", () => {
     });
   });
 
-  it("lets Hunter basic attacks launch projectiles from four cells", () => {
+  it("lets Hunter basic attacks launch projectiles from ranged distance", () => {
     const companion = {
       ...createAttackingCompanion("leader", { x: 4, y: 0 }, 0, "hunter"),
       lastAttackAt: -2000,

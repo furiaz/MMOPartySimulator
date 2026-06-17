@@ -5,6 +5,7 @@ import { getCompanionDerivedStats } from "./stats";
 import {
   applyIncomingDamageAbsorb,
   applyIncomingDamageMitigation,
+  applyPartyPoisonCoatingFromAttack,
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
 } from "./skillRuntime";
@@ -189,6 +190,13 @@ export function resolveAndApplyCombatDamage(
     if (finalDamage > 0) {
       const damagedTarget = damageEntity(target, finalDamage);
       nextState = updateEntity(nextState, damagedTarget);
+      nextState = applyPartyPoisonCoatingFromAttack(
+        nextState,
+        attacker,
+        damagedTarget,
+        finalDamage,
+        options.now,
+      );
       if (damagedTarget.state === "dead" || damagedTarget.health <= 0) {
         nextState = clearStatusEffectsForEntity(nextState, damagedTarget.id);
       }

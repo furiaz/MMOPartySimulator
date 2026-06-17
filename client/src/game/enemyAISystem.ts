@@ -33,6 +33,7 @@ import {
   getEnemyTargetPreference,
   getEnemyTemperament,
 } from "./enemyArchetypes";
+import { isFakeDeathActive } from "./statusEffects";
 import type {
   AutonomousEntity,
   Enemy,
@@ -103,7 +104,7 @@ export function updateEnemyAISystem(
       : undefined;
 
     const targetRetention =
-      currentTarget && isValidEnemyTarget(currentTarget)
+      currentTarget && isValidEnemyTarget(nextState, currentTarget)
         ? canKeepCurrentTarget(nextState, entity, currentTarget, timing.nowMs)
         : null;
 
@@ -332,7 +333,7 @@ function getValidTargetCandidates(
 
   return entities.flatMap((entity) => {
     if (
-      !isValidEnemyTarget(entity) ||
+      !isValidEnemyTarget(state, entity) ||
       getDistanceSquared(enemy, entity) > detectionRange * detectionRange ||
       !isInsideAttackLeash(enemy, entity.position)
     ) {
@@ -356,7 +357,7 @@ function getNoTargetReason(
   entities: GameEntity[],
 ): TargetSearchResult {
   const detectionRange = getEnemyAggroRange(enemy);
-  const validTargets = entities.filter(isValidEnemyTarget);
+  const validTargets = entities.filter((entity) => isValidEnemyTarget(state, entity));
 
   if (
     validTargets.some(
@@ -435,8 +436,15 @@ function findLowestHealthCandidate(
   return lowestHealthCandidate;
 }
 
-function isValidEnemyTarget(entity: GameEntity): entity is AutonomousEntity {
-  return isAutonomousEntity(entity) && entity.state !== "dead";
+function isValidEnemyTarget(
+  state: GameState,
+  entity: GameEntity,
+): entity is AutonomousEntity {
+  return (
+    isAutonomousEntity(entity) &&
+    entity.state !== "dead" &&
+    !isFakeDeathActive(state, entity.id)
+  );
 }
 
 function getDistanceSquared(a: GameEntity, b: GameEntity): number {
