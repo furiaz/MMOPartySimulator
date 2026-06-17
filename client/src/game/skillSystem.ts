@@ -287,6 +287,16 @@ function getSkillTargetSkipReason(
   }
 
   if (
+    skill.effect.type === "holdFast" &&
+    (state.skillAbsorbShieldsByCompanionId?.[caster.id] ||
+      Object.values(state.statusEffectsById ?? {}).some(
+        (status) => status.targetId === caster.id && status.sourceKey === skill.id,
+      ))
+  ) {
+    return "active_duplicate_shield";
+  }
+
+  if (
     (skill.effect.type === "selfBuff" || skill.effect.type === "selfCostHeal") &&
     "hpCost" in skill.effect &&
     caster.health <= skill.effect.hpCost + LOW_HEALTH_BUFFER
@@ -441,6 +451,7 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "selfCostHeal" ||
     skill.effect.type === "shieldBlock" ||
     skill.effect.type === "absorbShield" ||
+    skill.effect.type === "holdFast" ||
     skill.effect.type === "damageMitigation" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff"
@@ -472,6 +483,7 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "partyBuff" ||
     skill.effect.type === "damageMitigation" ||
     skill.effect.type === "absorbShield" ||
+    skill.effect.type === "holdFast" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff" ||
     skill.effect.type === "allyBuff" ||

@@ -1462,7 +1462,7 @@ describe("beginner skill system", () => {
     expect(nextState.skillCooldownsByCompanionId?.blade?.second_wind).toBeUndefined();
   });
 
-  it("uses Hold Fast at the configured threshold and caps the heal threshold at 30 percent", () => {
+  it("uses Hold Fast during party danger at the configured use threshold", () => {
     const baseAegis = createCompanion(
       "aegis",
       { x: 0, y: 0 },
@@ -1473,17 +1473,31 @@ describe("beginner skill system", () => {
     );
     const aegis = {
       ...baseAegis,
-      health: 30,
-      maxHealth: 100,
+      health: 3,
+      maxHealth: 10,
       skillBehavior: {
         ...baseAegis.skillBehavior,
-        holdFastSelfHealHpThresholdPercent: 80,
+        holdFastUseHpThresholdPercent: 30,
       },
     };
-    const nextState = updateSkillSystem(createSkillState([aegis]), 1000);
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: aegis.id,
+    };
+    const nextState = updateSkillSystem(createSkillState([aegis, enemy]), 1000);
 
-    expect(nextState.entities.aegis).toMatchObject({
-      health: 48,
+    expect(nextState.skillAbsorbShieldsByCompanionId?.aegis).toMatchObject({
+      remainingAbsorb: 1,
+      maxAbsorb: 1,
+      expiresAt: 6000,
+    });
+    expect(nextState.statusEffectsById?.["aegis-defenseBuff-hold_fast"]).toMatchObject({
+      defenseBonusPercent: 25,
+      expiresAt: 11000,
+    });
+    expect(nextState.statusEffectsById?.["aegis-immobilized-hold_fast"]).toMatchObject({
+      expiresAt: 6000,
     });
     expect(nextState.skillCooldownsByCompanionId?.aegis?.hold_fast).toMatchObject({
       skillId: "hold_fast",
@@ -1491,7 +1505,7 @@ describe("beginner skill system", () => {
     });
   });
 
-  it("does not use Hold Fast above the capped threshold", () => {
+  it("does not use Hold Fast above the configured use threshold", () => {
     const baseAegis = createCompanion(
       "aegis",
       { x: 0, y: 0 },
@@ -1502,18 +1516,40 @@ describe("beginner skill system", () => {
     );
     const aegis = {
       ...baseAegis,
-      health: 31,
+      health: 60,
       maxHealth: 100,
       skillBehavior: {
         ...baseAegis.skillBehavior,
-        holdFastSelfHealHpThresholdPercent: 80,
+        holdFastUseHpThresholdPercent: 50,
       },
     };
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: aegis.id,
+    };
+    const nextState = updateSkillSystem(createSkillState([aegis, enemy]), 1000);
+
+    expect(nextState.skillCooldownsByCompanionId?.aegis?.hold_fast).toBeUndefined();
+    expect(nextState.skillAbsorbShieldsByCompanionId?.aegis?.id).not.toBe(
+      "aegis-hold_fast",
+    );
+    expect(
+      nextState.statusEffectsById?.["aegis-defenseBuff-hold_fast"],
+    ).toBeUndefined();
+  });
+
+  it("does not use Hold Fast without party danger", () => {
+    const aegis = createCompanion(
+      "aegis",
+      { x: 0, y: 0 },
+      "leader",
+      "defender",
+      1,
+      "aegis",
+    );
     const nextState = updateSkillSystem(createSkillState([aegis]), 1000);
 
-    expect(nextState.entities.aegis).toMatchObject({
-      health: 31,
-    });
     expect(nextState.skillCooldownsByCompanionId?.aegis?.hold_fast).toBeUndefined();
   });
 
@@ -1783,6 +1819,11 @@ describe("beginner skill system", () => {
               skillId: "shield_challenge",
               expiresAt: 5000,
             },
+            hold_fast: {
+              companionId: "aegis",
+              skillId: "hold_fast",
+              expiresAt: 5000,
+            },
           },
         },
       }),
@@ -2039,6 +2080,11 @@ function createAegisEarlierSkillCooldowns(companionId: string): Partial<GameStat
         shield_challenge: {
           companionId,
           skillId: "shield_challenge",
+          expiresAt: 5000,
+        },
+        hold_fast: {
+          companionId,
+          skillId: "hold_fast",
           expiresAt: 5000,
         },
         guard_wall: {

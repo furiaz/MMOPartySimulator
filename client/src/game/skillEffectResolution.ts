@@ -29,6 +29,7 @@ import { getCompanionSkillBehavior } from "./skillBehavior";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
 import { getCompanionDerivedStats } from "./stats";
+import { applyStatusEffect } from "./statusEffects";
 import {
   addCombatFeedback,
   addSkillVisualEvent,
@@ -180,6 +181,18 @@ export function resolveSkillEffect(
     return resolveAppliedSkillEffect(
       state,
       applyAbsorbShield(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (
+    skill.effect.type === "holdFast" &&
+    isLivingCompanion(target) &&
+    target.id === caster.id
+  ) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyHoldFast(state, caster, skill, now),
       caster.id,
     );
   }
@@ -877,6 +890,78 @@ function applyAbsorbShield(
       },
     },
   };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyHoldFast(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "holdFast" ||
+    state.skillAbsorbShieldsByCompanionId?.[caster.id]
+  ) {
+    return state;
+  }
+
+  const maxAbsorb = Math.max(
+    1,
+    Math.round(caster.maxHealth * (skill.effect.absorbPercentMaxHealth / 100)),
+  );
+  let nextState: GameState = {
+    ...state,
+    skillAbsorbShieldsByCompanionId: {
+      ...(state.skillAbsorbShieldsByCompanionId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        ownerId: caster.id,
+        remainingAbsorb: maxAbsorb,
+        maxAbsorb,
+        expiresAt: now + skill.effect.absorbDurationMs,
+      },
+    },
+  };
+
+  nextState = applyStatusEffect(
+    nextState,
+    {
+      type: "defenseBuff",
+      targetId: caster.id,
+      durationMs: skill.effect.defenseDurationMs,
+      defenseBonusPercent: skill.effect.defenseBonusPercent,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+    },
+    now,
+  );
+  nextState = applyStatusEffect(
+    nextState,
+    {
+      type: "immobilized",
+      targetId: caster.id,
+      durationMs: skill.effect.immobilizeDurationMs,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+    },
+    now,
+  );
 
   nextState = addCombatFeedback(nextState, {
     type: "attack",

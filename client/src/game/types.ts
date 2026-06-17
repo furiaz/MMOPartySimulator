@@ -489,7 +489,7 @@ export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
   beginnerFirstAidAllyHealHpThresholdPercent: number;
   secondWindSelfHealHpThresholdPercent: number;
-  holdFastSelfHealHpThresholdPercent: number;
+  holdFastUseHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
   supportFocus: SupportFocus;
 };
@@ -896,6 +896,14 @@ export type SkillDefinition = {
         durationMs: number;
         absorbPercentMaxHealth: number;
         absorbedDamageTypes?: CombatDamageType[];
+      }
+    | {
+        type: "holdFast";
+        defenseBonusPercent: number;
+        defenseDurationMs: number;
+        absorbPercentMaxHealth: number;
+        absorbDurationMs: number;
+        immobilizeDurationMs: number;
       }
     | {
         type: "selfMitigationBuff";

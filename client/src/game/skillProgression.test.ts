@@ -137,9 +137,11 @@ describe("skill progression", () => {
     if (woodcutterRhythm.effect.type === "gatherBuff") {
       expect(woodcutterRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
     }
-    expect(holdFast.effect.type).toBe("selfPercentHeal");
-    if (holdFast.effect.type === "selfPercentHeal") {
-      expect(holdFast.effect.healPercent).toBeCloseTo(21.6);
+    expect(holdFast.effect.type).toBe("holdFast");
+    if (holdFast.effect.type === "holdFast") {
+      expect(holdFast.effect.defenseBonusPercent).toBeCloseTo(30);
+      expect(holdFast.effect.absorbPercentMaxHealth).toBeCloseTo(12);
+      expect(holdFast.effect.immobilizeDurationMs).toBe(4000);
     }
     expect(guardWall.effect.type).toBe("absorbShield");
     if (guardWall.effect.type === "absorbShield") {

@@ -12,11 +12,11 @@ import {
   CLASS_DEFINITIONS,
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
-  DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
-  HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_SUPPORT_FOCUS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
@@ -512,6 +512,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
   if (effect.type === "absorbShield") {
     return `Absorbs ${Math.round(effect.absorbPercentMaxHealth)}% max HP damage.`;
+  }
+
+  if (effect.type === "holdFast") {
+    return `Self +${Math.round(effect.defenseBonusPercent)}% defense, ${Math.round(effect.absorbPercentMaxHealth)}% max HP shield, and cannot move briefly.`;
   }
 
   if (effect.type === "damageMitigation") {
@@ -1487,8 +1491,8 @@ function SkillPreferencesSection({
     member.skillBehavior.secondWindSelfHealHpThresholdPercent ??
     DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT;
   const holdFastThreshold =
-    member.skillBehavior.holdFastSelfHealHpThresholdPercent ??
-    DEFAULT_HOLD_FAST_SELF_HEAL_HP_THRESHOLD_PERCENT;
+    member.skillBehavior.holdFastUseHpThresholdPercent ??
+    DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
@@ -1614,28 +1618,24 @@ function SkillPreferencesSection({
         ) : null}
         {hasHoldFast ? (
           <label className="behavior-range-row">
-            <span>Hold Fast Self-Heal Threshold</span>
+            <span>Hold Fast Use Threshold</span>
             <input
-              max={HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              max={HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT}
               min={1}
               onChange={(event) =>
                 onChangeSkillBehavior(member.id, {
-                  holdFastSelfHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
+                  holdFastUseHpThresholdPercent: Number(event.target.value),
                 })
               }
               type="range"
               value={holdFastThreshold}
             />
             <input
-              max={HOLD_FAST_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              max={HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT}
               min={1}
               onChange={(event) =>
                 onChangeSkillBehavior(member.id, {
-                  holdFastSelfHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
+                  holdFastUseHpThresholdPercent: Number(event.target.value),
                 })
               }
               type="number"

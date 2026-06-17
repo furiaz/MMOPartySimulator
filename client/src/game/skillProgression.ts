@@ -264,9 +264,8 @@ export function getScaledSkillDefinitionForCompanion(
   companion: Companion,
   skill: SkillDefinition,
 ): SkillDefinition {
-  const multiplier = getSkillRankMultiplier(
-    getCompanionSkillRank(companion, skill.id),
-  );
+  const rank = getCompanionSkillRank(companion, skill.id);
+  const multiplier = getSkillRankMultiplier(rank);
 
   if (multiplier === 1) {
     return skill;
@@ -359,6 +358,24 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         absorbPercentMaxHealth: effect.absorbPercentMaxHealth * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "holdFast") {
+    const inverseMultiplier =
+      1 - (Math.max(1, Math.floor(rank)) - 1) * SKILL_RANK_BONUS_PER_RANK;
+
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        defenseBonusPercent: effect.defenseBonusPercent * multiplier,
+        absorbPercentMaxHealth: effect.absorbPercentMaxHealth * multiplier,
+        immobilizeDurationMs: Math.max(
+          0,
+          Math.round(effect.immobilizeDurationMs * inverseMultiplier),
+        ),
       },
     };
   }

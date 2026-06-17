@@ -152,7 +152,7 @@ describe("skill effect resolution", () => {
     expect(skipped.state.entities.ally).toMatchObject({ health: 10 });
   });
 
-  it("applies Hold Fast as a self-only percent heal", () => {
+  it("applies Hold Fast as a self-only defensive stance", () => {
     const caster = {
       ...createSkillCompanion("aegis", "defender", { x: 0, y: 0 }, "aegis"),
       health: 10,
@@ -177,7 +177,21 @@ describe("skill effect resolution", () => {
     );
 
     expect(healed.shouldConsumeCooldown).toBe(true);
-    expect(healed.state.entities.aegis).toMatchObject({ health: 28 });
+    expect(healed.state.entities.aegis).toMatchObject({ health: 10 });
+    expect(healed.state.skillAbsorbShieldsByCompanionId?.aegis).toMatchObject({
+      remainingAbsorb: 10,
+      maxAbsorb: 10,
+      expiresAt: 6000,
+    });
+    expect(healed.state.statusEffectsById?.["aegis-defenseBuff-hold_fast"]).toMatchObject({
+      type: "defenseBuff",
+      defenseBonusPercent: 25,
+      expiresAt: 11000,
+    });
+    expect(healed.state.statusEffectsById?.["aegis-immobilized-hold_fast"]).toMatchObject({
+      type: "immobilized",
+      expiresAt: 6000,
+    });
     expect(skipped.shouldConsumeCooldown).toBe(false);
     expect(skipped.state.entities.ally).toMatchObject({ health: 10 });
   });

@@ -140,6 +140,14 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "holdFast") {
+    return hasPartyDanger(state, caster) &&
+      isHoldFastUseThresholdActive(caster) &&
+      !hasActiveHoldFast(state, caster, skill)
+      ? caster
+      : undefined;
+  }
+
   if (skill.effect.type === "damageMitigation") {
     return hasPartyDanger(state, caster) && !hasActiveDamageMitigation(state, caster)
       ? caster
@@ -810,6 +818,26 @@ function hasActiveAbsorbShield(state: GameState, caster: Companion): boolean {
   return Boolean(state.skillAbsorbShieldsByCompanionId?.[caster.id]);
 }
 
+function hasActiveHoldFast(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+): boolean {
+  return (
+    hasActiveAbsorbShield(state, caster) ||
+    Object.values(state.statusEffectsById ?? {}).some(
+      (status) => status.targetId === caster.id && status.sourceKey === skill.id,
+    )
+  );
+}
+
+function isHoldFastUseThresholdActive(caster: Companion): boolean {
+  return isCompanionAtOrBelowHpThreshold(
+    caster,
+    getCompanionSkillBehavior(caster).holdFastUseHpThresholdPercent,
+  );
+}
+
 function isHealingSkill(skill: SkillDefinition): boolean {
   return skill.effect.type === "heal" || skill.effect.type === "selfCostHeal";
 }
@@ -821,9 +849,7 @@ function isSelfPercentHealPriorityActive(
   const thresholdPercent =
     skill.id === "second_wind"
       ? getCompanionSkillBehavior(caster).secondWindSelfHealHpThresholdPercent
-      : skill.id === "hold_fast"
-        ? getCompanionSkillBehavior(caster).holdFastSelfHealHpThresholdPercent
-        : null;
+      : null;
 
   return (
     thresholdPercent !== null &&
