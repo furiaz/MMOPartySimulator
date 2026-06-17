@@ -42,6 +42,7 @@ import type {
   SkillShieldBlockState,
   SkillVisualEvent,
   SlimewardDungeonRuntimeState,
+  StatusEffectState,
   TeleportRuntimeState,
   WorldWipeRecoveryState,
 } from "./types";
@@ -199,6 +200,7 @@ export type GameState = {
   skillPartyMitigationBuffsBySourceId?: Record<string, SkillMitigationBuffState>;
   skillBindsByEnemyId?: Record<string, SkillBindState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
+  statusEffectsById?: Record<string, StatusEffectState>;
   skillCooldownsByCompanionId?: Record<string, SkillCooldownsBySkillId>;
   globalCooldownsByCompanionId?: Record<string, CompanionGlobalCooldownState>;
   skillVisualEvents?: SkillVisualEvent[];
@@ -398,6 +400,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillShieldBlocksById,
     now,
   );
+  const statusEffectsById = filterExpiredRecord(
+    state.statusEffectsById,
+    now,
+  );
   const skillCooldownsByCompanionId = filterExpiredSkillCooldownsByCompanion(
     state.skillCooldownsByCompanionId,
     now,
@@ -419,6 +425,7 @@ export function clearExpiredSkillRuntimeState(
     skillPartyMitigationBuffsBySourceId === state.skillPartyMitigationBuffsBySourceId &&
     skillBindsByEnemyId === state.skillBindsByEnemyId &&
     skillShieldBlocksById === state.skillShieldBlocksById &&
+    statusEffectsById === state.statusEffectsById &&
     skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
     globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
     skillVisualEvents === state.skillVisualEvents
@@ -438,6 +445,7 @@ export function clearExpiredSkillRuntimeState(
     skillPartyMitigationBuffsBySourceId,
     skillBindsByEnemyId,
     skillShieldBlocksById,
+    statusEffectsById,
     skillCooldownsByCompanionId,
     globalCooldownsByCompanionId,
     skillVisualEvents,

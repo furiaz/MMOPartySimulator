@@ -265,6 +265,7 @@ function resetStateToRescueHub(
     skillPartyMitigationBuffsBySourceId: {},
     skillBindsByEnemyId: {},
     skillShieldBlocksById: {},
+    statusEffectsById: {},
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
     companionAoeChannelsByCasterId: {},

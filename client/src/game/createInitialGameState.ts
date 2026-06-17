@@ -98,6 +98,7 @@ export function createInitialGameState(): GameState {
     skillPartyMitigationBuffsBySourceId: {},
     skillBindsByEnemyId: {},
     skillShieldBlocksById: {},
+    statusEffectsById: {},
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
     skillVisualEvents: [],

@@ -134,6 +134,13 @@ export type {
   DropVisualEvent,
   SkillAbsorbShieldState,
   SkillMitigationBuffState,
+  DefenseBuffStatusEffect,
+  NextAttackDamageBonusStatusEffect,
+  PoisonStatusEffect,
+  SimpleStatusEffect,
+  StatusEffectBase,
+  StatusEffectState,
+  StatusEffectType,
   WorldWipeRecoveryChoice,
   WorldWipeRecoveryState,
   WeaponType,
@@ -588,6 +595,24 @@ export { updateExplorationSystem } from "./explorationSystem";
 export { updateGatherSystem } from "./gatherSystem";
 export { updateRoleSystem } from "./roleSystem";
 export { updateSkillSystem } from "./skillSystem";
+export {
+  POISON_MAX_DURATION_MULTIPLIER,
+  POISON_TICK_INTERVAL_MS,
+  applyStatusEffect,
+  clearStatusEffectsForEntity,
+  consumeForcedEvasionStatus,
+  consumeNextAttackDamageBonus,
+  dropAggroFromTarget,
+  getStatusDefenseBonusPercent,
+  isAttackBlockedByStatus,
+  isGatherBlockedByStatus,
+  isMovementBlockedByStatus,
+  isSkillUseBlockedByStatus,
+  removeStatusEffects,
+  updateStatusEffects,
+  type ApplyStatusEffectInput,
+  type StatusEffectRemovalFilter,
+} from "./statusEffects";
 export {
   SHIELD_SHOCKWAVE_CHANNEL_MS,
   updateCompanionAoeChannelSystem,

@@ -58,6 +58,10 @@ import {
 import { resolveBasicAttackImpact } from "./combatBasicAttackResolution";
 import { launchBasicCombatProjectile } from "./combatProjectileSystem";
 import {
+  isAttackBlockedByStatus,
+  isMovementBlockedByStatus,
+} from "./statusEffects";
+import {
   getCompanionBasicProjectileProfile,
   getEnemyBasicProjectileProfile,
   type CombatProjectileProfile,
@@ -149,11 +153,16 @@ export function updateAttackSystem(
       currentAttacker,
       target,
     );
-    const finalStepPosition =
+    const candidateAllowedFinalStepPosition =
       candidateFinalStepPosition &&
       (!isResurrectionParticipant ||
         isPositionInActiveResurrectionArea(nextState, candidateFinalStepPosition))
         ? candidateFinalStepPosition
+        : null;
+    const finalStepPosition =
+      candidateAllowedFinalStepPosition &&
+      !isMovementBlockedByStatus(nextState, currentAttacker.id)
+        ? candidateAllowedFinalStepPosition
         : null;
     const attackReadyAttacker = finalStepPosition
       ? moveEntityTo(currentAttacker, finalStepPosition)
@@ -518,6 +527,10 @@ function canAttack(
   entity: CombatEntity,
   now: number,
 ): boolean {
+  if (isAttackBlockedByStatus(state, entity.id)) {
+    return false;
+  }
+
   if (isPartyCombatEntity(entity)) {
     return !isCompanionGlobalCooldownActive(state, entity.id, now);
   }

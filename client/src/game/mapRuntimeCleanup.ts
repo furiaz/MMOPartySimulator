@@ -59,6 +59,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     skillSelfMitigationBuffsByCompanionId: {},
     skillPartyMitigationBuffsBySourceId: {},
     skillShieldBlocksById: {},
+    statusEffectsById: {},
     partyFormation: createIdlePartyFormation(),
   };
 }
@@ -132,6 +133,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     currentEntityIds,
   );
   const skillBindsByEnemyId = pruneRecordById(state.skillBindsByEnemyId, currentEntityIds);
+  const statusEffectsById = pruneStatusEffectsByEntityId(
+    state.statusEffectsById,
+    currentEntityIds,
+  );
   const skillCooldownsByCompanionId = pruneRecordById(
     state.skillCooldownsByCompanionId,
     currentEntityIds,
@@ -190,6 +195,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillSelfMitigationBuffsByCompanionId === state.skillSelfMitigationBuffsByCompanionId &&
     skillPartyMitigationBuffsBySourceId === state.skillPartyMitigationBuffsBySourceId &&
     skillBindsByEnemyId === state.skillBindsByEnemyId &&
+    statusEffectsById === state.statusEffectsById &&
     skillCooldownsByCompanionId === state.skillCooldownsByCompanionId &&
     globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
     companionAoeChannelsByCasterId === state.companionAoeChannelsByCasterId &&
@@ -225,6 +231,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillSelfMitigationBuffsByCompanionId,
     skillPartyMitigationBuffsBySourceId,
     skillBindsByEnemyId,
+    statusEffectsById,
     skillCooldownsByCompanionId,
     globalCooldownsByCompanionId,
     companionAoeChannelsByCasterId,
@@ -260,6 +267,27 @@ function pruneRecordById<T>(
   }
 
   return nextRecord ?? record;
+}
+
+function pruneStatusEffectsByEntityId<T extends { targetId: string; sourceId?: string }>(
+  record: Record<string, T> | undefined,
+  currentEntityIds: Set<string>,
+): Record<string, T> | undefined {
+  if (!record) {
+    return record;
+  }
+
+  let didPrune = false;
+  const entries = Object.entries(record).filter(([, value]) => {
+    const shouldKeep =
+      currentEntityIds.has(value.targetId) &&
+      (!value.sourceId || currentEntityIds.has(value.sourceId));
+
+    didPrune ||= !shouldKeep;
+    return shouldKeep;
+  });
+
+  return didPrune ? Object.fromEntries(entries) : record;
 }
 
 function copyCurrentEntries<T>(

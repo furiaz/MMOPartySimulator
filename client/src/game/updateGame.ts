@@ -50,6 +50,7 @@ import {
   updateSkillShieldBlockPositions,
   updateSkillSystem,
 } from "./skillSystem";
+import { updateStatusEffects } from "./statusEffects";
 import {
   isMapTeleportPoiActive,
   updateTeleportSystem,
@@ -81,13 +82,12 @@ export function updateGame(
     return recordDebugTelemetryTick(state, state, timing);
   }
 
-  let nextState = clearExpiredSkillRuntimeState(
-    clearExpiredCombatFeedback(
-      clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
-      timing.nowMs,
-    ),
+  let nextState = clearExpiredCombatFeedback(
+    clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
     timing.nowMs,
   );
+  nextState = updateStatusEffects(nextState, timing.nowMs);
+  nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = clearExpiredHubDepartureFoodWarning(nextState, timing.nowMs);
   nextState = updateRoleBonusAssignments(nextState, timing.nowMs);

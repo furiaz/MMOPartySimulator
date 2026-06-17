@@ -31,6 +31,10 @@ import {
   isWithinGathererLeaderBoundary,
 } from "./gathererResourceReservation";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
+import {
+  isGatherBlockedByStatus,
+  isMovementBlockedByStatus,
+} from "./statusEffects";
 import type { AutonomousEntity, Enemy, GameEntity, ResourceEntity } from "./types";
 
 const GATHER_COOLDOWN_MS = 1000;
@@ -56,6 +60,10 @@ export function updateGatherSystem(
     }
 
     if (!gatherer.currentTargetId) {
+      continue;
+    }
+
+    if (isGatherBlockedByStatus(nextState, gatherer.id)) {
       continue;
     }
 
@@ -117,7 +125,10 @@ export function updateGatherSystem(
     }
 
     if (!isInGatherRange(gatherer, resource)) {
-      if (movedEntityIds.has(gatherer.id)) {
+      if (
+        movedEntityIds.has(gatherer.id) ||
+        isMovementBlockedByStatus(nextState, gatherer.id)
+      ) {
         continue;
       }
 
