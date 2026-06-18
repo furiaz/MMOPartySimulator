@@ -58,6 +58,13 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   pounce: "pounce_skill_book",
   maul_sweep: "maul_sweep_skill_book",
   elemental_bolt: "elemental_bolt_skill_book",
+  mana_shield: "mana_shield_skill_book",
+  frost_armor: "frost_armor_skill_book",
+  overcharge: "overcharge_skill_book",
+  arcane_conduit: "arcane_conduit_skill_book",
+  emberwood_rhythm: "emberwood_rhythm_skill_book",
+  flame_step: "flame_step_skill_book",
+  fire_burst: "fire_burst_skill_book",
   binding_rune: "binding_rune_skill_book",
   light_mend: "light_mend_skill_book",
   penitents_gift: "penitents_gift_skill_book",
@@ -384,6 +391,41 @@ export function getScaledSkillDefinitionForCompanion(
     };
   }
 
+  if (effect.type === "manaShield") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        absorbPercentMaxHealth:
+          effect.absorbPercentMaxHealth +
+          (Math.max(1, Math.floor(rank)) - 1) * 1.25,
+      },
+    };
+  }
+
+  if (effect.type === "frostArmor") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        defenseBonusPercent: effect.defenseBonusPercent * multiplier,
+        mitigationPercent: effect.mitigationPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "overcharge") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        skillPowerBonusPercent:
+          effect.skillPowerBonusPercent +
+          (Math.max(1, Math.floor(rank)) - 1) * 2.5,
+      },
+    };
+  }
+
   if (effect.type === "fakeDeath") {
     return {
       ...skill,
@@ -443,6 +485,29 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         powerMultiplier: effect.powerMultiplier * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "flameStep") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        burnDamageMagicPowerPercent:
+          effect.burnDamageMagicPowerPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "fireBurst") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        powerMultiplier: effect.powerMultiplier * multiplier,
+        burnDamageMagicPowerPercent:
+          effect.burnDamageMagicPowerPercent * multiplier,
       },
     };
   }

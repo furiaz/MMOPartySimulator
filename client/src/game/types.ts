@@ -416,6 +416,13 @@ export type SkillBookItemId =
   | "pounce_skill_book"
   | "maul_sweep_skill_book"
   | "elemental_bolt_skill_book"
+  | "mana_shield_skill_book"
+  | "frost_armor_skill_book"
+  | "overcharge_skill_book"
+  | "arcane_conduit_skill_book"
+  | "emberwood_rhythm_skill_book"
+  | "flame_step_skill_book"
+  | "fire_burst_skill_book"
   | "binding_rune_skill_book"
   | "light_mend_skill_book"
   | "penitents_gift_skill_book";
@@ -498,6 +505,7 @@ export type CompanionConsumableBehavior = {
 
 export type SupportFocus = "lowest_hp" | "leader" | "defender";
 export type MobilitySkillUseMode = "offensive" | "defensive";
+export type FireBurstTargetMode = "big_group" | "low_health" | "highest_health";
 
 export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
@@ -507,7 +515,10 @@ export type CompanionSkillBehavior = {
   fakeDeathUseHpThresholdPercent: number;
   bloodFeastUseHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
+  defensiveMobilityUseHpThresholdPercent: number;
   supportFocus: SupportFocus;
+  overchargeEnabled: boolean;
+  fireBurstTargetMode: FireBurstTargetMode;
 };
 
 export type CompanionSkillProgression = {
@@ -796,6 +807,13 @@ export type SkillId =
   | "pounce"
   | "maul_sweep"
   | "elemental_bolt"
+  | "mana_shield"
+  | "frost_armor"
+  | "overcharge"
+  | "arcane_conduit"
+  | "emberwood_rhythm"
+  | "flame_step"
+  | "fire_burst"
   | "binding_rune"
   | "light_mend"
   | "penitents_gift";
@@ -821,6 +839,7 @@ export type SkillTag =
   | "Aggro"
   | "Buff"
   | "Party Buff"
+  | "Maintenance"
   | "Cleanse"
   | "Summon - Support"
   | "Mobility"
@@ -926,6 +945,23 @@ export type SkillDefinition = {
         refreshWindowMs?: number;
       }
     | {
+        type: "manaShield";
+        absorbPercentMaxHealth: number;
+      }
+    | {
+        type: "frostArmor";
+        durationMs: number;
+        defenseBonusPercent: number;
+        mitigationPercent: number;
+      }
+    | {
+        type: "overcharge";
+        durationMs: number;
+        skillPowerBonusPercent: number;
+        cooldownPenaltyPercent: number;
+        refreshWindowMs?: number;
+      }
+    | {
         type: "partyPoisonCoating";
         durationMs: number;
         poisonDurationMs: number;
@@ -964,6 +1000,24 @@ export type SkillDefinition = {
         distance: number;
         damageType: CombatDamageType;
         powerMultiplier: number;
+      }
+    | {
+        type: "flameStep";
+        distance: number;
+        burnDurationMs: number;
+        burnTickIntervalMs: number;
+        burnDamageMagicPowerPercent: number;
+        sourceKey: string;
+      }
+    | {
+        type: "fireBurst";
+        damageType: "magic";
+        powerMultiplier: number;
+        radius: number;
+        burnDurationMs: number;
+        burnTickIntervalMs: number;
+        burnDamageMagicPowerPercent: number;
+        sourceKey: string;
       }
     | {
         type: "maulSweep";
@@ -1074,6 +1128,31 @@ export type SkillPartyClassBuffState = {
   };
 };
 
+export type SkillOverchargeState = {
+  companionId: string;
+  skillPowerBonusPercent: number;
+  cooldownPenaltyPercent: number;
+  expiresAt: number;
+};
+
+export type SkillManaShieldState = {
+  id: string;
+  ownerId: string;
+  remainingAbsorb: number;
+  maxAbsorb: number;
+  absorbedDamageTypes?: CombatDamageType[];
+};
+
+export type SkillFrostArmorState = {
+  id: string;
+  targetId: string;
+  sourceId: string;
+  defenseBonusPercent: number;
+  mitigationPercent: number;
+  expiresAt: number;
+  mitigatedDamageTypes?: CombatDamageType[];
+};
+
 export type SkillLifestealBuffState = {
   companionId: string;
   lifestealPercent: number;
@@ -1131,6 +1210,7 @@ export type StatusEffectType =
   | "forcedEvasion"
   | "nextAttackDamageBonus"
   | "poison"
+  | "burning"
   | "defenseBuff";
 
 export type StatusEffectBase = {
@@ -1159,14 +1239,22 @@ export type NextAttackDamageBonusStatusEffect = StatusEffectBase & {
   damageTypes?: CombatDamageType[];
 };
 
-export type PoisonStatusEffect = StatusEffectBase & {
-  type: "poison";
+export type DotStatusEffect = StatusEffectBase & {
+  type: "poison" | "burning";
   sourceKey: string;
   tickDamage: number;
   tickIntervalMs: number;
   nextTickAt: number;
   baseDurationMs: number;
   maxDurationMs: number;
+};
+
+export type PoisonStatusEffect = DotStatusEffect & {
+  type: "poison";
+};
+
+export type BurningStatusEffect = DotStatusEffect & {
+  type: "burning";
 };
 
 export type DefenseBuffStatusEffect = StatusEffectBase & {
@@ -1178,6 +1266,7 @@ export type StatusEffectState =
   | SimpleStatusEffect
   | NextAttackDamageBonusStatusEffect
   | PoisonStatusEffect
+  | BurningStatusEffect
   | DefenseBuffStatusEffect;
 
 export type SkillCooldownState = {

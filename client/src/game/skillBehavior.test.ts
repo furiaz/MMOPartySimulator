@@ -4,11 +4,15 @@ import {
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
+  DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
+  DEFAULT_FIRE_BURST_TARGET_MODE,
   DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
+  DEFAULT_OVERCHARGE_ENABLED,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
   BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
+  DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
@@ -35,7 +39,11 @@ describe("companion skill behavior", () => {
       bloodFeastUseHpThresholdPercent:
         DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
       mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
+      defensiveMobilityUseHpThresholdPercent:
+        DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
       supportFocus: DEFAULT_SUPPORT_FOCUS,
+      overchargeEnabled: DEFAULT_OVERCHARGE_ENABLED,
+      fireBurstTargetMode: DEFAULT_FIRE_BURST_TARGET_MODE,
     });
   });
 
@@ -208,6 +216,46 @@ describe("companion skill behavior", () => {
     ).toBe(DEFAULT_MOBILITY_SKILL_USE_MODE);
   });
 
+  it("clamps defensive mobility threshold updates to the hard cap", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
+    const state = addEntity(createTestGameState(), companion);
+
+    const belowMinimum = updateCompanionSkillBehavior(state, companion.id, {
+      defensiveMobilityUseHpThresholdPercent: -20,
+    });
+    const aboveMaximum = updateCompanionSkillBehavior(state, companion.id, {
+      defensiveMobilityUseHpThresholdPercent: 80,
+    });
+
+    expect(
+      belowMinimum.entities.companion.kind === "companion"
+        ? belowMinimum.entities.companion.skillBehavior
+            .defensiveMobilityUseHpThresholdPercent
+        : null,
+    ).toBe(1);
+    expect(
+      aboveMaximum.entities.companion.kind === "companion"
+        ? aboveMaximum.entities.companion.skillBehavior
+            .defensiveMobilityUseHpThresholdPercent
+        : null,
+    ).toBe(DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT);
+  });
+
+  it("normalizes invalid FireBurst target mode updates", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
+    const state = addEntity(createTestGameState(), companion);
+
+    const nextState = updateCompanionSkillBehavior(state, companion.id, {
+      fireBurstTargetMode: "missing" as Companion["skillBehavior"]["fireBurstTargetMode"],
+    });
+
+    expect(
+      nextState.entities.companion.kind === "companion"
+        ? nextState.entities.companion.skillBehavior.fireBurstTargetMode
+        : null,
+    ).toBe(DEFAULT_FIRE_BURST_TARGET_MODE);
+  });
+
   it("fills missing saved skill behavior fields with defaults", () => {
     const companion = {
       ...createCompanion("companion", { x: 0, y: 0 }, "leader"),
@@ -227,7 +275,11 @@ describe("companion skill behavior", () => {
       bloodFeastUseHpThresholdPercent:
         DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
       mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
+      defensiveMobilityUseHpThresholdPercent:
+        DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
       supportFocus: DEFAULT_SUPPORT_FOCUS,
+      overchargeEnabled: DEFAULT_OVERCHARGE_ENABLED,
+      fireBurstTargetMode: DEFAULT_FIRE_BURST_TARGET_MODE,
     });
   });
 

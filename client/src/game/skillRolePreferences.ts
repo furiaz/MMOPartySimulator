@@ -20,6 +20,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "Self Buff",
       "Party Buff",
       "Self Healing",
+      "Maintenance",
     ],
     secondary: ["Mobility", "Control"],
     fallback: [],
@@ -37,6 +38,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "Self Healing",
       "Self Buff",
       "Party Buff",
+      "Maintenance",
       "Summon - Defense",
     ],
     secondary: ["Mobility", "Damage"],
@@ -53,6 +55,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "Party Buff",
       "Cleanse",
       "Safety",
+      "Maintenance",
       "Summon - Support",
     ],
     secondary: ["Control", "Mobility", "Self Cost - HP"],
@@ -60,13 +63,20 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
     avoid: ["Aggro", "Taunt"],
   },
   gatherer: {
-    primary: ["Gathering", "Resource Buff", "Tool Buff", "Self Buff", "Party Buff"],
+    primary: [
+      "Gathering",
+      "Resource Buff",
+      "Tool Buff",
+      "Self Buff",
+      "Party Buff",
+      "Maintenance",
+    ],
     secondary: ["Mobility", "Escape", "Safety", "Self Healing"],
     fallback: ["Light Damage", "Single Target"],
     avoid: ["Aggro", "Taunt"],
   },
   none: {
-    primary: ["Self Buff", "Party Buff"],
+    primary: ["Self Buff", "Party Buff", "Maintenance"],
     secondary: ["Safety", "Mobility", "Self Healing"],
     fallback: ["Damage", "Single Target"],
     avoid: ["Self Cost - HP"],
@@ -102,9 +112,15 @@ function countAvoidMatches(
   tags: SkillTag[],
   avoidedTags: SkillTag[],
 ): number {
-  const effectiveAvoids = tags.includes("Self Healing")
-    ? avoidedTags.filter((tag) => tag !== "Heal")
-    : avoidedTags;
+  let effectiveAvoids = avoidedTags;
+
+  if (tags.includes("Self Healing")) {
+    effectiveAvoids = effectiveAvoids.filter((tag) => tag !== "Heal");
+  }
+
+  if (tags.includes("Maintenance")) {
+    effectiveAvoids = effectiveAvoids.filter((tag) => tag !== "Shield");
+  }
 
   return tags.filter((tag) => effectiveAvoids.includes(tag)).length;
 }

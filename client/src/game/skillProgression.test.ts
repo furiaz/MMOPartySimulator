@@ -61,6 +61,17 @@ const BEAST_SKILL_IDS: SkillId[] = [
   "maul_sweep",
 ];
 
+const ELEMENTALIST_SKILL_IDS: SkillId[] = [
+  "elemental_bolt",
+  "mana_shield",
+  "frost_armor",
+  "overcharge",
+  "arcane_conduit",
+  "emberwood_rhythm",
+  "flame_step",
+  "fire_burst",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -99,6 +110,14 @@ describe("skill progression", () => {
       stoneclaw_rhythm: 5,
       pounce: 5,
       maul_sweep: 5,
+      elemental_bolt: 5,
+      mana_shield: 5,
+      frost_armor: 5,
+      overcharge: 5,
+      arcane_conduit: 5,
+      emberwood_rhythm: 5,
+      flame_step: 5,
+      fire_burst: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -196,6 +215,38 @@ describe("skill progression", () => {
     const maulSweep = getScaledSkillDefinitionForCompanion(
       companion,
       SKILL_DEFINITIONS.maul_sweep,
+    );
+    const elementalBolt = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.elemental_bolt,
+    );
+    const manaShield = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.mana_shield,
+    );
+    const frostArmor = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.frost_armor,
+    );
+    const overcharge = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.overcharge,
+    );
+    const arcaneConduit = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.arcane_conduit,
+    );
+    const emberwoodRhythm = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.emberwood_rhythm,
+    );
+    const flameStep = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.flame_step,
+    );
+    const fireBurst = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.fire_burst,
     );
 
     expect(kick.effect.type).toBe("lungeDamage");
@@ -311,6 +362,45 @@ describe("skill progression", () => {
     expect(maulSweep.effect.type).toBe("maulSweep");
     if (maulSweep.effect.type === "maulSweep") {
       expect(maulSweep.effect.powerMultiplier).toBeCloseTo(1.08);
+    }
+    expect(elementalBolt.effect.type).toBe("damage");
+    if (elementalBolt.effect.type === "damage") {
+      expect(elementalBolt.effect.powerMultiplier).toBeCloseTo(1.5);
+    }
+    expect(manaShield.effect.type).toBe("manaShield");
+    if (manaShield.effect.type === "manaShield") {
+      expect(manaShield.effect.absorbPercentMaxHealth).toBeCloseTo(20);
+    }
+    expect(frostArmor.effect.type).toBe("frostArmor");
+    if (frostArmor.effect.type === "frostArmor") {
+      expect(frostArmor.effect.defenseBonusPercent).toBeCloseTo(12);
+      expect(frostArmor.effect.mitigationPercent).toBeCloseTo(12);
+    }
+    expect(overcharge.effect.type).toBe("overcharge");
+    if (overcharge.effect.type === "overcharge") {
+      expect(overcharge.effect.skillPowerBonusPercent).toBeCloseTo(20);
+      expect(overcharge.effect.cooldownPenaltyPercent).toBe(20);
+    }
+    expect(arcaneConduit.effect.type).toBe("partyClassBuff");
+    if (arcaneConduit.effect.type === "partyClassBuff") {
+      expect(arcaneConduit.effect.magicDamageBonusPercent).toBe(5);
+      expect(
+        arcaneConduit.effect.primaryStatBonusPercentByStat?.intelligence,
+      ).toBeCloseTo(10);
+    }
+    expect(emberwoodRhythm.effect.type).toBe("gatherBuff");
+    if (emberwoodRhythm.effect.type === "gatherBuff") {
+      expect(emberwoodRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+      expect(emberwoodRhythm.effect.resourceType).toBe("wood");
+    }
+    expect(flameStep.effect.type).toBe("flameStep");
+    if (flameStep.effect.type === "flameStep") {
+      expect(flameStep.effect.burnDamageMagicPowerPercent).toBeCloseTo(24);
+    }
+    expect(fireBurst.effect.type).toBe("fireBurst");
+    if (fireBurst.effect.type === "fireBurst") {
+      expect(fireBurst.effect.powerMultiplier).toBeCloseTo(1.2);
+      expect(fireBurst.effect.burnDamageMagicPowerPercent).toBeCloseTo(24);
     }
   });
 
@@ -468,6 +558,39 @@ describe("skill progression", () => {
     expect(getCompanionSkillRank(nextCompanion, "maul_sweep")).toBe(2);
   });
 
+  it("reads new Elementalist skill books for eligible Elementalist companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "elementalist",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "fire_burst_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "fire_burst_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "fire_burst",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "fire_burst")).toBe(2);
+  });
+
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
     const companion = withSkillRanks(
       createCompanion("companion", { x: 0, y: 0 }, "companion"),
@@ -613,6 +736,21 @@ describe("skill progression", () => {
 
     expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
       ...BEAST_SKILL_IDS,
+    ]);
+  });
+
+  it("keeps Elementalist current-class skills ordered in the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "elementalist",
+    );
+
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...ELEMENTALIST_SKILL_IDS,
     ]);
   });
 

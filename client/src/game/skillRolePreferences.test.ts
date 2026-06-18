@@ -58,6 +58,15 @@ describe("skill role preferences", () => {
     }
   });
 
+  it("makes every role value maintenance skills", () => {
+    for (const role of ["fighter", "defender", "support", "gatherer", "none"] as const) {
+      expect(
+        getSkillRoleScore(role, SKILL_DEFINITIONS.mana_shield.tags),
+      ).toBeGreaterThan(0);
+      expect(getSkillRoleScore(role, ["Maintenance"])).toBeGreaterThan(0);
+    }
+  });
+
   it("makes Aegis control and mitigation most desirable for Defenders", () => {
     const defenderShockwaveScore = getSkillRoleScore(
       "defender",
@@ -143,6 +152,16 @@ describe("skill role preferences", () => {
       "stoneclaw_rhythm",
       "pounce",
       "maul_sweep",
+    ]);
+    expect(getSkillsForClass("elementalist").map((skill) => skill.id)).toEqual([
+      "elemental_bolt",
+      "mana_shield",
+      "frost_armor",
+      "overcharge",
+      "arcane_conduit",
+      "emberwood_rhythm",
+      "flame_step",
+      "fire_burst",
     ]);
   });
 });

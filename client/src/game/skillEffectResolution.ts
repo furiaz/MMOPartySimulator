@@ -29,6 +29,7 @@ import {
   getSkillDashPosition,
 } from "./skillMovement";
 import { getCompanionSkillBehavior } from "./skillBehavior";
+import { applyOverchargeToSkillDefinition } from "./skillOvercharge";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
 import { getCompanionDerivedStatsWithPartyBuffs } from "./stats";
@@ -73,7 +74,12 @@ export function resolveSkillEffect(
   now: number,
 ): SkillEffectResolutionResult {
   const { target } = skillUse;
-  const skill = getScaledSkillDefinitionForCompanion(caster, skillUse.skill);
+  const skill = applyOverchargeToSkillDefinition(
+    state,
+    caster,
+    getScaledSkillDefinitionForCompanion(caster, skillUse.skill),
+    now,
+  );
 
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
@@ -241,10 +247,28 @@ export function resolveSkillEffect(
     return consumeSkillEffect(appliedState, target?.id ?? caster.id);
   }
 
+  if (skill.effect.type === "flameStep") {
+    const appliedState = applyFlameStep(state, caster, target, skill, now);
+
+    if (!appliedState) {
+      return skipSkillEffect(state);
+    }
+
+    return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
   if (skill.effect.type === "arrowBurst" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyArrowBurst(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "fireBurst" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyFireBurst(state, caster, target, skill, now),
       target.id,
     );
   }
@@ -261,6 +285,30 @@ export function resolveSkillEffect(
     return resolveAppliedSkillEffect(
       state,
       applyAbsorbShield(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "manaShield") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyManaShield(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "frostArmor" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyFrostArmor(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "overcharge") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyOvercharge(state, caster, skill, now),
       caster.id,
     );
   }
@@ -1281,6 +1329,145 @@ function applyAbsorbShield(
   return nextState;
 }
 
+function applyManaShield(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "manaShield" ||
+    state.skillManaShieldsByCompanionId?.[caster.id]
+  ) {
+    return state;
+  }
+
+  const maxAbsorb = Math.max(
+    1,
+    Math.round(caster.maxHealth * (skill.effect.absorbPercentMaxHealth / 100)),
+  );
+  let nextState: GameState = {
+    ...state,
+    skillManaShieldsByCompanionId: {
+      ...(state.skillManaShieldsByCompanionId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        ownerId: caster.id,
+        remainingAbsorb: maxAbsorb,
+        maxAbsorb,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyFrostArmor(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "frostArmor") {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillFrostArmorsByCompanionId: {
+      ...(state.skillFrostArmorsByCompanionId ?? {}),
+      [target.id]: {
+        id: `${target.id}-${skill.id}`,
+        targetId: target.id,
+        sourceId: caster.id,
+        defenseBonusPercent: skill.effect.defenseBonusPercent,
+        mitigationPercent: skill.effect.mitigationPercent,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyOvercharge(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "overcharge" ||
+    !getCompanionSkillBehavior(caster).overchargeEnabled ||
+    !canApplyRefreshableRuntimeState(
+      state.skillOverchargesByCompanionId?.[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillOverchargesByCompanionId: {
+      ...(state.skillOverchargesByCompanionId ?? {}),
+      [caster.id]: {
+        companionId: caster.id,
+        skillPowerBonusPercent: skill.effect.skillPowerBonusPercent,
+        cooldownPenaltyPercent: skill.effect.cooldownPenaltyPercent,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
 function applyHoldFast(
   state: GameState,
   caster: Companion,
@@ -1659,6 +1846,76 @@ function applyPounce(
   return nextState;
 }
 
+function applyFlameStep(
+  state: GameState,
+  caster: Companion,
+  target: Enemy | Companion | undefined,
+  skill: SkillDefinition,
+  now: number,
+): GameState | null {
+  if (skill.effect.type !== "flameStep" || !isLivingEnemy(target)) {
+    return null;
+  }
+
+  const direction =
+    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
+  );
+
+  if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
+    return null;
+  }
+
+  const movedCaster = {
+    ...caster,
+    position,
+  };
+  let nextState = updateEntity(state, movedCaster);
+  const currentTarget = nextState.entities[target.id];
+
+  if (isLivingEnemy(currentTarget)) {
+    nextState = applyBurning(
+      nextState,
+      movedCaster,
+      currentTarget,
+      skill,
+      now,
+    );
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "red_flash",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
 function applyArrowBurst(
   state: GameState,
   caster: Companion,
@@ -1710,6 +1967,79 @@ function applyArrowBurst(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return nextState;
+}
+
+function applyFireBurst(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "fireBurst") {
+    return state;
+  }
+
+  const effect = skill.effect;
+  let nextState = state;
+  const targets = Object.values(state.entities)
+    .filter(
+      (entity): entity is Enemy =>
+        isLivingEnemy(entity) &&
+        getGridDistance(entity.position, target.position) <= effect.radius,
+    )
+    .sort(
+      (a, b) =>
+        getGridDistance(target.position, a.position) -
+          getGridDistance(target.position, b.position) ||
+        a.id.localeCompare(b.id),
+    );
+
+  if (targets.length === 0) {
+    return state;
+  }
+
+  for (const burstTarget of targets) {
+    const currentTarget = nextState.entities[burstTarget.id];
+
+    if (!isLivingEnemy(currentTarget)) {
+      continue;
+    }
+
+    nextState = damageEnemy(
+      nextState,
+      caster,
+      currentTarget,
+      skill.displayName,
+      now,
+      effect.damageType,
+      effect.powerMultiplier,
+      false,
+    );
+
+    const targetAfterDamage = nextState.entities[burstTarget.id];
+
+    if (isLivingEnemy(targetAfterDamage)) {
+      nextState = applyBurning(
+        nextState,
+        caster,
+        targetAfterDamage,
+        skill,
+        now,
+      );
+    }
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "red_flash",
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
@@ -1987,6 +2317,38 @@ function damageEnemy(
   }
 
   return nextState;
+}
+
+function applyBurning(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "flameStep" && skill.effect.type !== "fireBurst") {
+    return state;
+  }
+
+  const magicPower = getCompanionDerivedStatsWithPartyBuffs(state, caster).magicPower;
+  const tickDamage = Math.max(
+    1,
+    magicPower * (skill.effect.burnDamageMagicPowerPercent / 100),
+  );
+
+  return applyStatusEffect(
+    state,
+    {
+      type: "burning",
+      targetId: target.id,
+      durationMs: skill.effect.burnDurationMs,
+      tickDamage,
+      sourceId: caster.id,
+      sourceKey: skill.effect.sourceKey,
+      tickIntervalMs: skill.effect.burnTickIntervalMs,
+    },
+    now,
+  );
 }
 
 function getUpdatedShieldBlock(

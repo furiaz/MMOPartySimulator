@@ -384,6 +384,64 @@ describe("status effects", () => {
     expect(deadState.statusEffectsById).toEqual({});
   });
 
+  it("ticks burning, extends same-source duration, and stacks different sources", () => {
+    const target = {
+      ...createEnemy("target", { x: 0, y: 0 }, "aggressive"),
+      health: 50,
+      maxHealth: 50,
+    };
+    let state = createState([target]);
+
+    state = applyStatusEffect(
+      state,
+      {
+        type: "burning",
+        targetId: target.id,
+        sourceKey: "flame_step",
+        tickDamage: 3,
+        durationMs: 4_000,
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "burning",
+        targetId: target.id,
+        sourceKey: "flame_step",
+        tickDamage: 2,
+        durationMs: 4_000,
+      },
+      1_000,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "burning",
+        targetId: target.id,
+        sourceKey: "fire_burst",
+        tickDamage: 4,
+        durationMs: 4_000,
+      },
+      1_000,
+    );
+
+    expect(state.statusEffectsById?.["target-burning-flame_step"]).toMatchObject({
+      tickDamage: 3,
+      expiresAt: 8_000,
+    });
+
+    const firstTick = updateStatusEffects(state, 3_000);
+
+    expect((firstTick.entities[target.id] as typeof target).health).toBe(43);
+    expect(firstTick.statusEffectsById).toHaveProperty(
+      "target-burning-flame_step",
+    );
+    expect(firstTick.statusEffectsById).toHaveProperty(
+      "target-burning-fire_burst",
+    );
+  });
+
   it("drops aggro from a target and falls back to idle when nobody else can be targeted", () => {
     const target = createCompanion("target", { x: 0, y: 0 }, "target");
     const ally = createCompanion("ally", { x: 2, y: 0 }, "target");

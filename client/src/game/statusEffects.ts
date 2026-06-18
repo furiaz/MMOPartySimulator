@@ -10,6 +10,8 @@ import type {
 
 export const POISON_TICK_INTERVAL_MS = 2000;
 export const POISON_MAX_DURATION_MULTIPLIER = 3;
+export const BURNING_TICK_INTERVAL_MS = POISON_TICK_INTERVAL_MS;
+export const BURNING_MAX_DURATION_MULTIPLIER = POISON_MAX_DURATION_MULTIPLIER;
 
 export type ApplyStatusEffectInput =
   | {
@@ -35,7 +37,7 @@ export type ApplyStatusEffectInput =
       damageTypes?: CombatDamageType[];
     }
   | {
-      type: "poison";
+      type: "poison" | "burning";
       targetId: string;
       durationMs: number;
       tickDamage: number;
@@ -75,8 +77,8 @@ export function applyStatusEffect(
     return state;
   }
 
-  if (input.type === "poison") {
-    return applyPoisonStatusEffect(state, input, now);
+  if (input.type === "poison" || input.type === "burning") {
+    return applyDotStatusEffect(state, input, now);
   }
 
   const statusEffectsById = { ...(state.statusEffectsById ?? {}) };
@@ -278,7 +280,7 @@ export function updateStatusEffects(
       continue;
     }
 
-    if (status.type !== "poison") {
+    if (status.type !== "poison" && status.type !== "burning") {
       if (status.expiresAt <= now) {
         delete statusEffectsById[status.id];
       }
@@ -286,16 +288,16 @@ export function updateStatusEffects(
     }
 
     let nextTickAt = status.nextTickAt;
-    let totalPoisonDamage = 0;
+    let totalDotDamage = 0;
 
     while (nextTickAt <= now && nextTickAt <= status.expiresAt) {
-      totalPoisonDamage += status.tickDamage;
+      totalDotDamage += status.tickDamage;
       nextTickAt += status.tickIntervalMs;
     }
 
-    if (totalPoisonDamage > 0 && isCombatEntity(target)) {
-      const poisonDamage = Math.max(1, Math.round(totalPoisonDamage));
-      const damagedTarget = damageEntity(target, poisonDamage);
+    if (totalDotDamage > 0 && isCombatEntity(target)) {
+      const dotDamage = Math.max(1, Math.round(totalDotDamage));
+      const damagedTarget = damageEntity(target, dotDamage);
       nextState = updateEntity(nextState, damagedTarget);
       nextState = addCombatFeedback(nextState, {
         type: "damage",
@@ -304,8 +306,8 @@ export function updateStatusEffects(
         targetEntityId: target.id,
         damageType: "magic",
         feedbackKind: "damage",
-        amount: poisonDamage,
-        text: `-${poisonDamage} HP`,
+        amount: dotDamage,
+        text: `-${dotDamage} HP`,
         now,
       });
 
@@ -372,20 +374,26 @@ export function dropAggroFromTarget(
   return nextState;
 }
 
-function applyPoisonStatusEffect(
+function applyDotStatusEffect(
   state: GameState,
-  input: Extract<ApplyStatusEffectInput, { type: "poison" }>,
+  input: Extract<ApplyStatusEffectInput, { type: "poison" | "burning" }>,
   now: number,
 ): GameState {
   const statusEffectsById = { ...(state.statusEffectsById ?? {}) };
   const id = createStatusEffectId(input.targetId, input.type, input.sourceKey);
-  const tickIntervalMs = input.tickIntervalMs ?? POISON_TICK_INTERVAL_MS;
+  const tickIntervalMs =
+    input.tickIntervalMs ??
+    (input.type === "burning" ? BURNING_TICK_INTERVAL_MS : POISON_TICK_INTERVAL_MS);
   const baseDurationMs = Math.max(0, input.durationMs);
   const maxDurationMs =
-    input.maxDurationMs ?? baseDurationMs * POISON_MAX_DURATION_MULTIPLIER;
+    input.maxDurationMs ??
+    baseDurationMs *
+      (input.type === "burning"
+        ? BURNING_MAX_DURATION_MULTIPLIER
+        : POISON_MAX_DURATION_MULTIPLIER);
   const existing = statusEffectsById[id];
 
-  if (existing?.type === "poison") {
+  if (existing?.type === input.type) {
     statusEffectsById[id] = {
       ...existing,
       sourceId: input.sourceId,
@@ -400,7 +408,7 @@ function applyPoisonStatusEffect(
   } else {
     statusEffectsById[id] = {
       id,
-      type: "poison",
+      type: input.type,
       targetId: input.targetId,
       sourceId: input.sourceId,
       sourceKey: input.sourceKey,
