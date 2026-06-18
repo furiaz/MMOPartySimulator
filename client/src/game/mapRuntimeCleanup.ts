@@ -55,6 +55,9 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     skillPartyBuffsBySourceId: {},
     skillPartyPoisonCoatingsBySourceId: {},
     skillPartyClassBuffsByCompanionId: {},
+    skillOverchargesByCompanionId: {},
+    skillManaShieldsByCompanionId: {},
+    skillFrostArmorsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
@@ -121,6 +124,18 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   );
   const skillPartyClassBuffsByCompanionId = pruneRecordById(
     state.skillPartyClassBuffsByCompanionId,
+    currentEntityIds,
+  );
+  const skillOverchargesByCompanionId = pruneRecordById(
+    state.skillOverchargesByCompanionId,
+    currentEntityIds,
+  );
+  const skillManaShieldsByCompanionId = pruneRecordById(
+    state.skillManaShieldsByCompanionId,
+    currentEntityIds,
+  );
+  const skillFrostArmorsByCompanionId = pruneRecordById(
+    state.skillFrostArmorsByCompanionId,
     currentEntityIds,
   );
   const skillLifestealBuffsByCompanionId = pruneRecordById(
@@ -208,6 +223,9 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
       state.skillPartyPoisonCoatingsBySourceId &&
     skillPartyClassBuffsByCompanionId ===
       state.skillPartyClassBuffsByCompanionId &&
+    skillOverchargesByCompanionId === state.skillOverchargesByCompanionId &&
+    skillManaShieldsByCompanionId === state.skillManaShieldsByCompanionId &&
+    skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
@@ -247,6 +265,9 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillPartyBuffsBySourceId,
     skillPartyPoisonCoatingsBySourceId,
     skillPartyClassBuffsByCompanionId,
+    skillOverchargesByCompanionId,
+    skillManaShieldsByCompanionId,
+    skillFrostArmorsByCompanionId,
     skillLifestealBuffsByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,

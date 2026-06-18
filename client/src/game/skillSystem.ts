@@ -10,7 +10,10 @@ import {
   resolveSkillEffect,
   type SkillUse,
 } from "./skillEffectResolution";
-import { isBeginnerFirstAidSelfHealPriorityUse } from "./skillBehavior";
+import {
+  getCompanionSkillBehavior,
+  isBeginnerFirstAidSelfHealPriorityUse,
+} from "./skillBehavior";
 import {
   getSkillTarget,
   hasPartyCombatContext,
@@ -28,6 +31,7 @@ import {
   startSkillCooldown,
 } from "./companionCooldowns";
 import { canUsePartyClassBuff } from "./skillRuntime";
+import { getOverchargedSkillCooldownMs } from "./skillOvercharge";
 import { isSkillUseBlockedByStatus } from "./statusEffects";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
@@ -39,6 +43,7 @@ const PROTECTIVE_THROW_ROCK_SCORE_BONUS = 5;
 const SUPPORT_ATTACKER_KICK_SCORE_BONUS = 12;
 const LEADER_OPENING_KICK_SCORE_BONUS = 10;
 const OUT_OF_COMBAT_FIRST_AID_ALLY_SCORE_BONUS = 7;
+const DEFENSIVE_MOBILITY_THRESHOLD_SCORE_BONUS = 20;
 const NORMAL_SKILL_SELECTION_PRIORITY = 0;
 const EMERGENCY_SKILL_SELECTION_PRIORITY = 1;
 const ATTACK_SKILL_TELEMETRY_CONTEXT_RANGE = 5;
@@ -298,6 +303,18 @@ function getSkillTargetSkipReason(
   }
 
   if (
+    skill.effect.type === "overcharge" &&
+    state.skillOverchargesByCompanionId?.[caster.id] &&
+    !canUseRefreshableRuntimeState(
+      state.skillOverchargesByCompanionId[caster.id]?.expiresAt,
+      skill.effect.refreshWindowMs,
+      now,
+    )
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
     skill.effect.type === "shieldBlock" &&
     Object.values(state.skillShieldBlocksById ?? {}).some(
       (shield) => shield.ownerId === caster.id,
@@ -309,6 +326,13 @@ function getSkillTargetSkipReason(
   if (
     skill.effect.type === "absorbShield" &&
     state.skillAbsorbShieldsByCompanionId?.[caster.id]
+  ) {
+    return "active_duplicate_shield";
+  }
+
+  if (
+    skill.effect.type === "manaShield" &&
+    state.skillManaShieldsByCompanionId?.[caster.id]
   ) {
     return "active_duplicate_shield";
   }
@@ -462,7 +486,35 @@ function getSkillSelectionScore(
     score += OUT_OF_COMBAT_FIRST_AID_ALLY_SCORE_BONUS;
   }
 
+  if (isDefensiveMobilityThresholdSkillUse(caster, skill)) {
+    score += DEFENSIVE_MOBILITY_THRESHOLD_SCORE_BONUS;
+  }
+
   return score;
+}
+
+function isDefensiveMobilityThresholdSkillUse(
+  caster: Companion,
+  skill: SkillDefinition,
+): boolean {
+  const behavior = getCompanionSkillBehavior(caster);
+
+  return (
+    behavior.mobilitySkillUseMode === "defensive" &&
+    isMobilitySkill(skill) &&
+    caster.maxHealth > 0 &&
+    (caster.health / caster.maxHealth) * 100 <=
+      behavior.defensiveMobilityUseHpThresholdPercent
+  );
+}
+
+function isMobilitySkill(skill: SkillDefinition): boolean {
+  return (
+    skill.effect.type === "quickStep" ||
+    skill.effect.type === "skirmishShot" ||
+    skill.effect.type === "pounce" ||
+    skill.effect.type === "flameStep"
+  );
 }
 
 function getSkillSelectionPriority(skill: SkillDefinition): number {
@@ -478,11 +530,13 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "selfCostHeal" ||
     skill.effect.type === "shieldBlock" ||
     skill.effect.type === "absorbShield" ||
+    skill.effect.type === "manaShield" ||
     skill.effect.type === "holdFast" ||
     skill.effect.type === "damageMitigation" ||
     skill.effect.type === "fakeDeath" ||
     skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "forcedEvasion" ||
+    skill.effect.type === "frostArmor" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff"
   );
@@ -514,11 +568,14 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "partyClassBuff" ||
     skill.effect.type === "partyPoisonCoating" ||
     skill.effect.type === "lifestealBuff" ||
+    skill.effect.type === "overcharge" ||
     skill.effect.type === "fakeDeath" ||
     skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "damageMitigation" ||
     skill.effect.type === "absorbShield" ||
+    skill.effect.type === "manaShield" ||
     skill.effect.type === "holdFast" ||
+    skill.effect.type === "frostArmor" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff" ||
     skill.effect.type === "allyBuff" ||
@@ -556,7 +613,13 @@ function applySkill(
     caster.id,
     skill,
     now,
-    getSkillCooldownMs(skill),
+    getOverchargedSkillCooldownMs(
+      appliedState,
+      caster,
+      skill,
+      getSkillCooldownMs(skill),
+      now,
+    ),
   );
 
   return startCompanionGlobalCooldown(
@@ -630,8 +693,10 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "pinningShot":
     case "skirmishShot":
     case "pounce":
+    case "flameStep":
     case "maulSweep":
     case "arrowBurst":
+    case "fireBurst":
     case "bind":
       return true;
     default:

@@ -34,7 +34,10 @@ import type {
   SkillDamageMitigationState,
   SkillGatherBuffState,
   SkillLifestealBuffState,
+  SkillFrostArmorState,
   SkillMarkState,
+  SkillManaShieldState,
+  SkillOverchargeState,
   SkillPartyClassBuffState,
   SkillPartyPoisonCoatingState,
   SkillMitigationBuffState,
@@ -201,6 +204,9 @@ export type GameState = {
     string,
     Partial<Record<ClassId, SkillPartyClassBuffState>>
   >;
+  skillOverchargesByCompanionId?: Record<string, SkillOverchargeState>;
+  skillManaShieldsByCompanionId?: Record<string, SkillManaShieldState>;
+  skillFrostArmorsByCompanionId?: Record<string, SkillFrostArmorState>;
   skillLifestealBuffsByCompanionId?: Record<string, SkillLifestealBuffState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillDamageMitigationsByCompanionId?: Record<string, SkillDamageMitigationState>;
@@ -389,6 +395,14 @@ export function clearExpiredSkillRuntimeState(
     state.skillPartyClassBuffsByCompanionId,
     now,
   );
+  const skillOverchargesByCompanionId = filterExpiredRecord(
+    state.skillOverchargesByCompanionId,
+    now,
+  );
+  const skillFrostArmorsByCompanionId = filterExpiredRecord(
+    state.skillFrostArmorsByCompanionId,
+    now,
+  );
   const skillLifestealBuffsByCompanionId = filterExpiredRecord(
     state.skillLifestealBuffsByCompanionId,
     now,
@@ -443,6 +457,8 @@ export function clearExpiredSkillRuntimeState(
       state.skillPartyPoisonCoatingsBySourceId &&
     skillPartyClassBuffsByCompanionId ===
       state.skillPartyClassBuffsByCompanionId &&
+    skillOverchargesByCompanionId === state.skillOverchargesByCompanionId &&
+    skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
@@ -466,6 +482,8 @@ export function clearExpiredSkillRuntimeState(
     skillPartyBuffsBySourceId,
     skillPartyPoisonCoatingsBySourceId,
     skillPartyClassBuffsByCompanionId,
+    skillOverchargesByCompanionId,
+    skillFrostArmorsByCompanionId,
     skillLifestealBuffsByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,

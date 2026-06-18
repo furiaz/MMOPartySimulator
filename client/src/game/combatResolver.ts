@@ -10,6 +10,7 @@ import {
   applyIncomingDamageMitigation,
   applyLifestealFromAttack,
   applyPartyPoisonCoatingFromAttack,
+  getFrostArmorDefenseBonusPercent,
   getPartyClassDamageBonusPercent,
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
@@ -107,7 +108,16 @@ export function resolveAndApplyCombatDamage(
   const targetDefense =
     options.damageType === "physical"
       ? baseTargetDefense *
-        (1 + getStatusDefenseBonusPercent(nextState, target.id) / 100)
+        (1 +
+          (getStatusDefenseBonusPercent(nextState, target.id) +
+            (target.kind === "companion"
+              ? getFrostArmorDefenseBonusPercent(
+                  nextState,
+                  target,
+                  options.damageType,
+                )
+              : 0)) /
+            100)
       : baseTargetDefense;
   const forcedEvasionResult = consumeForcedEvasionStatus(nextState, target.id);
   nextState = forcedEvasionResult.state;

@@ -2,6 +2,7 @@ import { updateEntity, type GameState } from "./state";
 import type {
   Companion,
   CompanionSkillBehavior,
+  FireBurstTargetMode,
   MobilitySkillUseMode,
   SkillDefinition,
   SupportFocus,
@@ -18,7 +19,11 @@ export const FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT = 30;
 export const BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
+export const DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT = 30;
+export const DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_SUPPORT_FOCUS: SupportFocus = "lowest_hp";
+export const DEFAULT_OVERCHARGE_ENABLED = true;
+export const DEFAULT_FIRE_BURST_TARGET_MODE: FireBurstTargetMode = "big_group";
 
 const SUPPORT_FOCUS_VALUES: ReadonlySet<SupportFocus> = new Set([
   "lowest_hp",
@@ -28,6 +33,11 @@ const SUPPORT_FOCUS_VALUES: ReadonlySet<SupportFocus> = new Set([
 const MOBILITY_SKILL_USE_MODE_VALUES: ReadonlySet<MobilitySkillUseMode> = new Set([
   "offensive",
   "defensive",
+]);
+const FIRE_BURST_TARGET_MODE_VALUES: ReadonlySet<FireBurstTargetMode> = new Set([
+  "big_group",
+  "low_health",
+  "highest_health",
 ]);
 
 export type SkillBehaviorUpdate = Partial<CompanionSkillBehavior>;
@@ -47,7 +57,11 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
     fakeDeathUseHpThresholdPercent: DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
     bloodFeastUseHpThresholdPercent: DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
     mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
+    defensiveMobilityUseHpThresholdPercent:
+      DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
     supportFocus: DEFAULT_SUPPORT_FOCUS,
+    overchargeEnabled: DEFAULT_OVERCHARGE_ENABLED,
+    fireBurstTargetMode: DEFAULT_FIRE_BURST_TARGET_MODE,
   };
 }
 
@@ -92,7 +106,17 @@ export function getCompanionSkillBehavior(
     mobilitySkillUseMode: normalizeMobilitySkillUseMode(
       storedBehavior.mobilitySkillUseMode,
     ),
+    defensiveMobilityUseHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.defensiveMobilityUseHpThresholdPercent ??
+        DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
+      DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
+    ),
     supportFocus: normalizeSupportFocus(storedBehavior.supportFocus),
+    overchargeEnabled:
+      storedBehavior.overchargeEnabled ?? DEFAULT_OVERCHARGE_ENABLED,
+    fireBurstTargetMode: normalizeFireBurstTargetMode(
+      storedBehavior.fireBurstTargetMode,
+    ),
   };
 }
 
@@ -153,8 +177,22 @@ export function updateCompanionSkillBehavior(
         update.mobilitySkillUseMode ??
           getCompanionSkillBehavior(companion).mobilitySkillUseMode,
       ),
+      defensiveMobilityUseHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.defensiveMobilityUseHpThresholdPercent ??
+            getCompanionSkillBehavior(companion)
+              .defensiveMobilityUseHpThresholdPercent,
+          DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
+        ),
       supportFocus: normalizeSupportFocus(
         update.supportFocus ?? getCompanionSkillBehavior(companion).supportFocus,
+      ),
+      overchargeEnabled:
+        update.overchargeEnabled ??
+        getCompanionSkillBehavior(companion).overchargeEnabled,
+      fireBurstTargetMode: normalizeFireBurstTargetMode(
+        update.fireBurstTargetMode ??
+          getCompanionSkillBehavior(companion).fireBurstTargetMode,
       ),
     },
   });
@@ -201,4 +239,11 @@ function normalizeMobilitySkillUseMode(value: unknown): MobilitySkillUseMode {
     MOBILITY_SKILL_USE_MODE_VALUES.has(value as MobilitySkillUseMode)
     ? (value as MobilitySkillUseMode)
     : DEFAULT_MOBILITY_SKILL_USE_MODE;
+}
+
+function normalizeFireBurstTargetMode(value: unknown): FireBurstTargetMode {
+  return typeof value === "string" &&
+    FIRE_BURST_TARGET_MODE_VALUES.has(value as FireBurstTargetMode)
+    ? (value as FireBurstTargetMode)
+    : DEFAULT_FIRE_BURST_TARGET_MODE;
 }

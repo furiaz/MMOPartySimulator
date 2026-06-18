@@ -101,6 +101,24 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "manaShield") {
+    return !hasActiveManaShield(state, caster) ? caster : undefined;
+  }
+
+  if (skill.effect.type === "overcharge") {
+    const behavior = getCompanionSkillBehavior(caster);
+
+    return behavior.overchargeEnabled &&
+      hasValidEnemyContext(state, caster, options) &&
+      canUseRefreshableRuntimeState(
+        state.skillOverchargesByCompanionId?.[caster.id]?.expiresAt,
+        skill.effect.refreshWindowMs,
+        options.now,
+      )
+      ? caster
+      : undefined;
+  }
+
   if (skill.effect.type === "lifestealBuff") {
     return hasPartyDanger(state, caster) &&
       isBloodFeastUseThresholdActive(caster) &&
@@ -123,6 +141,12 @@ export function getSkillTarget(
   if (skill.effect.type === "allyBuff") {
     return hasValidEnemyContext(state, caster, options)
       ? findAllyBuffTarget(state, caster, skill.range)
+      : undefined;
+  }
+
+  if (skill.effect.type === "frostArmor") {
+    return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options)
+      ? findFrostArmorTarget(state, caster, skill.range, options)
       : undefined;
   }
 
@@ -164,8 +188,16 @@ export function getSkillTarget(
     return findPounceTarget(state, caster, skill, options);
   }
 
+  if (skill.effect.type === "flameStep") {
+    return findFlameStepTarget(state, caster, skill, options);
+  }
+
   if (skill.effect.type === "maulSweep") {
     return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
+  }
+
+  if (skill.effect.type === "fireBurst") {
+    return findFireBurstTarget(state, caster, skill, options);
   }
 
   if (skill.effect.type === "fakeDeath") {
@@ -521,6 +553,63 @@ function findAllyBuffTarget(
     )[0];
 }
 
+function findFrostArmorTarget(
+  state: GameState,
+  caster: Companion,
+  range: number,
+  options: SkillTargetOptions,
+): Companion | undefined {
+  const behavior = getCompanionSkillBehavior(caster);
+  const candidates = getPartyMembers(state).filter(
+    (member) =>
+      isLivingCompanion(member) &&
+      getGridDistance(caster.position, member.position) <= range &&
+      canUseRefreshableRuntimeState(
+        state.skillFrostArmorsByCompanionId?.[member.id]?.expiresAt,
+        2000,
+        options.now,
+      ),
+  );
+
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  if (behavior.supportFocus === "leader") {
+    const leader = getPartyLeader(state);
+
+    if (leader && candidates.some((candidate) => candidate.id === leader.id)) {
+      return leader;
+    }
+  }
+
+  if (behavior.supportFocus === "defender") {
+    const defender = sortFrostArmorTargets(
+      caster,
+      candidates.filter((candidate) => candidate.role === "defender"),
+    )[0];
+
+    if (defender) {
+      return defender;
+    }
+  }
+
+  return sortFrostArmorTargets(caster, candidates)[0];
+}
+
+function sortFrostArmorTargets(
+  caster: Companion,
+  targets: Companion[],
+): Companion[] {
+  return targets.sort(
+    (a, b) =>
+      a.health / a.maxHealth - b.health / b.maxHealth ||
+      getGridDistance(caster.position, a.position) -
+        getGridDistance(caster.position, b.position) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
 function getRallyCallRolePriority(companion: Companion): number {
   switch (companion.role) {
     case "fighter":
@@ -785,7 +874,9 @@ function findQuickStepTarget(
   distance: number,
   options: SkillTargetOptions,
 ): Enemy | undefined {
-  if (getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive") {
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findEnemyTarget(state, caster, 6, options);
 
     return enemy &&
@@ -845,7 +936,9 @@ function findSkirmishShotTarget(
     return undefined;
   }
 
-  if (getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive") {
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findEnemyTarget(state, caster, skill.range, options);
 
     return enemy &&
@@ -885,7 +978,9 @@ function findPounceTarget(
     return undefined;
   }
 
-  if (getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive") {
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findEnemyTarget(state, caster, skill.range, options);
 
     return enemy &&
@@ -913,6 +1008,109 @@ function findPounceTarget(
     )
     ? threat
     : undefined;
+}
+
+function findFlameStepTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "flameStep") {
+    return undefined;
+  }
+
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
+    const enemy = findEnemyTarget(state, caster, skill.range, options);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        skill.effect.distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    isEnemyInRange(caster, threat, skill.range) &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      skill.effect.distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
+function findFireBurstTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "fireBurst") {
+    return undefined;
+  }
+
+  const effect = skill.effect;
+  const candidates = Object.values(state.entities).filter(
+    (entity): entity is Enemy =>
+      isLivingEnemy(entity) &&
+      isEnemyInRange(caster, entity, skill.range) &&
+      isAllowedEnemyTarget(entity, options),
+  );
+  const targetMode = getCompanionSkillBehavior(caster).fireBurstTargetMode;
+
+  if (targetMode === "low_health") {
+    return candidates.sort(
+      (a, b) =>
+        a.health / a.maxHealth - b.health / b.maxHealth ||
+        getGridDistance(caster.position, a.position) -
+          getGridDistance(caster.position, b.position) ||
+        a.id.localeCompare(b.id),
+    )[0];
+  }
+
+  if (targetMode === "highest_health") {
+    return candidates.sort(
+      (a, b) =>
+        b.health - a.health ||
+        getGridDistance(caster.position, a.position) -
+          getGridDistance(caster.position, b.position) ||
+        a.id.localeCompare(b.id),
+    )[0];
+  }
+
+  return candidates.sort(
+    (a, b) =>
+      countEnemiesInRadius(state, b, effect.radius) -
+        countEnemiesInRadius(state, a, effect.radius) ||
+      getGridDistance(caster.position, a.position) -
+        getGridDistance(caster.position, b.position) ||
+      a.id.localeCompare(b.id),
+  )[0];
+}
+
+function countEnemiesInRadius(
+  state: GameState,
+  target: Enemy,
+  radius: number,
+): number {
+  return Object.values(state.entities).filter(
+    (entity): entity is Enemy =>
+      isLivingEnemy(entity) &&
+      getGridDistance(entity.position, target.position) <= radius,
+  ).length;
 }
 
 function hasGatherBuffResourceContext(
@@ -954,6 +1152,10 @@ function hasActiveDamageMitigation(state: GameState, caster: Companion): boolean
 
 function hasActiveAbsorbShield(state: GameState, caster: Companion): boolean {
   return Boolean(state.skillAbsorbShieldsByCompanionId?.[caster.id]);
+}
+
+function hasActiveManaShield(state: GameState, caster: Companion): boolean {
+  return Boolean(state.skillManaShieldsByCompanionId?.[caster.id]);
 }
 
 function hasActiveLifestealBuff(state: GameState, caster: Companion): boolean {

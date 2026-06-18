@@ -286,6 +286,235 @@ describe("skill effect resolution", () => {
     expect((result.state.entities.far as Enemy).health).toBe(far.health);
   });
 
+  it("applies Mana Shield as a non-expiring absorb pool and skips recast while active", () => {
+    const elementalist = {
+      ...createSkillCompanion(
+        "elementalist",
+        "fighter",
+        { x: 0, y: 0 },
+        "elementalist",
+      ),
+      health: 100,
+      maxHealth: 100,
+    };
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { attack: 30 });
+    const shieldResult = resolveSkillEffect(
+      createSkillState([elementalist, enemy]),
+      elementalist,
+      createSkillUse("mana_shield", elementalist),
+      1000,
+    );
+
+    expect(shieldResult.shouldConsumeCooldown).toBe(true);
+    expect(
+      shieldResult.state.skillManaShieldsByCompanionId?.elementalist,
+    ).toMatchObject({
+      ownerId: elementalist.id,
+      remainingAbsorb: 15,
+      maxAbsorb: 15,
+    });
+
+    const recastResult = resolveSkillEffect(
+      shieldResult.state,
+      shieldResult.state.entities.elementalist as Companion,
+      createSkillUse(
+        "mana_shield",
+        shieldResult.state.entities.elementalist as Companion,
+      ),
+      2000,
+    );
+
+    expect(recastResult.shouldConsumeCooldown).toBe(false);
+
+    const hitResult = resolveAndApplyCombatDamage(
+      shieldResult.state,
+      enemy,
+      shieldResult.state.entities.elementalist as Companion,
+      {
+        damageType: "magic",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(hitResult.finalDamage).toBeGreaterThan(0);
+    expect(
+      hitResult.state.skillManaShieldsByCompanionId?.elementalist,
+    ).toBeUndefined();
+  });
+
+  it("applies Frost Armor to one ally with defense and mitigation", () => {
+    const elementalist = createSkillCompanion(
+      "elementalist",
+      "support",
+      { x: 0, y: 0 },
+      "elementalist",
+    );
+    const ally = createSkillCompanion("ally", "defender", { x: 1, y: 0 }, "aegis");
+    const enemy = createSkillEnemy("enemy", { x: 2, y: 0 }, { attack: 30 });
+    const armorState = resolveSkillEffect(
+      createSkillState([elementalist, ally, enemy]),
+      elementalist,
+      createSkillUse("frost_armor", ally),
+      1000,
+    ).state;
+
+    expect(armorState.skillFrostArmorsByCompanionId?.ally).toMatchObject({
+      targetId: ally.id,
+      sourceId: elementalist.id,
+      defenseBonusPercent: 10,
+      mitigationPercent: 10,
+      expiresAt: 21000,
+    });
+
+    const armoredHit = resolveAndApplyCombatDamage(
+      armorState,
+      enemy,
+      armorState.entities.ally as Companion,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+    const normalHit = resolveAndApplyCombatDamage(
+      createSkillState([elementalist, ally, enemy]),
+      enemy,
+      ally,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 2000,
+        rng: () => 1,
+      },
+    );
+
+    expect(armoredHit.finalDamage).toBeLessThan(normalHit.finalDamage);
+  });
+
+  it("applies Overcharge and Arcane Conduit runtime buffs", () => {
+    const elementalist = createSkillCompanion(
+      "elementalist",
+      "fighter",
+      { x: 0, y: 0 },
+      "elementalist",
+    );
+    const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 1 });
+    const overchargeState = resolveSkillEffect(
+      createSkillState([elementalist, ally, enemy]),
+      elementalist,
+      createSkillUse("overcharge", elementalist),
+      1000,
+    ).state;
+
+    expect(
+      overchargeState.skillOverchargesByCompanionId?.elementalist,
+    ).toMatchObject({
+      companionId: elementalist.id,
+      skillPowerBonusPercent: 10,
+      cooldownPenaltyPercent: 20,
+      expiresAt: 61000,
+    });
+
+    const conduitState = resolveSkillEffect(
+      overchargeState,
+      overchargeState.entities.elementalist as Companion,
+      createSkillUse(
+        "arcane_conduit",
+        overchargeState.entities.elementalist as Companion,
+      ),
+      2000,
+    ).state;
+
+    expect(
+      conduitState.skillPartyClassBuffsByCompanionId?.ally?.elementalist,
+    ).toMatchObject({
+      sourceClassId: "elementalist",
+      magicDamageBonusPercent: 5.5,
+      primaryStatBonusPercentByStat: { intelligence: 5.5 },
+    });
+  });
+
+  it("moves with Flame Step and applies burning", () => {
+    const elementalist = createSkillCompanion(
+      "elementalist",
+      "fighter",
+      { x: 1, y: 1 },
+      "elementalist",
+    );
+    const enemy = createSkillEnemy("enemy", { x: 4, y: 1 }, { maxHealth: 100 });
+    const result = resolveSkillEffect(
+      createSkillState([elementalist, enemy], {
+        map: createSkillMap([], 8),
+      }),
+      elementalist,
+      createSkillUse("flame_step", enemy),
+      1000,
+    );
+
+    expect(result.shouldConsumeCooldown).toBe(true);
+    expect(
+      (result.state.entities.elementalist as Companion).position.x,
+    ).toBeGreaterThan(elementalist.position.x);
+    expect(Object.values(result.state.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "burning",
+        targetId: enemy.id,
+        sourceKey: "flame_step",
+        tickIntervalMs: 2000,
+      }),
+    );
+  });
+
+  it("hits enemies near the selected target with FireBurst and applies burning", () => {
+    const elementalist = createSkillCompanion(
+      "elementalist",
+      "fighter",
+      { x: 0, y: 0 },
+      "elementalist",
+    );
+    const primary = createSkillEnemy("primary", { x: 4, y: 0 }, { maxHealth: 100 });
+    const nearby = createSkillEnemy("nearby", { x: 5, y: 1 }, { maxHealth: 100 });
+    const far = createSkillEnemy("far", { x: 8, y: 0 }, { maxHealth: 100 });
+    const result = resolveSkillEffect(
+      createSkillState([elementalist, primary, nearby, far]),
+      elementalist,
+      createSkillUse("fire_burst", primary),
+      1000,
+    );
+
+    expect((result.state.entities.primary as Enemy).health).toBeLessThan(
+      primary.health,
+    );
+    expect((result.state.entities.nearby as Enemy).health).toBeLessThan(
+      nearby.health,
+    );
+    expect((result.state.entities.far as Enemy).health).toBe(far.health);
+    expect(Object.values(result.state.statusEffectsById ?? {})).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "burning",
+          targetId: primary.id,
+          sourceKey: "fire_burst",
+        }),
+        expect.objectContaining({
+          type: "burning",
+          targetId: nearby.id,
+          sourceKey: "fire_burst",
+        }),
+      ]),
+    );
+  });
+
   it("applies Second Wind as a self-only percent heal", () => {
     const caster = {
       ...createSkillCompanion("blade", "fighter", { x: 0, y: 0 }, "blade"),

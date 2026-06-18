@@ -13,11 +13,15 @@ import {
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
+  DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
+  DEFAULT_FIRE_BURST_TARGET_MODE,
   DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
+  DEFAULT_OVERCHARGE_ENABLED,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
   BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
+  DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
@@ -63,6 +67,7 @@ import {
   type PrimaryStatId,
   type SkillDefinition,
   type SkillId,
+  type FireBurstTargetMode,
   type MobilitySkillUseMode,
   type SupportFocus,
 } from "./game";
@@ -135,6 +140,18 @@ const mobilitySkillUseModeOptions: MobilitySkillUseMode[] = [
 const mobilitySkillUseModeLabels: Record<MobilitySkillUseMode, string> = {
   offensive: "Offensive",
   defensive: "Defensive",
+};
+
+const fireBurstTargetModeOptions: FireBurstTargetMode[] = [
+  "big_group",
+  "low_health",
+  "highest_health",
+];
+
+const fireBurstTargetModeLabels: Record<FireBurstTargetMode, string> = {
+  big_group: "Big Group",
+  low_health: "Low HP",
+  highest_health: "High HP",
 };
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
@@ -554,6 +571,18 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Party attacks apply poison for ${Math.round(effect.poisonDurationMs / 1000)}s.`;
   }
 
+  if (effect.type === "manaShield") {
+    return `Self shield absorbs ${Math.round(effect.absorbPercentMaxHealth)}% max HP damage.`;
+  }
+
+  if (effect.type === "frostArmor") {
+    return `Ally +${Math.round(effect.defenseBonusPercent)}% defense and ${Math.round(effect.mitigationPercent)}% mitigation.`;
+  }
+
+  if (effect.type === "overcharge") {
+    return `Self skills are ${Math.round(effect.skillPowerBonusPercent)}% stronger with ${Math.round(effect.cooldownPenaltyPercent)}% longer cooldowns.`;
+  }
+
   if (effect.type === "gatherBuff") {
     return effect.resourceType
       ? `Self +${effect.bonusGatherSpeed} ${effect.resourceType} gather speed.`
@@ -578,6 +607,14 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
   if (effect.type === "pounce") {
     return `Moves ${effect.distance} spaces and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
+  }
+
+  if (effect.type === "flameStep") {
+    return `Moves ${effect.distance} spaces and applies burning.`;
+  }
+
+  if (effect.type === "fireBurst") {
+    return `Hits enemies near the target for ${Math.round(effect.powerMultiplier * 100)}% magic damage and applies burning.`;
   }
 
   if (effect.type === "maulSweep") {
@@ -1583,7 +1620,14 @@ function SkillPreferencesSection({
     DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
+  const defensiveMobilityThreshold =
+    member.skillBehavior.defensiveMobilityUseHpThresholdPercent ??
+    DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT;
   const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
+  const overchargeEnabled =
+    member.skillBehavior.overchargeEnabled ?? DEFAULT_OVERCHARGE_ENABLED;
+  const fireBurstTargetMode =
+    member.skillBehavior.fireBurstTargetMode ?? DEFAULT_FIRE_BURST_TARGET_MODE;
   const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
   const hasFirstAid = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "first_aid"),
@@ -1606,10 +1650,20 @@ function SkillPreferencesSection({
       skill.id === "flash_step" ||
       skill.id === "shield_rush" ||
       skill.id === "skirmish_shot" ||
-      skill.id === "pounce"
+      skill.id === "pounce" ||
+      skill.id === "flame_step"
     ),
   );
-  const isSupport = member.role === "support";
+  const hasOvercharge = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "overcharge"),
+  );
+  const hasFrostArmor = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "frost_armor"),
+  );
+  const hasFireBurst = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "fire_burst"),
+  );
+  const shouldShowSupportFocus = member.role === "support" || hasFrostArmor;
   const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
 
   return (
@@ -1796,6 +1850,20 @@ function SkillPreferencesSection({
             <strong>{bloodFeastThreshold}%</strong>
           </label>
         ) : null}
+        {hasOvercharge ? (
+          <label className="behavior-toggle-row">
+            <span>Overcharge</span>
+            <input
+              checked={overchargeEnabled}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  overchargeEnabled: event.target.checked,
+                })
+              }
+              type="checkbox"
+            />
+          </label>
+        ) : null}
         {hasMobilitySkill ? (
           <div className="behavior-choice-row">
             <span>Mobility Skill Use</span>
@@ -1822,9 +1890,41 @@ function SkillPreferencesSection({
             </div>
           </div>
         ) : null}
-        {isSupport ? (
+        {hasMobilitySkill && mobilitySkillUseMode === "defensive" ? (
+          <label className="behavior-range-row">
+            <span>Defensive Mobility Threshold</span>
+            <input
+              max={DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  defensiveMobilityUseHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="range"
+              value={defensiveMobilityThreshold}
+            />
+            <input
+              max={DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  defensiveMobilityUseHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="number"
+              value={defensiveMobilityThreshold}
+            />
+            <strong>{defensiveMobilityThreshold}%</strong>
+          </label>
+        ) : null}
+        {shouldShowSupportFocus ? (
           <div className="behavior-choice-row">
-            <span>Support Focus</span>
+            <span>{hasFrostArmor ? "Support / Frost Focus" : "Support Focus"}</span>
             <div
               aria-label="Support Focus"
               className="behavior-choice-group"
@@ -1843,6 +1943,32 @@ function SkillPreferencesSection({
                   type="button"
                 >
                   {supportFocusLabels[option]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {hasFireBurst ? (
+          <div className="behavior-choice-row">
+            <span>FireBurst Target</span>
+            <div
+              aria-label="FireBurst Target"
+              className="behavior-choice-group"
+              role="group"
+            >
+              {fireBurstTargetModeOptions.map((option) => (
+                <button
+                  aria-pressed={fireBurstTargetMode === option}
+                  className={fireBurstTargetMode === option ? "active" : ""}
+                  key={option}
+                  onClick={() =>
+                    onChangeSkillBehavior(member.id, {
+                      fireBurstTargetMode: option,
+                    })
+                  }
+                  type="button"
+                >
+                  {fireBurstTargetModeLabels[option]}
                 </button>
               ))}
             </div>
@@ -1882,7 +2008,16 @@ function SkillPreferencesSection({
             </div>
           </div>
         ) : null}
-        {!hasFirstAid && !isSupport && legacyCandidates.length === 0 ? (
+        {!hasFirstAid &&
+        !hasSecondWind &&
+        !hasHoldFast &&
+        !hasFakeDeath &&
+        !hasBloodFeast &&
+        !hasMobilitySkill &&
+        !hasOvercharge &&
+        !shouldShowSupportFocus &&
+        !hasFireBurst &&
+        legacyCandidates.length === 0 ? (
           <span className="party-menu-empty">No skill preferences available</span>
         ) : null}
       </div>

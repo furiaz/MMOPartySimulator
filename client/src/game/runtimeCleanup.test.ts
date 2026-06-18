@@ -109,6 +109,38 @@ describe("runtime cleanup", () => {
           expiresAt: 900,
         },
       },
+      skillOverchargesByCompanionId: {
+        "companion-1": {
+          companionId: "companion-1",
+          skillPowerBonusPercent: 10,
+          cooldownPenaltyPercent: 20,
+          expiresAt: 2000,
+        },
+        "companion-2": {
+          companionId: "companion-2",
+          skillPowerBonusPercent: 10,
+          cooldownPenaltyPercent: 20,
+          expiresAt: 900,
+        },
+      },
+      skillFrostArmorsByCompanionId: {
+        "companion-1": {
+          id: "frost-armor-active",
+          sourceId: "companion-1",
+          targetId: "companion-1",
+          defenseBonusPercent: 10,
+          mitigationPercent: 10,
+          expiresAt: 2000,
+        },
+        "companion-2": {
+          id: "frost-armor-expired",
+          sourceId: "companion-2",
+          targetId: "companion-2",
+          defenseBonusPercent: 10,
+          mitigationPercent: 10,
+          expiresAt: 900,
+        },
+      },
       skillVisualEvents: [activeVisual, expiredVisual],
     });
 
@@ -122,6 +154,24 @@ describe("runtime cleanup", () => {
       "companion-1": {
         companionId: "companion-1",
         lifestealPercent: 10,
+        expiresAt: 2000,
+      },
+    });
+    expect(nextState.skillOverchargesByCompanionId).toEqual({
+      "companion-1": {
+        companionId: "companion-1",
+        skillPowerBonusPercent: 10,
+        cooldownPenaltyPercent: 20,
+        expiresAt: 2000,
+      },
+    });
+    expect(nextState.skillFrostArmorsByCompanionId).toEqual({
+      "companion-1": {
+        id: "frost-armor-active",
+        sourceId: "companion-1",
+        targetId: "companion-1",
+        defenseBonusPercent: 10,
+        mitigationPercent: 10,
         expiresAt: 2000,
       },
     });
@@ -198,6 +248,32 @@ describe("runtime cleanup", () => {
           expiresAt: 6000,
         },
       },
+      skillOverchargesByCompanionId: {
+        leader: {
+          companionId: "leader",
+          skillPowerBonusPercent: 10,
+          cooldownPenaltyPercent: 20,
+          expiresAt: 6000,
+        },
+      },
+      skillManaShieldsByCompanionId: {
+        leader: {
+          id: "mana-shield",
+          ownerId: "leader",
+          remainingAbsorb: 20,
+          maxAbsorb: 20,
+        },
+      },
+      skillFrostArmorsByCompanionId: {
+        leader: {
+          id: "frost-armor",
+          sourceId: "leader",
+          targetId: "leader",
+          defenseBonusPercent: 10,
+          mitigationPercent: 10,
+          expiresAt: 6000,
+        },
+      },
       globalCooldownsByCompanionId: {
         leader: {
           companionId: "leader",
@@ -233,6 +309,9 @@ describe("runtime cleanup", () => {
       state.skillCooldownsByCompanionId,
     );
     expect(nextState.skillLifestealBuffsByCompanionId).toEqual({});
+    expect(nextState.skillOverchargesByCompanionId).toEqual({});
+    expect(nextState.skillManaShieldsByCompanionId).toEqual({});
+    expect(nextState.skillFrostArmorsByCompanionId).toEqual({});
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.combatProjectiles).toEqual([]);
     expect(nextState.companionAoeChannelsByCasterId).toEqual({});
@@ -317,6 +396,52 @@ describe("runtime cleanup", () => {
           expiresAt: 2000,
         },
       },
+      skillOverchargesByCompanionId: {
+        [companion.id]: {
+          companionId: companion.id,
+          skillPowerBonusPercent: 10,
+          cooldownPenaltyPercent: 20,
+          expiresAt: 2000,
+        },
+        [enemy.id]: {
+          companionId: enemy.id,
+          skillPowerBonusPercent: 10,
+          cooldownPenaltyPercent: 20,
+          expiresAt: 2000,
+        },
+      },
+      skillManaShieldsByCompanionId: {
+        [companion.id]: {
+          id: "mana-shield-active",
+          ownerId: companion.id,
+          remainingAbsorb: 20,
+          maxAbsorb: 20,
+        },
+        [enemy.id]: {
+          id: "mana-shield-stale",
+          ownerId: enemy.id,
+          remainingAbsorb: 20,
+          maxAbsorb: 20,
+        },
+      },
+      skillFrostArmorsByCompanionId: {
+        [companion.id]: {
+          id: "frost-armor-active",
+          sourceId: companion.id,
+          targetId: companion.id,
+          defenseBonusPercent: 10,
+          mitigationPercent: 10,
+          expiresAt: 2000,
+        },
+        [enemy.id]: {
+          id: "frost-armor-stale",
+          sourceId: enemy.id,
+          targetId: enemy.id,
+          defenseBonusPercent: 10,
+          mitigationPercent: 10,
+          expiresAt: 2000,
+        },
+      },
       globalCooldownsByCompanionId: {
         [companion.id]: {
           companionId: companion.id,
@@ -392,6 +517,32 @@ describe("runtime cleanup", () => {
       [companion.id]: {
         companionId: companion.id,
         lifestealPercent: 10,
+        expiresAt: 2000,
+      },
+    });
+    expect(nextState.skillOverchargesByCompanionId).toEqual({
+      [companion.id]: {
+        companionId: companion.id,
+        skillPowerBonusPercent: 10,
+        cooldownPenaltyPercent: 20,
+        expiresAt: 2000,
+      },
+    });
+    expect(nextState.skillManaShieldsByCompanionId).toEqual({
+      [companion.id]: {
+        id: "mana-shield-active",
+        ownerId: companion.id,
+        remainingAbsorb: 20,
+        maxAbsorb: 20,
+      },
+    });
+    expect(nextState.skillFrostArmorsByCompanionId).toEqual({
+      [companion.id]: {
+        id: "frost-armor-active",
+        sourceId: companion.id,
+        targetId: companion.id,
+        defenseBonusPercent: 10,
+        mitigationPercent: 10,
         expiresAt: 2000,
       },
     });

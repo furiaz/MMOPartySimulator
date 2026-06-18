@@ -9,8 +9,10 @@ import type {
   ResourceEntity,
   SkillAbsorbShieldState,
   SkillDamageMitigationState,
+  SkillFrostArmorState,
   SkillDefinition,
   SkillLifestealBuffState,
+  SkillManaShieldState,
   SkillMitigationBuffState,
   SkillPartyClassBuffState,
   SkillShieldBlockState,
@@ -282,16 +284,57 @@ export function applyIncomingDamageAbsorb(
   damageType: CombatDamageType,
   now: number,
 ): { state: GameState; remainingDamage: number; absorbedDamage: number } {
-  const absorbShield = getAbsorbShield(state, target, damageType);
+  const manaShield = getManaShield(state, target, damageType);
+  let nextState = state;
+  let remainingDamage = rawDamage;
+  let absorbedDamage = 0;
 
-  if (!absorbShield || rawDamage <= 0) {
-    return { state, remainingDamage: rawDamage, absorbedDamage: 0 };
+  if (manaShield && remainingDamage > 0) {
+    const manaAbsorbedDamage = Math.min(
+      remainingDamage,
+      manaShield.remainingAbsorb,
+    );
+    const remainingAbsorb = manaShield.remainingAbsorb - manaAbsorbedDamage;
+    const skillManaShieldsByCompanionId = {
+      ...(nextState.skillManaShieldsByCompanionId ?? {}),
+    };
+
+    if (remainingAbsorb > 0) {
+      skillManaShieldsByCompanionId[target.id] = {
+        ...manaShield,
+        remainingAbsorb,
+      };
+    } else {
+      delete skillManaShieldsByCompanionId[target.id];
+    }
+
+    nextState = {
+      ...nextState,
+      skillManaShieldsByCompanionId,
+    };
+    nextState = addCombatFeedback(nextState, {
+      type: "attack",
+      entityId: target.id,
+      text: "Mana Shield",
+      now,
+    });
+    remainingDamage = Math.max(0, remainingDamage - manaAbsorbedDamage);
+    absorbedDamage += manaAbsorbedDamage;
   }
 
-  const absorbedDamage = Math.min(rawDamage, absorbShield.remainingAbsorb);
-  const remainingAbsorb = absorbShield.remainingAbsorb - absorbedDamage;
+  const absorbShield = getAbsorbShield(nextState, target, damageType);
+
+  if (!absorbShield || remainingDamage <= 0) {
+    return { state: nextState, remainingDamage, absorbedDamage };
+  }
+
+  const shieldAbsorbedDamage = Math.min(
+    remainingDamage,
+    absorbShield.remainingAbsorb,
+  );
+  const remainingAbsorb = absorbShield.remainingAbsorb - shieldAbsorbedDamage;
   const skillAbsorbShieldsByCompanionId = {
-    ...(state.skillAbsorbShieldsByCompanionId ?? {}),
+    ...(nextState.skillAbsorbShieldsByCompanionId ?? {}),
   };
 
   if (remainingAbsorb > 0) {
@@ -303,8 +346,8 @@ export function applyIncomingDamageAbsorb(
     delete skillAbsorbShieldsByCompanionId[target.id];
   }
 
-  let nextState: GameState = {
-    ...state,
+  nextState = {
+    ...nextState,
     skillAbsorbShieldsByCompanionId,
   };
 
@@ -317,8 +360,8 @@ export function applyIncomingDamageAbsorb(
 
   return {
     state: nextState,
-    remainingDamage: Math.max(0, rawDamage - absorbedDamage),
-    absorbedDamage,
+    remainingDamage: Math.max(0, remainingDamage - shieldAbsorbedDamage),
+    absorbedDamage: absorbedDamage + shieldAbsorbedDamage,
   };
 }
 
@@ -419,8 +462,12 @@ function getTimedMitigationPercent(
           : total,
       0,
     );
+  const frostArmor = state.skillFrostArmorsByCompanionId?.[target.id];
+  const frostArmorPercent = doesFrostArmorApply(frostArmor, damageType)
+    ? frostArmor.mitigationPercent
+    : 0;
 
-  return selfPercent + partyPercent + partyClassPercent;
+  return selfPercent + partyPercent + partyClassPercent + frostArmorPercent;
 }
 
 function getAbsorbShield(
@@ -431,6 +478,28 @@ function getAbsorbShield(
   const shield = state.skillAbsorbShieldsByCompanionId?.[target.id];
 
   return shield && doesAbsorbApply(shield, damageType) ? shield : undefined;
+}
+
+function getManaShield(
+  state: GameState,
+  target: Companion,
+  damageType: CombatDamageType,
+): SkillManaShieldState | undefined {
+  const shield = state.skillManaShieldsByCompanionId?.[target.id];
+
+  return shield && doesManaShieldApply(shield, damageType) ? shield : undefined;
+}
+
+export function getFrostArmorDefenseBonusPercent(
+  state: GameState,
+  target: Companion,
+  damageType: CombatDamageType,
+): number {
+  const frostArmor = state.skillFrostArmorsByCompanionId?.[target.id];
+
+  return doesFrostArmorApply(frostArmor, damageType)
+    ? frostArmor.defenseBonusPercent
+    : 0;
 }
 
 function doesMitigationApply(
@@ -451,6 +520,27 @@ function doesAbsorbApply(
   return (
     shield.absorbedDamageTypes === undefined ||
     shield.absorbedDamageTypes.includes(damageType)
+  );
+}
+
+function doesManaShieldApply(
+  shield: SkillManaShieldState,
+  damageType: CombatDamageType,
+): boolean {
+  return (
+    shield.absorbedDamageTypes === undefined ||
+    shield.absorbedDamageTypes.includes(damageType)
+  );
+}
+
+function doesFrostArmorApply(
+  frostArmor: SkillFrostArmorState | undefined,
+  damageType: CombatDamageType,
+): frostArmor is SkillFrostArmorState {
+  return Boolean(
+    frostArmor &&
+      (frostArmor.mitigatedDamageTypes === undefined ||
+        frostArmor.mitigatedDamageTypes.includes(damageType)),
   );
 }
 
