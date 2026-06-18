@@ -31,8 +31,8 @@ import {
   canCompanionEnterFirstClassSelection,
   getCompanionEquipmentPrimaryStatModifiers,
   getCompanionEquipmentStatModifiers,
-  getCompanionActualStats,
-  getCompanionDerivedStats,
+  getCompanionActualStatsWithPartyBuffs,
+  getCompanionDerivedStatsWithPartyBuffs,
   getCompanionEffectiveGatherSpeed,
   getDefenseReductionPercent,
   getItemDefinition,
@@ -51,11 +51,13 @@ import {
   isLegacySkillEnabledForCompanion,
   validateEquipmentItemForCompanion,
   type Companion,
+  type CompanionDerivedStats,
   type CompanionPrimaryStatModifiers,
   type EquipmentSlot,
   type EquipmentStatModifiers,
   type ItemDefinition,
   type ItemId,
+  type GameState,
   type PartyInventory,
   type PartyMemberRole,
   type PrimaryStatId,
@@ -161,7 +163,7 @@ const primaryStatDescriptions: Record<PrimaryStatId, string> = {
 
 type DerivedStatId =
   | "health"
-  | keyof ReturnType<typeof getCompanionDerivedStats>
+  | keyof CompanionDerivedStats
   | "gatherSpeed";
 
 const derivedStatDescriptions: Record<DerivedStatId, string> = {
@@ -209,6 +211,7 @@ function getRoleAccentClass(role: PartyMemberRole): string {
 
 export function PartyMenuPanel({
   activeSection,
+  gameState,
   inventory,
   members,
   currentTime,
@@ -226,6 +229,7 @@ export function PartyMenuPanel({
   onUnequipFlask,
 }: {
   activeSection: PartyMenuSection;
+  gameState: GameState;
   inventory: PartyInventory;
   members: Companion[];
   currentTime: number;
@@ -285,6 +289,7 @@ export function PartyMenuPanel({
           <PartyMenuSectionPanel
             activeSection={activeSection}
             currentTime={currentTime}
+            gameState={gameState}
             inventory={inventory}
             member={selectedMember}
             onAllocateStatPoint={onAllocateStatPoint}
@@ -307,6 +312,7 @@ export function PartyMenuPanel({
 function PartyMenuSectionPanel({
   activeSection,
   currentTime,
+  gameState,
   inventory,
   member,
   onEquipEquipment,
@@ -320,6 +326,7 @@ function PartyMenuSectionPanel({
 }: {
   activeSection: PartyMenuSection;
   currentTime: number;
+  gameState: GameState;
   inventory: PartyInventory;
   member: Companion;
   onEquipEquipment: (
@@ -345,6 +352,7 @@ function PartyMenuSectionPanel({
   if (activeSection === "stats") {
     return (
       <StatsSection
+        gameState={gameState}
         member={member}
         onAllocateStatPoint={onAllocateStatPoint}
       />
@@ -512,6 +520,34 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
   if (effect.type === "partyBuff") {
     return `Party +${effect.bonusDamage} damage.`;
+  }
+
+  if (effect.type === "partyClassBuff") {
+    const parts: string[] = [];
+
+    if (effect.physicalDamageBonusPercent) {
+      parts.push(`+${Math.round(effect.physicalDamageBonusPercent)}% physical damage`);
+    }
+
+    if (effect.magicDamageBonusPercent) {
+      parts.push(`+${Math.round(effect.magicDamageBonusPercent)}% magic damage`);
+    }
+
+    if (effect.mitigationPercent) {
+      parts.push(`${Math.round(effect.mitigationPercent)}% mitigation`);
+    }
+
+    if (effect.poisonCoating) {
+      parts.push("attacks apply poison");
+    }
+
+    for (const [statId, percent] of Object.entries(
+      effect.primaryStatBonusPercentByStat ?? {},
+    )) {
+      parts.push(`+${Math.round(percent)}% ${statId}`);
+    }
+
+    return `Party ${parts.join(", ")}.`;
   }
 
   if (effect.type === "partyPoisonCoating") {
@@ -1914,14 +1950,16 @@ function PartyOrderSection({
 }
 
 function StatsSection({
+  gameState,
   member,
   onAllocateStatPoint,
 }: {
+  gameState: GameState;
   member: Companion;
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
 }) {
-  const actualStats = getCompanionActualStats(member);
-  const derivedStats = getCompanionDerivedStats(member);
+  const actualStats = getCompanionActualStatsWithPartyBuffs(gameState, member);
+  const derivedStats = getCompanionDerivedStatsWithPartyBuffs(gameState, member);
   const effectiveGatherSpeed = getCompanionEffectiveGatherSpeed(member);
 
   return (

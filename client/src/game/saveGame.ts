@@ -361,6 +361,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     skillSelfBuffsByCompanionId: {},
     skillPartyBuffsBySourceId: {},
     skillPartyPoisonCoatingsBySourceId: {},
+    skillPartyClassBuffsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},

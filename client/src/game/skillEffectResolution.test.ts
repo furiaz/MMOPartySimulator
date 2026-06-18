@@ -194,10 +194,16 @@ describe("skill effect resolution", () => {
       1000,
     ).state;
 
-    expect(coatedState.skillPartyPoisonCoatingsBySourceId?.hunter).toMatchObject({
+    expect(
+      coatedState.skillPartyClassBuffsByCompanionId?.ally?.hunter,
+    ).toMatchObject({
       sourceId: hunter.id,
-      sourceKey: "poison_coating",
-      poisonDurationMs: 4000,
+      sourceClassId: "hunter",
+      poisonCoating: expect.objectContaining({
+        sourceKey: "poison_coating",
+        poisonDurationMs: 4000,
+      }),
+      primaryStatBonusPercentByStat: { dexterity: 5 },
     });
 
     const damagedState = resolveAndApplyCombatDamage(coatedState, ally, enemy, {
@@ -565,8 +571,10 @@ describe("skill effect resolution", () => {
       bonusDamage: 1,
       expiresAt: 61000,
     });
-    expect(pressState.skillPartyBuffsBySourceId?.blade).toMatchObject({
-      bonusDamage: 1,
+    expect(pressState.skillPartyClassBuffsByCompanionId?.blade?.blade).toMatchObject({
+      sourceClassId: "blade",
+      physicalDamageBonusPercent: 5,
+      primaryStatBonusPercentByStat: { strength: 5 },
       expiresAt: 61000,
     });
 
@@ -597,7 +605,48 @@ describe("skill effect resolution", () => {
       },
     );
 
-    expect(bladeHit.rawDamage).toBe(allyHit.rawDamage + 1);
+    expect(bladeHit.rawDamage).toBeCloseTo(allyHit.rawDamage + 1.05);
+  });
+
+  it("refreshes same-class party buffs instead of stacking by caster", () => {
+    const firstBlade = createSkillCompanion(
+      "first-blade",
+      "fighter",
+      { x: 0, y: 0 },
+      "blade",
+    );
+    const secondBlade = createSkillCompanion(
+      "second-blade",
+      "fighter",
+      { x: 1, y: 0 },
+      "blade",
+    );
+    const ally = createSkillCompanion("ally", "fighter", { x: 2, y: 0 }, "beast");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 1 });
+    const firstState = resolveSkillEffect(
+      createSkillState([firstBlade, secondBlade, ally, enemy]),
+      firstBlade,
+      createSkillUse("press_the_opening", firstBlade),
+      1000,
+    ).state;
+    const refreshedState = resolveSkillEffect(
+      firstState,
+      firstState.entities["second-blade"] as Companion,
+      createSkillUse(
+        "press_the_opening",
+        firstState.entities["second-blade"] as Companion,
+      ),
+      59000,
+    ).state;
+
+    expect(
+      Object.keys(refreshedState.skillPartyClassBuffsByCompanionId?.ally ?? {}),
+    ).toEqual(["blade"]);
+    expect(refreshedState.skillPartyClassBuffsByCompanionId?.ally?.blade).toMatchObject({
+      sourceId: "second-blade",
+      sourceClassId: "blade",
+      expiresAt: 119000,
+    });
   });
 
   it("stacks Iron Stance and Shield Formation mitigation for landed damage", () => {
@@ -621,8 +670,12 @@ describe("skill effect resolution", () => {
       mitigationPercent: 10,
       expiresAt: 61000,
     });
-    expect(formationState.skillPartyMitigationBuffsBySourceId?.aegis).toMatchObject({
+    expect(
+      formationState.skillPartyClassBuffsByCompanionId?.aegis?.aegis,
+    ).toMatchObject({
+      sourceClassId: "aegis",
       mitigationPercent: 8,
+      primaryStatBonusPercentByStat: { constitution: 5 },
       expiresAt: 61000,
     });
 

@@ -3,12 +3,13 @@ import {
   CLASS_DEFINITIONS,
   companionIds,
   getCharacterXpProgress,
-  getCompanionDerivedStats,
+  getCompanionDerivedStatsWithPartyBuffs,
   getCompanionFlaskDisplayState,
   getItemDefinition,
   type ClassPath,
   type Companion,
   type CompanionGlobalCooldownState,
+  type GameState,
 } from "./game";
 import { CLASS_PORTRAIT_SRC } from "./visualAssets";
 
@@ -34,10 +35,12 @@ function getActiveFoodRemainingSeconds(
 
 export function CompanionVitalsPanel({
   currentTime,
+  gameState,
   globalCooldownsByCompanionId,
   members,
 }: {
   currentTime: number;
+  gameState: GameState;
   globalCooldownsByCompanionId?: Record<string, CompanionGlobalCooldownState>;
   members: Companion[];
 }) {
@@ -66,7 +69,10 @@ export function CompanionVitalsPanel({
           activeFoodRemainingSeconds !== null && member.consumableBuffs.food
             ? getItemDefinition(member.consumableBuffs.food.itemId)
             : null;
-        const derivedStats = getCompanionDerivedStats(member);
+        const derivedStats = getCompanionDerivedStatsWithPartyBuffs(
+          gameState,
+          member,
+        );
         const healthPercent =
           derivedStats.maxHealth > 0
             ? Math.max(

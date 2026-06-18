@@ -365,6 +365,25 @@ export function getScaledSkillDefinitionForCompanion(
     };
   }
 
+  if (effect.type === "partyClassBuff") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        primaryStatBonusPercentByStat:
+          effect.primaryStatBonusPercentByStat &&
+          Object.fromEntries(
+            Object.entries(effect.primaryStatBonusPercentByStat).map(
+              ([statId, percent]) => [
+                statId,
+                getScaledPartyClassBuffStatPercent(percent, rank),
+              ],
+            ),
+          ),
+      },
+    };
+  }
+
   if (effect.type === "fakeDeath") {
     return {
       ...skill,
@@ -507,6 +526,15 @@ export function getScaledSkillDefinitionForCompanion(
   }
 
   return skill;
+}
+
+function getScaledPartyClassBuffStatPercent(
+  basePercent: number,
+  rank: number,
+): number {
+  const rankBonus = (Math.max(1, Math.floor(rank)) - 1) * 1.25;
+
+  return Math.min(10, basePercent + rankBonus);
 }
 
 export function isSkillBookItemDefinition(

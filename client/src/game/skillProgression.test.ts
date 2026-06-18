@@ -211,9 +211,12 @@ describe("skill progression", () => {
     if (bladeParry.effect.type === "damageMitigation") {
       expect(bladeParry.effect.mitigationPercent).toBeCloseTo(60);
     }
-    expect(pressTheOpening.effect.type).toBe("partyBuff");
-    if (pressTheOpening.effect.type === "partyBuff") {
-      expect(pressTheOpening.effect.bonusDamage).toBeCloseTo(1.2);
+    expect(pressTheOpening.effect.type).toBe("partyClassBuff");
+    if (pressTheOpening.effect.type === "partyClassBuff") {
+      expect(pressTheOpening.effect.physicalDamageBonusPercent).toBe(5);
+      expect(
+        pressTheOpening.effect.primaryStatBonusPercentByStat?.strength,
+      ).toBeCloseTo(10);
     }
     expect(woodcutterRhythm.effect.type).toBe("gatherBuff");
     if (woodcutterRhythm.effect.type === "gatherBuff") {
@@ -233,9 +236,12 @@ describe("skill progression", () => {
     if (ironStance.effect.type === "selfMitigationBuff") {
       expect(ironStance.effect.mitigationPercent).toBeCloseTo(12);
     }
-    expect(shieldFormation.effect.type).toBe("partyMitigationBuff");
-    if (shieldFormation.effect.type === "partyMitigationBuff") {
-      expect(shieldFormation.effect.mitigationPercent).toBeCloseTo(9.6);
+    expect(shieldFormation.effect.type).toBe("partyClassBuff");
+    if (shieldFormation.effect.type === "partyClassBuff") {
+      expect(shieldFormation.effect.mitigationPercent).toBe(8);
+      expect(
+        shieldFormation.effect.primaryStatBonusPercentByStat?.constitution,
+      ).toBeCloseTo(10);
     }
     expect(stonebreakerRhythm.effect.type).toBe("gatherBuff");
     if (stonebreakerRhythm.effect.type === "gatherBuff") {
@@ -253,9 +259,14 @@ describe("skill progression", () => {
     if (fakeDeath.effect.type === "fakeDeath") {
       expect(fakeDeath.effect.nextAttackDamageMultiplierBonus).toBeCloseTo(0.36);
     }
-    expect(poisonCoating.effect.type).toBe("partyPoisonCoating");
-    if (poisonCoating.effect.type === "partyPoisonCoating") {
-      expect(poisonCoating.effect.poisonDamageAttackPowerPercent).toBeCloseTo(24);
+    expect(poisonCoating.effect.type).toBe("partyClassBuff");
+    if (poisonCoating.effect.type === "partyClassBuff") {
+      expect(
+        poisonCoating.effect.poisonCoating?.poisonDamageAttackPowerPercent,
+      ).toBe(20);
+      expect(
+        poisonCoating.effect.primaryStatBonusPercentByStat?.dexterity,
+      ).toBeCloseTo(10);
     }
     expect(skirmishShot.effect.type).toBe("skirmishShot");
     if (skirmishShot.effect.type === "skirmishShot") {
@@ -279,9 +290,14 @@ describe("skill progression", () => {
       expect(feralSurge.effect.bonusDamage).toBeCloseTo(1.2);
       expect(feralSurge.effect.movementSpeedBonusPercent).toBeCloseTo(24);
     }
-    expect(packFrenzy.effect.type).toBe("partyBuff");
-    if (packFrenzy.effect.type === "partyBuff") {
-      expect(packFrenzy.effect.bonusDamage).toBeCloseTo(1.2);
+    expect(packFrenzy.effect.type).toBe("partyClassBuff");
+    if (packFrenzy.effect.type === "partyClassBuff") {
+      expect(packFrenzy.effect.primaryStatBonusPercentByStat?.strength).toBeCloseTo(
+        10,
+      );
+      expect(packFrenzy.effect.primaryStatBonusPercentByStat?.dexterity).toBeCloseTo(
+        10,
+      );
     }
     expect(stoneclawRhythm.effect.type).toBe("gatherBuff");
     if (stoneclawRhythm.effect.type === "gatherBuff") {

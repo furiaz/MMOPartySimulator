@@ -27,6 +27,7 @@ import {
   startCompanionGlobalCooldown,
   startSkillCooldown,
 } from "./companionCooldowns";
+import { canUsePartyClassBuff } from "./skillRuntime";
 import { isSkillUseBlockedByStatus } from "./statusEffects";
 import type { Companion, Enemy, GameEntity, SkillDefinition } from "./types";
 
@@ -242,6 +243,13 @@ function getSkillTargetSkipReason(
       skill.effect.refreshWindowMs,
       now,
     )
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
+    skill.effect.type === "partyClassBuff" &&
+    !canUsePartyClassBuff(state, caster, skill, now)
   ) {
     return "active_duplicate_buff";
   }
@@ -503,6 +511,7 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "selfCostHeal" ||
     skill.effect.type === "selfBuff" ||
     skill.effect.type === "partyBuff" ||
+    skill.effect.type === "partyClassBuff" ||
     skill.effect.type === "partyPoisonCoating" ||
     skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "fakeDeath" ||
