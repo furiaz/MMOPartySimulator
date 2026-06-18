@@ -7,10 +7,20 @@ import {
   updateCombatProjectileSystem,
   type CombatProjectileLaunchProfile,
 } from "./combatProjectileSystem";
-import type { Enemy, GameEntity } from "./types";
+import type { Companion, CompanionPrimaryStats, Enemy, GameEntity } from "./types";
 
 const testProfile: CombatProjectileLaunchProfile = {
+  damageType: "physical",
+  powerMultiplier: 1,
   visualProfileId: "hunter_arrow",
+  speed: 12,
+  impactRadius: 0.3,
+};
+
+const magicProfile: CombatProjectileLaunchProfile = {
+  damageType: "magic",
+  powerMultiplier: 1,
+  visualProfileId: "elementalist_arcane_bolt",
   speed: 12,
   impactRadius: 0.3,
 };
@@ -68,6 +78,37 @@ describe("combat projectile system", () => {
 
     expect(nextState.combatProjectiles).toEqual([]);
     expect(nextTarget.health).toBeLessThan(target.health);
+  });
+
+  it("applies magic projectile damage from companion magic power", () => {
+    const attacker = withStats(
+      createAttackingCompanion("attacker", { x: 0, y: 0 }, "elementalist"),
+      { strength: 1, dexterity: 1, constitution: 1, intelligence: 50, wisdom: 1 },
+    );
+    const target = createEnemy("target", { x: 1, y: 0 }, undefined, {
+      defense: 999,
+      evasion: 0,
+      magicDefense: 0,
+      maxHealth: 100,
+    });
+    const launchedState = launchBasicCombatProjectile(
+      createState([attacker, target]),
+      attacker,
+      target,
+      magicProfile,
+      1000,
+    );
+
+    const nextState = updateCombatProjectileSystem(launchedState, 1100, 100);
+    const nextTarget = nextState.entities[target.id] as Enemy;
+
+    expect(nextState.combatProjectiles).toEqual([]);
+    expect(nextTarget.health).toBe(40);
+    expect(nextState.combatFeedbackEvents.at(-1)).toMatchObject({
+      damageType: "magic",
+      sourceEntityId: attacker.id,
+      targetEntityId: target.id,
+    });
   });
 
   it("expires without damage when the target is dead", () => {
@@ -164,10 +205,21 @@ function createState(entities: GameEntity[]) {
   );
 }
 
-function createAttackingCompanion(id: string, position: { x: number; y: number }) {
+function createAttackingCompanion(
+  id: string,
+  position: { x: number; y: number },
+  classId: Companion["classId"] = "hunter",
+) {
   return {
-    ...createCompanion(id, position, id, "fighter", 0, "hunter"),
+    ...createCompanion(id, position, id, "fighter", 0, classId),
     state: "attack" as const,
     currentTargetId: "target",
+  };
+}
+
+function withStats(companion: Companion, naturalStats: CompanionPrimaryStats): Companion {
+  return {
+    ...companion,
+    naturalStats,
   };
 }

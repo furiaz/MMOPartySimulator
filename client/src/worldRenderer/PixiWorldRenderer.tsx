@@ -137,6 +137,12 @@ const combatProjectileVisualProfiles: Record<
   ActiveCombatProjectile["visualProfileId"],
   { height: number; nativeAngleDegrees: number; src: string; width: number }
 > = {
+  elementalist_arcane_bolt: {
+    height: 18,
+    nativeAngleDegrees: 0,
+    src: `${combatProjectileSpritePath}/elementalist-arcane-bolt.png`,
+    width: 30,
+  },
   hunter_arrow: {
     height: 12,
     nativeAngleDegrees: 0,

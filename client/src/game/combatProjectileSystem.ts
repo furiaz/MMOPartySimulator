@@ -3,12 +3,15 @@ import { resolveBasicAttackImpact } from "./combatBasicAttackResolution";
 import { getEntityById, type GameState } from "./state";
 import type {
   ActiveCombatProjectile,
+  CombatDamageType,
   CombatEntity,
   CombatProjectileVisualProfileId,
   Position,
 } from "./types";
 
 export type CombatProjectileLaunchProfile = {
+  damageType: CombatDamageType;
+  powerMultiplier: number;
   visualProfileId: CombatProjectileVisualProfileId;
   speed: number;
   impactRadius: number;
@@ -32,8 +35,8 @@ export function launchBasicCombatProjectile(
     impactRadius: profile.impactRadius,
     visualProfileId: profile.visualProfileId,
     launchedAt: now,
-    damageType: "physical",
-    powerMultiplier: 1,
+    damageType: profile.damageType,
+    powerMultiplier: profile.powerMultiplier,
   };
 
   return {
@@ -72,7 +75,10 @@ export function updateCombatProjectileSystem(
     const travelDistance = projectile.speed * (deltaMs / 1000);
 
     if (distanceToTarget <= projectile.impactRadius + travelDistance) {
-      const impactResult = resolveBasicAttackImpact(nextState, source, target, now);
+      const impactResult = resolveBasicAttackImpact(nextState, source, target, now, {
+        damageType: projectile.damageType,
+        powerMultiplier: projectile.powerMultiplier,
+      });
       nextState = impactResult.state;
       continue;
     }

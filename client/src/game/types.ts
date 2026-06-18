@@ -857,6 +857,7 @@ export type SkillTag =
 export type CombatDamageType = "physical" | "magic";
 
 export type CombatProjectileVisualProfileId =
+  | "elementalist_arcane_bolt"
   | "hunter_arrow"
   | "slime_spitter"
   | "goblin_thrower"

@@ -6,11 +6,16 @@ import { protectPartyMember } from "./partyProtectionSystem";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { updateEntity, type GameState } from "./state";
-import type { CombatEntity, Companion, Enemy } from "./types";
+import type { CombatDamageType, CombatEntity, Companion, Enemy } from "./types";
 
 export type BasicAttackImpactResult = {
   state: GameState;
   target: CombatEntity;
+};
+
+type BasicAttackImpactOptions = {
+  damageType?: CombatDamageType;
+  powerMultiplier?: number;
 };
 
 export function resolveBasicAttackImpact(
@@ -18,12 +23,14 @@ export function resolveBasicAttackImpact(
   attacker: CombatEntity,
   target: CombatEntity,
   now: number,
+  options: BasicAttackImpactOptions = {},
 ): BasicAttackImpactResult {
+  const damageType = options.damageType ?? "physical";
   const combatResult = resolveAndApplyCombatDamage(state, attacker, target, {
-    damageType: "physical",
-    powerMultiplier: 1,
+    damageType,
+    powerMultiplier: options.powerMultiplier ?? 1,
     allowEvasion: true,
-    allowPassiveBlock: true,
+    allowPassiveBlock: damageType === "physical",
     now,
     label: "Attack",
   });
