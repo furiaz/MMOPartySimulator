@@ -1,5 +1,6 @@
 import { getEnemyCombatStyle } from "./enemyArchetypes";
 import type {
+  CombatDamageType,
   CombatProjectileVisualProfileId,
   Companion,
   Enemy,
@@ -9,6 +10,8 @@ export const BASIC_PROJECTILE_SPEED = 12;
 export const BASIC_PROJECTILE_IMPACT_RADIUS = 0.3;
 
 export type CombatProjectileProfile = {
+  damageType: CombatDamageType;
+  powerMultiplier: number;
   visualProfileId: CombatProjectileVisualProfileId;
   speed: number;
   impactRadius: number;
@@ -17,15 +20,27 @@ export type CombatProjectileProfile = {
 export function getCompanionBasicProjectileProfile(
   companion: Companion,
 ): CombatProjectileProfile | null {
-  if (companion.classId !== "hunter") {
-    return null;
+  if (companion.classId === "hunter") {
+    return {
+      damageType: "physical",
+      powerMultiplier: 1,
+      visualProfileId: "hunter_arrow",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    };
   }
 
-  return {
-    visualProfileId: "hunter_arrow",
-    speed: BASIC_PROJECTILE_SPEED,
-    impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
-  };
+  if (companion.classId === "elementalist") {
+    return {
+      damageType: "magic",
+      powerMultiplier: 1,
+      visualProfileId: "elementalist_arcane_bolt",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    };
+  }
+
+  return null;
 }
 
 export function getEnemyBasicProjectileProfile(
@@ -36,6 +51,8 @@ export function getEnemyBasicProjectileProfile(
   }
 
   return {
+    damageType: "physical",
+    powerMultiplier: 1,
     visualProfileId: getEnemyProjectileVisualProfileId(enemy),
     speed: BASIC_PROJECTILE_SPEED,
     impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import {
   DEFAULT_COMPANION_ATTACK_RANGE,
+  ELEMENTALIST_BASIC_ATTACK_RANGE,
   HUNTER_BASIC_ATTACK_RANGE,
   getCompanionAttackRange,
 } from "./companionCombat";
@@ -23,6 +24,15 @@ describe("enemy attack leash movement", () => {
 
     expect(getCompanionAttackRange(companion)).toBe(HUNTER_BASIC_ATTACK_RANGE);
     expect(getCompanionAttackRange(companion)).toBe(5);
+  });
+
+  it("starts Elementalist basic attack range at four cells", () => {
+    const companion = createIdleCompanion("leader", { x: 0, y: 0 }, "elementalist");
+
+    expect(getCompanionAttackRange(companion)).toBe(
+      ELEMENTALIST_BASIC_ATTACK_RANGE,
+    );
+    expect(getCompanionAttackRange(companion)).toBe(4);
   });
 
   it("lets enemies pursue beyond roam leash while inside attack leash", () => {
@@ -233,6 +243,37 @@ describe("enemy attack leash movement", () => {
       sourceId: companion.id,
       targetId: enemy.id,
       visualProfileId: "hunter_arrow",
+    });
+    expect(nextState.globalCooldownsByCompanionId?.leader).toMatchObject({
+      source: "basic_attack",
+      expiresAt: 3000,
+    });
+  });
+
+  it("lets Elementalist basic attacks launch magic projectiles from ranged distance", () => {
+    const companion = {
+      ...createAttackingCompanion("leader", { x: 4, y: 0 }, 0, "elementalist"),
+      lastAttackAt: -2000,
+    };
+    const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "slime",
+      maxHealth: 20,
+    });
+
+    const nextState = updateAttackSystem(
+      createState([companion, enemy]),
+      new Set(),
+      1000,
+    );
+    const nextEnemy = nextState.entities[enemy.id] as Enemy;
+
+    expect(nextEnemy.health).toBe(enemy.health);
+    expect(nextState.combatProjectiles).toHaveLength(1);
+    expect(nextState.combatProjectiles?.[0]).toMatchObject({
+      damageType: "magic",
+      sourceId: companion.id,
+      targetId: enemy.id,
+      visualProfileId: "elementalist_arcane_bolt",
     });
     expect(nextState.globalCooldownsByCompanionId?.leader).toMatchObject({
       source: "basic_attack",

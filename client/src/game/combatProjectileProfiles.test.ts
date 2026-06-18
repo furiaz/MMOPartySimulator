@@ -8,7 +8,7 @@ import {
 } from "./combatProjectileProfiles";
 
 describe("combat projectile profiles", () => {
-  it("uses Hunter class, not range alone, for companion basic projectiles", () => {
+  it("uses class identity for companion basic projectiles", () => {
     const beginner = createCompanion(
       "beginner",
       { x: 0, y: 0 },
@@ -25,10 +25,27 @@ describe("combat projectile profiles", () => {
       0,
       "hunter",
     );
+    const elementalist = createCompanion(
+      "elementalist",
+      { x: 0, y: 0 },
+      "elementalist",
+      "fighter",
+      0,
+      "elementalist",
+    );
 
     expect(getCompanionBasicProjectileProfile(beginner)).toBeNull();
     expect(getCompanionBasicProjectileProfile(hunter)).toEqual({
+      damageType: "physical",
+      powerMultiplier: 1,
       visualProfileId: "hunter_arrow",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    });
+    expect(getCompanionBasicProjectileProfile(elementalist)).toEqual({
+      damageType: "magic",
+      powerMultiplier: 1,
+      visualProfileId: "elementalist_arcane_bolt",
       speed: BASIC_PROJECTILE_SPEED,
       impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
     });
