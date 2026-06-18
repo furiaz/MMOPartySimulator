@@ -92,6 +92,7 @@ export function createInitialGameState(): GameState {
     skillSelfBuffsByCompanionId: {},
     skillPartyBuffsBySourceId: {},
     skillPartyPoisonCoatingsBySourceId: {},
+    skillPartyClassBuffsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},

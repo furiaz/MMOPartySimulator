@@ -123,6 +123,7 @@ export type {
   SkillGatherBuffState,
   SkillId,
   SkillMarkState,
+  SkillPartyClassBuffState,
   SkillPartyBuffState,
   SkillSelfBuffState,
   SkillShieldBlockState,
@@ -290,7 +291,9 @@ export {
   createDefaultNaturalCompanionStats,
   createEmptyAllocatedCompanionStats,
   getCompanionActualStats,
+  getCompanionActualStatsWithPartyBuffs,
   getCompanionDerivedStats,
+  getCompanionDerivedStatsWithPartyBuffs,
   type StatAllocationResult,
   type StatAllocationStatus,
 } from "./stats";

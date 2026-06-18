@@ -74,7 +74,7 @@ import {
   formatCurrencyDisplay,
   getAvailableInventorySlots,
   getCurrencyBalance,
-  getCompanionDerivedStats,
+  getCompanionDerivedStatsWithPartyBuffs,
   getEnemyArchetype,
   getEnemyType,
   getFilteredMerchantBuyStock,
@@ -2055,10 +2055,12 @@ function formatMerchantModifier(value: number): string {
 
 function EntityHoverTooltip({
   entity,
+  gameState,
   position,
   viewportSize,
 }: {
   entity: GameEntity;
+  gameState: GameState;
   position: Position;
   viewportSize: ViewportSize;
 }) {
@@ -2069,7 +2071,7 @@ function EntityHoverTooltip({
     left: Math.max(12, x),
     top: Math.max(12, y),
   };
-  const details = getEntityHoverDetails(entity);
+  const details = getEntityHoverDetails(gameState, entity);
 
   return (
     <aside
@@ -2090,12 +2092,15 @@ function EntityHoverTooltip({
   );
 }
 
-function getEntityHoverDetails(entity: GameEntity): {
+function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
   title: string;
   rows: Array<{ label: string; value: string }>;
 } {
   if (entity.kind === "companion") {
-    const derivedStats = getCompanionDerivedStats(entity);
+    const derivedStats = getCompanionDerivedStatsWithPartyBuffs(
+      gameState,
+      entity,
+    );
 
     return {
       title: getCompanionDisplayName(entity),
@@ -4524,6 +4529,7 @@ function App() {
           {hoveredEntity && entityHoverTooltip ? (
             <EntityHoverTooltip
               entity={hoveredEntity}
+              gameState={gameState}
               position={entityHoverTooltip.position}
               viewportSize={viewportSize}
             />
@@ -4892,6 +4898,7 @@ function App() {
               activeManagementSection={activePartyManagementSection}
               activePartySection={activePartyMenuSection}
               inventory={inventory}
+              gameState={gameState}
               wallet={gameState.wallet}
               leaderId={gameState.partyLeaderId}
               members={partyMembers}
@@ -4939,6 +4946,7 @@ function App() {
         ) : null}
         <CompanionVitalsPanel
           currentTime={currentTime}
+          gameState={gameState}
           globalCooldownsByCompanionId={gameState.globalCooldownsByCompanionId}
           members={partyMembers}
         />

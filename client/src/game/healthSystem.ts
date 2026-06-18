@@ -1,7 +1,10 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isLivingCompanion, isTargetDummyEnemy } from "./entityGuards";
 import { getPartyMembers } from "./partySystem";
-import { getCompanionDerivedStats, syncCompanionDerivedMaxHealth } from "./stats";
+import {
+  getCompanionDerivedStatsWithPartyBuffs,
+  syncCompanionDerivedMaxHealthWithPartyBuffs,
+} from "./stats";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 
 const HEALTH_REGEN_INTERVAL_MS = 5000;
@@ -12,7 +15,10 @@ export function syncPartyDerivedMaxHealth(state: GameState): GameState {
   let nextState = state;
 
   for (const member of getPartyMembers(nextState)) {
-    const syncedMember = syncCompanionDerivedMaxHealth(member);
+    const syncedMember = syncCompanionDerivedMaxHealthWithPartyBuffs(
+      nextState,
+      member,
+    );
 
     if (syncedMember === member) {
       continue;
@@ -156,7 +162,10 @@ export function updatePassiveHealthRegen(
       continue;
     }
 
-    const amount = getCompanionDerivedStats(member).healthRegen;
+    const amount = getCompanionDerivedStatsWithPartyBuffs(
+      nextState,
+      member,
+    ).healthRegen;
     const nextHealth = Math.min(member.maxHealth, member.health + amount);
     const healedAmount = nextHealth - member.health;
 

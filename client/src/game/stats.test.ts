@@ -9,11 +9,13 @@ import {
   applyCompanionLevelUpStatGrowth,
   createCompanionPrimaryStats,
   getCompanionActualStats,
+  getCompanionActualStatsWithPartyBuffs,
   getCompanionDerivedStats,
   PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK,
   PRIMARY_STAT_IDS,
 } from "./stats";
 import { createPendingRoleBonusState } from "./roleBonus";
+import { createInitialGameState } from "./createInitialGameState";
 import type { CompanionPrimaryStats } from "./types";
 
 describe("prototype companion stats", () => {
@@ -170,6 +172,42 @@ describe("prototype companion stats", () => {
     expect(getCompanionDerivedStats(support).healingPower).toBe(
       getCompanionDerivedStats(noRoleBonus).healingPower + 10,
     );
+  });
+
+  it("stacks party buff stat bonuses by class and floors after summing", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      naturalStats: createPrimaryStats(19, 19, 19, 19, 19),
+    };
+    const state = {
+      ...createInitialGameState(),
+      entities: { [companion.id]: companion },
+      skillPartyClassBuffsByCompanionId: {
+        [companion.id]: {
+          blade: {
+            targetId: companion.id,
+            sourceId: "blade-1",
+            sourceClassId: "blade" as const,
+            sourceSkillId: "press_the_opening" as const,
+            expiresAt: 60000,
+            primaryStatBonusPercentByStat: { strength: 5 },
+          },
+          beast: {
+            targetId: companion.id,
+            sourceId: "beast-1",
+            sourceClassId: "beast" as const,
+            sourceSkillId: "pack_frenzy" as const,
+            expiresAt: 60000,
+            primaryStatBonusPercentByStat: { strength: 5, dexterity: 5 },
+          },
+        },
+      },
+    };
+
+    expect(getCompanionActualStatsWithPartyBuffs(state, companion)).toMatchObject({
+      strength: 20,
+      dexterity: 19,
+    });
   });
 
   it("defines 5-point base class growth profiles", () => {

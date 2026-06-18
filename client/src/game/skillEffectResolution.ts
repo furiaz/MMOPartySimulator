@@ -31,7 +31,8 @@ import {
 import { getCompanionSkillBehavior } from "./skillBehavior";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
-import { getCompanionDerivedStats } from "./stats";
+import { getCompanionDerivedStatsWithPartyBuffs } from "./stats";
+import { canUsePartyClassBuff } from "./skillRuntime";
 import { applyStatusEffect, dropAggroFromTarget } from "./statusEffects";
 import {
   addCombatFeedback,
@@ -174,6 +175,14 @@ export function resolveSkillEffect(
     return resolveAppliedSkillEffect(
       state,
       applyPartyBuff(state, caster, skill, now),
+      caster.id,
+    );
+  }
+
+  if (skill.effect.type === "partyClassBuff") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyPartyClassBuff(state, caster, skill, now),
       caster.id,
     );
   }
@@ -907,6 +916,88 @@ function applyPartyBuff(
   return nextState;
 }
 
+function applyPartyClassBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "partyClassBuff" ||
+    !canUsePartyClassBuff(state, caster, skill, now)
+  ) {
+    return state;
+  }
+
+  const tickDamage = skill.effect.poisonCoating
+    ? Math.max(
+        1,
+        getCompanionDerivedStatsWithPartyBuffs(state, caster).attack *
+          (skill.effect.poisonCoating.poisonDamageAttackPowerPercent / 100),
+      )
+    : undefined;
+  let nextState: GameState = state;
+  let skillPartyClassBuffsByCompanionId = {
+    ...(state.skillPartyClassBuffsByCompanionId ?? {}),
+  };
+
+  for (const member of getPartyMembers(state)) {
+    if (!isLivingCompanion(member)) {
+      continue;
+    }
+
+    skillPartyClassBuffsByCompanionId = {
+      ...skillPartyClassBuffsByCompanionId,
+      [member.id]: {
+        ...(skillPartyClassBuffsByCompanionId[member.id] ?? {}),
+        [caster.classId]: {
+          targetId: member.id,
+          sourceId: caster.id,
+          sourceClassId: caster.classId,
+          sourceSkillId: skill.id,
+          expiresAt: now + skill.effect.durationMs,
+          primaryStatBonusPercentByStat:
+            skill.effect.primaryStatBonusPercentByStat,
+          physicalDamageBonusPercent: skill.effect.physicalDamageBonusPercent,
+          magicDamageBonusPercent: skill.effect.magicDamageBonusPercent,
+          mitigationPercent: skill.effect.mitigationPercent,
+          mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
+          poisonCoating:
+            skill.effect.poisonCoating && tickDamage !== undefined
+              ? {
+                  sourceKey: skill.effect.poisonCoating.sourceKey,
+                  tickDamage,
+                  poisonDurationMs: skill.effect.poisonCoating.poisonDurationMs,
+                  poisonTickIntervalMs:
+                    skill.effect.poisonCoating.poisonTickIntervalMs,
+                }
+              : undefined,
+        },
+      },
+    };
+    nextState = addCombatFeedback(nextState, {
+      type: "attack",
+      entityId: member.id,
+      text: skill.displayName,
+      now,
+    });
+  }
+
+  nextState = {
+    ...nextState,
+    skillPartyClassBuffsByCompanionId,
+  };
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
 function applyLifestealBuff(
   state: GameState,
   caster: Companion,
@@ -965,7 +1056,7 @@ function applyPartyPoisonCoating(
 
   const tickDamage = Math.max(
     1,
-    getCompanionDerivedStats(caster).attack *
+    getCompanionDerivedStatsWithPartyBuffs(state, caster).attack *
       (skill.effect.poisonDamageAttackPowerPercent / 100),
   );
   let nextState: GameState = {
@@ -1722,7 +1813,7 @@ function applyHeal(
     return state;
   }
 
-  const amount = getHealingAmount(caster, powerMultiplier);
+  const amount = getHealingAmount(caster, powerMultiplier, state);
   const healedTarget = {
     ...target,
     health: Math.min(target.maxHealth, target.health + amount),
@@ -1767,7 +1858,8 @@ function applyHeal(
     type: "healing_resolved",
     entityId: caster.id,
     targetId: target.id,
-    healingPowerRating: getCompanionDerivedStats(caster).healingPower,
+    healingPowerRating: getCompanionDerivedStatsWithPartyBuffs(state, caster)
+      .healingPower,
     healingMultiplier: powerMultiplier,
     healingAmount: amount,
     previousHealth: target.health,

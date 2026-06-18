@@ -910,6 +910,22 @@ export type SkillDefinition = {
     | { type: "allyBuff"; bonusDamage: number; durationMs: number }
     | { type: "partyBuff"; bonusDamage: number; durationMs: number; refreshWindowMs?: number }
     | {
+        type: "partyClassBuff";
+        durationMs: number;
+        primaryStatBonusPercentByStat?: Partial<Record<PrimaryStatId, number>>;
+        physicalDamageBonusPercent?: number;
+        magicDamageBonusPercent?: number;
+        mitigationPercent?: number;
+        mitigatedDamageTypes?: CombatDamageType[];
+        poisonCoating?: {
+          poisonDurationMs: number;
+          poisonTickIntervalMs: number;
+          poisonDamageAttackPowerPercent: number;
+          sourceKey: string;
+        };
+        refreshWindowMs?: number;
+      }
+    | {
         type: "partyPoisonCoating";
         durationMs: number;
         poisonDurationMs: number;
@@ -1037,6 +1053,25 @@ export type SkillPartyPoisonCoatingState = {
   poisonDurationMs: number;
   poisonTickIntervalMs: number;
   expiresAt: number;
+};
+
+export type SkillPartyClassBuffState = {
+  targetId: string;
+  sourceId: string;
+  sourceClassId: ClassId;
+  sourceSkillId: SkillId;
+  expiresAt: number;
+  primaryStatBonusPercentByStat?: Partial<Record<PrimaryStatId, number>>;
+  physicalDamageBonusPercent?: number;
+  magicDamageBonusPercent?: number;
+  mitigationPercent?: number;
+  mitigatedDamageTypes?: CombatDamageType[];
+  poisonCoating?: {
+    sourceKey: string;
+    tickDamage: number;
+    poisonDurationMs: number;
+    poisonTickIntervalMs: number;
+  };
 };
 
 export type SkillLifestealBuffState = {

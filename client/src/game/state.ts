@@ -35,6 +35,7 @@ import type {
   SkillGatherBuffState,
   SkillLifestealBuffState,
   SkillMarkState,
+  SkillPartyClassBuffState,
   SkillPartyPoisonCoatingState,
   SkillMitigationBuffState,
   SkillPartyBuffState,
@@ -196,6 +197,10 @@ export type GameState = {
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
   skillPartyBuffsBySourceId?: Record<string, SkillPartyBuffState>;
   skillPartyPoisonCoatingsBySourceId?: Record<string, SkillPartyPoisonCoatingState>;
+  skillPartyClassBuffsByCompanionId?: Record<
+    string,
+    Partial<Record<ClassId, SkillPartyClassBuffState>>
+  >;
   skillLifestealBuffsByCompanionId?: Record<string, SkillLifestealBuffState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillDamageMitigationsByCompanionId?: Record<string, SkillDamageMitigationState>;
@@ -380,6 +385,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillPartyPoisonCoatingsBySourceId,
     now,
   );
+  const skillPartyClassBuffsByCompanionId = filterExpiredNestedRecord(
+    state.skillPartyClassBuffsByCompanionId,
+    now,
+  );
   const skillLifestealBuffsByCompanionId = filterExpiredRecord(
     state.skillLifestealBuffsByCompanionId,
     now,
@@ -432,6 +441,8 @@ export function clearExpiredSkillRuntimeState(
     skillPartyBuffsBySourceId === state.skillPartyBuffsBySourceId &&
     skillPartyPoisonCoatingsBySourceId ===
       state.skillPartyPoisonCoatingsBySourceId &&
+    skillPartyClassBuffsByCompanionId ===
+      state.skillPartyClassBuffsByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
@@ -454,6 +465,7 @@ export function clearExpiredSkillRuntimeState(
     skillSelfBuffsByCompanionId,
     skillPartyBuffsBySourceId,
     skillPartyPoisonCoatingsBySourceId,
+    skillPartyClassBuffsByCompanionId,
     skillLifestealBuffsByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
@@ -467,6 +479,39 @@ export function clearExpiredSkillRuntimeState(
     globalCooldownsByCompanionId,
     skillVisualEvents,
   };
+}
+
+function filterExpiredNestedRecord<T extends { expiresAt: number }>(
+  record: Record<string, Partial<Record<ClassId, T>>> | undefined,
+  now: number,
+): Record<string, Partial<Record<ClassId, T>>> | undefined {
+  if (!record) {
+    return record;
+  }
+
+  let didExpire = false;
+  const nextEntries = Object.entries(record)
+    .map(([ownerId, buffs]) => {
+      const activeBuffEntries = Object.entries(buffs).filter(([, value]) => {
+        const isActive = value !== undefined && value.expiresAt > now;
+        didExpire ||= !isActive;
+        return isActive;
+      });
+
+      if (activeBuffEntries.length === 0) {
+        didExpire = true;
+        return null;
+      }
+
+      return [ownerId, Object.fromEntries(activeBuffEntries)];
+    })
+    .filter(
+      (
+        entry,
+      ): entry is [string, Partial<Record<ClassId, T>>] => entry !== null,
+    );
+
+  return didExpire ? Object.fromEntries(nextEntries) : record;
 }
 
 function filterExpiredRecord<T extends { expiresAt: number }>(

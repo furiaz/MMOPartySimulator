@@ -20,6 +20,7 @@ import {
   getCompanionSkillBehavior,
   isBeginnerFirstAidSelfHealPriorityActive,
 } from "./skillBehavior";
+import { canUsePartyClassBuff } from "./skillRuntime";
 import { isFakeDeathActive } from "./statusEffects";
 import type {
   Companion,
@@ -89,6 +90,13 @@ export function getSkillTarget(
         skill.effect.refreshWindowMs,
         options.now,
       )
+      ? caster
+      : undefined;
+  }
+
+  if (skill.effect.type === "partyClassBuff") {
+    return hasValidEnemyContext(state, caster, options) &&
+      canUsePartyClassBuff(state, caster, skill, options.now)
       ? caster
       : undefined;
   }

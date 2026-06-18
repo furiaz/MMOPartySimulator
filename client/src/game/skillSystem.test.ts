@@ -1747,8 +1747,18 @@ describe("beginner skill system", () => {
         skillSelfBuffsByCompanionId: {
           blade: { companionId: "blade", bonusDamage: 1, expiresAt: 65000 },
         },
-        skillPartyBuffsBySourceId: {
-          blade: { sourceId: "blade", bonusDamage: 1, expiresAt: 65000 },
+        skillPartyClassBuffsByCompanionId: {
+          blade: {
+            blade: {
+              targetId: "blade",
+              sourceId: "blade",
+              sourceClassId: "blade",
+              sourceSkillId: "press_the_opening",
+              expiresAt: 65000,
+              physicalDamageBonusPercent: 5,
+              primaryStatBonusPercentByStat: { strength: 5 },
+            },
+          },
         },
       }),
       1000,
@@ -1763,11 +1773,17 @@ describe("beginner skill system", () => {
             expiresAt: 65000,
           },
         },
-        skillPartyBuffsBySourceId: {
+        skillPartyClassBuffsByCompanionId: {
           "defensive-blade": {
-            sourceId: "defensive-blade",
-            bonusDamage: 1,
-            expiresAt: 65000,
+            blade: {
+              targetId: "defensive-blade",
+              sourceId: "defensive-blade",
+              sourceClassId: "blade",
+              sourceSkillId: "press_the_opening",
+              expiresAt: 65000,
+              physicalDamageBonusPercent: 5,
+              primaryStatBonusPercentByStat: { strength: 5 },
+            },
           },
         },
         skillDamageMitigationsByCompanionId: {

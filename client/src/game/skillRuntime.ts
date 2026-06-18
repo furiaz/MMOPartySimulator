@@ -1,5 +1,6 @@
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import { applyStatusEffect } from "./statusEffects";
+import { getPartyMembers } from "./partySystem";
 import type {
   CombatDamageType,
   CombatEntity,
@@ -8,8 +9,10 @@ import type {
   ResourceEntity,
   SkillAbsorbShieldState,
   SkillDamageMitigationState,
+  SkillDefinition,
   SkillLifestealBuffState,
   SkillMitigationBuffState,
+  SkillPartyClassBuffState,
   SkillShieldBlockState,
 } from "./types";
 
@@ -30,6 +33,25 @@ export function getPrototypeAttackDamage(
     .reduce((total, buff) => total + buff.bonusDamage, 0);
 
   return baseDamage + markBonus + selfBuffBonus + partyBuffBonus;
+}
+
+export function getPartyClassDamageBonusPercent(
+  state: GameState,
+  attacker: CombatEntity,
+  damageType: CombatDamageType,
+): number {
+  if (attacker.kind !== "companion") {
+    return 0;
+  }
+
+  return getActivePartyClassBuffsForCompanion(state, attacker)
+    .reduce((total, buff) => {
+      if (damageType === "magic") {
+        return total + (buff.magicDamageBonusPercent ?? 0);
+      }
+
+      return total + (buff.physicalDamageBonusPercent ?? 0);
+    }, 0);
 }
 
 export function getPrototypeGatherAmountBonus(
@@ -63,6 +85,34 @@ export function applyPartyPoisonCoatingFromAttack(
 
   let nextState = state;
 
+  for (const coating of getActivePartyClassBuffsForCompanion(
+    state,
+    attacker,
+  ).flatMap((buff) =>
+    buff.poisonCoating
+      ? [
+          {
+            ...buff.poisonCoating,
+            sourceId: buff.sourceId,
+          },
+        ]
+      : [],
+  )) {
+    nextState = applyStatusEffect(
+      nextState,
+      {
+        type: "poison",
+        targetId: target.id,
+        durationMs: coating.poisonDurationMs,
+        tickDamage: coating.tickDamage,
+        sourceId: coating.sourceId,
+        sourceKey: coating.sourceKey,
+        tickIntervalMs: coating.poisonTickIntervalMs,
+      },
+      now,
+    );
+  }
+
   for (const coating of Object.values(
     state.skillPartyPoisonCoatingsBySourceId ?? {},
   )) {
@@ -82,6 +132,30 @@ export function applyPartyPoisonCoatingFromAttack(
   }
 
   return nextState;
+}
+
+export function canUsePartyClassBuff(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now = Date.now(),
+): boolean {
+  if (skill.effect.type !== "partyClassBuff") {
+    return false;
+  }
+
+  const refreshWindowMs = skill.effect.refreshWindowMs ?? 0;
+
+  return getPartyMembers(state).some((member) => {
+    const activeBuff =
+      state.skillPartyClassBuffsByCompanionId?.[member.id]?.[caster.classId];
+
+    return (
+      !activeBuff ||
+      activeBuff.expiresAt <= now ||
+      activeBuff.expiresAt - now <= refreshWindowMs
+    );
+  });
 }
 
 export function applyLifestealFromAttack(
@@ -337,8 +411,16 @@ function getTimedMitigationPercent(
       doesMitigationApply(buff, damageType) ? total + buff.mitigationPercent : total,
     0,
   );
+  const partyClassPercent = getActivePartyClassBuffsForCompanion(state, target)
+    .reduce(
+      (total, buff) =>
+        doesPartyClassMitigationApply(buff, damageType)
+          ? total + (buff.mitigationPercent ?? 0)
+          : total,
+      0,
+    );
 
-  return selfPercent + partyPercent;
+  return selfPercent + partyPercent + partyClassPercent;
 }
 
 function getAbsorbShield(
@@ -377,6 +459,31 @@ function getLifestealBuff(
   attacker: Companion,
 ): SkillLifestealBuffState | undefined {
   return state.skillLifestealBuffsByCompanionId?.[attacker.id];
+}
+
+function getActivePartyClassBuffsForCompanion(
+  state: GameState,
+  companion: Companion,
+): SkillPartyClassBuffState[] {
+  const now = state.simulationTimeMs ?? Date.now();
+
+  return Object.values(
+    state.skillPartyClassBuffsByCompanionId?.[companion.id] ?? {},
+  ).filter(
+    (buff): buff is SkillPartyClassBuffState =>
+      Boolean(buff) && buff.expiresAt > now,
+  );
+}
+
+function doesPartyClassMitigationApply(
+  buff: SkillPartyClassBuffState,
+  damageType: CombatDamageType,
+): boolean {
+  return Boolean(
+    buff.mitigationPercent &&
+      (buff.mitigatedDamageTypes === undefined ||
+        buff.mitigatedDamageTypes.includes(damageType)),
+  );
 }
 
 export function isEnemyBound(state: GameState, enemy: Enemy): boolean {

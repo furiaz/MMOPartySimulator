@@ -28,6 +28,7 @@ export function GameMenu({
   activeTab,
   activeManagementSection,
   activePartySection,
+  gameState,
   inventory,
   wallet,
   leaderId,
@@ -69,6 +70,7 @@ export function GameMenu({
   activeTab: GameMenuTab | null;
   activeManagementSection: PartyManagementSection;
   activePartySection: PartyMenuSection;
+  gameState: GameState;
   inventory: PartyInventory;
   wallet: PartyWallet;
   leaderId: string;
@@ -173,6 +175,7 @@ export function GameMenu({
                 <PartyMenuPanel
                   activeSection={activePartySection}
                   inventory={inventory}
+                  gameState={gameState}
                   members={members}
                   currentTime={currentTime}
                   selectedCompanionId={selectedCompanionId}

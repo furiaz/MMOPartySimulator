@@ -11,6 +11,7 @@ import {
   getCompanionConsumableStatModifiers,
 } from "./consumables";
 import { getCompanionRoleBonusModifiers } from "./roleBonus";
+import type { GameState } from "./state";
 import type {
   ClassId,
   Companion,
@@ -186,6 +187,31 @@ export function getCompanionActualStats(
   );
 }
 
+export function getCompanionActualStatsWithPartyBuffs(
+  state: GameState,
+  companion: Companion,
+  temporaryStatModifiers: CompanionPrimaryStatModifiers = {},
+  equipmentPrimaryStatModifiers: CompanionPrimaryStatModifiers =
+    getCompanionEquipmentPrimaryStatModifiers(companion),
+): CompanionPrimaryStats {
+  const baseStats = getCompanionActualStats(
+    companion,
+    temporaryStatModifiers,
+    equipmentPrimaryStatModifiers,
+  );
+  const partyBuffModifiers = getPartyClassBuffPrimaryStatModifiers(
+    state,
+    companion,
+    baseStats,
+  );
+
+  if (isEmptyPrimaryStatModifiers(partyBuffModifiers)) {
+    return baseStats;
+  }
+
+  return addCompanionPrimaryStats(baseStats, partyBuffModifiers);
+}
+
 export function getCompanionDerivedStats(
   companion: Companion,
   options: {
@@ -256,6 +282,33 @@ export function getCompanionDerivedStats(
   };
 }
 
+export function getCompanionDerivedStatsWithPartyBuffs(
+  state: GameState,
+  companion: Companion,
+  options: {
+    temporaryStatModifiers?: CompanionPrimaryStatModifiers;
+    equipmentPrimaryStatModifiers?: CompanionPrimaryStatModifiers;
+    equipmentStatModifiers?: EquipmentStatModifiers;
+  } = {},
+): CompanionDerivedStats {
+  const actualStats = getCompanionActualStatsWithPartyBuffs(
+    state,
+    companion,
+    options.temporaryStatModifiers,
+    options.equipmentPrimaryStatModifiers,
+  );
+  const equipmentAndConsumableModifiers = addEquipmentStatModifiers(
+    options.equipmentStatModifiers ?? getCompanionEquipmentStatModifiers(companion),
+    getCompanionConsumableStatModifiers(companion),
+  );
+  const equipmentStatModifiers = addEquipmentStatModifiers(
+    equipmentAndConsumableModifiers,
+    getCompanionRoleBonusModifiers(companion).statModifiers,
+  );
+
+  return getDerivedStatsFromActualStats(companion, actualStats, equipmentStatModifiers);
+}
+
 export function syncCompanionDerivedMaxHealth(companion: Companion): Companion {
   const nextMaxHealth = getCompanionDerivedStats(companion).maxHealth;
 
@@ -275,6 +328,136 @@ export function syncCompanionDerivedMaxHealth(companion: Companion): Companion {
     health: nextHealth,
     maxHealth: nextMaxHealth,
   };
+}
+
+export function syncCompanionDerivedMaxHealthWithPartyBuffs(
+  state: GameState,
+  companion: Companion,
+): Companion {
+  const nextMaxHealth = getCompanionDerivedStatsWithPartyBuffs(
+    state,
+    companion,
+  ).maxHealth;
+
+  return syncCompanionToMaxHealth(companion, nextMaxHealth);
+}
+
+function getDerivedStatsFromActualStats(
+  companion: Companion,
+  actualStats: CompanionPrimaryStats,
+  equipmentStatModifiers: EquipmentStatModifiers,
+): CompanionDerivedStats {
+  return {
+    attack:
+      1 +
+      actualStats.strength +
+      Math.floor(actualStats.dexterity / 2) +
+      (equipmentStatModifiers.attack ?? 0),
+    defense:
+      Math.floor(actualStats.constitution / 2) +
+      Math.floor(actualStats.wisdom / 3) +
+      (equipmentStatModifiers.defense ?? 0),
+    maxHealth:
+      10 +
+      companion.characterLevel * 2 +
+      actualStats.constitution * 2 +
+      (equipmentStatModifiers.maxHealth ?? 0),
+    evasion:
+      Math.floor(actualStats.dexterity / 2) +
+      (equipmentStatModifiers.evasion ?? 0),
+    block:
+      Math.floor(actualStats.strength / 3) +
+      Math.floor(actualStats.constitution / 2) +
+      (equipmentStatModifiers.block ?? 0),
+    magicPower:
+      actualStats.intelligence +
+      Math.floor(actualStats.wisdom / 2) +
+      (equipmentStatModifiers.magicPower ?? 0),
+    healingPower:
+      actualStats.wisdom +
+      Math.floor(actualStats.intelligence / 3) +
+      (equipmentStatModifiers.healingPower ?? 0),
+    magicDefense:
+      Math.floor(actualStats.wisdom / 2) +
+      Math.floor(actualStats.intelligence / 3) +
+      (equipmentStatModifiers.magicDefense ?? 0),
+    accuracy:
+      actualStats.dexterity +
+      Math.floor(actualStats.wisdom / 3) +
+      (equipmentStatModifiers.accuracy ?? 0),
+    criticalChance: 0.05 + (equipmentStatModifiers.criticalChance ?? 0),
+    criticalDamage: 1.2 + (equipmentStatModifiers.criticalDamage ?? 0),
+    healthRegen: Math.max(
+      1,
+      Math.floor(actualStats.constitution / 8) +
+        (equipmentStatModifiers.healthRegen ?? 0),
+    ),
+  };
+}
+
+function syncCompanionToMaxHealth(
+  companion: Companion,
+  nextMaxHealth: number,
+): Companion {
+  if (companion.maxHealth === nextMaxHealth) {
+    return companion;
+  }
+
+  const healthPercent =
+    companion.maxHealth > 0 ? companion.health / companion.maxHealth : 1;
+  const nextHealth =
+    companion.health <= 0
+      ? 0
+      : Math.min(nextMaxHealth, Math.max(1, Math.round(healthPercent * nextMaxHealth)));
+
+  return {
+    ...companion,
+    health: nextHealth,
+    maxHealth: nextMaxHealth,
+  };
+}
+
+function getPartyClassBuffPrimaryStatModifiers(
+  state: GameState,
+  companion: Companion,
+  baseStats: CompanionPrimaryStats,
+): CompanionPrimaryStatModifiers {
+  const bonusesByStat: CompanionPrimaryStatModifiers = {};
+  const now = state.simulationTimeMs ?? Date.now();
+
+  for (const buff of Object.values(
+    state.skillPartyClassBuffsByCompanionId?.[companion.id] ?? {},
+  )) {
+    if (!buff?.primaryStatBonusPercentByStat || buff.expiresAt <= now) {
+      continue;
+    }
+
+    for (const statId of PRIMARY_STAT_IDS) {
+      const percent = buff.primaryStatBonusPercentByStat[statId];
+
+      if (percent) {
+        bonusesByStat[statId] = (bonusesByStat[statId] ?? 0) + percent;
+      }
+    }
+  }
+
+  const modifiers: CompanionPrimaryStatModifiers = {};
+
+  for (const statId of PRIMARY_STAT_IDS) {
+    const percent = bonusesByStat[statId] ?? 0;
+
+    if (percent > 0) {
+      modifiers[statId] = Math.floor(baseStats[statId] * (percent / 100));
+    }
+  }
+
+  return modifiers;
+}
+
+function isEmptyPrimaryStatModifiers(
+  modifiers: CompanionPrimaryStatModifiers,
+): boolean {
+  return PRIMARY_STAT_IDS.every((statId) => !modifiers[statId]);
 }
 
 function createCompanionPrimaryStatsFromValues(

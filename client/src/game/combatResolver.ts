@@ -1,12 +1,16 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { damageEntity } from "./entities";
 import { getEnemyCombatStats } from "./enemyScaling";
-import { getCompanionDerivedStats } from "./stats";
+import {
+  getCompanionDerivedStats,
+  getCompanionDerivedStatsWithPartyBuffs,
+} from "./stats";
 import {
   applyIncomingDamageAbsorb,
   applyIncomingDamageMitigation,
   applyLifestealFromAttack,
   applyPartyPoisonCoatingFromAttack,
+  getPartyClassDamageBonusPercent,
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
 } from "./skillRuntime";
@@ -74,9 +78,9 @@ export function resolveAndApplyCombatDamage(
   options: CombatResolutionOptions,
 ): CombatResolution {
   const rng = options.rng ?? Math.random;
-  const attackerStats = getCombatStats(attacker);
-  const targetStats = getCombatStats(target);
-  const basePower = getBasePower(attacker, options.damageType);
+  const attackerStats = getCombatStats(state, attacker);
+  const targetStats = getCombatStats(state, target);
+  const basePower = getBasePower(state, attacker, options.damageType);
   const bonusDamage =
     attacker.kind === "companion" && target.kind === "enemy"
       ? getPrototypeAttackDamage(state, attacker, target, 0)
@@ -96,7 +100,10 @@ export function resolveAndApplyCombatDamage(
   nextState = attackBonusResult.state;
   const rawDamage =
     (basePower * options.powerMultiplier + bonusDamage) *
-    (1 + attackBonusResult.damageMultiplierBonus);
+    (1 + attackBonusResult.damageMultiplierBonus) *
+    (1 +
+      getPartyClassDamageBonusPercent(nextState, attacker, options.damageType) /
+        100);
   const targetDefense =
     options.damageType === "physical"
       ? baseTargetDefense *
@@ -297,26 +304,41 @@ export function resolveAndApplyCombatDamage(
   };
 }
 
-export function getHealingAmount(caster: Companion, powerMultiplier: number): number {
+export function getHealingAmount(
+  caster: Companion,
+  powerMultiplier: number,
+  state?: GameState,
+): number {
+  const stats = state
+    ? getCompanionDerivedStatsWithPartyBuffs(state, caster)
+    : getCompanionDerivedStats(caster);
+
   return Math.max(
     1,
-    Math.round(getCompanionDerivedStats(caster).healingPower * powerMultiplier),
+    Math.round(stats.healingPower * powerMultiplier),
   );
 }
 
-function getBasePower(attacker: CombatEntity, damageType: CombatDamageType): number {
+function getBasePower(
+  state: GameState,
+  attacker: CombatEntity,
+  damageType: CombatDamageType,
+): number {
   if (attacker.kind === "enemy") {
     return attacker.attack;
   }
 
-  const stats = getCompanionDerivedStats(attacker);
+  const stats = getCompanionDerivedStatsWithPartyBuffs(state, attacker);
 
   return damageType === "magic" ? stats.magicPower : stats.attack;
 }
 
-function getCombatStats(entity: CombatEntity): CompanionDerivedStats {
+function getCombatStats(
+  state: GameState,
+  entity: CombatEntity,
+): CompanionDerivedStats {
   if (entity.kind === "companion") {
-    return getCompanionDerivedStats(entity);
+    return getCompanionDerivedStatsWithPartyBuffs(state, entity);
   }
 
   const enemyStats = getEnemyCombatStats(entity);
