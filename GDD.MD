@@ -420,9 +420,15 @@ Prototype combat supports numeric skill ranges, enemy attack ranges, enemy attac
 
 Projectile travel and enemy attack windup are prototype readability layers for current basic attacks. They should not be treated as the final ranged combat system, ammunition system, projectile physics model, advanced targeting framework, or production combat telegraph system.
 
-Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, and passive health regeneration.
+Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, barriers, absorbs, mitigation, and passive health regeneration.
 
-Derived stat combat integration should remain simple and readable. It should not become a final balance model, advanced threat model, or production combat formula system unless explicitly requested.
+Current prototype skill runtime may apply temporary combat state such as shields, barriers, absorbs, damage mitigation, mana shields, frost armor, Overcharge, party class buffs, gather buffs, healing over time, lifesteal, Runic Focus, forced evasion, fake death, next-attack damage bonuses, defense buffs, poison, burning, bleed, immobilize, disarm, curse, and temporary aggro drops.
+
+Poison, burning, and bleed may deal periodic damage while active.
+
+Temporary status effects may block movement, attacks, skill use, or gathering only where current prototype rules explicitly support that effect.
+
+Derived stat and temporary skill runtime integration should remain simple and readable. It should not become a final balance model, advanced threat model, production status-effect framework, or production combat formula system unless explicitly requested.
 
 Combat positioning should support future ranged classes without treating current prototype ranged enemy behavior as the final ranged combat system.
 
@@ -470,13 +476,20 @@ Current prototype world-wipe recovery behavior:
 - may present a pending rescue choice if multiple unlocked rescue hubs are equally valid
 - restores companions to the selected rescue hub arrival positions
 - restores companion health
-- clears active combat, movement, teleport, POI, skill, drop, resurrection, formation, and map-local runtime state
+- clears active combat, movement, teleport, POI, drop, resurrection, formation, and map-local runtime state
+- clears temporary skill runtime state, skill cooldowns, global cooldowns, status effects, skill visual events, companion AoE channels, enemy AoE channels, and enemy AoE cooldowns
 - clears Slimeward dungeon runtime when rescue returns the party to Slimeward Camp
 - may charge Crowns based on route distance, limited by the current wallet balance
 - records map reach for quest state after rescue
 - may show short-lived rescue feedback
 
 This is a prototype safety system, not the final death penalty, revive economy, checkpoint system, or town recovery design.
+
+Map transitions and rescue transitions should clear or prune map-local temporary runtime state.
+
+Current map-local cleanup may include movement caches, attack slot caches, follow trails, combat feedback, projectiles, skill runtime state, status effects, skill cooldowns, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, resurrection runtime, health timing, and target dummy timing.
+
+This cleanup is prototype runtime hygiene, not a final persistence, checkpoint, combat-instance, or encounter-reset system.
 
 ---
 
@@ -542,13 +555,24 @@ Current prototype enemy respawn behavior:
 Current prototype enemy AoE behavior:
 
 - the hub includes a debug AoE target dummy
-- the AoE dummy starts its stomp only when the player, party intent, direct command, or party combat state engages it
+- engaged Heavy Slimes may use the same current prototype stomp channel
+- eligible stomp casters start the stomp only when the player, party intent, direct command, or party combat state engages them
 - the stomp locks a circular area, channels briefly, enters a short windup, then deals small physical damage to living companions still inside the circle at impact
+- fake death can cause enemy AoE impact to skip the affected companion where current prototype rules support it
 - shield blocks and passive block can prevent the damage
 - binding the caster, killing the caster, or blocking line of sight to the locked area interrupts the channel and starts cooldown
 - the renderer shows the danger circle and channel bar
 
-Prototype enemy AoE behavior is debug combat-test behavior, not a final enemy ability framework, boss mechanic system, or production telegraph design.
+Prototype enemy AoE behavior is debug combat-test and early enemy-skill behavior, not a final enemy ability framework, boss mechanic system, or production telegraph design.
+
+Current prototype companion AoE channel behavior:
+
+- Shield Shockwave may briefly channel a circular party-offensive area before impact
+- Maul Sweep may briefly channel a circular party-offensive area before impact
+- companion AoE channels resolve against living enemies inside the locked circle at impact
+- Shield Shockwave may damage and bind affected non-dummy enemies
+- Maul Sweep may damage and disarm affected non-dummy enemies
+- companion AoE channels are temporary skill runtime behavior, not a final casting, telegraph, or player-authored area-targeting system
 
 Current prototype enemy archetype/family ids:
 
@@ -648,10 +672,12 @@ Current prototype inventory rules:
 - item gains go directly into shared inventory for now
 - materials stack to 250
 - consumables stack to 99
+- skill books stack to 99
 - equipment does not stack
 - quest items can stack only if their item definition allows it
 - event items can stack only if their item definition allows it
 - equipment items may move between shared inventory and companion equipment slots
+- skill books remain inventory items until successfully read by an eligible companion
 
 Current item categories:
 
@@ -662,6 +688,8 @@ Current item categories:
 - quest
 - event
 - junk
+
+The implementation category id for skill books is `skill_book`, but player-facing documentation may call them skill books.
 
 Current prototype consumable behavior:
 
@@ -776,10 +804,14 @@ Current merchant behavior:
 - quick exchange adds Crowns to the shared wallet
 - the hub Merchant has a fixed prototype buy stock
 - Merchant Buy can purchase selected equipment, consumables, and skill books for Crowns
+- current Merchant Buy skill book stock includes books for all current Beginner and first-class prototype skills
+- current prototype Merchant Buy pricing uses lower prices for Beginner skill books and higher prices for first-class skill books
 - Merchant Buy validates merchant identity, quest unlock state, stock membership, price, wallet balance, item category, and inventory capacity
 - purchased items are added to shared party inventory
-- Merchant Buy may filter stock by group and party equipment compatibility
+- Merchant Buy may filter stock by group, secondary item type or slot, and party equipment compatibility
+- party-compatible filtering applies to equipment compatibility and does not hide consumables or skill books
 - current Merchant Buy stock groups include flasks, food, books, weapons, offhands, cloth armor, leather armor, mail armor, plate armor, and accessories
+- current secondary Merchant Buy filters may separate weapons and offhands by equipment type, armor by slot, and accessories by charm type
 - the Sell panel may be visible as a placeholder only
 - full selling rules are not implemented
 - this is prototype merchant behavior, not a full shop economy
@@ -917,9 +949,10 @@ Current prototype accessory examples include:
 
 Current prototype quest equipment rewards may include:
 
-- Acolyte Hood
+- Guard Coif
 - Scout Boots
 - Bulwark Cuirass
+- Plain Charm
 
 Current archetype-specific prototype equipment drops may include:
 
@@ -958,6 +991,8 @@ Direct party orders may be rejected without changing party intent when the targe
 
 A direct-commanded companion may temporarily attack a personal threat or movement blocker while keeping direct-command priority.
 
+Temporary status effects may still prevent a direct-commanded companion from moving, attacking, gathering, or using skills when the current prototype status rules block that action.
+
 Example:
 
 If the party is attacking but the player orders one party member to gather, that party member gathers while the rest continue fighting.
@@ -994,10 +1029,14 @@ Party members act independently based on:
 - assigned role
 - class
 - available skills
+- skill tags
+- skill behavior settings
+- skill cooldowns and global cooldowns
 - level
 - party order
 - direct commands
 - nearby threats
+- temporary status effects
 - current task validity
 - current map and quest context
 
@@ -1069,17 +1108,45 @@ Current Equipment section may also show prototype consumable controls:
 - active food buff timing
 - basic consumable effect and requirement text
 
-Skills may show the selected companion's current class skills.
+Skills may show the selected companion's learned current-class skills.
+
+Current Skills UI may show:
+
+- skill display name
+- effect summary
+- current rank and max rank
+- cooldown
+- range
+- role score
+- skill tags
 
 Current class tabs may show only the companion's current class until class-history or multi-class progression data exists.
+
+Legacy-enabled Beginner skills may appear separately when the selected companion is eligible.
 
 Skill Preferences may show supported prototype skill behavior settings.
 
 Current supported Skill Preferences may include:
 
-- Beginner First Aid Self-Heal Threshold from 1 percent to 100 percent
-- Beginner First Aid Ally-Heal Threshold from 1 percent to 100 percent
-- Support Focus selection for lowest-health ally, leader, or Defender
+- First Aid Self-Heal Threshold from 1 percent to 100 percent
+- First Aid Ally-Heal Threshold from 1 percent to 100 percent
+- Second Wind Self-Heal Threshold up to the current prototype cap
+- Hold Fast Use Threshold
+- Fake Death Use Threshold up to the current prototype cap
+- Blood Feast Use Threshold up to the current prototype cap
+- Light Mend Ally HP Threshold up to the current prototype cap
+- Self-Sacrifice Safety Floor for Penitent self-cost skills
+- Penitent's Gift Ally HP Threshold up to the current prototype cap
+- Penitent's Gift Self HP Threshold up to the current prototype cap
+- Eternal Hope Use Threshold up to the current prototype cap
+- Overcharge enabled or disabled
+- Mobility Skill Use as Offensive or Defensive
+- Defensive Mobility Threshold up to the current prototype cap
+- Support Focus or Support Skill Focus selection for lowest-health ally, leader, or Defender
+- FireBurst Target selection for Big Group, Low HP, or High HP
+- Circle of Renewal Target selection for Big Group, Low HP, or Defender
+- Circle Main Target HP Threshold up to the current prototype cap
+- legacy Beginner skill toggles when eligible
 
 Skill Preferences must remain backed by game-logic behavior settings and should not define skill targeting, healing rules, or support behavior inside React UI.
 
@@ -1145,6 +1212,19 @@ It may show:
 - shared wallet balance
 
 The Inventory menu must not implement the full inventory, equipment economy, full wallet UI, shop, crafting, trading, bank, loot, or persistence systems unless explicitly requested.
+
+The Inventory view may display skill book details when a skill book is selected.
+
+Current skill book inventory interactions may include:
+
+- showing the mapped skill name
+- showing the mapped skill's max rank
+- showing eligible companions who can read the selected book
+- showing each eligible companion's current rank for that skill
+- reading the selected book for an eligible companion
+- showing a no-eligible-companion state when no party member can use the selected book
+
+Skill book reading must call game-logic skill progression helpers and must not duplicate skill lineage, rank cap, inventory removal, or eligibility rules inside React UI.
 
 ### Quests Menu
 
@@ -1212,6 +1292,7 @@ Supported prototype quest objective type definitions:
 - equip flask
 - buy merchant equipment
 - unlock route
+- collect dungeon chest
 - return to POI
 
 Current prototype quest content currently uses:
@@ -1230,6 +1311,7 @@ Current prototype quest content currently uses:
 - equip flask
 - buy merchant equipment
 - unlock route
+- collect dungeon chest
 
 Talk-to-POI and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
 
@@ -1238,12 +1320,12 @@ Current prototype quests:
 - Secure the Landing
   - Quest id: clear_the_shore
   - Objectives: defeat 10 Slimes in Shore Fringe, gather 3 Wood in Shore Fringe, and inspect the Shore Fringe supply marker
-  - Rewards: 50 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Minor Recovery Flask, 1 Acolyte Hood
+  - Rewards: 50 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Minor Recovery Flask, 1 Guard Coif
   - Unlocks: Outfit the Expedition
 
 - Outfit the Expedition
   - Quest id: outfit_the_expedition
-  - Objectives: equip a Training Sword, equip an Acolyte Hood, equip a Minor Recovery Flask, and buy 1 merchant equipment item
+  - Objectives: equip a Training Sword, equip a Guard Coif, equip a Minor Recovery Flask, and buy 1 merchant equipment item
   - Rewards: 10 Crowns, 4 character XP
   - Unlocks: Stolen Field Supplies
 
@@ -1300,7 +1382,14 @@ Current prototype quests:
   - Objectives: inspect the Slimeward Camp teleporter, defeat 4 Mosslings in Imp Fen, collect 4 Teleporter Stabilizer quest drops in Imp Fen, repair the Slimeward Camp teleporter, and unlock the Slimeward Camp route
   - Rewards: 25 Crowns, 10 character XP
 
-The Quest Giver in Harbor Union Bastion can accept available quests and turn in ready quests when the leader reaches interaction range.
+- The Azure Trial
+  - Quest id: azure_trial
+  - Objectives: enter Slimeward Floor 1, defeat The Azure Mass on Slimeward Floor 2, and collect the Slimeward boss chest
+  - Rewards: 100 Crowns, 1500 character XP
+
+The Quest Giver in Harbor Union Bastion can accept available Quest Giver quests and turn in ready Quest Giver quests when the leader reaches interaction range.
+
+The Class Mentor may act as the current prototype quest source for The Azure Trial.
 
 Current prototype quest guide behavior:
 
@@ -1326,6 +1415,7 @@ Current prototype quest reward behavior:
 
 - ready quests can grant rewards through Quest Giver turn-in
 - rewards may include Crowns, character XP, inventory items, and equipment items
+- current quest rewards do not grant skill books unless a quest definition explicitly adds them later
 - quest rewards are all-or-nothing
 - reward values are validated before state changes are applied
 - if every reward can fit, all rewards are granted and the quest completes
@@ -1527,10 +1617,13 @@ Skill usage is determined by:
 
 - role priorities
 - skill tags
-- current context such as combat, danger, gathering, or party safety
+- current context such as combat, danger, gathering, support needs, or party safety
 - target validity
 - range
-- cooldown availability
+- companion skill behavior settings
+- companion global cooldown availability
+- individual skill cooldown availability
+- temporary status effects that may block skill use
 
 Classes may have restrictive prototype weapon and offhand permissions.
 
@@ -1590,9 +1683,9 @@ First classes:
 - Blade
 - Aegis
 
-Blade is an offensive melee and precision combat class focused on fast, consistent damage.
+Blade is an offensive melee and precision combat class focused on fast, consistent damage, self-sustain, parrying, physical party support, wood gathering support, mobility, and small-area strikes.
 
-Aegis is a defensive combat class focused on mitigation, protection, and frontline control.
+Aegis is a defensive combat class focused on mitigation, protection, shielding, taunts, frontline control, ore gathering support, mobility, and defensive area disruption.
 
 ---
 
@@ -1610,9 +1703,9 @@ First classes:
 - Hunter
 - Beast
 
-Hunter is a tracking, positioning, precision, hybrid combat, and utility class.
+Hunter is a tracking, positioning, precision, hybrid combat, and utility class focused on control shots, threat escape, evasion, ranged pressure, poison support, herb gathering support, mobility, and area arrow attacks.
 
-Beast is a raw aggression class focused on sustain, feral combat, and resilience.
+Beast is a raw aggression class focused on sustain, feral combat, resilience, roaring control, lifesteal, mitigation, pack support, ore gathering support, pouncing mobility, and area disruption.
 
 ---
 
@@ -1628,9 +1721,9 @@ First classes:
 - Elementalist
 - Runecaster
 
-Elementalist is a damage-focused magic class with support for burst damage and future support for AoE and DoT effects.
+Elementalist is a damage-focused magic class with support for magic damage, shielding, defensive buffs, Overcharge, party magic support, wood gathering support, fiery mobility, AoE, and DoT effects.
 
-Runecaster is a control and utility magic class focused on traps, buffs, preparation, and battlefield manipulation.
+Runecaster is a control and utility magic class focused on traps, ranged magic, barriers, delayed recovery, focus effects, party mitigation support, ore gathering support, and rune-based mobility.
 
 ---
 
@@ -1647,9 +1740,9 @@ First classes:
 - Lightbearer
 - Penitent
 
-Lightbearer is a healing, protection, and stabilization class.
+Lightbearer is a healing, protection, and stabilization class focused on control, direct healing, barriers, healing over time, party support, herb gathering support, safe mobility, and area healing.
 
-Penitent is a high-risk, high-reward class based on self-sacrifice mechanics.
+Penitent is a high-risk, high-reward class based on self-sacrifice mechanics, control, bleeding damage, sacrificial barriers, sacrifice healing, sustain, party support, wood gathering support, and self-cost mobility.
 
 ---
 
@@ -1673,55 +1766,62 @@ Roles determine how those tools are prioritized.
 
 ## Skills Prototype
 
-Skills are simple abilities tied to classes.
+Skills are simple active abilities tied to classes.
 
 Skills:
 
 - are defined by tags
 - use simple effects
+- use numeric ranges
 - may use per-skill prototype cooldowns
 - may use a short companion global cooldown after basic attacks or skill use
 - do not yet use mana or advanced resource systems
-- are used as simple extensions of existing behavior
+- are used as simple extensions of existing party, role, combat, support, movement, and gathering behavior
 - should be selected through role priorities and context instead of hardcoded class behavior
 
 Skill usage is determined by:
 
 - role priorities
 - skill tags
-- current context such as combat, danger, gathering, and safety
+- current context such as combat, danger, gathering, support needs, and safety
 - target validity
 - range
 - companion global cooldown availability
 - individual skill cooldown availability
 - companion skill behavior settings where supported
 
-Current prototype skills may include:
+Current prototype skill effects may include:
 
-- offensive damage
-- splash damage
-- marks
+- direct physical or magic damage
+- lunge damage
+- splash or area damage
+- taunts and multi-target taunts
+- enemy control such as binds, disarms, traps, or temporary aggro drops
 - self-buffs
 - ally buffs
-- party buffs
-- shields
+- party class buffs
+- shields, barriers, absorbs, and block effects
 - damage mitigation
-- binds
 - healing
+- healing over time
 - self-healing
 - self-cost healing
-- mobility
-- lunge movement and damage
-- gathering support
+- lifesteal
+- DoT effects such as burning, bleeding, or poison
+- mobility, dash, escape, and repositioning effects
+- gathering support buffs
+- maintenance-style buffs
 - beginner fallback combat or survival tools
 
 Current prototype skill cooldown behavior:
 
 - Beginner prototype skills may have longer individual cooldowns than some first-class prototype skills
 - first-class prototype skills may define individual cooldowns or fall back to the shared prototype skill cooldown value
+- long-duration first-class buffs may use long cooldowns and refresh windows
 - individual skill cooldowns should not block other ready skills
 - companion global cooldown prevents immediate repeated basic attacks or skill use
 - failed skill effects should not consume cooldown when no effect is applied
+- Overcharge may temporarily increase supported skill power while adding a cooldown penalty
 
 Current prototype skill progression:
 
@@ -1802,21 +1902,88 @@ Current Blade prototype skill identities:
 - Flash Step
 - Sweeping Strike
 
-Current other first-class prototype skill identities:
+Current Aegis prototype skill identities:
 
-- Aegis: Guard Wall
-- Hunter: Mark Target
-- Beast: Feral Surge
-- Elementalist: Elemental Bolt
-- Runecaster: Binding Rune
-- Lightbearer: Light Mend
-- Penitent: Penitent's Gift
+- Shield Challenge
+- Hold Fast
+- Guard Wall
+- Iron Stance
+- Shield Formation
+- Stonebreaker Rhythm
+- Shield Rush
+- Shield Shockwave
+
+Current Hunter prototype skill identities:
+
+- Pinning Shot
+- Fake Death
+- Evasive Instinct
+- Hunter's Focus
+- Poison Coating
+- Herbalist Rhythm
+- Skirmish Shot
+- Arrow Burst
+
+Current Beast prototype skill identities:
+
+- Threatening Roar
+- Blood Feast
+- Rugged Hide
+- Feral Surge
+- Pack Frenzy
+- Stoneclaw Rhythm
+- Pounce
+- Maul Sweep
+
+Current Elementalist prototype skill identities:
+
+- Elemental Bolt
+- Mana Shield
+- Frost Armor
+- Overcharge
+- Arcane Conduit
+- Emberwood Rhythm
+- Flame Step
+- FireBurst
+
+Current Runecaster prototype skill identities:
+
+- Binding Rune
+- Rune Lance
+- Warding Glyph
+- Rewind Rune
+- Runic Focus
+- Leyline Matrix
+- Stone Sigil Rhythm
+- Rune Step
+
+Current Lightbearer prototype skill identities:
+
+- Blinding Ray
+- Light Mend
+- Sanctuary Veil
+- Guiding Light
+- Radiant Benediction
+- Herbalist Hymn
+- Dawn Step
+- Circle of Renewal
+
+Current Penitent prototype skill identities:
+
+- Whip Prison
+- Flagellant Lash
+- Martyr's Veil
+- Penitent's Gift
+- Eternal Hope
+- Burdened Benediction
+- Woodcutting Penance
+- Atonement Step
 
 These skills are placeholders for class identity, role interaction, and skill progression behavior.
 
 They may be replaced, renamed, retuned, or expanded later.
 
-The current Blade set is a prototype proving ground for first-class skill breadth and should not imply that every first class is complete or balanced.
+The current first-class sets are prototype proving grounds for class breadth and should not imply that every first class is final, complete, or balanced.
 
 ---
 
@@ -1828,13 +1995,23 @@ Current skill book behavior:
 
 - skill books are stackable inventory items
 - each skill book maps to one current prototype skill
+- current prototype skill books exist for all current Beginner and first-class skills
+- Beginner skill books are current prototype Tier 1 books
+- first-class skill books are current prototype Tier 1 books
 - a companion can read a skill book only for a skill in their current class lineage
+- a companion can read an eligible Beginner skill book while Beginner
+- a first-class companion can read eligible books for their current first-class skills
+- a first-class companion can read eligible Beginner skill books only when the Beginner skill remains valid through current prototype lineage and progression rules
 - a skill book raises the matching learned skill by one rank
 - reading fails if the companion is invalid, the book is missing, the item is not a skill book, the skill is unknown, the skill is unavailable to that companion, the skill is already maxed, or inventory removal fails
 - failed reads do not consume the book
 - successful reads consume one book from shared party inventory
 
 Skill books are a prototype skill-rank item path, not a final training, tutor, talent, mastery, or respec system.
+
+Current prototype skill books are primarily obtained through Merchant Buy stock unless another current reward, drop, or debug path explicitly grants one.
+
+Skill book availability through the Merchant is broad prototype access for testing skill progression, not a final trainer, loot, class tutor, or skill acquisition economy.
 
 ---
 
@@ -1857,6 +2034,7 @@ Defensive:
 
 - Defensive
 - Shield
+- Barrier
 - Heal
 - Safety
 - Damage Mitigation
@@ -1869,6 +2047,8 @@ Control / Utility:
 - Taunt
 - Aggro
 - Buff
+- Party Buff
+- Maintenance
 - Cleanse
 - Summon - Support
 
@@ -1902,6 +2082,7 @@ Important rules:
 - Beginner skills are temporary prototype tools, not a final class kit
 - First-class skills are prototype class identity tools, not final complete class kits
 - Skill ranks and legacy-enabled Beginner skills are prototype progression support, not final mastery or multiclass systems
+- Skill Preferences are UI controls backed by game-logic behavior settings
 - Skills must remain simple during this phase
 - This is a prototype system, not a full ability system
 
@@ -2116,7 +2297,7 @@ Visual priorities:
 - resources should be visible and readable
 - movement direction should be understandable
 - terrain, walls, obstacles, labels, teleports, and feedback should remain readable at the current prototype render scale
-- feedback should make combat, gathering, drops, quest guidance, escort behavior, resurrection, recovery, and skills readable
+- feedback should make combat, gathering, drops, quest guidance, escort behavior, resurrection, recovery, skills, status effects, projectiles, and AoE danger or party-offensive areas readable
 
 Enemy, NPC, and subzone name labels may be used as UI-facing readability aids.
 
@@ -2124,7 +2305,7 @@ Name labels must not define simulation behavior, targeting rules, NPC behavior, 
 
 Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, labels, effects, camera math, and input targeting while rendering larger floor chunks as background terrain.
 
-Current generated terrain and map visual asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, hub castle wall assets, decorative hub structure assets, and generated skill or feedback sprites.
+Current generated terrain, feedback, and map visual asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, Slimeward dungeon floor and wall assets, hub castle wall assets, decorative hub structure assets, generated skill or feedback sprites, combat projectile sprites, enemy AoE circles, companion AoE circles, and temporary skill visual events.
 
 Terrain asset size and render scale are UI-facing presentation choices.
 
@@ -2179,7 +2360,7 @@ Current prototype save behavior:
 - save files use a prototype save version
 - invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
 - restored saves rebuild the current prototype map from saved quest state
-- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, consumable buffs, and debug telemetry
+- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, consumable buffs, skill runtime state, status effects, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, and debug telemetry
 - restored saves sanitize companion skill progression and preserve valid learned skill rank data
 
 Current prototype offline progress:
@@ -2219,7 +2400,7 @@ Temporary debug tools may include:
 - restore party health
 - inspect AI decision reasons
 - inspect XP, level progression, first-class eligibility, skill ranks, skill books, and legacy skill behavior
-- inspect role bonus assignment, class behavior, first-class selection, skill behavior, skill cooldowns, First Aid thresholds, Second Wind thresholds, mobility skill mode, and Support Focus settings
+- inspect role bonus assignment, class behavior, first-class selection, skill behavior, skill cooldowns, skill thresholds, mobility skill mode, Support Focus settings, Overcharge settings, FireBurst targeting, Circle of Renewal targeting, legacy skill behavior, status effects, skill visual events, companion AoE channels, and enemy AoE channels
 - inspect movement/pathing issues, movement planning, path backoff, and navigation grid behavior
 - inspect direct companion command issue, rejection, replacement, completion, cancellation, and rejoin grace behavior
 - debug map transitions
@@ -2254,7 +2435,7 @@ Do not implement these unless explicitly requested:
 - full equipment economy beyond the current prototype equipment foundation
 - equipment visuals, weapon anchoring, paper-doll rendering, paper-doll equipment, or visible weapon swaps
 - full inventory/equipment economy beyond the current prototype shared party inventory
-- advanced ability framework beyond current prototype class skills, skill ranks, skill books, and legacy-enabled Beginner skill carry-over
+- advanced ability framework beyond current prototype class skills, skill ranks, skill books, skill behavior settings, temporary skill runtime state, status effects, companion AoE channels, and legacy-enabled Beginner skill carry-over
 - mana or complex resource costs
 - casting system
 - advanced targeting system

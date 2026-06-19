@@ -55,6 +55,7 @@ Current game-logic implementation files include:
 - `combatProjectileSystem.ts`
 - `combatResolver.ts`
 - `commands.ts`
+- `companionAoeChannelSystem.ts`
 - `companionCombat.ts`
 - `companionCooldowns.ts`
 - `consumables.ts`
@@ -129,6 +130,7 @@ Current game-logic implementation files include:
 - `skillBehavior.ts`
 - `skillEffectResolution.ts`
 - `skillMovement.ts`
+- `skillOvercharge.ts`
 - `skillProgression.ts`
 - `skillRolePreferences.ts`
 - `skillRuntime.ts`
@@ -137,6 +139,7 @@ Current game-logic implementation files include:
 - `skills.ts`
 - `state.ts`
 - `stats.ts`
+- `statusEffects.ts`
 - `subzoneSystem.ts`
 - `targetSelection.ts`
 - `teleportState.ts`
@@ -403,7 +406,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, prototype skill runtime state, prototype skill visual events, enemy AoE runtime state, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, prototype skill runtime state, status-effect runtime state, prototype skill visual events, companion AoE runtime state, enemy AoE runtime state, prototype consumable use state, hub food warning state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -485,13 +488,33 @@ Current prototype skill runtime and cooldown fields include:
 - `skillMarksByEnemyId`
 - `skillSelfBuffsByCompanionId`
 - `skillPartyBuffsBySourceId`
+- `skillPartyPoisonCoatingsBySourceId`
+- `skillPartyClassBuffsByCompanionId`
+- `skillOverchargesByCompanionId`
+- `skillManaShieldsByCompanionId`
+- `skillFrostArmorsByCompanionId`
+- `skillHealOverTimesByCompanionId`
+- `skillLifestealBuffsByCompanionId`
+- `skillRewindRunesByCompanionId`
+- `skillRunicFocusByCompanionId`
 - `skillGatherBuffsByCompanionId`
 - `skillDamageMitigationsByCompanionId`
+- `skillAbsorbShieldsByCompanionId`
+- `skillSelfMitigationBuffsByCompanionId`
+- `skillPartyMitigationBuffsBySourceId`
 - `skillBindsByEnemyId`
 - `skillShieldBlocksById`
 - `skillCooldownsByCompanionId`
 - `globalCooldownsByCompanionId`
 - `skillVisualEvents`
+
+Current status-effect runtime fields include:
+
+- `statusEffectsById`
+
+Current companion AoE runtime fields include:
+
+- `companionAoeChannelsByCasterId`
 
 Current enemy AoE runtime fields include:
 
@@ -550,7 +573,7 @@ Current save game behavior:
 - saved data includes `saveVersion`, `savedAtMs`, optional `offlineFarmingBlockedReason`, and sanitized `GameState`
 - validation rejects malformed saves, unsupported save versions, missing entities, invalid inventory, invalid wallet, invalid quest state, invalid leader id, and invalid current map id
 - restore rebuilds the current debug map from saved quest state
-- save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, skill runtime, enemy AoE runtime, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, and debug telemetry
+- save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, skill runtime, status-effect runtime, companion AoE runtime, enemy AoE runtime, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, and debug telemetry
 - companion save sanitization keeps dead companions dead, returns living companions to idle or follow state, clears temporary consumable buffs, and sanitizes skill progression data
 - enemy save sanitization keeps dead enemies dead and returns living enemies to idle state
 - Slimeward dungeon chest UI state is closed during save sanitization
@@ -649,6 +672,24 @@ Current first-class selection validates:
 
 Successful first-class selection calls `setPartyMemberClass`, which updates class id and ensures class skill progression for the selected class.
 
+Current first-class selection failure reasons include:
+
+```ts
+type FirstClassSelectionFailureReason =
+  | "companion_not_found"
+  | "companion_dead"
+  | "not_beginner"
+  | "level_too_low"
+  | "invalid_class"
+  | "incompatible_equipment";
+```
+
+First-class selection checks every currently equipped item against the selected first-class equipment profile.
+
+A companion cannot enter first-class selection if any first-class option would be blocked by currently equipped incompatible gear.
+
+Class selection validation must stay in `classSelection.ts` and must not be duplicated in React UI.
+
 Subclass progression is not implemented.
 
 ---
@@ -729,7 +770,7 @@ Skills are simple class-based actions used to extend existing behavior.
 
 Skill definitions live in `skills.ts`.
 
-Skill selection, behavior settings, cooldowns, execution, and effect resolution live in:
+Skill selection, behavior settings, cooldowns, execution, status-effect gating, overcharge adjustment, companion AoE channeling, runtime ticking, and effect resolution live in:
 
 - `skillSystem.ts`
 - `skillBehavior.ts`
@@ -738,6 +779,9 @@ Skill selection, behavior settings, cooldowns, execution, and effect resolution 
 - `skillRuntime.ts`
 - `skillTargeting.ts`
 - `skillMovement.ts`
+- `skillOvercharge.ts`
+- `statusEffects.ts`
+- `companionAoeChannelSystem.ts`
 - `skillEffectResolution.ts`
 
 Current skill runtime is prototype-only.
@@ -757,14 +801,47 @@ Current companion skill behavior settings include:
 - `beginnerFirstAidSelfHealHpThresholdPercent`
 - `beginnerFirstAidAllyHealHpThresholdPercent`
 - `secondWindSelfHealHpThresholdPercent`
+- `holdFastUseHpThresholdPercent`
+- `fakeDeathUseHpThresholdPercent`
+- `bloodFeastUseHpThresholdPercent`
+- `lightMendAllyHealHpThresholdPercent`
+- `selfSacrificeSafetyFloorPercent`
+- `penitentsGiftAllyHealHpThresholdPercent`
+- `penitentsGiftSelfHealHpThresholdPercent`
+- `eternalHopeUseHpThresholdPercent`
 - `mobilitySkillUseMode`
+- `defensiveMobilityUseHpThresholdPercent`
 - `supportFocus`
+- `overchargeEnabled`
+- `fireBurstTargetMode`
+- `circleOfRenewalTargetMode`
+- `circleOfRenewalMainTargetHpThresholdPercent`
 
 Beginner First Aid self-heal threshold defaults to 20 percent and is clamped from 1 percent to 100 percent.
 
 Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
 
 Second Wind self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
+
+Hold Fast use threshold defaults to 40 percent and is clamped from 1 percent to 100 percent.
+
+Fake Death use threshold defaults to 25 percent and is clamped from 1 percent to 100 percent.
+
+Blood Feast use threshold defaults to 45 percent and is clamped from 1 percent to 100 percent.
+
+Light Mend ally-heal threshold defaults to 60 percent and is clamped from 1 percent to 100 percent.
+
+Self Sacrifice safety floor defaults to 35 percent and is clamped from 1 percent to 100 percent.
+
+Penitent's Gift ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 100 percent.
+
+Penitent's Gift self-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+
+Eternal Hope use threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+
+Defensive mobility threshold defaults to 50 percent and is clamped from 1 percent to 100 percent.
+
+Overcharge is enabled by default.
 
 Current mobility skill use mode values are:
 
@@ -777,8 +854,21 @@ Current Support Focus values are:
 ```ts
 type SupportFocus = "lowest_hp" | "leader" | "defender";
 ```
+Current FireBurst target mode values are:
 
-Support Focus and mobility skill use mode are prototype targeting preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
+```ts
+type FireBurstTargetMode = "big_group" | "low_health" | "highest_health";
+```
+
+Current Circle of Renewal target mode values are:
+
+```ts
+type CircleOfRenewalTargetMode =
+  | "big_group"
+  | "low_health"
+  | "defender";
+```
+Support Focus, mobility skill use mode, FireBurst target mode, Circle of Renewal target mode, overcharge enablement, and skill HP thresholds are prototype targeting and usage preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
 
 Current skill ids include Beginner prototype skills and first-class prototype skills:
 
@@ -800,13 +890,62 @@ type SkillId =
   | "woodcutter_rhythm" // Blade
   | "flash_step" // Blade
   | "sweeping_strike" // Blade
+  | "shield_challenge" // Aegis
+  | "hold_fast" // Aegis
   | "guard_wall" // Aegis
-  | "mark_target" // Hunter
+  | "iron_stance" // Aegis
+  | "shield_formation" // Aegis
+  | "stonebreaker_rhythm" // Aegis
+  | "shield_rush" // Aegis
+  | "shield_shockwave" // Aegis
+  | "pinning_shot" // Hunter
+  | "fake_death" // Hunter
+  | "evasive_instinct" // Hunter
+  | "hunters_focus" // Hunter
+  | "poison_coating" // Hunter
+  | "herbalist_rhythm" // Hunter
+  | "skirmish_shot" // Hunter
+  | "arrow_burst" // Hunter
+  | "threatening_roar" // Beast
+  | "blood_feast" // Beast
+  | "rugged_hide" // Beast
   | "feral_surge" // Beast
+  | "pack_frenzy" // Beast
+  | "stoneclaw_rhythm" // Beast
+  | "pounce" // Beast
+  | "maul_sweep" // Beast
   | "elemental_bolt" // Elementalist
+  | "mana_shield" // Elementalist
+  | "frost_armor" // Elementalist
+  | "overcharge" // Elementalist
+  | "arcane_conduit" // Elementalist
+  | "emberwood_rhythm" // Elementalist
+  | "flame_step" // Elementalist
+  | "fire_burst" // Elementalist
   | "binding_rune" // Runecaster
+  | "rune_lance" // Runecaster
+  | "warding_glyph" // Runecaster
+  | "rewind_rune" // Runecaster
+  | "runic_focus" // Runecaster
+  | "leyline_matrix" // Runecaster
+  | "stone_sigil_rhythm" // Runecaster
+  | "rune_step" // Runecaster
+  | "blinding_ray" // Lightbearer
   | "light_mend" // Lightbearer
-  | "penitents_gift"; // Penitent
+  | "sanctuary_veil" // Lightbearer
+  | "guiding_light" // Lightbearer
+  | "radiant_benediction" // Lightbearer
+  | "herbalist_hymn" // Lightbearer
+  | "dawn_step" // Lightbearer
+  | "circle_of_renewal" // Lightbearer
+  | "whip_prison" // Penitent
+  | "flagellant_lash" // Penitent
+  | "martyrs_veil" // Penitent
+  | "penitents_gift" // Penitent
+  | "eternal_hope" // Penitent
+  | "burdened_benediction" // Penitent
+  | "woodcutting_penance" // Penitent
+  | "atonement_step"; // Penitent
 ```
 
 Current Beginner prototype skills:
@@ -831,32 +970,100 @@ Current Blade prototype skills:
 - Blade: Flash Step
 - Blade: Sweeping Strike
 
-Current other first-class prototype skills:
+Current Aegis prototype skills:
 
+- Aegis: Shield Challenge
+- Aegis: Hold Fast
 - Aegis: Guard Wall
-- Hunter: Mark Target
+- Aegis: Iron Stance
+- Aegis: Shield Formation
+- Aegis: Stonebreaker Rhythm
+- Aegis: Shield Rush
+- Aegis: Shield Shockwave
+
+Current Hunter prototype skills:
+
+- Hunter: Pinning Shot
+- Hunter: Fake Death
+- Hunter: Evasive Instinct
+- Hunter: Hunter's Focus
+- Hunter: Poison Coating
+- Hunter: Herbalist Rhythm
+- Hunter: Skirmish Shot
+- Hunter: Arrow Burst
+
+Current Beast prototype skills:
+
+- Beast: Threatening Roar
+- Beast: Blood Feast
+- Beast: Rugged Hide
 - Beast: Feral Surge
+- Beast: Pack Frenzy
+- Beast: Stoneclaw Rhythm
+- Beast: Pounce
+- Beast: Maul Sweep
+
+Current Elementalist prototype skills:
+
 - Elementalist: Elemental Bolt
+- Elementalist: Mana Shield
+- Elementalist: Frost Armor
+- Elementalist: Overcharge
+- Elementalist: Arcane Conduit
+- Elementalist: Emberwood Rhythm
+- Elementalist: Flame Step
+- Elementalist: FireBurst
+
+Current Runecaster prototype skills:
+
 - Runecaster: Binding Rune
+- Runecaster: Rune Lance
+- Runecaster: Warding Glyph
+- Runecaster: Rewind Rune
+- Runecaster: Runic Focus
+- Runecaster: Leyline Matrix
+- Runecaster: Stone Sigil Rhythm
+- Runecaster: Rune Step
+
+Current Lightbearer prototype skills:
+
+- Lightbearer: Blinding Ray
 - Lightbearer: Light Mend
+- Lightbearer: Sanctuary Veil
+- Lightbearer: Guiding Light
+- Lightbearer: Radiant Benediction
+- Lightbearer: Herbalist Hymn
+- Lightbearer: Dawn Step
+- Lightbearer: Circle of Renewal
+
+Current Penitent prototype skills:
+
+- Penitent: Whip Prison
+- Penitent: Flagellant Lash
+- Penitent: Martyr's Veil
 - Penitent: Penitent's Gift
+- Penitent: Eternal Hope
+- Penitent: Burdened Benediction
+- Penitent: Woodcutting Penance
+- Penitent: Atonement Step
 
-Current skill effects may include direct damage, lunge damage, sweeping/splash damage, taunt, enemy mark bonus damage, self damage buff, ally damage buff, party damage buff, gathering speed buff, quick-step movement, shield block, damage mitigation, bind, heal, self-percent heal, self-cost heal, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
+Current skill effects may include direct damage, lunge damage, sweeping/splash damage, area damage, taunt, multi-taunt, enemy mark bonus damage, self damage buff, ally damage buff, party damage buff, party class buffs, party poison coating, gathering speed buff, quick-step movement, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, immobilize, disarm, blind/forced evasion, fake death, curse, poison, burning, bleed, heal, self-percent heal, ally heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge, companion AoE channels, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
 
-`skillEffectResolution.ts` owns applying current prototype skill effects after selection, including damage, lunge damage, sweeping damage, taunt, mark, self buff, party buff, ally buff, gather buff, quick step, shield block, damage mitigation, bind, heal, self-percent heal, self-cost heal, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
+`skillEffectResolution.ts` owns applying current prototype skill effects after selection, including damage, lunge damage, sweeping damage, area damage, taunt, multi-taunt, mark, self buff, party buff, ally buff, party class buff, poison coating, gather buff, quick step, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, status effects, heal, self-percent heal, self-cost heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge setup, companion AoE channel setup, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
 
 Current skill rules:
 
 - skills are tied to classes
 - roles determine preferred skill usage
 - skill tags affect role scoring
+- skill tags are typed metadata on skill definitions and may describe targeting, effect family, role scoring, maintenance behavior, mobility, gathering, defensive, support, or self-cost traits
 - skill selection must validate target, range, cooldown, companion state, and current context
 - skill movement helpers must validate map bounds, walls, active resources, and blocking entity collision before moving companions
 - direct-commanded companions do not use autonomous prototype skills
 - dead companions do not use skills
 - skills may use individual per-skill cooldowns
 - skills without an explicit cooldown fall back to the shared prototype skill cooldown value
-- current fallback prototype skill cooldown is 5000ms
+- current fallback prototype skill cooldown is 10000ms
 - Beginner prototype skills currently use explicit 10000ms cooldowns
 - basic attacks and successful skill uses start a companion global cooldown
 - current companion global cooldown is 2000ms
@@ -875,8 +1082,18 @@ type SkillVisualType =
   | "red_flash"
   | "heal";
 ```
+Current AoE visual intent values are:
 
-Current skill runtime state includes marks, self buffs, party buffs, gather buffs, damage mitigations, binds, shield blocks, per-skill cooldowns, companion global cooldowns, and visual events.
+```ts
+type AoeVisualIntent =
+  | "enemyOffensive"
+  | "partyOffensive"
+  | "partyHealing";
+```
+
+AoE visual intent is presentation metadata for renderer feedback. It must not define damage ownership, targeting, faction logic, or simulation behavior.
+
+Current skill runtime state includes marks, self buffs, party buffs, poison coatings, class buffs, overcharges, mana shields, frost armor, heal-over-time effects, lifesteal buffs, rewind runes, runic focus, gather buffs, damage mitigations, absorb shields, self mitigation buffs, party mitigation buffs, binds, shield blocks, status effects, companion AoE channels, per-skill cooldowns, companion global cooldowns, and visual events.
 
 `skillProgression.ts` owns current prototype skill ranks, skill-book reading, active skill lookup, scaled skill definitions, and legacy-enabled Beginner skill carry-over.
 
@@ -893,7 +1110,7 @@ Current skill progression behavior:
 
 Do not expand this into a full ability framework unless explicitly requested.
 
-Do not add mana, casting, advanced targeting, equipment requirements, complex cooldown systems, skill trees, hotbars, or player-triggered active skill input unless explicitly requested.
+Do not add a mana resource, casting framework, advanced targeting, equipment requirements, complex cooldown systems, skill trees, hotbars, or player-triggered active skill input unless explicitly requested.
 
 ---
 
@@ -1137,6 +1354,7 @@ Current quest ids are:
 - `broken_thicket_survey`
 - `crawler_shelf_report`
 - `find_slimeward_camp`
+- `azure_trial`
 
 Current quest display names are:
 
@@ -1151,6 +1369,7 @@ Current quest display names are:
 - `broken_thicket_survey`: Broken Thicket Survey
 - `crawler_shelf_report`: Crawler Shelf Report
 - `find_slimeward_camp`: Slimeward Trail
+- `azure_trial`: The Azure Trial
 
 Current quest objective types are:
 
@@ -1171,10 +1390,11 @@ type QuestObjectiveType =
   | "guide_npc_to_poi"
   | "unlock_route"
   | "defeat_elite"
+  | "collect_dungeon_chest"
   | "return_to_poi";
 ```
 
-Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, equipment equip checks, flask equip checks, and Merchant Buy equipment checks.
+Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, and Merchant Buy equipment checks.
 
 Current prototype quest chain:
 
@@ -1188,6 +1408,7 @@ Current prototype quest chain:
 - `open_wolf_causeway` unlocks `broken_thicket_survey`
 - `broken_thicket_survey` unlocks `crawler_shelf_report`
 - `crawler_shelf_report` unlocks `find_slimeward_camp`
+- `find_slimeward_camp` unlocks `azure_trial`
 
 Current quest rewards may include:
 
@@ -1214,6 +1435,7 @@ Current quest objective helper behavior:
 - defend objectives start from a nearby repair actor, spawn quest enemy waves, and use repair progress as the defense timer
 - defeat elite objectives ensure the configured elite quest enemy is spawned
 - unlock route objectives complete the current route objective when active
+- collect dungeon chest objectives complete when the matching dungeon chest has been collected
 
 The quest guide and related quest objective helpers are prototype systems.
 
@@ -1311,8 +1533,15 @@ Current systems and update helpers include:
 - Role System
 - Class Selection helpers
 - Skill System
+- Skill Behavior helpers
 - Skill Progression helpers
+- Skill Runtime helpers
+- Skill Targeting helpers
+- Skill Movement helpers
+- Skill Overcharge helpers
 - Skill Effect Resolution helpers
+- Status Effect helpers
+- Companion AoE Channel System
 - Party Activity Coordinator helpers
 - Party Formation System
 - Exploration System
@@ -1322,6 +1551,7 @@ Current systems and update helpers include:
 - Enemy AI System
 - Enemy AoE Channel System
 - Attack System
+- Combat Projectile System
 - Drop System
 - Slimeward Dungeon System
 - Enemy Respawn System
@@ -1352,53 +1582,59 @@ The game loop runs continuously while enabled, executes systems in order, update
 Current high-level order:
 
 1. If the Slimeward dungeon chest UI is open, record telemetry and stop the tick early
-2. Advance simulation timing, clear frame movement planning, clear expired combat feedback, and clear expired skill runtime state
-3. Clear expired consumable buffs
-4. Clear expired hub departure food warnings
-5. Synchronize derived max health
-6. Apply debug companion infinite health when enabled
-7. Update consumable behavior
-8. Update active consumable use
-9. Synchronize derived max health again after consumable changes
-10. Apply debug companion infinite health again when enabled
-11. Update world-wipe recovery
-12. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
-13. Update party intent recovery
-14. Update resurrection
-15. Update party intent recovery again after resurrection changes
-16. Update teleport system
-17. If teleport is active or map transition happened, record telemetry and stop the tick early
-18. Update direct companion commands
-19. Build current resource work context
-20. Update POI system
-21. Update healing fountain system
-22. Rebuild resource work context
-23. If auto mode is enabled, update role behavior
-24. If auto mode is enabled, update prototype skills
-25. If party execution intent, auto mode, or teleport POI movement is active, update party formation movement
-26. If auto mode is enabled, reserve exploration movement
-27. Update defender behavior
-28. If auto mode is enabled, update exploration
-29. Update follow behavior
-30. Update quest guide escort behavior
-31. Update enemy AI
-32. Update enemy AoE channel behavior
-33. Update party intent self-defense
-34. Update combat skills
-35. Update attacks
-36. Update flask recharge from counted enemy defeats
-37. Restore interrupted POI target when valid
-38. Update passive health regeneration
-39. Update target dummy health regeneration
-40. Update drop system
-41. Update Slimeward dungeon system
-42. Update enemy respawn system
-43. Update gathering
-44. Update entity separation
-45. Update skill shield block positions
-46. Idle autonomous party members when no POI or leader intent is active
-47. Apply debug companion infinite health again when enabled
-48. Record debug telemetry
+2. Advance simulation timing, clear frame movement planning, and clear expired combat feedback
+3. Update status effects
+4. Update rune skill runtime
+5. Clear expired skill runtime state
+6. Clear expired consumable buffs
+7. Clear expired hub departure food warnings
+8. Update role bonus assignments
+9. Synchronize derived max health
+10. Apply debug companion infinite health when enabled
+11. Update consumable behavior
+12. Update active consumable use
+13. Synchronize derived max health again after consumable changes
+14. Apply debug companion infinite health again when enabled
+15. Update world-wipe recovery
+16. If world-wipe recovery is pending or changed maps, record telemetry and stop the tick early
+17. Update party intent recovery
+18. Update resurrection
+19. Update party intent recovery again after resurrection changes
+20. Update teleport system
+21. If teleport is active or map transition happened, record telemetry and stop the tick early
+22. Update direct companion commands
+23. Build current resource work context
+24. Update POI system
+25. Update healing fountain system
+26. Rebuild resource work context
+27. If auto mode is enabled, update role behavior
+28. If auto mode is enabled, update prototype skills
+29. If party execution intent, auto mode, or teleport POI movement is active, update party formation movement
+30. If auto mode is enabled, reserve exploration movement
+31. Update defender behavior
+32. If auto mode is enabled, update exploration
+33. Update follow behavior
+34. Update quest guide escort behavior
+35. Update enemy AI
+36. Update enemy AoE channel behavior
+37. Update companion AoE channel behavior
+38. Update party intent self-defense
+39. Update combat skills
+40. Update attacks
+41. Update combat projectiles
+42. Update flask recharge from counted enemy defeats
+43. Restore interrupted POI target when valid
+44. Update passive health regeneration
+45. Update target dummy health regeneration
+46. Update drop system
+47. Update Slimeward dungeon system
+48. Update enemy respawn system
+49. Update gathering
+50. Update entity separation
+51. Update skill shield block positions
+52. Idle autonomous party members when no POI or leader intent is active
+53. Apply debug companion infinite health again when enabled
+54. Record debug telemetry
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
 
@@ -1634,6 +1870,7 @@ Aegis shield-block skill behavior is handled by the prototype skill system, not 
 Current attack behavior:
 
 - attackers require a valid combat target
+- attackers cannot basic attack while an active status effect blocks attacks
 - attackers move toward targets if out of range
 - attackers can select attack slots around a target
 - attackers attack when in range and cooldown is ready
@@ -1644,9 +1881,9 @@ Current attack behavior:
 - enemies may use entity-specific attack cooldowns
 - enemies use a short basic attack windup before impact or projectile launch
 - attackers can take a small final positioning step when just outside range
-- damage is resolved through `combatResolver.ts` using derived combat stats, mitigation, evasion, block, critical hits, and prototype skill damage modifiers
-- prototype skill damage modifiers can increase damage
-- shield blocks can block incoming enemy attacks
+- damage is resolved through `combatResolver.ts` using derived combat stats, mitigation, evasion, forced evasion, block, critical hits, defense buffs, absorb shields, mana shields, frost armor, next-attack bonuses, and prototype skill damage modifiers
+- prototype skill damage modifiers, class buffs, party buffs, lifesteal buffs, and status-driven next-attack bonuses can affect combat impact
+- shield blocks, absorb shields, mana shields, frost armor, defense buffs, and mitigation buffs can reduce, absorb, block, reflect, or respond to incoming damage where implemented
 - defeated targets enter dead state
 - enemies attacked by party members fight back
 - party members may assist nearby party combat targets
@@ -1667,6 +1904,77 @@ Current basic attack constants and helpers:
 - enemy attack range may come from enemy entity data, enemy type data, enemy archetype defaults, or the default enemy attack range
 
 Combat movement order uses role priority for party members.
+
+---
+
+## Status Effects
+
+`statusEffects.ts` owns current prototype status-effect storage, expiry, action gating, damage-over-time ticking, forced evasion consumption, next-attack bonus consumption, defense bonus aggregation, and aggro-drop helpers.
+
+Current status-effect types include:
+
+- `immobilized`
+- `incapacitated`
+- `disarmed`
+- `cursed`
+- `fakeDeath`
+- `forcedEvasion`
+- `nextAttackDamageBonus`
+- `poison`
+- `burning`
+- `bleed`
+- `defenseBuff`
+
+Current status-effect behavior:
+
+- movement is blocked by `immobilized` and `incapacitated`
+- basic attacks are blocked by `incapacitated` and `disarmed`
+- skill use is blocked by `incapacitated` and `cursed`
+- gathering is blocked by `incapacitated`
+- fake death can make enemies ignore or drop the affected companion where supported
+- forced evasion is consumed by the next eligible incoming attack
+- next-attack damage bonus is consumed by the next eligible outgoing attack
+- poison and burning deal magic damage over time
+- bleed deals physical damage over time
+- damage-over-time effects can expire, tick, kill targets, grant XP, progress quests, and trigger drops through normal damage resolution where supported
+
+Status effects are prototype skill/combat runtime, not a final crowd-control, buff/debuff, dispel, resistance, or condition-stacking framework.
+
+---
+
+## Companion AoE Channel System
+
+`companionAoeChannelSystem.ts` owns current party-side AoE skill channel runtime and impact resolution.
+
+Current companion AoE channel behavior:
+
+- stores active companion AoE channels by caster id
+- resolves supported companion AoE impacts after their channel timing completes
+- removes the channel after impact or invalidation
+- Shield Shockwave damages nearby enemies and can apply bind runtime
+- Maul Sweep damages nearby enemies and can apply `disarmed`
+- companion AoE impact can grant XP, progress quest defeat objectives, and trigger enemy drops through normal combat resolution where supported
+
+Companion AoE channel runtime is prototype skill runtime and should stay in game logic.
+
+---
+
+## Enemy AoE Channel System
+
+`enemyAoeChannelSystem.ts` owns current enemy-side AoE channel runtime and impact resolution.
+
+Current enemy AoE channel behavior:
+
+- stores active enemy AoE channels by caster id
+- stores enemy AoE cooldown state by caster id
+- supports channeling and windup phases
+- supports current AoE dummy stomp behavior
+- supports current Heavy Slime stomp behavior
+- interrupts channels when the caster dies, becomes bound, or loses required line of sight where implemented
+- skips fake-death companions during eligible impact targeting
+- resolves AoE impact through normal damage resolution where supported
+
+Enemy AoE channel runtime is prototype combat runtime and should not become a final boss scripting, telegraph, encounter, or raid-mechanic framework unless explicitly requested.
 
 ---
 
@@ -1947,6 +2255,18 @@ Current skill book items map one inventory item to one `SkillId` through `skillB
 
 Skill-book reading logic lives in `skillProgression.ts`, not in React UI or merchant logic.
 
+Current skill-book behavior:
+
+- skill books are normal inventory items with `category: "skill_book"`
+- skill books are stackable and currently use `maxStack: 99`
+- each skill book points to exactly one `SkillId` through `skillBookSkillId`
+- `getSkillBookReadCandidates` returns companions that can currently read the selected book
+- `canCompanionReadSkillBook` returns `eligible`, `unavailable`, or `maxed`
+- `readSkillBook` validates item definition, known skill id, companion id, inventory quantity, learned skill availability, and max rank
+- failed skill-book reads do not remove the book from inventory
+- successful skill-book reads remove one book item and increase the matching learned skill rank by one, capped by that skill's max rank
+- skill progression sanitization keeps known skill ids, clamps ranks, preserves valid legacy-enabled skill ids, and ensures current-class skills remain learned
+
 The shared prototype wallet is stored on `GameState` as `wallet`.
 
 Wallet logic lives in `wallet.ts`.
@@ -2058,8 +2378,9 @@ Current merchant behavior:
 - supports buying selected equipment, consumables, and skill books for Crowns
 - validates merchant identity, stock membership, item category, price, wallet balance, inventory capacity, and quest gating
 - adds purchased items to shared inventory
-- supports stock filtering by group and party equipment compatibility
+- supports stock filtering by main group, secondary filter, and party equipment compatibility where implemented
 - always allows consumable and skill-book stock entries through stock compatibility filtering
+- treats party-compatible filtering as an equipment compatibility filter, not a consumable or skill-book visibility rule
 - records merchant buy, quick exchange, inventory, wallet, and quest-gating telemetry
 
 Current Merchant Buy stock groups are:
@@ -2074,6 +2395,24 @@ Current Merchant Buy stock groups are:
 - `mail`
 - `plate`
 - `accessories`
+
+Current Merchant Buy filter inputs include:
+
+```ts
+type MerchantBuyFilter = "all" | MerchantStockGroup;
+
+type MerchantStockFilterOptions = {
+  mainFilter?: MerchantBuyFilter;
+  secondaryFilter?: string | null;
+  partyCompatibleOnly?: boolean;
+};
+```
+
+Current Merchant Buy stock includes Beginner skill books and first-class skill books for all currently implemented prototype skills.
+
+Merchant stock, pricing, filtering, quest gating, buying, wallet mutation, and inventory mutation must remain in `merchant.ts` and related game-logic helpers.
+
+React may display merchant stock and issue buy/filter commands, but must not define merchant stock, prices, compatibility rules, wallet rules, or inventory mutation rules.
 
 The Merchant Sell panel is currently a UI placeholder only.
 
@@ -2172,12 +2511,19 @@ type AccessoryType = "accessory";
 
 Equipment rules validate:
 
+- companion existence
+- item existence
+- inventory quantity
+- item category
 - slot compatibility
 - class permission
 - level requirement
 - both-hands occupancy
+- inventory capacity for returned items
 - inventory removal
 - inventory return on unequip
+
+Equipment validation helpers are shared game logic and may be used by equipment UI, merchant compatibility filtering, and first-class selection compatibility checks.
 - telemetry results
 
 Armor and accessories currently ignore class restrictions when level requirements are met.
@@ -2222,9 +2568,10 @@ Current shared prototype accessory items include:
 
 Current quest equipment rewards may include:
 
-- Acolyte Hood
+- Guard Coif
 - Scout Boots
 - Bulwark Cuirass
+- Plain Charm
 
 Current archetype-specific prototype equipment drops may include:
 
@@ -2395,12 +2742,14 @@ Current teleport behavior:
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
-- map-local enemies, resources, hub placeholders, hub target dummies, explored tiles, movement planning, direct commands, formation state, combat feedback, skill visuals, enemy AoE runtime, drop visuals, resurrection state, and follow trails are reset or rebuilt for the new map
+- map-local enemies, resources, hub placeholders, hub target dummies, explored tiles, movement planning, direct commands, formation state, combat feedback, combat projectiles, skill runtime, status-effect runtime, skill visuals, companion AoE runtime, enemy AoE runtime, consumable-use runtime, drop visuals, resurrection state, health timing, target dummy timing, and follow trails are reset, cleared, pruned, or rebuilt for the new map
 - companion progression, class, role, level, XP, health, party identity, equipment, consumables, wallet, inventory, quests, party order, and teleport working state are preserved
 
 `mapRuntimeCleanup.ts` owns clearing map-local runtime state during map transitions and pruning runtime records for entities that no longer exist.
 
-Map transition cleanup clears or resets active teleport, direct commands, direct-command grace, interrupted POI state, explored tiles, follow trails, combat feedback, movement planning, attack slot cache, defender wait/blocking state, skill visuals, enemy AoE runtime, flask counted defeat records, health regeneration timing, target dummy regeneration timing, drop visuals, resurrection state, skill binds, skill marks, skill shield blocks, and party formation state.
+Map transition cleanup clears or resets active teleport, direct commands, direct-command grace, interrupted POI state, explored tiles, follow trails, combat feedback, combat projectiles, movement planning, attack slot cache, defender wait/blocking state, skill visuals, companion AoE runtime, enemy AoE runtime, consumable-use runtime, flask counted defeat records, health regeneration timing, target dummy regeneration timing, drop visuals, resurrection state, party formation state, and map-local skill/status runtime.
+
+Map transition cleanup clears map-local skill/status runtime such as marks, binds, shield blocks, status effects, party poison coatings, party class buffs, overcharges, mana shields, frost armor, heal-over-time effects, lifesteal buffs, rewind runes, runic focus, absorb shields, self mitigation buffs, party mitigation buffs, gather buffs, damage mitigations, and other transient skill records that should not survive a prototype map change.
 
 Current active teleport state:
 
@@ -2534,7 +2883,7 @@ Current world-wipe recovery behavior:
 - may charge Crowns using the current rescue fee calculation, capped by current wallet balance
 - restores companions to rescue hub arrival positions with full health
 - rebuilds rescue hub NPCs and hub target dummies where appropriate
-- clears map-local runtime state, combat state, movement state, teleport state, POI state, skill runtime state, enemy AoE runtime, drop visuals, resurrection state, direct commands, follow trails, and formation state
+- clears map-local runtime state, combat state, movement state, teleport state, POI state, skill runtime state, status-effect runtime, companion AoE runtime, enemy AoE runtime, drop visuals, resurrection state, direct commands, follow trails, and formation state
 - clears Slimeward dungeon runtime when rescuing to Slimeward Camp
 - records map reach for quest state after rescue
 
@@ -2620,7 +2969,7 @@ Current world renderer behavior:
 - PixiJS renders the main world view.
 - React hosts the renderer and passes game state and command callbacks.
 - The renderer supports preview and full modes.
-- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, drop visuals, resurrection feedback, world-wipe feedback, and camera-follow presentation.
+- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, basic combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, and camera-follow presentation.
 - PixiJS rendering must not own simulation rules, targeting rules, movement rules, combat rules, quest rules, or map data generation.
 
 Current companion visuals:
@@ -2738,7 +3087,9 @@ Debug/testing helpers may exist for development:
 - debug maps
 - direct companion command testing
 - role bonus assignment testing
-- skill behavior, skill progression, skill book, legacy skill, and cooldown testing
+- skill behavior, skill progression, skill book, legacy skill, cooldown, and overcharge testing
+- status-effect testing
+- companion AoE channel testing
 - map runtime cleanup testing
 - Slimeward dungeon runtime and chest testing
 - enemy AoE channel testing
@@ -2761,7 +3112,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, mobility skill use mode settings, Support Focus settings, learned skill summaries, legacy skill toggles, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, guide popup overlays, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, Options save controls, start screen save controls, offline progress summary, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype consumable equipment, food assignment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, hub food warnings, quest tracker, quest log, prototype quest reward text, quest objective text, quest turn-in error feedback, equipment tutorial quest state, guide popup overlays, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, World Travel menu state, prototype destination selection, Options save controls, start screen save controls, offline progress summary, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -2826,6 +3177,9 @@ Current intended Party sections and controls:
 - learned skill display
 - legacy skill toggles where eligible
 - Skill Preferences for supported prototype skill behavior settings
+- HP threshold controls for supported self-heal, ally-heal, defensive, and safety skills
+- target mode controls for supported FireBurst and Circle of Renewal behavior
+- Overcharge toggle control for supported Elementalist behavior
 
 Current intended Party Management sections and controls:
 
