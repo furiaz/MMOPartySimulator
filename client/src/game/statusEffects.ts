@@ -12,6 +12,8 @@ export const POISON_TICK_INTERVAL_MS = 2000;
 export const POISON_MAX_DURATION_MULTIPLIER = 3;
 export const BURNING_TICK_INTERVAL_MS = POISON_TICK_INTERVAL_MS;
 export const BURNING_MAX_DURATION_MULTIPLIER = POISON_MAX_DURATION_MULTIPLIER;
+export const BLEED_TICK_INTERVAL_MS = 1000;
+export const BLEED_MAX_DURATION_MULTIPLIER = POISON_MAX_DURATION_MULTIPLIER;
 
 export type ApplyStatusEffectInput =
   | {
@@ -37,7 +39,7 @@ export type ApplyStatusEffectInput =
       damageTypes?: CombatDamageType[];
     }
   | {
-      type: "poison" | "burning";
+      type: "poison" | "burning" | "bleed";
       targetId: string;
       durationMs: number;
       tickDamage: number;
@@ -77,7 +79,11 @@ export function applyStatusEffect(
     return state;
   }
 
-  if (input.type === "poison" || input.type === "burning") {
+  if (
+    input.type === "poison" ||
+    input.type === "burning" ||
+    input.type === "bleed"
+  ) {
     return applyDotStatusEffect(state, input, now);
   }
 
@@ -280,7 +286,11 @@ export function updateStatusEffects(
       continue;
     }
 
-    if (status.type !== "poison" && status.type !== "burning") {
+    if (
+      status.type !== "poison" &&
+      status.type !== "burning" &&
+      status.type !== "bleed"
+    ) {
       if (status.expiresAt <= now) {
         delete statusEffectsById[status.id];
       }
@@ -304,7 +314,7 @@ export function updateStatusEffects(
         entityId: target.id,
         sourceEntityId: status.sourceId,
         targetEntityId: target.id,
-        damageType: "magic",
+        damageType: status.type === "bleed" ? "physical" : "magic",
         feedbackKind: "damage",
         amount: dotDamage,
         text: `-${dotDamage} HP`,
@@ -376,21 +386,18 @@ export function dropAggroFromTarget(
 
 function applyDotStatusEffect(
   state: GameState,
-  input: Extract<ApplyStatusEffectInput, { type: "poison" | "burning" }>,
+  input: Extract<ApplyStatusEffectInput, { type: "poison" | "burning" | "bleed" }>,
   now: number,
 ): GameState {
   const statusEffectsById = { ...(state.statusEffectsById ?? {}) };
   const id = createStatusEffectId(input.targetId, input.type, input.sourceKey);
   const tickIntervalMs =
     input.tickIntervalMs ??
-    (input.type === "burning" ? BURNING_TICK_INTERVAL_MS : POISON_TICK_INTERVAL_MS);
+    getDefaultDotTickIntervalMs(input.type);
   const baseDurationMs = Math.max(0, input.durationMs);
   const maxDurationMs =
     input.maxDurationMs ??
-    baseDurationMs *
-      (input.type === "burning"
-        ? BURNING_MAX_DURATION_MULTIPLIER
-        : POISON_MAX_DURATION_MULTIPLIER);
+    baseDurationMs * getDefaultDotMaxDurationMultiplier(input.type);
   const existing = statusEffectsById[id];
 
   if (existing?.type === input.type) {
@@ -426,6 +433,26 @@ function applyDotStatusEffect(
     ...state,
     statusEffectsById,
   };
+}
+
+function getDefaultDotTickIntervalMs(type: "poison" | "burning" | "bleed"): number {
+  if (type === "burning") {
+    return BURNING_TICK_INTERVAL_MS;
+  }
+
+  return type === "bleed" ? BLEED_TICK_INTERVAL_MS : POISON_TICK_INTERVAL_MS;
+}
+
+function getDefaultDotMaxDurationMultiplier(
+  type: "poison" | "burning" | "bleed",
+): number {
+  if (type === "burning") {
+    return BURNING_MAX_DURATION_MULTIPLIER;
+  }
+
+  return type === "bleed"
+    ? BLEED_MAX_DURATION_MULTIPLIER
+    : POISON_MAX_DURATION_MULTIPLIER;
 }
 
 function hasActiveStatus(

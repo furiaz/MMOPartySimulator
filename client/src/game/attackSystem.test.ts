@@ -5,6 +5,7 @@ import {
   ELEMENTALIST_BASIC_ATTACK_RANGE,
   HUNTER_BASIC_ATTACK_RANGE,
   LIGHTBEARER_BASIC_ATTACK_RANGE,
+  PENITENT_BASIC_ATTACK_RANGE,
   RUNECASTER_BASIC_ATTACK_RANGE,
   getCompanionAttackRange,
 } from "./companionCombat";
@@ -53,6 +54,13 @@ describe("enemy attack leash movement", () => {
       LIGHTBEARER_BASIC_ATTACK_RANGE,
     );
     expect(getCompanionAttackRange(companion)).toBe(4);
+  });
+
+  it("starts Penitent basic attack range at three cells without becoming ranged projectile", () => {
+    const companion = createIdleCompanion("leader", { x: 0, y: 0 }, "penitent");
+
+    expect(getCompanionAttackRange(companion)).toBe(PENITENT_BASIC_ATTACK_RANGE);
+    expect(getCompanionAttackRange(companion)).toBe(3);
   });
 
   it("lets enemies pursue beyond roam leash while inside attack leash", () => {

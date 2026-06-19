@@ -538,7 +538,8 @@ function isMobilitySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "pounce" ||
     skill.effect.type === "flameStep" ||
     skill.effect.type === "runeStep" ||
-    skill.effect.type === "dawnStep"
+    skill.effect.type === "dawnStep" ||
+    skill.effect.type === "atonementStep"
   );
 }
 
@@ -564,7 +565,10 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "frostArmor" ||
     skill.effect.type === "healOverTime" ||
     skill.effect.type === "circleOfRenewal" ||
+    skill.effect.type === "sacrificeHeal" ||
+    skill.effect.type === "eternalHope" ||
     skill.effect.type === "barrierBlock" ||
+    skill.effect.type === "sacrificialBarrier" ||
     skill.effect.type === "rewindRune" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff"
@@ -596,6 +600,7 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "partyBuff" ||
     skill.effect.type === "partyClassBuff" ||
     skill.effect.type === "partyPoisonCoating" ||
+    skill.effect.type === "atonementStep" ||
     skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "overcharge" ||
     skill.effect.type === "fakeDeath" ||
@@ -607,7 +612,10 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "frostArmor" ||
     skill.effect.type === "healOverTime" ||
     skill.effect.type === "circleOfRenewal" ||
+    skill.effect.type === "sacrificeHeal" ||
+    skill.effect.type === "eternalHope" ||
     skill.effect.type === "barrierBlock" ||
+    skill.effect.type === "sacrificialBarrier" ||
     skill.effect.type === "rewindRune" ||
     skill.effect.type === "runicFocus" ||
     skill.effect.type === "selfMitigationBuff" ||
@@ -730,6 +738,9 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "flameStep":
     case "runeStep":
     case "dawnStep":
+    case "atonementStep":
+    case "whipPrison":
+    case "flagellantLash":
     case "maulSweep":
     case "arrowBurst":
     case "fireBurst":

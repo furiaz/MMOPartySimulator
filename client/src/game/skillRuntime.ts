@@ -766,19 +766,22 @@ function updateHealOverTimes(state: GameState, now: number): GameState {
 
     while (nextTickAt <= now && nextTickAt <= healOverTime.expiresAt) {
       if (target.health < target.maxHealth) {
-        const currentTarget = nextState.entities[healOverTime.targetId];
+      const currentTarget = nextState.entities[healOverTime.targetId];
 
-        if (isLivingCompanion(currentTarget)) {
-          const healAmount = Math.max(
-            1,
-            Math.ceil(
-              currentTarget.maxHealth *
-                (healOverTime.healPercentMaxHealth / 100),
-            ),
-          );
-          nextState = applyCompanionHealing(
-            nextState,
-            currentTarget,
+      if (isLivingCompanion(currentTarget)) {
+        const healAmount =
+          healOverTime.healAmountPerTick !== undefined
+            ? healOverTime.healAmountPerTick
+            : Math.max(
+                1,
+                Math.ceil(
+                  currentTarget.maxHealth *
+                    ((healOverTime.healPercentMaxHealth ?? 0) / 100),
+                ),
+              );
+        nextState = applyCompanionHealing(
+          nextState,
+          currentTarget,
             healAmount,
             now,
             { sourceId: healOverTime.sourceId },

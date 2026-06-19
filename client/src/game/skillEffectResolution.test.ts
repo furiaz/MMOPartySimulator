@@ -1579,7 +1579,168 @@ describe("skill effect resolution", () => {
       target.health,
     );
     expect((selfCostState.entities.penitent as Companion).health).toBe(
-      penitent.health - 1,
+      penitent.health - Math.ceil(penitent.health * 0.05),
+    );
+  });
+
+  it("applies Penitent control, sacrifice, sustain, party support, and mobility effects", () => {
+    const penitent = {
+      ...createSkillCompanion("penitent", "support", { x: 1, y: 1 }, "penitent"),
+      health: 100,
+      maxHealth: 100,
+    };
+    const enemy = createSkillEnemy("enemy", { x: 3, y: 1 }, { maxHealth: 100 });
+    const ally = {
+      ...createSkillCompanion("ally", "defender", { x: 1, y: 2 }),
+      health: 40,
+      maxHealth: 100,
+    };
+    let state = createSkillState([penitent, enemy, ally]);
+
+    state = resolveSkillEffect(
+      state,
+      penitent,
+      createSkillUse("whip_prison", enemy),
+      1000,
+    ).state;
+
+    expect(Object.values(state.statusEffectsById ?? {})).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "immobilized",
+          targetId: penitent.id,
+          sourceKey: "whip_prison",
+        }),
+        expect.objectContaining({
+          type: "disarmed",
+          targetId: enemy.id,
+          sourceKey: "whip_prison",
+        }),
+        expect.objectContaining({
+          type: "cursed",
+          targetId: enemy.id,
+          sourceKey: "whip_prison",
+        }),
+        expect.objectContaining({
+          type: "bleed",
+          targetId: enemy.id,
+          sourceKey: "whip_prison",
+          tickIntervalMs: 1000,
+        }),
+      ]),
+    );
+
+    const lashState = resolveSkillEffect(
+      createSkillState([penitent, enemy]),
+      penitent,
+      createSkillUse("flagellant_lash", enemy),
+      1100,
+    ).state;
+
+    expect((lashState.entities.penitent as Companion).health).toBe(
+      penitent.health - 3,
+    );
+    expect((lashState.entities.enemy as Enemy).health).toBeLessThan(enemy.health);
+    expect(lashState.statusEffectsById?.["enemy-bleed-flagellant_lash"]).toMatchObject({
+      tickIntervalMs: 1000,
+      sourceId: penitent.id,
+    });
+
+    const veilState = resolveSkillEffect(
+      createSkillState([penitent, ally]),
+      penitent,
+      createSkillUse("martyrs_veil", ally),
+      1200,
+    ).state;
+
+    expect((veilState.entities.penitent as Companion).health).toBe(
+      penitent.health - 3,
+    );
+    expect(veilState.skillShieldBlocksById?.["ally-martyrs_veil"]).toMatchObject({
+      ownerId: ally.id,
+      remainingBlocks: 2,
+      blockedDamageTypes: ["physical", "magic"],
+    });
+
+    const giftState = resolveSkillEffect(
+      createSkillState([penitent, ally]),
+      penitent,
+      createSkillUse("penitents_gift", ally),
+      1300,
+    ).state;
+
+    expect((giftState.entities.penitent as Companion).health).toBe(
+      penitent.health - 5,
+    );
+    expect((giftState.entities.ally as Companion).health).toBe(55);
+
+    const hopeState = resolveSkillEffect(
+      createSkillState([{ ...penitent, health: 50 }, enemy]),
+      { ...penitent, health: 50 },
+      createSkillUse("eternal_hope", penitent),
+      1400,
+    ).state;
+
+    expect((hopeState.entities.penitent as Companion).health).toBe(45);
+    expect(hopeState.skillSelfMitigationBuffsByCompanionId?.penitent).toMatchObject({
+      mitigationPercent: 20,
+      expiresAt: 16400,
+    });
+    expect(hopeState.skillHealOverTimesByCompanionId?.penitent).toMatchObject({
+      healAmountPerTick: 2,
+      nextTickAt: 4400,
+    });
+
+    const hopeTickState = updateRuneSkillRuntime(hopeState, 4400);
+    expect((hopeTickState.entities.penitent as Companion).health).toBe(47);
+
+    const benedictionState = resolveSkillEffect(
+      createSkillState([penitent, ally]),
+      penitent,
+      createSkillUse("burdened_benediction", penitent),
+      1500,
+    ).state;
+
+    expect(
+      benedictionState.skillPartyClassBuffsByCompanionId?.ally?.penitent,
+    ).toMatchObject({
+      sourceClassId: "penitent",
+      primaryStatBonusPercentByStat: { wisdom: 5, constitution: 5 },
+    });
+
+    const stepEnemy = createSkillEnemy("step-enemy", { x: 4, y: 1 });
+    const offensiveStepState = resolveSkillEffect(
+      createSkillState([penitent, stepEnemy]),
+      penitent,
+      createSkillUse("atonement_step", stepEnemy),
+      1600,
+    ).state;
+
+    expect((offensiveStepState.entities.penitent as Companion).position).not.toEqual(
+      penitent.position,
+    );
+    expect(offensiveStepState.statusEffectsById?.["step-enemy-disarmed-atonement_step"]).toMatchObject({
+      targetId: stepEnemy.id,
+    });
+
+    const defensivePenitent = {
+      ...penitent,
+      skillBehavior: {
+        ...penitent.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+      },
+    };
+    const woundedAlly = { ...ally, position: { x: 1, y: 2 }, health: 40 };
+    const defensiveEnemy = createSkillEnemy("defensive-enemy", { x: 0, y: 1 });
+    const defensiveStepState = resolveSkillEffect(
+      createSkillState([defensivePenitent, woundedAlly, defensiveEnemy]),
+      defensivePenitent,
+      createSkillUse("atonement_step", defensiveEnemy),
+      1700,
+    ).state;
+
+    expect((defensiveStepState.entities.ally as Companion).health).toBeGreaterThan(
+      woundedAlly.health,
     );
   });
 
