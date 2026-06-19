@@ -208,6 +208,16 @@ describe("merchant buy", () => {
           group: "books",
         }),
         expect.objectContaining({
+          itemId: "blinding_ray_skill_book",
+          priceCrowns: 60,
+          group: "books",
+        }),
+        expect.objectContaining({
+          itemId: "circle_of_renewal_skill_book",
+          priceCrowns: 60,
+          group: "books",
+        }),
+        expect.objectContaining({
           itemId: "training_sword",
           priceCrowns: 12,
           group: "weapons",

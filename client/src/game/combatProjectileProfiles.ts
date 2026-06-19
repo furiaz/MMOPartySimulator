@@ -50,6 +50,16 @@ export function getCompanionBasicProjectileProfile(
     };
   }
 
+  if (companion.classId === "lightbearer") {
+    return {
+      damageType: "magic",
+      powerMultiplier: 1,
+      visualProfileId: "lightbearer_holy_bolt",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    };
+  }
+
   return null;
 }
 

@@ -155,6 +155,12 @@ const combatProjectileVisualProfiles: Record<
     src: `${combatProjectileSpritePath}/runecaster-rune-bolt.png`,
     width: 34,
   },
+  lightbearer_holy_bolt: {
+    height: 18,
+    nativeAngleDegrees: 0,
+    src: `${combatProjectileSpritePath}/lightbearer-holy-bolt.png`,
+    width: 36,
+  },
   slime_spitter: {
     height: 22,
     nativeAngleDegrees: 0,

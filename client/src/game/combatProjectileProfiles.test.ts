@@ -41,6 +41,14 @@ describe("combat projectile profiles", () => {
       0,
       "runecaster",
     );
+    const lightbearer = createCompanion(
+      "lightbearer",
+      { x: 0, y: 0 },
+      "lightbearer",
+      "support",
+      0,
+      "lightbearer",
+    );
 
     expect(getCompanionBasicProjectileProfile(beginner)).toBeNull();
     expect(getCompanionBasicProjectileProfile(hunter)).toEqual({
@@ -61,6 +69,13 @@ describe("combat projectile profiles", () => {
       damageType: "magic",
       powerMultiplier: 1,
       visualProfileId: "runecaster_rune_bolt",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    });
+    expect(getCompanionBasicProjectileProfile(lightbearer)).toEqual({
+      damageType: "magic",
+      powerMultiplier: 1,
+      visualProfileId: "lightbearer_holy_bolt",
       speed: BASIC_PROJECTILE_SPEED,
       impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
     });

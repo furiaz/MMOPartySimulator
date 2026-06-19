@@ -96,6 +96,7 @@ export function createInitialGameState(): GameState {
     skillOverchargesByCompanionId: {},
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
+    skillHealOverTimesByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
     skillRewindRunesByCompanionId: {},
     skillRunicFocusByCompanionId: {},
@@ -112,6 +113,7 @@ export function createInitialGameState(): GameState {
     skillVisualEvents: [],
     companionAoeChannelsByCasterId: {},
     dropVisualEvents: [],
+    lastCompanionDamageTakenAtByCompanionId: {},
   });
 
   return addItemToInventoryState(

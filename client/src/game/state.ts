@@ -33,6 +33,7 @@ import type {
   SkillCooldownsBySkillId,
   SkillDamageMitigationState,
   SkillGatherBuffState,
+  SkillHealOverTimeState,
   SkillLifestealBuffState,
   SkillFrostArmorState,
   SkillMarkState,
@@ -209,6 +210,7 @@ export type GameState = {
   skillOverchargesByCompanionId?: Record<string, SkillOverchargeState>;
   skillManaShieldsByCompanionId?: Record<string, SkillManaShieldState>;
   skillFrostArmorsByCompanionId?: Record<string, SkillFrostArmorState>;
+  skillHealOverTimesByCompanionId?: Record<string, SkillHealOverTimeState>;
   skillLifestealBuffsByCompanionId?: Record<string, SkillLifestealBuffState>;
   skillRewindRunesByCompanionId?: Record<string, SkillRewindRuneState>;
   skillRunicFocusByCompanionId?: Record<string, SkillRunicFocusState>;
@@ -237,6 +239,7 @@ export type GameState = {
   worldWipeRecovery?: WorldWipeRecoveryState;
   lastHealthRegenAtByCompanionId?: Record<string, number>;
   lastTargetDummyRegenAtByEnemyId?: Record<string, number>;
+  lastCompanionDamageTakenAtByCompanionId?: Record<string, number>;
   debugTelemetry?: DebugTelemetryState;
   debugOptions?: DebugOptions;
 };
@@ -407,6 +410,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillFrostArmorsByCompanionId,
     now,
   );
+  const skillHealOverTimesByCompanionId = filterExpiredRecord(
+    state.skillHealOverTimesByCompanionId,
+    now,
+  );
   const skillLifestealBuffsByCompanionId = filterExpiredRecord(
     state.skillLifestealBuffsByCompanionId,
     now,
@@ -467,6 +474,7 @@ export function clearExpiredSkillRuntimeState(
       state.skillPartyClassBuffsByCompanionId &&
     skillOverchargesByCompanionId === state.skillOverchargesByCompanionId &&
     skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
+    skillHealOverTimesByCompanionId === state.skillHealOverTimesByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillRewindRunesByCompanionId === state.skillRewindRunesByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
@@ -493,6 +501,7 @@ export function clearExpiredSkillRuntimeState(
     skillPartyClassBuffsByCompanionId,
     skillOverchargesByCompanionId,
     skillFrostArmorsByCompanionId,
+    skillHealOverTimesByCompanionId,
     skillLifestealBuffsByCompanionId,
     skillRewindRunesByCompanionId,
     skillGatherBuffsByCompanionId,

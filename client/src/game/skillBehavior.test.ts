@@ -8,9 +8,14 @@ import {
   DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_FIRE_BURST_TARGET_MODE,
   DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
+  DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_OVERCHARGE_ENABLED,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
+  DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
+  LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT,
   BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
   DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
@@ -44,6 +49,11 @@ describe("companion skill behavior", () => {
       supportFocus: DEFAULT_SUPPORT_FOCUS,
       overchargeEnabled: DEFAULT_OVERCHARGE_ENABLED,
       fireBurstTargetMode: DEFAULT_FIRE_BURST_TARGET_MODE,
+      lightMendAllyHealHpThresholdPercent:
+        DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+      circleOfRenewalTargetMode: DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
+      circleOfRenewalMainTargetHpThresholdPercent:
+        DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
     });
   });
 
@@ -256,6 +266,52 @@ describe("companion skill behavior", () => {
     ).toBe(DEFAULT_FIRE_BURST_TARGET_MODE);
   });
 
+  it("clamps Lightbearer healing thresholds and target mode updates", () => {
+    const companion = createCompanion("companion", { x: 0, y: 0 }, "leader");
+    const state = addEntity(createTestGameState(), companion);
+
+    const belowMinimum = updateCompanionSkillBehavior(state, companion.id, {
+      lightMendAllyHealHpThresholdPercent: -1,
+      circleOfRenewalMainTargetHpThresholdPercent: 0,
+    });
+    const aboveMaximum = updateCompanionSkillBehavior(state, companion.id, {
+      lightMendAllyHealHpThresholdPercent: 100,
+      circleOfRenewalMainTargetHpThresholdPercent: 100,
+      circleOfRenewalTargetMode:
+        "missing" as Companion["skillBehavior"]["circleOfRenewalTargetMode"],
+    });
+
+    expect(
+      belowMinimum.entities.companion.kind === "companion"
+        ? belowMinimum.entities.companion.skillBehavior
+            .lightMendAllyHealHpThresholdPercent
+        : null,
+    ).toBe(1);
+    expect(
+      belowMinimum.entities.companion.kind === "companion"
+        ? belowMinimum.entities.companion.skillBehavior
+            .circleOfRenewalMainTargetHpThresholdPercent
+        : null,
+    ).toBe(1);
+    expect(
+      aboveMaximum.entities.companion.kind === "companion"
+        ? aboveMaximum.entities.companion.skillBehavior
+            .lightMendAllyHealHpThresholdPercent
+        : null,
+    ).toBe(LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT);
+    expect(
+      aboveMaximum.entities.companion.kind === "companion"
+        ? aboveMaximum.entities.companion.skillBehavior
+            .circleOfRenewalMainTargetHpThresholdPercent
+        : null,
+    ).toBe(CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT);
+    expect(
+      aboveMaximum.entities.companion.kind === "companion"
+        ? aboveMaximum.entities.companion.skillBehavior.circleOfRenewalTargetMode
+        : null,
+    ).toBe(DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE);
+  });
+
   it("fills missing saved skill behavior fields with defaults", () => {
     const companion = {
       ...createCompanion("companion", { x: 0, y: 0 }, "leader"),
@@ -280,6 +336,11 @@ describe("companion skill behavior", () => {
       supportFocus: DEFAULT_SUPPORT_FOCUS,
       overchargeEnabled: DEFAULT_OVERCHARGE_ENABLED,
       fireBurstTargetMode: DEFAULT_FIRE_BURST_TARGET_MODE,
+      lightMendAllyHealHpThresholdPercent:
+        DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+      circleOfRenewalTargetMode: DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
+      circleOfRenewalMainTargetHpThresholdPercent:
+        DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
     });
   });
 

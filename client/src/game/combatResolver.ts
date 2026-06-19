@@ -218,6 +218,15 @@ export function resolveAndApplyCombatDamage(
     if (finalDamage > 0) {
       const damagedTarget = damageEntity(target, finalDamage);
       nextState = updateEntity(nextState, damagedTarget);
+      if (damagedTarget.kind === "companion") {
+        nextState = {
+          ...nextState,
+          lastCompanionDamageTakenAtByCompanionId: {
+            ...(nextState.lastCompanionDamageTakenAtByCompanionId ?? {}),
+            [damagedTarget.id]: options.now,
+          },
+        };
+      }
       nextState = applyLifestealFromAttack(
         nextState,
         attacker,

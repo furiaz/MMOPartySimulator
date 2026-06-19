@@ -37,6 +37,7 @@ const BEGINNER_THROW_ROCK_LOW_HEALTH_PROTECT_THRESHOLD_PERCENT = 30;
 const BEGINNER_KICK_LEADER_OPENING_RANGE = 5;
 const BEGINNER_FIELD_HANDS_RESOURCE_RANGE = 5;
 const SUPPORT_FOCUS_HP_THRESHOLD_PERCENT = 70;
+const RECENT_INCOMING_DAMAGE_PRESSURE_MS = 5000;
 
 export type SkillTargetOptions = {
   now?: number;
@@ -68,6 +69,8 @@ export function getSkillTarget(
       ? caster
       : skill.id === "first_aid"
         ? findFirstAidTarget(state, caster, skill.range, options)
+        : skill.id === "light_mend"
+          ? findLightMendTarget(state, caster, skill.range)
         : findHealingTarget(state, caster, skill.range);
   }
 
@@ -215,12 +218,26 @@ export function getSkillTarget(
     return findRuneStepTarget(state, caster, skill, options);
   }
 
+  if (skill.effect.type === "dawnStep") {
+    return findDawnStepTarget(state, caster, skill, options);
+  }
+
   if (skill.effect.type === "maulSweep") {
     return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
   }
 
   if (skill.effect.type === "fireBurst") {
     return findFireBurstTarget(state, caster, skill, options);
+  }
+
+  if (skill.effect.type === "circleOfRenewal") {
+    return findCircleOfRenewalTarget(state, caster, skill);
+  }
+
+  if (skill.effect.type === "healOverTime") {
+    return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options)
+      ? findHealOverTimeTarget(state, caster, skill.range, options)
+      : undefined;
   }
 
   if (skill.effect.type === "fakeDeath") {
@@ -324,6 +341,13 @@ export function getSkillTarget(
 
   if (
     skill.effect.type === "pinningShot" &&
+    hasActiveStatusEffect(state, enemy.id, skill.id)
+  ) {
+    return undefined;
+  }
+
+  if (
+    skill.effect.type === "cursedRay" &&
     hasActiveStatusEffect(state, enemy.id, skill.id)
   ) {
     return undefined;
@@ -690,6 +714,160 @@ function findFrostArmorTarget(
   }
 
   return sortFrostArmorTargets(caster, candidates)[0];
+}
+
+function findLightMendTarget(
+  state: GameState,
+  caster: Companion,
+  range: number,
+): Companion | undefined {
+  const behavior = getCompanionSkillBehavior(caster);
+  const candidates = getPartyMembers(state).filter(
+    (member) =>
+      isLivingCompanion(member) &&
+      member.health < member.maxHealth &&
+      isCompanionAtOrBelowHpThreshold(
+        member,
+        behavior.lightMendAllyHealHpThresholdPercent,
+      ) &&
+      getGridDistance(caster.position, member.position) <= range,
+  );
+
+  return findFocusedSupportTarget(state, caster, candidates, behavior.supportFocus);
+}
+
+function findHealOverTimeTarget(
+  state: GameState,
+  caster: Companion,
+  range: number,
+  options: SkillTargetOptions,
+): Companion | undefined {
+  const now = options.now ?? Date.now();
+  const behavior = getCompanionSkillBehavior(caster);
+  const candidates = getPartyMembers(state).filter((member) => {
+    if (
+      !isLivingCompanion(member) ||
+      getGridDistance(caster.position, member.position) > range
+    ) {
+      return false;
+    }
+
+    const healOverTime = state.skillHealOverTimesByCompanionId?.[member.id];
+    const canRefresh = canUseRefreshableRuntimeState(
+      healOverTime?.expiresAt,
+      2000,
+      now,
+    );
+
+    return (
+      canRefresh &&
+      (member.health < member.maxHealth ||
+        hasRecentIncomingDamagePressure(state, member.id, now))
+    );
+  });
+
+  return findFocusedSupportTarget(state, caster, candidates, behavior.supportFocus);
+}
+
+function findCircleOfRenewalTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+): Companion | undefined {
+  if (skill.effect.type !== "circleOfRenewal") {
+    return undefined;
+  }
+
+  const behavior = getCompanionSkillBehavior(caster);
+  const candidates = getPartyMembers(state).filter(
+    (member) =>
+      isLivingCompanion(member) &&
+      member.health < member.maxHealth &&
+      isCompanionAtOrBelowHpThreshold(
+        member,
+        behavior.circleOfRenewalMainTargetHpThresholdPercent,
+      ) &&
+      getGridDistance(caster.position, member.position) <= skill.range,
+  );
+
+  if (behavior.circleOfRenewalTargetMode === "low_health") {
+    return sortFrostArmorTargets(caster, candidates)[0];
+  }
+
+  if (behavior.circleOfRenewalTargetMode === "defender") {
+    return (
+      sortFrostArmorTargets(
+        caster,
+        candidates.filter((candidate) => candidate.role === "defender"),
+      )[0] ?? sortFrostArmorTargets(caster, candidates)[0]
+    );
+  }
+
+  const radius = skill.effect.radius;
+
+  return candidates.sort(
+    (a, b) =>
+      countInjuredCompanionsInRadius(state, b, radius) -
+        countInjuredCompanionsInRadius(state, a, radius) ||
+      getGridDistance(caster.position, a.position) -
+        getGridDistance(caster.position, b.position) ||
+      a.id.localeCompare(b.id),
+  )[0];
+}
+
+function findFocusedSupportTarget(
+  state: GameState,
+  caster: Companion,
+  candidates: Companion[],
+  supportFocus: Companion["skillBehavior"]["supportFocus"],
+): Companion | undefined {
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  if (supportFocus === "leader") {
+    const leader = getPartyLeader(state);
+
+    if (leader && candidates.some((candidate) => candidate.id === leader.id)) {
+      return leader;
+    }
+  }
+
+  if (supportFocus === "defender") {
+    const defender = sortFrostArmorTargets(
+      caster,
+      candidates.filter((candidate) => candidate.role === "defender"),
+    )[0];
+
+    if (defender) {
+      return defender;
+    }
+  }
+
+  return sortFrostArmorTargets(caster, candidates)[0];
+}
+
+function countInjuredCompanionsInRadius(
+  state: GameState,
+  target: Companion,
+  radius: number,
+): number {
+  return getPartyMembers(state).filter(
+    (member) =>
+      isLivingCompanion(member) &&
+      member.health < member.maxHealth &&
+      getGridDistance(member.position, target.position) <= radius,
+  ).length;
+}
+
+function hasRecentIncomingDamagePressure(
+  state: GameState,
+  companionId: string,
+  now: number,
+): boolean {
+  const lastDamagedAt = state.lastCompanionDamageTakenAtByCompanionId?.[companionId];
+
+  return lastDamagedAt !== undefined && now - lastDamagedAt <= RECENT_INCOMING_DAMAGE_PRESSURE_MS;
 }
 
 function sortFrostArmorTargets(
@@ -1189,6 +1367,72 @@ function findRuneStepTarget(
     : undefined;
 }
 
+function findDawnStepTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "dawnStep") {
+    return undefined;
+  }
+
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
+    const enemy = findEnemyTarget(state, caster, skill.range, options);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        skill.effect.distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  if (!isDefensiveMobilityUseThresholdActive(caster)) {
+    return undefined;
+  }
+
+  if (!isDefensiveMobilityUseThresholdActive(caster)) {
+    return undefined;
+  }
+
+  if (!isDefensiveMobilityUseThresholdActive(caster)) {
+    return undefined;
+  }
+
+  if (!isDefensiveMobilityUseThresholdActive(caster)) {
+    return undefined;
+  }
+
+  if (!isDefensiveMobilityUseThresholdActive(caster)) {
+    return undefined;
+  }
+
+  if (!isDefensiveMobilityUseThresholdActive(caster)) {
+    return undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    isEnemyInRange(caster, threat, skill.range) &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      skill.effect.distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
 function findFireBurstTarget(
   state: GameState,
   caster: Companion,
@@ -1340,6 +1584,13 @@ function isBloodFeastUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
     getCompanionSkillBehavior(caster).bloodFeastUseHpThresholdPercent,
+  );
+}
+
+function isDefensiveMobilityUseThresholdActive(caster: Companion): boolean {
+  return isCompanionAtOrBelowHpThreshold(
+    caster,
+    getCompanionSkillBehavior(caster).defensiveMobilityUseHpThresholdPercent,
   );
 }
 
