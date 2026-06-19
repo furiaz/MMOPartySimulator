@@ -14,6 +14,7 @@ import {
   getPartyClassDamageBonusPercent,
   blockIncomingAttackIfShielded,
   getPrototypeAttackDamage,
+  recordRewindRuneDamage,
 } from "./skillRuntime";
 import {
   clearStatusEffectsForEntity,
@@ -119,6 +120,8 @@ export function resolveAndApplyCombatDamage(
               : 0)) /
             100)
       : baseTargetDefense;
+  const relevantDefense =
+    options.damageType === "magic" ? targetMagicDefense : targetDefense;
   const forcedEvasionResult = consumeForcedEvasionStatus(nextState, target.id);
   nextState = forcedEvasionResult.state;
   const evasionChance = options.allowEvasion
@@ -156,11 +159,17 @@ export function resolveAndApplyCombatDamage(
 
     nextState = shieldResult.state;
     activeShieldBlocked = shieldResult.blocked;
+
+    if (activeShieldBlocked && target.kind === "companion") {
+      nextState = recordRewindRuneDamage(
+        nextState,
+        target,
+        rawDamage * (1 - getDefenseReduction(relevantDefense)),
+      );
+    }
   }
 
   if (!evaded && !activeShieldBlocked) {
-    const relevantDefense =
-      options.damageType === "magic" ? targetMagicDefense : targetDefense;
     defenseReduction = getDefenseReduction(relevantDefense);
     let mitigatedDamage = rawDamage * (1 - defenseReduction);
 
@@ -191,6 +200,7 @@ export function resolveAndApplyCombatDamage(
       );
       nextState = mitigationResult.state;
       mitigatedDamage = mitigationResult.mitigatedDamage;
+      nextState = recordRewindRuneDamage(nextState, target, mitigatedDamage);
 
       const absorbResult = applyIncomingDamageAbsorb(
         nextState,

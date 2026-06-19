@@ -66,6 +66,13 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   flame_step: "flame_step_skill_book",
   fire_burst: "fire_burst_skill_book",
   binding_rune: "binding_rune_skill_book",
+  rune_lance: "rune_lance_skill_book",
+  warding_glyph: "warding_glyph_skill_book",
+  rewind_rune: "rewind_rune_skill_book",
+  runic_focus: "runic_focus_skill_book",
+  leyline_matrix: "leyline_matrix_skill_book",
+  stone_sigil_rhythm: "stone_sigil_rhythm_skill_book",
+  rune_step: "rune_step_skill_book",
   light_mend: "light_mend_skill_book",
   penitents_gift: "penitents_gift_skill_book",
 };
@@ -330,7 +337,10 @@ export function getScaledSkillDefinitionForCompanion(
       ...skill,
       effect: {
         ...effect,
-        durationMs: effect.durationMs + (Math.max(1, Math.floor(rank)) - 1) * 125,
+        durationMs:
+          effect.durationMs +
+          (Math.max(1, Math.floor(rank)) - 1) *
+            (skill.id === "binding_rune" ? 175 : 125),
       },
     };
   }
@@ -410,6 +420,28 @@ export function getScaledSkillDefinitionForCompanion(
         ...effect,
         defenseBonusPercent: effect.defenseBonusPercent * multiplier,
         mitigationPercent: effect.mitigationPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "barrierBlock") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        blocks: Math.min(3, effect.blocks + Math.floor((rank - 1) / 4)),
+      },
+    };
+  }
+
+  if (effect.type === "rewindRune") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        healPercentRecordedDamage:
+          effect.healPercentRecordedDamage +
+          (Math.max(1, Math.floor(rank)) - 1) * 3.75,
       },
     };
   }
@@ -496,6 +528,18 @@ export function getScaledSkillDefinitionForCompanion(
         ...effect,
         burnDamageMagicPowerPercent:
           effect.burnDamageMagicPowerPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "runeStep") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        trapImmobilizeDurationMs:
+          effect.trapImmobilizeDurationMs +
+          (Math.max(1, Math.floor(rank)) - 1) * 100,
       },
     };
   }

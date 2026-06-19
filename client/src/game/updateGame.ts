@@ -51,6 +51,7 @@ import {
   updateSkillSystem,
 } from "./skillSystem";
 import { updateStatusEffects } from "./statusEffects";
+import { updateRuneSkillRuntime } from "./skillRuntime";
 import {
   isMapTeleportPoiActive,
   updateTeleportSystem,
@@ -87,6 +88,7 @@ export function updateGame(
     timing.nowMs,
   );
   nextState = updateStatusEffects(nextState, timing.nowMs);
+  nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = clearExpiredHubDepartureFoodWarning(nextState, timing.nowMs);

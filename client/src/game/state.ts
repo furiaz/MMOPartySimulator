@@ -42,6 +42,8 @@ import type {
   SkillPartyPoisonCoatingState,
   SkillMitigationBuffState,
   SkillPartyBuffState,
+  SkillRewindRuneState,
+  SkillRunicFocusState,
   ResurrectionProgressState,
   ResurrectionRecoveryAssignmentState,
   SkillSelfBuffState,
@@ -208,6 +210,8 @@ export type GameState = {
   skillManaShieldsByCompanionId?: Record<string, SkillManaShieldState>;
   skillFrostArmorsByCompanionId?: Record<string, SkillFrostArmorState>;
   skillLifestealBuffsByCompanionId?: Record<string, SkillLifestealBuffState>;
+  skillRewindRunesByCompanionId?: Record<string, SkillRewindRuneState>;
+  skillRunicFocusByCompanionId?: Record<string, SkillRunicFocusState>;
   skillGatherBuffsByCompanionId?: Record<string, SkillGatherBuffState>;
   skillDamageMitigationsByCompanionId?: Record<string, SkillDamageMitigationState>;
   skillAbsorbShieldsByCompanionId?: Record<string, SkillAbsorbShieldState>;
@@ -407,6 +411,10 @@ export function clearExpiredSkillRuntimeState(
     state.skillLifestealBuffsByCompanionId,
     now,
   );
+  const skillRewindRunesByCompanionId = filterExpiredRecord(
+    state.skillRewindRunesByCompanionId,
+    now,
+  );
   const skillGatherBuffsByCompanionId = filterExpiredRecord(
     state.skillGatherBuffsByCompanionId,
     now,
@@ -460,6 +468,7 @@ export function clearExpiredSkillRuntimeState(
     skillOverchargesByCompanionId === state.skillOverchargesByCompanionId &&
     skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
+    skillRewindRunesByCompanionId === state.skillRewindRunesByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
     skillAbsorbShieldsByCompanionId === state.skillAbsorbShieldsByCompanionId &&
@@ -485,6 +494,7 @@ export function clearExpiredSkillRuntimeState(
     skillOverchargesByCompanionId,
     skillFrostArmorsByCompanionId,
     skillLifestealBuffsByCompanionId,
+    skillRewindRunesByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
     skillAbsorbShieldsByCompanionId,

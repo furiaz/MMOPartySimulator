@@ -149,6 +149,12 @@ const combatProjectileVisualProfiles: Record<
     src: `${combatProjectileSpritePath}/hunter-arrow.png`,
     width: 34,
   },
+  runecaster_rune_bolt: {
+    height: 20,
+    nativeAngleDegrees: 0,
+    src: `${combatProjectileSpritePath}/runecaster-rune-bolt.png`,
+    width: 34,
+  },
   slime_spitter: {
     height: 22,
     nativeAngleDegrees: 0,

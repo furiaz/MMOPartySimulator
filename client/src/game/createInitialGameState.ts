@@ -97,6 +97,8 @@ export function createInitialGameState(): GameState {
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
+    skillRewindRunesByCompanionId: {},
+    skillRunicFocusByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
     skillAbsorbShieldsByCompanionId: {},

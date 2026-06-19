@@ -33,6 +33,14 @@ describe("combat projectile profiles", () => {
       0,
       "elementalist",
     );
+    const runecaster = createCompanion(
+      "runecaster",
+      { x: 0, y: 0 },
+      "runecaster",
+      "fighter",
+      0,
+      "runecaster",
+    );
 
     expect(getCompanionBasicProjectileProfile(beginner)).toBeNull();
     expect(getCompanionBasicProjectileProfile(hunter)).toEqual({
@@ -46,6 +54,13 @@ describe("combat projectile profiles", () => {
       damageType: "magic",
       powerMultiplier: 1,
       visualProfileId: "elementalist_arcane_bolt",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    });
+    expect(getCompanionBasicProjectileProfile(runecaster)).toEqual({
+      damageType: "magic",
+      powerMultiplier: 1,
+      visualProfileId: "runecaster_rune_bolt",
       speed: BASIC_PROJECTILE_SPEED,
       impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
     });

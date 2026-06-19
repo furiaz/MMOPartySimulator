@@ -73,6 +73,24 @@ export function resolveSkillEffect(
   skillUse: SkillUse,
   now: number,
 ): SkillEffectResolutionResult {
+  const result = resolveSkillEffectOnce(state, caster, skillUse, now);
+
+  if (
+    !result.shouldConsumeCooldown ||
+    skillUse.skill.effect.type === "runicFocus"
+  ) {
+    return result;
+  }
+
+  return applyRunicFocusDuplicate(state, caster, skillUse, result, now);
+}
+
+function resolveSkillEffectOnce(
+  state: GameState,
+  caster: Companion,
+  skillUse: SkillUse,
+  now: number,
+): SkillEffectResolutionResult {
   const { target } = skillUse;
   const skill = applyOverchargeToSkillDefinition(
     state,
@@ -209,6 +227,30 @@ export function resolveSkillEffect(
     );
   }
 
+  if (skill.effect.type === "barrierBlock" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyBarrierBlock(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "rewindRune" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyRewindRune(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "runicFocus") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyRunicFocus(state, caster, now),
+      caster.id,
+    );
+  }
+
   if (skill.effect.type === "gatherBuff") {
     return resolveAppliedSkillEffect(
       state,
@@ -249,6 +291,16 @@ export function resolveSkillEffect(
 
   if (skill.effect.type === "flameStep") {
     const appliedState = applyFlameStep(state, caster, target, skill, now);
+
+    if (!appliedState) {
+      return skipSkillEffect(state);
+    }
+
+    return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
+  if (skill.effect.type === "runeStep") {
+    const appliedState = applyRuneStep(state, caster, target, skill, now);
 
     if (!appliedState) {
       return skipSkillEffect(state);
@@ -449,6 +501,123 @@ function skipSkillEffect(state: GameState): SkillEffectResolutionResult {
     state,
     shouldConsumeCooldown: false,
   };
+}
+
+function applyRunicFocusDuplicate(
+  originalState: GameState,
+  caster: Companion,
+  skillUse: SkillUse,
+  result: SkillEffectResolutionResult,
+  now: number,
+): SkillEffectResolutionResult {
+  if (
+    !originalState.skillRunicFocusByCompanionId?.[caster.id] ||
+    !isRunicFocusEligibleSkill(skillUse.skill)
+  ) {
+    return result;
+  }
+
+  const currentCaster = result.state.entities[caster.id];
+
+  if (!isLivingCompanion(currentCaster)) {
+    return result;
+  }
+
+  const skillRunicFocusByCompanionId = {
+    ...(result.state.skillRunicFocusByCompanionId ?? {}),
+  };
+  delete skillRunicFocusByCompanionId[caster.id];
+
+  const stateWithoutFocus = {
+    ...result.state,
+    skillRunicFocusByCompanionId,
+  };
+  const duplicateTarget = findRunicFocusDuplicateTarget(
+    stateWithoutFocus,
+    currentCaster,
+    skillUse.skill,
+    skillUse.target,
+  );
+
+  if (!duplicateTarget) {
+    return {
+      ...result,
+      state: stateWithoutFocus,
+    };
+  }
+
+  const duplicateResult = resolveSkillEffectOnce(
+    stateWithoutFocus,
+    currentCaster,
+    {
+      ...skillUse,
+      target: duplicateTarget,
+    },
+    now,
+  );
+
+  return {
+    ...result,
+    state: duplicateResult.shouldConsumeCooldown
+      ? duplicateResult.state
+      : stateWithoutFocus,
+  };
+}
+
+function isRunicFocusEligibleSkill(skill: SkillDefinition): boolean {
+  switch (skill.effect.type) {
+    case "damage":
+    case "taunt":
+    case "pinningShot":
+    case "bind":
+    case "allyBuff":
+    case "barrierBlock":
+    case "rewindRune":
+    case "frostArmor":
+    case "heal":
+    case "selfCostHeal":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function findRunicFocusDuplicateTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  originalTarget: Enemy | Companion | undefined,
+): Enemy | Companion | undefined {
+  if (
+    skill.effect.type === "damage" ||
+    skill.effect.type === "taunt" ||
+    skill.effect.type === "pinningShot" ||
+    skill.effect.type === "bind"
+  ) {
+    return (
+      getLivingEnemiesInRange(state, caster, skill.range).find(
+        (enemy) => enemy.id !== originalTarget?.id,
+      ) ??
+      (isLivingEnemy(originalTarget) ? originalTarget : undefined)
+    );
+  }
+
+  return (
+    getPartyMembers(state)
+      .filter(
+        (member) =>
+          isLivingCompanion(member) &&
+          getGridDistance(caster.position, member.position) <= skill.range &&
+          member.id !== originalTarget?.id,
+      )
+      .sort(
+        (a, b) =>
+          a.health / a.maxHealth - b.health / b.maxHealth ||
+          getGridDistance(caster.position, a.position) -
+            getGridDistance(caster.position, b.position) ||
+          a.id.localeCompare(b.id),
+      )[0] ?? (isLivingCompanion(originalTarget) ? originalTarget : undefined)
+  );
 }
 
 function applyDamageSkill(
@@ -1190,6 +1359,138 @@ function applyAllyBuff(
   return nextState;
 }
 
+function applyBarrierBlock(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "barrierBlock") {
+    return state;
+  }
+
+  const barrierPlacement = getShieldPlacement(state, target);
+  const barrierId = `${target.id}-${skill.id}`;
+  let nextState: GameState = {
+    ...state,
+    skillShieldBlocksById: {
+      ...(state.skillShieldBlocksById ?? {}),
+      [barrierId]: {
+        id: barrierId,
+        ownerId: target.id,
+        position: barrierPlacement.position,
+        rotationRadians: barrierPlacement.rotationRadians,
+        expiresAt: now + skill.effect.durationMs,
+        remainingBlocks: skill.effect.blocks,
+        blockedDamageTypes: skill.effect.blockedDamageTypes,
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position: barrierPlacement.position,
+    now,
+    durationMs: 600,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applyRewindRune(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "rewindRune") {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillRewindRunesByCompanionId: {
+      ...(state.skillRewindRunesByCompanionId ?? {}),
+      [target.id]: {
+        id: `${target.id}-${skill.id}`,
+        targetId: target.id,
+        sourceId: caster.id,
+        healPercentRecordedDamage: skill.effect.healPercentRecordedDamage,
+        tickIntervalMs: skill.effect.tickIntervalMs,
+        nextTickAt: now + skill.effect.tickIntervalMs,
+        expiresAt: now + skill.effect.durationMs,
+        recordedDamage:
+          state.skillRewindRunesByCompanionId?.[target.id]?.recordedDamage ?? 0,
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: 600,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applyRunicFocus(
+  state: GameState,
+  caster: Companion,
+  now: number,
+): GameState {
+  if (state.skillRunicFocusByCompanionId?.[caster.id]) {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillRunicFocusByCompanionId: {
+      ...(state.skillRunicFocusByCompanionId ?? {}),
+      [caster.id]: {
+        companionId: caster.id,
+        skillId: "runic_focus",
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: "runic_focus",
+    sourceId: caster.id,
+    now,
+    durationMs: 600,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: "Runic Focus",
+    now,
+  });
+
+  return nextState;
+}
+
 function applyGatherBuff(
   state: GameState,
   caster: Companion,
@@ -1903,6 +2204,93 @@ function applyFlameStep(
     sourceId: caster.id,
     targetId: target.id,
     position,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applyRuneStep(
+  state: GameState,
+  caster: Companion,
+  target: Enemy | Companion | undefined,
+  skill: SkillDefinition,
+  now: number,
+): GameState | null {
+  if (skill.effect.type !== "runeStep" || !isLivingEnemy(target)) {
+    return null;
+  }
+
+  const useMode = getCompanionSkillBehavior(caster).mobilitySkillUseMode;
+  const direction =
+    useMode === "offensive"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
+  );
+
+  if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
+    return null;
+  }
+
+  const trapPosition = useMode === "offensive" ? position : caster.position;
+  let nextState = updateEntity(state, {
+    ...caster,
+    position,
+  });
+  let affectedEnemies = 0;
+
+  for (const enemy of Object.values(nextState.entities)) {
+    if (
+      !isLivingEnemy(enemy) ||
+      getGridDistance(enemy.position, trapPosition) > skill.effect.trapRadius
+    ) {
+      continue;
+    }
+
+    nextState = applyStatusEffect(
+      nextState,
+      {
+        type: "immobilized",
+        targetId: enemy.id,
+        durationMs: skill.effect.trapImmobilizeDurationMs,
+        sourceId: caster.id,
+        sourceKey: skill.id,
+      },
+      now,
+    );
+    affectedEnemies += 1;
+  }
+
+  if (affectedEnemies === 0) {
+    return null;
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position: trapPosition,
     now,
     durationMs: VISUAL_DURATION_MS,
   });

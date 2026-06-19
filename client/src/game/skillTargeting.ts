@@ -144,6 +144,25 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "barrierBlock") {
+    return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options)
+      ? findBarrierBlockTarget(state, caster, skill.range)
+      : undefined;
+  }
+
+  if (skill.effect.type === "rewindRune") {
+    return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options)
+      ? findRewindRuneTarget(state, caster, skill.range, options)
+      : undefined;
+  }
+
+  if (skill.effect.type === "runicFocus") {
+    return hasValidEnemyContext(state, caster, options) &&
+      !state.skillRunicFocusByCompanionId?.[caster.id]
+      ? caster
+      : undefined;
+  }
+
   if (skill.effect.type === "frostArmor") {
     return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options)
       ? findFrostArmorTarget(state, caster, skill.range, options)
@@ -190,6 +209,10 @@ export function getSkillTarget(
 
   if (skill.effect.type === "flameStep") {
     return findFlameStepTarget(state, caster, skill, options);
+  }
+
+  if (skill.effect.type === "runeStep") {
+    return findRuneStepTarget(state, caster, skill, options);
   }
 
   if (skill.effect.type === "maulSweep") {
@@ -551,6 +574,78 @@ function findAllyBuffTarget(
         getGridDistance(caster.position, a.position) -
           getGridDistance(caster.position, b.position),
     )[0];
+}
+
+function findBarrierBlockTarget(
+  state: GameState,
+  caster: Companion,
+  range: number,
+): Companion | undefined {
+  return sortSupportTargets(
+    caster,
+    getPartyMembers(state).filter(
+      (member) =>
+        isLivingCompanion(member) &&
+        getGridDistance(caster.position, member.position) <= range &&
+        !hasActiveShield(state, member),
+    ),
+  )[0];
+}
+
+function findRewindRuneTarget(
+  state: GameState,
+  caster: Companion,
+  range: number,
+  options: SkillTargetOptions,
+): Companion | undefined {
+  const refreshWindowMs = 2000;
+  const candidates = getPartyMembers(state).filter((member) => {
+    if (
+      !isLivingCompanion(member) ||
+      getGridDistance(caster.position, member.position) > range
+    ) {
+      return false;
+    }
+
+    const rewind = state.skillRewindRunesByCompanionId?.[member.id];
+
+    return (
+      !rewind ||
+      rewind.expiresAt <= (options.now ?? Date.now()) ||
+      rewind.expiresAt - (options.now ?? Date.now()) <= refreshWindowMs
+    );
+  });
+
+  return sortSupportTargets(caster, candidates)[0];
+}
+
+function sortSupportTargets(
+  caster: Companion,
+  targets: Companion[],
+): Companion[] {
+  return targets.sort(
+    (a, b) =>
+      a.health / a.maxHealth - b.health / b.maxHealth ||
+      getSupportRolePriority(a) - getSupportRolePriority(b) ||
+      getGridDistance(caster.position, a.position) -
+        getGridDistance(caster.position, b.position) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
+function getSupportRolePriority(companion: Companion): number {
+  switch (companion.role) {
+    case "defender":
+      return 0;
+    case "fighter":
+      return 1;
+    case "support":
+      return 2;
+    case "gatherer":
+      return 3;
+    case "none":
+      return 4;
+  }
 }
 
 function findFrostArmorTarget(
@@ -1017,6 +1112,48 @@ function findFlameStepTarget(
   options: SkillTargetOptions,
 ): Enemy | undefined {
   if (skill.effect.type !== "flameStep") {
+    return undefined;
+  }
+
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
+    const enemy = findEnemyTarget(state, caster, skill.range, options);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        skill.effect.distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    isEnemyInRange(caster, threat, skill.range) &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      skill.effect.distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
+function findRuneStepTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "runeStep") {
     return undefined;
   }
 

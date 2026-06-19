@@ -424,6 +424,13 @@ export type SkillBookItemId =
   | "flame_step_skill_book"
   | "fire_burst_skill_book"
   | "binding_rune_skill_book"
+  | "rune_lance_skill_book"
+  | "warding_glyph_skill_book"
+  | "rewind_rune_skill_book"
+  | "runic_focus_skill_book"
+  | "leyline_matrix_skill_book"
+  | "stone_sigil_rhythm_skill_book"
+  | "rune_step_skill_book"
   | "light_mend_skill_book"
   | "penitents_gift_skill_book";
 
@@ -815,6 +822,13 @@ export type SkillId =
   | "flame_step"
   | "fire_burst"
   | "binding_rune"
+  | "rune_lance"
+  | "warding_glyph"
+  | "rewind_rune"
+  | "runic_focus"
+  | "leyline_matrix"
+  | "stone_sigil_rhythm"
+  | "rune_step"
   | "light_mend"
   | "penitents_gift";
 
@@ -829,6 +843,7 @@ export type SkillTag =
   | "Summon - Attack"
   | "Defensive"
   | "Shield"
+  | "Barrier"
   | "Heal"
   | "Safety"
   | "Damage Mitigation"
@@ -859,6 +874,7 @@ export type CombatDamageType = "physical" | "magic";
 export type CombatProjectileVisualProfileId =
   | "elementalist_arcane_bolt"
   | "hunter_arrow"
+  | "runecaster_rune_bolt"
   | "slime_spitter"
   | "goblin_thrower"
   | "bog_imp"
@@ -956,6 +972,19 @@ export type SkillDefinition = {
         mitigationPercent: number;
       }
     | {
+        type: "barrierBlock";
+        durationMs: number;
+        blocks: number;
+        blockedDamageTypes?: CombatDamageType[];
+      }
+    | {
+        type: "rewindRune";
+        durationMs: number;
+        healPercentRecordedDamage: number;
+        tickIntervalMs: number;
+      }
+    | { type: "runicFocus" }
+    | {
         type: "overcharge";
         durationMs: number;
         skillPowerBonusPercent: number;
@@ -1009,6 +1038,12 @@ export type SkillDefinition = {
         burnTickIntervalMs: number;
         burnDamageMagicPowerPercent: number;
         sourceKey: string;
+      }
+    | {
+        type: "runeStep";
+        distance: number;
+        trapRadius: number;
+        trapImmobilizeDurationMs: number;
       }
     | {
         type: "fireBurst";
@@ -1152,6 +1187,22 @@ export type SkillFrostArmorState = {
   mitigationPercent: number;
   expiresAt: number;
   mitigatedDamageTypes?: CombatDamageType[];
+};
+
+export type SkillRewindRuneState = {
+  id: string;
+  targetId: string;
+  sourceId: string;
+  healPercentRecordedDamage: number;
+  tickIntervalMs: number;
+  nextTickAt: number;
+  expiresAt: number;
+  recordedDamage: number;
+};
+
+export type SkillRunicFocusState = {
+  companionId: string;
+  skillId: "runic_focus";
 };
 
 export type SkillLifestealBuffState = {

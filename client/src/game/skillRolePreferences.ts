@@ -24,7 +24,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
     ],
     secondary: ["Mobility", "Control"],
     fallback: [],
-    avoid: ["Heal", "Shield", "Gathering", "Taunt", "Aggro"],
+    avoid: ["Heal", "Shield", "Barrier", "Gathering", "Taunt", "Aggro"],
   },
   defender: {
     primary: [
@@ -32,6 +32,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "Aggro",
       "Defensive",
       "Shield",
+      "Barrier",
       "Damage Mitigation",
       "Elemental Mitigation",
       "Control",
@@ -50,6 +51,7 @@ export const SKILL_ROLE_PREFERENCES: Record<PartyMemberRole, SkillRolePreference
       "Heal",
       "Self Healing",
       "Shield",
+      "Barrier",
       "Buff",
       "Self Buff",
       "Party Buff",
@@ -119,7 +121,9 @@ function countAvoidMatches(
   }
 
   if (tags.includes("Maintenance")) {
-    effectiveAvoids = effectiveAvoids.filter((tag) => tag !== "Shield");
+    effectiveAvoids = effectiveAvoids.filter(
+      (tag) => tag !== "Shield" && tag !== "Barrier",
+    );
   }
 
   return tags.filter((tag) => effectiveAvoids.includes(tag)).length;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import { addEntity, updateEntity } from "./state";
 import { createTestGameState } from "./testState";
@@ -26,6 +26,10 @@ const magicProfile: CombatProjectileLaunchProfile = {
 };
 
 describe("combat projectile system", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("follows the live target position while traveling", () => {
     const attacker = createAttackingCompanion("attacker", { x: 0, y: 0 });
     const target = createEnemy("target", { x: 4, y: 0 }, undefined, {
@@ -72,6 +76,8 @@ describe("combat projectile system", () => {
       testProfile,
       1000,
     );
+
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
 
     const nextState = updateCombatProjectileSystem(launchedState, 1100, 100);
     const nextTarget = nextState.entities[target.id] as Enemy;

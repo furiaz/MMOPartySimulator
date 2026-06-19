@@ -1651,7 +1651,8 @@ function SkillPreferencesSection({
       skill.id === "shield_rush" ||
       skill.id === "skirmish_shot" ||
       skill.id === "pounce" ||
-      skill.id === "flame_step"
+      skill.id === "flame_step" ||
+      skill.id === "rune_step"
     ),
   );
   const hasOvercharge = learnedSkillGroups.some((group) =>

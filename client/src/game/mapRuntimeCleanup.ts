@@ -59,6 +59,8 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
+    skillRewindRunesByCompanionId: {},
+    skillRunicFocusByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
     skillAbsorbShieldsByCompanionId: {},
@@ -140,6 +142,14 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   );
   const skillLifestealBuffsByCompanionId = pruneRecordById(
     state.skillLifestealBuffsByCompanionId,
+    currentEntityIds,
+  );
+  const skillRewindRunesByCompanionId = pruneRecordById(
+    state.skillRewindRunesByCompanionId,
+    currentEntityIds,
+  );
+  const skillRunicFocusByCompanionId = pruneRecordById(
+    state.skillRunicFocusByCompanionId,
     currentEntityIds,
   );
   const skillGatherBuffsByCompanionId = pruneRecordById(
@@ -227,6 +237,8 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillManaShieldsByCompanionId === state.skillManaShieldsByCompanionId &&
     skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
+    skillRewindRunesByCompanionId === state.skillRewindRunesByCompanionId &&
+    skillRunicFocusByCompanionId === state.skillRunicFocusByCompanionId &&
     skillGatherBuffsByCompanionId === state.skillGatherBuffsByCompanionId &&
     skillDamageMitigationsByCompanionId === state.skillDamageMitigationsByCompanionId &&
     skillAbsorbShieldsByCompanionId === state.skillAbsorbShieldsByCompanionId &&
@@ -269,6 +281,8 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillManaShieldsByCompanionId,
     skillFrostArmorsByCompanionId,
     skillLifestealBuffsByCompanionId,
+    skillRewindRunesByCompanionId,
+    skillRunicFocusByCompanionId,
     skillGatherBuffsByCompanionId,
     skillDamageMitigationsByCompanionId,
     skillAbsorbShieldsByCompanionId,
