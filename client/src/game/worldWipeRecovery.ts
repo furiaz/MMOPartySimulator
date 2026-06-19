@@ -264,6 +264,8 @@ function resetStateToRescueHub(
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
+    skillRewindRunesByCompanionId: {},
+    skillRunicFocusByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
     skillAbsorbShieldsByCompanionId: {},

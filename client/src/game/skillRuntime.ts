@@ -1,5 +1,6 @@
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import { applyStatusEffect } from "./statusEffects";
+import { isLivingCompanion } from "./entityGuards";
 import { getPartyMembers } from "./partySystem";
 import type {
   CombatDamageType,
@@ -35,6 +36,51 @@ export function getPrototypeAttackDamage(
     .reduce((total, buff) => total + buff.bonusDamage, 0);
 
   return baseDamage + markBonus + selfBuffBonus + partyBuffBonus;
+}
+
+export function updateRuneSkillRuntime(
+  state: GameState,
+  now: number,
+): GameState {
+  let nextState = updateRewindRunes(state, now);
+  const skillRunicFocusByCompanionId = Object.fromEntries(
+    Object.entries(nextState.skillRunicFocusByCompanionId ?? {}).filter(
+      ([companionId]) => isLivingCompanion(nextState.entities[companionId]),
+    ),
+  );
+
+  return objectShallowEqual(
+    skillRunicFocusByCompanionId,
+    nextState.skillRunicFocusByCompanionId ?? {},
+  )
+    ? nextState
+    : {
+        ...nextState,
+        skillRunicFocusByCompanionId,
+      };
+}
+
+export function recordRewindRuneDamage(
+  state: GameState,
+  target: Companion,
+  damageAmount: number,
+): GameState {
+  const rewindRune = state.skillRewindRunesByCompanionId?.[target.id];
+
+  if (!rewindRune || damageAmount <= 0) {
+    return state;
+  }
+
+  return {
+    ...state,
+    skillRewindRunesByCompanionId: {
+      ...(state.skillRewindRunesByCompanionId ?? {}),
+      [target.id]: {
+        ...rewindRune,
+        recordedDamage: rewindRune.recordedDamage + damageAmount,
+      },
+    },
+  };
 }
 
 export function getPartyClassDamageBonusPercent(
@@ -562,6 +608,103 @@ function getActivePartyClassBuffsForCompanion(
   ).filter(
     (buff): buff is SkillPartyClassBuffState =>
       Boolean(buff) && buff.expiresAt > now,
+  );
+}
+
+function updateRewindRunes(state: GameState, now: number): GameState {
+  const rewinds = state.skillRewindRunesByCompanionId;
+
+  if (!rewinds) {
+    return state;
+  }
+
+  let nextState = state;
+  const nextRewinds = { ...rewinds };
+  let didChange = false;
+
+  for (const rewind of Object.values(rewinds)) {
+    const target = nextState.entities[rewind.targetId];
+
+    if (!isLivingCompanion(target)) {
+      delete nextRewinds[rewind.targetId];
+      didChange = true;
+      continue;
+    }
+
+    let nextTickAt = rewind.nextTickAt;
+    let recordedDamage = rewind.recordedDamage;
+
+    while (nextTickAt <= now && nextTickAt <= rewind.expiresAt) {
+      if (recordedDamage > 0 && target.health < target.maxHealth) {
+        const healAmount = Math.max(
+          1,
+          Math.round(recordedDamage * (rewind.healPercentRecordedDamage / 100)),
+        );
+        const currentTarget = nextState.entities[rewind.targetId];
+
+        if (isLivingCompanion(currentTarget)) {
+          const nextHealth = Math.min(
+            currentTarget.maxHealth,
+            currentTarget.health + healAmount,
+          );
+          const appliedHeal = nextHealth - currentTarget.health;
+
+          if (appliedHeal > 0) {
+            nextState = updateEntity(nextState, {
+              ...currentTarget,
+              health: nextHealth,
+            });
+            nextState = addCombatFeedback(nextState, {
+              type: "heal",
+              entityId: currentTarget.id,
+              sourceEntityId: rewind.sourceId,
+              targetEntityId: currentTarget.id,
+              amount: appliedHeal,
+              text: `+${appliedHeal} HP`,
+              now,
+            });
+          }
+        }
+      }
+
+      recordedDamage = 0;
+      nextTickAt += rewind.tickIntervalMs;
+    }
+
+    if (rewind.expiresAt <= now) {
+      delete nextRewinds[rewind.targetId];
+      didChange = true;
+      continue;
+    }
+
+    if (nextTickAt !== rewind.nextTickAt || recordedDamage !== rewind.recordedDamage) {
+      nextRewinds[rewind.targetId] = {
+        ...rewind,
+        nextTickAt,
+        recordedDamage,
+      };
+      didChange = true;
+    }
+  }
+
+  return didChange
+    ? {
+        ...nextState,
+        skillRewindRunesByCompanionId: nextRewinds,
+      }
+    : nextState;
+}
+
+function objectShallowEqual<T>(
+  first: Record<string, T>,
+  second: Record<string, T>,
+): boolean {
+  const firstKeys = Object.keys(first);
+  const secondKeys = Object.keys(second);
+
+  return (
+    firstKeys.length === secondKeys.length &&
+    firstKeys.every((key) => first[key] === second[key])
   );
 }
 

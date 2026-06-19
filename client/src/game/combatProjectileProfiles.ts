@@ -40,6 +40,16 @@ export function getCompanionBasicProjectileProfile(
     };
   }
 
+  if (companion.classId === "runecaster") {
+    return {
+      damageType: "magic",
+      powerMultiplier: 1,
+      visualProfileId: "runecaster_rune_bolt",
+      speed: BASIC_PROJECTILE_SPEED,
+      impactRadius: BASIC_PROJECTILE_IMPACT_RADIUS,
+    };
+  }
+
   return null;
 }
 

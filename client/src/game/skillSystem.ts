@@ -338,6 +338,29 @@ function getSkillTargetSkipReason(
   }
 
   if (
+    skill.effect.type === "barrierBlock" &&
+    Object.values(state.skillShieldBlocksById ?? {}).some(
+      (shield) => shield.ownerId === caster.id,
+    )
+  ) {
+    return "active_duplicate_shield";
+  }
+
+  if (
+    skill.effect.type === "rewindRune" &&
+    state.skillRewindRunesByCompanionId?.[caster.id]
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
+    skill.effect.type === "runicFocus" &&
+    state.skillRunicFocusByCompanionId?.[caster.id]
+  ) {
+    return "active_duplicate_buff";
+  }
+
+  if (
     skill.effect.type === "holdFast" &&
     (state.skillAbsorbShieldsByCompanionId?.[caster.id] ||
       Object.values(state.statusEffectsById ?? {}).some(
@@ -513,7 +536,8 @@ function isMobilitySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "quickStep" ||
     skill.effect.type === "skirmishShot" ||
     skill.effect.type === "pounce" ||
-    skill.effect.type === "flameStep"
+    skill.effect.type === "flameStep" ||
+    skill.effect.type === "runeStep"
   );
 }
 
@@ -537,6 +561,8 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "frostArmor" ||
+    skill.effect.type === "barrierBlock" ||
+    skill.effect.type === "rewindRune" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff"
   );
@@ -576,6 +602,9 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "manaShield" ||
     skill.effect.type === "holdFast" ||
     skill.effect.type === "frostArmor" ||
+    skill.effect.type === "barrierBlock" ||
+    skill.effect.type === "rewindRune" ||
+    skill.effect.type === "runicFocus" ||
     skill.effect.type === "selfMitigationBuff" ||
     skill.effect.type === "partyMitigationBuff" ||
     skill.effect.type === "allyBuff" ||
@@ -694,6 +723,7 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "skirmishShot":
     case "pounce":
     case "flameStep":
+    case "runeStep":
     case "maulSweep":
     case "arrowBurst":
     case "fireBurst":

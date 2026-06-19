@@ -366,6 +366,8 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
+    skillRewindRunesByCompanionId: {},
+    skillRunicFocusByCompanionId: {},
     skillGatherBuffsByCompanionId: {},
     skillDamageMitigationsByCompanionId: {},
     skillAbsorbShieldsByCompanionId: {},

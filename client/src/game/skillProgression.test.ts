@@ -72,6 +72,17 @@ const ELEMENTALIST_SKILL_IDS: SkillId[] = [
   "fire_burst",
 ];
 
+const RUNECASTER_SKILL_IDS: SkillId[] = [
+  "binding_rune",
+  "rune_lance",
+  "warding_glyph",
+  "rewind_rune",
+  "runic_focus",
+  "leyline_matrix",
+  "stone_sigil_rhythm",
+  "rune_step",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -118,6 +129,13 @@ describe("skill progression", () => {
       emberwood_rhythm: 5,
       flame_step: 5,
       fire_burst: 5,
+      binding_rune: 5,
+      rune_lance: 5,
+      warding_glyph: 5,
+      rewind_rune: 5,
+      leyline_matrix: 5,
+      stone_sigil_rhythm: 5,
+      rune_step: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -247,6 +265,34 @@ describe("skill progression", () => {
     const fireBurst = getScaledSkillDefinitionForCompanion(
       companion,
       SKILL_DEFINITIONS.fire_burst,
+    );
+    const bindingRune = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.binding_rune,
+    );
+    const runeLance = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.rune_lance,
+    );
+    const wardingGlyph = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.warding_glyph,
+    );
+    const rewindRune = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.rewind_rune,
+    );
+    const leylineMatrix = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.leyline_matrix,
+    );
+    const stoneSigilRhythm = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.stone_sigil_rhythm,
+    );
+    const runeStep = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.rune_step,
     );
 
     expect(kick.effect.type).toBe("lungeDamage");
@@ -401,6 +447,43 @@ describe("skill progression", () => {
     if (fireBurst.effect.type === "fireBurst") {
       expect(fireBurst.effect.powerMultiplier).toBeCloseTo(1.2);
       expect(fireBurst.effect.burnDamageMagicPowerPercent).toBeCloseTo(24);
+    }
+    expect(bindingRune.effect.type).toBe("pinningShot");
+    if (bindingRune.effect.type === "pinningShot") {
+      expect(bindingRune.effect.durationMs).toBe(4200);
+    }
+    expect(runeLance.effect.type).toBe("damage");
+    if (runeLance.effect.type === "damage") {
+      expect(runeLance.effect.powerMultiplier).toBeCloseTo(1.2);
+    }
+    expect(wardingGlyph.effect.type).toBe("barrierBlock");
+    if (wardingGlyph.effect.type === "barrierBlock") {
+      expect(wardingGlyph.effect.blocks).toBe(3);
+      expect(wardingGlyph.effect.blockedDamageTypes).toEqual([
+        "physical",
+        "magic",
+      ]);
+    }
+    expect(rewindRune.effect.type).toBe("rewindRune");
+    if (rewindRune.effect.type === "rewindRune") {
+      expect(rewindRune.effect.healPercentRecordedDamage).toBeCloseTo(50);
+    }
+    expect(leylineMatrix.effect.type).toBe("partyClassBuff");
+    if (leylineMatrix.effect.type === "partyClassBuff") {
+      expect(leylineMatrix.effect.primaryStatBonusPercentByStat?.wisdom).toBeCloseTo(
+        10,
+      );
+      expect(leylineMatrix.effect.mitigationPercent).toBe(8);
+      expect(leylineMatrix.effect.mitigatedDamageTypes).toEqual(["magic"]);
+    }
+    expect(stoneSigilRhythm.effect.type).toBe("gatherBuff");
+    if (stoneSigilRhythm.effect.type === "gatherBuff") {
+      expect(stoneSigilRhythm.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+      expect(stoneSigilRhythm.effect.resourceType).toBe("ore");
+    }
+    expect(runeStep.effect.type).toBe("runeStep");
+    if (runeStep.effect.type === "runeStep") {
+      expect(runeStep.effect.trapImmobilizeDurationMs).toBe(2400);
     }
   });
 
@@ -591,6 +674,39 @@ describe("skill progression", () => {
     expect(getCompanionSkillRank(nextCompanion, "fire_burst")).toBe(2);
   });
 
+  it("reads new Runecaster skill books for eligible Runecaster companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      "runecaster",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "rune_step_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "rune_step_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "rune_step",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "rune_step")).toBe(2);
+  });
+
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
     const companion = withSkillRanks(
       createCompanion("companion", { x: 0, y: 0 }, "companion"),
@@ -751,6 +867,21 @@ describe("skill progression", () => {
 
     expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
       ...ELEMENTALIST_SKILL_IDS,
+    ]);
+  });
+
+  it("keeps Runecaster current-class skills ordered in the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      "runecaster",
+    );
+
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...RUNECASTER_SKILL_IDS,
     ]);
   });
 

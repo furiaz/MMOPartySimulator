@@ -12,6 +12,7 @@ import {
   updateSkillShieldBlockPositions,
   type SkillUse,
 } from "./skillEffectResolution";
+import { updateRuneSkillRuntime } from "./skillRuntime";
 import { SKILL_DEFINITIONS } from "./skills";
 import { addEntity, updateEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
@@ -1085,10 +1086,14 @@ describe("skill effect resolution", () => {
       1000,
     ).state;
 
-    expect(boundState.skillBindsByEnemyId?.["bound-enemy"]).toMatchObject({
-      sourceId: runecaster.id,
-      targetId: boundEnemy.id,
-    });
+    expect(Object.values(boundState.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "immobilized",
+        sourceId: runecaster.id,
+        sourceKey: "binding_rune",
+        targetId: boundEnemy.id,
+      }),
+    );
 
     const beast = createSkillCompanion("beast", "fighter", { x: 0, y: 0 }, "beast");
     const selfBuffState = resolveSkillEffect(
@@ -1144,6 +1149,210 @@ describe("skill effect resolution", () => {
       ownerId: defender.id,
       remainingBlocks: 1,
     });
+  });
+
+  it("applies Runecaster barriers to physical and magic hits", () => {
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
+    const ally = createSkillCompanion("ally", "defender", { x: 1, y: 0 });
+    const enemy = createSkillEnemy("enemy", { x: 2, y: 0 }, { attack: 20 });
+    const barrierState = resolveSkillEffect(
+      createSkillState([runecaster, ally, enemy]),
+      runecaster,
+      createSkillUse("warding_glyph", ally),
+      1000,
+    ).state;
+
+    expect(barrierState.skillShieldBlocksById?.["ally-warding_glyph"]).toMatchObject({
+      ownerId: ally.id,
+      remainingBlocks: 2,
+      blockedDamageTypes: ["physical", "magic"],
+    });
+
+    const magicBlockedState = resolveAndApplyCombatDamage(
+      barrierState,
+      enemy,
+      ally,
+      {
+        damageType: "magic",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 1100,
+        label: "Test Spell",
+      },
+    ).state;
+
+    expect((magicBlockedState.entities.ally as Companion).health).toBe(ally.health);
+    expect(
+      magicBlockedState.skillShieldBlocksById?.["ally-warding_glyph"]
+        ?.remainingBlocks,
+    ).toBe(1);
+  });
+
+  it("records Rewind Rune damage and heals on ticks", () => {
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
+    const ally = {
+      ...createSkillCompanion("ally", "defender", { x: 1, y: 0 }),
+      health: 30,
+      maxHealth: 100,
+    };
+    const enemy = createSkillEnemy("enemy", { x: 2, y: 0 }, { attack: 20 });
+    const runeState = resolveSkillEffect(
+      createSkillState([runecaster, ally, enemy]),
+      runecaster,
+      createSkillUse("rewind_rune", ally),
+      1000,
+    ).state;
+    const damagedState = resolveAndApplyCombatDamage(
+      runeState,
+      enemy,
+      ally,
+      {
+        damageType: "physical",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 1100,
+        label: "Test Hit",
+      },
+    ).state;
+
+    expect(
+      damagedState.skillRewindRunesByCompanionId?.ally?.recordedDamage ?? 0,
+    ).toBeGreaterThan(0);
+
+    const tickedState = updateRuneSkillRuntime(damagedState, 2000);
+
+    expect((tickedState.entities.ally as Companion).health).toBeGreaterThan(
+      (damagedState.entities.ally as Companion).health,
+    );
+    expect(tickedState.skillRewindRunesByCompanionId?.ally?.recordedDamage).toBe(0);
+  });
+
+  it("records Rewind Rune damage that was blocked by a barrier", () => {
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
+    const ally = createSkillCompanion("ally", "defender", { x: 1, y: 0 });
+    const enemy = createSkillEnemy("enemy", { x: 2, y: 0 }, { attack: 20 });
+    let state = createSkillState([runecaster, ally, enemy]);
+
+    state = resolveSkillEffect(
+      state,
+      runecaster,
+      createSkillUse("rewind_rune", ally),
+      1000,
+    ).state;
+    state = resolveSkillEffect(
+      state,
+      runecaster,
+      createSkillUse("warding_glyph", ally),
+      1000,
+    ).state;
+
+    const blockedState = resolveAndApplyCombatDamage(
+      state,
+      enemy,
+      ally,
+      {
+        damageType: "magic",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 1100,
+        label: "Test Spell",
+      },
+    ).state;
+
+    expect((blockedState.entities.ally as Companion).health).toBe(ally.health);
+    expect(
+      blockedState.skillRewindRunesByCompanionId?.ally?.recordedDamage ?? 0,
+    ).toBeGreaterThan(0);
+  });
+
+  it("uses Runic Focus to duplicate the next valid non-party skill", () => {
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
+    const firstEnemy = createSkillEnemy("first-enemy", { x: 1, y: 0 }, { maxHealth: 50 });
+    const secondEnemy = createSkillEnemy("second-enemy", { x: 2, y: 0 }, { maxHealth: 50 });
+    const focusedState = resolveSkillEffect(
+      createSkillState([runecaster, firstEnemy, secondEnemy]),
+      runecaster,
+      createSkillUse("runic_focus", runecaster),
+      1000,
+    ).state;
+
+    expect(focusedState.skillRunicFocusByCompanionId?.runecaster).toMatchObject({
+      companionId: runecaster.id,
+    });
+
+    const lancedState = resolveSkillEffect(
+      focusedState,
+      runecaster,
+      createSkillUse("rune_lance", firstEnemy),
+      1100,
+    ).state;
+
+    expect((lancedState.entities["first-enemy"] as Enemy).health).toBeLessThan(
+      firstEnemy.health,
+    );
+    expect((lancedState.entities["second-enemy"] as Enemy).health).toBeLessThan(
+      secondEnemy.health,
+    );
+    expect(lancedState.skillRunicFocusByCompanionId?.runecaster).toBeUndefined();
+  });
+
+  it("does not consume Runic Focus with party, self, or gather buffs", () => {
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
+    let state = resolveSkillEffect(
+      createSkillState([runecaster]),
+      runecaster,
+      createSkillUse("runic_focus", runecaster),
+      1000,
+    ).state;
+
+    state = resolveSkillEffect(
+      state,
+      runecaster,
+      createSkillUse("edge_focus", runecaster),
+      1050,
+    ).state;
+    state = resolveSkillEffect(
+      state,
+      runecaster,
+      createSkillUse("leyline_matrix", runecaster),
+      1100,
+    ).state;
+    state = resolveSkillEffect(
+      state,
+      runecaster,
+      createSkillUse("stone_sigil_rhythm", runecaster),
+      1200,
+    ).state;
+
+    expect(state.skillRunicFocusByCompanionId?.runecaster).toBeDefined();
+  });
+
+  it("uses Rune Step mobility preference and traps enemies near the placement point", () => {
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
+    const enemy = createSkillEnemy("enemy", { x: 3, y: 0 });
+    const result = resolveSkillEffect(
+      createSkillState([runecaster, enemy], {
+        map: createSkillMap([], 8),
+      }),
+      runecaster,
+      createSkillUse("rune_step", enemy),
+      1000,
+    );
+    const movedRunecaster = result.state.entities.runecaster as Companion;
+
+    expect(result.shouldConsumeCooldown).toBe(true);
+    expect(movedRunecaster.position.x).toBeGreaterThan(runecaster.position.x);
+    expect(Object.values(result.state.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "immobilized",
+        sourceId: runecaster.id,
+        sourceKey: "rune_step",
+        targetId: enemy.id,
+      }),
+    );
   });
 
   it("applies Beast lifesteal from final physical damage only", () => {

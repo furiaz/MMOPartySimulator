@@ -67,6 +67,18 @@ describe("skill role preferences", () => {
     }
   });
 
+  it("scores Barrier like Shield for protective roles", () => {
+    expect(getSkillRoleScore("defender", ["Barrier"])).toBe(
+      getSkillRoleScore("defender", ["Shield"]),
+    );
+    expect(getSkillRoleScore("support", ["Barrier"])).toBe(
+      getSkillRoleScore("support", ["Shield"]),
+    );
+    expect(getSkillRoleScore("fighter", ["Barrier"])).toBe(
+      getSkillRoleScore("fighter", ["Shield"]),
+    );
+  });
+
   it("makes Aegis control and mitigation most desirable for Defenders", () => {
     const defenderShockwaveScore = getSkillRoleScore(
       "defender",
@@ -162,6 +174,16 @@ describe("skill role preferences", () => {
       "emberwood_rhythm",
       "flame_step",
       "fire_burst",
+    ]);
+    expect(getSkillsForClass("runecaster").map((skill) => skill.id)).toEqual([
+      "binding_rune",
+      "rune_lance",
+      "warding_glyph",
+      "rewind_rune",
+      "runic_focus",
+      "leyline_matrix",
+      "stone_sigil_rhythm",
+      "rune_step",
     ]);
   });
 });

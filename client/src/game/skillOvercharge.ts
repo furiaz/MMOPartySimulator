@@ -87,6 +87,31 @@ function scaleSkillEffect(
             : undefined,
         },
       };
+    case "pinningShot":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          durationMs: Math.round(effect.durationMs * multiplier),
+        },
+      };
+    case "barrierBlock":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          blocks: Math.ceil(effect.blocks * multiplier),
+        },
+      };
+    case "rewindRune":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          healPercentRecordedDamage:
+            effect.healPercentRecordedDamage * multiplier,
+        },
+      };
     case "fakeDeath":
       return {
         ...skill,
@@ -195,6 +220,16 @@ function scaleSkillEffect(
           ...effect,
           burnDamageMagicPowerPercent:
             effect.burnDamageMagicPowerPercent * multiplier,
+          },
+      };
+    case "runeStep":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          trapImmobilizeDurationMs: Math.round(
+            effect.trapImmobilizeDurationMs * multiplier,
+          ),
         },
       };
     case "fireBurst":
