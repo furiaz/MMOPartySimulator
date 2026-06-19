@@ -431,7 +431,14 @@ export type SkillBookItemId =
   | "leyline_matrix_skill_book"
   | "stone_sigil_rhythm_skill_book"
   | "rune_step_skill_book"
+  | "blinding_ray_skill_book"
   | "light_mend_skill_book"
+  | "sanctuary_veil_skill_book"
+  | "guiding_light_skill_book"
+  | "radiant_benediction_skill_book"
+  | "herbalist_hymn_skill_book"
+  | "dawn_step_skill_book"
+  | "circle_of_renewal_skill_book"
   | "penitents_gift_skill_book";
 
 export type ItemId =
@@ -513,6 +520,10 @@ export type CompanionConsumableBehavior = {
 export type SupportFocus = "lowest_hp" | "leader" | "defender";
 export type MobilitySkillUseMode = "offensive" | "defensive";
 export type FireBurstTargetMode = "big_group" | "low_health" | "highest_health";
+export type CircleOfRenewalTargetMode =
+  | "big_group"
+  | "low_health"
+  | "defender";
 
 export type CompanionSkillBehavior = {
   beginnerFirstAidSelfHealHpThresholdPercent: number;
@@ -521,11 +532,14 @@ export type CompanionSkillBehavior = {
   holdFastUseHpThresholdPercent: number;
   fakeDeathUseHpThresholdPercent: number;
   bloodFeastUseHpThresholdPercent: number;
+  lightMendAllyHealHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
   defensiveMobilityUseHpThresholdPercent: number;
   supportFocus: SupportFocus;
   overchargeEnabled: boolean;
   fireBurstTargetMode: FireBurstTargetMode;
+  circleOfRenewalTargetMode: CircleOfRenewalTargetMode;
+  circleOfRenewalMainTargetHpThresholdPercent: number;
 };
 
 export type CompanionSkillProgression = {
@@ -829,7 +843,14 @@ export type SkillId =
   | "leyline_matrix"
   | "stone_sigil_rhythm"
   | "rune_step"
+  | "blinding_ray"
   | "light_mend"
+  | "sanctuary_veil"
+  | "guiding_light"
+  | "radiant_benediction"
+  | "herbalist_hymn"
+  | "dawn_step"
+  | "circle_of_renewal"
   | "penitents_gift";
 
 export type SkillTag =
@@ -875,6 +896,7 @@ export type CombatProjectileVisualProfileId =
   | "elementalist_arcane_bolt"
   | "hunter_arrow"
   | "runecaster_rune_bolt"
+  | "lightbearer_holy_bolt"
   | "slime_spitter"
   | "goblin_thrower"
   | "bog_imp"
@@ -953,6 +975,7 @@ export type SkillDefinition = {
         magicDamageBonusPercent?: number;
         mitigationPercent?: number;
         mitigatedDamageTypes?: CombatDamageType[];
+        healingReceivedBonusPercent?: number;
         poisonCoating?: {
           poisonDurationMs: number;
           poisonTickIntervalMs: number;
@@ -976,6 +999,7 @@ export type SkillDefinition = {
         durationMs: number;
         blocks: number;
         blockedDamageTypes?: CombatDamageType[];
+        healPercentMaxHealthOnConsume?: number;
       }
     | {
         type: "rewindRune";
@@ -1044,6 +1068,24 @@ export type SkillDefinition = {
         distance: number;
         trapRadius: number;
         trapImmobilizeDurationMs: number;
+      }
+    | { type: "cursedRay"; durationMs: number }
+    | {
+        type: "dawnStep";
+        distance: number;
+        disarmRadius: number;
+        disarmDurationMs: number;
+      }
+    | {
+        type: "healOverTime";
+        durationMs: number;
+        tickIntervalMs: number;
+        healPercentMaxHealth: number;
+      }
+    | {
+        type: "circleOfRenewal";
+        powerMultiplier: number;
+        radius: number;
       }
     | {
         type: "fireBurst";
@@ -1156,6 +1198,7 @@ export type SkillPartyClassBuffState = {
   magicDamageBonusPercent?: number;
   mitigationPercent?: number;
   mitigatedDamageTypes?: CombatDamageType[];
+  healingReceivedBonusPercent?: number;
   poisonCoating?: {
     sourceKey: string;
     tickDamage: number;
@@ -1200,6 +1243,16 @@ export type SkillRewindRuneState = {
   recordedDamage: number;
 };
 
+export type SkillHealOverTimeState = {
+  id: string;
+  targetId: string;
+  sourceId: string;
+  healPercentMaxHealth: number;
+  tickIntervalMs: number;
+  nextTickAt: number;
+  expiresAt: number;
+};
+
 export type SkillRunicFocusState = {
   companionId: string;
   skillId: "runic_focus";
@@ -1234,6 +1287,8 @@ export type SkillShieldBlockState = {
   expiresAt: number;
   remainingBlocks: number;
   blockedDamageTypes?: CombatDamageType[];
+  healPercentMaxHealthOnConsume?: number;
+  sourceId?: string;
 };
 
 export type SkillDamageMitigationState = {

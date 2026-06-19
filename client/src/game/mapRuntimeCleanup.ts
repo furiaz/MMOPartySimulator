@@ -46,6 +46,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     flaskRechargeCountedEnemyDefeats: {},
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
+    lastCompanionDamageTakenAtByCompanionId: {},
     dropVisualEvents: [],
     resurrectionProgressByCompanionId: {},
     resurrectionChannelsByHelperId: {},
@@ -58,6 +59,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     skillOverchargesByCompanionId: {},
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
+    skillHealOverTimesByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
     skillRewindRunesByCompanionId: {},
     skillRunicFocusByCompanionId: {},
@@ -140,6 +142,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     state.skillFrostArmorsByCompanionId,
     currentEntityIds,
   );
+  const skillHealOverTimesByCompanionId = pruneRecordById(
+    state.skillHealOverTimesByCompanionId,
+    currentEntityIds,
+  );
   const skillLifestealBuffsByCompanionId = pruneRecordById(
     state.skillLifestealBuffsByCompanionId,
     currentEntityIds,
@@ -205,6 +211,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     state.lastTargetDummyRegenAtByEnemyId,
     currentEntityIds,
   );
+  const lastCompanionDamageTakenAtByCompanionId = pruneRecordById(
+    state.lastCompanionDamageTakenAtByCompanionId,
+    currentEntityIds,
+  );
   const resurrectionProgressByCompanionId = pruneRecordById(
     state.resurrectionProgressByCompanionId,
     currentEntityIds,
@@ -236,6 +246,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillOverchargesByCompanionId === state.skillOverchargesByCompanionId &&
     skillManaShieldsByCompanionId === state.skillManaShieldsByCompanionId &&
     skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
+    skillHealOverTimesByCompanionId === state.skillHealOverTimesByCompanionId &&
     skillLifestealBuffsByCompanionId === state.skillLifestealBuffsByCompanionId &&
     skillRewindRunesByCompanionId === state.skillRewindRunesByCompanionId &&
     skillRunicFocusByCompanionId === state.skillRunicFocusByCompanionId &&
@@ -253,6 +264,8 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     flaskRechargeCountedEnemyDefeats === state.flaskRechargeCountedEnemyDefeats &&
     lastHealthRegenAtByCompanionId === state.lastHealthRegenAtByCompanionId &&
     lastTargetDummyRegenAtByEnemyId === state.lastTargetDummyRegenAtByEnemyId &&
+    lastCompanionDamageTakenAtByCompanionId ===
+      state.lastCompanionDamageTakenAtByCompanionId &&
     resurrectionProgressByCompanionId === state.resurrectionProgressByCompanionId &&
     resurrectionChannelsByHelperId === state.resurrectionChannelsByHelperId
   ) {
@@ -280,6 +293,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillOverchargesByCompanionId,
     skillManaShieldsByCompanionId,
     skillFrostArmorsByCompanionId,
+    skillHealOverTimesByCompanionId,
     skillLifestealBuffsByCompanionId,
     skillRewindRunesByCompanionId,
     skillRunicFocusByCompanionId,
@@ -297,6 +311,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     flaskRechargeCountedEnemyDefeats,
     lastHealthRegenAtByCompanionId,
     lastTargetDummyRegenAtByEnemyId,
+    lastCompanionDamageTakenAtByCompanionId,
     resurrectionProgressByCompanionId,
     resurrectionChannelsByHelperId,
   };

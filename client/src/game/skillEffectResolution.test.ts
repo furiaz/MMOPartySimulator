@@ -1189,6 +1189,53 @@ describe("skill effect resolution", () => {
     ).toBe(1);
   });
 
+  it("heals when Sanctuary Veil barrier is consumed", () => {
+    const lightbearer = createSkillCompanion(
+      "lightbearer",
+      "support",
+      { x: 0, y: 0 },
+      "lightbearer",
+    );
+    const ally = {
+      ...createSkillCompanion("ally", "defender", { x: 1, y: 0 }),
+      health: 50,
+      maxHealth: 100,
+    };
+    const enemy = createSkillEnemy("enemy", { x: 2, y: 0 }, { attack: 20 });
+    const barrierState = resolveSkillEffect(
+      createSkillState([lightbearer, ally, enemy]),
+      lightbearer,
+      createSkillUse("sanctuary_veil", ally),
+      1000,
+    ).state;
+
+    expect(barrierState.skillShieldBlocksById?.["ally-sanctuary_veil"]).toMatchObject({
+      ownerId: ally.id,
+      remainingBlocks: 1,
+      healPercentMaxHealthOnConsume: 5,
+      blockedDamageTypes: ["physical", "magic"],
+    });
+
+    const blockedState = resolveAndApplyCombatDamage(
+      barrierState,
+      enemy,
+      ally,
+      {
+        damageType: "magic",
+        powerMultiplier: 1,
+        allowEvasion: false,
+        allowPassiveBlock: false,
+        now: 1100,
+        label: "Test Spell",
+      },
+    ).state;
+
+    expect((blockedState.entities.ally as Companion).health).toBe(55);
+    expect(
+      blockedState.skillShieldBlocksById?.["ally-sanctuary_veil"],
+    ).toBeUndefined();
+  });
+
   it("records Rewind Rune damage and heals on ticks", () => {
     const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
     const ally = {
@@ -1533,6 +1580,157 @@ describe("skill effect resolution", () => {
     );
     expect((selfCostState.entities.penitent as Companion).health).toBe(
       penitent.health - 1,
+    );
+  });
+
+  it("applies Lightbearer curse, HoT, party healing bonus, and area healing", () => {
+    const lightbearer = createSkillCompanion(
+      "lightbearer",
+      "support",
+      { x: 0, y: 0 },
+      "lightbearer",
+    );
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 });
+    const ally = {
+      ...createSkillCompanion("ally", "fighter", { x: 1, y: 0 }),
+      health: 40,
+      maxHealth: 100,
+    };
+    const nearby = {
+      ...createSkillCompanion("nearby", "defender", { x: 3, y: 0 }),
+      health: 45,
+      maxHealth: 100,
+    };
+    const far = {
+      ...createSkillCompanion("far", "fighter", { x: 7, y: 0 }),
+      health: 40,
+      maxHealth: 100,
+    };
+    let state = createSkillState([lightbearer, enemy, ally, nearby, far]);
+
+    state = resolveSkillEffect(
+      state,
+      lightbearer,
+      createSkillUse("blinding_ray", enemy),
+      1000,
+    ).state;
+
+    expect(Object.values(state.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "cursed",
+        targetId: enemy.id,
+        expiresAt: 4000,
+      }),
+    );
+
+    state = resolveSkillEffect(
+      state,
+      lightbearer,
+      createSkillUse("guiding_light", ally),
+      1100,
+    ).state;
+
+    expect(state.skillHealOverTimesByCompanionId?.ally).toMatchObject({
+      targetId: ally.id,
+      healPercentMaxHealth: 1,
+      nextTickAt: 3100,
+    });
+
+    const tickedState = updateRuneSkillRuntime(state, 3100);
+    expect((tickedState.entities.ally as Companion).health).toBe(41);
+
+    const noBuffHealState = resolveSkillEffect(
+      createSkillState([lightbearer, ally]),
+      lightbearer,
+      createSkillUse("light_mend", ally),
+      1200,
+    ).state;
+    const buffState = resolveSkillEffect(
+      createSkillState([lightbearer, ally]),
+      lightbearer,
+      createSkillUse("radiant_benediction", lightbearer),
+      1200,
+    ).state;
+    const buffedHealState = resolveSkillEffect(
+      buffState,
+      lightbearer,
+      createSkillUse("light_mend", ally),
+      1300,
+    ).state;
+
+    expect((buffedHealState.entities.ally as Companion).health).toBeGreaterThan(
+      (noBuffHealState.entities.ally as Companion).health,
+    );
+    expect(
+      buffedHealState.skillPartyClassBuffsByCompanionId?.ally?.lightbearer
+        ?.healingReceivedBonusPercent,
+    ).toBe(5);
+
+    const areaState = resolveSkillEffect(
+      createSkillState([lightbearer, ally, nearby, far]),
+      lightbearer,
+      createSkillUse("circle_of_renewal", ally),
+      1400,
+    ).state;
+
+    expect((areaState.entities.ally as Companion).health).toBeGreaterThan(
+      ally.health,
+    );
+    expect((areaState.entities.nearby as Companion).health).toBeGreaterThan(
+      nearby.health,
+    );
+    expect((areaState.entities.far as Companion).health).toBe(far.health);
+  });
+
+  it("disarms enemies at Dawn Step arrival or departure", () => {
+    const lightbearer = createSkillCompanion(
+      "lightbearer",
+      "support",
+      { x: 1, y: 0 },
+      "lightbearer",
+    );
+    const enemy = createSkillEnemy("enemy", { x: 4, y: 0 });
+    const offensiveState = resolveSkillEffect(
+      createSkillState([lightbearer, enemy]),
+      lightbearer,
+      createSkillUse("dawn_step", enemy),
+      1000,
+    ).state;
+
+    expect(offensiveState.entities.lightbearer.position).not.toEqual(
+      lightbearer.position,
+    );
+    expect(Object.values(offensiveState.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "disarmed",
+        targetId: enemy.id,
+        sourceKey: "dawn_step",
+      }),
+    );
+
+    const defensiveLightbearer = {
+      ...lightbearer,
+      skillBehavior: {
+        ...lightbearer.skillBehavior,
+        mobilitySkillUseMode: "defensive" as const,
+        defensiveMobilityUseHpThresholdPercent: 80,
+      },
+      health: Math.floor(lightbearer.maxHealth * 0.5),
+    };
+    const defensiveEnemy = createSkillEnemy("defensive-enemy", { x: 2, y: 0 });
+    const defensiveState = resolveSkillEffect(
+      createSkillState([defensiveLightbearer, defensiveEnemy]),
+      defensiveLightbearer,
+      createSkillUse("dawn_step", defensiveEnemy),
+      1000,
+    ).state;
+
+    expect(Object.values(defensiveState.statusEffectsById ?? {})).toContainEqual(
+      expect.objectContaining({
+        type: "disarmed",
+        targetId: defensiveEnemy.id,
+        sourceKey: "dawn_step",
+      }),
     );
   });
 

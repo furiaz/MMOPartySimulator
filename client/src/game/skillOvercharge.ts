@@ -61,6 +61,7 @@ function scaleSkillEffect(
     case "shockwave":
     case "heal":
     case "selfCostHeal":
+    case "circleOfRenewal":
       return {
         ...skill,
         effect: {
@@ -101,6 +102,9 @@ function scaleSkillEffect(
         effect: {
           ...effect,
           blocks: Math.ceil(effect.blocks * multiplier),
+          healPercentMaxHealthOnConsume: effect.healPercentMaxHealthOnConsume
+            ? effect.healPercentMaxHealthOnConsume * multiplier
+            : undefined,
         },
       };
     case "rewindRune":
@@ -230,6 +234,30 @@ function scaleSkillEffect(
           trapImmobilizeDurationMs: Math.round(
             effect.trapImmobilizeDurationMs * multiplier,
           ),
+        },
+      };
+    case "cursedRay":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          durationMs: Math.round(effect.durationMs * multiplier),
+        },
+      };
+    case "dawnStep":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          disarmDurationMs: Math.round(effect.disarmDurationMs * multiplier),
+        },
+      };
+    case "healOverTime":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          healPercentMaxHealth: effect.healPercentMaxHealth * multiplier,
         },
       };
     case "fireBurst":

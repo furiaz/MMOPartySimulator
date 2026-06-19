@@ -2,6 +2,7 @@ import { updateEntity, type GameState } from "./state";
 import type {
   Companion,
   CompanionSkillBehavior,
+  CircleOfRenewalTargetMode,
   FireBurstTargetMode,
   MobilitySkillUseMode,
   SkillDefinition,
@@ -18,12 +19,18 @@ export const DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT = 30;
 export const FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT = 30;
 export const BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT = 30;
+export const DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT = 50;
+export const LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT = 80;
 export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
 export const DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT = 30;
 export const DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_SUPPORT_FOCUS: SupportFocus = "lowest_hp";
 export const DEFAULT_OVERCHARGE_ENABLED = true;
 export const DEFAULT_FIRE_BURST_TARGET_MODE: FireBurstTargetMode = "big_group";
+export const DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE: CircleOfRenewalTargetMode =
+  "big_group";
+export const DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT = 70;
+export const CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT = 90;
 
 const SUPPORT_FOCUS_VALUES: ReadonlySet<SupportFocus> = new Set([
   "lowest_hp",
@@ -39,6 +46,8 @@ const FIRE_BURST_TARGET_MODE_VALUES: ReadonlySet<FireBurstTargetMode> = new Set(
   "low_health",
   "highest_health",
 ]);
+const CIRCLE_OF_RENEWAL_TARGET_MODE_VALUES: ReadonlySet<CircleOfRenewalTargetMode> =
+  new Set(["big_group", "low_health", "defender"]);
 
 export type SkillBehaviorUpdate = Partial<CompanionSkillBehavior>;
 type StoredCompanionSkillBehavior = Partial<CompanionSkillBehavior> & {
@@ -56,12 +65,17 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
     holdFastUseHpThresholdPercent: DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
     fakeDeathUseHpThresholdPercent: DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
     bloodFeastUseHpThresholdPercent: DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
+    lightMendAllyHealHpThresholdPercent:
+      DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
     mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
     defensiveMobilityUseHpThresholdPercent:
       DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
     supportFocus: DEFAULT_SUPPORT_FOCUS,
     overchargeEnabled: DEFAULT_OVERCHARGE_ENABLED,
     fireBurstTargetMode: DEFAULT_FIRE_BURST_TARGET_MODE,
+    circleOfRenewalTargetMode: DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
+    circleOfRenewalMainTargetHpThresholdPercent:
+      DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
   };
 }
 
@@ -103,6 +117,11 @@ export function getCompanionSkillBehavior(
         DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
       BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
     ),
+    lightMendAllyHealHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.lightMendAllyHealHpThresholdPercent ??
+        DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+      LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+    ),
     mobilitySkillUseMode: normalizeMobilitySkillUseMode(
       storedBehavior.mobilitySkillUseMode,
     ),
@@ -116,6 +135,14 @@ export function getCompanionSkillBehavior(
       storedBehavior.overchargeEnabled ?? DEFAULT_OVERCHARGE_ENABLED,
     fireBurstTargetMode: normalizeFireBurstTargetMode(
       storedBehavior.fireBurstTargetMode,
+    ),
+    circleOfRenewalTargetMode: normalizeCircleOfRenewalTargetMode(
+      storedBehavior.circleOfRenewalTargetMode,
+    ),
+    circleOfRenewalMainTargetHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.circleOfRenewalMainTargetHpThresholdPercent ??
+        DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
+      CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT,
     ),
   };
 }
@@ -173,6 +200,12 @@ export function updateCompanionSkillBehavior(
             getCompanionSkillBehavior(companion).bloodFeastUseHpThresholdPercent,
           BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
         ),
+      lightMendAllyHealHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.lightMendAllyHealHpThresholdPercent ??
+            getCompanionSkillBehavior(companion).lightMendAllyHealHpThresholdPercent,
+          LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+        ),
       mobilitySkillUseMode: normalizeMobilitySkillUseMode(
         update.mobilitySkillUseMode ??
           getCompanionSkillBehavior(companion).mobilitySkillUseMode,
@@ -194,6 +227,17 @@ export function updateCompanionSkillBehavior(
         update.fireBurstTargetMode ??
           getCompanionSkillBehavior(companion).fireBurstTargetMode,
       ),
+      circleOfRenewalTargetMode: normalizeCircleOfRenewalTargetMode(
+        update.circleOfRenewalTargetMode ??
+          getCompanionSkillBehavior(companion).circleOfRenewalTargetMode,
+      ),
+      circleOfRenewalMainTargetHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.circleOfRenewalMainTargetHpThresholdPercent ??
+            getCompanionSkillBehavior(companion)
+              .circleOfRenewalMainTargetHpThresholdPercent,
+          CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT,
+        ),
     },
   });
 }
@@ -246,4 +290,13 @@ function normalizeFireBurstTargetMode(value: unknown): FireBurstTargetMode {
     FIRE_BURST_TARGET_MODE_VALUES.has(value as FireBurstTargetMode)
     ? (value as FireBurstTargetMode)
     : DEFAULT_FIRE_BURST_TARGET_MODE;
+}
+
+function normalizeCircleOfRenewalTargetMode(
+  value: unknown,
+): CircleOfRenewalTargetMode {
+  return typeof value === "string" &&
+    CIRCLE_OF_RENEWAL_TARGET_MODE_VALUES.has(value as CircleOfRenewalTargetMode)
+    ? (value as CircleOfRenewalTargetMode)
+    : DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE;
 }

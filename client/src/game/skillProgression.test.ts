@@ -83,6 +83,17 @@ const RUNECASTER_SKILL_IDS: SkillId[] = [
   "rune_step",
 ];
 
+const LIGHTBEARER_SKILL_IDS: SkillId[] = [
+  "blinding_ray",
+  "light_mend",
+  "sanctuary_veil",
+  "guiding_light",
+  "radiant_benediction",
+  "herbalist_hymn",
+  "dawn_step",
+  "circle_of_renewal",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -136,6 +147,13 @@ describe("skill progression", () => {
       leyline_matrix: 5,
       stone_sigil_rhythm: 5,
       rune_step: 5,
+      blinding_ray: 5,
+      sanctuary_veil: 5,
+      guiding_light: 5,
+      radiant_benediction: 5,
+      herbalist_hymn: 5,
+      dawn_step: 5,
+      circle_of_renewal: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -293,6 +311,30 @@ describe("skill progression", () => {
     const runeStep = getScaledSkillDefinitionForCompanion(
       companion,
       SKILL_DEFINITIONS.rune_step,
+    );
+    const blindingRay = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.blinding_ray,
+    );
+    const sanctuaryVeil = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.sanctuary_veil,
+    );
+    const guidingLight = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.guiding_light,
+    );
+    const radiantBenediction = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.radiant_benediction,
+    );
+    const herbalistHymn = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.herbalist_hymn,
+    );
+    const circleOfRenewal = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.circle_of_renewal,
     );
 
     expect(kick.effect.type).toBe("lungeDamage");
@@ -484,6 +526,36 @@ describe("skill progression", () => {
     expect(runeStep.effect.type).toBe("runeStep");
     if (runeStep.effect.type === "runeStep") {
       expect(runeStep.effect.trapImmobilizeDurationMs).toBe(2400);
+    }
+    expect(blindingRay.effect.type).toBe("cursedRay");
+    if (blindingRay.effect.type === "cursedRay") {
+      expect(blindingRay.effect.durationMs).toBe(3600);
+    }
+    expect(sanctuaryVeil.effect.type).toBe("barrierBlock");
+    if (sanctuaryVeil.effect.type === "barrierBlock") {
+      expect(sanctuaryVeil.effect.blocks).toBe(2);
+      expect(sanctuaryVeil.effect.healPercentMaxHealthOnConsume).toBeCloseTo(6);
+    }
+    expect(guidingLight.effect.type).toBe("healOverTime");
+    if (guidingLight.effect.type === "healOverTime") {
+      expect(guidingLight.effect.durationMs).toBe(20000);
+      expect(guidingLight.effect.healPercentMaxHealth).toBe(1);
+    }
+    expect(radiantBenediction.effect.type).toBe("partyClassBuff");
+    if (radiantBenediction.effect.type === "partyClassBuff") {
+      expect(
+        radiantBenediction.effect.primaryStatBonusPercentByStat?.wisdom,
+      ).toBeCloseTo(10);
+      expect(radiantBenediction.effect.healingReceivedBonusPercent).toBe(5);
+    }
+    expect(herbalistHymn.effect.type).toBe("gatherBuff");
+    if (herbalistHymn.effect.type === "gatherBuff") {
+      expect(herbalistHymn.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+      expect(herbalistHymn.effect.resourceType).toBe("herb");
+    }
+    expect(circleOfRenewal.effect.type).toBe("circleOfRenewal");
+    if (circleOfRenewal.effect.type === "circleOfRenewal") {
+      expect(circleOfRenewal.effect.powerMultiplier).toBeCloseTo(1.2);
     }
   });
 
@@ -707,6 +779,43 @@ describe("skill progression", () => {
     expect(getCompanionSkillRank(nextCompanion, "rune_step")).toBe(2);
   });
 
+  it("reads new Lightbearer skill books for eligible Lightbearer companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      "lightbearer",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "circle_of_renewal_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(
+      state,
+      companion.id,
+      "circle_of_renewal_skill_book",
+    );
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "circle_of_renewal",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "circle_of_renewal")).toBe(2);
+  });
+
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
     const companion = withSkillRanks(
       createCompanion("companion", { x: 0, y: 0 }, "companion"),
@@ -882,6 +991,21 @@ describe("skill progression", () => {
 
     expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
       ...RUNECASTER_SKILL_IDS,
+    ]);
+  });
+
+  it("keeps Lightbearer current-class skills ordered in the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      "lightbearer",
+    );
+
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...LIGHTBEARER_SKILL_IDS,
     ]);
   });
 

@@ -17,14 +17,19 @@ import {
   DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_FIRE_BURST_TARGET_MODE,
   DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
+  DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_OVERCHARGE_ENABLED,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
   BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
+  CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT,
   DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
+  LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
+  DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
   DEFAULT_SUPPORT_FOCUS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
@@ -68,6 +73,7 @@ import {
   type SkillDefinition,
   type SkillId,
   type FireBurstTargetMode,
+  type CircleOfRenewalTargetMode,
   type MobilitySkillUseMode,
   type SupportFocus,
 } from "./game";
@@ -152,6 +158,18 @@ const fireBurstTargetModeLabels: Record<FireBurstTargetMode, string> = {
   big_group: "Big Group",
   low_health: "Low HP",
   highest_health: "High HP",
+};
+
+const circleOfRenewalTargetModeOptions: CircleOfRenewalTargetMode[] = [
+  "big_group",
+  "low_health",
+  "defender",
+];
+
+const circleOfRenewalTargetModeLabels: Record<CircleOfRenewalTargetMode, string> = {
+  big_group: "Big Group",
+  low_health: "Low HP",
+  defender: "Defender",
 };
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
@@ -558,6 +576,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
       parts.push("attacks apply poison");
     }
 
+    if (effect.healingReceivedBonusPercent) {
+      parts.push(`+${Math.round(effect.healingReceivedBonusPercent)}% healing received`);
+    }
+
     for (const [statId, percent] of Object.entries(
       effect.primaryStatBonusPercentByStat ?? {},
     )) {
@@ -613,6 +635,14 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Moves ${effect.distance} spaces and applies burning.`;
   }
 
+  if (effect.type === "runeStep") {
+    return `Moves ${effect.distance} spaces and places an immobilizing trap.`;
+  }
+
+  if (effect.type === "dawnStep") {
+    return `Moves ${effect.distance} spaces and disarms nearby enemies.`;
+  }
+
   if (effect.type === "fireBurst") {
     return `Hits enemies near the target for ${Math.round(effect.powerMultiplier * 100)}% magic damage and applies burning.`;
   }
@@ -649,8 +679,20 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return "Binds an enemy briefly.";
   }
 
+  if (effect.type === "cursedRay") {
+    return `Curses one enemy for ${Math.round(effect.durationMs / 1000)}s.`;
+  }
+
   if (effect.type === "heal") {
     return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power.`;
+  }
+
+  if (effect.type === "healOverTime") {
+    return `Heals ${Math.round(effect.healPercentMaxHealth)}% max HP every ${Math.round(effect.tickIntervalMs / 1000)}s.`;
+  }
+
+  if (effect.type === "circleOfRenewal") {
+    return `Heals allies near the target for ${Math.round(effect.powerMultiplier * 100)}% healing power.`;
   }
 
   if (effect.type === "selfPercentHeal") {
@@ -1618,6 +1660,9 @@ function SkillPreferencesSection({
   const bloodFeastThreshold =
     member.skillBehavior.bloodFeastUseHpThresholdPercent ??
     DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT;
+  const lightMendAllyThreshold =
+    member.skillBehavior.lightMendAllyHealHpThresholdPercent ??
+    DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const defensiveMobilityThreshold =
@@ -1628,6 +1673,12 @@ function SkillPreferencesSection({
     member.skillBehavior.overchargeEnabled ?? DEFAULT_OVERCHARGE_ENABLED;
   const fireBurstTargetMode =
     member.skillBehavior.fireBurstTargetMode ?? DEFAULT_FIRE_BURST_TARGET_MODE;
+  const circleOfRenewalTargetMode =
+    member.skillBehavior.circleOfRenewalTargetMode ??
+    DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE;
+  const circleOfRenewalMainTargetThreshold =
+    member.skillBehavior.circleOfRenewalMainTargetHpThresholdPercent ??
+    DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT;
   const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
   const hasFirstAid = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "first_aid"),
@@ -1652,7 +1703,8 @@ function SkillPreferencesSection({
       skill.id === "skirmish_shot" ||
       skill.id === "pounce" ||
       skill.id === "flame_step" ||
-      skill.id === "rune_step"
+      skill.id === "rune_step" ||
+      skill.id === "dawn_step"
     ),
   );
   const hasOvercharge = learnedSkillGroups.some((group) =>
@@ -1661,10 +1713,25 @@ function SkillPreferencesSection({
   const hasFrostArmor = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "frost_armor"),
   );
+  const hasLightMend = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "light_mend"),
+  );
+  const hasLightbearerSupportSkill = learnedSkillGroups.some((group) =>
+    group.skills.some(
+      (skill) =>
+        skill.id === "light_mend" ||
+        skill.id === "sanctuary_veil" ||
+        skill.id === "guiding_light",
+    ),
+  );
   const hasFireBurst = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "fire_burst"),
   );
-  const shouldShowSupportFocus = member.role === "support" || hasFrostArmor;
+  const hasCircleOfRenewal = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "circle_of_renewal"),
+  );
+  const shouldShowSupportFocus =
+    member.role === "support" || hasFrostArmor || hasLightbearerSupportSkill;
   const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
 
   return (
@@ -1851,6 +1918,38 @@ function SkillPreferencesSection({
             <strong>{bloodFeastThreshold}%</strong>
           </label>
         ) : null}
+        {hasLightMend ? (
+          <label className="behavior-range-row">
+            <span>Light Mend Ally HP Threshold</span>
+            <input
+              max={LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  lightMendAllyHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="range"
+              value={lightMendAllyThreshold}
+            />
+            <input
+              max={LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  lightMendAllyHealHpThresholdPercent: Number(
+                    event.target.value,
+                  ),
+                })
+              }
+              type="number"
+              value={lightMendAllyThreshold}
+            />
+            <strong>{lightMendAllyThreshold}%</strong>
+          </label>
+        ) : null}
         {hasOvercharge ? (
           <label className="behavior-toggle-row">
             <span>Overcharge</span>
@@ -1925,7 +2024,11 @@ function SkillPreferencesSection({
         ) : null}
         {shouldShowSupportFocus ? (
           <div className="behavior-choice-row">
-            <span>{hasFrostArmor ? "Support / Frost Focus" : "Support Focus"}</span>
+            <span>
+              {hasFrostArmor || hasLightbearerSupportSkill
+                ? "Support Skill Focus"
+                : "Support Focus"}
+            </span>
             <div
               aria-label="Support Focus"
               className="behavior-choice-group"
@@ -1975,6 +2078,66 @@ function SkillPreferencesSection({
             </div>
           </div>
         ) : null}
+        {hasCircleOfRenewal ? (
+          <>
+            <div className="behavior-choice-row">
+              <span>Circle of Renewal Target</span>
+              <div
+                aria-label="Circle of Renewal Target"
+                className="behavior-choice-group"
+                role="group"
+              >
+                {circleOfRenewalTargetModeOptions.map((option) => (
+                  <button
+                    aria-pressed={circleOfRenewalTargetMode === option}
+                    className={
+                      circleOfRenewalTargetMode === option ? "active" : ""
+                    }
+                    key={option}
+                    onClick={() =>
+                      onChangeSkillBehavior(member.id, {
+                        circleOfRenewalTargetMode: option,
+                      })
+                    }
+                    type="button"
+                  >
+                    {circleOfRenewalTargetModeLabels[option]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="behavior-range-row">
+              <span>Circle Main Target HP Threshold</span>
+              <input
+                max={CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    circleOfRenewalMainTargetHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="range"
+                value={circleOfRenewalMainTargetThreshold}
+              />
+              <input
+                max={CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    circleOfRenewalMainTargetHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="number"
+                value={circleOfRenewalMainTargetThreshold}
+              />
+              <strong>{circleOfRenewalMainTargetThreshold}%</strong>
+            </label>
+          </>
+        ) : null}
         {legacyCandidates.length > 0 ? (
           <div className="companion-skill-summary" aria-label="Legacy skill toggles">
             <span className="equipment-section-label">Legacy Skills</span>
@@ -2014,10 +2177,12 @@ function SkillPreferencesSection({
         !hasHoldFast &&
         !hasFakeDeath &&
         !hasBloodFeast &&
+        !hasLightMend &&
         !hasMobilitySkill &&
         !hasOvercharge &&
         !shouldShowSupportFocus &&
         !hasFireBurst &&
+        !hasCircleOfRenewal &&
         legacyCandidates.length === 0 ? (
           <span className="party-menu-empty">No skill preferences available</span>
         ) : null}

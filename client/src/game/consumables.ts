@@ -14,6 +14,7 @@ import { getItemDefinition } from "./items";
 import { getPartyMembers } from "./partySystem";
 import { recordEquippedItemObjectivesForQuests } from "./questSystem";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
+import { applyCompanionHealing } from "./skillRuntime";
 import type {
   Companion,
   CompanionConsumableBuffs,
@@ -935,14 +936,16 @@ function completeFlaskUse(
     0,
     Math.ceil(companion.maxHealth * (itemDefinition.healPercent ?? 0)),
   );
-  const nextHealth = Math.min(companion.maxHealth, companion.health + healedAmount);
-  const actualHeal = nextHealth - companion.health;
+  const healResult = applyCompanionHealing(state, companion, healedAmount, now, {
+    feedback: false,
+  });
+  const healedCompanion = healResult.target;
+  const actualHeal = healResult.healedAmount;
   const nextCompanion = applyConsumableBuff(
     {
-      ...companion,
-      health: nextHealth,
+      ...healedCompanion,
       consumables: {
-        ...companion.consumables,
+        ...healedCompanion.consumables,
         flask: {
           ...flask,
           charges: Math.max(0, flask.charges - chargeCost),
@@ -953,7 +956,7 @@ function completeFlaskUse(
     itemDefinition,
     now,
   );
-  let nextState = updateEntity(state, nextCompanion);
+  let nextState = updateEntity(healResult.state, nextCompanion);
   nextState = removeConsumableUse(nextState, use.companionId);
 
   if (actualHeal > 0) {

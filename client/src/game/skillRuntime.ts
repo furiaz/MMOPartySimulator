@@ -43,6 +43,7 @@ export function updateRuneSkillRuntime(
   now: number,
 ): GameState {
   let nextState = updateRewindRunes(state, now);
+  nextState = updateHealOverTimes(nextState, now);
   const skillRunicFocusByCompanionId = Object.fromEntries(
     Object.entries(nextState.skillRunicFocusByCompanionId ?? {}).filter(
       ([companionId]) => isLivingCompanion(nextState.entities[companionId]),
@@ -58,6 +59,76 @@ export function updateRuneSkillRuntime(
         ...nextState,
         skillRunicFocusByCompanionId,
       };
+}
+
+export function getHealingReceivedBonusPercent(
+  state: GameState,
+  target: Companion,
+): number {
+  return getActivePartyClassBuffsForCompanion(state, target).reduce(
+    (total, buff) => total + (buff.healingReceivedBonusPercent ?? 0),
+    0,
+  );
+}
+
+export function applyCompanionHealing(
+  state: GameState,
+  target: Companion,
+  baseAmount: number,
+  now: number,
+  {
+    sourceId,
+    feedback = true,
+  }: { sourceId?: string; feedback?: boolean } = {},
+): { state: GameState; healedAmount: number; target: Companion } {
+  const currentTarget = state.entities[target.id];
+
+  if (!isLivingCompanion(currentTarget) || baseAmount <= 0) {
+    return { state, healedAmount: 0, target };
+  }
+
+  const healingReceivedBonusPercent = getHealingReceivedBonusPercent(
+    state,
+    currentTarget,
+  );
+  const amount = Math.max(
+    1,
+    Math.round(baseAmount * (1 + healingReceivedBonusPercent / 100)),
+  );
+  const nextHealth = Math.min(
+    currentTarget.maxHealth,
+    currentTarget.health + amount,
+  );
+  const healedAmount = nextHealth - currentTarget.health;
+
+  if (healedAmount <= 0) {
+    return { state, healedAmount: 0, target: currentTarget };
+  }
+
+  let nextState = updateEntity(state, {
+    ...currentTarget,
+    health: nextHealth,
+  });
+
+  if (feedback) {
+    nextState = addCombatFeedback(nextState, {
+      type: "heal",
+      entityId: currentTarget.id,
+      sourceEntityId: sourceId,
+      targetEntityId: currentTarget.id,
+      amount: healedAmount,
+      text: `+${healedAmount} HP`,
+      now,
+    });
+  }
+
+  const healedTarget = nextState.entities[currentTarget.id];
+
+  return {
+    state: nextState,
+    healedAmount,
+    target: isLivingCompanion(healedTarget) ? healedTarget : currentTarget,
+  };
 }
 
 export function recordRewindRuneDamage(
@@ -237,32 +308,9 @@ export function applyLifestealFromAttack(
     1,
     Math.round(finalDamage * (lifesteal.lifestealPercent / 100)),
   );
-  const nextHealth = Math.min(
-    currentAttacker.maxHealth,
-    currentAttacker.health + healAmount,
-  );
-  const appliedHeal = nextHealth - currentAttacker.health;
-
-  if (appliedHeal <= 0) {
-    return state;
-  }
-
-  let nextState = updateEntity(state, {
-    ...currentAttacker,
-    health: nextHealth,
-  });
-
-  nextState = addCombatFeedback(nextState, {
-    type: "heal",
-    entityId: attacker.id,
-    sourceEntityId: attacker.id,
-    targetEntityId: attacker.id,
-    amount: appliedHeal,
-    text: `+${appliedHeal} HP`,
-    now,
-  });
-
-  return nextState;
+  return applyCompanionHealing(state, currentAttacker, healAmount, now, {
+    sourceId: attacker.id,
+  }).state;
 }
 
 export function applyIncomingDamageMitigation(
@@ -440,6 +488,23 @@ export function blockIncomingAttackIfShielded(
     ...state,
     skillShieldBlocksById,
   };
+
+  if (remainingBlocks <= 0 && shield.healPercentMaxHealthOnConsume) {
+    const currentTarget = nextState.entities[target.id];
+
+    if (isLivingCompanion(currentTarget)) {
+      const healAmount = Math.max(
+        1,
+        Math.ceil(
+          currentTarget.maxHealth *
+            (shield.healPercentMaxHealthOnConsume / 100),
+        ),
+      );
+      nextState = applyCompanionHealing(nextState, currentTarget, healAmount, now, {
+        sourceId: shield.sourceId ?? target.id,
+      }).state;
+    }
+  }
 
   nextState = addCombatFeedback(nextState, {
     type: "attack",
@@ -643,27 +708,9 @@ function updateRewindRunes(state: GameState, now: number): GameState {
         const currentTarget = nextState.entities[rewind.targetId];
 
         if (isLivingCompanion(currentTarget)) {
-          const nextHealth = Math.min(
-            currentTarget.maxHealth,
-            currentTarget.health + healAmount,
-          );
-          const appliedHeal = nextHealth - currentTarget.health;
-
-          if (appliedHeal > 0) {
-            nextState = updateEntity(nextState, {
-              ...currentTarget,
-              health: nextHealth,
-            });
-            nextState = addCombatFeedback(nextState, {
-              type: "heal",
-              entityId: currentTarget.id,
-              sourceEntityId: rewind.sourceId,
-              targetEntityId: currentTarget.id,
-              amount: appliedHeal,
-              text: `+${appliedHeal} HP`,
-              now,
-            });
-          }
+          nextState = applyCompanionHealing(nextState, currentTarget, healAmount, now, {
+            sourceId: rewind.sourceId,
+          }).state;
         }
       }
 
@@ -691,6 +738,76 @@ function updateRewindRunes(state: GameState, now: number): GameState {
     ? {
         ...nextState,
         skillRewindRunesByCompanionId: nextRewinds,
+      }
+    : nextState;
+}
+
+function updateHealOverTimes(state: GameState, now: number): GameState {
+  const healOverTimes = state.skillHealOverTimesByCompanionId;
+
+  if (!healOverTimes) {
+    return state;
+  }
+
+  let nextState = state;
+  const nextHealOverTimes = { ...healOverTimes };
+  let didChange = false;
+
+  for (const healOverTime of Object.values(healOverTimes)) {
+    const target = nextState.entities[healOverTime.targetId];
+
+    if (!isLivingCompanion(target)) {
+      delete nextHealOverTimes[healOverTime.targetId];
+      didChange = true;
+      continue;
+    }
+
+    let nextTickAt = healOverTime.nextTickAt;
+
+    while (nextTickAt <= now && nextTickAt <= healOverTime.expiresAt) {
+      if (target.health < target.maxHealth) {
+        const currentTarget = nextState.entities[healOverTime.targetId];
+
+        if (isLivingCompanion(currentTarget)) {
+          const healAmount = Math.max(
+            1,
+            Math.ceil(
+              currentTarget.maxHealth *
+                (healOverTime.healPercentMaxHealth / 100),
+            ),
+          );
+          nextState = applyCompanionHealing(
+            nextState,
+            currentTarget,
+            healAmount,
+            now,
+            { sourceId: healOverTime.sourceId },
+          ).state;
+        }
+      }
+
+      nextTickAt += healOverTime.tickIntervalMs;
+    }
+
+    if (healOverTime.expiresAt <= now) {
+      delete nextHealOverTimes[healOverTime.targetId];
+      didChange = true;
+      continue;
+    }
+
+    if (nextTickAt !== healOverTime.nextTickAt) {
+      nextHealOverTimes[healOverTime.targetId] = {
+        ...healOverTime,
+        nextTickAt,
+      };
+      didChange = true;
+    }
+  }
+
+  return didChange
+    ? {
+        ...nextState,
+        skillHealOverTimesByCompanionId: nextHealOverTimes,
       }
     : nextState;
 }

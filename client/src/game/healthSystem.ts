@@ -6,6 +6,7 @@ import {
   syncCompanionDerivedMaxHealthWithPartyBuffs,
 } from "./stats";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
+import { applyCompanionHealing } from "./skillRuntime";
 
 const HEALTH_REGEN_INTERVAL_MS = 5000;
 const TARGET_DUMMY_REGEN_INTERVAL_MS = 5000;
@@ -166,19 +167,16 @@ export function updatePassiveHealthRegen(
       nextState,
       member,
     ).healthRegen;
-    const nextHealth = Math.min(member.maxHealth, member.health + amount);
-    const healedAmount = nextHealth - member.health;
+    const healResult = applyCompanionHealing(nextState, member, amount, now, {
+      feedback: false,
+    });
+    const healedAmount = healResult.healedAmount;
 
     if (healedAmount <= 0) {
       continue;
     }
 
-    const healedMember = {
-      ...member,
-      health: nextHealth,
-    };
-
-    nextState = updateEntity(nextState, healedMember);
+    nextState = healResult.state;
     nextState = addCombatFeedback(nextState, {
       type: "heal",
       entityId: member.id,
@@ -190,7 +188,7 @@ export function updatePassiveHealthRegen(
       entityId: member.id,
       healthRegenAmount: healedAmount,
       previousHealth: member.health,
-      nextHealth,
+      nextHealth: healResult.target.health,
     });
   }
 

@@ -537,7 +537,8 @@ function isMobilitySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "skirmishShot" ||
     skill.effect.type === "pounce" ||
     skill.effect.type === "flameStep" ||
-    skill.effect.type === "runeStep"
+    skill.effect.type === "runeStep" ||
+    skill.effect.type === "dawnStep"
   );
 }
 
@@ -561,6 +562,8 @@ function isEmergencySkill(skill: SkillDefinition): boolean {
     skill.effect.type === "lifestealBuff" ||
     skill.effect.type === "forcedEvasion" ||
     skill.effect.type === "frostArmor" ||
+    skill.effect.type === "healOverTime" ||
+    skill.effect.type === "circleOfRenewal" ||
     skill.effect.type === "barrierBlock" ||
     skill.effect.type === "rewindRune" ||
     skill.effect.type === "selfMitigationBuff" ||
@@ -602,6 +605,8 @@ function isRecoveryAreaSkillUseAllowed(
     skill.effect.type === "manaShield" ||
     skill.effect.type === "holdFast" ||
     skill.effect.type === "frostArmor" ||
+    skill.effect.type === "healOverTime" ||
+    skill.effect.type === "circleOfRenewal" ||
     skill.effect.type === "barrierBlock" ||
     skill.effect.type === "rewindRune" ||
     skill.effect.type === "runicFocus" ||
@@ -724,9 +729,11 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "pounce":
     case "flameStep":
     case "runeStep":
+    case "dawnStep":
     case "maulSweep":
     case "arrowBurst":
     case "fireBurst":
+    case "cursedRay":
     case "bind":
       return true;
     default:

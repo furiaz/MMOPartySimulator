@@ -33,7 +33,7 @@ import { applyOverchargeToSkillDefinition } from "./skillOvercharge";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import { findEnemyTarget } from "./skillTargeting";
 import { getCompanionDerivedStatsWithPartyBuffs } from "./stats";
-import { canUsePartyClassBuff } from "./skillRuntime";
+import { applyCompanionHealing, canUsePartyClassBuff } from "./skillRuntime";
 import { applyStatusEffect, dropAggroFromTarget } from "./statusEffects";
 import {
   addCombatFeedback,
@@ -309,6 +309,24 @@ function resolveSkillEffectOnce(
     return consumeSkillEffect(appliedState, target?.id ?? caster.id);
   }
 
+  if (skill.effect.type === "dawnStep") {
+    const appliedState = applyDawnStep(state, caster, target, skill, now);
+
+    if (!appliedState) {
+      return skipSkillEffect(state);
+    }
+
+    return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
+  if (skill.effect.type === "cursedRay" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyCursedRay(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
   if (skill.effect.type === "arrowBurst" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
@@ -353,6 +371,14 @@ function resolveSkillEffectOnce(
     return resolveAppliedSkillEffect(
       state,
       applyFrostArmor(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "healOverTime" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyHealOverTime(state, caster, target, skill, now),
       target.id,
     );
   }
@@ -421,6 +447,14 @@ function resolveSkillEffectOnce(
         skill.id,
         now,
       ),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "circleOfRenewal" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyCircleOfRenewal(state, caster, target, skill, now),
       target.id,
     );
   }
@@ -569,12 +603,15 @@ function isRunicFocusEligibleSkill(skill: SkillDefinition): boolean {
     case "damage":
     case "taunt":
     case "pinningShot":
+    case "cursedRay":
     case "bind":
     case "allyBuff":
     case "barrierBlock":
     case "rewindRune":
     case "frostArmor":
+    case "healOverTime":
     case "heal":
+    case "circleOfRenewal":
     case "selfCostHeal":
       return true;
     default:
@@ -592,6 +629,7 @@ function findRunicFocusDuplicateTarget(
     skill.effect.type === "damage" ||
     skill.effect.type === "taunt" ||
     skill.effect.type === "pinningShot" ||
+    skill.effect.type === "cursedRay" ||
     skill.effect.type === "bind"
   ) {
     return (
@@ -1179,6 +1217,7 @@ function applyPartyClassBuff(
           magicDamageBonusPercent: skill.effect.magicDamageBonusPercent,
           mitigationPercent: skill.effect.mitigationPercent,
           mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
+          healingReceivedBonusPercent: skill.effect.healingReceivedBonusPercent,
           poisonCoating:
             skill.effect.poisonCoating && tickDamage !== undefined
               ? {
@@ -1384,6 +1423,8 @@ function applyBarrierBlock(
         expiresAt: now + skill.effect.durationMs,
         remainingBlocks: skill.effect.blocks,
         blockedDamageTypes: skill.effect.blockedDamageTypes,
+        healPercentMaxHealthOnConsume: skill.effect.healPercentMaxHealthOnConsume,
+        sourceId: caster.id,
       },
     },
   };
@@ -1698,6 +1739,51 @@ function applyFrostArmor(
         sourceId: caster.id,
         defenseBonusPercent: skill.effect.defenseBonusPercent,
         mitigationPercent: skill.effect.mitigationPercent,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: 600,
+  });
+
+  return nextState;
+}
+
+function applyHealOverTime(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "healOverTime") {
+    return state;
+  }
+
+  let nextState: GameState = {
+    ...state,
+    skillHealOverTimesByCompanionId: {
+      ...(state.skillHealOverTimesByCompanionId ?? {}),
+      [target.id]: {
+        id: `${target.id}-${skill.id}`,
+        targetId: target.id,
+        sourceId: caster.id,
+        healPercentMaxHealth: skill.effect.healPercentMaxHealth,
+        tickIntervalMs: skill.effect.tickIntervalMs,
+        nextTickAt: now + skill.effect.tickIntervalMs,
         expiresAt: now + skill.effect.durationMs,
       },
     },
@@ -2304,6 +2390,94 @@ function applyRuneStep(
   return nextState;
 }
 
+function applyDawnStep(
+  state: GameState,
+  caster: Companion,
+  target: Enemy | Companion | undefined,
+  skill: SkillDefinition,
+  now: number,
+): GameState | null {
+  if (skill.effect.type !== "dawnStep" || !isLivingEnemy(target)) {
+    return null;
+  }
+
+  const useMode = getCompanionSkillBehavior(caster).mobilitySkillUseMode;
+  const direction =
+    useMode === "offensive"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
+  );
+
+  if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
+    return null;
+  }
+
+  const disarmPosition = useMode === "offensive" ? position : caster.position;
+  let nextState = updateEntity(state, {
+    ...caster,
+    position,
+  });
+  let affectedEnemies = 0;
+
+  for (const enemy of Object.values(nextState.entities)) {
+    if (
+      !isLivingEnemy(enemy) ||
+      getGridDistance(enemy.position, disarmPosition) >
+        skill.effect.disarmRadius
+    ) {
+      continue;
+    }
+
+    nextState = applyStatusEffect(
+      nextState,
+      {
+        type: "disarmed",
+        targetId: enemy.id,
+        durationMs: skill.effect.disarmDurationMs,
+        sourceId: caster.id,
+        sourceKey: skill.id,
+      },
+      now,
+    );
+    affectedEnemies += 1;
+  }
+
+  if (affectedEnemies === 0) {
+    return null;
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position: disarmPosition,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
 function applyArrowBurst(
   state: GameState,
   caster: Companion,
@@ -2518,6 +2692,47 @@ function applyBind(
   return nextState;
 }
 
+function applyCursedRay(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "cursedRay") {
+    return state;
+  }
+
+  let nextState = applyStatusEffect(
+    state,
+    {
+      type: "cursed",
+      targetId: target.id,
+      durationMs: skill.effect.durationMs,
+      sourceId: caster.id,
+      sourceKey: skill.id,
+    },
+    now,
+  );
+
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return nextState;
+}
+
 function applyHeal(
   state: GameState,
   caster: Companion,
@@ -2532,11 +2747,12 @@ function applyHeal(
   }
 
   const amount = getHealingAmount(caster, powerMultiplier, state);
-  const healedTarget = {
-    ...target,
-    health: Math.min(target.maxHealth, target.health + amount),
-  };
-  let nextState = updateEntity(state, healedTarget);
+  const healResult = applyCompanionHealing(state, target, amount, now, {
+    sourceId: caster.id,
+    feedback: false,
+  });
+  let nextState = healResult.state;
+  const healedTarget = healResult.target;
 
   if (hpCost > 0) {
     const currentCaster = nextState.entities[caster.id];
@@ -2569,7 +2785,10 @@ function applyHeal(
   nextState = addCombatFeedback(nextState, {
     type: "heal",
     entityId: target.id,
-    text: `+${amount} HP`,
+    amount: healResult.healedAmount,
+    sourceEntityId: caster.id,
+    targetEntityId: target.id,
+    text: `+${healResult.healedAmount} HP`,
     now,
   });
   nextState = appendDebugTelemetryEvent(nextState, {
@@ -2579,10 +2798,75 @@ function applyHeal(
     healingPowerRating: getCompanionDerivedStatsWithPartyBuffs(state, caster)
       .healingPower,
     healingMultiplier: powerMultiplier,
-    healingAmount: amount,
+    healingAmount: healResult.healedAmount,
     previousHealth: target.health,
     nextHealth: healedTarget.health,
     skillId,
+  });
+
+  return nextState;
+}
+
+function applyCircleOfRenewal(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "circleOfRenewal") {
+    return state;
+  }
+
+  const healAmount = getHealingAmount(caster, skill.effect.powerMultiplier, state);
+  let nextState = state;
+  let healedAny = false;
+
+  for (const member of getPartyMembers(state)) {
+    if (
+      !isLivingCompanion(member) ||
+      member.health >= member.maxHealth ||
+      getGridDistance(member.position, target.position) > skill.effect.radius
+    ) {
+      continue;
+    }
+
+    const result = applyCompanionHealing(nextState, member, healAmount, now, {
+      sourceId: caster.id,
+    });
+    nextState = result.state;
+    healedAny ||= result.healedAmount > 0;
+  }
+
+  if (!healedAny) {
+    return state;
+  }
+
+  const updatedTarget = nextState.entities[target.id];
+  const nextTargetHealth = isLivingCompanion(updatedTarget)
+    ? updatedTarget.health
+    : target.health;
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position: target.position,
+    now,
+    durationMs: 1000,
+  });
+  nextState = appendDebugTelemetryEvent(nextState, {
+    type: "healing_resolved",
+    entityId: caster.id,
+    targetId: target.id,
+    healingPowerRating: getCompanionDerivedStatsWithPartyBuffs(state, caster)
+      .healingPower,
+    healingMultiplier: skill.effect.powerMultiplier,
+    healingAmount: healAmount,
+    previousHealth: target.health,
+    nextHealth: nextTargetHealth,
+    skillId: skill.id,
   });
 
   return nextState;
@@ -2607,11 +2891,12 @@ function applySelfPercentHeal(
     1,
     Math.round(target.maxHealth * (skill.effect.healPercent / 100)),
   );
-  const healedTarget = {
-    ...target,
-    health: Math.min(target.maxHealth, target.health + amount),
-  };
-  let nextState = updateEntity(state, healedTarget);
+  const healResult = applyCompanionHealing(state, target, amount, now, {
+    sourceId: caster.id,
+    feedback: false,
+  });
+  let nextState = healResult.state;
+  const healedTarget = healResult.target;
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
@@ -2624,7 +2909,10 @@ function applySelfPercentHeal(
   nextState = addCombatFeedback(nextState, {
     type: "heal",
     entityId: target.id,
-    text: `+${healedTarget.health - target.health} HP`,
+    amount: healResult.healedAmount,
+    sourceEntityId: caster.id,
+    targetEntityId: target.id,
+    text: `+${healResult.healedAmount} HP`,
     now,
   });
   nextState = appendDebugTelemetryEvent(nextState, {
@@ -2632,7 +2920,7 @@ function applySelfPercentHeal(
     entityId: caster.id,
     targetId: target.id,
     healingMultiplier: skill.effect.healPercent / 100,
-    healingAmount: healedTarget.health - target.health,
+    healingAmount: healResult.healedAmount,
     previousHealth: target.health,
     nextHealth: healedTarget.health,
     skillId: skill.id,

@@ -73,7 +73,14 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   leyline_matrix: "leyline_matrix_skill_book",
   stone_sigil_rhythm: "stone_sigil_rhythm_skill_book",
   rune_step: "rune_step_skill_book",
+  blinding_ray: "blinding_ray_skill_book",
   light_mend: "light_mend_skill_book",
+  sanctuary_veil: "sanctuary_veil_skill_book",
+  guiding_light: "guiding_light_skill_book",
+  radiant_benediction: "radiant_benediction_skill_book",
+  herbalist_hymn: "herbalist_hymn_skill_book",
+  dawn_step: "dawn_step_skill_book",
+  circle_of_renewal: "circle_of_renewal_skill_book",
   penitents_gift: "penitents_gift_skill_book",
 };
 
@@ -430,6 +437,9 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         blocks: Math.min(3, effect.blocks + Math.floor((rank - 1) / 4)),
+        healPercentMaxHealthOnConsume: effect.healPercentMaxHealthOnConsume
+          ? effect.healPercentMaxHealthOnConsume * multiplier
+          : undefined,
       },
     };
   }
@@ -540,6 +550,38 @@ export function getScaledSkillDefinitionForCompanion(
         trapImmobilizeDurationMs:
           effect.trapImmobilizeDurationMs +
           (Math.max(1, Math.floor(rank)) - 1) * 100,
+      },
+    };
+  }
+
+  if (effect.type === "cursedRay") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        durationMs:
+          effect.durationMs + (Math.max(1, Math.floor(rank)) - 1) * 150,
+      },
+    };
+  }
+
+  if (effect.type === "healOverTime") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        durationMs:
+          effect.durationMs + (Math.max(1, Math.floor(rank)) - 1) * 1250,
+      },
+    };
+  }
+
+  if (effect.type === "circleOfRenewal") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        powerMultiplier: effect.powerMultiplier * multiplier,
       },
     };
   }

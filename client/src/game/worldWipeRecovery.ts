@@ -263,6 +263,7 @@ function resetStateToRescueHub(
     skillOverchargesByCompanionId: {},
     skillManaShieldsByCompanionId: {},
     skillFrostArmorsByCompanionId: {},
+    skillHealOverTimesByCompanionId: {},
     skillLifestealBuffsByCompanionId: {},
     skillRewindRunesByCompanionId: {},
     skillRunicFocusByCompanionId: {},
@@ -276,6 +277,7 @@ function resetStateToRescueHub(
     statusEffectsById: {},
     skillCooldownsByCompanionId: {},
     globalCooldownsByCompanionId: {},
+    lastCompanionDamageTakenAtByCompanionId: {},
     companionAoeChannelsByCasterId: {},
   };
 
