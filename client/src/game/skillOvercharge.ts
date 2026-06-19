@@ -69,6 +69,16 @@ function scaleSkillEffect(
           powerMultiplier: effect.powerMultiplier * multiplier,
         },
       };
+    case "flagellantLash":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          powerMultiplier: effect.powerMultiplier * multiplier,
+          bleedDamageAttackPowerPercent:
+            effect.bleedDamageAttackPowerPercent * multiplier,
+        },
+      };
     case "sweepingDamage":
       return {
         ...skill,
@@ -250,6 +260,40 @@ function scaleSkillEffect(
         effect: {
           ...effect,
           disarmDurationMs: Math.round(effect.disarmDurationMs * multiplier),
+        },
+      };
+    case "whipPrison":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          bleedDamageAttackPowerPercent:
+            effect.bleedDamageAttackPowerPercent * multiplier,
+        },
+      };
+    case "sacrificeHeal":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          healSacrificeMultiplier: effect.healSacrificeMultiplier * multiplier,
+        },
+      };
+    case "eternalHope":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          healSacrificeMultiplier: effect.healSacrificeMultiplier * multiplier,
+          mitigationPercent: effect.mitigationPercent * multiplier,
+        },
+      };
+    case "atonementStep":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          healSacrificeMultiplier: effect.healSacrificeMultiplier * multiplier,
         },
       };
     case "healOverTime":

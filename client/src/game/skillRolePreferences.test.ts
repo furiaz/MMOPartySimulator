@@ -114,6 +114,20 @@ describe("skill role preferences", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("keeps Penitent strongest for Support while preserving offensive and gathering tools", () => {
+    expect(
+      getSkillRoleScore("support", SKILL_DEFINITIONS.penitents_gift.tags),
+    ).toBeGreaterThan(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.penitents_gift.tags),
+    );
+    expect(
+      getSkillRoleScore("fighter", SKILL_DEFINITIONS.flagellant_lash.tags),
+    ).toBeGreaterThan(0);
+    expect(
+      getSkillRoleScore("gatherer", SKILL_DEFINITIONS.woodcutting_penance.tags),
+    ).toBeGreaterThan(0);
+  });
+
   it("keeps Beginner skills scoped to Beginner class lookup", () => {
     expect(getSkillsForClass("beginner").map((skill) => skill.id)).toEqual([
       "throw_rock",
@@ -184,6 +198,26 @@ describe("skill role preferences", () => {
       "leyline_matrix",
       "stone_sigil_rhythm",
       "rune_step",
+    ]);
+    expect(getSkillsForClass("lightbearer").map((skill) => skill.id)).toEqual([
+      "blinding_ray",
+      "light_mend",
+      "sanctuary_veil",
+      "guiding_light",
+      "radiant_benediction",
+      "herbalist_hymn",
+      "dawn_step",
+      "circle_of_renewal",
+    ]);
+    expect(getSkillsForClass("penitent").map((skill) => skill.id)).toEqual([
+      "whip_prison",
+      "flagellant_lash",
+      "martyrs_veil",
+      "penitents_gift",
+      "eternal_hope",
+      "burdened_benediction",
+      "woodcutting_penance",
+      "atonement_step",
     ]);
   });
 });

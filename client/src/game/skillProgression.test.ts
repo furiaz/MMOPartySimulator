@@ -94,6 +94,17 @@ const LIGHTBEARER_SKILL_IDS: SkillId[] = [
   "circle_of_renewal",
 ];
 
+const PENITENT_SKILL_IDS: SkillId[] = [
+  "whip_prison",
+  "flagellant_lash",
+  "martyrs_veil",
+  "penitents_gift",
+  "eternal_hope",
+  "burdened_benediction",
+  "woodcutting_penance",
+  "atonement_step",
+];
+
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
     expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
@@ -154,6 +165,13 @@ describe("skill progression", () => {
       herbalist_hymn: 5,
       dawn_step: 5,
       circle_of_renewal: 5,
+      whip_prison: 5,
+      flagellant_lash: 5,
+      martyrs_veil: 5,
+      eternal_hope: 5,
+      burdened_benediction: 5,
+      woodcutting_penance: 5,
+      atonement_step: 5,
     });
 
     const kick = getScaledSkillDefinitionForCompanion(
@@ -335,6 +353,34 @@ describe("skill progression", () => {
     const circleOfRenewal = getScaledSkillDefinitionForCompanion(
       companion,
       SKILL_DEFINITIONS.circle_of_renewal,
+    );
+    const whipPrison = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.whip_prison,
+    );
+    const flagellantLash = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.flagellant_lash,
+    );
+    const martyrsVeil = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.martyrs_veil,
+    );
+    const eternalHope = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.eternal_hope,
+    );
+    const burdenedBenediction = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.burdened_benediction,
+    );
+    const woodcuttingPenance = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.woodcutting_penance,
+    );
+    const atonementStep = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.atonement_step,
     );
 
     expect(kick.effect.type).toBe("lungeDamage");
@@ -556,6 +602,42 @@ describe("skill progression", () => {
     expect(circleOfRenewal.effect.type).toBe("circleOfRenewal");
     if (circleOfRenewal.effect.type === "circleOfRenewal") {
       expect(circleOfRenewal.effect.powerMultiplier).toBeCloseTo(1.2);
+    }
+    expect(whipPrison.effect.type).toBe("whipPrison");
+    if (whipPrison.effect.type === "whipPrison") {
+      expect(whipPrison.effect.bleedDamageAttackPowerPercent).toBeCloseTo(12);
+    }
+    expect(flagellantLash.effect.type).toBe("flagellantLash");
+    if (flagellantLash.effect.type === "flagellantLash") {
+      expect(flagellantLash.effect.powerMultiplier).toBeCloseTo(1.44);
+      expect(flagellantLash.effect.bleedDamageAttackPowerPercent).toBeCloseTo(12);
+    }
+    expect(martyrsVeil.effect.type).toBe("sacrificialBarrier");
+    if (martyrsVeil.effect.type === "sacrificialBarrier") {
+      expect(martyrsVeil.effect.blocks).toBe(3);
+    }
+    expect(eternalHope.effect.type).toBe("eternalHope");
+    if (eternalHope.effect.type === "eternalHope") {
+      expect(eternalHope.cooldownMs).toBe(15000);
+      expect(eternalHope.effect.healSacrificeMultiplier).toBeCloseTo(2.5);
+    }
+    expect(burdenedBenediction.effect.type).toBe("partyClassBuff");
+    if (burdenedBenediction.effect.type === "partyClassBuff") {
+      expect(
+        burdenedBenediction.effect.primaryStatBonusPercentByStat?.wisdom,
+      ).toBeCloseTo(10);
+      expect(
+        burdenedBenediction.effect.primaryStatBonusPercentByStat?.constitution,
+      ).toBeCloseTo(10);
+    }
+    expect(woodcuttingPenance.effect.type).toBe("gatherBuff");
+    if (woodcuttingPenance.effect.type === "gatherBuff") {
+      expect(woodcuttingPenance.effect.bonusGatherSpeed).toBeCloseTo(2.4);
+      expect(woodcuttingPenance.effect.resourceType).toBe("wood");
+    }
+    expect(atonementStep.effect.type).toBe("atonementStep");
+    if (atonementStep.effect.type === "atonementStep") {
+      expect(atonementStep.effect.healSacrificeMultiplier).toBeCloseTo(1.2);
     }
   });
 
@@ -816,6 +898,39 @@ describe("skill progression", () => {
     expect(getCompanionSkillRank(nextCompanion, "circle_of_renewal")).toBe(2);
   });
 
+  it("reads new Penitent skill books for eligible Penitent companions", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      "penitent",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "atonement_step_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "atonement_step_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "atonement_step",
+      previousRank: 1,
+      newRank: 2,
+      maxRank: 5,
+    });
+    expect(getCompanionSkillRank(nextCompanion, "atonement_step")).toBe(2);
+  });
+
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
     const companion = withSkillRanks(
       createCompanion("companion", { x: 0, y: 0 }, "companion"),
@@ -1006,6 +1121,21 @@ describe("skill progression", () => {
 
     expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
       ...LIGHTBEARER_SKILL_IDS,
+    ]);
+  });
+
+  it("keeps Penitent current-class skills ordered in the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      "penitent",
+    );
+
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...PENITENT_SKILL_IDS,
     ]);
   });
 

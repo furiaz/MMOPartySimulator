@@ -21,6 +21,14 @@ export const DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT = 30;
 export const BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT = 50;
 export const LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT = 80;
+export const DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT = 20;
+export const SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT = 50;
+export const DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT = 50;
+export const PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT = 80;
+export const DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT = 30;
+export const PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT = 30;
+export const DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT = 60;
+export const ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT = 80;
 export const DEFAULT_MOBILITY_SKILL_USE_MODE: MobilitySkillUseMode = "offensive";
 export const DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT = 30;
 export const DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT = 30;
@@ -67,6 +75,13 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
     bloodFeastUseHpThresholdPercent: DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
     lightMendAllyHealHpThresholdPercent:
       DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+    selfSacrificeSafetyFloorPercent:
+      DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT,
+    penitentsGiftAllyHealHpThresholdPercent:
+      DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+    penitentsGiftSelfHealHpThresholdPercent:
+      DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT,
+    eternalHopeUseHpThresholdPercent: DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT,
     mobilitySkillUseMode: DEFAULT_MOBILITY_SKILL_USE_MODE,
     defensiveMobilityUseHpThresholdPercent:
       DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
@@ -121,6 +136,26 @@ export function getCompanionSkillBehavior(
       storedBehavior.lightMendAllyHealHpThresholdPercent ??
         DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
       LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    selfSacrificeSafetyFloorPercent: clampHpThresholdPercent(
+      storedBehavior.selfSacrificeSafetyFloorPercent ??
+        DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT,
+      SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT,
+    ),
+    penitentsGiftAllyHealHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.penitentsGiftAllyHealHpThresholdPercent ??
+        DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+      PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    penitentsGiftSelfHealHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.penitentsGiftSelfHealHpThresholdPercent ??
+        DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT,
+      PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+    ),
+    eternalHopeUseHpThresholdPercent: clampHpThresholdPercent(
+      storedBehavior.eternalHopeUseHpThresholdPercent ??
+        DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT,
+      ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT,
     ),
     mobilitySkillUseMode: normalizeMobilitySkillUseMode(
       storedBehavior.mobilitySkillUseMode,
@@ -205,6 +240,32 @@ export function updateCompanionSkillBehavior(
           update.lightMendAllyHealHpThresholdPercent ??
             getCompanionSkillBehavior(companion).lightMendAllyHealHpThresholdPercent,
           LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      selfSacrificeSafetyFloorPercent:
+        clampHpThresholdPercent(
+          update.selfSacrificeSafetyFloorPercent ??
+            getCompanionSkillBehavior(companion).selfSacrificeSafetyFloorPercent,
+          SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT,
+        ),
+      penitentsGiftAllyHealHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.penitentsGiftAllyHealHpThresholdPercent ??
+            getCompanionSkillBehavior(companion)
+              .penitentsGiftAllyHealHpThresholdPercent,
+          PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      penitentsGiftSelfHealHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.penitentsGiftSelfHealHpThresholdPercent ??
+            getCompanionSkillBehavior(companion)
+              .penitentsGiftSelfHealHpThresholdPercent,
+          PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+        ),
+      eternalHopeUseHpThresholdPercent:
+        clampHpThresholdPercent(
+          update.eternalHopeUseHpThresholdPercent ??
+            getCompanionSkillBehavior(companion).eternalHopeUseHpThresholdPercent,
+          ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT,
         ),
       mobilitySkillUseMode: normalizeMobilitySkillUseMode(
         update.mobilitySkillUseMode ??

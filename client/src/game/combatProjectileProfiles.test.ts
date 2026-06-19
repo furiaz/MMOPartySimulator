@@ -49,8 +49,17 @@ describe("combat projectile profiles", () => {
       0,
       "lightbearer",
     );
+    const penitent = createCompanion(
+      "penitent",
+      { x: 0, y: 0 },
+      "penitent",
+      "support",
+      0,
+      "penitent",
+    );
 
     expect(getCompanionBasicProjectileProfile(beginner)).toBeNull();
+    expect(getCompanionBasicProjectileProfile(penitent)).toBeNull();
     expect(getCompanionBasicProjectileProfile(hunter)).toEqual({
       damageType: "physical",
       powerMultiplier: 1,

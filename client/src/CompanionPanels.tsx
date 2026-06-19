@@ -20,14 +20,22 @@ import {
   DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_MOBILITY_SKILL_USE_MODE,
   DEFAULT_OVERCHARGE_ENABLED,
+  DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT,
+  DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
   BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
   CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT,
   DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
+  ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
   SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
+  SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT,
   DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
   DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
   DEFAULT_SUPPORT_FOCUS,
@@ -641,6 +649,30 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
   if (effect.type === "dawnStep") {
     return `Moves ${effect.distance} spaces and disarms nearby enemies.`;
+  }
+
+  if (effect.type === "whipPrison") {
+    return `Locks the caster and target for ${Math.round(effect.controlDurationMs / 1000)}s and applies bleed.`;
+  }
+
+  if (effect.type === "flagellantLash") {
+    return `Costs ${Math.round(effect.hpCostCurrentPercent)}% current HP, deals ${Math.round(effect.powerMultiplier * 100)}% physical damage, and applies bleed.`;
+  }
+
+  if (effect.type === "sacrificialBarrier") {
+    return `Costs ${Math.round(effect.hpCostCurrentPercent)}% current HP and grants an ally barrier for ${effect.blocks} hits.`;
+  }
+
+  if (effect.type === "sacrificeHeal") {
+    return `Sacrifices ${Math.round(effect.hpCostCurrentPercent)}% current HP and heals for ${Math.round(effect.healSacrificeMultiplier * 100)}% of the sacrifice.`;
+  }
+
+  if (effect.type === "eternalHope") {
+    return `Sacrifices ${Math.round(effect.hpCostCurrentPercent)}% current HP for self mitigation and healing over time.`;
+  }
+
+  if (effect.type === "atonementStep") {
+    return `Costs ${Math.round(effect.hpCostCurrentPercent)}% current HP, moves ${effect.distance} spaces, and heals or disarms nearby targets.`;
   }
 
   if (effect.type === "fireBurst") {
@@ -1663,6 +1695,18 @@ function SkillPreferencesSection({
   const lightMendAllyThreshold =
     member.skillBehavior.lightMendAllyHealHpThresholdPercent ??
     DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT;
+  const selfSacrificeSafetyFloor =
+    member.skillBehavior.selfSacrificeSafetyFloorPercent ??
+    DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT;
+  const penitentsGiftAllyThreshold =
+    member.skillBehavior.penitentsGiftAllyHealHpThresholdPercent ??
+    DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT;
+  const penitentsGiftSelfThreshold =
+    member.skillBehavior.penitentsGiftSelfHealHpThresholdPercent ??
+    DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT;
+  const eternalHopeThreshold =
+    member.skillBehavior.eternalHopeUseHpThresholdPercent ??
+    DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT;
   const mobilitySkillUseMode =
     member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
   const defensiveMobilityThreshold =
@@ -1704,7 +1748,8 @@ function SkillPreferencesSection({
       skill.id === "pounce" ||
       skill.id === "flame_step" ||
       skill.id === "rune_step" ||
-      skill.id === "dawn_step"
+      skill.id === "dawn_step" ||
+      skill.id === "atonement_step"
     ),
   );
   const hasOvercharge = learnedSkillGroups.some((group) =>
@@ -1730,8 +1775,32 @@ function SkillPreferencesSection({
   const hasCircleOfRenewal = learnedSkillGroups.some((group) =>
     group.skills.some((skill) => skill.id === "circle_of_renewal"),
   );
+  const hasPenitentSelfCostSkill = learnedSkillGroups.some((group) =>
+    group.skills.some(
+      (skill) =>
+        skill.id === "flagellant_lash" ||
+        skill.id === "martyrs_veil" ||
+        skill.id === "penitents_gift" ||
+        skill.id === "eternal_hope" ||
+        skill.id === "atonement_step",
+    ),
+  );
+  const hasPenitentsGift = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "penitents_gift"),
+  );
+  const hasEternalHope = learnedSkillGroups.some((group) =>
+    group.skills.some((skill) => skill.id === "eternal_hope"),
+  );
+  const hasPenitentSupportSkill = learnedSkillGroups.some((group) =>
+    group.skills.some(
+      (skill) => skill.id === "martyrs_veil" || skill.id === "penitents_gift",
+    ),
+  );
   const shouldShowSupportFocus =
-    member.role === "support" || hasFrostArmor || hasLightbearerSupportSkill;
+    member.role === "support" ||
+    hasFrostArmor ||
+    hasLightbearerSupportSkill ||
+    hasPenitentSupportSkill;
   const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
 
   return (
@@ -1950,6 +2019,126 @@ function SkillPreferencesSection({
             <strong>{lightMendAllyThreshold}%</strong>
           </label>
         ) : null}
+        {hasPenitentSelfCostSkill ? (
+          <label className="behavior-range-row">
+            <span>Self-Sacrifice Safety Floor</span>
+            <input
+              max={SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  selfSacrificeSafetyFloorPercent: Number(event.target.value),
+                })
+              }
+              type="range"
+              value={selfSacrificeSafetyFloor}
+            />
+            <input
+              max={SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  selfSacrificeSafetyFloorPercent: Number(event.target.value),
+                })
+              }
+              type="number"
+              value={selfSacrificeSafetyFloor}
+            />
+            <strong>{selfSacrificeSafetyFloor}%</strong>
+          </label>
+        ) : null}
+        {hasPenitentsGift ? (
+          <>
+            <label className="behavior-range-row">
+              <span>Penitent's Gift Ally HP Threshold</span>
+              <input
+                max={PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    penitentsGiftAllyHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="range"
+                value={penitentsGiftAllyThreshold}
+              />
+              <input
+                max={PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    penitentsGiftAllyHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="number"
+                value={penitentsGiftAllyThreshold}
+              />
+              <strong>{penitentsGiftAllyThreshold}%</strong>
+            </label>
+            <label className="behavior-range-row">
+              <span>Penitent's Gift Self HP Threshold</span>
+              <input
+                max={PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    penitentsGiftSelfHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="range"
+                value={penitentsGiftSelfThreshold}
+              />
+              <input
+                max={PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
+                min={1}
+                onChange={(event) =>
+                  onChangeSkillBehavior(member.id, {
+                    penitentsGiftSelfHealHpThresholdPercent: Number(
+                      event.target.value,
+                    ),
+                  })
+                }
+                type="number"
+                value={penitentsGiftSelfThreshold}
+              />
+              <strong>{penitentsGiftSelfThreshold}%</strong>
+            </label>
+          </>
+        ) : null}
+        {hasEternalHope ? (
+          <label className="behavior-range-row">
+            <span>Eternal Hope Use Threshold</span>
+            <input
+              max={ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  eternalHopeUseHpThresholdPercent: Number(event.target.value),
+                })
+              }
+              type="range"
+              value={eternalHopeThreshold}
+            />
+            <input
+              max={ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT}
+              min={1}
+              onChange={(event) =>
+                onChangeSkillBehavior(member.id, {
+                  eternalHopeUseHpThresholdPercent: Number(event.target.value),
+                })
+              }
+              type="number"
+              value={eternalHopeThreshold}
+            />
+            <strong>{eternalHopeThreshold}%</strong>
+          </label>
+        ) : null}
         {hasOvercharge ? (
           <label className="behavior-toggle-row">
             <span>Overcharge</span>
@@ -2025,7 +2214,7 @@ function SkillPreferencesSection({
         {shouldShowSupportFocus ? (
           <div className="behavior-choice-row">
             <span>
-              {hasFrostArmor || hasLightbearerSupportSkill
+              {hasFrostArmor || hasLightbearerSupportSkill || hasPenitentSupportSkill
                 ? "Support Skill Focus"
                 : "Support Focus"}
             </span>
@@ -2178,6 +2367,9 @@ function SkillPreferencesSection({
         !hasFakeDeath &&
         !hasBloodFeast &&
         !hasLightMend &&
+        !hasPenitentSelfCostSkill &&
+        !hasPenitentsGift &&
+        !hasEternalHope &&
         !hasMobilitySkill &&
         !hasOvercharge &&
         !shouldShowSupportFocus &&

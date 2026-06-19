@@ -235,6 +235,14 @@ function resolveSkillEffectOnce(
     );
   }
 
+  if (skill.effect.type === "sacrificialBarrier" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applySacrificialBarrier(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
   if (skill.effect.type === "rewindRune" && isLivingCompanion(target)) {
     return resolveAppliedSkillEffect(
       state,
@@ -317,6 +325,32 @@ function resolveSkillEffectOnce(
     }
 
     return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
+  if (skill.effect.type === "atonementStep") {
+    const appliedState = applyAtonementStep(state, caster, target, skill, now);
+
+    if (!appliedState) {
+      return skipSkillEffect(state);
+    }
+
+    return consumeSkillEffect(appliedState, target?.id ?? caster.id);
+  }
+
+  if (skill.effect.type === "whipPrison" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyWhipPrison(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "flagellantLash" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyFlagellantLash(state, caster, target, skill, now),
+      target.id,
+    );
   }
 
   if (skill.effect.type === "cursedRay" && isLivingEnemy(target)) {
@@ -464,6 +498,22 @@ function resolveSkillEffectOnce(
       state,
       applySelfPercentHeal(state, caster, target, skill, now),
       target.id,
+    );
+  }
+
+  if (skill.effect.type === "sacrificeHeal" && isLivingCompanion(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applySacrificeHeal(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "eternalHope") {
+    return resolveAppliedSkillEffect(
+      state,
+      applyEternalHope(state, caster, skill, now),
+      caster.id,
     );
   }
 
@@ -1441,6 +1491,72 @@ function applyBarrierBlock(
   nextState = addCombatFeedback(nextState, {
     type: "attack",
     entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applySacrificialBarrier(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "sacrificialBarrier") {
+    return state;
+  }
+
+  const sacrifice = applyCurrentHpSacrifice(
+    state,
+    caster,
+    skill.effect.hpCostCurrentPercent,
+    { respectSafetyFloor: true },
+  );
+
+  if (!sacrifice) {
+    return state;
+  }
+
+  const currentTarget = sacrifice.state.entities[target.id];
+
+  if (!isLivingCompanion(currentTarget)) {
+    return state;
+  }
+
+  const barrierPlacement = getShieldPlacement(sacrifice.state, currentTarget);
+  const barrierId = `${currentTarget.id}-${skill.id}`;
+  let nextState: GameState = {
+    ...sacrifice.state,
+    skillShieldBlocksById: {
+      ...(sacrifice.state.skillShieldBlocksById ?? {}),
+      [barrierId]: {
+        id: barrierId,
+        ownerId: currentTarget.id,
+        position: barrierPlacement.position,
+        rotationRadians: barrierPlacement.rotationRadians,
+        expiresAt: now + skill.effect.durationMs,
+        remainingBlocks: skill.effect.blocks,
+        blockedDamageTypes: skill.effect.blockedDamageTypes,
+        sourceId: caster.id,
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: currentTarget.id,
+    position: barrierPlacement.position,
+    now,
+    durationMs: 600,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: currentTarget.id,
     text: skill.displayName,
     now,
   });
@@ -2692,6 +2808,139 @@ function applyBind(
   return nextState;
 }
 
+function applyAtonementStep(
+  state: GameState,
+  caster: Companion,
+  target: Enemy | Companion | undefined,
+  skill: SkillDefinition,
+  now: number,
+): GameState | null {
+  if (skill.effect.type !== "atonementStep" || !isLivingEnemy(target)) {
+    return null;
+  }
+
+  const effect = skill.effect;
+  const useMode = getCompanionSkillBehavior(caster).mobilitySkillUseMode;
+  const direction =
+    useMode === "offensive"
+      ? getDirectionToward(caster, target)
+      : getDirectionAwayFrom(caster, target);
+  const position = getSkillDashPosition(
+    state,
+    caster,
+    direction,
+    skill.effect.distance,
+    { allowAngles: true },
+  );
+
+  if (!position) {
+    return null;
+  }
+
+  if (
+    isCompanionAssignedToResurrectionRecovery(state, caster.id) &&
+    !isPositionInActiveResurrectionArea(state, position)
+  ) {
+    return null;
+  }
+
+  const effectPosition = useMode === "offensive" ? position : caster.position;
+  const healTargets =
+    useMode === "defensive"
+      ? getPartyMembers(state).filter(
+        (member) =>
+          member.id !== caster.id &&
+          isLivingCompanion(member) &&
+          member.health < member.maxHealth &&
+          getGridDistance(member.position, effectPosition) <=
+              effect.healRadius,
+        )
+      : [];
+  const affectedEnemies =
+    useMode === "offensive"
+      ? Object.values(state.entities).filter(
+          (entity): entity is Enemy =>
+            isLivingEnemy(entity) &&
+            getGridDistance(entity.position, effectPosition) <=
+              effect.disarmRadius,
+        )
+      : [];
+
+  if (
+    (useMode === "offensive" && affectedEnemies.length === 0) ||
+    (useMode === "defensive" && healTargets.length === 0)
+  ) {
+    return null;
+  }
+
+  const sacrifice = applyCurrentHpSacrifice(
+    state,
+    caster,
+    skill.effect.hpCostCurrentPercent,
+    { respectSafetyFloor: true },
+  );
+
+  if (!sacrifice) {
+    return null;
+  }
+
+  let nextState = updateEntity(sacrifice.state, {
+    ...sacrifice.caster,
+    position,
+  });
+
+  if (useMode === "offensive") {
+    for (const enemy of affectedEnemies) {
+      nextState = applyStatusEffect(
+        nextState,
+        {
+          type: "disarmed",
+          targetId: enemy.id,
+            durationMs: effect.disarmDurationMs,
+          sourceId: caster.id,
+          sourceKey: skill.id,
+        },
+        now,
+      );
+    }
+  } else {
+    const healAmount = Math.max(
+      1,
+      Math.round(sacrifice.sacrificedHp * skill.effect.healSacrificeMultiplier),
+    );
+
+    for (const healTarget of healTargets) {
+      const currentTarget = nextState.entities[healTarget.id];
+
+      if (!isLivingCompanion(currentTarget)) {
+        continue;
+      }
+
+      nextState = applyCompanionHealing(nextState, currentTarget, healAmount, now, {
+        sourceId: caster.id,
+      }).state;
+    }
+  }
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    position: effectPosition,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
 function applyCursedRay(
   state: GameState,
   caster: Companion,
@@ -2929,12 +3178,209 @@ function applySelfPercentHeal(
   return nextState;
 }
 
+function applySacrificeHeal(
+  state: GameState,
+  caster: Companion,
+  target: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "sacrificeHeal") {
+    return state;
+  }
+
+  const sacrifice = applyCurrentHpSacrifice(
+    state,
+    caster,
+    skill.effect.hpCostCurrentPercent,
+    { respectSafetyFloor: target.id !== caster.id },
+  );
+
+  if (!sacrifice) {
+    return state;
+  }
+
+  const currentTarget = sacrifice.state.entities[target.id];
+
+  if (!isLivingCompanion(currentTarget) || currentTarget.health >= currentTarget.maxHealth) {
+    return state;
+  }
+
+  const healAmount = Math.max(
+    1,
+    Math.round(sacrifice.sacrificedHp * skill.effect.healSacrificeMultiplier),
+  );
+  const healResult = applyCompanionHealing(
+    sacrifice.state,
+    currentTarget,
+    healAmount,
+    now,
+    { sourceId: caster.id, feedback: false },
+  );
+  let nextState = healResult.state;
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: currentTarget.id,
+    now,
+    durationMs: 1000,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "heal",
+    entityId: currentTarget.id,
+    amount: healResult.healedAmount,
+    sourceEntityId: caster.id,
+    targetEntityId: currentTarget.id,
+    text: `+${healResult.healedAmount} HP`,
+    now,
+  });
+  nextState = appendDebugTelemetryEvent(nextState, {
+    type: "healing_resolved",
+    entityId: caster.id,
+    targetId: currentTarget.id,
+    healingMultiplier: skill.effect.healSacrificeMultiplier,
+    healingAmount: healResult.healedAmount,
+    previousHealth: currentTarget.health,
+    nextHealth: healResult.target.health,
+    skillId: skill.id,
+  });
+
+  return nextState;
+}
+
+function applyEternalHope(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (
+    skill.effect.type !== "eternalHope" ||
+    state.skillSelfMitigationBuffsByCompanionId?.[caster.id] ||
+    state.skillHealOverTimesByCompanionId?.[caster.id]
+  ) {
+    return state;
+  }
+
+  const sacrifice = applyCurrentHpSacrifice(
+    state,
+    caster,
+    skill.effect.hpCostCurrentPercent,
+    { respectSafetyFloor: false },
+  );
+
+  if (!sacrifice) {
+    return state;
+  }
+
+  const tickCount = Math.max(
+    1,
+    Math.floor(skill.effect.durationMs / skill.effect.tickIntervalMs),
+  );
+  const healAmountPerTick = Math.max(
+    1,
+    Math.round(
+      (sacrifice.sacrificedHp * skill.effect.healSacrificeMultiplier) /
+        tickCount,
+    ),
+  );
+  let nextState: GameState = {
+    ...sacrifice.state,
+    skillSelfMitigationBuffsByCompanionId: {
+      ...(sacrifice.state.skillSelfMitigationBuffsByCompanionId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        sourceId: caster.id,
+        mitigationPercent: skill.effect.mitigationPercent,
+        expiresAt: now + skill.effect.durationMs,
+        mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
+      },
+    },
+    skillHealOverTimesByCompanionId: {
+      ...(sacrifice.state.skillHealOverTimesByCompanionId ?? {}),
+      [caster.id]: {
+        id: `${caster.id}-${skill.id}`,
+        targetId: caster.id,
+        sourceId: caster.id,
+        healAmountPerTick,
+        tickIntervalMs: skill.effect.tickIntervalMs,
+        nextTickAt: now + skill.effect.tickIntervalMs,
+        expiresAt: now + skill.effect.durationMs,
+      },
+    },
+  };
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "heal",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: caster.id,
+    now,
+    durationMs: 1000,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: caster.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
 function canApplyRefreshableRuntimeState(
   expiresAt: number | undefined,
   refreshWindowMs = 0,
   now: number,
 ): boolean {
   return expiresAt === undefined || expiresAt - now <= refreshWindowMs;
+}
+
+function applyCurrentHpSacrifice(
+  state: GameState,
+  caster: Companion,
+  hpCostCurrentPercent: number,
+  { respectSafetyFloor }: { respectSafetyFloor: boolean },
+): { state: GameState; caster: Companion; sacrificedHp: number } | null {
+  const currentCaster = state.entities[caster.id];
+
+  if (!isLivingCompanion(currentCaster)) {
+    return null;
+  }
+
+  const sacrificedHp = Math.max(
+    1,
+    Math.ceil(currentCaster.health * (hpCostCurrentPercent / 100)),
+  );
+  const nextHealth = currentCaster.health - sacrificedHp;
+
+  if (nextHealth < 1) {
+    return null;
+  }
+
+  if (respectSafetyFloor) {
+    const safetyFloor =
+      getCompanionSkillBehavior(currentCaster).selfSacrificeSafetyFloorPercent;
+    const nextHealthPercent =
+      currentCaster.maxHealth > 0 ? (nextHealth / currentCaster.maxHealth) * 100 : 0;
+
+    if (nextHealthPercent < safetyFloor) {
+      return null;
+    }
+  }
+
+  const nextCaster: Companion = {
+    ...currentCaster,
+    health: nextHealth,
+  };
+
+  return {
+    state: updateEntity(state, nextCaster),
+    caster: nextCaster,
+    sacrificedHp,
+  };
 }
 
 function getLivingEnemiesInRange(
@@ -2995,6 +3441,114 @@ function damageEnemy(
   return nextState;
 }
 
+function applyWhipPrison(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "whipPrison") {
+    return state;
+  }
+
+  let nextState = state;
+  const controlTargets = [caster.id, target.id];
+
+  for (const targetId of controlTargets) {
+    for (const type of ["immobilized", "disarmed", "cursed"] as const) {
+      nextState = applyStatusEffect(
+        nextState,
+        {
+          type,
+          targetId,
+          durationMs: skill.effect.controlDurationMs,
+          sourceId: caster.id,
+          sourceKey: skill.id,
+        },
+        now,
+      );
+    }
+  }
+
+  nextState = applyBleed(nextState, caster, target, {
+    durationMs: skill.effect.bleedDurationMs,
+    tickIntervalMs: skill.effect.bleedTickIntervalMs,
+    damageAttackPowerPercent: skill.effect.bleedDamageAttackPowerPercent,
+    sourceKey: skill.effect.sourceKey,
+    now,
+  });
+  nextState = updateEntity(nextState, {
+    ...target,
+    state: "attack",
+    currentTargetId: caster.id,
+  });
+  nextState = addSkillVisualEvent(nextState, {
+    type: "slash",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+  nextState = addCombatFeedback(nextState, {
+    type: "attack",
+    entityId: target.id,
+    text: skill.displayName,
+    now,
+  });
+
+  return nextState;
+}
+
+function applyFlagellantLash(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "flagellantLash") {
+    return state;
+  }
+
+  const sacrifice = applyCurrentHpSacrifice(
+    state,
+    caster,
+    skill.effect.hpCostCurrentPercent,
+    { respectSafetyFloor: true },
+  );
+
+  if (!sacrifice) {
+    return state;
+  }
+
+  const currentCaster = sacrifice.caster;
+  let nextState = damageEnemy(
+    sacrifice.state,
+    currentCaster,
+    target,
+    skill.displayName,
+    now,
+    skill.effect.damageType,
+    skill.effect.powerMultiplier,
+    true,
+  );
+  const currentTarget = nextState.entities[target.id];
+
+  if (isLivingEnemy(currentTarget)) {
+    nextState = applyBleed(nextState, currentCaster, currentTarget, {
+      durationMs: skill.effect.bleedDurationMs,
+      tickIntervalMs: skill.effect.bleedTickIntervalMs,
+      damageAttackPowerPercent: skill.effect.bleedDamageAttackPowerPercent,
+      sourceKey: skill.effect.sourceKey,
+      now,
+    });
+  }
+
+  return nextState;
+}
+
 function applyBurning(
   state: GameState,
   caster: Companion,
@@ -3022,6 +3576,42 @@ function applyBurning(
       sourceId: caster.id,
       sourceKey: skill.effect.sourceKey,
       tickIntervalMs: skill.effect.burnTickIntervalMs,
+    },
+    now,
+  );
+}
+
+function applyBleed(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  {
+    damageAttackPowerPercent,
+    durationMs,
+    now,
+    sourceKey,
+    tickIntervalMs,
+  }: {
+    damageAttackPowerPercent: number;
+    durationMs: number;
+    now: number;
+    sourceKey: string;
+    tickIntervalMs: number;
+  },
+): GameState {
+  const attack = getCompanionDerivedStatsWithPartyBuffs(state, caster).attack;
+  const tickDamage = Math.max(1, attack * (damageAttackPowerPercent / 100));
+
+  return applyStatusEffect(
+    state,
+    {
+      type: "bleed",
+      targetId: target.id,
+      durationMs,
+      tickDamage,
+      sourceId: caster.id,
+      sourceKey,
+      tickIntervalMs,
     },
     now,
   );

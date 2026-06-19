@@ -439,7 +439,14 @@ export type SkillBookItemId =
   | "herbalist_hymn_skill_book"
   | "dawn_step_skill_book"
   | "circle_of_renewal_skill_book"
-  | "penitents_gift_skill_book";
+  | "whip_prison_skill_book"
+  | "flagellant_lash_skill_book"
+  | "martyrs_veil_skill_book"
+  | "penitents_gift_skill_book"
+  | "eternal_hope_skill_book"
+  | "burdened_benediction_skill_book"
+  | "woodcutting_penance_skill_book"
+  | "atonement_step_skill_book";
 
 export type ItemId =
   | ResourceItemId
@@ -533,6 +540,10 @@ export type CompanionSkillBehavior = {
   fakeDeathUseHpThresholdPercent: number;
   bloodFeastUseHpThresholdPercent: number;
   lightMendAllyHealHpThresholdPercent: number;
+  selfSacrificeSafetyFloorPercent: number;
+  penitentsGiftAllyHealHpThresholdPercent: number;
+  penitentsGiftSelfHealHpThresholdPercent: number;
+  eternalHopeUseHpThresholdPercent: number;
   mobilitySkillUseMode: MobilitySkillUseMode;
   defensiveMobilityUseHpThresholdPercent: number;
   supportFocus: SupportFocus;
@@ -851,7 +862,14 @@ export type SkillId =
   | "herbalist_hymn"
   | "dawn_step"
   | "circle_of_renewal"
-  | "penitents_gift";
+  | "whip_prison"
+  | "flagellant_lash"
+  | "martyrs_veil"
+  | "penitents_gift"
+  | "eternal_hope"
+  | "burdened_benediction"
+  | "woodcutting_penance"
+  | "atonement_step";
 
 export type SkillTag =
   | "Offensive"
@@ -1088,6 +1106,54 @@ export type SkillDefinition = {
         radius: number;
       }
     | {
+        type: "whipPrison";
+        controlDurationMs: number;
+        bleedDurationMs: number;
+        bleedTickIntervalMs: number;
+        bleedDamageAttackPowerPercent: number;
+        sourceKey: string;
+      }
+    | {
+        type: "flagellantLash";
+        damageType: "physical";
+        powerMultiplier: number;
+        hpCostCurrentPercent: number;
+        bleedDurationMs: number;
+        bleedTickIntervalMs: number;
+        bleedDamageAttackPowerPercent: number;
+        sourceKey: string;
+      }
+    | {
+        type: "sacrificialBarrier";
+        durationMs: number;
+        blocks: number;
+        blockedDamageTypes?: CombatDamageType[];
+        hpCostCurrentPercent: number;
+      }
+    | {
+        type: "sacrificeHeal";
+        hpCostCurrentPercent: number;
+        healSacrificeMultiplier: number;
+      }
+    | {
+        type: "eternalHope";
+        hpCostCurrentPercent: number;
+        durationMs: number;
+        tickIntervalMs: number;
+        healSacrificeMultiplier: number;
+        mitigationPercent: number;
+        mitigatedDamageTypes?: CombatDamageType[];
+      }
+    | {
+        type: "atonementStep";
+        distance: number;
+        hpCostCurrentPercent: number;
+        disarmRadius: number;
+        disarmDurationMs: number;
+        healRadius: number;
+        healSacrificeMultiplier: number;
+      }
+    | {
         type: "fireBurst";
         damageType: "magic";
         powerMultiplier: number;
@@ -1247,7 +1313,8 @@ export type SkillHealOverTimeState = {
   id: string;
   targetId: string;
   sourceId: string;
-  healPercentMaxHealth: number;
+  healPercentMaxHealth?: number;
+  healAmountPerTick?: number;
   tickIntervalMs: number;
   nextTickAt: number;
   expiresAt: number;
@@ -1318,6 +1385,7 @@ export type StatusEffectType =
   | "nextAttackDamageBonus"
   | "poison"
   | "burning"
+  | "bleed"
   | "defenseBuff";
 
 export type StatusEffectBase = {
@@ -1347,7 +1415,7 @@ export type NextAttackDamageBonusStatusEffect = StatusEffectBase & {
 };
 
 export type DotStatusEffect = StatusEffectBase & {
-  type: "poison" | "burning";
+  type: "poison" | "burning" | "bleed";
   sourceKey: string;
   tickDamage: number;
   tickIntervalMs: number;
@@ -1364,6 +1432,10 @@ export type BurningStatusEffect = DotStatusEffect & {
   type: "burning";
 };
 
+export type BleedStatusEffect = DotStatusEffect & {
+  type: "bleed";
+};
+
 export type DefenseBuffStatusEffect = StatusEffectBase & {
   type: "defenseBuff";
   defenseBonusPercent: number;
@@ -1374,6 +1446,7 @@ export type StatusEffectState =
   | NextAttackDamageBonusStatusEffect
   | PoisonStatusEffect
   | BurningStatusEffect
+  | BleedStatusEffect
   | DefenseBuffStatusEffect;
 
 export type SkillCooldownState = {

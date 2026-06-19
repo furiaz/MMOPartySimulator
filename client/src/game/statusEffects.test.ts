@@ -442,6 +442,61 @@ describe("status effects", () => {
     );
   });
 
+  it("ticks bleed every second, extends same-source duration, and stacks different sources", () => {
+    const target = {
+      ...createEnemy("target", { x: 0, y: 0 }, "aggressive"),
+      health: 50,
+      maxHealth: 50,
+    };
+    let state = createState([target]);
+
+    state = applyStatusEffect(
+      state,
+      {
+        type: "bleed",
+        targetId: target.id,
+        sourceKey: "whip_prison",
+        tickDamage: 2,
+        durationMs: 3_000,
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "bleed",
+        targetId: target.id,
+        sourceKey: "whip_prison",
+        tickDamage: 1,
+        durationMs: 3_000,
+      },
+      500,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "bleed",
+        targetId: target.id,
+        sourceKey: "flagellant_lash",
+        tickDamage: 3,
+        durationMs: 4_000,
+      },
+      500,
+    );
+
+    expect(state.statusEffectsById?.["target-bleed-whip_prison"]).toMatchObject({
+      tickDamage: 2,
+      expiresAt: 6_000,
+    });
+
+    const firstTick = updateStatusEffects(state, 1_500);
+
+    expect((firstTick.entities[target.id] as typeof target).health).toBe(45);
+    expect(firstTick.combatFeedbackEvents.at(-1)).toMatchObject({
+      damageType: "physical",
+    });
+  });
+
   it("drops aggro from a target and falls back to idle when nobody else can be targeted", () => {
     const target = createCompanion("target", { x: 0, y: 0 }, "target");
     const ally = createCompanion("ally", { x: 2, y: 0 }, "target");

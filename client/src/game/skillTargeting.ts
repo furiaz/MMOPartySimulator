@@ -153,6 +153,15 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "sacrificialBarrier") {
+    return canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
+      respectSafetyFloor: true,
+    }) &&
+      (hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options))
+      ? findBarrierBlockTarget(state, caster, skill.range)
+      : undefined;
+  }
+
   if (skill.effect.type === "rewindRune") {
     return hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options)
       ? findRewindRuneTarget(state, caster, skill.range, options)
@@ -222,6 +231,10 @@ export function getSkillTarget(
     return findDawnStepTarget(state, caster, skill, options);
   }
 
+  if (skill.effect.type === "atonementStep") {
+    return findAtonementStepTarget(state, caster, skill, options);
+  }
+
   if (skill.effect.type === "maulSweep") {
     return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
   }
@@ -232,6 +245,20 @@ export function getSkillTarget(
 
   if (skill.effect.type === "circleOfRenewal") {
     return findCircleOfRenewalTarget(state, caster, skill);
+  }
+
+  if (skill.effect.type === "sacrificeHeal") {
+    return findSacrificeHealTarget(state, caster, skill);
+  }
+
+  if (skill.effect.type === "eternalHope") {
+    return isEternalHopeUseThresholdActive(caster) &&
+      !hasActiveEternalHope(state, caster) &&
+      canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
+        respectSafetyFloor: false,
+      })
+      ? caster
+      : undefined;
   }
 
   if (skill.effect.type === "healOverTime") {
@@ -337,6 +364,23 @@ export function getSkillTarget(
       )
       ? enemy
       : undefined;
+  }
+
+  if (
+    skill.effect.type === "whipPrison" &&
+    (hasActiveStatusEffect(state, caster.id, skill.id) ||
+      hasActiveStatusEffect(state, enemy.id, skill.id))
+  ) {
+    return undefined;
+  }
+
+  if (
+    skill.effect.type === "flagellantLash" &&
+    !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
+      respectSafetyFloor: true,
+    })
+  ) {
+    return undefined;
   }
 
   if (
@@ -1433,6 +1477,77 @@ function findDawnStepTarget(
     : undefined;
 }
 
+function findAtonementStepTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+  options: SkillTargetOptions,
+): Enemy | undefined {
+  if (skill.effect.type !== "atonementStep") {
+    return undefined;
+  }
+
+  if (
+    !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
+      respectSafetyFloor: true,
+    })
+  ) {
+    return undefined;
+  }
+
+  const behavior = getCompanionSkillBehavior(caster);
+
+  if (behavior.mobilitySkillUseMode === "offensive") {
+    const enemy = findEnemyTarget(state, caster, skill.range, options);
+
+    return enemy &&
+      getSkillDashPosition(
+        state,
+        caster,
+        getDirectionToward(caster, enemy),
+        skill.effect.distance,
+        { allowAngles: true },
+      )
+      ? enemy
+      : undefined;
+  }
+
+  if (
+    !isDefensiveMobilityUseThresholdActive(caster) ||
+    !hasAtonementStepHealTarget(state, caster, skill.effect.healRadius)
+  ) {
+    return undefined;
+  }
+
+  const threat = findQuickStepThreat(state, caster);
+
+  return threat &&
+    isEnemyInRange(caster, threat, skill.range) &&
+    getSkillDashPosition(
+      state,
+      caster,
+      getDirectionAwayFrom(caster, threat),
+      skill.effect.distance,
+      { allowAngles: true },
+    )
+    ? threat
+    : undefined;
+}
+
+function hasAtonementStepHealTarget(
+  state: GameState,
+  caster: Companion,
+  radius: number,
+): boolean {
+  return getPartyMembers(state).some(
+    (member) =>
+      member.id !== caster.id &&
+      isLivingCompanion(member) &&
+      member.health < member.maxHealth &&
+      getGridDistance(member.position, caster.position) <= radius,
+  );
+}
+
 function findFireBurstTarget(
   state: GameState,
   caster: Companion,
@@ -1543,6 +1658,13 @@ function hasActiveLifestealBuff(state: GameState, caster: Companion): boolean {
   return Boolean(state.skillLifestealBuffsByCompanionId?.[caster.id]);
 }
 
+function hasActiveEternalHope(state: GameState, caster: Companion): boolean {
+  return Boolean(
+    state.skillSelfMitigationBuffsByCompanionId?.[caster.id] ||
+      state.skillHealOverTimesByCompanionId?.[caster.id],
+  );
+}
+
 function hasActiveHoldFast(
   state: GameState,
   caster: Companion,
@@ -1584,6 +1706,23 @@ function isBloodFeastUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
     getCompanionSkillBehavior(caster).bloodFeastUseHpThresholdPercent,
+  );
+}
+
+function isPenitentsGiftSelfUseThresholdActive(caster: Companion): boolean {
+  return (
+    caster.health < caster.maxHealth &&
+    isCompanionAtOrBelowHpThreshold(
+      caster,
+      getCompanionSkillBehavior(caster).penitentsGiftSelfHealHpThresholdPercent,
+    )
+  );
+}
+
+function isEternalHopeUseThresholdActive(caster: Companion): boolean {
+  return isCompanionAtOrBelowHpThreshold(
+    caster,
+    getCompanionSkillBehavior(caster).eternalHopeUseHpThresholdPercent,
   );
 }
 
@@ -1637,6 +1776,75 @@ function canUseRefreshableRuntimeState(
 
 function canPayHpCost(caster: Companion, hpCost: number): boolean {
   return caster.health > hpCost + LOW_HEALTH_BUFFER;
+}
+
+function findSacrificeHealTarget(
+  state: GameState,
+  caster: Companion,
+  skill: SkillDefinition,
+): Companion | undefined {
+  if (skill.effect.type !== "sacrificeHeal") {
+    return undefined;
+  }
+
+  if (
+    isPenitentsGiftSelfUseThresholdActive(caster) &&
+    canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
+      respectSafetyFloor: false,
+    })
+  ) {
+    return caster;
+  }
+
+  if (
+    !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
+      respectSafetyFloor: true,
+    })
+  ) {
+    return undefined;
+  }
+
+  const behavior = getCompanionSkillBehavior(caster);
+  const candidates = getPartyMembers(state).filter(
+    (member) =>
+      member.id !== caster.id &&
+      isLivingCompanion(member) &&
+      member.health < member.maxHealth &&
+      isCompanionAtOrBelowHpThreshold(
+        member,
+        behavior.penitentsGiftAllyHealHpThresholdPercent,
+      ) &&
+      getGridDistance(caster.position, member.position) <= skill.range,
+  );
+
+  return findFocusedSupportTarget(state, caster, candidates, behavior.supportFocus);
+}
+
+function canPayCurrentHpSacrifice(
+  caster: Companion,
+  hpCostCurrentPercent: number,
+  { respectSafetyFloor }: { respectSafetyFloor: boolean },
+): boolean {
+  const cost = Math.max(
+    1,
+    Math.ceil(caster.health * (hpCostCurrentPercent / 100)),
+  );
+  const remainingHealth = caster.health - cost;
+
+  if (remainingHealth < LOW_HEALTH_BUFFER) {
+    return false;
+  }
+
+  if (!respectSafetyFloor || caster.maxHealth <= 0) {
+    return true;
+  }
+
+  const remainingPercent = (remainingHealth / caster.maxHealth) * 100;
+
+  return (
+    remainingPercent >=
+    getCompanionSkillBehavior(caster).selfSacrificeSafetyFloorPercent
+  );
 }
 
 function isEnemyInRange(

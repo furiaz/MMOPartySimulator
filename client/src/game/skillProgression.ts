@@ -81,7 +81,14 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   herbalist_hymn: "herbalist_hymn_skill_book",
   dawn_step: "dawn_step_skill_book",
   circle_of_renewal: "circle_of_renewal_skill_book",
+  whip_prison: "whip_prison_skill_book",
+  flagellant_lash: "flagellant_lash_skill_book",
+  martyrs_veil: "martyrs_veil_skill_book",
   penitents_gift: "penitents_gift_skill_book",
+  eternal_hope: "eternal_hope_skill_book",
+  burdened_benediction: "burdened_benediction_skill_book",
+  woodcutting_penance: "woodcutting_penance_skill_book",
+  atonement_step: "atonement_step_skill_book",
 };
 
 export type ReadSkillBookFailureReason =
@@ -582,6 +589,62 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         powerMultiplier: effect.powerMultiplier * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "whipPrison") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        bleedDamageAttackPowerPercent:
+          effect.bleedDamageAttackPowerPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "flagellantLash") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        powerMultiplier: effect.powerMultiplier * multiplier,
+        bleedDamageAttackPowerPercent:
+          effect.bleedDamageAttackPowerPercent * multiplier,
+      },
+    };
+  }
+
+  if (effect.type === "sacrificialBarrier") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        blocks: Math.min(3, effect.blocks + Math.floor((rank - 1) / 4)),
+      },
+    };
+  }
+
+  if (effect.type === "eternalHope") {
+    const rankBonus = Math.max(1, Math.floor(rank)) - 1;
+
+    return {
+      ...skill,
+      cooldownMs: Math.max(15000, (skill.cooldownMs ?? 20000) - rankBonus * 1250),
+      effect: {
+        ...effect,
+        healSacrificeMultiplier: effect.healSacrificeMultiplier + rankBonus * 0.125,
+      },
+    };
+  }
+
+  if (effect.type === "atonementStep") {
+    return {
+      ...skill,
+      effect: {
+        ...effect,
+        healSacrificeMultiplier: effect.healSacrificeMultiplier * multiplier,
       },
     };
   }
