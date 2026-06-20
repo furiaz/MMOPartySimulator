@@ -355,6 +355,7 @@ export type OverheadUiBox = {
 };
 
 const overheadStatusPriority = [
+  "taunted",
   "immobilized",
   "silenced",
   "incapacitated",
@@ -365,6 +366,7 @@ const overheadStatusPriority = [
 ] satisfies StatusEffectType[];
 
 const overheadStatusLabels = {
+  taunted: "Taunted",
   immobilized: "Immobilized",
   silenced: "Silenced",
   incapacitated: "Incapacitated",
@@ -375,6 +377,11 @@ const overheadStatusLabels = {
 } satisfies Record<(typeof overheadStatusPriority)[number], string>;
 
 const overheadStatusColors = {
+  taunted: {
+    backgroundColor: 0x451a03,
+    fillColor: 0xf59e0b,
+    textColor: 0xfffbeb,
+  },
   immobilized: {
     backgroundColor: 0x1e293b,
     fillColor: 0x64748b,

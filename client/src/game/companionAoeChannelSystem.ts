@@ -65,6 +65,7 @@ export function startShieldShockwaveChannel(
         damageType: skill.effect.damageType,
         powerMultiplier: skill.effect.powerMultiplier,
         bindDurationMs: skill.effect.bindDurationMs,
+        tauntDurationMs: skill.effect.tauntDurationMs,
         startedAt: now,
         channelEndsAt: now + SHIELD_SHOCKWAVE_CHANNEL_MS,
       },
@@ -234,6 +235,17 @@ function resolveShieldShockwaveImpact(
         state: "attack",
         currentTargetId: caster.id,
       });
+      nextState = applyStatusEffect(
+        nextState,
+        {
+          type: "taunted",
+          targetId: damagedTarget.id,
+          durationMs: channel.tauntDurationMs ?? channel.bindDurationMs,
+          sourceId: caster.id,
+          sourceKey: "shield_shockwave",
+        },
+        now,
+      );
       nextState = {
         ...nextState,
         skillBindsByEnemyId: {

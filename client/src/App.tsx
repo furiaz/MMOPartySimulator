@@ -2359,6 +2359,9 @@ function App() {
     string | null
   >(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [statusPresentationTime, setStatusPresentationTime] = useState(() =>
+    Date.now(),
+  );
   const [rendererResetNonce, setRendererResetNonce] = useState(0);
   const [currencyGainFeedbackUntil, setCurrencyGainFeedbackUntil] = useState(0);
   const [directCommandFeedback, setDirectCommandFeedback] = useState<{
@@ -2857,7 +2860,9 @@ function App() {
       return;
     }
 
+    const now = Date.now();
     stopLoopRef.current = startGameLoop(setGameState);
+    setStatusPresentationTime(now);
     setIsSimulationRunning(true);
   }, []);
 
@@ -2868,6 +2873,7 @@ function App() {
 
     stopLoopRef.current();
     stopLoopRef.current = null;
+    setStatusPresentationTime(Date.now());
     setIsSimulationRunning(false);
   }, []);
 
@@ -3336,6 +3342,9 @@ function App() {
       if (now - lastUiClockAt >= uiClockIntervalMs) {
         lastUiClockAt = now;
         setCurrentTime(now);
+        if (stopLoopRef.current) {
+          setStatusPresentationTime(now);
+        }
       }
 
       const latestPositions = latestAnimatedEntityPositionsRef.current;
@@ -4521,6 +4530,7 @@ function App() {
               skillShieldBlocksById={skillShieldBlocksById}
               skillVisualEvents={skillVisualEvents}
               statusEffectsById={gameState.statusEffectsById ?? {}}
+              statusPresentationTime={statusPresentationTime}
               suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}

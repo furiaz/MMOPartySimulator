@@ -955,13 +955,22 @@ describe("overhead status presentation", () => {
           targetId: "enemy",
           type: "immobilized",
         },
+        "enemy-taunted": {
+          appliedAt: 1000,
+          expiresAt: 1800,
+          id: "enemy-taunted",
+          sourceId: "companion",
+          sourceKey: "throw_rock",
+          targetId: "enemy",
+          type: "taunted",
+        },
       },
     });
 
     expect(presentation).toMatchObject({
-      fillPercent: 0.5,
-      label: "Immobilized",
-      type: "immobilized",
+      fillPercent: 0.375,
+      label: "Taunted",
+      type: "taunted",
     });
   });
 
@@ -1013,6 +1022,33 @@ describe("overhead status presentation", () => {
       label: "Silenced",
       type: "silenced",
     });
+  });
+
+  it("decreases status fill as remaining duration runs down", () => {
+    const statusEffectsById = {
+      "enemy-taunted": {
+        appliedAt: 1000,
+        expiresAt: 4000,
+        id: "enemy-taunted",
+        sourceId: "companion",
+        sourceKey: "throw_rock",
+        targetId: "enemy",
+        type: "taunted" as const,
+      },
+    };
+    const early = getOverheadStatusPresentation({
+      entityId: "enemy",
+      now: 1500,
+      statusEffectsById,
+    });
+    const late = getOverheadStatusPresentation({
+      entityId: "enemy",
+      now: 3000,
+      statusEffectsById,
+    });
+
+    expect(early?.fillPercent).toBeCloseTo(5 / 6);
+    expect(late?.fillPercent).toBeCloseTo(1 / 3);
   });
 });
 

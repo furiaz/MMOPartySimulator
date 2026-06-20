@@ -16,7 +16,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 4,
     cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
-    effect: { type: "taunt" },
+    effect: { type: "taunt", durationMs: 3000 },
   },
   kick: {
     id: "kick",
@@ -119,7 +119,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 4,
     cooldownMs: 12000,
-    effect: { type: "taunt" },
+    effect: { type: "taunt", durationMs: 4000 },
   },
   second_wind: {
     id: "second_wind",
@@ -229,7 +229,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 4,
     cooldownMs: 12000,
-    effect: { type: "multiTaunt", maxTargets: 2 },
+    effect: { type: "multiTaunt", maxTargets: 2, durationMs: 6000 },
   },
   hold_fast: {
     id: "hold_fast",
@@ -333,6 +333,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
       powerMultiplier: 0.5,
       radius: 2,
       bindDurationMs: 1000,
+      tauntDurationMs: 5000,
     },
   },
   pinning_shot: {
@@ -461,7 +462,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 3,
     cooldownMs: 15000,
-    effect: { type: "multiTaunt", maxTargets: 2 },
+    effect: { type: "multiTaunt", maxTargets: 2, durationMs: 4000 },
   },
   blood_feast: {
     id: "blood_feast",

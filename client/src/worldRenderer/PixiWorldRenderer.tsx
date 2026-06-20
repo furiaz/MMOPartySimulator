@@ -112,6 +112,8 @@ const criticalHitBackingSize = 128;
 const deadEnemyFadeDurationMs = 2500;
 const entityFeedbackTintDurationMs = 260;
 const enemyNameplateFontSize = 10;
+const enemyNameplateStatusGap = 2;
+const enemyNameplateHealthGap = 3;
 const aggressiveEnemyNameplateColor = 0xdc2626;
 const passiveEnemyNameplateColor = 0x1f2937;
 const superiorEnemyAuraColor = 0xef4444;
@@ -142,6 +144,20 @@ const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
 const burnDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-burn.png`;
 const poisonDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-poison.png`;
 const bleedDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-bleed.png`;
+const overheadStatusLabelHeight = 10;
+const overheadStatusLabelGap = 2;
+const overheadStatusBarHeight = 8;
+const overheadStatusHealthGap = 4;
+const overheadHealthHeight = 4;
+const overheadStatusTextColor = 0xffffff;
+const overheadStatusTextStrokeColor = 0x020617;
+const overheadStatusTextStrokeWidth = 4;
+
+type EntityOverheadUiLayout = OverheadUiBox & {
+  healthY: number;
+  statusBarY: number;
+  statusLabelY: number;
+};
 
 const combatProjectileVisualProfiles: Record<
   ActiveCombatProjectile["visualProfileId"],
@@ -259,6 +275,7 @@ type PixiWorldRendererProps = {
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillVisualEvents?: SkillVisualEvent[];
   statusEffectsById?: Record<string, StatusEffectState>;
+  statusPresentationTime?: number;
   suppressMovePoiRing?: boolean;
   teleportWorkingById?: Record<string, boolean>;
   viewportSize?: ViewportSize;
@@ -440,6 +457,7 @@ type DrawWorldOptions = {
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
   statusEffectsById: Record<string, StatusEffectState>;
+  statusPresentationTime: number;
   suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
@@ -2157,22 +2175,22 @@ function drawDebugCollisionShape(
 }
 
 function drawEntityOverheadUiPass({
-  currentTime,
   entities,
   graphics,
   layer,
   managedState,
   metrics,
+  statusPresentationTime,
   statusEffectsById,
   transform,
   visibleTileBounds,
 }: {
-  currentTime: number;
   entities: GameEntity[];
   graphics: Graphics;
   layer: Container;
   managedState: ManagedRendererState;
   metrics: PixiDrawMetrics;
+  statusPresentationTime: number;
   statusEffectsById: Record<string, StatusEffectState>;
   transform: FullTransform;
   visibleTileBounds: TileBounds;
@@ -2182,7 +2200,7 @@ function drawEntityOverheadUiPass({
     .map((entity) => {
       const status = getOverheadStatusPresentation({
         entityId: entity.id,
-        now: currentTime,
+        now: statusPresentationTime,
         statusEffectsById,
       });
       const box = getEntityOverheadUiBox(entity, transform, status);
@@ -2193,7 +2211,7 @@ function drawEntityOverheadUiPass({
       (
         entry,
       ): entry is {
-        box: OverheadUiBox;
+        box: EntityOverheadUiLayout;
         entity: GameEntity;
         status: OverheadStatusPresentation | null;
       } => Boolean(entry),
@@ -2247,7 +2265,7 @@ function getEntityOverheadUiBox(
   entity: GameEntity,
   transform: FullTransform,
   status: OverheadStatusPresentation | null,
-): OverheadUiBox | null {
+): EntityOverheadUiLayout | null {
   if (
     entity.kind === "enemy" &&
     (entity.state === "dead" || entity.health <= 0)
@@ -2263,12 +2281,41 @@ function getEntityOverheadUiBox(
 
   const center = toFullPosition(entity.position, transform);
   const width = status ? 64 : Math.max(36, transform.cellPixelSize * 0.72);
-  const height = 4;
   const x = center.x - width / 2;
-  const y = center.y - transform.cellPixelSize * 0.86;
+
+  if (entity.kind === "enemy" && status) {
+    const nameplatePosition = getEnemyNameplatePosition(entity, transform);
+    const nameplateTop = nameplatePosition.y - enemyNameplateFontSize / 2;
+    const statusBarY =
+      nameplateTop - enemyNameplateStatusGap - overheadStatusBarHeight;
+    const statusLabelY =
+      statusBarY - overheadStatusLabelGap - overheadStatusLabelHeight;
+    const healthY =
+      nameplatePosition.y + enemyNameplateFontSize / 2 + enemyNameplateHealthGap;
+
+    return {
+      healthY,
+      height: healthY + overheadHealthHeight - statusLabelY,
+      statusBarY,
+      statusLabelY,
+      width,
+      x,
+      y: statusLabelY,
+    };
+  }
+
+  const y = center.y - transform.cellPixelSize * (status ? 1.05 : 0.86);
+  const statusLabelY = y;
+  const statusBarY = statusLabelY + overheadStatusLabelHeight + overheadStatusLabelGap;
+  const healthY = status
+    ? statusBarY + overheadStatusBarHeight + overheadStatusHealthGap
+    : y;
 
   return {
-    height: status ? 18 : height,
+    healthY,
+    height: healthY + overheadHealthHeight - y,
+    statusBarY,
+    statusLabelY,
     width,
     x,
     y,
@@ -2284,7 +2331,7 @@ function drawEntityOverheadUi({
   metrics,
   status,
 }: {
-  box: OverheadUiBox;
+  box: EntityOverheadUiLayout;
   entity: GameEntity;
   graphics: Graphics;
   layer: Container;
@@ -2298,8 +2345,6 @@ function drawEntityOverheadUi({
     return;
   }
 
-  const healthHeight = 4;
-  const healthY = status ? box.y + 14 : box.y;
   const healthColor =
     healthPercent <= 0.25
       ? 0xef4444
@@ -2308,31 +2353,45 @@ function drawEntityOverheadUi({
         : 0x22c55e;
 
   if (status) {
-    const statusHeight = 12;
-
     graphics
-      .roundRect(box.x, box.y, box.width, statusHeight, 3)
+      .roundRect(box.x, box.statusLabelY, box.width, overheadStatusLabelHeight, 3)
+      .fill({ color: 0x020617, alpha: 0.94 });
+    graphics
+      .roundRect(box.x, box.statusBarY, box.width, overheadStatusBarHeight, 3)
       .fill({ color: status.backgroundColor, alpha: 0.9 });
     graphics
-      .roundRect(box.x, box.y, box.width * status.fillPercent, statusHeight, 3)
+      .roundRect(
+        box.x,
+        box.statusBarY,
+        box.width * status.fillPercent,
+        overheadStatusBarHeight,
+        3,
+      )
       .fill({ color: status.fillColor, alpha: 0.95 });
 
     drawManagedFeedbackText({
-      color: status.textColor,
-      fontSize: 8,
+      color: overheadStatusTextColor,
+      fontSize: 9,
       key: `status-label:${entity.id}`,
       layer,
       managedState,
       metrics,
-      position: { x: box.x + box.width / 2, y: box.y + statusHeight / 2 },
+      position: {
+        x: box.x + box.width / 2,
+        y: box.statusLabelY + overheadStatusLabelHeight / 2,
+      },
+      strokeColor: overheadStatusTextStrokeColor,
+      strokeWidth: overheadStatusTextStrokeWidth,
       text: status.label,
     });
   }
 
   graphics
-    .rect(box.x, healthY, box.width, healthHeight)
+    .rect(box.x, box.healthY, box.width, overheadHealthHeight)
     .fill({ color: 0x0f172a, alpha: 0.9 });
-  graphics.rect(box.x, healthY, box.width * healthPercent, healthHeight).fill(healthColor);
+  graphics
+    .rect(box.x, box.healthY, box.width * healthPercent, overheadHealthHeight)
+    .fill(healthColor);
 }
 
 function getEnemyNameplateText(
@@ -2358,6 +2417,18 @@ function getEnemyNameplateColor(
     : passiveEnemyNameplateColor;
 }
 
+function getEnemyNameplatePosition(
+  enemy: Extract<GameEntity, { kind: "enemy" }>,
+  transform: FullTransform,
+) {
+  const center = toFullPosition(enemy.position, transform);
+
+  return {
+    x: center.x,
+    y: center.y - transform.cellPixelSize * 1.32,
+  };
+}
+
 function drawEnemyNameplate({
   enemy,
   layer,
@@ -2375,8 +2446,6 @@ function drawEnemyNameplate({
     return;
   }
 
-  const center = toFullPosition(enemy.position, transform);
-
   drawManagedFeedbackText({
     color: getEnemyNameplateColor(enemy),
     fontSize: enemyNameplateFontSize,
@@ -2384,10 +2453,7 @@ function drawEnemyNameplate({
     layer,
     managedState,
     metrics,
-    position: {
-      x: center.x,
-      y: center.y - transform.cellPixelSize * 1.32,
-    },
+    position: getEnemyNameplatePosition(enemy, transform),
     text: getEnemyNameplateText(enemy),
   });
 }
@@ -2831,10 +2897,14 @@ function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
 function createFeedbackText({
   color,
   fontSize = defaultFeedbackFontSize,
+  strokeColor = 0xffffff,
+  strokeWidth = 3,
   text,
 }: {
   color: number;
   fontSize?: number;
+  strokeColor?: number;
+  strokeWidth?: number;
   text: string;
 }) {
   const label = new Text({
@@ -2845,7 +2915,7 @@ function createFeedbackText({
       fontFamily: "Arial, sans-serif",
       fontSize,
       fontWeight: "700",
-      stroke: { color: 0xffffff, width: 3 },
+      stroke: { color: strokeColor, width: strokeWidth },
     },
   });
 
@@ -2854,8 +2924,18 @@ function createFeedbackText({
   return label;
 }
 
-function getFeedbackTextStyleKey(color: number, fontSize: number): string {
-  return `${color}:${fontSize}`;
+function getFeedbackTextStyleKey({
+  color,
+  fontSize,
+  strokeColor = 0xffffff,
+  strokeWidth = 3,
+}: {
+  color: number;
+  fontSize: number;
+  strokeColor?: number;
+  strokeWidth?: number;
+}): string {
+  return `${color}:${fontSize}:${strokeColor}:${strokeWidth}`;
 }
 
 function drawManagedFeedbackText({
@@ -2868,6 +2948,8 @@ function drawManagedFeedbackText({
   metrics,
   position,
   rotation = 0,
+  strokeColor,
+  strokeWidth,
   text,
 }: {
   alpha?: number;
@@ -2879,9 +2961,16 @@ function drawManagedFeedbackText({
   metrics: PixiDrawMetrics;
   position: Position;
   rotation?: number;
+  strokeColor?: number;
+  strokeWidth?: number;
   text: string;
 }) {
-  const styleKey = getFeedbackTextStyleKey(color, fontSize);
+  const styleKey = getFeedbackTextStyleKey({
+    color,
+    fontSize,
+    strokeColor,
+    strokeWidth,
+  });
   const existingEntry = managedState.texts.get(key);
 
   if (existingEntry && existingEntry.styleKey === styleKey) {
@@ -2907,7 +2996,13 @@ function drawManagedFeedbackText({
     destroyManagedTextEntry(existingEntry);
   }
 
-  const label = createFeedbackText({ color, fontSize, text });
+  const label = createFeedbackText({
+    color,
+    fontSize,
+    strokeColor,
+    strokeWidth,
+    text,
+  });
 
   label.alpha = alpha;
   label.position.set(position.x, position.y);
@@ -5228,6 +5323,7 @@ function drawFullMap({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusPresentationTime,
   statusEffectsById,
   suppressMovePoiRing,
   teleportWorkingById,
@@ -5263,6 +5359,7 @@ function drawFullMap({
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  statusPresentationTime: number;
   statusEffectsById: Record<string, StatusEffectState>;
   suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
@@ -5537,12 +5634,12 @@ function drawFullMap({
   );
 
   drawEntityOverheadUiPass({
-    currentTime,
     entities,
-    graphics: overlayGraphics,
+    graphics: layers.effectsGraphics,
     layer: layers.effectsLayer,
     managedState,
     metrics,
+    statusPresentationTime,
     statusEffectsById,
     transform,
     visibleTileBounds,
@@ -5611,6 +5708,7 @@ function drawWorld({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusPresentationTime,
   statusEffectsById,
   suppressMovePoiRing,
   teleportWorkingById,
@@ -5635,6 +5733,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      statusPresentationTime,
       statusEffectsById,
       visualMovementByEntityId,
     });
@@ -5715,6 +5814,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      statusPresentationTime,
       statusEffectsById,
       suppressMovePoiRing,
       teleportWorkingById,
@@ -5790,6 +5890,7 @@ function hasActiveTimedRendererWork({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusPresentationTime,
   statusEffectsById,
   visualMovementByEntityId,
 }: {
@@ -5807,6 +5908,7 @@ function hasActiveTimedRendererWork({
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  statusPresentationTime: number;
   statusEffectsById: Record<string, StatusEffectState>;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }): boolean {
@@ -5833,7 +5935,9 @@ function hasActiveTimedRendererWork({
     Object.values(skillShieldBlocksById).some(
       (shield) => shield.expiresAt > currentTime,
     ) ||
-    Object.values(statusEffectsById).some((status) => status.expiresAt > currentTime) ||
+    Object.values(statusEffectsById).some(
+      (status) => status.expiresAt > statusPresentationTime,
+    ) ||
     Object.values(companionAoeChannelsByCasterId).some(
       (channel) => channel.channelEndsAt > currentTime,
     ) ||
@@ -5892,6 +5996,7 @@ export function PixiWorldRenderer({
   skillShieldBlocksById = {},
   skillVisualEvents = [],
   statusEffectsById = {},
+  statusPresentationTime,
   suppressMovePoiRing = false,
   teleportWorkingById = {},
   viewportSize,
@@ -5916,7 +6021,10 @@ export function PixiWorldRenderer({
   const latestCompanionAoeChannelsByCasterIdRef = useRef(
     companionAoeChannelsByCasterId,
   );
-  const latestCurrentTimeRef = useRef(currentTime ?? 0);
+  const latestCurrentTimeRef = useRef(currentTime ?? Date.now());
+  const latestStatusPresentationTimeRef = useRef(
+    statusPresentationTime ?? currentTime ?? Date.now(),
+  );
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
   const latestEnemyAoeChannelsByCasterIdRef = useRef(enemyAoeChannelsByCasterId);
@@ -5978,6 +6086,11 @@ export function PixiWorldRenderer({
     if (currentTime !== undefined) {
       latestCurrentTimeRef.current = currentTime;
     }
+    if (statusPresentationTime !== undefined) {
+      latestStatusPresentationTimeRef.current = statusPresentationTime;
+    } else if (currentTime !== undefined) {
+      latestStatusPresentationTimeRef.current = currentTime;
+    }
     latestDirectCompanionCommandsByIdRef.current = directCompanionCommandsById;
     latestDropVisualEventsRef.current = dropVisualEvents;
     latestEnemyAoeChannelsByCasterIdRef.current = enemyAoeChannelsByCasterId;
@@ -6032,6 +6145,7 @@ export function PixiWorldRenderer({
     skillShieldBlocksById,
     skillVisualEvents,
     statusEffectsById,
+    statusPresentationTime,
     suppressMovePoiRing,
     teleportWorkingById,
     sortedEntities,
@@ -6097,6 +6211,7 @@ export function PixiWorldRenderer({
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
         skillVisualEvents: latestSkillVisualEventsRef.current,
+        statusPresentationTime: latestStatusPresentationTimeRef.current,
         statusEffectsById: latestStatusEffectsByIdRef.current,
         visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
       });
@@ -6150,6 +6265,7 @@ export function PixiWorldRenderer({
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
         skillVisualEvents: latestSkillVisualEventsRef.current,
+        statusPresentationTime: latestStatusPresentationTimeRef.current,
         statusEffectsById: latestStatusEffectsByIdRef.current,
         suppressMovePoiRing: latestSuppressMovePoiRingRef.current,
         teleportWorkingById: latestTeleportWorkingByIdRef.current,
@@ -6267,6 +6383,8 @@ export function PixiWorldRenderer({
     }
 
     latestCurrentTimeRef.current = currentTime ?? Date.now();
+    latestStatusPresentationTimeRef.current =
+      statusPresentationTime ?? currentTime ?? latestStatusPresentationTimeRef.current;
     requestRedrawRef.current();
   }, [
     activeTeleport,
@@ -6295,6 +6413,8 @@ export function PixiWorldRenderer({
     skillMarksByEnemyId,
     skillShieldBlocksById,
     skillVisualEvents,
+    statusEffectsById,
+    statusPresentationTime,
     teleportWorkingById,
     sortedEntities,
     viewportSize,

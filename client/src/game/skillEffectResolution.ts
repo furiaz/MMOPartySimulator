@@ -903,6 +903,17 @@ function applyTaunt(
       state: "attack",
       currentTargetId: caster.id,
     });
+    nextState = applyStatusEffect(
+      nextState,
+      {
+        type: "taunted",
+        targetId: currentTarget.id,
+        durationMs: skill.effect.durationMs,
+        sourceId: caster.id,
+        sourceKey: skill.id,
+      },
+      now,
+    );
   }
 
   nextState = addSkillVisualEvent(nextState, {
@@ -957,6 +968,17 @@ function applyMultiTaunt(
         state: "attack",
         currentTargetId: caster.id,
       });
+      nextState = applyStatusEffect(
+        nextState,
+        {
+          type: "taunted",
+          targetId: currentTarget.id,
+          durationMs: skill.effect.durationMs,
+          sourceId: caster.id,
+          sourceKey: skill.id,
+        },
+        now,
+      );
     }
   }
 

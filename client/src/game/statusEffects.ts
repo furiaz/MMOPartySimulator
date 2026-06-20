@@ -1,5 +1,5 @@
 import { damageEntity } from "./entities";
-import { isLivingCompanion } from "./entityGuards";
+import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getEuclideanDistance } from "./positionUtils";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
@@ -19,6 +19,7 @@ export type ApplyStatusEffectInput =
   | {
       type:
         | "immobilized"
+        | "taunted"
         | "incapacitated"
         | "disarmed"
         | "silenced"
@@ -292,6 +293,7 @@ export function updateStatusEffects(
       status.type !== "bleed"
     ) {
       if (status.expiresAt <= now) {
+        nextState = releaseExpiredTaunt(nextState, status, statusEffectsById, now);
         delete statusEffectsById[status.id];
       }
       continue;
@@ -349,6 +351,59 @@ export function updateStatusEffects(
     ...nextState,
     statusEffectsById,
   };
+}
+
+function releaseExpiredTaunt(
+  state: GameState,
+  status: {
+    id: string;
+    type: StatusEffectType;
+    targetId: string;
+    sourceId?: string;
+  },
+  statusEffectsById: Record<
+    string,
+    {
+      id: string;
+      type: StatusEffectType;
+      targetId: string;
+      sourceId?: string;
+      expiresAt: number;
+    }
+  >,
+  now: number,
+): GameState {
+  if (status.type !== "taunted" || !status.sourceId) {
+    return state;
+  }
+
+  const hasNewerTauntFromSameSource = Object.values(statusEffectsById).some(
+    (candidate) =>
+      candidate.id !== status.id &&
+      candidate.type === "taunted" &&
+      candidate.targetId === status.targetId &&
+      candidate.sourceId === status.sourceId &&
+      candidate.expiresAt > now,
+  );
+
+  if (hasNewerTauntFromSameSource) {
+    return state;
+  }
+
+  const target = state.entities[status.targetId];
+
+  if (
+    !isLivingEnemy(target) ||
+    target.currentTargetId !== status.sourceId
+  ) {
+    return state;
+  }
+
+  return updateEntity(state, {
+    ...target,
+    state: "idle",
+    currentTargetId: null,
+  });
 }
 
 export function dropAggroFromTarget(

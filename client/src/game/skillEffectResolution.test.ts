@@ -31,6 +31,29 @@ describe("skill effect resolution", () => {
     vi.restoreAllMocks();
   });
 
+  it("defines explicit taunt status durations for taunt skills", () => {
+    expect(SKILL_DEFINITIONS.throw_rock.effect).toMatchObject({
+      type: "taunt",
+      durationMs: 3000,
+    });
+    expect(SKILL_DEFINITIONS.duelist_challenge.effect).toMatchObject({
+      type: "taunt",
+      durationMs: 4000,
+    });
+    expect(SKILL_DEFINITIONS.shield_challenge.effect).toMatchObject({
+      type: "multiTaunt",
+      durationMs: 6000,
+    });
+    expect(SKILL_DEFINITIONS.shield_shockwave.effect).toMatchObject({
+      type: "shockwave",
+      tauntDurationMs: 5000,
+    });
+    expect(SKILL_DEFINITIONS.threatening_roar.effect).toMatchObject({
+      type: "multiTaunt",
+      durationMs: 4000,
+    });
+  });
+
   it("applies damage skills and enemy aggro side effects", () => {
     const caster = createSkillCompanion("caster", "fighter", { x: 0, y: 0 }, "elementalist");
     const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 200 });
@@ -616,6 +639,20 @@ describe("skill effect resolution", () => {
       state: "attack",
       currentTargetId: caster.id,
     });
+    expect(result.state.statusEffectsById?.["nearest-taunted-shield_challenge"]).toMatchObject({
+      type: "taunted",
+      sourceId: caster.id,
+      targetId: nearest.id,
+      expiresAt: 7000,
+    });
+    expect(
+      result.state.statusEffectsById?.["tied-other-taunted-shield_challenge"],
+    ).toMatchObject({
+      type: "taunted",
+      sourceId: caster.id,
+      targetId: tiedOther.id,
+      expiresAt: 7000,
+    });
     expect(result.state.entities.far).toMatchObject({
       currentTargetId: null,
     });
@@ -985,6 +1022,12 @@ describe("skill effect resolution", () => {
       state: "attack",
       currentTargetId: caster.id,
     });
+    expect(afterImpact.statusEffectsById?.["near-taunted-shield_shockwave"]).toMatchObject({
+      type: "taunted",
+      sourceId: caster.id,
+      targetId: near.id,
+      expiresAt: 1000 + SHIELD_SHOCKWAVE_CHANNEL_MS + 5000,
+    });
     expect(afterImpact.skillBindsByEnemyId?.near).toMatchObject({
       sourceId: caster.id,
       targetId: near.id,
@@ -1058,6 +1101,19 @@ describe("skill effect resolution", () => {
     expect(taunted).toMatchObject({
       state: "attack",
       currentTargetId: taunter.id,
+    });
+    expect(
+      resolveSkillEffect(
+        createSkillState([taunter, tauntEnemy]),
+        taunter,
+        createSkillUse("throw_rock", tauntEnemy),
+        1000,
+      ).state.statusEffectsById?.["taunt-enemy-taunted-throw_rock"],
+    ).toMatchObject({
+      type: "taunted",
+      sourceId: taunter.id,
+      targetId: tauntEnemy.id,
+      expiresAt: 4000,
     });
 
     const hunter = createSkillCompanion("hunter", "fighter", { x: 0, y: 0 }, "hunter");

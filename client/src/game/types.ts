@@ -959,14 +959,20 @@ export type SkillDefinition = {
         splashPowerMultiplier: number;
         splashRange: number;
       }
-    | { type: "taunt"; damageType?: CombatDamageType; powerMultiplier?: number }
-    | { type: "multiTaunt"; maxTargets: number }
+    | {
+        type: "taunt";
+        durationMs: number;
+        damageType?: CombatDamageType;
+        powerMultiplier?: number;
+      }
+    | { type: "multiTaunt"; maxTargets: number; durationMs: number }
     | {
         type: "shockwave";
         damageType: CombatDamageType;
         powerMultiplier: number;
         radius: number;
         bindDurationMs: number;
+        tauntDurationMs: number;
       }
     | { type: "pinningShot"; durationMs: number }
     | {
@@ -1377,6 +1383,7 @@ export type SkillMitigationBuffState = {
 };
 
 export type StatusEffectType =
+  | "taunted"
   | "immobilized"
   | "incapacitated"
   | "disarmed"
@@ -1401,6 +1408,7 @@ export type StatusEffectBase = {
 
 export type SimpleStatusEffect = StatusEffectBase & {
   type:
+    | "taunted"
     | "immobilized"
     | "incapacitated"
     | "disarmed"
@@ -1535,6 +1543,7 @@ export type CompanionAoeChannelState = {
   powerMultiplier: number;
   bindDurationMs?: number;
   disarmDurationMs?: number;
+  tauntDurationMs?: number;
   startedAt: number;
   channelEndsAt: number;
 };

@@ -17,7 +17,7 @@ import {
 } from "./statusEffects";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
-import type { Companion, GameEntity } from "./types";
+import type { Companion, Enemy, GameEntity } from "./types";
 
 describe("status effects", () => {
   it("applies, refreshes, expires, removes, and clears statuses", () => {
@@ -516,6 +516,39 @@ describe("status effects", () => {
       currentTargetId: ally.id,
     });
     expect(idleState.entities[enemy.id]).toMatchObject({
+      state: "idle",
+      currentTargetId: null,
+    });
+  });
+
+  it("releases forced taunt targeting when taunted expires", () => {
+    const taunter = createCompanion("taunter", { x: 0, y: 0 }, "taunter");
+    const enemy = {
+      ...createEnemy("enemy", { x: 1, y: 0 }, "aggressive"),
+      state: "attack" as const,
+      currentTargetId: taunter.id,
+    };
+    const state = applyStatusEffect(
+      createState([taunter, enemy]),
+      {
+        type: "taunted",
+        targetId: enemy.id,
+        durationMs: 3_000,
+        sourceId: taunter.id,
+        sourceKey: "throw_rock",
+      },
+      1_000,
+    );
+
+    const activeState = updateStatusEffects(state, 3_999);
+    const expiredState = updateStatusEffects(state, 4_000);
+
+    expect(activeState.entities.enemy).toMatchObject({
+      state: "attack",
+      currentTargetId: taunter.id,
+    });
+    expect(expiredState.statusEffectsById).toEqual({});
+    expect(expiredState.entities.enemy as Enemy).toMatchObject({
       state: "idle",
       currentTargetId: null,
     });
