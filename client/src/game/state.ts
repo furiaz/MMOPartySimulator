@@ -302,6 +302,7 @@ export function addCombatFeedback(
   event: {
     amount?: number;
     damageType?: CombatDamageType;
+    dotStatusType?: CombatFeedbackEvent["dotStatusType"];
     feedbackKind?: string;
     type: CombatFeedbackType;
     entityId: string;
@@ -322,6 +323,7 @@ export function addCombatFeedback(
         id: `${event.now}-${event.type}-${event.entityId}-${state.combatFeedbackEvents.length}`,
         amount: event.amount,
         damageType: event.damageType,
+        dotStatusType: event.dotStatusType,
         type: event.type,
         entityId: event.entityId,
         feedbackKind: event.feedbackKind,

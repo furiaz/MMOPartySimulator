@@ -1617,7 +1617,7 @@ describe("skill effect resolution", () => {
           sourceKey: "whip_prison",
         }),
         expect.objectContaining({
-          type: "cursed",
+          type: "silenced",
           targetId: enemy.id,
           sourceKey: "whip_prison",
         }),
@@ -1744,7 +1744,7 @@ describe("skill effect resolution", () => {
     );
   });
 
-  it("applies Lightbearer curse, HoT, party healing bonus, and area healing", () => {
+  it("applies Lightbearer silence, HoT, party healing bonus, and area healing", () => {
     const lightbearer = createSkillCompanion(
       "lightbearer",
       "support",
@@ -1778,7 +1778,7 @@ describe("skill effect resolution", () => {
 
     expect(Object.values(state.statusEffectsById ?? {})).toContainEqual(
       expect.objectContaining({
-        type: "cursed",
+        type: "silenced",
         targetId: enemy.id,
         expiresAt: 4000,
       }),

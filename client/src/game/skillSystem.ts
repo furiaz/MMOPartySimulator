@@ -744,7 +744,7 @@ function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
     case "maulSweep":
     case "arrowBurst":
     case "fireBurst":
-    case "cursedRay":
+    case "silencingRay":
     case "bind":
       return true;
     default:

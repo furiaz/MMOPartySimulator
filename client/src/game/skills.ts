@@ -805,7 +805,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 5,
     cooldownMs: 12000,
-    effect: { type: "cursedRay", durationMs: 3000 },
+    effect: { type: "silencingRay", durationMs: 3000 },
   },
   light_mend: {
     id: "light_mend",

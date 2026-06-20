@@ -573,8 +573,8 @@ describe("skill progression", () => {
     if (runeStep.effect.type === "runeStep") {
       expect(runeStep.effect.trapImmobilizeDurationMs).toBe(2400);
     }
-    expect(blindingRay.effect.type).toBe("cursedRay");
-    if (blindingRay.effect.type === "cursedRay") {
+    expect(blindingRay.effect.type).toBe("silencingRay");
+    if (blindingRay.effect.type === "silencingRay") {
       expect(blindingRay.effect.durationMs).toBe(3600);
     }
     expect(sanctuaryVeil.effect.type).toBe("barrierBlock");

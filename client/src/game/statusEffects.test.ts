@@ -68,7 +68,7 @@ describe("status effects", () => {
     state = applyStatusEffect(
       state,
       {
-        type: "cursed",
+        type: "silenced",
         targetId: companion.id,
         durationMs: 1_000,
       },
@@ -121,10 +121,10 @@ describe("status effects", () => {
       state: "attack" as const,
       currentTargetId: "target",
     };
-    const cursedDefender = createCompanion(
-      "cursed",
+    const silencedDefender = createCompanion(
+      "silenced",
       { x: 0, y: 1 },
-      "cursed",
+      "silenced",
       "defender",
     );
     const incapacitatedCollector = {
@@ -141,7 +141,7 @@ describe("status effects", () => {
     const skillTarget = createEnemy("skill-target", { x: 1, y: 1 }, "passive");
     const wood = createResource("wood", { x: 5.5, y: 5 });
     let state = createState(
-      [disarmedAttacker, cursedDefender, incapacitatedCollector, target, skillTarget, wood],
+      [disarmedAttacker, silencedDefender, incapacitatedCollector, target, skillTarget, wood],
       { partyLeaderId: disarmedAttacker.id },
     );
 
@@ -152,7 +152,7 @@ describe("status effects", () => {
     );
     state = applyStatusEffect(
       state,
-      { type: "cursed", targetId: cursedDefender.id, durationMs: 5_000 },
+      { type: "silenced", targetId: silencedDefender.id, durationMs: 5_000 },
       0,
     );
     state = applyStatusEffect(
@@ -173,7 +173,7 @@ describe("status effects", () => {
       target.health,
     );
     expect(
-      skillState.skillCooldownsByCompanionId?.[cursedDefender.id]?.throw_rock,
+      skillState.skillCooldownsByCompanionId?.[silencedDefender.id]?.throw_rock,
     ).toBeUndefined();
     expect(gatheredState.entities[wood.id]).toMatchObject({
       durability: wood.durability,
@@ -526,7 +526,7 @@ describe("status effects", () => {
     const statusState = applyStatusEffect(
       createState([companion], { partyLeaderId: companion.id }),
       {
-        type: "cursed",
+        type: "silenced",
         targetId: companion.id,
         durationMs: 5_000,
       },

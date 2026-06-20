@@ -391,7 +391,7 @@ export function getSkillTarget(
   }
 
   if (
-    skill.effect.type === "cursedRay" &&
+    skill.effect.type === "silencingRay" &&
     hasActiveStatusEffect(state, enemy.id, skill.id)
   ) {
     return undefined;

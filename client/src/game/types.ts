@@ -786,6 +786,7 @@ export type CombatFeedbackType =
 export type CombatFeedbackEvent = {
   amount?: number;
   damageType?: CombatDamageType;
+  dotStatusType?: "poison" | "burning" | "bleed";
   id: string;
   type: CombatFeedbackType;
   entityId: string;
@@ -1087,7 +1088,7 @@ export type SkillDefinition = {
         trapRadius: number;
         trapImmobilizeDurationMs: number;
       }
-    | { type: "cursedRay"; durationMs: number }
+    | { type: "silencingRay"; durationMs: number }
     | {
         type: "dawnStep";
         distance: number;
@@ -1379,7 +1380,7 @@ export type StatusEffectType =
   | "immobilized"
   | "incapacitated"
   | "disarmed"
-  | "cursed"
+  | "silenced"
   | "fakeDeath"
   | "forcedEvasion"
   | "nextAttackDamageBonus"
@@ -1403,7 +1404,7 @@ export type SimpleStatusEffect = StatusEffectBase & {
     | "immobilized"
     | "incapacitated"
     | "disarmed"
-    | "cursed"
+    | "silenced"
     | "fakeDeath"
     | "forcedEvasion";
 };

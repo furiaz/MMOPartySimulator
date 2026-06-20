@@ -42,6 +42,7 @@ import type {
   SkillMarkState,
   SkillShieldBlockState,
   SkillVisualEvent,
+  StatusEffectState,
 } from "../game";
 import {
   getEnemyAggroRange,
@@ -72,11 +73,16 @@ import {
 } from "../visualAssets";
 import {
   createRendererFrameScheduler,
+  doOverheadUiBoxesOverlap,
+  getDotDamageIconSrc,
   getFullRenderSignature,
+  getOverheadStatusPresentation,
   getPreviewRenderSignature,
   isStaticMapSpriteKey,
   shouldSkipStableRendererFrame,
   type MovementClickFeedbackEvent,
+  type OverheadStatusPresentation,
+  type OverheadUiBox,
   type PixiRendererPerformanceSample,
 } from "./PixiWorldRendererHelpers";
 
@@ -101,6 +107,7 @@ const damageNumberAnimationDurationMs = 1000;
 const damageNumberRisePixels = 32;
 const damageNumberDriftPixels = 18;
 const damageNumberRotationRadians = 0.32;
+const dotDamageIconSize = 32;
 const criticalHitBackingSize = 128;
 const deadEnemyFadeDurationMs = 2500;
 const entityFeedbackTintDurationMs = 260;
@@ -132,6 +139,9 @@ const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png`;
 const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
 const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
 const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
+const burnDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-burn.png`;
+const poisonDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-poison.png`;
+const bleedDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-bleed.png`;
 
 const combatProjectileVisualProfiles: Record<
   ActiveCombatProjectile["visualProfileId"],
@@ -248,6 +258,7 @@ type PixiWorldRendererProps = {
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
   skillShieldBlocksById?: Record<string, SkillShieldBlockState>;
   skillVisualEvents?: SkillVisualEvent[];
+  statusEffectsById?: Record<string, StatusEffectState>;
   suppressMovePoiRing?: boolean;
   teleportWorkingById?: Record<string, boolean>;
   viewportSize?: ViewportSize;
@@ -428,6 +439,7 @@ type DrawWorldOptions = {
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  statusEffectsById: Record<string, StatusEffectState>;
   suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
@@ -880,6 +892,9 @@ function collectDurableVisualTextureSrcs(): Set<string> {
     resourceHitWoodSrc,
     shieldInvulnerableGlintSrc,
     teleportPulseSrc,
+    burnDotDamageIconSrc,
+    poisonDotDamageIconSrc,
+    bleedDotDamageIconSrc,
   ]);
 
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.beginnerCharacter);
@@ -2141,32 +2156,150 @@ function drawDebugCollisionShape(
     .stroke({ color: 0x06b6d4, alpha: 0.85, width: 2 });
 }
 
-function drawHealthBar(
-  graphics: Graphics,
+function drawEntityOverheadUiPass({
+  currentTime,
+  entities,
+  graphics,
+  layer,
+  managedState,
+  metrics,
+  statusEffectsById,
+  transform,
+  visibleTileBounds,
+}: {
+  currentTime: number;
+  entities: GameEntity[];
+  graphics: Graphics;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  statusEffectsById: Record<string, StatusEffectState>;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  const entries = entities
+    .filter((entity) => isPositionInTileBounds(entity.position, visibleTileBounds))
+    .map((entity) => {
+      const status = getOverheadStatusPresentation({
+        entityId: entity.id,
+        now: currentTime,
+        statusEffectsById,
+      });
+      const box = getEntityOverheadUiBox(entity, transform, status);
+
+      return box ? { box, entity, status } : null;
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        box: OverheadUiBox;
+        entity: GameEntity;
+        status: OverheadStatusPresentation | null;
+      } => Boolean(entry),
+    );
+
+  const companionBoxes: OverheadUiBox[] = [];
+
+  for (const entry of entries.filter((candidate) => candidate.entity.kind === "companion")) {
+    drawEntityOverheadUi({
+      box: entry.box,
+      entity: entry.entity,
+      graphics,
+      layer,
+      managedState,
+      metrics,
+      status: entry.status,
+    });
+    companionBoxes.push(entry.box);
+  }
+
+  for (const entry of entries.filter((candidate) => candidate.entity.kind === "enemy")) {
+    if (companionBoxes.some((box) => doOverheadUiBoxesOverlap(box, entry.box))) {
+      continue;
+    }
+
+    drawEntityOverheadUi({
+      box: entry.box,
+      entity: entry.entity,
+      graphics,
+      layer,
+      managedState,
+      metrics,
+      status: entry.status,
+    });
+
+    if (entry.entity.kind !== "enemy") {
+      continue;
+    }
+
+    drawEnemyNameplate({
+      enemy: entry.entity,
+      layer,
+      managedState,
+      metrics,
+      transform,
+    });
+  }
+}
+
+function getEntityOverheadUiBox(
   entity: GameEntity,
   transform: FullTransform,
-) {
+  status: OverheadStatusPresentation | null,
+): OverheadUiBox | null {
   if (
     entity.kind === "enemy" &&
     (entity.state === "dead" || entity.health <= 0)
   ) {
-    return;
+    return null;
   }
 
+  const healthPercent = getEntityHealthPercent(entity);
+
+  if (healthPercent === null) {
+    return null;
+  }
+
+  const center = toFullPosition(entity.position, transform);
+  const width = status ? 64 : Math.max(36, transform.cellPixelSize * 0.72);
+  const height = 4;
+  const x = center.x - width / 2;
+  const y = center.y - transform.cellPixelSize * 0.86;
+
+  return {
+    height: status ? 18 : height,
+    width,
+    x,
+    y,
+  };
+}
+
+function drawEntityOverheadUi({
+  box,
+  entity,
+  graphics,
+  layer,
+  managedState,
+  metrics,
+  status,
+}: {
+  box: OverheadUiBox;
+  entity: GameEntity;
+  graphics: Graphics;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  status: OverheadStatusPresentation | null;
+}) {
   const healthPercent = getEntityHealthPercent(entity);
 
   if (healthPercent === null) {
     return;
   }
 
-  const center = toFullPosition(entity.position, transform);
-  const width = transform.cellPixelSize * 0.72;
-  const height = 4;
-  const x = center.x - width / 2;
-  const y =
-    entity.kind === "companion"
-      ? center.y + transform.cellPixelSize * 0.68
-      : center.y - transform.cellPixelSize * 0.48;
+  const healthHeight = 4;
+  const healthY = status ? box.y + 14 : box.y;
   const healthColor =
     healthPercent <= 0.25
       ? 0xef4444
@@ -2174,8 +2307,32 @@ function drawHealthBar(
         ? 0xfacc15
         : 0x22c55e;
 
-  graphics.rect(x, y, width, height).fill({ color: 0x0f172a, alpha: 0.9 });
-  graphics.rect(x, y, width * healthPercent, height).fill(healthColor);
+  if (status) {
+    const statusHeight = 12;
+
+    graphics
+      .roundRect(box.x, box.y, box.width, statusHeight, 3)
+      .fill({ color: status.backgroundColor, alpha: 0.9 });
+    graphics
+      .roundRect(box.x, box.y, box.width * status.fillPercent, statusHeight, 3)
+      .fill({ color: status.fillColor, alpha: 0.95 });
+
+    drawManagedFeedbackText({
+      color: status.textColor,
+      fontSize: 8,
+      key: `status-label:${entity.id}`,
+      layer,
+      managedState,
+      metrics,
+      position: { x: box.x + box.width / 2, y: box.y + statusHeight / 2 },
+      text: status.label,
+    });
+  }
+
+  graphics
+    .rect(box.x, healthY, box.width, healthHeight)
+    .fill({ color: 0x0f172a, alpha: 0.9 });
+  graphics.rect(box.x, healthY, box.width * healthPercent, healthHeight).fill(healthColor);
 }
 
 function getEnemyNameplateText(
@@ -2229,7 +2386,7 @@ function drawEnemyNameplate({
     metrics,
     position: {
       x: center.x,
-      y: center.y - transform.cellPixelSize * 0.92,
+      y: center.y - transform.cellPixelSize * 1.32,
     },
     text: getEnemyNameplateText(enemy),
   });
@@ -2782,7 +2939,7 @@ function getCombatFeedbackFontSize(event: CombatFeedbackEvent): number {
 }
 
 function isDamageNumberFeedback(event: CombatFeedbackEvent): boolean {
-  return event.type === "damage" && /^-\d+ HP$/.test(event.text);
+  return event.type === "damage" && /^-\d+( HP)?$/.test(event.text);
 }
 
 function isHealingNumberFeedback(event: CombatFeedbackEvent): boolean {
@@ -2802,6 +2959,7 @@ function getCombatFeedbackLaneKey(event: CombatFeedbackEvent): string {
       event.sourceEntityId ?? "unknown-source",
       feedbackKind,
       event.damageType ?? "none",
+      event.dotStatusType ?? "direct",
     ].join(":");
   }
 
@@ -4022,6 +4180,32 @@ function drawFullEffects({
       text: event.text,
     });
     if (isDamageNumberFeedback(event)) {
+      const dotIconSrc = getDotDamageIconSrc(event);
+      if (dotIconSrc) {
+        const progress = getDamageNumberProgress(event, currentTime);
+        const direction = getDamageNumberDirection(event);
+        const iconPosition = {
+          x: labelPosition.x - direction * 18,
+          y: labelPosition.y,
+        };
+
+        drawManagedImageSprite({
+          alpha: 1 - progress,
+          anchorX: 0.5,
+          anchorY: 0.5,
+          cache,
+          height: dotDamageIconSize,
+          key: `dot-damage-icon:${getCombatFeedbackLaneKey(event)}`,
+          layer,
+          managedState,
+          metrics,
+          position: iconPosition,
+          requestRedraw,
+          rotation: direction * damageNumberRotationRadians * progress,
+          src: dotIconSrc,
+          width: dotDamageIconSize,
+        });
+      }
       applyDamageNumberAnimation(label, event, currentTime);
     }
     metrics.drawnFeedbackCount += 1;
@@ -5044,6 +5228,7 @@ function drawFullMap({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusEffectsById,
   suppressMovePoiRing,
   teleportWorkingById,
   textureCache,
@@ -5078,6 +5263,7 @@ function drawFullMap({
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  statusEffectsById: Record<string, StatusEffectState>;
   suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   textureCache: TextureCache;
@@ -5350,22 +5536,21 @@ function drawFullMap({
     visibleTileBounds,
   );
 
+  drawEntityOverheadUiPass({
+    currentTime,
+    entities,
+    graphics: overlayGraphics,
+    layer: layers.effectsLayer,
+    managedState,
+    metrics,
+    statusEffectsById,
+    transform,
+    visibleTileBounds,
+  });
+
   for (const entity of entities) {
-    if (!isPositionInTileBounds(entity.position, visibleTileBounds)) {
-      continue;
-    }
-
-    drawHealthBar(overlayGraphics, entity, transform);
-    drawEnemyAttackWindupBar(overlayGraphics, entity, currentTime, transform);
-
-    if (entity.kind === "enemy") {
-      drawEnemyNameplate({
-        enemy: entity,
-        layer: layers.effectsLayer,
-        managedState,
-        metrics,
-        transform,
-      });
+    if (isPositionInTileBounds(entity.position, visibleTileBounds)) {
+      drawEnemyAttackWindupBar(overlayGraphics, entity, currentTime, transform);
     }
   }
 
@@ -5426,6 +5611,7 @@ function drawWorld({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusEffectsById,
   suppressMovePoiRing,
   teleportWorkingById,
   textureCache,
@@ -5449,6 +5635,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      statusEffectsById,
       visualMovementByEntityId,
     });
     const fullSignature = getFullRenderSignature({
@@ -5475,6 +5662,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      statusEffectsById,
       suppressMovePoiRing,
       teleportWorkingById,
       visualMovementByEntityId,
@@ -5527,6 +5715,7 @@ function drawWorld({
       skillMarksByEnemyId,
       skillShieldBlocksById,
       skillVisualEvents,
+      statusEffectsById,
       suppressMovePoiRing,
       teleportWorkingById,
       textureCache,
@@ -5601,6 +5790,7 @@ function hasActiveTimedRendererWork({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusEffectsById,
   visualMovementByEntityId,
 }: {
   activeTeleport: ActiveTeleport | null;
@@ -5617,6 +5807,7 @@ function hasActiveTimedRendererWork({
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  statusEffectsById: Record<string, StatusEffectState>;
   visualMovementByEntityId: Record<string, EntityVisualMovement>;
 }): boolean {
   const hasActiveMovementClickFeedback = movementClickFeedbackEvents.some(
@@ -5642,6 +5833,7 @@ function hasActiveTimedRendererWork({
     Object.values(skillShieldBlocksById).some(
       (shield) => shield.expiresAt > currentTime,
     ) ||
+    Object.values(statusEffectsById).some((status) => status.expiresAt > currentTime) ||
     Object.values(companionAoeChannelsByCasterId).some(
       (channel) => channel.channelEndsAt > currentTime,
     ) ||
@@ -5699,6 +5891,7 @@ export function PixiWorldRenderer({
   skillMarksByEnemyId = {},
   skillShieldBlocksById = {},
   skillVisualEvents = [],
+  statusEffectsById = {},
   suppressMovePoiRing = false,
   teleportWorkingById = {},
   viewportSize,
@@ -5752,6 +5945,7 @@ export function PixiWorldRenderer({
   const latestSkillMarksByEnemyIdRef = useRef(skillMarksByEnemyId);
   const latestSkillShieldBlocksByIdRef = useRef(skillShieldBlocksById);
   const latestSkillVisualEventsRef = useRef(skillVisualEvents);
+  const latestStatusEffectsByIdRef = useRef(statusEffectsById);
   const latestSuppressMovePoiRingRef = useRef(suppressMovePoiRing);
   const latestTeleportWorkingByIdRef = useRef(teleportWorkingById);
   const latestVisualMovementByEntityIdRef = useRef(visualMovementByEntityId);
@@ -5806,6 +6000,7 @@ export function PixiWorldRenderer({
     latestSkillMarksByEnemyIdRef.current = skillMarksByEnemyId;
     latestSkillShieldBlocksByIdRef.current = skillShieldBlocksById;
     latestSkillVisualEventsRef.current = skillVisualEvents;
+    latestStatusEffectsByIdRef.current = statusEffectsById;
     latestSuppressMovePoiRingRef.current = suppressMovePoiRing;
     latestTeleportWorkingByIdRef.current = teleportWorkingById;
     latestVisualMovementByEntityIdRef.current = visualMovementByEntityId;
@@ -5836,6 +6031,7 @@ export function PixiWorldRenderer({
     skillMarksByEnemyId,
     skillShieldBlocksById,
     skillVisualEvents,
+    statusEffectsById,
     suppressMovePoiRing,
     teleportWorkingById,
     sortedEntities,
@@ -5901,6 +6097,7 @@ export function PixiWorldRenderer({
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
         skillVisualEvents: latestSkillVisualEventsRef.current,
+        statusEffectsById: latestStatusEffectsByIdRef.current,
         visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
       });
     }
@@ -5953,6 +6150,7 @@ export function PixiWorldRenderer({
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
         skillVisualEvents: latestSkillVisualEventsRef.current,
+        statusEffectsById: latestStatusEffectsByIdRef.current,
         suppressMovePoiRing: latestSuppressMovePoiRingRef.current,
         teleportWorkingById: latestTeleportWorkingByIdRef.current,
         textureCache: textureCacheRef.current,

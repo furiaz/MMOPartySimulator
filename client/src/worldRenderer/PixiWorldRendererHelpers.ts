@@ -28,6 +28,8 @@ import type {
   SkillMarkState,
   SkillShieldBlockState,
   SkillVisualEvent,
+  StatusEffectState,
+  StatusEffectType,
 } from "../game";
 import {
   aoeTargetDummyId,
@@ -77,6 +79,9 @@ export const resourceHitOreSrc = `${prototypeVfxSpritePath}/resource-hit-ore.png
 export const resourceHitWoodSrc = `${prototypeVfxSpritePath}/resource-hit-wood.png`;
 export const shieldInvulnerableGlintSrc = `${prototypeVfxSpritePath}/shield-invulnerable-glint.png`;
 export const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
+export const burnDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-burn.png`;
+export const poisonDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-poison.png`;
+export const bleedDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-bleed.png`;
 
 export const TELEPORT_OBJECT_SPRITE_SIZE_PX = 250;
 export const TELEPORT_OBJECT_SPRITE_ANCHOR_X = 0.5;
@@ -326,10 +331,89 @@ export type FullRenderSignatureInput = {
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
   skillVisualEvents: SkillVisualEvent[];
+  statusEffectsById: Record<string, StatusEffectState>;
   suppressMovePoiRing: boolean;
   teleportWorkingById: Record<string, boolean>;
   visualMovementByEntityId: Record<string, FullRenderVisualMovement>;
 };
+
+export type OverheadStatusPresentation = {
+  backgroundColor: number;
+  fillColor: number;
+  fillPercent: number;
+  label: string;
+  remainingMs: number;
+  textColor: number;
+  type: StatusEffectType;
+};
+
+export type OverheadUiBox = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+const overheadStatusPriority = [
+  "immobilized",
+  "silenced",
+  "incapacitated",
+  "disarmed",
+  "fakeDeath",
+  "forcedEvasion",
+  "nextAttackDamageBonus",
+] satisfies StatusEffectType[];
+
+const overheadStatusLabels = {
+  immobilized: "Immobilized",
+  silenced: "Silenced",
+  incapacitated: "Incapacitated",
+  disarmed: "Disarmed",
+  fakeDeath: "Fake Death",
+  forcedEvasion: "Evasion",
+  nextAttackDamageBonus: "Next Hit",
+} satisfies Record<(typeof overheadStatusPriority)[number], string>;
+
+const overheadStatusColors = {
+  immobilized: {
+    backgroundColor: 0x1e293b,
+    fillColor: 0x64748b,
+    textColor: 0xf8fafc,
+  },
+  silenced: {
+    backgroundColor: 0x2e1065,
+    fillColor: 0x8b5cf6,
+    textColor: 0xf5f3ff,
+  },
+  incapacitated: {
+    backgroundColor: 0x111827,
+    fillColor: 0x4b5563,
+    textColor: 0xf9fafb,
+  },
+  disarmed: {
+    backgroundColor: 0x431407,
+    fillColor: 0xf97316,
+    textColor: 0xfffbeb,
+  },
+  fakeDeath: {
+    backgroundColor: 0x172554,
+    fillColor: 0x60a5fa,
+    textColor: 0xeff6ff,
+  },
+  forcedEvasion: {
+    backgroundColor: 0x134e4a,
+    fillColor: 0x2dd4bf,
+    textColor: 0xf0fdfa,
+  },
+  nextAttackDamageBonus: {
+    backgroundColor: 0x422006,
+    fillColor: 0xfacc15,
+    textColor: 0xfffbeb,
+  },
+} satisfies Record<
+  (typeof overheadStatusPriority)[number],
+  { backgroundColor: number; fillColor: number; textColor: number }
+>;
 
 export type StableRendererFrameSkipInput = {
   hadTimedWork: boolean;
@@ -465,6 +549,9 @@ export function collectDurableVisualTextureSrcs(): Set<string> {
     resourceHitWoodSrc,
     shieldInvulnerableGlintSrc,
     teleportPulseSrc,
+    burnDotDamageIconSrc,
+    poisonDotDamageIconSrc,
+    bleedDotDamageIconSrc,
   ]);
 
   addEntityVisualAssetTextureSrcs(sources, entityVisualAssets.beginnerCharacter);
@@ -927,6 +1014,7 @@ export function getFullRenderSignature({
   skillMarksByEnemyId,
   skillShieldBlocksById,
   skillVisualEvents,
+  statusEffectsById,
   suppressMovePoiRing,
   teleportWorkingById,
   visualMovementByEntityId,
@@ -982,6 +1070,7 @@ export function getFullRenderSignature({
     getRecordSignature(skillBindsByEnemyId, getSkillBindSignature),
     getRecordSignature(skillMarksByEnemyId, getSkillMarkSignature),
     getRecordSignature(skillShieldBlocksById, getSkillShieldBlockSignature),
+    getRecordSignature(statusEffectsById, getStatusEffectSignature),
     getRecordSignature(
       resurrectionProgressByCompanionId,
       getResurrectionProgressSignature,
@@ -1189,6 +1278,7 @@ function getCombatFeedbackSignature(event: CombatFeedbackEvent): string {
     event.amount ?? "",
     event.createdAt,
     event.expiresAt,
+    event.dotStatusType ?? "",
   ].join(":");
 }
 
@@ -1281,6 +1371,17 @@ function getSkillShieldBlockSignature(
     shield.expiresAt,
     shield.remainingBlocks,
     shield.blockedDamageTypes?.join(",") ?? "",
+  ].join(":");
+}
+
+function getStatusEffectSignature(_statusId: string, status: StatusEffectState): string {
+  return [
+    status.type,
+    status.targetId,
+    status.sourceId ?? "",
+    status.sourceKey ?? "",
+    status.appliedAt,
+    status.expiresAt,
   ].join(":");
 }
 
@@ -1640,7 +1741,7 @@ export function getEnemyNameplateColor(
 }
 
 export function isDamageNumberFeedback(event: CombatFeedbackEvent): boolean {
-  return event.type === "damage" && /^-\d+ HP$/.test(event.text);
+  return event.type === "damage" && /^-\d+( HP)?$/.test(event.text);
 }
 
 export function isHealingNumberFeedback(event: CombatFeedbackEvent): boolean {
@@ -1660,10 +1761,98 @@ export function getCombatFeedbackLaneKey(event: CombatFeedbackEvent): string {
       event.sourceEntityId ?? "unknown-source",
       feedbackKind,
       event.damageType ?? "none",
+      event.dotStatusType ?? "direct",
     ].join(":");
   }
 
   return ["feedback-event", event.id, event.type].join(":");
+}
+
+export function getDotDamageIconSrc(
+  event: CombatFeedbackEvent,
+): string | undefined {
+  if (event.dotStatusType === "burning") {
+    return burnDotDamageIconSrc;
+  }
+
+  if (event.dotStatusType === "poison") {
+    return poisonDotDamageIconSrc;
+  }
+
+  if (event.dotStatusType === "bleed") {
+    return bleedDotDamageIconSrc;
+  }
+
+  return undefined;
+}
+
+export function getOverheadStatusPresentation({
+  entityId,
+  now,
+  statusEffectsById,
+}: {
+  entityId: string;
+  now: number;
+  statusEffectsById: Record<string, StatusEffectState>;
+}): OverheadStatusPresentation | null {
+  const bestByType = new Map<StatusEffectType, StatusEffectState>();
+
+  for (const status of Object.values(statusEffectsById)) {
+    if (
+      status.targetId !== entityId ||
+      status.expiresAt <= now ||
+      !isOverheadStatusType(status.type)
+    ) {
+      continue;
+    }
+
+    const currentBest = bestByType.get(status.type);
+    if (!currentBest || status.expiresAt > currentBest.expiresAt) {
+      bestByType.set(status.type, status);
+    }
+  }
+
+  for (const type of overheadStatusPriority) {
+    const status = bestByType.get(type);
+
+    if (!status) {
+      continue;
+    }
+
+    const durationMs = Math.max(1, status.expiresAt - status.appliedAt);
+    const remainingMs = Math.max(0, status.expiresAt - now);
+    const colors = overheadStatusColors[type];
+
+    return {
+      ...colors,
+      fillPercent: Math.max(0, Math.min(1, remainingMs / durationMs)),
+      label: overheadStatusLabels[type],
+      remainingMs,
+      type,
+    };
+  }
+
+  return null;
+}
+
+export function doOverheadUiBoxesOverlap(
+  first: OverheadUiBox,
+  second: OverheadUiBox,
+): boolean {
+  return (
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y
+  );
+}
+
+function isOverheadStatusType(
+  type: StatusEffectType,
+): type is (typeof overheadStatusPriority)[number] {
+  return overheadStatusPriority.includes(
+    type as (typeof overheadStatusPriority)[number],
+  );
 }
 
 export function shouldDrawCombatFeedbackEvent(

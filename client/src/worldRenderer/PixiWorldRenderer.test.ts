@@ -9,7 +9,9 @@ import {
   collectCurrentMapScopedVisualTextureSrcs,
   collectDurableVisualTextureSrcs,
   createRendererFrameScheduler,
+  doOverheadUiBoxesOverlap,
   enemySpottedAlertSrc,
+  getDotDamageIconSrc,
   getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
   getEnemyNameplateColor,
@@ -20,6 +22,7 @@ import {
   getLevelUpBurstPresentation,
   getNearestHoverEntity,
   getNearestInteractableEntity,
+  getOverheadStatusPresentation,
   getPreviewMapPosition,
   getPreviewRenderSignature,
   getTeleportIconSrc,
@@ -27,7 +30,10 @@ import {
   MIN_RENDER_FRAME_MS,
   isPositionInTileBounds,
   isStaticMapSpriteKey,
+  bleedDotDamageIconSrc,
+  burnDotDamageIconSrc,
   levelUpBurstSrc,
+  poisonDotDamageIconSrc,
   shouldDrawCombatFeedbackEvent,
   shouldSkipStableRendererFrame,
   TELEPORT_OBJECT_SPRITE_ANCHOR_X,
@@ -450,6 +456,7 @@ function createFullRenderSignatureInput(
     skillMarksByEnemyId: {},
     skillShieldBlocksById: {},
     skillVisualEvents: [],
+    statusEffectsById: {},
     suppressMovePoiRing: false,
     teleportWorkingById: {},
     visualMovementByEntityId: {},
@@ -551,6 +558,21 @@ describe("getFullRenderSignature", () => {
             expiresAt: 1900,
           },
         ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        statusEffectsById: {
+          "companion-silenced-test": {
+            appliedAt: 1000,
+            expiresAt: 2000,
+            id: "companion-silenced-test",
+            sourceKey: "test",
+            targetId: companion.id,
+            type: "silenced",
+          },
+        },
       }),
     ).not.toBe(baseSignature);
     expect(
@@ -848,6 +870,29 @@ describe("getCombatFeedbackLaneKey", () => {
     expect(differentType).not.toBe(first);
   });
 
+  it("keeps different DoT status types on separate lanes", () => {
+    const burning = getCombatFeedbackLaneKey({
+      ...baseEvent,
+      amount: 5,
+      damageType: "magic",
+      dotStatusType: "burning",
+      sourceEntityId: "companion-1",
+      targetEntityId: "enemy-1",
+      text: "-5",
+    });
+    const poison = getCombatFeedbackLaneKey({
+      ...baseEvent,
+      amount: 5,
+      damageType: "magic",
+      dotStatusType: "poison",
+      sourceEntityId: "companion-1",
+      targetEntityId: "enemy-1",
+      text: "-5",
+    });
+
+    expect(poison).not.toBe(burning);
+  });
+
   it("keeps special labels separate by event id", () => {
     expect(
       getCombatFeedbackLaneKey({
@@ -857,6 +902,134 @@ describe("getCombatFeedbackLaneKey", () => {
         type: "attack",
       }),
     ).toBe("feedback-event:blocked-1:attack");
+  });
+});
+
+describe("DoT feedback icon mapping", () => {
+  const baseEvent: CombatFeedbackEvent = {
+    amount: 5,
+    createdAt: 0,
+    damageType: "magic",
+    entityId: "enemy-1",
+    expiresAt: 1000,
+    id: "feedback-1",
+    text: "-5",
+    type: "damage",
+  };
+
+  it("maps DoT feedback events to their icon assets", () => {
+    expect(getDotDamageIconSrc({ ...baseEvent, dotStatusType: "burning" })).toBe(
+      burnDotDamageIconSrc,
+    );
+    expect(getDotDamageIconSrc({ ...baseEvent, dotStatusType: "poison" })).toBe(
+      poisonDotDamageIconSrc,
+    );
+    expect(
+      getDotDamageIconSrc({
+        ...baseEvent,
+        damageType: "physical",
+        dotStatusType: "bleed",
+      }),
+    ).toBe(bleedDotDamageIconSrc);
+    expect(getDotDamageIconSrc(baseEvent)).toBeUndefined();
+  });
+});
+
+describe("overhead status presentation", () => {
+  it("uses priority over remaining duration across different status types", () => {
+    const presentation = getOverheadStatusPresentation({
+      entityId: "enemy",
+      now: 1500,
+      statusEffectsById: {
+        "enemy-silenced": {
+          appliedAt: 1000,
+          expiresAt: 2500,
+          id: "enemy-silenced",
+          targetId: "enemy",
+          type: "silenced",
+        },
+        "enemy-immobilized": {
+          appliedAt: 1000,
+          expiresAt: 2000,
+          id: "enemy-immobilized",
+          targetId: "enemy",
+          type: "immobilized",
+        },
+      },
+    });
+
+    expect(presentation).toMatchObject({
+      fillPercent: 0.5,
+      label: "Immobilized",
+      type: "immobilized",
+    });
+  });
+
+  it("uses the longest active same-type status and excludes DoTs and buffs", () => {
+    const presentation = getOverheadStatusPresentation({
+      entityId: "enemy",
+      now: 2000,
+      statusEffectsById: {
+        "enemy-silenced-short": {
+          appliedAt: 1000,
+          expiresAt: 2400,
+          id: "enemy-silenced-short",
+          targetId: "enemy",
+          type: "silenced",
+        },
+        "enemy-silenced-long": {
+          appliedAt: 1000,
+          expiresAt: 4000,
+          id: "enemy-silenced-long",
+          targetId: "enemy",
+          type: "silenced",
+        },
+        "enemy-burning": {
+          appliedAt: 1000,
+          baseDurationMs: 4000,
+          expiresAt: 5000,
+          id: "enemy-burning",
+          maxDurationMs: 12000,
+          nextTickAt: 3000,
+          sourceKey: "fire",
+          targetId: "enemy",
+          tickDamage: 2,
+          tickIntervalMs: 1000,
+          type: "burning",
+        },
+        "enemy-defense": {
+          appliedAt: 1000,
+          defenseBonusPercent: 20,
+          expiresAt: 5000,
+          id: "enemy-defense",
+          targetId: "enemy",
+          type: "defenseBuff",
+        },
+      },
+    });
+
+    expect(presentation).toMatchObject({
+      fillPercent: 2 / 3,
+      label: "Silenced",
+      type: "silenced",
+    });
+  });
+});
+
+describe("overhead UI overlap", () => {
+  it("detects overlapping companion and enemy overhead boxes", () => {
+    expect(
+      doOverheadUiBoxesOverlap(
+        { height: 18, width: 64, x: 10, y: 10 },
+        { height: 18, width: 64, x: 40, y: 20 },
+      ),
+    ).toBe(true);
+    expect(
+      doOverheadUiBoxesOverlap(
+        { height: 18, width: 64, x: 10, y: 10 },
+        { height: 18, width: 64, x: 90, y: 10 },
+      ),
+    ).toBe(false);
   });
 });
 

@@ -21,7 +21,7 @@ export type ApplyStatusEffectInput =
         | "immobilized"
         | "incapacitated"
         | "disarmed"
-        | "cursed"
+        | "silenced"
         | "fakeDeath"
         | "forcedEvasion";
       targetId: string;
@@ -179,7 +179,7 @@ export function isSkillUseBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated", "cursed"]);
+  return hasActiveStatus(state, entityId, ["incapacitated", "silenced"]);
 }
 
 export function isGatherBlockedByStatus(
@@ -315,9 +315,10 @@ export function updateStatusEffects(
         sourceEntityId: status.sourceId,
         targetEntityId: target.id,
         damageType: status.type === "bleed" ? "physical" : "magic",
+        dotStatusType: status.type,
         feedbackKind: "damage",
         amount: dotDamage,
-        text: `-${dotDamage} HP`,
+        text: `-${dotDamage}`,
         now,
       });
 

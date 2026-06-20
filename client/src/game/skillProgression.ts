@@ -561,7 +561,7 @@ export function getScaledSkillDefinitionForCompanion(
     };
   }
 
-  if (effect.type === "cursedRay") {
+  if (effect.type === "silencingRay") {
     return {
       ...skill,
       effect: {

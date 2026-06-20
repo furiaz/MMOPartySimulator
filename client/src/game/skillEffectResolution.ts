@@ -353,10 +353,10 @@ function resolveSkillEffectOnce(
     );
   }
 
-  if (skill.effect.type === "cursedRay" && isLivingEnemy(target)) {
+  if (skill.effect.type === "silencingRay" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
       state,
-      applyCursedRay(state, caster, target, skill, now),
+      applySilencingRay(state, caster, target, skill, now),
       target.id,
     );
   }
@@ -653,7 +653,7 @@ function isRunicFocusEligibleSkill(skill: SkillDefinition): boolean {
     case "damage":
     case "taunt":
     case "pinningShot":
-    case "cursedRay":
+    case "silencingRay":
     case "bind":
     case "allyBuff":
     case "barrierBlock":
@@ -679,7 +679,7 @@ function findRunicFocusDuplicateTarget(
     skill.effect.type === "damage" ||
     skill.effect.type === "taunt" ||
     skill.effect.type === "pinningShot" ||
-    skill.effect.type === "cursedRay" ||
+    skill.effect.type === "silencingRay" ||
     skill.effect.type === "bind"
   ) {
     return (
@@ -2941,21 +2941,21 @@ function applyAtonementStep(
   return nextState;
 }
 
-function applyCursedRay(
+function applySilencingRay(
   state: GameState,
   caster: Companion,
   target: Enemy,
   skill: SkillDefinition,
   now: number,
 ): GameState {
-  if (skill.effect.type !== "cursedRay") {
+  if (skill.effect.type !== "silencingRay") {
     return state;
   }
 
   let nextState = applyStatusEffect(
     state,
     {
-      type: "cursed",
+      type: "silenced",
       targetId: target.id,
       durationMs: skill.effect.durationMs,
       sourceId: caster.id,
@@ -3456,7 +3456,7 @@ function applyWhipPrison(
   const controlTargets = [caster.id, target.id];
 
   for (const targetId of controlTargets) {
-    for (const type of ["immobilized", "disarmed", "cursed"] as const) {
+    for (const type of ["immobilized", "disarmed", "silenced"] as const) {
       nextState = applyStatusEffect(
         nextState,
         {

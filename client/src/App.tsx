@@ -4520,6 +4520,7 @@ function App() {
               skillMarksByEnemyId={skillMarksByEnemyId}
               skillShieldBlocksById={skillShieldBlocksById}
               skillVisualEvents={skillVisualEvents}
+              statusEffectsById={gameState.statusEffectsById ?? {}}
               suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}
               viewportSize={viewportSize}

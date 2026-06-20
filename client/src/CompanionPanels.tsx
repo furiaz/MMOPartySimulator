@@ -711,8 +711,8 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return "Binds an enemy briefly.";
   }
 
-  if (effect.type === "cursedRay") {
-    return `Curses one enemy for ${Math.round(effect.durationMs / 1000)}s.`;
+  if (effect.type === "silencingRay") {
+    return `Silences one enemy for ${Math.round(effect.durationMs / 1000)}s.`;
   }
 
   if (effect.type === "heal") {

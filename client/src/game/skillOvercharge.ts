@@ -246,7 +246,7 @@ function scaleSkillEffect(
           ),
         },
       };
-    case "cursedRay":
+    case "silencingRay":
       return {
         ...skill,
         effect: {
