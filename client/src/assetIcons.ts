@@ -18,6 +18,7 @@ const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
 const beginnerSkillEffectsPath = "/assets/Generated/beginner-skill-effects-50/sprites";
 const firstClassSkillEffectsPath = "/assets/Generated/first-class-skill-effects";
 const bladeSkillEffectsPath = `${firstClassSkillEffectsPath}/blade/sprites`;
+const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -135,6 +136,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   woodcutter_rhythm: `${bladeSkillEffectsPath}/woodcutter_rhythm.png`,
   flash_step: `${bladeSkillEffectsPath}/flash_step.png`,
   sweeping_strike: `${bladeSkillEffectsPath}/sweeping_strike.png`,
+  shield_challenge: `${aegisSkillEffectsPath}/shield_challenge.png`,
+  hold_fast: `${aegisSkillEffectsPath}/hold_fast.png`,
+  guard_wall: `${aegisSkillEffectsPath}/guard_wall.png`,
+  iron_stance: `${aegisSkillEffectsPath}/iron_stance.png`,
+  shield_formation: `${aegisSkillEffectsPath}/shield_formation_caster.png`,
+  stonebreaker_rhythm: `${aegisSkillEffectsPath}/stonebreaker_rhythm.png`,
+  shield_rush: `${aegisSkillEffectsPath}/shield_rush.png`,
+  shield_shockwave: `${aegisSkillEffectsPath}/shield_shockwave.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -191,6 +200,49 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
     src: `${bladeSkillEffectsPath}/sweeping_strike.png`,
     width: 96,
     height: 96,
+  },
+  shield_challenge: {
+    src: `${aegisSkillEffectsPath}/shield_challenge.png`,
+    width: 84,
+    height: 84,
+  },
+  hold_fast: {
+    src: `${aegisSkillEffectsPath}/hold_fast.png`,
+    width: 88,
+    height: 88,
+  },
+  guard_wall: {
+    src: `${aegisSkillEffectsPath}/guard_wall.png`,
+    width: 86,
+    height: 86,
+  },
+  iron_stance: {
+    src: `${aegisSkillEffectsPath}/iron_stance.png`,
+    width: 82,
+    height: 82,
+  },
+  shield_formation: {
+    src: `${aegisSkillEffectsPath}/shield_formation_caster.png`,
+    width: 96,
+    height: 96,
+    targetedSrc: `${aegisSkillEffectsPath}/shield_formation_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  stonebreaker_rhythm: {
+    src: `${aegisSkillEffectsPath}/stonebreaker_rhythm.png`,
+    width: 82,
+    height: 82,
+  },
+  shield_rush: {
+    src: `${aegisSkillEffectsPath}/shield_rush.png`,
+    width: 84,
+    height: 84,
+  },
+  shield_shockwave: {
+    src: `${aegisSkillEffectsPath}/shield_shockwave.png`,
+    width: 100,
+    height: 100,
   },
 };
 

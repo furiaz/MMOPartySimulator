@@ -964,6 +964,20 @@ describe("skill effect resolution", () => {
       expiresAt: 61000,
     });
 
+    const formationVisualEvents =
+      formationState.skillVisualEvents?.filter(
+        (event) => event.skillId === "shield_formation",
+      ) ?? [];
+    expect(formationVisualEvents).toHaveLength(3);
+    expect(formationVisualEvents[0]).toMatchObject({
+      sourceId: "aegis",
+    });
+    expect(formationVisualEvents[0]?.targetId).toBeUndefined();
+    expect(formationVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      "aegis",
+      "ally",
+    ]);
+
     const aegisHit = resolveAndApplyCombatDamage(
       formationState,
       formationState.entities.enemy as Enemy,
