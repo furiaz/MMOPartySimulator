@@ -16,6 +16,8 @@ const teleportAssetPath = "/assets/Generated/teleports";
 const passageBlockerAssetPath = "/assets/Generated/passage-blockers";
 const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
 const beginnerSkillEffectsPath = "/assets/Generated/beginner-skill-effects-50/sprites";
+const firstClassSkillEffectsPath = "/assets/Generated/first-class-skill-effects";
+const bladeSkillEffectsPath = `${firstClassSkillEffectsPath}/blade/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -125,7 +127,82 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   rally_call: `${beginnerSkillEffectsPath}/rally_call.png`,
   field_hands: `${beginnerSkillEffectsPath}/field_hands.png`,
   quick_step: `${beginnerSkillEffectsPath}/quick_step.png`,
+  duelist_challenge: `${bladeSkillEffectsPath}/duelist_challenge.png`,
+  second_wind: `${bladeSkillEffectsPath}/second_wind.png`,
+  blade_parry: `${bladeSkillEffectsPath}/blade_parry.png`,
+  edge_focus: `${bladeSkillEffectsPath}/edge_focus.png`,
+  press_the_opening: `${bladeSkillEffectsPath}/press_the_opening_caster.png`,
+  woodcutter_rhythm: `${bladeSkillEffectsPath}/woodcutter_rhythm.png`,
+  flash_step: `${bladeSkillEffectsPath}/flash_step.png`,
+  sweeping_strike: `${bladeSkillEffectsPath}/sweeping_strike.png`,
 };
+
+export type SkillVisualPresentation = {
+  src: string;
+  width: number;
+  height: number;
+  targetedSrc?: string;
+  targetedWidth?: number;
+  targetedHeight?: number;
+};
+
+export const SKILL_VISUAL_PRESENTATION: Partial<
+  Record<SkillId, SkillVisualPresentation>
+> = {
+  duelist_challenge: {
+    src: `${bladeSkillEffectsPath}/duelist_challenge.png`,
+    width: 84,
+    height: 84,
+  },
+  second_wind: {
+    src: `${bladeSkillEffectsPath}/second_wind.png`,
+    width: 76,
+    height: 76,
+  },
+  blade_parry: {
+    src: `${bladeSkillEffectsPath}/blade_parry.png`,
+    width: 80,
+    height: 80,
+  },
+  edge_focus: {
+    src: `${bladeSkillEffectsPath}/edge_focus.png`,
+    width: 78,
+    height: 78,
+  },
+  press_the_opening: {
+    src: `${bladeSkillEffectsPath}/press_the_opening_caster.png`,
+    width: 92,
+    height: 92,
+    targetedSrc: `${bladeSkillEffectsPath}/press_the_opening_companion.png`,
+    targetedWidth: 58,
+    targetedHeight: 58,
+  },
+  woodcutter_rhythm: {
+    src: `${bladeSkillEffectsPath}/woodcutter_rhythm.png`,
+    width: 82,
+    height: 82,
+  },
+  flash_step: {
+    src: `${bladeSkillEffectsPath}/flash_step.png`,
+    width: 80,
+    height: 80,
+  },
+  sweeping_strike: {
+    src: `${bladeSkillEffectsPath}/sweeping_strike.png`,
+    width: 96,
+    height: 96,
+  },
+};
+
+export const SKILL_VISUAL_PRESENTATION_TEXTURE_SRC = Object.values(
+  SKILL_VISUAL_PRESENTATION,
+).flatMap((presentation) =>
+  presentation
+    ? [presentation.src, presentation.targetedSrc].filter(
+        (src): src is string => Boolean(src),
+      )
+    : [],
+);
 
 export const SHARED_SKILL_VISUAL_ICON_SRC = {
   projectile: `${beginnerSkillEffectsPath}/generic_projectile.png`,

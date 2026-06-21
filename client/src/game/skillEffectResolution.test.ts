@@ -844,6 +844,20 @@ describe("skill effect resolution", () => {
       primaryStatBonusPercentByStat: { strength: 5 },
       expiresAt: 61000,
     });
+    const pressVisualEvents =
+      pressState.skillVisualEvents?.filter(
+        (event) => event.skillId === "press_the_opening",
+      ) ?? [];
+
+    expect(pressVisualEvents).toHaveLength(3);
+    expect(pressVisualEvents[0]).toMatchObject({
+      sourceId: "blade",
+    });
+    expect(pressVisualEvents[0]?.targetId).toBeUndefined();
+    expect(pressVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      "blade",
+      "ally",
+    ]);
 
     const bladeHit = resolveAndApplyCombatDamage(
       pressState,

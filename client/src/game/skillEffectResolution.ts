@@ -1267,12 +1267,9 @@ function applyPartyClassBuff(
   let skillPartyClassBuffsByCompanionId = {
     ...(state.skillPartyClassBuffsByCompanionId ?? {}),
   };
+  const affectedMembers = getPartyMembers(state).filter(isLivingCompanion);
 
-  for (const member of getPartyMembers(state)) {
-    if (!isLivingCompanion(member)) {
-      continue;
-    }
-
+  for (const member of affectedMembers) {
     skillPartyClassBuffsByCompanionId = {
       ...skillPartyClassBuffsByCompanionId,
       [member.id]: {
@@ -1322,6 +1319,19 @@ function applyPartyClassBuff(
     now,
     durationMs: 600,
   });
+
+  if (skill.id === "press_the_opening") {
+    for (const member of affectedMembers) {
+      nextState = addSkillVisualEvent(nextState, {
+        type: "heal",
+        skillId: skill.id,
+        sourceId: caster.id,
+        targetId: member.id,
+        now,
+        durationMs: 600,
+      });
+    }
+  }
 
   return nextState;
 }

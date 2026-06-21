@@ -18,6 +18,8 @@ import {
   SHARED_SKILL_VISUAL_ICON_SRC,
   SLIMEWARD_DUNGEON_TILE_SRC,
   SKILL_VISUAL_ICON_SRC,
+  SKILL_VISUAL_PRESENTATION,
+  SKILL_VISUAL_PRESENTATION_TEXTURE_SRC,
   WILDERNESS_MAP_TILE_SRC,
 } from "../assetIcons";
 import type {
@@ -894,6 +896,7 @@ function collectDurableVisualTextureSrcs(): Set<string> {
     ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
       (src): src is string => Boolean(src),
     ),
+    ...SKILL_VISUAL_PRESENTATION_TEXTURE_SRC,
     ...Object.values(combatProjectileVisualProfiles).map((profile) => profile.src),
     blockImpactSrc,
     criticalHitBackingSrc,
@@ -2894,6 +2897,38 @@ function getSkillVisualIconSrc(event: SkillVisualEvent): string | undefined {
   return undefined;
 }
 
+function getSkillVisualPresentation(event: SkillVisualEvent): {
+  src: string | undefined;
+  width: number;
+  height: number;
+} {
+  const presentation = event.skillId
+    ? SKILL_VISUAL_PRESENTATION[event.skillId]
+    : undefined;
+
+  if (!presentation) {
+    return {
+      src: getSkillVisualIconSrc(event),
+      width: 50,
+      height: 50,
+    };
+  }
+
+  if (event.targetId && presentation.targetedSrc) {
+    return {
+      src: presentation.targetedSrc,
+      width: presentation.targetedWidth ?? presentation.width,
+      height: presentation.targetedHeight ?? presentation.height,
+    };
+  }
+
+  return {
+    src: presentation.src,
+    width: presentation.width,
+    height: presentation.height,
+  };
+}
+
 function createFeedbackText({
   color,
   fontSize = defaultFeedbackFontSize,
@@ -3978,7 +4013,7 @@ function drawFullEffects({
       continue;
     }
 
-    const iconSrc = getSkillVisualIconSrc(event);
+    const skillVisualPresentation = getSkillVisualPresentation(event);
     const spritePosition =
       event.type === "heal" && target
         ? target.position
@@ -4001,20 +4036,20 @@ function drawFullEffects({
         .stroke({ color: 0xfacc15, alpha: 0.82, width: 3 });
     }
 
-    if (iconSrc) {
+    if (skillVisualPresentation.src) {
       const didDraw = drawManagedImageSprite({
         anchorX: 0.5,
         anchorY: 0.5,
         cache,
-        height: 50,
-        key: `skill-effect:${event.id}:${iconSrc}`,
+        height: skillVisualPresentation.height,
+        key: `skill-effect:${event.id}:${skillVisualPresentation.src}`,
         layer,
         managedState,
         metrics,
         position: center,
         requestRedraw,
-        src: iconSrc,
-        width: 50,
+        src: skillVisualPresentation.src,
+        width: skillVisualPresentation.width,
       });
 
       if (didDraw) {
