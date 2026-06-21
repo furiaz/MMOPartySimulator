@@ -391,6 +391,21 @@ For each implementation ticket:
 - Completion notes should list the main files changed and any verification performed.
 - If rollback is needed, prefer reverting the commit associated with the ticket instead of manually undoing unrelated code.
 
+## Git Handling Authorization
+
+The user has authorized Codex to handle git workflow for ticket-scoped work after implementation and verification are complete.
+
+When Codex handles git workflow:
+
+- Review `git status` before staging.
+- Stage only files that belong to the active ticket.
+- Do not stage, commit, revert, or discard unrelated user changes.
+- Use commit messages that reference the active ticket number.
+- Push the branch and create a pull request when the user has asked Codex to handle the full git workflow for that task.
+- Keep GitHub Issue and Project status updates aligned with the ticket workflow rules.
+
+This authorization does not bypass issue creation, protected documentation approval, verification, review, rollback, or conflict-resolution rules.
+
 ## Explicit Quick Fix Exception
 
 Codex may skip GitHub Issue ticket creation only when the user explicitly labels the request as a quick fix and explicitly says to ignore or skip issue creation.

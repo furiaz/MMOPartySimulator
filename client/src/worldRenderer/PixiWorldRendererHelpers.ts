@@ -7,6 +7,7 @@ import {
   SHARED_SKILL_VISUAL_ICON_SRC,
   SLIMEWARD_DUNGEON_TILE_SRC,
   SKILL_VISUAL_ICON_SRC,
+  SKILL_VISUAL_PRESENTATION_TEXTURE_SRC,
   WILDERNESS_MAP_TILE_SRC,
 } from "../assetIcons";
 import type {
@@ -541,6 +542,7 @@ export function collectDurableVisualTextureSrcs(): Set<string> {
     ...Object.values(SKILL_VISUAL_ICON_SRC).filter(
       (src): src is string => Boolean(src),
     ),
+    ...SKILL_VISUAL_PRESENTATION_TEXTURE_SRC,
     blockImpactSrc,
     criticalHitBackingSrc,
     deathDownedPuffSrc,
