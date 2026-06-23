@@ -53,7 +53,13 @@ const LOW_HEALTH_BUFFER = 1;
 const VISUAL_DURATION_MS = 600;
 const PARTY_CLASS_BUFF_SKILLS_WITH_COMPANION_VISUALS = new Set<
   SkillDefinition["id"]
->(["press_the_opening", "shield_formation", "poison_coating", "pack_frenzy"]);
+>([
+  "press_the_opening",
+  "shield_formation",
+  "poison_coating",
+  "pack_frenzy",
+  "arcane_conduit",
+]);
 const SHIELD_OFFSET_DISTANCE = 1;
 const DEFAULT_SHIELD_DIRECTION: Position = { x: 0, y: -1 };
 
