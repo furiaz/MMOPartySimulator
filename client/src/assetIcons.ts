@@ -19,6 +19,7 @@ const beginnerSkillEffectsPath = "/assets/Generated/beginner-skill-effects-50/sp
 const firstClassSkillEffectsPath = "/assets/Generated/first-class-skill-effects";
 const bladeSkillEffectsPath = `${firstClassSkillEffectsPath}/blade/sprites`;
 const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
+const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -144,6 +145,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   stonebreaker_rhythm: `${aegisSkillEffectsPath}/stonebreaker_rhythm.png`,
   shield_rush: `${aegisSkillEffectsPath}/shield_rush.png`,
   shield_shockwave: `${aegisSkillEffectsPath}/shield_shockwave.png`,
+  pinning_shot: `${hunterSkillEffectsPath}/pinning_shot.png`,
+  fake_death: `${hunterSkillEffectsPath}/fake_death.png`,
+  evasive_instinct: `${hunterSkillEffectsPath}/evasive_instinct.png`,
+  hunters_focus: `${hunterSkillEffectsPath}/hunters_focus.png`,
+  poison_coating: `${hunterSkillEffectsPath}/poison_coating_caster.png`,
+  herbalist_rhythm: `${hunterSkillEffectsPath}/herbalist_rhythm.png`,
+  skirmish_shot: `${hunterSkillEffectsPath}/skirmish_shot.png`,
+  arrow_burst: `${hunterSkillEffectsPath}/arrow_burst.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -241,6 +250,49 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
   },
   shield_shockwave: {
     src: `${aegisSkillEffectsPath}/shield_shockwave.png`,
+    width: 100,
+    height: 100,
+  },
+  pinning_shot: {
+    src: `${hunterSkillEffectsPath}/pinning_shot.png`,
+    width: 84,
+    height: 84,
+  },
+  fake_death: {
+    src: `${hunterSkillEffectsPath}/fake_death.png`,
+    width: 82,
+    height: 82,
+  },
+  evasive_instinct: {
+    src: `${hunterSkillEffectsPath}/evasive_instinct.png`,
+    width: 82,
+    height: 82,
+  },
+  hunters_focus: {
+    src: `${hunterSkillEffectsPath}/hunters_focus.png`,
+    width: 84,
+    height: 84,
+  },
+  poison_coating: {
+    src: `${hunterSkillEffectsPath}/poison_coating_caster.png`,
+    width: 96,
+    height: 96,
+    targetedSrc: `${hunterSkillEffectsPath}/poison_coating_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  herbalist_rhythm: {
+    src: `${hunterSkillEffectsPath}/herbalist_rhythm.png`,
+    width: 82,
+    height: 82,
+  },
+  skirmish_shot: {
+    src: `${hunterSkillEffectsPath}/skirmish_shot.png`,
+    width: 84,
+    height: 84,
+  },
+  arrow_burst: {
+    src: `${hunterSkillEffectsPath}/arrow_burst.png`,
     width: 100,
     height: 100,
   },

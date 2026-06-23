@@ -234,6 +234,20 @@ describe("skill effect resolution", () => {
       primaryStatBonusPercentByStat: { dexterity: 5 },
     });
 
+    const poisonCoatingVisualEvents =
+      coatedState.skillVisualEvents?.filter(
+        (event) => event.skillId === "poison_coating",
+      ) ?? [];
+    expect(poisonCoatingVisualEvents).toHaveLength(3);
+    expect(poisonCoatingVisualEvents[0]).toMatchObject({
+      sourceId: "hunter",
+    });
+    expect(poisonCoatingVisualEvents[0]?.targetId).toBeUndefined();
+    expect(poisonCoatingVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      "hunter",
+      "ally",
+    ]);
+
     const damagedState = resolveAndApplyCombatDamage(coatedState, ally, enemy, {
       damageType: "physical",
       powerMultiplier: 1,
