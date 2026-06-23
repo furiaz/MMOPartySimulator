@@ -484,6 +484,20 @@ describe("skill effect resolution", () => {
       magicDamageBonusPercent: 5.5,
       primaryStatBonusPercentByStat: { intelligence: 5.5 },
     });
+
+    const conduitVisualEvents =
+      conduitState.skillVisualEvents?.filter(
+        (event) => event.skillId === "arcane_conduit",
+      ) ?? [];
+    expect(conduitVisualEvents).toHaveLength(3);
+    expect(conduitVisualEvents[0]).toMatchObject({
+      sourceId: "elementalist",
+    });
+    expect(conduitVisualEvents[0]?.targetId).toBeUndefined();
+    expect(conduitVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      "elementalist",
+      "ally",
+    ]);
   });
 
   it("moves with Flame Step and applies burning", () => {

@@ -21,6 +21,7 @@ const bladeSkillEffectsPath = `${firstClassSkillEffectsPath}/blade/sprites`;
 const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
 const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
 const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
+const elementalistSkillEffectsPath = `${firstClassSkillEffectsPath}/elementalist/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -162,6 +163,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   stoneclaw_rhythm: `${beastSkillEffectsPath}/stoneclaw_rhythm.png`,
   pounce: `${beastSkillEffectsPath}/pounce.png`,
   maul_sweep: `${beastSkillEffectsPath}/maul_sweep.png`,
+  elemental_bolt: `${elementalistSkillEffectsPath}/elemental_bolt.png`,
+  mana_shield: `${elementalistSkillEffectsPath}/mana_shield.png`,
+  frost_armor: `${elementalistSkillEffectsPath}/frost_armor.png`,
+  overcharge: `${elementalistSkillEffectsPath}/overcharge.png`,
+  arcane_conduit: `${elementalistSkillEffectsPath}/arcane_conduit_caster.png`,
+  emberwood_rhythm: `${elementalistSkillEffectsPath}/emberwood_rhythm.png`,
+  flame_step: `${elementalistSkillEffectsPath}/flame_step.png`,
+  fire_burst: `${elementalistSkillEffectsPath}/fire_burst.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -345,6 +354,49 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
   },
   maul_sweep: {
     src: `${beastSkillEffectsPath}/maul_sweep.png`,
+    width: 100,
+    height: 100,
+  },
+  elemental_bolt: {
+    src: `${elementalistSkillEffectsPath}/elemental_bolt.png`,
+    width: 84,
+    height: 84,
+  },
+  mana_shield: {
+    src: `${elementalistSkillEffectsPath}/mana_shield.png`,
+    width: 88,
+    height: 88,
+  },
+  frost_armor: {
+    src: `${elementalistSkillEffectsPath}/frost_armor.png`,
+    width: 86,
+    height: 86,
+  },
+  overcharge: {
+    src: `${elementalistSkillEffectsPath}/overcharge.png`,
+    width: 86,
+    height: 86,
+  },
+  arcane_conduit: {
+    src: `${elementalistSkillEffectsPath}/arcane_conduit_caster.png`,
+    width: 96,
+    height: 96,
+    targetedSrc: `${elementalistSkillEffectsPath}/arcane_conduit_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  emberwood_rhythm: {
+    src: `${elementalistSkillEffectsPath}/emberwood_rhythm.png`,
+    width: 82,
+    height: 82,
+  },
+  flame_step: {
+    src: `${elementalistSkillEffectsPath}/flame_step.png`,
+    width: 86,
+    height: 86,
+  },
+  fire_burst: {
+    src: `${elementalistSkillEffectsPath}/fire_burst.png`,
     width: 100,
     height: 100,
   },
