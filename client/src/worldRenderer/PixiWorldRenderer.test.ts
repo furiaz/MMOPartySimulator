@@ -41,6 +41,7 @@ import {
   TELEPORT_OBJECT_SPRITE_SIZE_PX,
   type FullRenderSignatureInput,
 } from "./PixiWorldRendererHelpers";
+import { getSkillVisualOpacity } from "./PixiWorldRenderer";
 import { MAP_OBJECT_ICON_SRC, MAP_VISUAL_OBJECT_SRC } from "../assetIcons";
 
 const previewCanvasBounds = {
@@ -1110,6 +1111,22 @@ describe("prototype VFX feedback sprites", () => {
     expect(getLevelUpBurstPresentation(baseEvent, 2_000).scale).toBe(1.5);
     expect(getLevelUpBurstPresentation(baseEvent, 3_000).alpha).toBeCloseTo(0.3);
     expect(getLevelUpBurstPresentation(baseEvent, 3_000).scale).toBe(2);
+  });
+
+  it("keeps normal skill visuals opaque and fades configured visuals to their endpoint", () => {
+    const skillVisualEvent = {
+      id: "whip-prison-visual",
+      type: "slash" as const,
+      skillId: "whip_prison" as const,
+      sourceId: "penitent",
+      createdAt: 1_000,
+      expiresAt: 4_000,
+    };
+
+    expect(getSkillVisualOpacity(skillVisualEvent, 2_500)).toBe(1);
+    expect(getSkillVisualOpacity(skillVisualEvent, 1_000, 0.7)).toBe(1);
+    expect(getSkillVisualOpacity(skillVisualEvent, 2_500, 0.7)).toBeCloseTo(0.85);
+    expect(getSkillVisualOpacity(skillVisualEvent, 4_000, 0.7)).toBeCloseTo(0.7);
   });
 });
 
