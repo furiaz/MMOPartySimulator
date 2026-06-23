@@ -1320,7 +1320,7 @@ function applyPartyClassBuff(
     durationMs: 600,
   });
 
-  if (skill.id === "press_the_opening") {
+  if (skill.id === "press_the_opening" || skill.id === "shield_formation") {
     for (const member of affectedMembers) {
       nextState = addSkillVisualEvent(nextState, {
         type: "heal",
