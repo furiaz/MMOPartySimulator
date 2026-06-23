@@ -144,6 +144,10 @@ describe("skill effect resolution", () => {
       splash.health,
     );
     expect((result.state.entities.far as Enemy).health).toBe(far.health);
+    expect(result.state.skillVisualEvents?.at(-1)).toMatchObject({
+      skillId: "sweeping_strike",
+      targetId: primary.id,
+    });
   });
 
   it("applies Hunter control, fake death, and forced evasion statuses", () => {

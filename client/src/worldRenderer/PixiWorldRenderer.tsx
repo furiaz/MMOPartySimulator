@@ -4015,9 +4015,7 @@ function drawFullEffects({
 
     const skillVisualPresentation = getSkillVisualPresentation(event);
     const spritePosition =
-      event.type === "heal" && target
-        ? target.position
-        : event.position ?? source.position;
+      target?.position ?? event.position ?? source.position;
     const center = toFullPosition(spritePosition, transform);
 
     if (!isPositionInTileBounds(spritePosition, visibleTileBounds)) {
