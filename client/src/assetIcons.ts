@@ -20,6 +20,7 @@ const firstClassSkillEffectsPath = "/assets/Generated/first-class-skill-effects"
 const bladeSkillEffectsPath = `${firstClassSkillEffectsPath}/blade/sprites`;
 const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
 const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
+const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -153,6 +154,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   herbalist_rhythm: `${hunterSkillEffectsPath}/herbalist_rhythm.png`,
   skirmish_shot: `${hunterSkillEffectsPath}/skirmish_shot.png`,
   arrow_burst: `${hunterSkillEffectsPath}/arrow_burst.png`,
+  threatening_roar: `${beastSkillEffectsPath}/threatening_roar.png`,
+  blood_feast: `${beastSkillEffectsPath}/blood_feast.png`,
+  rugged_hide: `${beastSkillEffectsPath}/rugged_hide.png`,
+  feral_surge: `${beastSkillEffectsPath}/feral_surge.png`,
+  pack_frenzy: `${beastSkillEffectsPath}/pack_frenzy_caster.png`,
+  stoneclaw_rhythm: `${beastSkillEffectsPath}/stoneclaw_rhythm.png`,
+  pounce: `${beastSkillEffectsPath}/pounce.png`,
+  maul_sweep: `${beastSkillEffectsPath}/maul_sweep.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -293,6 +302,49 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
   },
   arrow_burst: {
     src: `${hunterSkillEffectsPath}/arrow_burst.png`,
+    width: 100,
+    height: 100,
+  },
+  threatening_roar: {
+    src: `${beastSkillEffectsPath}/threatening_roar.png`,
+    width: 88,
+    height: 88,
+  },
+  blood_feast: {
+    src: `${beastSkillEffectsPath}/blood_feast.png`,
+    width: 84,
+    height: 84,
+  },
+  rugged_hide: {
+    src: `${beastSkillEffectsPath}/rugged_hide.png`,
+    width: 86,
+    height: 86,
+  },
+  feral_surge: {
+    src: `${beastSkillEffectsPath}/feral_surge.png`,
+    width: 84,
+    height: 84,
+  },
+  pack_frenzy: {
+    src: `${beastSkillEffectsPath}/pack_frenzy_caster.png`,
+    width: 96,
+    height: 96,
+    targetedSrc: `${beastSkillEffectsPath}/pack_frenzy_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  stoneclaw_rhythm: {
+    src: `${beastSkillEffectsPath}/stoneclaw_rhythm.png`,
+    width: 82,
+    height: 82,
+  },
+  pounce: {
+    src: `${beastSkillEffectsPath}/pounce.png`,
+    width: 86,
+    height: 86,
+  },
+  maul_sweep: {
+    src: `${beastSkillEffectsPath}/maul_sweep.png`,
     width: 100,
     height: 100,
   },
