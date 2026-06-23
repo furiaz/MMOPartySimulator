@@ -1823,6 +1823,23 @@ describe("skill effect resolution", () => {
         }),
       ]),
     );
+    const whipPrisonVisualEvents =
+      state.skillVisualEvents?.filter(
+        (event) => event.skillId === "whip_prison",
+      ) ?? [];
+    expect(whipPrisonVisualEvents).toHaveLength(2);
+    expect(whipPrisonVisualEvents[0]).toMatchObject({
+      sourceId: penitent.id,
+      createdAt: 1000,
+      expiresAt: 4000,
+    });
+    expect(whipPrisonVisualEvents[0]?.targetId).toBeUndefined();
+    expect(whipPrisonVisualEvents[1]).toMatchObject({
+      sourceId: penitent.id,
+      targetId: enemy.id,
+      createdAt: 1000,
+      expiresAt: 4000,
+    });
 
     const lashState = resolveSkillEffect(
       createSkillState([penitent, enemy]),
@@ -1901,6 +1918,19 @@ describe("skill effect resolution", () => {
       sourceClassId: "penitent",
       primaryStatBonusPercentByStat: { wisdom: 5, constitution: 5 },
     });
+    const benedictionVisualEvents =
+      benedictionState.skillVisualEvents?.filter(
+        (event) => event.skillId === "burdened_benediction",
+      ) ?? [];
+    expect(benedictionVisualEvents).toHaveLength(3);
+    expect(benedictionVisualEvents[0]).toMatchObject({
+      sourceId: penitent.id,
+    });
+    expect(benedictionVisualEvents[0]?.targetId).toBeUndefined();
+    expect(benedictionVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      penitent.id,
+      ally.id,
+    ]);
 
     const stepEnemy = createSkillEnemy("step-enemy", { x: 4, y: 1 });
     const offensiveStepState = resolveSkillEffect(

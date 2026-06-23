@@ -61,6 +61,7 @@ const PARTY_CLASS_BUFF_SKILLS_WITH_COMPANION_VISUALS = new Set<
   "arcane_conduit",
   "leyline_matrix",
   "radiant_benediction",
+  "burdened_benediction",
 ]);
 const SHIELD_OFFSET_DISTANCE = 1;
 const DEFAULT_SHIELD_DIRECTION: Position = { x: 0, y: -1 };
@@ -3526,13 +3527,25 @@ function applyWhipPrison(
     state: "attack",
     currentTargetId: caster.id,
   });
+  const visualDurationMs = Math.max(
+    skill.effect.controlDurationMs,
+    skill.effect.bleedDurationMs,
+  );
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "slash",
+    skillId: skill.id,
+    sourceId: caster.id,
+    now,
+    durationMs: visualDurationMs,
+  });
   nextState = addSkillVisualEvent(nextState, {
     type: "slash",
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
     now,
-    durationMs: VISUAL_DURATION_MS,
+    durationMs: visualDurationMs,
   });
   nextState = addCombatFeedback(nextState, {
     type: "attack",

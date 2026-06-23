@@ -24,6 +24,7 @@ const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
 const elementalistSkillEffectsPath = `${firstClassSkillEffectsPath}/elementalist/sprites`;
 const runecasterSkillEffectsPath = `${firstClassSkillEffectsPath}/runecaster/sprites`;
 const lightbearerSkillEffectsPath = `${firstClassSkillEffectsPath}/lightbearer/sprites`;
+const penitentSkillEffectsPath = `${firstClassSkillEffectsPath}/penitent/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -189,6 +190,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   herbalist_hymn: `${lightbearerSkillEffectsPath}/herbalist_hymn.png`,
   dawn_step: `${lightbearerSkillEffectsPath}/dawn_step.png`,
   circle_of_renewal: `${lightbearerSkillEffectsPath}/circle_of_renewal.png`,
+  whip_prison: `${penitentSkillEffectsPath}/whip_prison_caster.png`,
+  flagellant_lash: `${penitentSkillEffectsPath}/flagellant_lash.png`,
+  martyrs_veil: `${penitentSkillEffectsPath}/martyrs_veil.png`,
+  penitents_gift: `${penitentSkillEffectsPath}/penitents_gift.png`,
+  eternal_hope: `${penitentSkillEffectsPath}/eternal_hope.png`,
+  burdened_benediction: `${penitentSkillEffectsPath}/burdened_benediction_caster.png`,
+  woodcutting_penance: `${penitentSkillEffectsPath}/woodcutting_penance.png`,
+  atonement_step: `${penitentSkillEffectsPath}/atonement_step.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -198,6 +207,7 @@ export type SkillVisualPresentation = {
   targetedSrc?: string;
   targetedWidth?: number;
   targetedHeight?: number;
+  endOpacity?: number;
 };
 
 export const SKILL_VISUAL_PRESENTATION: Partial<
@@ -503,6 +513,53 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
     src: `${lightbearerSkillEffectsPath}/circle_of_renewal.png`,
     width: 100,
     height: 100,
+  },
+  whip_prison: {
+    src: `${penitentSkillEffectsPath}/whip_prison_caster.png`,
+    width: 88,
+    height: 88,
+    targetedSrc: `${penitentSkillEffectsPath}/whip_prison_target.png`,
+    targetedWidth: 88,
+    targetedHeight: 88,
+    endOpacity: 0.7,
+  },
+  flagellant_lash: {
+    src: `${penitentSkillEffectsPath}/flagellant_lash.png`,
+    width: 86,
+    height: 86,
+  },
+  martyrs_veil: {
+    src: `${penitentSkillEffectsPath}/martyrs_veil.png`,
+    width: 88,
+    height: 88,
+  },
+  penitents_gift: {
+    src: `${penitentSkillEffectsPath}/penitents_gift.png`,
+    width: 86,
+    height: 86,
+  },
+  eternal_hope: {
+    src: `${penitentSkillEffectsPath}/eternal_hope.png`,
+    width: 88,
+    height: 88,
+  },
+  burdened_benediction: {
+    src: `${penitentSkillEffectsPath}/burdened_benediction_caster.png`,
+    width: 98,
+    height: 98,
+    targetedSrc: `${penitentSkillEffectsPath}/burdened_benediction_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  woodcutting_penance: {
+    src: `${penitentSkillEffectsPath}/woodcutting_penance.png`,
+    width: 84,
+    height: 84,
+  },
+  atonement_step: {
+    src: `${penitentSkillEffectsPath}/atonement_step.png`,
+    width: 88,
+    height: 88,
   },
 };
 

@@ -2901,6 +2901,7 @@ function getSkillVisualPresentation(event: SkillVisualEvent): {
   src: string | undefined;
   width: number;
   height: number;
+  endOpacity?: number;
 } {
   const presentation = event.skillId
     ? SKILL_VISUAL_PRESENTATION[event.skillId]
@@ -2919,6 +2920,7 @@ function getSkillVisualPresentation(event: SkillVisualEvent): {
       src: presentation.targetedSrc,
       width: presentation.targetedWidth ?? presentation.width,
       height: presentation.targetedHeight ?? presentation.height,
+      endOpacity: presentation.endOpacity,
     };
   }
 
@@ -2926,7 +2928,23 @@ function getSkillVisualPresentation(event: SkillVisualEvent): {
     src: presentation.src,
     width: presentation.width,
     height: presentation.height,
+    endOpacity: presentation.endOpacity,
   };
+}
+
+export function getSkillVisualOpacity(
+  event: SkillVisualEvent,
+  currentTime: number,
+  endOpacity?: number,
+): number {
+  if (endOpacity === undefined) {
+    return 1;
+  }
+
+  const durationMs = Math.max(1, event.expiresAt - event.createdAt);
+  const progress = clamp((currentTime - event.createdAt) / durationMs, 0, 1);
+
+  return 1 + (endOpacity - 1) * progress;
 }
 
 function createFeedbackText({
@@ -4044,6 +4062,11 @@ function drawFullEffects({
         layer,
         managedState,
         metrics,
+        alpha: getSkillVisualOpacity(
+          event,
+          currentTime,
+          skillVisualPresentation.endOpacity,
+        ),
         position: center,
         requestRedraw,
         src: skillVisualPresentation.src,
