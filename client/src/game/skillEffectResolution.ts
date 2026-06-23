@@ -60,6 +60,7 @@ const PARTY_CLASS_BUFF_SKILLS_WITH_COMPANION_VISUALS = new Set<
   "pack_frenzy",
   "arcane_conduit",
   "leyline_matrix",
+  "radiant_benediction",
 ]);
 const SHIELD_OFFSET_DISTANCE = 1;
 const DEFAULT_SHIELD_DIRECTION: Position = { x: 0, y: -1 };

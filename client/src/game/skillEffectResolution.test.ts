@@ -2021,6 +2021,19 @@ describe("skill effect resolution", () => {
         ?.healingReceivedBonusPercent,
     ).toBe(5);
 
+    const radiantBenedictionVisualEvents =
+      buffState.skillVisualEvents?.filter(
+        (event) => event.skillId === "radiant_benediction",
+      ) ?? [];
+    expect(radiantBenedictionVisualEvents).toHaveLength(3);
+    expect(radiantBenedictionVisualEvents[0]).toMatchObject({
+      sourceId: "lightbearer",
+    });
+    expect(radiantBenedictionVisualEvents[0]?.targetId).toBeUndefined();
+    expect(
+      radiantBenedictionVisualEvents.slice(1).map((event) => event.targetId),
+    ).toEqual(["lightbearer", "ally"]);
+
     const areaState = resolveSkillEffect(
       createSkillState([lightbearer, ally, nearby, far]),
       lightbearer,

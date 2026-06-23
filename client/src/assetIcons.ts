@@ -23,6 +23,7 @@ const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
 const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
 const elementalistSkillEffectsPath = `${firstClassSkillEffectsPath}/elementalist/sprites`;
 const runecasterSkillEffectsPath = `${firstClassSkillEffectsPath}/runecaster/sprites`;
+const lightbearerSkillEffectsPath = `${firstClassSkillEffectsPath}/lightbearer/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -180,6 +181,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   leyline_matrix: `${runecasterSkillEffectsPath}/leyline_matrix_caster.png`,
   stone_sigil_rhythm: `${runecasterSkillEffectsPath}/stone_sigil_rhythm.png`,
   rune_step: `${runecasterSkillEffectsPath}/rune_step.png`,
+  blinding_ray: `${lightbearerSkillEffectsPath}/blinding_ray.png`,
+  light_mend: `${lightbearerSkillEffectsPath}/light_mend.png`,
+  sanctuary_veil: `${lightbearerSkillEffectsPath}/sanctuary_veil.png`,
+  guiding_light: `${lightbearerSkillEffectsPath}/guiding_light.png`,
+  radiant_benediction: `${lightbearerSkillEffectsPath}/radiant_benediction_caster.png`,
+  herbalist_hymn: `${lightbearerSkillEffectsPath}/herbalist_hymn.png`,
+  dawn_step: `${lightbearerSkillEffectsPath}/dawn_step.png`,
+  circle_of_renewal: `${lightbearerSkillEffectsPath}/circle_of_renewal.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -451,6 +460,49 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
     src: `${runecasterSkillEffectsPath}/rune_step.png`,
     width: 88,
     height: 88,
+  },
+  blinding_ray: {
+    src: `${lightbearerSkillEffectsPath}/blinding_ray.png`,
+    width: 86,
+    height: 86,
+  },
+  light_mend: {
+    src: `${lightbearerSkillEffectsPath}/light_mend.png`,
+    width: 86,
+    height: 86,
+  },
+  sanctuary_veil: {
+    src: `${lightbearerSkillEffectsPath}/sanctuary_veil.png`,
+    width: 88,
+    height: 88,
+  },
+  guiding_light: {
+    src: `${lightbearerSkillEffectsPath}/guiding_light.png`,
+    width: 84,
+    height: 84,
+  },
+  radiant_benediction: {
+    src: `${lightbearerSkillEffectsPath}/radiant_benediction_caster.png`,
+    width: 98,
+    height: 98,
+    targetedSrc: `${lightbearerSkillEffectsPath}/radiant_benediction_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  herbalist_hymn: {
+    src: `${lightbearerSkillEffectsPath}/herbalist_hymn.png`,
+    width: 84,
+    height: 84,
+  },
+  dawn_step: {
+    src: `${lightbearerSkillEffectsPath}/dawn_step.png`,
+    width: 88,
+    height: 88,
+  },
+  circle_of_renewal: {
+    src: `${lightbearerSkillEffectsPath}/circle_of_renewal.png`,
+    width: 100,
+    height: 100,
   },
 };
 
