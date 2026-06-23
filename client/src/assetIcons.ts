@@ -22,6 +22,7 @@ const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
 const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
 const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
 const elementalistSkillEffectsPath = `${firstClassSkillEffectsPath}/elementalist/sprites`;
+const runecasterSkillEffectsPath = `${firstClassSkillEffectsPath}/runecaster/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
 const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
 
@@ -171,6 +172,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   emberwood_rhythm: `${elementalistSkillEffectsPath}/emberwood_rhythm.png`,
   flame_step: `${elementalistSkillEffectsPath}/flame_step.png`,
   fire_burst: `${elementalistSkillEffectsPath}/fire_burst.png`,
+  binding_rune: `${runecasterSkillEffectsPath}/binding_rune.png`,
+  rune_lance: `${runecasterSkillEffectsPath}/rune_lance.png`,
+  warding_glyph: `${runecasterSkillEffectsPath}/warding_glyph.png`,
+  rewind_rune: `${runecasterSkillEffectsPath}/rewind_rune.png`,
+  runic_focus: `${runecasterSkillEffectsPath}/runic_focus.png`,
+  leyline_matrix: `${runecasterSkillEffectsPath}/leyline_matrix_caster.png`,
+  stone_sigil_rhythm: `${runecasterSkillEffectsPath}/stone_sigil_rhythm.png`,
+  rune_step: `${runecasterSkillEffectsPath}/rune_step.png`,
 };
 
 export type SkillVisualPresentation = {
@@ -399,6 +408,49 @@ export const SKILL_VISUAL_PRESENTATION: Partial<
     src: `${elementalistSkillEffectsPath}/fire_burst.png`,
     width: 100,
     height: 100,
+  },
+  binding_rune: {
+    src: `${runecasterSkillEffectsPath}/binding_rune.png`,
+    width: 86,
+    height: 86,
+  },
+  rune_lance: {
+    src: `${runecasterSkillEffectsPath}/rune_lance.png`,
+    width: 88,
+    height: 88,
+  },
+  warding_glyph: {
+    src: `${runecasterSkillEffectsPath}/warding_glyph.png`,
+    width: 86,
+    height: 86,
+  },
+  rewind_rune: {
+    src: `${runecasterSkillEffectsPath}/rewind_rune.png`,
+    width: 86,
+    height: 86,
+  },
+  runic_focus: {
+    src: `${runecasterSkillEffectsPath}/runic_focus.png`,
+    width: 84,
+    height: 84,
+  },
+  leyline_matrix: {
+    src: `${runecasterSkillEffectsPath}/leyline_matrix_caster.png`,
+    width: 98,
+    height: 98,
+    targetedSrc: `${runecasterSkillEffectsPath}/leyline_matrix_companion.png`,
+    targetedWidth: 60,
+    targetedHeight: 60,
+  },
+  stone_sigil_rhythm: {
+    src: `${runecasterSkillEffectsPath}/stone_sigil_rhythm.png`,
+    width: 84,
+    height: 84,
+  },
+  rune_step: {
+    src: `${runecasterSkillEffectsPath}/rune_step.png`,
+    width: 88,
+    height: 88,
   },
 };
 
