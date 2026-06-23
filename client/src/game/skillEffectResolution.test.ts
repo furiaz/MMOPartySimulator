@@ -1529,6 +1529,48 @@ describe("skill effect resolution", () => {
     expect(state.skillRunicFocusByCompanionId?.runecaster).toBeDefined();
   });
 
+  it("shows Leyline Matrix on the caster and affected companions", () => {
+    const runecaster = createSkillCompanion(
+      "runecaster",
+      "support",
+      { x: 0, y: 0 },
+      "runecaster",
+    );
+    const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 1 });
+    const matrixState = resolveSkillEffect(
+      createSkillState([runecaster, ally, enemy]),
+      runecaster,
+      createSkillUse("leyline_matrix", runecaster),
+      1000,
+    ).state;
+
+    expect(
+      matrixState.skillPartyClassBuffsByCompanionId?.ally?.runecaster,
+    ).toMatchObject({
+      sourceId: runecaster.id,
+      sourceClassId: "runecaster",
+      primaryStatBonusPercentByStat: { wisdom: 5 },
+      mitigationPercent: 8,
+      mitigatedDamageTypes: ["magic"],
+      expiresAt: 61000,
+    });
+
+    const leylineMatrixVisualEvents =
+      matrixState.skillVisualEvents?.filter(
+        (event) => event.skillId === "leyline_matrix",
+      ) ?? [];
+    expect(leylineMatrixVisualEvents).toHaveLength(3);
+    expect(leylineMatrixVisualEvents[0]).toMatchObject({
+      sourceId: "runecaster",
+    });
+    expect(leylineMatrixVisualEvents[0]?.targetId).toBeUndefined();
+    expect(leylineMatrixVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      "runecaster",
+      "ally",
+    ]);
+  });
+
   it("uses Rune Step mobility preference and traps enemies near the placement point", () => {
     const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
     const enemy = createSkillEnemy("enemy", { x: 3, y: 0 });
