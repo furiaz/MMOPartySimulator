@@ -907,6 +907,42 @@ describe("skill effect resolution", () => {
     expect(bladeHit.rawDamage).toBeCloseTo(allyHit.rawDamage + 1.05);
   });
 
+  it("shows Pack Frenzy on the caster and affected companions", () => {
+    const beast = createSkillCompanion("beast", "fighter", { x: 0, y: 0 }, "beast");
+    const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "blade");
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 1 });
+    const frenzyState = resolveSkillEffect(
+      createSkillState([beast, ally, enemy]),
+      beast,
+      createSkillUse("pack_frenzy", beast),
+      1000,
+    ).state;
+
+    expect(frenzyState.skillPartyClassBuffsByCompanionId?.ally?.beast).toMatchObject({
+      sourceId: beast.id,
+      sourceClassId: "beast",
+      primaryStatBonusPercentByStat: {
+        strength: 5,
+        dexterity: 5,
+      },
+      expiresAt: 61000,
+    });
+
+    const packFrenzyVisualEvents =
+      frenzyState.skillVisualEvents?.filter(
+        (event) => event.skillId === "pack_frenzy",
+      ) ?? [];
+    expect(packFrenzyVisualEvents).toHaveLength(3);
+    expect(packFrenzyVisualEvents[0]).toMatchObject({
+      sourceId: "beast",
+    });
+    expect(packFrenzyVisualEvents[0]?.targetId).toBeUndefined();
+    expect(packFrenzyVisualEvents.slice(1).map((event) => event.targetId)).toEqual([
+      "beast",
+      "ally",
+    ]);
+  });
+
   it("refreshes same-class party buffs instead of stacking by caster", () => {
     const firstBlade = createSkillCompanion(
       "first-blade",
