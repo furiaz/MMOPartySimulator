@@ -201,6 +201,13 @@ export const slimewardCampArrivalPositions: Position[] = [
   { x: 13, y: 18 },
 ];
 
+export const slimewardCampDungeonEntranceArrivalPositions: Position[] = [
+  { x: 28, y: 17 },
+  { x: 29, y: 17 },
+  { x: 28, y: 18 },
+  { x: 29, y: 18 },
+];
+
 export const mapThreeSlimewardArrivalPositions: Position[] = [
   { x: 151, y: 8 },
   { x: 152, y: 8 },
@@ -1424,7 +1431,7 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: SLIMEWARD_FLOOR_ONE_ID,
         targetMapId: SLIMEWARD_CAMP_ID,
-        arrivalPositions: slimewardCampArrivalPositions,
+        arrivalPositions: slimewardCampDungeonEntranceArrivalPositions,
         visualTheme: "slimeward",
       },
       {
@@ -1485,7 +1492,7 @@ export const debugMapDefinitions: Record<
         range: TELEPORTER_RANGE,
         sourceMapId: SLIMEWARD_FLOOR_TWO_ID,
         targetMapId: SLIMEWARD_CAMP_ID,
-        arrivalPositions: slimewardCampArrivalPositions,
+        arrivalPositions: slimewardCampDungeonEntranceArrivalPositions,
         startsWorking: false,
         visualTheme: "slimeward",
       },

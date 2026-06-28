@@ -5,7 +5,17 @@ import {
   createDebugMap,
   createPendingRoleBonusState,
 } from "./index";
-import { companionIds, HUB_MAP_ID, MAP_ONE_ID } from "./debugMap";
+import {
+  companionIds,
+  HUB_MAP_ID,
+  MAP_ONE_ID,
+  SLIMEWARD_CAMP_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_ONE_TO_CAMP_TELEPORTER_ID,
+  SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
+  slimewardCampDungeonEntranceArrivalPositions,
+} from "./debugMap";
 import { addItemToInventoryState } from "./inventory";
 import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
@@ -103,6 +113,29 @@ describe("teleport system", () => {
       },
     });
   });
+
+  it.each([
+    {
+      sourceMapId: SLIMEWARD_FLOOR_ONE_ID,
+      teleportId: SLIMEWARD_FLOOR_ONE_TO_CAMP_TELEPORTER_ID,
+    },
+    {
+      sourceMapId: SLIMEWARD_FLOOR_TWO_ID,
+      teleportId: SLIMEWARD_FLOOR_TWO_EXIT_TELEPORTER_ID,
+    },
+  ])(
+    "places companions at the Slimeward Camp dungeon entrance after $teleportId",
+    ({ sourceMapId, teleportId }) => {
+      const state = createTeleportReadyState(sourceMapId, teleportId);
+
+      const nextState = updateTeleportSystem(state, new Set(), 12345);
+
+      expect(nextState.currentMapId).toBe(SLIMEWARD_CAMP_ID);
+      expect(nextState.entities[companionIds[0]]?.position).toEqual(
+        slimewardCampDungeonEntranceArrivalPositions[0],
+      );
+    },
+  );
 });
 
 function createHubTeleportReadyState(overrides: Partial<GameState> = {}) {
@@ -153,4 +186,44 @@ function createHubTeleportReadyState(overrides: Partial<GameState> = {}) {
     1,
     "debug",
   ).state;
+}
+
+function createTeleportReadyState(
+  sourceMapId: Parameters<typeof createDebugMap>[0],
+  teleportId: string,
+  overrides: Partial<GameState> = {},
+) {
+  const map = createDebugMap(sourceMapId);
+  const teleport = map.teleports.find((candidate) => candidate.id === teleportId);
+  const companionId = companionIds[0];
+
+  if (!teleport) {
+    throw new Error(`Missing ${teleportId} teleport in test map.`);
+  }
+
+  const leader = createCompanion(
+    companionId,
+    teleport.position,
+    companionId,
+    "fighter",
+    0,
+  );
+
+  return createTestGameState({
+    currentMapId: sourceMapId,
+    map,
+    entities: {
+      [leader.id]: leader,
+    },
+    partyLeaderId: leader.id,
+    activeTeleport: {
+      id: teleport.id,
+      position: teleport.position,
+      range: teleport.range,
+      sourceMapId: teleport.sourceMapId,
+      targetMapId: teleport.targetMapId,
+      triggeredBy: "player",
+    } satisfies ActiveTeleport,
+    ...overrides,
+  });
 }
