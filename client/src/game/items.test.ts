@@ -1,5 +1,113 @@
 import { describe, expect, it } from "vitest";
 import { getItemDefinitionForResourceType, ITEM_DEFINITIONS } from "./items";
+import type { ItemId } from "./types";
+
+const SCALED_EQUIPMENT_LEVEL_REQUIREMENTS: Partial<Record<ItemId, number>> = {
+  steel_sword: 15,
+  veteran_sword: 20,
+  bastion_mace: 15,
+  ironhold_mace: 20,
+  steel_claws: 15,
+  rending_claws: 20,
+  barbed_whip: 15,
+  bloodthorn_whip: 20,
+  reinforced_bow: 15,
+  veteran_warbow: 20,
+  adept_orb: 15,
+  storm_orb: 20,
+  etched_rune_lantern: 15,
+  deep_rune_lantern: 20,
+  sanctified_mace: 15,
+  dawn_mace: 20,
+  reinforced_shield: 15,
+  tower_shield: 20,
+  warded_talisman: 15,
+  greater_talisman: 20,
+  bright_lantern: 15,
+  radiant_lantern: 20,
+  ritual_dagger: 15,
+  oath_dagger: 20,
+  bastion_helm: 15,
+  bastion_cuirass: 15,
+  bastion_greaves: 15,
+  bastion_gauntlets: 15,
+  bastion_sabatons: 15,
+  ironhold_helm: 20,
+  ironhold_cuirass: 20,
+  ironhold_greaves: 20,
+  ironhold_gauntlets: 20,
+  ironhold_sabatons: 20,
+  breaker_helm: 15,
+  breaker_cuirass: 15,
+  breaker_greaves: 15,
+  breaker_gauntlets: 15,
+  breaker_sabatons: 15,
+  conqueror_helm: 20,
+  conqueror_cuirass: 20,
+  conqueror_greaves: 20,
+  conqueror_gauntlets: 20,
+  conqueror_sabatons: 20,
+  blessed_hood: 15,
+  blessed_robe: 15,
+  blessed_pants: 15,
+  blessed_wraps: 15,
+  blessed_sandals: 15,
+  sanctuary_hood: 20,
+  sanctuary_robe: 20,
+  sanctuary_pants: 20,
+  sanctuary_wraps: 20,
+  sanctuary_sandals: 20,
+  adept_hood: 15,
+  adept_robe: 15,
+  adept_pants: 15,
+  adept_gloves: 15,
+  adept_sandals: 15,
+  arcanist_hood: 20,
+  arcanist_robe: 20,
+  arcanist_pants: 20,
+  arcanist_gloves: 20,
+  arcanist_sandals: 20,
+  pathfinder_cap: 15,
+  pathfinder_jacket: 15,
+  pathfinder_trousers: 15,
+  pathfinder_gloves: 15,
+  pathfinder_boots: 15,
+  wayfarer_cap: 20,
+  wayfarer_jacket: 20,
+  wayfarer_trousers: 20,
+  wayfarer_gloves: 20,
+  wayfarer_boots: 20,
+  striker_mask: 15,
+  striker_vest: 15,
+  striker_leggings: 15,
+  striker_grips: 15,
+  striker_boots: 15,
+  duelist_mask: 20,
+  duelist_vest: 20,
+  duelist_leggings: 20,
+  duelist_grips: 20,
+  duelist_boots: 20,
+  sentinel_coif: 15,
+  sentinel_hauberk: 15,
+  sentinel_legguards: 15,
+  sentinel_gloves: 15,
+  sentinel_boots: 15,
+  ironward_coif: 20,
+  ironward_hauberk: 20,
+  ironward_legguards: 20,
+  ironward_gloves: 20,
+  ironward_boots: 20,
+  marshal_coif: 15,
+  marshal_hauberk: 15,
+  marshal_legguards: 15,
+  marshal_gloves: 15,
+  marshal_boots: 15,
+  frontline_coif: 20,
+  frontline_hauberk: 20,
+  frontline_legguards: 20,
+  frontline_gloves: 20,
+  frontline_boots: 20,
+};
 
 describe("prototype item definitions", () => {
   const getArmorItems = () =>
@@ -38,7 +146,7 @@ describe("prototype item definitions", () => {
   it("keeps regular armor class-unrestricted and grouped by family", () => {
     const armorItems = getArmorItems();
 
-    expect(armorItems.length).toBe(40);
+    expect(armorItems.length).toBe(120);
 
     for (const itemDefinition of armorItems) {
       expect(itemDefinition.armorFamily).toMatch(/^(cloth|leather|mail|plate)$/);
@@ -77,8 +185,9 @@ describe("prototype item definitions", () => {
   it("keeps cloth and plate tier 1 armor at level 10", () => {
     const clothAndPlateItems = getArmorItems().filter(
       (itemDefinition) =>
-        itemDefinition.armorFamily === "cloth" ||
-        itemDefinition.armorFamily === "plate",
+        itemDefinition.tier === 1 &&
+        (itemDefinition.armorFamily === "cloth" ||
+          itemDefinition.armorFamily === "plate"),
     );
     const familiesAvailableAtLevel10 = new Set(
       getArmorItems()
@@ -93,6 +202,28 @@ describe("prototype item definitions", () => {
     expect(familiesAvailableAtLevel10).toEqual(
       new Set(["cloth", "leather", "mail", "plate"]),
     );
+  });
+
+  it("defines level 15 and 20 scaled equipment as tier 2 one-off items", () => {
+    const scaledEquipmentEntries = Object.entries(
+      SCALED_EQUIPMENT_LEVEL_REQUIREMENTS,
+    );
+
+    expect(scaledEquipmentEntries).toHaveLength(104);
+
+    for (const [itemId, levelRequirement] of scaledEquipmentEntries) {
+      const itemDefinition = ITEM_DEFINITIONS[itemId as ItemId];
+
+      expect(itemDefinition).toMatchObject({
+        id: itemId,
+        category: "equipment",
+        rarity: "common",
+        tier: 2,
+        stackable: false,
+        maxStack: 1,
+        levelRequirement,
+      });
+    }
   });
 
   it("keeps regular mail and plate away from magic and healing power", () => {

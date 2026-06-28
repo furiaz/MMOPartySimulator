@@ -260,6 +260,130 @@ describe("prototype equipment system", () => {
     });
   });
 
+  it("equips representative level 15 weapon and offhand loadouts", () => {
+    const { state, companion } = createStateWithCompanion(
+      "aegis",
+      ["bastion_mace", "reinforced_shield"],
+      10,
+      15,
+    );
+
+    const maceState = equipItemToCompanion(
+      state,
+      companion.id,
+      "bastion_mace",
+      "mainHand",
+    ).state;
+    const { state: nextState, result } = equipItemToCompanion(
+      maceState,
+      companion.id,
+      "reinforced_shield",
+      "offhand",
+    );
+    const nextCompanion = nextState.entities[companion.id] as Companion;
+
+    expect(result.status).toBe("success");
+    expect(nextCompanion.equipment.mainHand).toBe("bastion_mace");
+    expect(nextCompanion.equipment.offhand).toBe("reinforced_shield");
+  });
+
+  it("equips representative level 20 both-hands weapons", () => {
+    const { state, companion } = createStateWithCompanion(
+      "hunter",
+      ["veteran_warbow"],
+      10,
+      20,
+    );
+
+    const { state: nextState, result } = equipItemToCompanion(
+      state,
+      companion.id,
+      "veteran_warbow",
+      "mainHand",
+    );
+    const nextCompanion = nextState.entities[companion.id] as Companion;
+
+    expect(result.status).toBe("success");
+    expect(nextCompanion.equipment.mainHand).toBe("veteran_warbow");
+    expect(nextCompanion.equipment.offhand).toBeNull();
+  });
+
+  it("rejects level 15 and 20 scaled equipment below their requirements", () => {
+    const level14State = createStateWithCompanion(
+      "blade",
+      ["steel_sword"],
+      10,
+      14,
+    );
+    const level19State = createStateWithCompanion(
+      "blade",
+      ["veteran_sword"],
+      10,
+      19,
+    );
+
+    expect(
+      equipItemToCompanion(
+        level14State.state,
+        level14State.companion.id,
+        "steel_sword",
+        "mainHand",
+      ).result,
+    ).toMatchObject({
+      status: "failed",
+      reason: "level_requirement_not_met",
+    });
+    expect(
+      equipItemToCompanion(
+        level19State.state,
+        level19State.companion.id,
+        "veteran_sword",
+        "mainHand",
+      ).result,
+    ).toMatchObject({
+      status: "failed",
+      reason: "level_requirement_not_met",
+    });
+  });
+
+  it("equips scaled armor only when level requirements are met", () => {
+    const underleveled = createStateWithCompanion(
+      "elementalist",
+      ["bastion_cuirass"],
+      10,
+      14,
+    );
+    const ready = createStateWithCompanion(
+      "elementalist",
+      ["ironhold_cuirass"],
+      10,
+      20,
+    );
+
+    expect(
+      equipItemToCompanion(
+        underleveled.state,
+        underleveled.companion.id,
+        "bastion_cuirass",
+        "chest",
+      ).result,
+    ).toMatchObject({
+      status: "failed",
+      reason: "level_requirement_not_met",
+    });
+
+    const { state: nextState, result } = equipItemToCompanion(
+      ready.state,
+      ready.companion.id,
+      "ironhold_cuirass",
+      "chest",
+    );
+    const nextCompanion = nextState.entities[ready.companion.id] as Companion;
+
+    expect(result.status).toBe("success");
+    expect(nextCompanion.equipment.chest).toBe("ironhold_cuirass");
+  });
+
   it("does not unequip when inventory is full", () => {
     const { state, companion } = createStateWithCompanion("blade", [
       "iron_sword",

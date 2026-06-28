@@ -1460,6 +1460,20 @@ function formatCurrencyAmount(amount: number): string {
   return Math.max(0, Math.floor(amount)).toLocaleString();
 }
 
+function getMerchantLevelFilterValue(value: string): number | null {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(trimmedValue);
+
+  return Number.isFinite(parsedValue)
+    ? Math.max(0, Math.floor(parsedValue))
+    : null;
+}
+
 function MerchantBuyPanel({
   merchantNpcId,
   state,
@@ -1471,6 +1485,8 @@ function MerchantBuyPanel({
 }) {
   const [activeFilter, setActiveFilter] = useState<MerchantBuyFilter>("all");
   const [activeSecondaryFilter, setActiveSecondaryFilter] = useState<string | null>(null);
+  const [minLevelFilter, setMinLevelFilter] = useState("");
+  const [maxLevelFilter, setMaxLevelFilter] = useState("");
   const [partyCompatibleOnly, setPartyCompatibleOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<ItemId | null>(null);
   const stock = getMerchantBuyStock(state, merchantNpcId);
@@ -1486,9 +1502,13 @@ function MerchantBuyPanel({
     secondaryFilterOptions.some((option) => option.id === activeSecondaryFilter)
       ? activeSecondaryFilter
       : null;
+  const minLevelRequirement = getMerchantLevelFilterValue(minLevelFilter);
+  const maxLevelRequirement = getMerchantLevelFilterValue(maxLevelFilter);
   const filteredStock = getFilteredMerchantBuyStock(state, merchantNpcId, {
     mainFilter: activeFilter,
     secondaryFilter: effectiveSecondaryFilter,
+    minLevelRequirement,
+    maxLevelRequirement,
     partyCompatibleOnly,
   });
   const selectedEntry =
@@ -1556,6 +1576,36 @@ function MerchantBuyPanel({
             ))}
           </nav>
         ) : null}
+        <div className="merchant-buy-level-filters" aria-label="Merchant stock level filters">
+          <label>
+            Min level
+            <input
+              inputMode="numeric"
+              min={0}
+              onChange={(event) => {
+                setMinLevelFilter(event.currentTarget.value);
+                setSelectedItemId(null);
+              }}
+              step={1}
+              type="number"
+              value={minLevelFilter}
+            />
+          </label>
+          <label>
+            Max level
+            <input
+              inputMode="numeric"
+              min={0}
+              onChange={(event) => {
+                setMaxLevelFilter(event.currentTarget.value);
+                setSelectedItemId(null);
+              }}
+              step={1}
+              type="number"
+              value={maxLevelFilter}
+            />
+          </label>
+        </div>
         <label className="merchant-buy-compatible-toggle">
           <input
             checked={partyCompatibleOnly}

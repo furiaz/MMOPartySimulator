@@ -81,6 +81,8 @@ const DEFAULT_DEBUG_OPTIONS = {
 const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "training_sword",
   "iron_sword",
+  "steel_sword",
+  "veteran_sword",
   "guard_mace",
   "claw_gauntlets",
   "thorn_whip",
@@ -99,6 +101,8 @@ const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "guard_hauberk",
   "vanguard_gloves",
   "bulwark_cuirass",
+  "bastion_cuirass",
+  "ironhold_cuirass",
   "warplate_gauntlets",
   "plain_charm",
 ] as const;

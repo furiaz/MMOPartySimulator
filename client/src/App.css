@@ -1279,6 +1279,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
@@ -1292,6 +1293,34 @@
   border-color: #7aa6ad;
   background: rgba(58, 90, 96, 0.62);
   color: #ffffff;
+}
+
+.merchant-buy-level-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.merchant-buy-level-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #d7e7df;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.merchant-buy-level-filters input {
+  width: 64px;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border: 1px solid #3a5a60;
+  background: rgba(9, 18, 21, 0.48);
+  color: #e6f0f2;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .merchant-buy-compatible-toggle {

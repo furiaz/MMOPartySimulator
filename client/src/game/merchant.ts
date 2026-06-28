@@ -55,6 +55,8 @@ export type MerchantBuyFilter = "all" | MerchantStockGroup;
 export type MerchantStockFilterOptions = {
   mainFilter?: MerchantBuyFilter;
   secondaryFilter?: string | null;
+  minLevelRequirement?: number | null;
+  maxLevelRequirement?: number | null;
   partyCompatibleOnly?: boolean;
 };
 
@@ -228,9 +230,33 @@ const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "apprentice_orb", priceCrowns: 60, group: "weapons" },
   { itemId: "rune_lantern", priceCrowns: 60, group: "weapons" },
   { itemId: "holy_mace", priceCrowns: 60, group: "weapons" },
+  { itemId: "steel_sword", priceCrowns: 120, group: "weapons" },
+  { itemId: "veteran_sword", priceCrowns: 180, group: "weapons" },
+  { itemId: "bastion_mace", priceCrowns: 120, group: "weapons" },
+  { itemId: "ironhold_mace", priceCrowns: 180, group: "weapons" },
+  { itemId: "steel_claws", priceCrowns: 130, group: "weapons" },
+  { itemId: "rending_claws", priceCrowns: 195, group: "weapons" },
+  { itemId: "barbed_whip", priceCrowns: 130, group: "weapons" },
+  { itemId: "bloodthorn_whip", priceCrowns: 195, group: "weapons" },
+  { itemId: "reinforced_bow", priceCrowns: 130, group: "weapons" },
+  { itemId: "veteran_warbow", priceCrowns: 195, group: "weapons" },
+  { itemId: "adept_orb", priceCrowns: 120, group: "weapons" },
+  { itemId: "storm_orb", priceCrowns: 180, group: "weapons" },
+  { itemId: "etched_rune_lantern", priceCrowns: 120, group: "weapons" },
+  { itemId: "deep_rune_lantern", priceCrowns: 180, group: "weapons" },
+  { itemId: "sanctified_mace", priceCrowns: 120, group: "weapons" },
+  { itemId: "dawn_mace", priceCrowns: 180, group: "weapons" },
   { itemId: "wooden_shield", priceCrowns: 45, group: "offhands" },
   { itemId: "simple_talisman", priceCrowns: 40, group: "offhands" },
   { itemId: "sacrificial_dagger", priceCrowns: 40, group: "offhands" },
+  { itemId: "reinforced_shield", priceCrowns: 90, group: "offhands" },
+  { itemId: "tower_shield", priceCrowns: 135, group: "offhands" },
+  { itemId: "warded_talisman", priceCrowns: 90, group: "offhands" },
+  { itemId: "greater_talisman", priceCrowns: 135, group: "offhands" },
+  { itemId: "bright_lantern", priceCrowns: 90, group: "offhands" },
+  { itemId: "radiant_lantern", priceCrowns: 135, group: "offhands" },
+  { itemId: "ritual_dagger", priceCrowns: 90, group: "offhands" },
+  { itemId: "oath_dagger", priceCrowns: 135, group: "offhands" },
   { itemId: "acolyte_robe", priceCrowns: 82, group: "cloth" },
   { itemId: "acolyte_pants", priceCrowns: 62, group: "cloth" },
   { itemId: "acolyte_wraps", priceCrowns: 52, group: "cloth" },
@@ -240,6 +266,26 @@ const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "scholar_pants", priceCrowns: 62, group: "cloth" },
   { itemId: "scholar_gloves", priceCrowns: 52, group: "cloth" },
   { itemId: "scholar_sandals", priceCrowns: 52, group: "cloth" },
+  { itemId: "blessed_hood", priceCrowns: 100, group: "cloth" },
+  { itemId: "blessed_robe", priceCrowns: 140, group: "cloth" },
+  { itemId: "blessed_pants", priceCrowns: 120, group: "cloth" },
+  { itemId: "blessed_wraps", priceCrowns: 100, group: "cloth" },
+  { itemId: "blessed_sandals", priceCrowns: 100, group: "cloth" },
+  { itemId: "sanctuary_hood", priceCrowns: 150, group: "cloth" },
+  { itemId: "sanctuary_robe", priceCrowns: 210, group: "cloth" },
+  { itemId: "sanctuary_pants", priceCrowns: 180, group: "cloth" },
+  { itemId: "sanctuary_wraps", priceCrowns: 150, group: "cloth" },
+  { itemId: "sanctuary_sandals", priceCrowns: 150, group: "cloth" },
+  { itemId: "adept_hood", priceCrowns: 100, group: "cloth" },
+  { itemId: "adept_robe", priceCrowns: 140, group: "cloth" },
+  { itemId: "adept_pants", priceCrowns: 120, group: "cloth" },
+  { itemId: "adept_gloves", priceCrowns: 100, group: "cloth" },
+  { itemId: "adept_sandals", priceCrowns: 100, group: "cloth" },
+  { itemId: "arcanist_hood", priceCrowns: 150, group: "cloth" },
+  { itemId: "arcanist_robe", priceCrowns: 210, group: "cloth" },
+  { itemId: "arcanist_pants", priceCrowns: 180, group: "cloth" },
+  { itemId: "arcanist_gloves", priceCrowns: 150, group: "cloth" },
+  { itemId: "arcanist_sandals", priceCrowns: 150, group: "cloth" },
   { itemId: "scout_cap", priceCrowns: 26, group: "leather" },
   { itemId: "scout_jacket", priceCrowns: 35, group: "leather" },
   { itemId: "scout_trousers", priceCrowns: 28, group: "leather" },
@@ -249,6 +295,26 @@ const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "stalker_leggings", priceCrowns: 50, group: "leather" },
   { itemId: "stalker_grips", priceCrowns: 46, group: "leather" },
   { itemId: "stalker_boots", priceCrowns: 44, group: "leather" },
+  { itemId: "pathfinder_cap", priceCrowns: 100, group: "leather" },
+  { itemId: "pathfinder_jacket", priceCrowns: 140, group: "leather" },
+  { itemId: "pathfinder_trousers", priceCrowns: 120, group: "leather" },
+  { itemId: "pathfinder_gloves", priceCrowns: 100, group: "leather" },
+  { itemId: "pathfinder_boots", priceCrowns: 100, group: "leather" },
+  { itemId: "wayfarer_cap", priceCrowns: 150, group: "leather" },
+  { itemId: "wayfarer_jacket", priceCrowns: 210, group: "leather" },
+  { itemId: "wayfarer_trousers", priceCrowns: 180, group: "leather" },
+  { itemId: "wayfarer_gloves", priceCrowns: 150, group: "leather" },
+  { itemId: "wayfarer_boots", priceCrowns: 150, group: "leather" },
+  { itemId: "striker_mask", priceCrowns: 100, group: "leather" },
+  { itemId: "striker_vest", priceCrowns: 140, group: "leather" },
+  { itemId: "striker_leggings", priceCrowns: 120, group: "leather" },
+  { itemId: "striker_grips", priceCrowns: 100, group: "leather" },
+  { itemId: "striker_boots", priceCrowns: 100, group: "leather" },
+  { itemId: "duelist_mask", priceCrowns: 150, group: "leather" },
+  { itemId: "duelist_vest", priceCrowns: 210, group: "leather" },
+  { itemId: "duelist_leggings", priceCrowns: 180, group: "leather" },
+  { itemId: "duelist_grips", priceCrowns: 150, group: "leather" },
+  { itemId: "duelist_boots", priceCrowns: 150, group: "leather" },
   { itemId: "guard_coif", priceCrowns: 26, group: "mail" },
   { itemId: "guard_hauberk", priceCrowns: 35, group: "mail" },
   { itemId: "guard_legguards", priceCrowns: 28, group: "mail" },
@@ -259,6 +325,26 @@ const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "vanguard_legguards", priceCrowns: 50, group: "mail" },
   { itemId: "vanguard_gloves", priceCrowns: 46, group: "mail" },
   { itemId: "vanguard_boots", priceCrowns: 44, group: "mail" },
+  { itemId: "sentinel_coif", priceCrowns: 100, group: "mail" },
+  { itemId: "sentinel_hauberk", priceCrowns: 140, group: "mail" },
+  { itemId: "sentinel_legguards", priceCrowns: 120, group: "mail" },
+  { itemId: "sentinel_gloves", priceCrowns: 100, group: "mail" },
+  { itemId: "sentinel_boots", priceCrowns: 100, group: "mail" },
+  { itemId: "ironward_coif", priceCrowns: 150, group: "mail" },
+  { itemId: "ironward_hauberk", priceCrowns: 210, group: "mail" },
+  { itemId: "ironward_legguards", priceCrowns: 180, group: "mail" },
+  { itemId: "ironward_gloves", priceCrowns: 150, group: "mail" },
+  { itemId: "ironward_boots", priceCrowns: 150, group: "mail" },
+  { itemId: "marshal_coif", priceCrowns: 100, group: "mail" },
+  { itemId: "marshal_hauberk", priceCrowns: 140, group: "mail" },
+  { itemId: "marshal_legguards", priceCrowns: 120, group: "mail" },
+  { itemId: "marshal_gloves", priceCrowns: 100, group: "mail" },
+  { itemId: "marshal_boots", priceCrowns: 100, group: "mail" },
+  { itemId: "frontline_coif", priceCrowns: 150, group: "mail" },
+  { itemId: "frontline_hauberk", priceCrowns: 210, group: "mail" },
+  { itemId: "frontline_legguards", priceCrowns: 180, group: "mail" },
+  { itemId: "frontline_gloves", priceCrowns: 150, group: "mail" },
+  { itemId: "frontline_boots", priceCrowns: 150, group: "mail" },
   { itemId: "bulwark_helm", priceCrowns: 62, group: "plate" },
   { itemId: "bulwark_greaves", priceCrowns: 74, group: "plate" },
   { itemId: "bulwark_gauntlets", priceCrowns: 62, group: "plate" },
@@ -268,6 +354,26 @@ const DEFAULT_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "warplate_greaves", priceCrowns: 74, group: "plate" },
   { itemId: "warplate_gauntlets", priceCrowns: 66, group: "plate" },
   { itemId: "warplate_sabatons", priceCrowns: 64, group: "plate" },
+  { itemId: "bastion_helm", priceCrowns: 100, group: "plate" },
+  { itemId: "bastion_cuirass", priceCrowns: 140, group: "plate" },
+  { itemId: "bastion_greaves", priceCrowns: 120, group: "plate" },
+  { itemId: "bastion_gauntlets", priceCrowns: 100, group: "plate" },
+  { itemId: "bastion_sabatons", priceCrowns: 100, group: "plate" },
+  { itemId: "ironhold_helm", priceCrowns: 150, group: "plate" },
+  { itemId: "ironhold_cuirass", priceCrowns: 210, group: "plate" },
+  { itemId: "ironhold_greaves", priceCrowns: 180, group: "plate" },
+  { itemId: "ironhold_gauntlets", priceCrowns: 150, group: "plate" },
+  { itemId: "ironhold_sabatons", priceCrowns: 150, group: "plate" },
+  { itemId: "breaker_helm", priceCrowns: 100, group: "plate" },
+  { itemId: "breaker_cuirass", priceCrowns: 140, group: "plate" },
+  { itemId: "breaker_greaves", priceCrowns: 120, group: "plate" },
+  { itemId: "breaker_gauntlets", priceCrowns: 100, group: "plate" },
+  { itemId: "breaker_sabatons", priceCrowns: 100, group: "plate" },
+  { itemId: "conqueror_helm", priceCrowns: 150, group: "plate" },
+  { itemId: "conqueror_cuirass", priceCrowns: 210, group: "plate" },
+  { itemId: "conqueror_greaves", priceCrowns: 180, group: "plate" },
+  { itemId: "conqueror_gauntlets", priceCrowns: 150, group: "plate" },
+  { itemId: "conqueror_sabatons", priceCrowns: 150, group: "plate" },
   { itemId: "plain_charm", priceCrowns: 25, group: "accessories" },
 ];
 
@@ -311,6 +417,10 @@ export function getFilteredMerchantBuyStock(
       filters.secondaryFilter &&
       !doesMerchantSecondaryFilterMatch(entry, itemDefinition, filters.secondaryFilter)
     ) {
+      return false;
+    }
+
+    if (!doesMerchantLevelRequirementMatch(itemDefinition, filters)) {
       return false;
     }
 
@@ -611,6 +721,45 @@ function doesMerchantSecondaryFilterMatch(
   const option = getMerchantSecondaryFilterOption(entry, itemDefinition);
 
   return option?.id === secondaryFilter;
+}
+
+function doesMerchantLevelRequirementMatch(
+  itemDefinition: ItemDefinition,
+  filters: MerchantStockFilterOptions,
+): boolean {
+  const itemLevelRequirement = itemDefinition.levelRequirement ?? 0;
+  const minLevelRequirement = normalizeMerchantLevelFilter(
+    filters.minLevelRequirement,
+  );
+  const maxLevelRequirement = normalizeMerchantLevelFilter(
+    filters.maxLevelRequirement,
+  );
+
+  if (
+    minLevelRequirement !== null &&
+    itemLevelRequirement < minLevelRequirement
+  ) {
+    return false;
+  }
+
+  if (
+    maxLevelRequirement !== null &&
+    itemLevelRequirement > maxLevelRequirement
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function normalizeMerchantLevelFilter(
+  value: number | null | undefined,
+): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor(value));
 }
 
 function getMerchantSecondaryFilterOption(
