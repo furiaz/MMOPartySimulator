@@ -233,6 +233,36 @@ describe("merchant buy", () => {
           group: "weapons",
         }),
         expect.objectContaining({
+          itemId: "steel_sword",
+          priceCrowns: 120,
+          group: "weapons",
+        }),
+        expect.objectContaining({
+          itemId: "veteran_sword",
+          priceCrowns: 180,
+          group: "weapons",
+        }),
+        expect.objectContaining({
+          itemId: "reinforced_shield",
+          priceCrowns: 90,
+          group: "offhands",
+        }),
+        expect.objectContaining({
+          itemId: "tower_shield",
+          priceCrowns: 135,
+          group: "offhands",
+        }),
+        expect.objectContaining({
+          itemId: "bastion_cuirass",
+          priceCrowns: 140,
+          group: "plate",
+        }),
+        expect.objectContaining({
+          itemId: "ironhold_cuirass",
+          priceCrowns: 210,
+          group: "plate",
+        }),
+        expect.objectContaining({
           itemId: "plain_charm",
           priceCrowns: 25,
           group: "accessories",
@@ -267,6 +297,18 @@ describe("merchant buy", () => {
       scholar_pants: 62,
       scholar_gloves: 52,
       scholar_sandals: 52,
+      steel_sword: 120,
+      veteran_sword: 180,
+      reinforced_shield: 90,
+      tower_shield: 135,
+      blessed_robe: 140,
+      sanctuary_robe: 210,
+      pathfinder_jacket: 140,
+      wayfarer_jacket: 210,
+      sentinel_hauberk: 140,
+      ironward_hauberk: 210,
+      bastion_cuirass: 140,
+      ironhold_cuirass: 210,
     });
   });
 
@@ -424,16 +466,16 @@ describe("merchant buy", () => {
 
   it("allows buying equipment before class or level requirements are met", () => {
     let state = createMerchantState();
-    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+    state = setCurrencyBalanceForDebug(state, "crowns", 200).state;
 
     const { state: nextState, result } = buyMerchantItem(
       state,
       MERCHANT_ID,
-      "iron_sword",
+      "veteran_sword",
     );
 
     expect(result.status).toBe("success");
-    expect(countInventoryItem(nextState.inventory, "iron_sword")).toBe(1);
+    expect(countInventoryItem(nextState.inventory, "veteran_sword")).toBe(1);
   });
 
   it("records buy telemetry while debug recording is active", () => {
@@ -508,7 +550,41 @@ describe("merchant buy", () => {
         secondaryFilter: "one_handed_sword",
         partyCompatibleOnly: true,
       }).map((entry) => entry.itemId),
-    ).toEqual(["iron_sword"]);
+    ).toEqual(["iron_sword", "steel_sword", "veteran_sword"]);
+  });
+
+  it("filters merchant stock by level requirement range", () => {
+    const state = createMerchantStateWithParty();
+
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "weapons",
+        secondaryFilter: "one_handed_sword",
+        minLevelRequirement: 15,
+        maxLevelRequirement: 20,
+      }).map((entry) => entry.itemId),
+    ).toEqual(["steel_sword", "veteran_sword"]);
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "weapons",
+        secondaryFilter: "one_handed_sword",
+        minLevelRequirement: 15,
+        maxLevelRequirement: 15,
+      }).map((entry) => entry.itemId),
+    ).toEqual(["steel_sword"]);
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "plate",
+        secondaryFilter: "chest",
+        minLevelRequirement: 20,
+      }).map((entry) => entry.itemId),
+    ).toEqual(["ironhold_cuirass", "conqueror_cuirass"]);
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "weapons",
+        maxLevelRequirement: 1,
+      }).map((entry) => entry.itemId),
+    ).toEqual(["training_sword"]);
   });
 });
 

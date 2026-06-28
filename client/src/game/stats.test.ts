@@ -107,6 +107,86 @@ describe("prototype companion stats", () => {
     });
   });
 
+  it("aggregates scaled level 15 and 20 weapon loadouts into derived stats", () => {
+    const equipmentSource = createCompanion(
+      "equipment-source",
+      { x: 0, y: 0 },
+      "equipment-source",
+    ).equipment;
+    const aegis = {
+      ...createCompanion("aegis", { x: 0, y: 0 }, "aegis"),
+      characterLevel: 15,
+      equipment: {
+        ...equipmentSource,
+        mainHand: "bastion_mace" as const,
+        offhand: "reinforced_shield" as const,
+      },
+    };
+    const blade = {
+      ...createCompanion("blade", { x: 0, y: 0 }, "blade"),
+      characterLevel: 20,
+      equipment: {
+        ...equipmentSource,
+        mainHand: "veteran_sword" as const,
+      },
+    };
+
+    expect(getCompanionDerivedStats(aegis)).toMatchObject({
+      attack: 4,
+      defense: 4,
+      block: 3,
+    });
+    expect(getCompanionDerivedStats(blade)).toMatchObject({
+      attack: 8,
+      accuracy: 2,
+    });
+  });
+
+  it("aggregates scaled defensive plate sets through primary and derived stats", () => {
+    const equipmentSource = createCompanion(
+      "equipment-source",
+      { x: 0, y: 0 },
+      "equipment-source",
+    ).equipment;
+    const bastionCompanion = {
+      ...createCompanion("bastion", { x: 0, y: 0 }, "bastion"),
+      characterLevel: 15,
+      equipment: {
+        ...equipmentSource,
+        head: "bastion_helm" as const,
+        chest: "bastion_cuirass" as const,
+        legs: "bastion_greaves" as const,
+        gloves: "bastion_gauntlets" as const,
+        boots: "bastion_sabatons" as const,
+      },
+    };
+    const ironholdCompanion = {
+      ...createCompanion("ironhold", { x: 0, y: 0 }, "ironhold"),
+      characterLevel: 20,
+      equipment: {
+        ...equipmentSource,
+        head: "ironhold_helm" as const,
+        chest: "ironhold_cuirass" as const,
+        legs: "ironhold_greaves" as const,
+        gloves: "ironhold_gauntlets" as const,
+        boots: "ironhold_sabatons" as const,
+      },
+    };
+
+    expect(getCompanionDerivedStats(bastionCompanion)).toMatchObject({
+      defense: 17,
+      maxHealth: 54,
+      evasion: -8,
+      block: 5,
+    });
+    expect(getCompanionDerivedStats(ironholdCompanion)).toMatchObject({
+      defense: 23,
+      maxHealth: 72,
+      evasion: -9,
+      block: 8,
+    });
+  });
+
   it("lets wisdom contribute to defense, magic power, and healing power", () => {
     const companion = {
       ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
