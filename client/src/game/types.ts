@@ -709,8 +709,16 @@ export type DungeonChestRuntimeState = {
   inventoryFull?: boolean;
 };
 
+export type AzureMassPhaseThreshold = 75 | 50 | 25;
+
+export type AzureMassRuntimeState = {
+  triggeredPhaseThresholds: AzureMassPhaseThreshold[];
+  fleeUntilMs?: number;
+};
+
 export type SlimewardDungeonRuntimeState = {
   chest: DungeonChestRuntimeState | null;
+  azureMass?: AzureMassRuntimeState;
 };
 
 export type CurrencyId = "crowns";

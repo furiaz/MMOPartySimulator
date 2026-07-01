@@ -575,17 +575,26 @@ function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity
 function sanitizeSlimewardDungeon(
   slimewardDungeon: GameState["slimewardDungeon"],
 ): GameState["slimewardDungeon"] {
-  if (!slimewardDungeon?.chest) {
+  if (!slimewardDungeon) {
     return slimewardDungeon;
   }
 
   return {
-    ...slimewardDungeon,
-    chest: {
-      ...slimewardDungeon.chest,
-      isUiOpen: false,
-      autoContinueAtMs: undefined,
-    },
+    chest: slimewardDungeon?.chest
+      ? {
+          ...slimewardDungeon.chest,
+          isUiOpen: false,
+          autoContinueAtMs: undefined,
+        }
+      : null,
+    azureMass: slimewardDungeon?.azureMass
+      ? {
+          triggeredPhaseThresholds: [
+            ...slimewardDungeon.azureMass.triggeredPhaseThresholds,
+          ],
+          fleeUntilMs: undefined,
+        }
+      : undefined,
   };
 }
 

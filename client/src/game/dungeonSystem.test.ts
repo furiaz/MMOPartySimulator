@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   closeSlimewardDungeonChestUi,
   debugResetSlimewardDungeon,
+  sanitizeGameStateForSave,
+  updateGame,
   updateEnemyRespawnSystem,
   updateSlimewardDungeonSystem,
 } from "./index";
@@ -23,13 +25,16 @@ import {
   slimewardFloorTwoEnemyStartData,
   slimewardFloorTwoSubzones,
 } from "./debugMap";
-import { createCompanion, createEnemy } from "./entities";
+import { ENEMY_MOVEMENT_SPEED_PER_SECOND, createCompanion, createEnemy } from "./entities";
+import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { createEmptyPartyInventory } from "./inventory";
 import { isNavigationCellWalkable } from "./navigation";
 import { createInitialQuestStates } from "./questSystem";
+import { isPositionInsideSubzone } from "./subzoneSystem";
 import { isTeleportWorking } from "./teleportState";
 import { createTestGameState } from "./testState";
-import type { Enemy, GameEntity, GameMap, Position } from "./types";
+import { GAME_LOOP_TICK_MS } from "./simulationTiming";
+import type { AzureMassPhaseThreshold, Enemy, GameEntity, GameMap, Position } from "./types";
 
 describe("Slimeward dungeon prototype", () => {
   it("registers the camp and two floor maps with debug access", () => {
@@ -199,6 +204,181 @@ describe("Slimeward dungeon prototype", () => {
     });
   });
 
+  it.each([
+    {
+      threshold: 75 as const,
+      healthPercent: 75,
+      previousThresholds: [],
+      expectedCount: 3,
+      superiorTypeId: "slimeward_heavy_slime",
+    },
+    {
+      threshold: 50 as const,
+      healthPercent: 50,
+      previousThresholds: [75],
+      expectedCount: 4,
+      superiorTypeId: "slimeward_pale_ooze",
+    },
+    {
+      threshold: 25 as const,
+      healthPercent: 25,
+      previousThresholds: [75, 50],
+      expectedCount: 5,
+      superiorTypeId: "slimeward_spitter_slime",
+    },
+  ])(
+    "triggers the Azure Mass $threshold% slime wave with one Superior",
+    ({
+      threshold,
+      healthPercent,
+      previousThresholds,
+      expectedCount,
+      superiorTypeId,
+    }) => {
+      const state = createFloorTwoBossPhaseState({
+        healthPercent,
+        triggeredPhaseThresholds: previousThresholds as AzureMassPhaseThreshold[],
+      });
+      const nextState = updateSlimewardDungeonSystem(state, 1_000);
+      const waveEnemies = getAzureMassPhaseEnemies(nextState, threshold);
+      const superiorEnemies = waveEnemies.filter(
+        (enemy) => enemy.variant === "superior",
+      );
+
+      expect(waveEnemies).toHaveLength(expectedCount);
+      expect(superiorEnemies).toHaveLength(1);
+      expect(superiorEnemies[0].enemyTypeId).toBe(superiorTypeId);
+      expect(
+        nextState.slimewardDungeon?.azureMass?.triggeredPhaseThresholds,
+      ).toEqual([...previousThresholds, threshold]);
+      expect(nextState.slimewardDungeon?.azureMass?.fleeUntilMs).toBe(6_000);
+    },
+  );
+
+  it("triggers every newly crossed Azure Mass phase in one update", () => {
+    const state = createFloorTwoBossPhaseState({ healthPercent: 20 });
+    const nextState = updateSlimewardDungeonSystem(state, 1_000);
+    const phaseEnemies = getAzureMassPhaseEnemies(nextState);
+
+    expect(phaseEnemies).toHaveLength(12);
+    expect(
+      nextState.slimewardDungeon?.azureMass?.triggeredPhaseThresholds,
+    ).toEqual([75, 50, 25]);
+    expect(
+      phaseEnemies.filter((enemy) => enemy.variant === "superior"),
+    ).toHaveLength(3);
+  });
+
+  it("does not retrigger Azure Mass phases after they fire once", () => {
+    const state = createFloorTwoBossPhaseState({ healthPercent: 20 });
+    const triggeredState = updateSlimewardDungeonSystem(state, 1_000);
+    const nextState = updateSlimewardDungeonSystem(triggeredState, 2_000);
+
+    expect(getAzureMassPhaseEnemies(nextState)).toHaveLength(12);
+    expect(
+      nextState.slimewardDungeon?.azureMass?.triggeredPhaseThresholds,
+    ).toEqual([75, 50, 25]);
+  });
+
+  it("places Azure Mass phase slimes in valid non-overlapping boss-room positions", () => {
+    const state = createFloorTwoBossPhaseState({ healthPercent: 20 });
+    const nextState = updateSlimewardDungeonSystem(state, 1_000);
+    const boss = nextState.entities[SLIMEWARD_BOSS_ID];
+    const bossRoom = nextState.map?.subzones?.find(
+      (subzone) => subzone.id === "f2-boss-room",
+    );
+    const phaseEnemies = getAzureMassPhaseEnemies(nextState);
+
+    expect(boss?.kind).toBe("enemy");
+    expect(bossRoom).toBeDefined();
+    expect(phaseEnemies).toHaveLength(12);
+
+    if (!boss || boss.kind !== "enemy" || !bossRoom) {
+      throw new Error("Expected Azure Mass and boss room in test state.");
+    }
+
+    for (const enemy of phaseEnemies) {
+      expect(isPositionInsideSubzone(enemy.position, bossRoom)).toBe(true);
+      expect(isNavigationCellWalkable(nextState.map!, enemy.position)).toBe(true);
+      expect(getDistance(enemy.position, boss.position)).toBeGreaterThanOrEqual(
+        getEnemyCombatBodyRadius(boss) + 1.5,
+      );
+      expect(
+        ["slimeward_heavy_slime", "slimeward_pale_ooze", "slimeward_spitter_slime"],
+      ).toContain(enemy.enemyTypeId);
+    }
+
+    for (let index = 0; index < phaseEnemies.length; index += 1) {
+      for (let otherIndex = index + 1; otherIndex < phaseEnemies.length; otherIndex += 1) {
+        expect(
+          getDistance(
+            phaseEnemies[index].position,
+            phaseEnemies[otherIndex].position,
+          ),
+        ).toBeGreaterThanOrEqual(1.5);
+      }
+    }
+  });
+
+  it("makes Azure Mass flee living companions at 200% base enemy speed for five seconds", () => {
+    const state = createFloorTwoBossPhaseState({
+      bossPosition: { x: 132, y: 22 },
+      companionPosition: { x: 124, y: 22 },
+      healthPercent: 75,
+    });
+    const phaseState = updateSlimewardDungeonSystem(state, 1_000);
+    const nextState = updateGame(phaseState, {
+      nowMs: 1_100,
+      deltaMs: 1_000,
+    });
+    const boss = state.entities[SLIMEWARD_BOSS_ID];
+    const movedBoss = nextState.entities[SLIMEWARD_BOSS_ID];
+    const bossRoom = nextState.map?.subzones?.find(
+      (subzone) => subzone.id === "f2-boss-room",
+    );
+
+    expect(phaseState.slimewardDungeon?.azureMass?.fleeUntilMs).toBe(6_000);
+    expect(boss.kind).toBe("enemy");
+    expect(movedBoss?.kind).toBe("enemy");
+    expect(bossRoom).toBeDefined();
+
+    if (boss.kind !== "enemy" || movedBoss?.kind !== "enemy" || !bossRoom) {
+      throw new Error("Expected Azure Mass and boss room in flee test state.");
+    }
+
+    expect(movedBoss.position.x).toBeGreaterThan(boss.position.x);
+    expect(getDistance(boss.position, movedBoss.position)).toBeCloseTo(
+      ENEMY_MOVEMENT_SPEED_PER_SECOND * 2 * (GAME_LOOP_TICK_MS / 1_000),
+      2,
+    );
+    expect(isPositionInsideSubzone(movedBoss.position, bossRoom)).toBe(true);
+    expect(movedBoss.state).toBe("idle");
+    expect(movedBoss.currentTargetId).toBeNull();
+  });
+
+  it("preserves Azure Mass triggered phases but clears active flee timing on save", () => {
+    const state = createFloorTwoBossPhaseState({
+      healthPercent: 75,
+      triggeredPhaseThresholds: [75],
+    });
+    const activeFleeState = {
+      ...state,
+      slimewardDungeon: {
+        chest: null,
+        azureMass: {
+          triggeredPhaseThresholds: [75 as const],
+          fleeUntilMs: 6_000,
+        },
+      },
+    };
+    const sanitizedState = sanitizeGameStateForSave(activeFleeState);
+
+    expect(
+      sanitizedState.slimewardDungeon?.azureMass?.triggeredPhaseThresholds,
+    ).toEqual([75]);
+    expect(sanitizedState.slimewardDungeon?.azureMass?.fleeUntilMs).toBeUndefined();
+  });
+
   it("spawns and collects the boss chest before enabling the exit", () => {
     const state = createFloorTwoBossDeadState();
     const withChest = updateSlimewardDungeonSystem(state, 1_000);
@@ -307,6 +487,72 @@ function createFloorTwoBossDeadState() {
   });
 }
 
+function createFloorTwoBossPhaseState({
+  bossPosition = { x: 132, y: 22 },
+  companionPosition = { x: 124, y: 22 },
+  healthPercent,
+  triggeredPhaseThresholds = [],
+}: {
+  bossPosition?: Position;
+  companionPosition?: Position;
+  healthPercent: number;
+  triggeredPhaseThresholds?: AzureMassPhaseThreshold[];
+}) {
+  const companion = createCompanion(
+    "test-companion-1",
+    companionPosition,
+    "test-companion-1",
+    "fighter",
+    0,
+  );
+  const boss = createEnemy(SLIMEWARD_BOSS_ID, bossPosition, undefined, {
+    enemyTypeId: "azure_mass",
+    subzoneId: "f2-boss-room",
+    encounterAreaId: "f2-boss-pack",
+  });
+  const damagedBoss: Enemy = {
+    ...boss,
+    health: Math.max(1, Math.floor(boss.maxHealth * (healthPercent / 100))),
+  };
+
+  return createTestGameState({
+    currentMapId: SLIMEWARD_FLOOR_TWO_ID,
+    map: createDebugMap(SLIMEWARD_FLOOR_TWO_ID),
+    partyLeaderId: companion.id,
+    entities: {
+      [companion.id]: companion,
+      [damagedBoss.id]: damagedBoss,
+    },
+    slimewardDungeon: {
+      chest: null,
+      azureMass:
+        triggeredPhaseThresholds.length > 0
+          ? { triggeredPhaseThresholds }
+          : undefined,
+    },
+  });
+}
+
+function getAzureMassPhaseEnemies(
+  state: ReturnType<typeof createTestGameState>,
+  threshold?: AzureMassPhaseThreshold,
+): Enemy[] {
+  const idPrefix =
+    threshold === undefined
+      ? "slimeward-azure-mass-phase-"
+      : `slimeward-azure-mass-phase-${threshold}-`;
+
+  return Object.values(state.entities)
+    .filter(
+      (entity): entity is Enemy =>
+        entity.kind === "enemy" &&
+        entity.id.startsWith(idPrefix) &&
+        entity.state !== "dead" &&
+        entity.health > 0,
+    )
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
 function createAzureTrialChestQuestStates() {
   const quests = createInitialQuestStates();
   quests.azure_trial = {
@@ -410,6 +656,10 @@ function isWallAdjacent(map: GameMap, position: Position): boolean {
 
 function getPositionKey(position: Position): string {
   return `${position.x},${position.y}`;
+}
+
+function getDistance(from: Position, to: Position): number {
+  return Math.hypot(to.x - from.x, to.y - from.y);
 }
 
 function countRoomEnemies(
