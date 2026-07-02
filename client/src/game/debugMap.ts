@@ -209,10 +209,10 @@ export const slimewardCampDungeonEntranceArrivalPositions: Position[] = [
 ];
 
 export const mapThreeSlimewardArrivalPositions: Position[] = [
-  { x: 151, y: 8 },
-  { x: 152, y: 8 },
-  { x: 151, y: 9 },
-  { x: 152, y: 9 },
+  { x: 154, y: 8 },
+  { x: 153, y: 8 },
+  { x: 154, y: 9 },
+  { x: 153, y: 9 },
 ];
 
 export const slimewardFloorOneArrivalPositions: Position[] = [
