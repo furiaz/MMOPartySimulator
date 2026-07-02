@@ -2,6 +2,7 @@ import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import {
   CLASS_MENTOR_NPC_ID,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
@@ -14,6 +15,8 @@ import {
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
   createDebugMapForQuestState,
+  getHubNpcStartDataForQuestState,
+  getHubTwoNpcStartDataForQuestState,
   npcIds,
 } from "./debugMap";
 import { createNpc } from "./entities";
@@ -1167,7 +1170,9 @@ function refreshCurrentMapForQuestState(state: GameState): GameState {
 
   if (
     state.currentMapId === HUB_MAP_ID &&
-    state.quests.find_slimeward_camp?.status === "completed" &&
+    getHubNpcStartDataForQuestState(state.quests).some(
+      (npc) => npc.id === CLASS_MENTOR_NPC_ID,
+    ) &&
     !state.entities[CLASS_MENTOR_NPC_ID]
   ) {
     return updateEntity(
@@ -1179,6 +1184,30 @@ function refreshCurrentMapForQuestState(state: GameState): GameState {
         classMentorNpcStartData.npcRole,
       ),
     );
+  }
+
+  if (
+    state.currentMapId === HUB_TWO_MAP_ID &&
+    getHubTwoNpcStartDataForQuestState(state.quests).some(
+      (npc) => npc.id === CLASS_MENTOR_NPC_ID,
+    ) &&
+    !state.entities[CLASS_MENTOR_NPC_ID]
+  ) {
+    const classMentor = getHubTwoNpcStartDataForQuestState(state.quests).find(
+      (npc) => npc.id === CLASS_MENTOR_NPC_ID,
+    );
+
+    return classMentor
+      ? updateEntity(
+          state,
+          createNpc(
+            classMentor.id,
+            classMentor.position,
+            classMentor.displayName,
+            classMentor.npcRole,
+          ),
+        )
+      : state;
   }
 
   return state;
@@ -1610,6 +1639,10 @@ export function getQuestTargetMapId(
   const quest = state.quests[questId];
 
   if (quest.status === "ready_to_turn_in") {
+    if (questId === "azure_trial") {
+      return HUB_TWO_MAP_ID;
+    }
+
     return HUB_MAP_ID;
   }
 

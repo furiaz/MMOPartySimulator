@@ -794,6 +794,7 @@ export type InventoryRemoveResult = {
 
 export type DebugMapId =
   | "hub"
+  | "hub-2"
   | "map-1"
   | "map-2"
   | "map-3"
@@ -2364,6 +2365,7 @@ export type NpcEntity = BaseEntity & {
   npcRole:
     | "quest_giver"
     | "class_mentor"
+    | "bounty_board"
     | "merchant"
     | "smith"
     | "dog"

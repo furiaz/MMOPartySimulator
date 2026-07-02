@@ -1143,7 +1143,7 @@ function isWildernessVisualMap(mapId: string | undefined): boolean {
 }
 
 function isHubVisualMap(mapId: string | undefined): boolean {
-  return mapId === "hub";
+  return mapId === "hub" || mapId === "hub-2";
 }
 
 function getPreviewTransform(map: GameMap): PreviewTransform {

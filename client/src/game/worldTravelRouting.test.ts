@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
+  HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
+  HUB_TWO_TO_MAP_THREE_TELEPORTER_ID,
   HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+  MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
+  MAP_THREE_TO_HUB_TWO_TELEPORTER_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_TWO_ID,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
@@ -25,6 +30,46 @@ describe("world travel routing", () => {
     );
 
     expect(teleport?.id).toBe("hub-to-map-1");
+  });
+
+  it("routes map 3 to map 4 through Forward Bastion", () => {
+    const teleport = getNextWorldTravelTeleport(
+      createRoutingState(createUnlockedMainRouteTeleportStates()),
+      MAP_THREE_ID,
+      MAP_FOUR_ID,
+    );
+
+    expect(teleport?.id).toBe(MAP_THREE_TO_HUB_TWO_TELEPORTER_ID);
+  });
+
+  it("routes Forward Bastion south to map 4", () => {
+    const teleport = getNextWorldTravelTeleport(
+      createRoutingState(createUnlockedMainRouteTeleportStates()),
+      HUB_TWO_MAP_ID,
+      MAP_FOUR_ID,
+    );
+
+    expect(teleport?.id).toBe(HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID);
+  });
+
+  it("routes map 4 back toward the first hub through Forward Bastion", () => {
+    const teleport = getNextWorldTravelTeleport(
+      createRoutingState(createUnlockedMainRouteTeleportStates()),
+      MAP_FOUR_ID,
+      HUB_MAP_ID,
+    );
+
+    expect(teleport?.id).toBe(MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID);
+  });
+
+  it("routes Forward Bastion west toward map 3", () => {
+    const teleport = getNextWorldTravelTeleport(
+      createRoutingState(createUnlockedMainRouteTeleportStates()),
+      HUB_TWO_MAP_ID,
+      MAP_THREE_ID,
+    );
+
+    expect(teleport?.id).toBe(HUB_TWO_TO_MAP_THREE_TELEPORTER_ID);
   });
 
   it("does not route map 1 to map 2 through a non-working forward teleport", () => {

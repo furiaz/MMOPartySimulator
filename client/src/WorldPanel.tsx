@@ -1,6 +1,7 @@
 import {
   debugMapDefinitions,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
@@ -13,6 +14,7 @@ const prototypeRegionMapIds: DebugMapId[] = [
   MAP_ONE_ID,
   MAP_TWO_ID,
   MAP_THREE_ID,
+  HUB_TWO_MAP_ID,
   MAP_FOUR_ID,
 ];
 

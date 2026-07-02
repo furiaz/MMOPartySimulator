@@ -84,6 +84,7 @@ import {
   getMerchantSecondaryFilterOptions,
   hubCompanionStartPositions,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_TYPE_LABELS,
   QUEST_DEFINITIONS,
@@ -405,6 +406,7 @@ const npcRoleLabels: Record<NpcEntity["npcRole"], string> = {
   merchant: "Merchant",
   quest_giver: "Quest Giver",
   class_mentor: "Class Mentor",
+  bounty_board: "Bounty Board",
   smith: "Smith",
   dog: "Dog",
   test_blade: "Test Blade",
@@ -574,7 +576,7 @@ function isWildernessVisualMap(mapId: string | undefined): boolean {
 }
 
 function isHubVisualMap(mapId: string | undefined): boolean {
-  return mapId === HUB_MAP_ID;
+  return mapId === HUB_MAP_ID || mapId === HUB_TWO_MAP_ID;
 }
 
 function getNpcInteractionKind(npc: NpcEntity): NpcInteractionKind | null {
@@ -2744,6 +2746,11 @@ function App() {
       : null;
   const activeQuestGiverIsClassMentor =
     activeQuestGiver?.npcRole === "class_mentor";
+  const activeQuestGiverCanSelectFirstClass =
+    activeQuestGiverIsClassMentor &&
+    gameState.currentMapId === HUB_TWO_MAP_ID &&
+    (gameState.quests.azure_trial?.status === "ready_to_turn_in" ||
+      gameState.quests.azure_trial?.status === "completed");
   const activeQuestGiverReadyQuests = activeQuestGiver
     ? getQuestGiverReadyQuests(gameState, activeQuestGiver.id)
     : [];
@@ -4702,7 +4709,7 @@ function App() {
               <button disabled type="button">
                 Talk
               </button>
-              {activeQuestGiverIsClassMentor ? (
+              {activeQuestGiverCanSelectFirstClass ? (
                 <button
                   className={activeClassMentorFlowScreen ? "active" : ""}
                   onClick={openFirstClassSelectionFlow}

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDebugMap, MAP_ONE_ID, SLIMEWARD_FLOOR_ONE_ID } from "./debugMap";
+import {
+  createDebugMap,
+  HUB_TWO_MAP_ID,
+  MAP_ONE_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
+} from "./debugMap";
 import { createDebugTelemetryState } from "./debugTelemetry";
 import { createCompanion, createResource } from "./entities";
 import { addItemToInventoryState } from "./inventory";
@@ -119,6 +124,26 @@ describe("save game serialization", () => {
         (entity) => entity.kind === "resource" && entity.resourceType === "wood",
       ),
     ).toBe(true);
+  });
+
+  it("restores Forward Bastion saves with deterministic map data", () => {
+    const state = sanitizeGameStateForSave({
+      ...createTestGameState(),
+      currentMapId: HUB_TWO_MAP_ID,
+      map: createDebugMap(HUB_TWO_MAP_ID),
+    });
+    const save = createSavedGame(state, NOW_MS);
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+
+    expect(restored.state.currentMapId).toBe(HUB_TWO_MAP_ID);
+    expect(restored.state.map?.id).toBe(HUB_TWO_MAP_ID);
+    expect(restored.state.map?.displayName).toBe("Forward Bastion");
   });
 });
 

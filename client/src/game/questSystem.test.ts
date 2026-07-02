@@ -5,6 +5,7 @@ import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
 import {
   createDebugMap,
   CLASS_MENTOR_NPC_ID,
+  HUB_TWO_MAP_ID,
   MAP_TWO_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
@@ -191,6 +192,8 @@ describe("prototype quest system", () => {
 
   it("turns in The Azure Trial through the Class Mentor rewards", () => {
     const state = createStateWithParty({
+      currentMapId: HUB_TWO_MAP_ID,
+      map: createDebugMap(HUB_TWO_MAP_ID),
       quests: createQuestStates({
         azure_trial: "ready_to_turn_in",
       }),

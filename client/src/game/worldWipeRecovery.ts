@@ -4,8 +4,11 @@ import {
   createDebugMapForQuestState,
   debugMapDefinitions,
   getHubNpcStartDataForQuestState,
+  getHubTwoNpcStartDataForQuestState,
   hubCompanionStartPositions,
+  hubTwoCompanionStartPositions,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
@@ -86,6 +89,17 @@ const SLIMEWARD_CAMP_RESCUE_HUB: RescueHubDefinition = {
   arrivalPositions: slimewardCampArrivalPositions,
 };
 
+const HUB_TWO_RESCUE_HUB: RescueHubDefinition = {
+  id: "forward-bastion",
+  mapId: HUB_TWO_MAP_ID,
+  displayName: "Forward Bastion",
+  rescueActorId: "hub-2-dog-west",
+  rescueActorName: "Bastion Dog",
+  rescueLine: "Back to the bastion.",
+  isUnlocked: true,
+  arrivalPositions: hubTwoCompanionStartPositions,
+};
+
 export function updateWorldWipeRecovery(
   state: GameState,
   nowMs: number,
@@ -156,7 +170,7 @@ export function getWorldWipeRecoveryChoices(
     ];
   }
 
-  const hubs = (options.rescueHubs ?? DEFAULT_RESCUE_HUBS).filter(
+  const hubs = (options.rescueHubs ?? getDefaultRescueHubs(state)).filter(
     (hub) => hub.isUnlocked,
   );
   const reachableHubs = hubs
@@ -186,7 +200,11 @@ export function getWorldWipeRecoveryChoices(
 function shouldTriggerWorldWipeRecovery(state: GameState): state is GameState & {
   currentMapId: DebugMapId;
 } {
-  if (!state.currentMapId || state.currentMapId === HUB_MAP_ID) {
+  if (
+    !state.currentMapId ||
+    state.currentMapId === HUB_MAP_ID ||
+    state.currentMapId === HUB_TWO_MAP_ID
+  ) {
     return false;
   }
 
@@ -347,6 +365,17 @@ function getRescueHubEntities(
     );
   }
 
+  if (choice.mapId === HUB_TWO_MAP_ID) {
+    for (const npc of getHubTwoNpcStartDataForQuestState(state.quests)) {
+      entities[npc.id] = createNpc(
+        npc.id,
+        npc.position,
+        npc.displayName,
+        npc.npcRole,
+      );
+    }
+  }
+
   if (choice.mapId === SLIMEWARD_CAMP_ID) {
     for (const npc of slimewardCampNpcStartData) {
       entities[npc.id] = createNpc(
@@ -408,11 +437,21 @@ function isCurrentFreeRescueMap(mapId: DebugMapId): boolean {
     mapId === MAP_ONE_ID ||
     mapId === MAP_TWO_ID ||
     mapId === MAP_THREE_ID ||
+    mapId === HUB_TWO_MAP_ID ||
     mapId === MAP_FOUR_ID ||
     mapId === SLIMEWARD_CAMP_ID ||
     mapId === SLIMEWARD_FLOOR_ONE_ID ||
     mapId === SLIMEWARD_FLOOR_TWO_ID
   );
+}
+
+function getDefaultRescueHubs(state: GameState): RescueHubDefinition[] {
+  const azureTrialStatus = state.quests.azure_trial?.status;
+
+  return azureTrialStatus === "ready_to_turn_in" ||
+    azureTrialStatus === "completed"
+    ? [...DEFAULT_RESCUE_HUBS, HUB_TWO_RESCUE_HUB]
+    : DEFAULT_RESCUE_HUBS;
 }
 
 function getMapHopDistance(fromMapId: DebugMapId, toMapId: DebugMapId): number {

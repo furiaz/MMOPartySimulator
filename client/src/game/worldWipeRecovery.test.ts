@@ -7,7 +7,9 @@ import {
 } from "./index";
 import {
   hubCompanionStartPositions,
+  hubTwoCompanionStartPositions,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_TWO_ID,
@@ -40,6 +42,21 @@ describe("world wipe recovery", () => {
     const nextState = updateGame(state, { nowMs: 1000 });
 
     expect(nextState.currentMapId).toBe(HUB_MAP_ID);
+    expect(nextState.worldWipeRecovery).toBeUndefined();
+    expect(nextState.entities.leader).toMatchObject({
+      state: "dead",
+      health: 0,
+    });
+  });
+
+  it("does not trigger in Forward Bastion", () => {
+    const state = createHubTwoState([createDeadCompanion("leader")], {
+      partyLeaderId: "leader",
+    });
+
+    const nextState = updateGame(state, { nowMs: 1000 });
+
+    expect(nextState.currentMapId).toBe(HUB_TWO_MAP_ID);
     expect(nextState.worldWipeRecovery).toBeUndefined();
     expect(nextState.entities.leader).toMatchObject({
       state: "dead",
@@ -170,8 +187,41 @@ describe("world wipe recovery", () => {
       chargedFee: 0,
       selectedChoice: {
         fee: 0,
-        hopDistance: 4,
+        hopDistance: 5,
       },
+    });
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
+  });
+
+  it("rescues a post-Slimeward map-4 full wipe to Forward Bastion", () => {
+    const state = setCurrencyBalanceForDebug(
+      createMapFourState([createDeadCompanion("leader")], {
+        partyLeaderId: "leader",
+        quests: createForwardBastionQuestStates(),
+      }),
+      "crowns",
+      100,
+    ).state;
+
+    const nextState = updateGame(state, { nowMs: 1000 });
+
+    expect(nextState.currentMapId).toBe(HUB_TWO_MAP_ID);
+    expect(nextState.worldWipeRecovery).toMatchObject({
+      status: "rescued",
+      chargedFee: 0,
+      selectedChoice: {
+        fee: 0,
+        hubDisplayName: "Forward Bastion",
+        hopDistance: 1,
+        rescueActorId: "hub-2-dog-west",
+      },
+    });
+    expect(nextState.entities.leader).toMatchObject({
+      state: "follow",
+      position: hubTwoCompanionStartPositions[0],
+    });
+    expect(nextState.entities["hub-2-dog-west"]).toMatchObject({
+      kind: "npc",
     });
     expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
   });
@@ -558,6 +608,22 @@ function createHubState(
   );
 }
 
+function createHubTwoState(
+  entities: GameEntity[],
+  overrides: Partial<GameState>,
+): GameState {
+  return entities.reduce(
+    addEntity,
+    createTestGameState({
+      currentMapId: HUB_TWO_MAP_ID,
+      map: createDebugMap(HUB_TWO_MAP_ID),
+      activeTeleport: null,
+      quests: createInitialQuestStates(),
+      ...overrides,
+    }),
+  );
+}
+
 function createSlimewardFloorTwoState(
   entities: GameEntity[],
   overrides: Partial<GameState>,
@@ -572,6 +638,17 @@ function createSlimewardFloorTwoState(
       ...overrides,
     }),
   );
+}
+
+function createForwardBastionQuestStates() {
+  const quests = createInitialQuestStates();
+
+  quests.azure_trial = {
+    ...quests.azure_trial,
+    status: "completed",
+  };
+
+  return quests;
 }
 
 function createTieRescueHubs(): RescueHubDefinition[] {

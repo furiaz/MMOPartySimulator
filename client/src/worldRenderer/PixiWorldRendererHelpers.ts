@@ -639,7 +639,7 @@ export function isWildernessVisualMap(mapId: string | undefined): boolean {
 }
 
 export function isHubVisualMap(mapId: string | undefined): boolean {
-  return mapId === "hub";
+  return mapId === "hub" || mapId === "hub-2";
 }
 
 export function getPreviewTransform(map: GameMap): PreviewTransform {

@@ -23,7 +23,9 @@ import {
   createDebugMapForQuestState,
   debugMapDefinitions,
   getHubNpcStartDataForQuestState,
+  getHubTwoNpcStartDataForQuestState,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   SLIMEWARD_CAMP_ID,
   SLIMEWARD_CHEST_ID,
   SLIMEWARD_FLOOR_TWO_ID,
@@ -422,10 +424,16 @@ function getMapEntities(
   const entities = getPreservedCompanions(state);
   const mapId = map.id ?? HUB_MAP_ID;
 
-  if (mapId === HUB_MAP_ID || mapId === SLIMEWARD_CAMP_ID) {
+  if (
+    mapId === HUB_MAP_ID ||
+    mapId === HUB_TWO_MAP_ID ||
+    mapId === SLIMEWARD_CAMP_ID
+  ) {
     const npcStartData =
       mapId === HUB_MAP_ID
         ? getHubNpcStartDataForQuestState(state.quests)
+        : mapId === HUB_TWO_MAP_ID
+          ? getHubTwoNpcStartDataForQuestState(state.quests)
         : slimewardCampNpcStartData;
 
     for (const npc of npcStartData) {
@@ -437,7 +445,7 @@ function getMapEntities(
       );
     }
 
-    if (mapId === SLIMEWARD_CAMP_ID) {
+    if (mapId === HUB_TWO_MAP_ID || mapId === SLIMEWARD_CAMP_ID) {
       return entities;
     }
 
@@ -452,6 +460,7 @@ function getMapEntities(
 
   const enemyStartDataByMapId: Record<DebugMapId, typeof mapOneEnemyStartData> = {
     hub: [],
+    "hub-2": [],
     "map-1": mapOneEnemyStartData,
     "map-2": mapTwoEnemyStartData,
     "map-3": mapThreeEnemyStartData,
@@ -462,6 +471,7 @@ function getMapEntities(
   };
   const resourceStartDataByMapId: Record<DebugMapId, typeof mapOneResourceStartData> = {
     hub: [],
+    "hub-2": [],
     "map-1": mapOneResourceStartData,
     "map-2": mapTwoResourceStartData,
     "map-3": mapThreeResourceStartData,
