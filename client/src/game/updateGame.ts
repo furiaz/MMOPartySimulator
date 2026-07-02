@@ -16,6 +16,7 @@ import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { updateEntitySeparationSystem } from "./entitySeparationSystem";
 import {
   isSlimewardDungeonChestUiOpen,
+  updateAzureMassFleeBehavior,
   updateSlimewardDungeonSystem,
 } from "./dungeonSystem";
 import { updateDropSystem } from "./dropSystem";
@@ -186,6 +187,7 @@ export function updateGame(
   nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
+  nextState = updateAzureMassFleeBehavior(nextState, timing, movedEntityIds);
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
