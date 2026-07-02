@@ -1,11 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { createCompanion, createNpc, FIRST_CLASS_IDS } from "./game";
+import { createCompanion, createEnemy, createNpc, FIRST_CLASS_IDS } from "./game";
 import {
   entityVisualAssets,
   firstClassCharacterVisualAssets,
   getEntityVisualAsset,
   getSpriteAnimation,
+  type SpriteDirection,
 } from "./visualAssets";
+
+const azureMassDirections = [
+  "north",
+  "northEast",
+  "east",
+  "southEast",
+  "south",
+  "southWest",
+  "west",
+  "northWest",
+] satisfies SpriteDirection[];
+
+const azureMassFrames = {
+  north: "/assets/Characters/BossSlimeTest/TheAzureMassNorth.png",
+  northEast: "/assets/Characters/BossSlimeTest/TheAzureMassNorthEast.png",
+  east: "/assets/Characters/BossSlimeTest/TheAzureMassEast.png",
+  southEast: "/assets/Characters/BossSlimeTest/TheAzureMassSouthEast.png",
+  south: "/assets/Characters/BossSlimeTest/TheAzureMassSouth.png",
+  southWest: "/assets/Characters/BossSlimeTest/TheAzureMassSouthWest.png",
+  west: "/assets/Characters/BossSlimeTest/TheAzureMassWest.png",
+  northWest: "/assets/Characters/BossSlimeTest/TheAzureMassNorthWest.png",
+} satisfies Record<SpriteDirection, string>;
 
 describe("entity visual assets", () => {
   it("uses real-size Test-Character Idle and Run art for quest guide NPCs", () => {
@@ -73,6 +96,37 @@ describe("entity visual assets", () => {
       width: 65,
       height: 111,
     });
+  });
+
+  it("uses the Azure Mass eight-direction boss sprites", () => {
+    const azureMass = createEnemy("azure-mass", { x: 0, y: 0 }, undefined, {
+      enemyTypeId: "azure_mass",
+    });
+    const visualAsset = getEntityVisualAsset(azureMass);
+
+    if (visualAsset.kind !== "sprite") {
+      throw new Error("Azure Mass visual should be a sprite asset.");
+    }
+
+    if ("frames" in visualAsset.animations.idle) {
+      throw new Error("Azure Mass idle animation should be directional.");
+    }
+
+    expect(visualAsset.naturalSize).toEqual({ width: 260, height: 260 });
+    expect(Object.keys(visualAsset.animations.idle)).toEqual(azureMassDirections);
+    expect(Object.keys(visualAsset.animations.run)).toEqual(azureMassDirections);
+
+    for (const direction of azureMassDirections) {
+      expect(visualAsset.animations.idle[direction]?.frames).toEqual([
+        azureMassFrames[direction],
+      ]);
+      expect(visualAsset.animations.run[direction]?.frames).toEqual([
+        azureMassFrames[direction],
+      ]);
+      expect(getSpriteAnimation(visualAsset, true, direction).frames).toEqual([
+        azureMassFrames[direction],
+      ]);
+    }
   });
 
   it("uses narrow vertical angle bands for Beginner four-direction movement", () => {

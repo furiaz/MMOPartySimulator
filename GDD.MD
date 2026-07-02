@@ -2287,7 +2287,7 @@ The game uses a top-down readable presentation.
 
 Current world rendering uses a PixiJS renderer for the main map view.
 
-Current visuals may use prototype sprites, generated terrain tiles, generated icons, class portraits, feedback VFX sprites, decorative map visual objects, and placeholders.
+Current visuals may use prototype sprites, first-class character sprites, generated terrain tiles, generated icons, class portraits, feedback VFX sprites, decorative map visual objects, dungeon visuals, teleporter and passage-blocker visuals, boss sprites, and placeholders.
 
 Visual priorities:
 
@@ -2305,7 +2305,7 @@ Name labels must not define simulation behavior, targeting rules, NPC behavior, 
 
 Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, labels, effects, camera math, and input targeting while rendering larger floor chunks as background terrain.
 
-Current generated terrain, feedback, and map visual asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, Slimeward dungeon floor and wall assets, hub castle wall assets, decorative hub structure assets, generated skill or feedback sprites, combat projectile sprites, enemy AoE circles, companion AoE circles, and temporary skill visual events.
+Current generated terrain, feedback, and map visual asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, Slimeward dungeon floor and wall assets, hub castle wall assets, decorative hub structure assets, generated skill or feedback sprites, first-class skill effect sprites, combat projectile sprites, teleporter active/broken visuals, passage blocker visuals, enemy AoE circles, companion AoE circles, Azure Mass boss sprites, and temporary skill visual events.
 
 Terrain asset size and render scale are UI-facing presentation choices.
 

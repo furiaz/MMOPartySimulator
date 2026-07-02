@@ -294,6 +294,27 @@ function createStaticEnemySprite(
   };
 }
 
+function createBossSlimeDirectionalSprite(
+  framePrefix: string,
+  naturalSize?: SpriteVisualAsset["naturalSize"],
+): SpriteVisualAsset {
+  const frames = Object.fromEntries(
+    Object.entries(spriteDirectionAssetNames).map(([direction, assetName]) => [
+      direction,
+      createSingleFrame(`${bossSlimeTestAssetPath}/${framePrefix}${assetName}.png`),
+    ]),
+  ) as Record<SpriteDirection, SpriteAnimationAsset>;
+
+  return {
+    kind: "sprite",
+    animations: {
+      idle: frames,
+      run: frames,
+    },
+    naturalSize,
+  };
+}
+
 const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>> = {
   slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
   slimeward_heavy_slime: createStaticEnemySprite(
@@ -308,8 +329,8 @@ const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>
     `${slimewardDungeonAssetPath}/spitter-slime-sac-128.png`,
     { width: 112, height: 112 },
   ),
-  azure_mass: createStaticEnemySprite(
-    `${bossSlimeTestAssetPath}/BossSlimeTestTransparent.png`,
+  azure_mass: createBossSlimeDirectionalSprite(
+    "TheAzureMass",
     { width: 260, height: 260 },
   ),
   cave_bat: createStaticEnemySprite(`${prototypeEnemyBasePath}/cave-bat-se.png`),

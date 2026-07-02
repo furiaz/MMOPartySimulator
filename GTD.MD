@@ -153,6 +153,28 @@ Current game-logic implementation files include:
 
 Current tests live beside game-logic files as `*.test.ts`.
 
+Current top-level React/UI implementation files include:
+
+- `App.tsx`
+- `CompanionPanels.tsx`
+- `CompanionVitalsPanel.tsx`
+- `GameMenu.tsx`
+- `gameMenuTypes.ts`
+- `GuidePopup.tsx`
+- `guidePopupDefinitions.ts`
+- `InventoryPanel.tsx`
+- `main.tsx`
+- `npcInteractionRange.ts`
+- `QuestPanels.tsx`
+- `QuestTrackerPanel.tsx`
+- `questUiHelpers.ts`
+- `saveStorage.ts`
+- `SpriteAnimation.tsx`
+- `visualAssets.ts`
+- `assetIcons.ts`
+- `visualMovement.ts`
+- `WorldPanel.tsx`
+
 Do not restructure the project unless explicitly requested.
 
 New helper modules may be added when they keep responsibilities clear and preserve the simulation-first boundary.
@@ -2940,29 +2962,43 @@ Current visual and rendering files:
 
 Current public asset path root:
 
-- `client/public/Asserts/`
+- `client/public/assets/`
 
 Current generated asset groups referenced by UI include:
 
-- `Asserts/Generated/now-pack`
-- `Asserts/Generated/map-wilderness`
-- `Asserts/Generated/map-wilderness/128`
-- `Asserts/Generated/hub-floors`
-- `Asserts/Generated/hub-floors/New/128`
-- `Asserts/Generated/beginner-skill-effects-50/sprites`
-- `Asserts/Generated/prototype-vfx/sprites`
-- `Asserts/Generated/class-portraits`
-- `Asserts/Generated/hub-castle-walls`
-- `Asserts/Generated/hub-structures/256`
+- `assets/Generated/now-pack`
+- `assets/Generated/map-wilderness`
+- `assets/Generated/map-wilderness/128`
+- `assets/Generated/hub-floors`
+- `assets/Generated/hub-floors/New/128`
+- `assets/Generated/beginner-skill-effects-50/sprites`
+- `assets/Generated/first-class-skill-effects`
+- `assets/Generated/prototype-vfx/sprites`
+- `assets/Generated/class-portraits`
+- `assets/Generated/hub-castle-walls`
+- `assets/Generated/hub-structures/256`
+- `assets/Generated/teleports`
+- `assets/Generated/passage-blockers`
+- `assets/Generated/Dungeon Generation`
+- `assets/Generated/combat-projectiles`
 
 Current sprite asset groups include:
 
-- `Asserts/Characters/Beginner`
-- `Asserts/Characters/Test-Character`
-- `Asserts/Characters/Test-Enemy`
-- `Asserts/Characters/Test-Enemy2`
-- `Asserts/Characters/Test-NPC`
-- `Asserts/Characters/Prototype-Enemies`
+- `assets/Characters/Beginner`
+- `assets/Characters/Test-Character`
+- `assets/Characters/Test-Enemy`
+- `assets/Characters/Test-Enemy2`
+- `assets/Characters/Test-NPC`
+- `assets/Characters/Prototype-Enemies`
+- `assets/Characters/Blade`
+- `assets/Characters/Aegis`
+- `assets/Characters/Hunter`
+- `assets/Characters/Beast`
+- `assets/Characters/Elementalist`
+- `assets/Characters/Runecaster`
+- `assets/Characters/Lightbearer`
+- `assets/Characters/Penitent`
+- `assets/Characters/BossSlimeTest`
 
 Current world renderer behavior:
 
@@ -2975,8 +3011,9 @@ Current world renderer behavior:
 Current companion visuals:
 
 - Beginner companions use the generated Beginner walking sprite set
-- non-Beginner companions currently use the test character sprite
-- idle may use a single idle frame or directional first-frame idle fallback depending on the sprite set
+- first-class companions currently use class-specific sprite folders for Blade, Aegis, Hunter, Beast, Elementalist, Runecaster, Lightbearer, and Penitent
+- non-Beginner companions fall back to the test character sprite only if a class-specific sprite mapping is missing
+- idle may use a single idle frame, four-direction first-frame fallback, or eight-direction first-class idle frames depending on the sprite set
 - run uses directional frame sequences for north, south, west, and east where available
 - class portraits are UI-facing images and do not define simulation behavior
 
@@ -2985,6 +3022,8 @@ Current enemy visuals:
 - Wolf-style enemies may use the test enemy sprite
 - Orc-style enemies may use the Test-Enemy2 directional static sprites
 - prototype enemy archetypes may use static generated archetype sprites
+- Slimeward dungeon enemies may use generated dungeon enemy images
+- The Azure Mass currently uses eight-direction BossSlimeTest sprites
 - fallback enemy visuals depend on current map/debug context
 
 Current resource visuals use generated image icons by resource type.
@@ -3016,6 +3055,10 @@ Current generated terrain asset direction may include:
 - 128x128 floor assets for the active floor-chunk render experiment
 - hub castle wall assets
 - 256px decorative hub structure assets
+- teleport active/broken visuals
+- passage blocker open/repaired and closed/collapsed visuals
+- Slimeward dungeon floor, wall, waypoint, chest, obstacle, slime, and boss visuals
+- class portrait, first-class skill effect, prototype VFX, and combat projectile visuals
 
 The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement.
 
