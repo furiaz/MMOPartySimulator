@@ -4,7 +4,15 @@ import type {
   GameMap,
   NavigationClickAccessibility,
 } from "../game";
-import { createCompanion, createEnemy, createNpc, createResource, createTargetDummy } from "../game";
+import {
+  createCompanion,
+  createDebugMap,
+  createEnemy,
+  createNpc,
+  createResource,
+  createTargetDummy,
+  HUB_TWO_MAP_ID,
+} from "../game";
 import {
   collectCurrentMapScopedVisualTextureSrcs,
   collectDurableVisualTextureSrcs,
@@ -42,7 +50,13 @@ import {
   type FullRenderSignatureInput,
 } from "./PixiWorldRendererHelpers";
 import { getSkillVisualOpacity } from "./PixiWorldRenderer";
-import { MAP_OBJECT_ICON_SRC, MAP_VISUAL_OBJECT_SRC } from "../assetIcons";
+import {
+  HUB_MAP_TILE_SRC,
+  HUB_WALL_TILE_SRC,
+  MAP_OBJECT_ICON_SRC,
+  MAP_VISUAL_OBJECT_SRC,
+  WILDERNESS_MAP_TILE_SRC,
+} from "../assetIcons";
 
 const previewCanvasBounds = {
   left: 100,
@@ -706,6 +720,22 @@ describe("texture lifetime classification", () => {
     expect(scopedSources.some((src) => src.includes("map-wilderness"))).toBe(true);
     expect(scopedSources.some((src) => src.includes("slime-se.png"))).toBe(true);
     expect(scopedSources).not.toContain(enemySpottedAlertSrc);
+  });
+
+  it("classifies Forward Bastion as a hub visual map", () => {
+    const scopedSources = collectCurrentMapScopedVisualTextureSrcs(
+      createDebugMap(HUB_TWO_MAP_ID),
+      [],
+    );
+
+    expect(scopedSources).toContain(HUB_MAP_TILE_SRC.stone128);
+    expect(scopedSources).toContain(HUB_WALL_TILE_SRC.north);
+    expect(scopedSources).toContain(HUB_WALL_TILE_SRC.south);
+    expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.hub_house);
+    expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.hub_cabin);
+    expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.hub_tent);
+    expect(scopedSources).not.toContain(WILDERNESS_MAP_TILE_SRC.bush);
+    expect(scopedSources).not.toContain(WILDERNESS_MAP_TILE_SRC.tree);
   });
 });
 

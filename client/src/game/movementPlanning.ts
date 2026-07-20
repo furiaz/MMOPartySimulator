@@ -1353,6 +1353,7 @@ function isStaticPassiveNpcRole(npcRole: string): boolean {
   return (
     npcRole === "quest_giver" ||
     npcRole === "class_mentor" ||
+    npcRole === "bounty_board" ||
     npcRole === "merchant" ||
     npcRole === "smith" ||
     npcRole === "dog" ||

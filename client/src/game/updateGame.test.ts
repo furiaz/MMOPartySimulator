@@ -9,10 +9,14 @@ import {
 import {
   createDebugMap,
   createDebugMapForQuestState,
+  MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
+  HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
+  MAP_THREE_TO_HUB_TWO_TELEPORTER_ID,
   MAP_TWO_ID,
   MAP_TWO_TO_MAP_THREE_TELEPORTER_ID,
   TELEPORTER_ID,
@@ -4980,7 +4984,7 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent?.type).toBe("move");
   });
 
-  it("routes world travel from map 3 toward map 4 directly", () => {
+  it("routes world travel from map 3 toward map 4 through Hub 2", () => {
     const leader = createLeader({ x: 80, y: 12 });
 
     const nextState = updateGame(
@@ -4990,11 +4994,25 @@ describe("game update intent priority", () => {
       }),
     );
 
-    expect(nextState.localPoiTarget?.poiId).toBe("map-3-to-map-4");
+    expect(nextState.localPoiTarget?.poiId).toBe(MAP_THREE_TO_HUB_TWO_TELEPORTER_ID);
     expect(nextState.leaderIntent?.type).toBe("move");
   });
 
-  it("routes world travel from map 4 toward hub through map 3", () => {
+  it("routes world travel from Hub 2 toward map 4 directly", () => {
+    const leader = createLeader({ x: 66, y: 60 });
+
+    const nextState = updateGame(
+      createHubTwoState([leader], {
+        partyLeaderId: leader.id,
+        worldTravelTargetMapId: MAP_FOUR_ID,
+      }),
+    );
+
+    expect(nextState.localPoiTarget?.poiId).toBe(HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID);
+    expect(nextState.leaderIntent?.type).toBe("move");
+  });
+
+  it("routes world travel from map 4 toward hub through Hub 2", () => {
     const leader = createLeader({ x: 130, y: 12 });
 
     const nextState = updateGame(
@@ -5004,7 +5022,7 @@ describe("game update intent priority", () => {
       }),
     );
 
-    expect(nextState.localPoiTarget?.poiId).toBe("map-4-to-map-3");
+    expect(nextState.localPoiTarget?.poiId).toBe(MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID);
     expect(nextState.leaderIntent?.type).toBe("move");
   });
 
@@ -5392,6 +5410,23 @@ function createHubState(
       autoModeEnabled: true,
       currentMapId: HUB_MAP_ID,
       map: createDebugMap(HUB_MAP_ID),
+      activeTeleport: null,
+      exploredTiles: {},
+      ...overrides,
+    }),
+  );
+}
+
+function createHubTwoState(
+  entities: GameEntity[],
+  overrides: Partial<GameState>,
+): GameState {
+  return entities.reduce(
+    addEntity,
+    createTestGameState({
+      autoModeEnabled: true,
+      currentMapId: HUB_TWO_MAP_ID,
+      map: createDebugMap(HUB_TWO_MAP_ID),
       activeTeleport: null,
       exploredTiles: {},
       ...overrides,

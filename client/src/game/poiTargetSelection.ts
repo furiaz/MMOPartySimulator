@@ -1,6 +1,7 @@
 import { isTargetDummyEnemy } from "./entityGuards";
 import {
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   MAP_FOUR_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
@@ -122,7 +123,7 @@ export function selectPoiTarget(
 }
 
 export function getMapType(mapId: DebugMapId | undefined): PoiMapType {
-  return mapId === HUB_MAP_ID ? "hub" : "wild";
+  return mapId === HUB_MAP_ID || mapId === HUB_TWO_MAP_ID ? "hub" : "wild";
 }
 
 function getPoiTargetOptions(

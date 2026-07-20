@@ -24,9 +24,15 @@ export const MAP_TWO_ROWS = MAP_ONE_ROWS;
 export const MAP_THREE_ROWS = MAP_ONE_ROWS;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const MAP_TWO_TO_MAP_THREE_TELEPORTER_ID = "map-2-to-map-3";
-export const MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID = "map-3-to-map-4";
+export const MAP_THREE_TO_HUB_TWO_TELEPORTER_ID = "map-3-to-hub-2";
+export const HUB_TWO_TO_MAP_THREE_TELEPORTER_ID = "hub-2-to-map-3";
+export const HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID = "hub-2-to-map-4";
+export const MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID = "map-4-to-hub-2";
+export const HUB_TWO_NORTH_ROUTE_TELEPORTER_ID = "hub-2-north-route";
+export const HUB_TWO_EAST_ROUTE_TELEPORTER_ID = "hub-2-east-route";
 export const TELEPORTER_RANGE = 10;
 export const HUB_MAP_ID: DebugMapId = "hub";
+export const HUB_TWO_MAP_ID: DebugMapId = "hub-2";
 export const MAP_ONE_ID: DebugMapId = "map-1";
 export const MAP_TWO_ID: DebugMapId = "map-2";
 export const MAP_THREE_ID: DebugMapId = "map-3";
@@ -109,6 +115,13 @@ export const hubCompanionStartPositions: Position[] = [
   { x: 13, y: 52 },
 ];
 
+export const hubTwoCompanionStartPositions: Position[] = [
+  { x: 64, y: 36 },
+  { x: 65, y: 36 },
+  { x: 64, y: 37 },
+  { x: 65, y: 37 },
+];
+
 export const mapTwoCompanionStartPositions: Position[] = [
   { x: 28, y: 29 },
   { x: 29, y: 29 },
@@ -121,16 +134,28 @@ export const mapTwoForwardTeleporterPosition: Position = { x: 154, y: 29 };
 export const mapThreeForwardTeleporterPosition: Position = { x: 154, y: 29 };
 export const mapThreeSlimewardCampTeleporterPosition: Position = { x: 154, y: 8 };
 export const hubTeleporterPosition: Position = { x: 102, y: 30 };
+export const hubTwoWestTeleporterPosition: Position = { x: 5, y: 36 };
+export const hubTwoSouthTeleporterPosition: Position = { x: 66, y: 66 };
+export const hubTwoNorthTeleporterPosition: Position = { x: 66, y: 6 };
+export const hubTwoEastTeleporterPosition: Position = { x: 126, y: 36 };
 export const mapOneHubTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapFourReturnTeleporterPosition: Position = { x: 5, y: 12 };
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
+export const HUB_TWO_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
   {
     id: "hub-healing-fountain",
     position: { x: 55, y: 32 },
     range: HUB_HEALING_FOUNTAIN_RANGE,
+  },
+];
+export const hubTwoHealingFountains: HealingFountain[] = [
+  {
+    id: "hub-2-healing-fountain",
+    position: { x: 66, y: 35 },
+    range: HUB_TWO_HEALING_FOUNTAIN_RANGE,
   },
 ];
 export const targetDummyId = "hub-target-dummy";
@@ -180,18 +205,32 @@ const mapThreeMapTwoArrivalPositions: Position[] = [
   { x: 153, y: 30 },
 ];
 
-const mapThreeMapFourArrivalPositions: Position[] = [
+const mapThreeHubTwoArrivalPositions: Position[] = [
+  { x: 10, y: 36 },
+  { x: 11, y: 36 },
+  { x: 10, y: 37 },
+  { x: 11, y: 37 },
+];
+
+const hubTwoMapThreeArrivalPositions: Position[] = [
+  { x: 154, y: 29 },
+  { x: 153, y: 29 },
+  { x: 154, y: 30 },
+  { x: 153, y: 30 },
+];
+
+const hubTwoMapFourArrivalPositions: Position[] = [
   { x: 8, y: 12 },
   { x: 9, y: 12 },
   { x: 8, y: 13 },
   { x: 9, y: 13 },
 ];
 
-const mapFourMapThreeArrivalPositions: Position[] = [
-  { x: 154, y: 29 },
-  { x: 153, y: 29 },
-  { x: 154, y: 30 },
-  { x: 153, y: 30 },
+const mapFourHubTwoArrivalPositions: Position[] = [
+  { x: 65, y: 62 },
+  { x: 66, y: 62 },
+  { x: 65, y: 63 },
+  { x: 66, y: 63 },
 ];
 
 export const slimewardCampArrivalPositions: Position[] = [
@@ -267,6 +306,50 @@ export const classMentorNpcStartData = {
   position: { x: 65, y: 35 },
   displayName: "Class Mentor",
   npcRole: "class_mentor",
+} as const;
+
+export const hubTwoNpcStartData = [
+  {
+    id: "hub-2-quest-giver",
+    position: { x: 56, y: 31 },
+    displayName: "Quest Giver",
+    npcRole: "quest_giver",
+  },
+  {
+    id: "hub-2-merchant",
+    position: { x: 42, y: 48 },
+    displayName: "Merchant",
+    npcRole: "merchant",
+  },
+  {
+    id: "hub-2-smith",
+    position: { x: 90, y: 48 },
+    displayName: "Smith",
+    npcRole: "smith",
+  },
+  {
+    id: "hub-2-bounty-board",
+    position: { x: 66, y: 49 },
+    displayName: "Bounty Board",
+    npcRole: "bounty_board",
+  },
+  {
+    id: "hub-2-dog-west",
+    position: { x: 29, y: 37 },
+    displayName: "Bastion Dog",
+    npcRole: "dog",
+  },
+  {
+    id: "hub-2-dog-south",
+    position: { x: 70, y: 58 },
+    displayName: "Gate Dog",
+    npcRole: "dog",
+  },
+] as const;
+
+export const hubTwoClassMentorNpcStartData = {
+  ...classMentorNpcStartData,
+  position: { x: 76, y: 31 },
 } as const;
 
 export const slimewardCampNpcStartData = [
@@ -1043,9 +1126,17 @@ type DebugMapQuestStates = Partial<
 export function getHubNpcStartDataForQuestState(
   quests: DebugMapQuestStates = {},
 ) {
-  return isClassMentorAvailable(quests)
+  return isHubClassMentorAvailable(quests)
     ? [...hubNpcStartData, classMentorNpcStartData]
     : hubNpcStartData;
+}
+
+export function getHubTwoNpcStartDataForQuestState(
+  quests: DebugMapQuestStates = {},
+) {
+  return isHubTwoClassMentorAvailable(quests)
+    ? [...hubTwoNpcStartData, hubTwoClassMentorNpcStartData]
+    : hubTwoNpcStartData;
 }
 
 export const SECURE_LANDING_PASSAGE_GATE_ID = "map-1-shore-fringe-passage-gate";
@@ -1116,12 +1207,95 @@ const HUB_VISUAL_OBJECTS: MapVisualObject[] = [
   },
 ];
 
+const HUB_TWO_VISUAL_OBJECTS: MapVisualObject[] = [
+  {
+    id: "hub-2-west-inn",
+    visualId: "hub_house",
+    position: { x: 29, y: 28 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-merchant-row",
+    visualId: "hub_tent",
+    position: { x: 42, y: 41 },
+    widthCells: 9,
+    heightCells: 9,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-quest-hall",
+    visualId: "hub_cabin",
+    position: { x: 56, y: 29 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-class-hall",
+    visualId: "hub_house",
+    position: { x: 76, y: 29 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-smithy",
+    visualId: "hub_cabin",
+    position: { x: 90, y: 41 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-supply-tent",
+    visualId: "hub_tent",
+    position: { x: 104, y: 28 },
+    widthCells: 9,
+    heightCells: 9,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-south-barracks",
+    visualId: "hub_house",
+    position: { x: 54, y: 58 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+  {
+    id: "hub-2-east-storehouse",
+    visualId: "hub_cabin",
+    position: { x: 83, y: 58 },
+    widthCells: 10,
+    heightCells: 10,
+    anchorY: 1,
+  },
+];
+
 const HUB_WALLS = dedupeWalls([
   ...createPerimeterWalls(DEBUG_MAP_COLUMNS, DEBUG_MAP_ROWS),
   ...createHorizontalWall(12, 30, 80, []),
   ...createHorizontalWall(47, 30, 80, [[51, 59]]),
   ...createVerticalWall(30, 12, 47, [[34, 39]]),
   ...createVerticalWall(80, 12, 47, [[28, 34]]),
+]);
+
+const HUB_TWO_COLUMNS = 132;
+const HUB_TWO_ROWS = 72;
+const HUB_TWO_WALLS = dedupeWalls([
+  ...createPerimeterWalls(HUB_TWO_COLUMNS, HUB_TWO_ROWS),
+]);
+const HUB_TWO_STRUCTURE_COLLISION_WALLS = dedupeWalls([
+  ...createBottomCenteredWallOutline({ x: 29, y: 28 }, 7, 6),
+  ...createBottomCenteredWallOutline({ x: 56, y: 29 }, 7, 6),
+  ...createBottomCenteredWallOutline({ x: 76, y: 29 }, 7, 6),
+  ...createBottomCenteredWallOutline({ x: 104, y: 28 }, 6, 5),
+  ...createBottomCenteredWallOutline({ x: 42, y: 41 }, 6, 5),
+  ...createBottomCenteredWallOutline({ x: 90, y: 41 }, 7, 6),
+  ...createBottomCenteredWallOutline({ x: 54, y: 58 }, 7, 6),
+  ...createBottomCenteredWallOutline({ x: 83, y: 58 }, 7, 6),
 ]);
 
 const MAP_ONE_WALLS = dedupeWalls([
@@ -1230,6 +1404,52 @@ export const debugMapDefinitions: Record<
       },
     ],
   },
+  [HUB_TWO_MAP_ID]: {
+    id: HUB_TWO_MAP_ID,
+    displayName: "Forward Bastion",
+    debugName: "hub-2",
+    columns: HUB_TWO_COLUMNS,
+    rows: HUB_TWO_ROWS,
+    walls: HUB_TWO_WALLS,
+    healingFountains: hubTwoHealingFountains,
+    visualObjects: HUB_TWO_VISUAL_OBJECTS,
+    teleports: [
+      {
+        id: HUB_TWO_TO_MAP_THREE_TELEPORTER_ID,
+        position: hubTwoWestTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: HUB_TWO_MAP_ID,
+        targetMapId: MAP_THREE_ID,
+        arrivalPositions: hubTwoMapThreeArrivalPositions,
+      },
+      {
+        id: HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
+        position: hubTwoSouthTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: HUB_TWO_MAP_ID,
+        targetMapId: MAP_FOUR_ID,
+        arrivalPositions: hubTwoMapFourArrivalPositions,
+      },
+      {
+        id: HUB_TWO_NORTH_ROUTE_TELEPORTER_ID,
+        position: hubTwoNorthTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: HUB_TWO_MAP_ID,
+        targetMapId: HUB_TWO_MAP_ID,
+        arrivalPositions: mapThreeHubTwoArrivalPositions,
+        startsWorking: false,
+      },
+      {
+        id: HUB_TWO_EAST_ROUTE_TELEPORTER_ID,
+        position: hubTwoEastTeleporterPosition,
+        range: TELEPORTER_RANGE,
+        sourceMapId: HUB_TWO_MAP_ID,
+        targetMapId: HUB_TWO_MAP_ID,
+        arrivalPositions: mapThreeHubTwoArrivalPositions,
+        startsWorking: false,
+      },
+    ],
+  },
   [MAP_ONE_ID]: {
     id: MAP_ONE_ID,
     displayName: "First Wild Zone",
@@ -1312,12 +1532,12 @@ export const debugMapDefinitions: Record<
         arrivalPositions: mapThreeMapTwoArrivalPositions,
       },
       {
-        id: MAP_THREE_TO_MAP_FOUR_TELEPORTER_ID,
+        id: MAP_THREE_TO_HUB_TWO_TELEPORTER_ID,
         position: mapThreeForwardTeleporterPosition,
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_THREE_ID,
-        targetMapId: MAP_FOUR_ID,
-        arrivalPositions: mapThreeMapFourArrivalPositions,
+        targetMapId: HUB_TWO_MAP_ID,
+        arrivalPositions: mapThreeHubTwoArrivalPositions,
         autoSelectAfterEnemiesCleared: true,
       },
       {
@@ -1344,12 +1564,12 @@ export const debugMapDefinitions: Record<
     subzoneNameLabels: mapFourSubzoneNameLabels,
     teleports: [
       {
-        id: "map-4-to-map-3",
+        id: MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
         position: mapFourReturnTeleporterPosition,
         range: TELEPORTER_RANGE,
         sourceMapId: MAP_FOUR_ID,
-        targetMapId: MAP_THREE_ID,
-        arrivalPositions: mapFourMapThreeArrivalPositions,
+        targetMapId: HUB_TWO_MAP_ID,
+        arrivalPositions: mapFourHubTwoArrivalPositions,
         autoSelectAfterEnemiesCleared: true,
       },
     ],
@@ -1560,7 +1780,30 @@ export function isOldGrovePassageOpen(
 export function isClassMentorAvailable(
   quests: DebugMapQuestStates = {},
 ): boolean {
-  return quests.find_slimeward_camp?.status === "completed";
+  return isHubClassMentorAvailable(quests) || isHubTwoClassMentorAvailable(quests);
+}
+
+export function isHubClassMentorAvailable(
+  quests: DebugMapQuestStates = {},
+): boolean {
+  const azureTrialStatus = quests.azure_trial?.status;
+
+  return (
+    quests.find_slimeward_camp?.status === "completed" &&
+    azureTrialStatus !== "ready_to_turn_in" &&
+    azureTrialStatus !== "completed"
+  );
+}
+
+export function isHubTwoClassMentorAvailable(
+  quests: DebugMapQuestStates = {},
+): boolean {
+  const azureTrialStatus = quests.azure_trial?.status;
+
+  return (
+    azureTrialStatus === "ready_to_turn_in" ||
+    azureTrialStatus === "completed"
+  );
 }
 
 export function getDebugMapDefinition(mapId: DebugMapId) {
@@ -1584,6 +1827,10 @@ function getDebugMapCollisionWalls(
 
   if (definition.id === MAP_TWO_ID && !options.oldGrovePassageOpen) {
     return OLD_GROVE_PASSAGE_BLOCKER_COLLISION_WALLS;
+  }
+
+  if (definition.id === HUB_TWO_MAP_ID) {
+    return HUB_TWO_STRUCTURE_COLLISION_WALLS;
   }
 
   if (definition.id !== MAP_ONE_ID && definition.id !== MAP_TWO_ID) {
@@ -1657,6 +1904,39 @@ function createWallBlock(
   }
 
   return walls;
+}
+
+function createWallOutline(
+  startX: number,
+  endX: number,
+  startY: number,
+  endY: number,
+) {
+  if (startX === endX || startY === endY) {
+    return createWallBlock(startX, endX, startY, endY);
+  }
+
+  return dedupeWalls([
+    ...createHorizontalWall(startY, startX, endX, []),
+    ...createHorizontalWall(endY, startX, endX, []),
+    ...createVerticalWall(startX, startY + 1, endY - 1, []),
+    ...createVerticalWall(endX, startY + 1, endY - 1, []),
+  ]);
+}
+
+function createBottomCenteredWallOutline(
+  bottomCenter: Position,
+  width: number,
+  height: number,
+) {
+  const halfWidth = Math.floor(width / 2);
+
+  return createWallOutline(
+    bottomCenter.x - halfWidth,
+    bottomCenter.x + width - halfWidth - 1,
+    bottomCenter.y - height,
+    bottomCenter.y - 1,
+  );
 }
 
 function createHorizontalWall(

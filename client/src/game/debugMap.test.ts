@@ -3,11 +3,15 @@ import {
   DEBUG_MAP_COLUMNS,
   DEBUG_MAP_ROWS,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
+  HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
+  HUB_TWO_TO_MAP_THREE_TELEPORTER_ID,
   MAP_FOUR_ID,
   MAP_ONE_ROWS,
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_THREE_ROWS,
+  MAP_THREE_TO_HUB_TWO_TELEPORTER_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_TWO_ID,
   MAP_TWO_ROWS,
@@ -20,8 +24,12 @@ import {
   debugMapDefinitions,
   hubCompanionStartPositions,
   hubHealingFountains,
+  hubTwoCompanionStartPositions,
+  hubTwoHealingFountains,
+  hubTwoNpcStartData,
   hubNpcStartData,
   getHubNpcStartDataForQuestState,
+  getHubTwoNpcStartDataForQuestState,
   mapFourEnemyStartPositions,
   mapFourEnemyStartData,
   mapFourSubzoneNameLabels,
@@ -125,6 +133,10 @@ describe("debug maps", () => {
       columns: WILDERNESS_MAP_COLUMNS,
       rows: WILDERNESS_MAP_ROWS,
     });
+    expect(createDebugMap(HUB_TWO_MAP_ID)).toMatchObject({
+      columns: 132,
+      rows: 72,
+    });
   });
 
   it("places the remade hub dock, base, NPCs, fountain, and teleport on reachable floor", () => {
@@ -165,10 +177,14 @@ describe("debug maps", () => {
     expect(
       getHubNpcStartDataForQuestState().map((npc) => npc.id),
     ).not.toContain(CLASS_MENTOR_NPC_ID);
+    expect(
+      getHubTwoNpcStartDataForQuestState().map((npc) => npc.id),
+    ).not.toContain(CLASS_MENTOR_NPC_ID);
 
     expect(
       getHubNpcStartDataForQuestState({
         find_slimeward_camp: { status: "completed" },
+        azure_trial: { status: "available" },
       }),
     ).toContainEqual(
       expect.objectContaining({
@@ -177,6 +193,104 @@ describe("debug maps", () => {
         npcRole: "class_mentor",
       }),
     );
+    expect(
+      getHubNpcStartDataForQuestState({
+        find_slimeward_camp: { status: "completed" },
+        azure_trial: { status: "ready_to_turn_in" },
+      }).map((npc) => npc.id),
+    ).not.toContain(CLASS_MENTOR_NPC_ID);
+    expect(
+      getHubTwoNpcStartDataForQuestState({
+        azure_trial: { status: "ready_to_turn_in" },
+      }),
+    ).toContainEqual(
+      expect.objectContaining({
+        id: CLASS_MENTOR_NPC_ID,
+        displayName: "Class Mentor",
+        npcRole: "class_mentor",
+      }),
+    );
+  });
+
+  it("places Forward Bastion services, fountain, and travel routes on reachable floor", () => {
+    const hubTwo = createDebugMap(HUB_TWO_MAP_ID);
+    const westTeleport = debugMapDefinitions[HUB_TWO_MAP_ID].teleports.find(
+      (teleport) => teleport.id === HUB_TWO_TO_MAP_THREE_TELEPORTER_ID,
+    );
+    const southTeleport = debugMapDefinitions[HUB_TWO_MAP_ID].teleports.find(
+      (teleport) => teleport.id === HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
+    );
+    const futureTeleports = debugMapDefinitions[HUB_TWO_MAP_ID].teleports.filter(
+      (teleport) => teleport.startsWorking === false,
+    );
+
+    expect(hubTwo.displayName).toBe("Forward Bastion");
+    expect(westTeleport?.targetMapId).toBe(MAP_THREE_ID);
+    expect(westTeleport?.position).toEqual({ x: 5, y: 36 });
+    expect(southTeleport?.targetMapId).toBe(MAP_FOUR_ID);
+    expect(southTeleport?.position).toEqual({ x: 66, y: 66 });
+    expect(futureTeleports).toHaveLength(2);
+    expect(hubTwo.visualObjects?.length).toBeGreaterThanOrEqual(8);
+    expect(hubTwo.healingFountains).toBe(hubTwoHealingFountains);
+    expect(hubTwoNpcStartData.map((npc) => npc.npcRole)).toEqual([
+      "quest_giver",
+      "merchant",
+      "smith",
+      "bounty_board",
+      "dog",
+      "dog",
+    ]);
+
+    assertMapPlacements(HUB_TWO_MAP_ID, [
+      ...hubTwoCompanionStartPositions,
+      ...hubTwoNpcStartData.map((npc) => npc.position),
+      ...getHubTwoNpcStartDataForQuestState({
+        azure_trial: { status: "completed" },
+      }).map((npc) => npc.position),
+      ...hubTwoHealingFountains.map((fountain) => fountain.position),
+      ...debugMapDefinitions[HUB_TWO_MAP_ID].teleports.map(
+        (teleport) => teleport.position,
+      ),
+    ]);
+  });
+
+  it("keeps Forward Bastion building collision as invisible footprint outlines", () => {
+    const hubTwo = createDebugMap(HUB_TWO_MAP_ID);
+    const structureVisuals = hubTwo.visualObjects?.filter((visualObject) =>
+      visualObject.id.startsWith("hub-2-"),
+    ) ?? [];
+
+    expect(structureVisuals).toHaveLength(8);
+
+    for (const visualObject of structureVisuals) {
+      const upperLeftVisualArea = {
+        x: Math.floor(visualObject.position.x - visualObject.widthCells / 2) + 1,
+        y: visualObject.position.y - Math.floor(visualObject.heightCells) + 1,
+      };
+      const lowerFootprintCenter = {
+        x: visualObject.position.x,
+        y: visualObject.position.y - 3,
+      };
+      const lowerFootprintEdge = {
+        x: visualObject.position.x,
+        y: visualObject.position.y - 1,
+      };
+
+      expect(
+        isNavigationCellWalkable(hubTwo, upperLeftVisualArea),
+        `${visualObject.id} upper visual area should stay walkable`,
+      ).toBe(true);
+      expect(
+        isNavigationCellWalkable(hubTwo, lowerFootprintCenter),
+        `${visualObject.id} lower footprint center should not be filled`,
+      ).toBe(true);
+      expect(
+        isNavigationCellWalkable(hubTwo, lowerFootprintEdge),
+        `${visualObject.id} lower footprint edge should remain blocked`,
+      ).toBe(false);
+      expect(hubTwo.walls).not.toContainEqual(lowerFootprintEdge);
+      expect(hubTwo.collisionWalls).toContainEqual(lowerFootprintEdge);
+    }
   });
 
   it("keeps wilderness enemies and resources on reachable open floor", () => {
@@ -528,7 +642,7 @@ describe("debug maps", () => {
       (teleport) => teleport.targetMapId === MAP_TWO_ID,
     );
     const forwardEntry = mapThreeDefinition.teleports.find(
-      (teleport) => teleport.targetMapId === MAP_FOUR_ID,
+      (teleport) => teleport.targetMapId === HUB_TWO_MAP_ID,
     );
     const slimewardEntry = mapThreeDefinition.teleports.find(
       (teleport) => teleport.targetMapId === SLIMEWARD_CAMP_ID,
@@ -561,6 +675,7 @@ describe("debug maps", () => {
     expect(returnEntry && isInsideSubzone(brokenThicket, returnEntry.position)).toBe(true);
     expect(forwardEntry && isInsideSubzone(impFen, forwardEntry.position)).toBe(true);
     expect(slimewardEntry && isInsideSubzone(impFen, slimewardEntry.position)).toBe(true);
+    expect(forwardEntry?.id).toBe(MAP_THREE_TO_HUB_TWO_TELEPORTER_ID);
     expect(slimewardEntry?.position).toEqual(mapThreeSlimewardCampTeleporterPosition);
     expect(slimewardObjective).toMatchObject({
       targetSubzoneId: "south-center",
@@ -571,7 +686,7 @@ describe("debug maps", () => {
     for (const arrivalPosition of debugMapDefinitions[MAP_TWO_ID].teleports[1].arrivalPositions) {
       expect(isInsideSubzone(brokenThicket, arrivalPosition)).toBe(true);
     }
-    for (const arrivalPosition of debugMapDefinitions[MAP_FOUR_ID].teleports[0].arrivalPositions) {
+    for (const arrivalPosition of debugMapDefinitions[HUB_TWO_MAP_ID].teleports[0].arrivalPositions) {
       expect(isInsideSubzone(impFen, arrivalPosition)).toBe(true);
     }
     for (const arrivalPosition of slimewardReturnEntry?.arrivalPositions ?? []) {
