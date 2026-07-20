@@ -13,6 +13,7 @@ import type {
   DirectCompanionCommand,
   ActiveCombatProjectile,
   ActiveTeleport,
+  AutonomousTargetSuppressionState,
   DebugMapId,
   GameMap,
   GameEntity,
@@ -233,6 +234,7 @@ export type GameState = {
   flaskRechargeEnemyKillCounter?: number;
   flaskRechargeCountedEnemyDefeats?: Record<string, number>;
   dropVisualEvents?: DropVisualEvent[];
+  autonomousTargetSuppressionsByEnemyId?: Record<string, AutonomousTargetSuppressionState>;
   slimewardDungeon?: SlimewardDungeonRuntimeState;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
   resurrectionChannelsByHelperId?: Record<string, ResurrectionRecoveryAssignmentState>;

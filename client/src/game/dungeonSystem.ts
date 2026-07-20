@@ -16,6 +16,10 @@ import {
 import { createEnemy, createNpc } from "./entities";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { addItemToInventoryState } from "./inventory";
+import {
+  clearEnemyFromPartyTargeting,
+  suppressAutonomousEnemyTarget,
+} from "./partyTargetSystem";
 import { getPartyLeader } from "./partySystem";
 import { recordDungeonChestCollectedForQuests } from "./questSystem";
 import { setTeleportWorking } from "./teleportState";
@@ -51,6 +55,7 @@ const AZURE_MASS_BOSS_PACK_ID = "f2-boss-pack";
 const AZURE_MASS_FLEE_DURATION_MS = 5_000;
 const AZURE_MASS_FLEE_SPEED_MULTIPLIER = 2;
 const AZURE_MASS_SPAWN_CLEARANCE = 1.5;
+const AZURE_MASS_TARGET_SUPPRESSION_REASON = "azure_mass_flee_phase";
 const AZURE_MASS_PHASE_THRESHOLDS: AzureMassPhaseThreshold[] = [75, 50, 25];
 
 type AzureMassWaveEnemy = {
@@ -362,7 +367,14 @@ export function updateAzureMassPhaseSystem(
     nextState = spawnAzureMassPhaseWave(nextState, boss, threshold);
   }
 
-  return nextState;
+  nextState = suppressAutonomousEnemyTarget(
+    nextState,
+    boss.id,
+    AZURE_MASS_FLEE_DURATION_MS,
+    AZURE_MASS_TARGET_SUPPRESSION_REASON,
+  );
+
+  return clearEnemyFromPartyTargeting(nextState, boss.id);
 }
 
 export function updateAzureMassFleeBehavior(
