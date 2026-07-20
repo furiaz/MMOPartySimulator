@@ -146,7 +146,7 @@ describe("prototype item definitions", () => {
   it("keeps regular armor class-unrestricted and grouped by family", () => {
     const armorItems = getArmorItems();
 
-    expect(armorItems.length).toBe(120);
+    expect(armorItems.length).toBe(140);
 
     for (const itemDefinition of armorItems) {
       expect(itemDefinition.armorFamily).toMatch(/^(cloth|leather|mail|plate)$/);
@@ -182,25 +182,42 @@ describe("prototype item definitions", () => {
     ]);
   });
 
-  it("keeps cloth and plate tier 1 armor at level 10", () => {
-    const clothAndPlateItems = getArmorItems().filter(
+  it("keeps all armor families represented at level 10", () => {
+    const level10Tier1ArmorItems = getArmorItems().filter(
       (itemDefinition) =>
-        itemDefinition.tier === 1 &&
-        (itemDefinition.armorFamily === "cloth" ||
-          itemDefinition.armorFamily === "plate"),
+        itemDefinition.tier === 1 && itemDefinition.levelRequirement === 10,
     );
     const familiesAvailableAtLevel10 = new Set(
-      getArmorItems()
-        .filter((itemDefinition) => (itemDefinition.levelRequirement ?? 0) <= 10)
-        .map((itemDefinition) => itemDefinition.armorFamily),
+      level10Tier1ArmorItems.map((itemDefinition) => itemDefinition.armorFamily),
     );
 
-    expect(clothAndPlateItems.length).toBe(20);
-    for (const itemDefinition of clothAndPlateItems) {
-      expect(itemDefinition.levelRequirement).toBe(10);
-    }
+    expect(level10Tier1ArmorItems).toHaveLength(40);
     expect(familiesAvailableAtLevel10).toEqual(
       new Set(["cloth", "leather", "mail", "plate"]),
+    );
+    expect(getArmorItemIdsWithLevelRequirement(10)).toEqual(
+      expect.arrayContaining([
+        "trailrunner_cap",
+        "trailrunner_jacket",
+        "trailrunner_trousers",
+        "trailrunner_gloves",
+        "trailrunner_boots",
+        "ravager_mask",
+        "ravager_vest",
+        "ravager_leggings",
+        "ravager_grips",
+        "ravager_boots",
+        "wardmail_coif",
+        "wardmail_hauberk",
+        "wardmail_legguards",
+        "wardmail_gloves",
+        "wardmail_boots",
+        "ironmarch_coif",
+        "ironmarch_hauberk",
+        "ironmarch_legguards",
+        "ironmarch_gloves",
+        "ironmarch_boots",
+      ]),
     );
   });
 
