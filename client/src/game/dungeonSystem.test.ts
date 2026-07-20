@@ -29,12 +29,22 @@ import { ENEMY_MOVEMENT_SPEED_PER_SECOND, createCompanion, createEnemy } from ".
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { createEmptyPartyInventory } from "./inventory";
 import { isNavigationCellWalkable } from "./navigation";
+import { setPartyExecutionIntent } from "./partyIntentState";
 import { createInitialQuestStates } from "./questSystem";
+import { findEnemyTarget as findSkillEnemyTarget } from "./skillTargeting";
 import { isPositionInsideSubzone } from "./subzoneSystem";
+import { findEnemyTarget as findAutonomousEnemyTarget } from "./targetSelection";
 import { isTeleportWorking } from "./teleportState";
 import { createTestGameState } from "./testState";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
-import type { AzureMassPhaseThreshold, Enemy, GameEntity, GameMap, Position } from "./types";
+import type {
+  AzureMassPhaseThreshold,
+  Companion,
+  Enemy,
+  GameEntity,
+  GameMap,
+  Position,
+} from "./types";
 
 describe("Slimeward dungeon prototype", () => {
   it("registers the camp and two floor maps with debug access", () => {
@@ -318,6 +328,93 @@ describe("Slimeward dungeon prototype", () => {
         ).toBeGreaterThanOrEqual(1.5);
       }
     }
+  });
+
+  it("clears Azure Mass from shared and autonomous party targets when a flee phase starts", () => {
+    const state = createFloorTwoBossPhaseState({ healthPercent: 75 });
+    const companion = state.entities["test-companion-1"] as Companion;
+    const boss = state.entities[SLIMEWARD_BOSS_ID] as Enemy;
+    const targetingState = setPartyExecutionIntent(
+      {
+        ...state,
+        entities: {
+          ...state.entities,
+          [companion.id]: {
+            ...companion,
+            state: "attack",
+            currentTargetId: boss.id,
+            commandPriority: "autonomous",
+          },
+        },
+      },
+      {
+        type: "attack",
+        targetId: boss.id,
+        targetPosition: boss.position,
+        source: "player",
+      },
+    );
+
+    const nextState = updateSlimewardDungeonSystem(targetingState, 1_000);
+    const nextCompanion = nextState.entities[companion.id] as Companion;
+
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextState.partyIntent).toBeNull();
+    expect(nextCompanion.state).toBe("follow");
+    expect(nextCompanion.currentTargetId).toBeNull();
+    expect(
+      nextState.autonomousTargetSuppressionsByEnemyId?.[boss.id]?.reason,
+    ).toBe("azure_mass_flee_phase");
+  });
+
+  it("preserves direct companion commands when Azure Mass starts fleeing", () => {
+    const state = createFloorTwoBossPhaseState({ healthPercent: 75 });
+    const companion = state.entities["test-companion-1"] as Companion;
+    const boss = state.entities[SLIMEWARD_BOSS_ID] as Enemy;
+    const targetingState = setPartyExecutionIntent(
+      {
+        ...state,
+        entities: {
+          ...state.entities,
+          [companion.id]: {
+            ...companion,
+            state: "attack",
+            currentTargetId: boss.id,
+            commandPriority: "direct",
+          },
+        },
+      },
+      {
+        type: "attack",
+        targetId: boss.id,
+        targetPosition: boss.position,
+        source: "player",
+      },
+    );
+
+    const nextState = updateSlimewardDungeonSystem(targetingState, 1_000);
+    const nextCompanion = nextState.entities[companion.id] as Companion;
+
+    expect(nextState.leaderIntent).toBeNull();
+    expect(nextCompanion.state).toBe("attack");
+    expect(nextCompanion.currentTargetId).toBe(boss.id);
+    expect(nextCompanion.commandPriority).toBe("direct");
+  });
+
+  it("keeps Azure Mass out of autonomous and skill target selection while fleeing", () => {
+    const state = createFloorTwoBossPhaseState({ healthPercent: 75 });
+    const nextState = updateSlimewardDungeonSystem(state, 1_000);
+    const companion = nextState.entities["test-companion-1"] as Companion;
+    const boss = nextState.entities[SLIMEWARD_BOSS_ID] as Enemy;
+    const phaseEnemies = getAzureMassPhaseEnemies(nextState, 75);
+    const autonomousTarget = findAutonomousEnemyTarget(nextState, companion);
+    const skillTarget = findSkillEnemyTarget(nextState, companion, 99);
+
+    expect(phaseEnemies).toHaveLength(3);
+    expect(autonomousTarget?.id).not.toBe(boss.id);
+    expect(phaseEnemies.some((enemy) => enemy.id === autonomousTarget?.id)).toBe(true);
+    expect(skillTarget?.id).not.toBe(boss.id);
+    expect(phaseEnemies.some((enemy) => enemy.id === skillTarget?.id)).toBe(true);
   });
 
   it("makes Azure Mass flee living companions at 200% base enemy speed for five seconds", () => {

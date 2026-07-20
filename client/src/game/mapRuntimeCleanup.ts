@@ -24,6 +24,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    autonomousTargetSuppressionsByEnemyId: undefined,
     failedMoveByEntityId: {},
     movementFailureMsByEntityId: {},
     movementFailuresByEntityId: {},

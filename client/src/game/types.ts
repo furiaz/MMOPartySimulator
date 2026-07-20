@@ -2267,6 +2267,12 @@ export type PartyFormationState = {
   skippedTargetIds: string[];
 };
 
+export type AutonomousTargetSuppressionState = {
+  enemyId: string;
+  expiresAtMs: number;
+  reason: string;
+};
+
 export type BaseEntity = {
   id: string;
   kind: EntityKind;

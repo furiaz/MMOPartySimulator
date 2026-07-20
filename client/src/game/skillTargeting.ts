@@ -15,7 +15,10 @@ import { getCompanionAttackRange } from "./companionCombat";
 import { getGridDistance } from "./positionUtils";
 import { getEntityById, type GameState } from "./state";
 import { getPartyExecutionIntent } from "./partyIntentState";
-import { getPartyCombatTarget } from "./partyTargetSystem";
+import {
+  getPartyCombatTarget,
+  isEnemySuppressedForAutonomousTargeting,
+} from "./partyTargetSystem";
 import {
   getCompanionSkillBehavior,
   isBeginnerFirstAidSelfHealPriorityActive,
@@ -427,6 +430,7 @@ export function findEnemyTarget(
   if (
     isLivingEnemy(currentTarget) &&
     isEnemyInRange(caster, currentTarget, range) &&
+    isSkillEnemyTargetAvailable(state, caster, currentTarget) &&
     isAllowedEnemyTarget(currentTarget, options)
   ) {
     return currentTarget;
@@ -447,7 +451,19 @@ export function findEnemyTarget(
       isLivingEnemy(entity) &&
       !isTargetDummyEnemy(entity) &&
       isEnemyInRange(caster, entity, range) &&
+      isSkillEnemyTargetAvailable(state, caster, entity) &&
       isAllowedEnemyTarget(entity, options),
+  );
+}
+
+function isSkillEnemyTargetAvailable(
+  state: GameState,
+  caster: Companion,
+  enemy: Enemy,
+): boolean {
+  return (
+    caster.commandPriority === "direct" ||
+    !isEnemySuppressedForAutonomousTargeting(state, enemy.id)
   );
 }
 

@@ -69,6 +69,7 @@ import {
   type GameState,
 } from "./state";
 import { getPartyExecutionIntent } from "./partyIntentState";
+import { clearExpiredAutonomousTargetSuppressions } from "./partyTargetSystem";
 import {
   createSimulationTiming,
   type SimulationTiming,
@@ -88,6 +89,7 @@ export function updateGame(
     clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
     timing.nowMs,
   );
+  nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);

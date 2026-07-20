@@ -3,6 +3,7 @@ import { isActiveResource, isTargetDummyEnemy } from "./entityGuards";
 import { getBoundedNavigationDistance } from "./movementPlanning";
 import type { GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
+import { isEnemySuppressedForAutonomousTargeting } from "./partyTargetSystem";
 import type { Enemy, GameEntity, Position, ResourceEntity } from "./types";
 
 type EnemyTargetOptions = {
@@ -20,7 +21,9 @@ export function findEnemyTarget(
   seeker: GameEntity,
   options: EnemyTargetOptions = {},
 ): Enemy | undefined {
-  const enemies = Object.values(state.entities).filter(isValidEnemyTarget);
+  const enemies = Object.values(state.entities).filter((entity): entity is Enemy =>
+    isValidEnemyTarget(state, entity),
+  );
   const reachableEnemies = enemies.filter((enemy) =>
     isEnemyInRange(state, seeker.position, enemy, options.maxDistance),
   );
@@ -86,13 +89,17 @@ function isResourcePositionAllowed(
   return options.isCandidatePositionAllowed?.(position) ?? true;
 }
 
-function isValidEnemyTarget(entity: GameEntity): entity is Enemy {
+function isValidEnemyTarget(
+  state: GameState,
+  entity: GameEntity,
+): entity is Enemy {
   return (
     entity.kind === "enemy" &&
     !isTargetDummyEnemy(entity) &&
     isCombatEntity(entity) &&
     entity.state !== "dead" &&
-    entity.health > 0
+    entity.health > 0 &&
+    !isEnemySuppressedForAutonomousTargeting(state, entity.id)
   );
 }
 

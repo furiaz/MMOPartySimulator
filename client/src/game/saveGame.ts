@@ -357,6 +357,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     partyFormation: undefined,
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    autonomousTargetSuppressionsByEnemyId: undefined,
     skillMarksByEnemyId: {},
     skillSelfBuffsByCompanionId: {},
     skillPartyBuffsBySourceId: {},
