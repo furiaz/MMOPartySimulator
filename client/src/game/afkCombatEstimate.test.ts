@@ -28,7 +28,7 @@ describe("afk combat estimate", () => {
     expect(estimate.experiencePerMinute).toBeGreaterThan(0);
     expect(estimate.accessEfficiencyPercent).toBeGreaterThan(0);
     expect(estimate.downtimeSecondsPerKill).toBeGreaterThan(0);
-    expect(estimate.enemies.map((enemy) => enemy.enemyTypeId)).toContain("slime");
+    expect(estimate.enemies.map((enemy) => enemy.enemyTypeId)).toContain("green_slime");
   });
 
   it("uses the live two-second global cooldown for basic attacks", () => {
@@ -105,7 +105,7 @@ describe("afk combat estimate", () => {
     };
     const state = createWildState([weakCompanion], [
       createEnemy("enemy-1", { x: 14, y: 20 }, "aggressive", {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
         subzoneId: subzone.id,
         maxHealth: 500,
         attack: 200,
@@ -266,15 +266,15 @@ function createWildState(
   companions: Companion[],
   enemies: GameEntity[] = [
     createEnemy("enemy-1", { x: 14, y: 20 }, "aggressive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     }),
     createEnemy("enemy-2", { x: 20, y: 26 }, "aggressive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     }),
     createEnemy("enemy-3", { x: 24, y: 34 }, "aggressive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     }),
   ],

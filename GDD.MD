@@ -591,7 +591,7 @@ Current prototype enemy archetype/family ids:
 
 Current prototype enemy types:
 
-- Slime
+- Green Slime
 - Heavy Slime
 - Pale Ooze
 - Slime Spitter
@@ -1460,7 +1460,7 @@ Current prototype quests:
 
 - Secure the Landing
   - Quest id: clear_the_shore
-  - Objectives: defeat 10 Slimes in Shore Fringe, gather 3 Wood in Shore Fringe, and inspect the Shore Fringe supply marker
+  - Objectives: defeat 10 Green Slimes in Shore Fringe, gather 3 Wood in Shore Fringe, and inspect the Shore Fringe supply marker
   - Rewards: 50 Crowns, 8 character XP, 2 Tier 1 Wolf Pelt, 1 Minor Recovery Flask, 1 Guard Coif
   - Unlocks: Outfit the Expedition
 

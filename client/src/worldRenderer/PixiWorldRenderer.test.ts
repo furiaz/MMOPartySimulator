@@ -730,7 +730,7 @@ describe("texture lifetime classification", () => {
     };
     const resource = createResource("wood", { x: 4, y: 4 });
     const enemy = createEnemy("enemy", { x: 6, y: 6 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
     const scopedSources = collectCurrentMapScopedVisualTextureSrcs(map, [
       resource,
@@ -1195,11 +1195,11 @@ describe("enemy nameplates", () => {
 
   it("prefixes Superior enemies", () => {
     const enemy = createEnemy("slime", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       variant: "superior",
     });
 
-    expect(getEnemyNameplateText(enemy)).toBe("Superior Slime Lv 1");
+    expect(getEnemyNameplateText(enemy)).toBe("Superior Green Slime Lv 1");
   });
 
   it("uses red text for aggressive enemies", () => {

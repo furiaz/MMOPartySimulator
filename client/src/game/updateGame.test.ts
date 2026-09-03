@@ -1662,7 +1662,7 @@ describe("game update intent priority", () => {
       resourceType: "wood",
     });
     const shoreSlime = createEnemy("shore-slime", { x: 43, y: 22 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
 
@@ -1733,7 +1733,7 @@ describe("game update intent priority", () => {
       resourceType: "wood",
     });
     const gladeBat = createEnemy("glade-bat", { x: 7, y: 5 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
     const quests = createQuestStates({
@@ -3530,7 +3530,7 @@ describe("game update intent priority", () => {
   it.skip("keeps combat quest targeting under POI control", () => {
     const leader = createLeader({ x: 4, y: 4 });
     const questEnemy = createEnemy("quest-enemy", { x: 5, y: 4 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
 
@@ -5136,7 +5136,7 @@ describe("game update intent priority", () => {
   it.skip("Stay in Subzone still allows same-subzone active quest objectives", () => {
     const leader = createLeader({ x: 2, y: 2 });
     const questEnemy = createDurableEnemy("quest-enemy", { x: 4, y: 2 }, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
 

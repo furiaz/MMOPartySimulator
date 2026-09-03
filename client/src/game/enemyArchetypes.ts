@@ -86,9 +86,9 @@ export const ENEMY_ARCHETYPES: Record<EnemyArchetypeId, EnemyArchetypeDefinition
 };
 
 export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
-  slime: {
-    id: "slime",
-    displayName: "Slime",
+  green_slime: {
+    id: "green_slime",
+    displayName: "Green Slime",
     archetypeId: "slime",
     temperament: "passive",
     targetPreference: "closest",

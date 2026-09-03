@@ -317,7 +317,7 @@ function createBossSlimeDirectionalSprite(
 }
 
 const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>> = {
-  slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
+  green_slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
   slimeward_heavy_slime: createStaticEnemySprite(
     `${slimewardDungeonAssetPath}/cave-slime-heavy-128.png`,
     { width: 104, height: 104 },

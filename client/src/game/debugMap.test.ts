@@ -584,7 +584,7 @@ describe("debug maps", () => {
     for (const wildernessMap of wildernessMaps) {
       for (const enemy of wildernessMap.enemies) {
         const expectedTemperament =
-          enemy.enemyTypeId === "slime" ? "passive" : "aggressive";
+          enemy.enemyTypeId === "green_slime" ? "passive" : "aggressive";
 
         expect(ENEMY_TYPES[enemy.enemyTypeId].temperament).toBe(
           expectedTemperament,
@@ -680,7 +680,7 @@ describe("debug maps", () => {
     }
 
     const expectedSubzoneEnemyTypes = new Map([
-      ["shore-fringe", "slime"],
+      ["shore-fringe", "green_slime"],
       ["mossy-glade", "cave_bat"],
       ["lower-shore", "forest_spider"],
     ]);

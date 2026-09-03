@@ -8,7 +8,7 @@ import {
 import { createEnemy } from "./entities";
 
 const EXPECTED_ENEMY_COMBAT_BODY_RADII = {
-  slime: 0.7,
+  green_slime: 0.7,
   slimeward_heavy_slime: 1.25,
   slimeward_pale_ooze: 0.6,
   slimeward_spitter_slime: 1.4,
@@ -65,9 +65,9 @@ describe("prototype enemy identity definitions", () => {
     }
   });
 
-  it("keeps starter slimes passive and later prototype enemy types aggressive", () => {
+  it("keeps starter Green Slimes passive and later prototype enemy types aggressive", () => {
     for (const enemyType of Object.values(ENEMY_TYPES)) {
-      if (enemyType.id === "slime") {
+      if (enemyType.id === "green_slime") {
         expect(enemyType.temperament).toBe("passive");
       } else {
         expect(enemyType.temperament).toBe("aggressive");
@@ -120,9 +120,9 @@ describe("prototype enemy identity definitions", () => {
     }
   });
 
-  it("creates slime archetypes as passive starter enemies", () => {
+  it("creates Green Slime as a passive starter enemy", () => {
     const enemy = createEnemy("starter-slime", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
 
     expect(enemy.aggressionMode).toBe("passive");
@@ -131,7 +131,7 @@ describe("prototype enemy identity definitions", () => {
 
   it("lets explicit enemy setup options override archetype defaults", () => {
     const enemy = createEnemy("custom-slime", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       level: 5,
       maxHealth: 9,
       attack: 4,

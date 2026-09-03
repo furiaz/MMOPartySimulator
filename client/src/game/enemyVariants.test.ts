@@ -9,7 +9,7 @@ import { createDebugMap, MAP_ONE_ID, HUB_MAP_ID } from "./debugMap";
 describe("enemy variants", () => {
   it("applies Superior stat multipliers when creating an enemy", () => {
     const slime = createEnemy("slime", { x: 10, y: 10 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       variant: "superior",
     });
 
@@ -62,7 +62,7 @@ describe("enemy variants", () => {
   it("allows at most one living Superior enemy per subzone", () => {
     const map = createDebugMap(MAP_ONE_ID);
     const superior = createEnemy("superior", { x: 8, y: 8 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
       variant: "superior",
     });

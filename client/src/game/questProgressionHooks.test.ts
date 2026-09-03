@@ -142,7 +142,7 @@ describe("quest progression hooks", () => {
       state,
       {
         ...createEnemy("normal-slime", { x: 0, y: 0 }, undefined, {
-          enemyTypeId: "slime",
+          enemyTypeId: "green_slime",
           archetypeId: "slime",
           subzoneId: "f2-boss-room",
         }),

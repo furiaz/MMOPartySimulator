@@ -298,7 +298,7 @@ describe("character leveling", () => {
 
   it("applies the Superior enemy XP multiplier to normal enemy XP", () => {
     const enemy = createEnemy("slime", { x: 1, y: 0 }, "aggressive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       variant: "superior",
     });
 

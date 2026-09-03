@@ -2136,7 +2136,7 @@ Current enemy type ids are:
 
 ```ts
 type EnemyTypeId =
-  | "slime"
+  | "green_slime"
   | "slimeward_heavy_slime"
   | "slimeward_pale_ooze"
   | "slimeward_spitter_slime"

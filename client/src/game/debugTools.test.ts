@@ -37,11 +37,11 @@ describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
       "companion-1",
     );
     const closestEnemy = createEnemy("enemy-close", { x: 12, y: 10 }, "passive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
     const fartherEnemy = createEnemy("enemy-far", { x: 30, y: 10 }, "passive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
     const otherSubzoneEnemy = createEnemy(
@@ -100,13 +100,13 @@ describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
       { x: 12, y: 10 },
       "passive",
       {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
         subzoneId: "shore-fringe",
         variant: "superior",
       },
     );
     const normalEnemy = createEnemy("enemy-normal", { x: 14, y: 10 }, "passive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
     const state = createTestGameState({
@@ -132,7 +132,7 @@ describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
       "companion-1",
     );
     const enemy = createEnemy("enemy-normal", { x: 12, y: 10 }, "passive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       subzoneId: "shore-fringe",
     });
     const state = createTestGameState({
@@ -176,7 +176,7 @@ describe("debugAddEnemiesToCurrentSubzone", () => {
     for (const enemy of enemies) {
       expect(enemy.debugSpawn).toBe(true);
       expect(enemy.subzoneId).toBe("shore-fringe");
-      expect(enemy.enemyTypeId).toBe("slime");
+      expect(enemy.enemyTypeId).toBe("green_slime");
       expect(enemy.level).toBe(1);
       expect(enemy.encounterAreaId).toBeTruthy();
       expect(subzone && isPositionInsideSubzone(enemy.position, subzone)).toBe(true);
@@ -264,7 +264,7 @@ describe("debugAddEnemiesToCurrentSubzone", () => {
       { x: 12, y: 10 },
       "passive",
       {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
         subzoneId: "shore-fringe",
       },
     );
@@ -273,7 +273,7 @@ describe("debugAddEnemiesToCurrentSubzone", () => {
       { x: 14, y: 10 },
       "passive",
       {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
         subzoneId: "shore-fringe",
       },
     );

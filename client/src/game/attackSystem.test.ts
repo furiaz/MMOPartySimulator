@@ -105,7 +105,7 @@ describe("enemy attack leash movement", () => {
       currentTargetId: "enemy",
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 3,
     });
 
@@ -124,7 +124,7 @@ describe("enemy attack leash movement", () => {
       currentTargetId: "enemy",
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 20,
     });
 
@@ -149,7 +149,7 @@ describe("enemy attack leash movement", () => {
       currentTargetId: "enemy",
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 20,
     });
 
@@ -254,7 +254,7 @@ describe("enemy attack leash movement", () => {
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 20,
     });
 
@@ -284,7 +284,7 @@ describe("enemy attack leash movement", () => {
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 20,
     });
 
@@ -315,7 +315,7 @@ describe("enemy attack leash movement", () => {
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 20,
     });
 
@@ -346,7 +346,7 @@ describe("enemy attack leash movement", () => {
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 20,
     });
 
@@ -464,7 +464,7 @@ describe("enemy attack leash movement", () => {
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 50,
     });
 
@@ -484,7 +484,7 @@ describe("enemy attack leash movement", () => {
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
       maxHealth: 50,
     });
 

@@ -193,7 +193,7 @@ describe("getQuestEntityIndicators", () => {
       enemyTypeId: "cave_bat",
     });
     const slime = createEnemy("notice-slime", { x: 18, y: 13 }, "passive", {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
     const deadBat = {
       ...createEnemy("notice-dead-bat", { x: 76, y: 9 }, "passive", {
@@ -217,7 +217,7 @@ describe("getQuestEntityIndicators", () => {
             }),
             createNoticeBoardQuest("available-notice", "available", {
               currentCount: 0,
-              enemyTypeId: "slime",
+              enemyTypeId: "green_slime",
               id: "kill-slimes",
               requiredCount: 3,
             }),

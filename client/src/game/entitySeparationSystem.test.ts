@@ -116,7 +116,7 @@ describe("stationary overlap separation", () => {
       "blade",
     );
     const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
     const state = createState([companion, enemy]);
     const nextState = updateEntitySeparationSystem(state, new Set());
@@ -128,7 +128,7 @@ describe("stationary overlap separation", () => {
   it("does not separate a Beginner companion standing at a small enemy attack edge", () => {
     const companion = createCompanion("companion", { x: 6.7, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
     const state = createState([companion, enemy]);
     const nextState = updateEntitySeparationSystem(state, new Set());
@@ -140,7 +140,7 @@ describe("stationary overlap separation", () => {
   it("pushes a companion that is clearly inside a small enemy body", () => {
     const companion = createCompanion("companion", { x: 5.5, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
     const state = createState([companion, enemy]);
     const nextState = updateEntitySeparationSystem(state, new Set());

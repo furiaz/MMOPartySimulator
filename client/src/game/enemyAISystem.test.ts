@@ -298,7 +298,7 @@ describe("enemy AI aggro and roaming", () => {
   it("keeps starter slime archetypes from acquiring nearby targets", () => {
     const leader = createIdleCompanion("leader", { x: 1, y: 0 });
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
-      enemyTypeId: "slime",
+      enemyTypeId: "green_slime",
     });
 
     const nextState = updateEnemyAISystem(createState([leader, enemy]));

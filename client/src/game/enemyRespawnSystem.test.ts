@@ -153,7 +153,7 @@ describe("enemy respawn system", () => {
   it("allows drop processing to observe a dead enemy before respawn", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 8, y: 7 }, undefined, {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
       }),
       state: "dead" as const,
       health: 0,
@@ -167,7 +167,7 @@ describe("enemy respawn system", () => {
         {
           id: "drop-1",
           enemyId: enemy.id,
-          enemyTypeId: "slime",
+          enemyTypeId: "green_slime",
           enemyArchetypeId: "slime",
           itemId: "slime_gel_t1",
           quantity: 1,
@@ -197,7 +197,7 @@ describe("enemy respawn system", () => {
   it("rerolls Superior status when enemies respawn", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 8, y: 7 }, undefined, {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
         subzoneId: "shore-fringe",
         variant: "superior",
       }),
@@ -228,7 +228,7 @@ describe("enemy respawn system", () => {
   it("can respawn an eligible enemy as Superior and records telemetry", () => {
     const enemy = {
       ...createEnemy("enemy", { x: 8, y: 7 }, undefined, {
-        enemyTypeId: "slime",
+        enemyTypeId: "green_slime",
         subzoneId: "shore-fringe",
       }),
       state: "dead" as const,

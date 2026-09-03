@@ -495,7 +495,7 @@ function formatQuestEnemyName(
   enemyArchetypeId: QuestObjectiveDefinition["enemyArchetypeId"],
 ): string {
   if (enemyArchetypeId === "slime") {
-    return "Slimes";
+    return "Green Slimes";
   }
 
   if (enemyArchetypeId === "bat") {

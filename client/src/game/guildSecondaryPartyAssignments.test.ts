@@ -489,7 +489,7 @@ describe("guild field team assignments", () => {
 
     const withPending = withPendingAssignmentResult(assigned.state, {
       enemyKills: 1,
-      enemyKillsByType: [{ enemyTypeId: "slime", enemyLevel: 1, quantity: 1 }],
+      enemyKillsByType: [{ enemyTypeId: "green_slime", enemyLevel: 1, quantity: 1 }],
       xpGranted: 3,
       loot: [{ itemId: "training_sword", quantity: 1 }],
       resources: [],
