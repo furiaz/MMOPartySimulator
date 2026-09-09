@@ -13,7 +13,12 @@ import { GuidePopup } from "./GuidePopup";
 import {
   guidePopupDefinitions,
   type GuidePopupId,
+  type GuidePopupMenuTarget,
 } from "./guidePopupDefinitions";
+import {
+  getGuidePopupsForQuestStatusChanges,
+  type QuestStatusLookup,
+} from "./guidePopupFlow";
 import type {
   AtlasSubpage,
   GameMenuTab,
@@ -79,7 +84,6 @@ import {
   equipItemToCompanion,
   equipFlaskToCompanion,
   exportDebugTelemetryReport,
-  EQUIPMENT_TUTORIAL_QUEST_ID,
   formatCurrencyDisplay,
   getAvailableInventorySlots,
   getCurrencyBalance,
@@ -2926,13 +2930,40 @@ function formatOfflineDuration(durationMs: number): string {
   return `${minutes}m ${seconds}s credited`;
 }
 
-function getQuestStatuses(state: GameState): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(state.quests).map(([questId, quest]) => [
-      questId,
-      quest.status,
-    ]),
-  );
+function getQuestStatuses(state: GameState): QuestStatusLookup {
+  const statuses: QuestStatusLookup = {};
+
+  for (const questId of Object.keys(state.quests) as QuestId[]) {
+    statuses[questId] = state.quests[questId].status;
+  }
+
+  return statuses;
+}
+
+function applyGuidePopupMenuTarget(
+  target: GuidePopupMenuTarget,
+  setters: {
+    setIsGameMenuOpen: (isOpen: boolean) => void;
+    setActiveGameMenuTab: (tab: GameMenuTab) => void;
+    setActiveAtlasSubpage: (subpage: AtlasSubpage) => void;
+    setActivePartyMenuSection: (section: PartyMenuSection) => void;
+    setActivePartyManagementSection: (section: PartyManagementSection) => void;
+  },
+) {
+  setters.setIsGameMenuOpen(true);
+  setters.setActiveGameMenuTab(target.tab);
+
+  if (target.atlasSubpage) {
+    setters.setActiveAtlasSubpage(target.atlasSubpage);
+  }
+
+  if (target.partySection) {
+    setters.setActivePartyMenuSection(target.partySection);
+  }
+
+  if (target.partyManagementSection) {
+    setters.setActivePartyManagementSection(target.partyManagementSection);
+  }
 }
 
 function App() {
@@ -3691,11 +3722,6 @@ function App() {
     queueSaveAfterStateChange,
   ]);
   const previousInteractionMapIdRef = useRef(currentMap.id);
-  const equipmentTutorialQuestStatus =
-    gameState.quests[EQUIPMENT_TUTORIAL_QUEST_ID]?.status ?? null;
-  const previousEquipmentTutorialQuestStatusRef = useRef(
-    equipmentTutorialQuestStatus,
-  );
   const rescuedWipeId =
     gameState.worldWipeRecovery?.status === "rescued"
       ? gameState.worldWipeRecovery.wipeId
@@ -3704,6 +3730,23 @@ function App() {
   const activeGuidePopup = activeGuidePopupId
     ? guidePopupDefinitions[activeGuidePopupId]
     : null;
+
+  useEffect(() => {
+    const menuTarget =
+      activeGuidePopup?.panels[activeGuidePanelIndex]?.menuTarget ?? null;
+
+    if (!menuTarget) {
+      return;
+    }
+
+    applyGuidePopupMenuTarget(menuTarget, {
+      setIsGameMenuOpen,
+      setActiveGameMenuTab,
+      setActiveAtlasSubpage,
+      setActivePartyMenuSection,
+      setActivePartyManagementSection,
+    });
+  }, [activeGuidePanelIndex, activeGuidePopup]);
 
   const startSimulationLoop = useCallback(() => {
     if (stopLoopRef.current) {
@@ -3996,19 +4039,6 @@ function App() {
   }, [activeGuidePopupId, queuedGuidePopupIds, stopSimulationLoop]);
 
   useEffect(() => {
-    const previousStatus = previousEquipmentTutorialQuestStatusRef.current;
-    previousEquipmentTutorialQuestStatusRef.current =
-      equipmentTutorialQuestStatus;
-
-    if (
-      previousStatus !== "active" &&
-      equipmentTutorialQuestStatus === "active"
-    ) {
-      queueGuidePopup("equipment_setup");
-    }
-  }, [equipmentTutorialQuestStatus, queueGuidePopup]);
-
-  useEffect(() => {
     const previousWipeId = previousRescuedWipeIdRef.current;
     previousRescuedWipeIdRef.current = rescuedWipeId;
 
@@ -4054,22 +4084,30 @@ function App() {
       return;
     }
 
-    const shouldSaveQuestProgress = Object.entries(nextQuestStatuses).some(
-      ([questId, status]) => {
-        const previousStatus = previousQuestStatuses[questId];
+    for (const guidePopupId of getGuidePopupsForQuestStatusChanges(
+      previousQuestStatuses,
+      nextQuestStatuses,
+    )) {
+      queueGuidePopup(guidePopupId);
+    }
 
-        return (
-          previousStatus &&
-          previousStatus !== status &&
-          (status === "ready_to_turn_in" || status === "completed")
-        );
-      },
-    );
+    const shouldSaveQuestProgress = (
+      Object.keys(nextQuestStatuses) as QuestId[]
+    ).some((questId) => {
+      const status = nextQuestStatuses[questId];
+      const previousStatus = previousQuestStatuses[questId];
+
+      return (
+        previousStatus &&
+        previousStatus !== status &&
+        (status === "ready_to_turn_in" || status === "completed")
+      );
+    });
 
     if (shouldSaveQuestProgress) {
       writeCurrentSave("Quest progress saved", gameState);
     }
-  }, [appMode, gameState, writeCurrentSave]);
+  }, [appMode, gameState, queueGuidePopup, writeCurrentSave]);
 
   useEffect(() => {
     if (!activeMerchantNpcId && !activeQuestGiverNpcId) {
@@ -4451,6 +4489,8 @@ function App() {
       return;
     }
 
+    const closedGuidePopupId = activeGuidePopupId;
+
     viewedGuidePopupIdsRef.current.add(activeGuidePopupId);
     setViewedGuidePopupIds((currentViewedIds) =>
       currentViewedIds.includes(activeGuidePopupId)
@@ -4460,6 +4500,11 @@ function App() {
     activeGuidePopupIdRef.current = null;
     setActiveGuidePopupId(null);
     setActiveGuidePanelIndex(0);
+
+    if (closedGuidePopupId === "welcome") {
+      setIsGameMenuOpen(false);
+      setActiveGameMenuTab(null);
+    }
 
     if (queuedGuidePopupIdsRef.current.length > 0) {
       return;
@@ -5517,6 +5562,9 @@ function App() {
             : ""
         }`,
       );
+      if (recipeId === "plain_charm") {
+        queueGuidePopup("first_equipment_crafted");
+      }
     } else {
       setCraftingResultMessage(craftingFailureMessages[crafting.result.reason]);
     }
@@ -5822,6 +5870,7 @@ function App() {
 
       queueSaveAfterStateChange("Class selection saved");
       setGameState(selection.state);
+      queueGuidePopup("first_class_selected");
       setClassMentorFlow([]);
       setClassMentorResultMessage(
         `${selection.result.companionId} is now a ${className}.`,

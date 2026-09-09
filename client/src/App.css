@@ -4423,6 +4423,19 @@
   line-height: 1.45;
 }
 
+.guide-popup-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.guide-popup-body-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
 .guide-popup-kicker {
   color: #f3df93;
   font-size: 12px;
