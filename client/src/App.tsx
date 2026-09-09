@@ -29,6 +29,7 @@ import {
   getQuestObjectiveText,
   getQuestProgressTotals,
   getQuestRewardText,
+  getQuestTrackerRouteActionDisplay,
   getQuestTurnInErrorText,
 } from "./questUiHelpers";
 import { getQuestObjectiveMarkers } from "./questObjectiveMarkers";
@@ -3329,6 +3330,10 @@ function App() {
     [gameState.entities],
   );
   const displayQuest = getDisplayQuest(gameState.quests);
+  const questTrackerRouteActionDisplay = getQuestTrackerRouteActionDisplay(
+    gameState,
+    displayQuest,
+  );
   const poiSearchScope = getPoiSearchScope(gameState);
   const activeQuestIds = getQuestLogQuests(gameState.quests).map(
     (quest) => quest.questId,
@@ -4764,6 +4769,16 @@ function App() {
 
     if (tab === "atlas") {
       setActiveAtlasSubpage("quests");
+    }
+  }
+
+  function openDisplayedQuestMenu() {
+    setIsGameMenuOpen(true);
+    setActiveGameMenuTab("atlas");
+    setActiveAtlasSubpage("quests");
+
+    if (displayQuest) {
+      setSelectedQuestId(displayQuest.questId);
     }
   }
 
@@ -6842,9 +6857,29 @@ function App() {
         />
         <QuestTrackerPanel
           isHidden={isQuestTrackerHidden}
+          onOpenQuestMenu={openDisplayedQuestMenu}
           onShow={() => setIsQuestTrackerHidden(false)}
           quest={displayQuest}
           onHide={() => setIsQuestTrackerHidden(true)}
+          routeAction={
+            questTrackerRouteActionDisplay
+              ? {
+                  label: questTrackerRouteActionDisplay.label,
+                  disabled: questTrackerRouteActionDisplay.disabled,
+                  title: questTrackerRouteActionDisplay.title,
+                  onClick: () => {
+                    if (
+                      questTrackerRouteActionDisplay.disabled ||
+                      !questTrackerRouteActionDisplay.targetMapId
+                    ) {
+                      return;
+                    }
+
+                    setWorldTravelRoute(questTrackerRouteActionDisplay.targetMapId);
+                  },
+                }
+              : null
+          }
         />
         {activeDirectCommandFeedback ? (
           <div className="direct-command-feedback-toast" role="status">

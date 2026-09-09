@@ -10,14 +10,18 @@ const questObjectiveCompleteSrc =
 
 export function QuestTrackerPanel({
   isHidden,
+  onOpenQuestMenu,
   onShow,
   quest,
   onHide,
+  routeAction,
 }: {
   isHidden: boolean;
+  onOpenQuestMenu: () => void;
   onShow: () => void;
   quest: QuestState | null;
   onHide: () => void;
+  routeAction?: QuestTrackerRouteAction | null;
 }) {
   if (quest?.status === "completed" || quest?.status === "locked") {
     return null;
@@ -33,15 +37,41 @@ export function QuestTrackerPanel({
     >
       <div className="quest-tracker-header">
         <h2>Quests</h2>
-        <button onClick={isHidden ? onShow : onHide} type="button">
-          {isHidden ? "Show" : "Hide"}
-        </button>
+        <div className="quest-tracker-header-actions">
+          <button
+            aria-label="Open Quest Menu"
+            className="quest-tracker-menu-shortcut"
+            onClick={onOpenQuestMenu}
+            title="Open Quest Menu"
+            type="button"
+          >
+            ?
+          </button>
+          <button onClick={isHidden ? onShow : onHide} type="button">
+            {isHidden ? "Show" : "Hide"}
+          </button>
+        </div>
       </div>
       {isHidden ? null : quest && definition ? (
         <>
-          <div className="quest-tracker-title">
-            <strong>{definition.displayName}</strong>
-            <span>{formatQuestStatus(quest.status)}</span>
+          <div className="quest-tracker-title-row">
+            <div className="quest-tracker-title">
+              <strong>{definition.displayName}</strong>
+              <span>{formatQuestStatus(quest.status)}</span>
+            </div>
+            {routeAction ? (
+              <span className="quest-tracker-route-action" title={routeAction.title}>
+                <button
+                  aria-label={`${routeAction.label} for ${definition.displayName}`}
+                  disabled={routeAction.disabled}
+                  onClick={routeAction.onClick}
+                  title={routeAction.disabled ? undefined : routeAction.title}
+                  type="button"
+                >
+                  {routeAction.label}
+                </button>
+              </span>
+            ) : null}
           </div>
           {runtimeProgress ? (
             <div
@@ -93,3 +123,10 @@ export function QuestTrackerPanel({
     </section>
   );
 }
+
+export type QuestTrackerRouteAction = {
+  label: string;
+  disabled: boolean;
+  title: string;
+  onClick: () => void;
+};

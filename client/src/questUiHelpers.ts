@@ -1,11 +1,14 @@
 import {
   debugMapDefinitions,
+  getFirstIncompleteObjective,
   getItemDefinition,
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
   MAP_THREE_ID,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
+  startAutoRoute,
+  type AutoRouteStartFailureReason,
   type GameState,
   type DebugMapId,
   type QuestObjectiveDefinition,
@@ -48,6 +51,13 @@ export type NpcQuestRouteHintsByMap = Partial<
   Record<DebugMapId, NpcQuestRouteHintLocationGroup[]>
 >;
 
+export type QuestTrackerRouteActionDisplay = {
+  label: "Set Route" | "Deliver";
+  disabled: boolean;
+  targetMapId: DebugMapId | null;
+  title: string;
+};
+
 export function formatQuestStatus(status: QuestState["status"]): string {
   return status
     .split("_")
@@ -78,6 +88,48 @@ export function getQuestLogQuests(quests: GameState["quests"]): QuestState[] {
         quest.status === "active" ||
         quest.status === "ready_to_turn_in",
     );
+}
+
+export function getQuestTrackerRouteActionDisplay(
+  state: GameState,
+  quest: QuestState | null,
+): QuestTrackerRouteActionDisplay | null {
+  if (!quest) {
+    return null;
+  }
+
+  const label = quest.status === "ready_to_turn_in" ? "Deliver" : "Set Route";
+  const targetMapId = getStrictQuestRouteTargetMapId(state, quest);
+
+  if (!targetMapId) {
+    return {
+      label,
+      disabled: true,
+      targetMapId: null,
+      title: "No route target.",
+    };
+  }
+
+  const route = startAutoRoute(state, targetMapId);
+
+  if (route.status === "success") {
+    return {
+      label,
+      disabled: false,
+      targetMapId,
+      title:
+        label === "Deliver"
+          ? "Set route to quest turn-in."
+          : "Set route to quest objective.",
+    };
+  }
+
+  return {
+    label,
+    disabled: true,
+    targetMapId,
+    title: getQuestTrackerRouteFailureTitle(route.reason),
+  };
 }
 
 export function getQuestProgressTotals(quest: QuestState): {
@@ -295,6 +347,37 @@ function getObjectiveProgressText(
   const requiredCount = objective.requiredCount ?? 1;
 
   return `${getObjectiveLabel(objective, requiredCount)} ${progress?.currentCount ?? 0}/${requiredCount}`;
+}
+
+function getStrictQuestRouteTargetMapId(
+  state: GameState,
+  quest: QuestState,
+): DebugMapId | null {
+  if (quest.status === "ready_to_turn_in") {
+    return quest.questId === "azure_trial" ? HUB_TWO_MAP_ID : HUB_MAP_ID;
+  }
+
+  if (quest.status !== "active") {
+    return null;
+  }
+
+  const objective = getFirstIncompleteObjective(state, quest.questId);
+
+  return objective?.targetMapId ?? objective?.enemyMapId ?? null;
+}
+
+function getQuestTrackerRouteFailureTitle(
+  reason: AutoRouteStartFailureReason,
+): string {
+  switch (reason) {
+    case "current_map":
+      return "Already in that zone.";
+    case "unknown_destination":
+      return "Zone not visited.";
+    case "blocked_route":
+    default:
+      return "Route unavailable because the next path is blocked.";
+  }
 }
 
 function getObjectiveQuestLocation(

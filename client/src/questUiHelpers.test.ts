@@ -3,15 +3,18 @@ import {
   createInitialQuestStates,
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
+  MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_TWO_ID,
   type QuestState,
 } from "./game";
+import { createTestGameState } from "./game/testState";
 import {
   getNpcQuestRouteHintGroupsByMap,
   getObjectiveLabel,
   getQuestDetailLocations,
   getQuestRuntimeProgressDisplay,
+  getQuestTrackerRouteActionDisplay,
 } from "./questUiHelpers";
 
 function activateQuest(quest: QuestState): QuestState {
@@ -218,5 +221,138 @@ describe("quest UI helpers", () => {
         objectiveLines: [],
       }),
     );
+  });
+
+  it("shows Set Route for an active quest with a known objective zone", () => {
+    const quests = createInitialQuestStates();
+    const quest = activateQuest(quests.clear_the_shore);
+    const state = createTestGameState({
+      currentMapId: HUB_MAP_ID,
+      quests: {
+        ...quests,
+        clear_the_shore: quest,
+      },
+      worldDiscovery: {
+        visitedMapIds: [MAP_ONE_ID],
+        visitedSubzonesByMapId: {},
+      },
+    });
+
+    expect(getQuestTrackerRouteActionDisplay(state, quest)).toEqual({
+      label: "Set Route",
+      disabled: false,
+      targetMapId: MAP_ONE_ID,
+      title: "Set route to quest objective.",
+    });
+  });
+
+  it("shows Deliver for a ready-to-turn-in quest", () => {
+    const quests = createInitialQuestStates();
+    const quest: QuestState = {
+      ...quests.clear_the_shore,
+      status: "ready_to_turn_in",
+    };
+    const state = createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      quests: {
+        ...quests,
+        clear_the_shore: quest,
+      },
+    });
+
+    expect(getQuestTrackerRouteActionDisplay(state, quest)).toEqual({
+      label: "Deliver",
+      disabled: false,
+      targetMapId: HUB_MAP_ID,
+      title: "Set route to quest turn-in.",
+    });
+  });
+
+  it("disables Set Route for active quests without a strict route target", () => {
+    const quests = createInitialQuestStates();
+    const quest = activateQuest(quests.outfit_the_expedition);
+    const state = createTestGameState({
+      currentMapId: HUB_MAP_ID,
+      quests: {
+        ...quests,
+        outfit_the_expedition: quest,
+      },
+    });
+
+    expect(getQuestTrackerRouteActionDisplay(state, quest)).toEqual({
+      label: "Set Route",
+      disabled: true,
+      targetMapId: null,
+      title: "No route target.",
+    });
+  });
+
+  it("disables Set Route for unvisited objective zones", () => {
+    const quests = createInitialQuestStates();
+    const quest = activateQuest(quests.clear_the_shore);
+    const state = createTestGameState({
+      currentMapId: HUB_MAP_ID,
+      quests: {
+        ...quests,
+        clear_the_shore: quest,
+      },
+      worldDiscovery: {
+        visitedMapIds: [],
+        visitedSubzonesByMapId: {},
+      },
+    });
+
+    expect(getQuestTrackerRouteActionDisplay(state, quest)).toEqual({
+      label: "Set Route",
+      disabled: true,
+      targetMapId: MAP_ONE_ID,
+      title: "Zone not visited.",
+    });
+  });
+
+  it("disables Set Route when the quest target is already in the current zone", () => {
+    const quests = createInitialQuestStates();
+    const quest = activateQuest(quests.clear_the_shore);
+    const state = createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      quests: {
+        ...quests,
+        clear_the_shore: quest,
+      },
+      worldDiscovery: {
+        visitedMapIds: [MAP_ONE_ID],
+        visitedSubzonesByMapId: {},
+      },
+    });
+
+    expect(getQuestTrackerRouteActionDisplay(state, quest)).toEqual({
+      label: "Set Route",
+      disabled: true,
+      targetMapId: MAP_ONE_ID,
+      title: "Already in that zone.",
+    });
+  });
+
+  it("disables Set Route when the route to a known objective zone is blocked", () => {
+    const quests = createInitialQuestStates();
+    const quest = activateQuest(quests.scout_rise_samples);
+    const state = createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      quests: {
+        ...quests,
+        scout_rise_samples: quest,
+      },
+      worldDiscovery: {
+        visitedMapIds: [MAP_TWO_ID],
+        visitedSubzonesByMapId: {},
+      },
+    });
+
+    expect(getQuestTrackerRouteActionDisplay(state, quest)).toEqual({
+      label: "Set Route",
+      disabled: true,
+      targetMapId: MAP_TWO_ID,
+      title: "Route unavailable because the next path is blocked.",
+    });
   });
 });
