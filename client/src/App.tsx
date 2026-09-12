@@ -178,6 +178,7 @@ import {
   resolveNavigationClickTarget,
   resolveNpcInteractionApproachTarget,
   resolveWorldWipeRecoveryChoice,
+  restartNewsBroadcastDisplayDuration,
   clearAutoRoute,
   setAutoModeEnabled,
   setAutoCombatOnArrivalEnabled,
@@ -806,8 +807,16 @@ function NewsBroadcastOverlay({
   return (
     <div className="news-broadcast-overlay" aria-live="polite">
       <div className="news-broadcast-panel">
-        <span>News Broadcast</span>
-        <strong>{latestBroadcast.text}</strong>
+        <span>{latestBroadcast.title ?? "News Broadcast"}</span>
+        {latestBroadcast.details?.length ? (
+          <div className="news-broadcast-details">
+            {latestBroadcast.details.map((detail, index) => (
+              <strong key={`${latestBroadcast.id}-${index}`}>{detail}</strong>
+            ))}
+          </div>
+        ) : (
+          <strong>{latestBroadcast.text}</strong>
+        )}
       </div>
     </div>
   );
@@ -4499,6 +4508,10 @@ function App() {
     if (queuedGuidePopupIdsRef.current.length > 0) {
       return;
     }
+
+    setGameState((state) =>
+      restartNewsBroadcastDisplayDuration(state, Date.now()),
+    );
 
     const shouldResumeSimulation = shouldResumeAfterGuideSequenceRef.current;
     isGuideSequenceActiveRef.current = false;

@@ -4,13 +4,15 @@ import { sanitizeInnKitchenState } from "./innKitchen";
 import { addItemToInventoryState } from "./inventory";
 import {
   awardKeyItemIfMissing,
-  getKeyItemDefinition,
   LIVESTOCK_DUSKHEN_DISCOVERY_KEY_ITEM_ID,
   LIVESTOCK_ELDER_MOSSLING_DISCOVERY_KEY_ITEM_ID,
   LIVESTOCK_TIN_CRAWLER_DISCOVERY_KEY_ITEM_ID,
   LIVESTOCK_WOLF_DISCOVERY_KEY_ITEM_ID,
 } from "./keyItems";
-import { queueNewsBroadcast, queueUnlockNewsBroadcast } from "./newsBroadcast";
+import {
+  queueImportantItemAcquisitionBroadcast,
+  queueUnlockNewsBroadcast,
+} from "./newsBroadcast";
 import { isTownServicesUnlocked } from "./townServices";
 import {
   getCurrencyBalance,
@@ -704,16 +706,26 @@ export function addOwnedLivestockCreature(
   const award = awardKeyItemIfMissing(nextState, creature.discoveryKeyItemId);
   nextState = award.state;
 
-  if (source === "merchant" && award.awardedQuantity > 0) {
+  if (award.awardedQuantity > 0) {
     nextState = queueUnlockNewsBroadcast(
       nextState,
-      getKeyItemDefinition(creature.discoveryKeyItemId).displayName,
+      getLivestockCreatureDropDisplayName(creature),
       nowMs,
     );
   } else if (source !== "merchant") {
-    nextState = queueNewsBroadcast(
+    nextState = queueImportantItemAcquisitionBroadcast(
       nextState,
-      `Dropped: ${getLivestockCreatureDropDisplayName(creature)}`,
+      {
+        title: "Items Received",
+        entries: [
+          {
+            verb: "Obtained",
+            displayName: getLivestockCreatureDropDisplayName(creature),
+            quantity: 1,
+            stackable: false,
+          },
+        ],
+      },
       nowMs,
     );
   }

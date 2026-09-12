@@ -65,7 +65,7 @@ describe("enemy drop system", () => {
       enemy,
       "leader",
       now,
-      () => randomValues.shift() ?? 0,
+      () => randomValues.shift() ?? 0.99,
     );
 
     expect(withDrops.dropVisualEvents).toHaveLength(1);
@@ -82,6 +82,7 @@ describe("enemy drop system", () => {
     expect(afterExpiry.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 1 },
     ]);
+    expect(afterExpiry.newsBroadcasts).toEqual([]);
   });
 
   it("reports inventory overflow without adding unavailable drops", () => {
@@ -203,7 +204,11 @@ describe("enemy drop system", () => {
     expect(getKeyItemQuantity(nextState, LIVESTOCK_WOLF_DISCOVERY_KEY_ITEM_ID))
       .toBe(1);
     expect(nextState.livestock?.ownedCreaturesById.wolf).toBe(1);
-    expect(nextState.newsBroadcasts?.at(-1)?.text).toBe("Dropped: Wolf Pup");
+    expect(nextState.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Unlock Acquired",
+      text: "Unlocked: Wolf Pup",
+      details: ["Unlocked: Wolf Pup"],
+    });
   });
 });
 

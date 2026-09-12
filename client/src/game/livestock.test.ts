@@ -703,15 +703,21 @@ describe("Livestock MVP", () => {
 
     expect(unlocked.livestock?.ownedCreaturesById.wolf).toBe(1);
     expect(unlocked.keyItemsById?.[LIVESTOCK_WOLF_DISCOVERY_KEY_ITEM_ID]).toBe(1);
-    expect(unlocked.newsBroadcasts?.at(-1)?.text).toBe("Dropped: Wolf Pup");
+    expect(unlocked.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Unlock Acquired",
+      text: "Unlocked: Wolf Pup",
+      details: ["Unlocked: Wolf Pup"],
+    });
     expect(failedSecond.livestock?.ownedCreaturesById.wolf).toBe(1);
     expect(failedSecond.newsBroadcasts).toHaveLength(
       unlocked.newsBroadcasts?.length ?? 0,
     );
     expect(passedSecond.livestock?.ownedCreaturesById.wolf).toBe(2);
-    expect(passedSecond.newsBroadcasts?.at(-1)?.text).toBe(
-      "Dropped: Wolf Pup",
-    );
+    expect(passedSecond.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Items Received",
+      text: "Obtained: Wolf Pup",
+      details: ["Obtained: Wolf Pup"],
+    });
   });
 
   it("counts only placed fed helper creatures for helper bonuses", () => {

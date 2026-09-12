@@ -828,8 +828,14 @@ export {
 } from "./worldTravelTeleports";
 export {
   NEWS_BROADCAST_DURATION_MS,
+  formatImportantItemAcquisitionLine,
+  queueImportantItemAcquisitionBroadcast,
   queueNewsBroadcast,
   queueUnlockNewsBroadcast,
+  restartNewsBroadcastDisplayDuration,
+  type ImportantItemAcquisitionBroadcast,
+  type ImportantItemAcquisitionEntry,
+  type ImportantItemAcquisitionVerb,
   updateNewsBroadcasts,
 } from "./newsBroadcast";
 export { updatePoiSystem } from "./poiSystem";

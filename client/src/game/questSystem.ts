@@ -22,7 +22,10 @@ import {
 import { createNpc } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
-import { queueNewsBroadcast } from "./newsBroadcast";
+import {
+  queueImportantItemAcquisitionBroadcast,
+  type ImportantItemAcquisitionEntry,
+} from "./newsBroadcast";
 import {
   MAX_CHARACTER_LEVEL,
   getDebugXpMultiplier,
@@ -44,6 +47,7 @@ import type {
   DebugMapId,
   InventorySlot,
   ItemId,
+  ResourceType,
 } from "./types";
 import type {
   QuestDefinition,
@@ -75,8 +79,11 @@ const SMITHS_FIRST_WORK_ACCEPTANCE_GRANTS: QuestRewardItem[] = [
   { itemId: "copper_ore", quantity: 2 },
   { itemId: "field_herb", quantity: 2 },
 ];
-const SMITHS_FIRST_WORK_ACCEPTANCE_GRANT_MESSAGE =
-  "Received Copper Ore x2 and Field Herb x2";
+const resourceTypeDisplayNames: Record<ResourceType, string> = {
+  wood: "Wood",
+  ore: "Ore",
+  herb: "Herb",
+};
 
 export const QUEST_ORDER: QuestId[] = [
   "clear_the_shore",
@@ -948,7 +955,7 @@ export function finishReadyQuestsForQuestGiver(
       ]),
     ) as Partial<Record<QuestId, QuestState>>;
 
-    return appendDebugTelemetryEvent(
+    const failedState = appendDebugTelemetryEvent(
       {
         ...nextState,
         quests: {
@@ -969,6 +976,12 @@ export function finishReadyQuestsForQuestGiver(
         currentMapDisplayName: nextState.map?.displayName,
         currentMapDebugName: nextState.map?.debugName,
       },
+    );
+
+    return queueQuestRewardFailureBroadcast(
+      failedState,
+      validation,
+      now,
     );
   }
 
@@ -1070,7 +1083,8 @@ function grantQuestAcceptanceItems(
   }
 
   let nextState = state;
-  let grantedAllItems = true;
+  const obtainedEntries: ImportantItemAcquisitionEntry[] = [];
+  const failureMessages: string[] = [];
 
   for (const grant of SMITHS_FIRST_WORK_ACCEPTANCE_GRANTS) {
     const addResult = addItemToInventoryState(
@@ -1081,14 +1095,171 @@ function grantQuestAcceptanceItems(
     );
     nextState = addResult.state;
 
-    if (addResult.result.addedQuantity !== grant.quantity) {
-      grantedAllItems = false;
+    if (addResult.result.addedQuantity > 0) {
+      obtainedEntries.push({
+        verb: "Obtained",
+        itemId: grant.itemId,
+        quantity: addResult.result.addedQuantity,
+      });
+    }
+
+    if (addResult.result.overflowQuantity > 0) {
+      failureMessages.push(
+        `Could not receive ${getItemDefinition(grant.itemId).displayName} x${addResult.result.overflowQuantity}.`,
+      );
     }
   }
 
-  return grantedAllItems
-    ? queueNewsBroadcast(nextState, SMITHS_FIRST_WORK_ACCEPTANCE_GRANT_MESSAGE)
-    : nextState;
+  if (obtainedEntries.length === 0 && failureMessages.length === 0) {
+    return nextState;
+  }
+
+  return queueImportantItemAcquisitionBroadcast(nextState, {
+    title:
+      failureMessages.length > 0 && obtainedEntries.length === 0
+        ? "Items Not Received"
+        : failureMessages.length > 0
+          ? "Items Partially Received"
+          : "Items Received",
+    entries: obtainedEntries,
+    messages: failureMessages,
+  });
+}
+
+function queueQuestRewardFailureBroadcast(
+  state: GameState,
+  validation: {
+    status: "failed_inventory_full" | "failed_invalid";
+    reason: string;
+    itemId?: ItemId;
+  },
+  now = Date.now(),
+): GameState {
+  const itemName = validation.itemId
+    ? getItemDefinition(validation.itemId).displayName
+    : null;
+  const messages =
+    validation.status === "failed_inventory_full"
+      ? [
+          itemName
+            ? `Inventory full: ${itemName} could not fit.`
+            : "Inventory full: quest rewards could not fit.",
+          "Make room and try again.",
+        ]
+      : ["Quest rewards could not be claimed.", "Try again later."];
+
+  return queueImportantItemAcquisitionBroadcast(
+    state,
+    {
+      title: "Quest Turn-In Failed",
+      messages,
+    },
+    now,
+  );
+}
+
+function queueQuestCompletionAcquisitionBroadcast(
+  state: GameState,
+  questId: QuestId,
+  now = Date.now(),
+): GameState {
+  const entries = [
+    ...getDeliveredQuestObjectiveEntries(state, questId),
+    ...getQuestRewardObtainedEntries(questId),
+  ];
+
+  return entries.length > 0
+    ? queueImportantItemAcquisitionBroadcast(
+        state,
+        {
+          title: "Quest Complete",
+          entries,
+        },
+        now,
+      )
+    : state;
+}
+
+function getDeliveredQuestObjectiveEntries(
+  state: GameState,
+  questId: QuestId,
+): ImportantItemAcquisitionEntry[] {
+  const quest = state.quests[questId];
+  const definition = QUEST_DEFINITIONS[questId];
+
+  if (!quest) {
+    return [];
+  }
+
+  return definition.objectives.flatMap((objective): ImportantItemAcquisitionEntry[] => {
+    if (!isDeliveryStyleQuestObjective(objective)) {
+      return [];
+    }
+
+    const progress = quest.objectiveProgress[objective.id];
+
+    if (!progress?.completed) {
+      return [];
+    }
+
+    const quantity = objective.requiredCount ?? Math.max(1, progress.currentCount);
+
+    if (objective.itemId) {
+      return [{ verb: "Delivered", itemId: objective.itemId, quantity }];
+    }
+
+    if (objective.questItemDisplayName) {
+      return [
+        {
+          verb: "Delivered",
+          displayName: objective.questItemDisplayName,
+          quantity,
+          stackable: true,
+        },
+      ];
+    }
+
+    if (objective.resourceType) {
+      return [
+        {
+          verb: "Delivered",
+          displayName: resourceTypeDisplayNames[objective.resourceType],
+          quantity,
+          stackable: true,
+        },
+      ];
+    }
+
+    return [];
+  });
+}
+
+function isDeliveryStyleQuestObjective(
+  objective: QuestObjectiveDefinition,
+): boolean {
+  return (
+    objective.type === "gather_item_count" ||
+    objective.type === "collect_enemy_quest_drop_count"
+  );
+}
+
+function getQuestRewardObtainedEntries(
+  questId: QuestId,
+): ImportantItemAcquisitionEntry[] {
+  const reward = QUEST_DEFINITIONS[questId].rewards;
+
+  if (!reward) {
+    return [];
+  }
+
+  return [
+    ...(reward.items ?? []),
+    ...(reward.equipment ?? []),
+  ].map((rewardItem) => ({
+    verb: "Obtained" as const,
+    itemId: rewardItem.itemId,
+    quantity: rewardItem.quantity,
+  }));
 }
 
 function claimQuestReward(
@@ -1149,7 +1320,7 @@ function claimQuestReward(
         ? "quest_reward_validation_failed_inventory_full"
         : "quest_reward_claim_failed";
 
-    return appendDebugTelemetryEvent(
+    const failedState = appendDebugTelemetryEvent(
       {
         ...nextState,
         quests: {
@@ -1173,6 +1344,12 @@ function claimQuestReward(
         currentMapDisplayName: nextState.map?.displayName,
         currentMapDebugName: nextState.map?.debugName,
       },
+    );
+
+    return queueQuestRewardFailureBroadcast(
+      failedState,
+      validation,
+      options.now ?? Date.now(),
     );
   }
 
@@ -1230,6 +1407,12 @@ function claimQuestReward(
     currentMapDisplayName: nextState.map?.displayName,
     currentMapDebugName: nextState.map?.debugName,
   });
+
+  nextState = queueQuestCompletionAcquisitionBroadcast(
+    nextState,
+    questId,
+    options.now ?? Date.now(),
+  );
 
   return unlockAvailableQuests(refreshCurrentMapForQuestState(nextState), questId);
 }

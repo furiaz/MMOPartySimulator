@@ -112,6 +112,11 @@ describe("Farm upgrades", () => {
       lastGeneratedAtMs: NOW_MS,
     });
     expect(unlocked.state.keyItemsById?.farm_seed_moonleaf).toBe(1);
+    expect(unlocked.state.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Unlock Acquired",
+      text: "Unlocked: Moonleaf Seed",
+      details: ["Unlocked: Moonleaf Seed"],
+    });
 
     const duplicate = unlockFarmCrop(
       unlocked.state,

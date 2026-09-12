@@ -293,9 +293,11 @@ describe("prototype quest system", () => {
     expect(state.quests.smiths_first_work.status).toBe("active");
     expect(countInventoryItem(state.inventory, "copper_ore")).toBe(2);
     expect(countInventoryItem(state.inventory, "field_herb")).toBe(2);
-    expect(state.newsBroadcasts?.at(-1)?.text).toBe(
-      "Received Copper Ore x2 and Field Herb x2",
-    );
+    expect(state.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Items Received",
+      text: "Obtained: Copper Ore x2 | Obtained: Field Herb x2",
+      details: ["Obtained: Copper Ore x2", "Obtained: Field Herb x2"],
+    });
 
     const craftResult = craftRecipe(state, "plain_charm");
 
@@ -309,6 +311,35 @@ describe("prototype quest system", () => {
     ).toMatchObject({
       currentCount: 1,
       completed: true,
+    });
+  });
+
+  it("shows partial quest acceptance handouts when only some items fit", () => {
+    let state = createStateWithParty({
+      inventory: {
+        capacity: 1,
+        slots: [{ itemId: "copper_ore", quantity: 249 }],
+      },
+      quests: createQuestStates({
+        smiths_first_work: "available",
+      }),
+    });
+
+    state = acceptQuestFromQuestGiver(
+      state,
+      QUEST_GIVER_POI_ID,
+      "smiths_first_work",
+    );
+
+    expect(countInventoryItem(state.inventory, "copper_ore")).toBe(250);
+    expect(countInventoryItem(state.inventory, "field_herb")).toBe(0);
+    expect(state.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Items Partially Received",
+      details: [
+        "Obtained: Copper Ore x1",
+        "Could not receive Copper Ore x1.",
+        "Could not receive Field Herb x2.",
+      ],
     });
   });
 
@@ -541,6 +572,13 @@ describe("prototype quest system", () => {
     expect(state.wallet.balancesByCurrencyId.crowns).toBe(0);
     expect(state.inventory.slots).toEqual([{ itemId: "wolf_pelt", quantity: 1 }]);
     expect(getCompanion(state, "companion-1").characterXp).toBe(0);
+    expect(state.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Quest Turn-In Failed",
+      details: [
+        "Inventory full: Minor Recovery Flask could not fit.",
+        "Make room and try again.",
+      ],
+    });
   });
 
   it("accepts a selected available quest from the quest giver", () => {
@@ -1243,6 +1281,43 @@ describe("prototype quest system", () => {
       { itemId: "minor_recovery_flask", quantity: 1 },
       { itemId: "guard_coif", quantity: 1 },
     ]);
+  });
+
+  it("queues one quest completion popup with delivered and obtained items", () => {
+    let state = createStateWithParty({
+      quests: createQuestStates({
+        clear_the_shore: "ready_to_turn_in",
+      }),
+    });
+    state = {
+      ...state,
+      quests: {
+        ...state.quests,
+        clear_the_shore: {
+          ...state.quests.clear_the_shore,
+          objectiveProgress: {
+            ...state.quests.clear_the_shore.objectiveProgress,
+            gather_shore_fringe_wood: {
+              objectiveId: "gather_shore_fringe_wood",
+              currentCount: 3,
+              completed: true,
+            },
+          },
+        },
+      },
+    };
+
+    state = updateQuestGiverInteraction(state);
+
+    expect(state.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Quest Complete",
+      details: [
+        "Delivered: Wood x3",
+        "Obtained: Wolf Pelt (Tier 1) x2",
+        "Obtained: Minor Recovery Flask x1",
+        "Obtained: Guard Coif",
+      ],
+    });
   });
 
   it("records quest reward telemetry phases", () => {

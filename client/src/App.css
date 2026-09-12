@@ -4732,6 +4732,11 @@
   line-height: 1.25;
 }
 
+.news-broadcast-details {
+  display: grid;
+  gap: 5px;
+}
+
 .menu-split-layout {
   display: grid;
   grid-template-columns: minmax(150px, 0.9fr) minmax(220px, 1.4fr);

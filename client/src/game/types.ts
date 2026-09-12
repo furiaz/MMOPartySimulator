@@ -754,6 +754,8 @@ export type PartyInventory = {
 export type NewsBroadcastEvent = {
   id: string;
   text: string;
+  title?: string;
+  details?: string[];
   createdAt: number;
   expiresAt: number;
 };
