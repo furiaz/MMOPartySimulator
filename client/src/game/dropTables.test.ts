@@ -30,7 +30,7 @@ describe("enemy drop tables", () => {
     }
   });
 
-  it("keeps normal wolf and orc tables scoped to junk drops", () => {
+  it("keeps normal wolf and orc tables scoped to enemy-part material drops", () => {
     const wolfItemIds = ENEMY_DROP_TABLES.wolf?.[1]?.groups.flatMap((group) =>
       group.entries.map((entry) => entry.itemId),
     );
@@ -40,10 +40,18 @@ describe("enemy drop tables", () => {
 
     expect(wolfItemIds).toEqual(["wolf_pelt", "wolf_fang"]);
     expect(orcItemIds).toEqual(["orc_hide", "orc_tusk"]);
-    expect(wolfItemIds?.every((itemId) => getItemDefinition(itemId).category === "junk"))
-      .toBe(true);
-    expect(orcItemIds?.every((itemId) => getItemDefinition(itemId).category === "junk"))
-      .toBe(true);
+    expect(wolfItemIds?.every((itemId) => {
+      const itemDefinition = getItemDefinition(itemId);
+
+      return itemDefinition.category === "material" &&
+        itemDefinition.materialKind === "enemy_part";
+    })).toBe(true);
+    expect(orcItemIds?.every((itemId) => {
+      const itemDefinition = getItemDefinition(itemId);
+
+      return itemDefinition.category === "material" &&
+        itemDefinition.materialKind === "enemy_part";
+    })).toBe(true);
   });
 
   it("adds Tier 2 drops for the level 13-18 archetypes", () => {

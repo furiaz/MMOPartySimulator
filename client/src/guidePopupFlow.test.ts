@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getGuidePopupsForQuestStatusChanges } from "./guidePopupFlow";
+import {
+  getGuidePopupsForQuestStatusChanges,
+  shouldRenderNewsBroadcastOverlay,
+} from "./guidePopupFlow";
 
 describe("guide popup flow", () => {
   it("queues first quest, equipment, and smith guides when those quests become active", () => {
@@ -58,5 +61,15 @@ describe("guide popup flow", () => {
         { stolen_field_supplies: "ready_to_turn_in" },
       ),
     ).toEqual([]);
+  });
+
+  it("holds news broadcasts until guide popup sequences finish", () => {
+    expect(shouldRenderNewsBroadcastOverlay(null, [])).toBe(true);
+    expect(shouldRenderNewsBroadcastOverlay("first_smith_quest_started", [])).toBe(
+      false,
+    );
+    expect(shouldRenderNewsBroadcastOverlay(null, ["first_smith_quest_started"])).toBe(
+      false,
+    );
   });
 });

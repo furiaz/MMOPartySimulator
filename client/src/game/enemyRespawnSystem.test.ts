@@ -220,8 +220,8 @@ describe("enemy respawn system", () => {
     expect(nextState.entities[enemy.id]).toMatchObject({
       state: "idle",
       variant: undefined,
-      maxHealth: 8,
-      health: 8,
+      maxHealth: 12,
+      health: 12,
     });
   });
 
@@ -250,8 +250,8 @@ describe("enemy respawn system", () => {
     expect(nextState.entities[enemy.id]).toMatchObject({
       state: "idle",
       variant: "superior",
-      maxHealth: 20,
-      health: 20,
+      maxHealth: 30,
+      health: 30,
     });
     expect(nextState.debugTelemetry?.events.at(-1)).toMatchObject({
       type: "superior_enemy_spawned",

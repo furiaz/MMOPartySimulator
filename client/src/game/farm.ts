@@ -31,7 +31,7 @@ import {
   removeCurrencyFromWalletState,
 } from "./wallet";
 
-export const FARM_INTERACTION_RANGE = 4;
+export const FARM_INTERACTION_RANGE = 8;
 export const FARM_CARROT_CROP_ID: FarmCropId = "carrot";
 export const FARM_POTATO_CROP_ID: FarmCropId = "potato";
 export const FARM_MOONLEAF_CROP_ID: FarmCropId = "moonleaf";

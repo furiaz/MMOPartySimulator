@@ -663,6 +663,8 @@ Legacy Wood, Ore, and Herb item definitions may still exist as prototype data, b
 
 Resources currently grant prototype item stacks into the shared party inventory.
 
+Resource hover details should show the current produced item name, resource type, tier, durability, and current quantity. Resource hover quantity should show the actual remaining quantity only, without current/max inventory capacity text.
+
 Gathering should remain readable and lightweight during the prototype phase. Do not add full crafting chains, profession progression, complex tool durability, or production resource ecosystems unless explicitly requested.
 
 ---
@@ -696,7 +698,6 @@ Current item categories:
 - equipment
 - quest
 - event
-- junk
 
 The implementation category id for skill books is `skill_book`, but player-facing documentation may call them skill books.
 
@@ -745,7 +746,7 @@ Current enemy drop behavior:
 - loot tier is currently derived from enemy level
 - Tier 1 currently covers enemies below level 10
 - Tier 2 currently covers enemies level 10 and above
-- archetype/tier drops route prototype junk items into shared inventory
+- archetype/tier drops route enemy-part material items into shared inventory
 - Superior enemies use higher-yield prototype drop tables where supported
 - Azure Mass currently has a type-specific Slime loot table
 - Goblin Shaman may also roll a low-chance type-specific Holy Lantern equipment drop at Tier 2
@@ -780,7 +781,7 @@ Current prototype gathered materials:
 
 Legacy gathered material ids for Wood, Ore, and Herb may still exist for compatibility, but current resource yields should use tiered gathered material items.
 
-Current prototype junk drops may include:
+Current prototype enemy-part material drops may include:
 
 - Tier 1 Slime Gel
 - Tier 1 Slime Core
@@ -811,10 +812,6 @@ Current prototype enemy equipment drops may include:
 
 Current merchant behavior:
 
-- the hub Merchant can exchange eligible junk items for Crowns
-- eligible quick-exchange junk items are prototype junk items with sell value
-- quick exchange removes eligible junk items from shared inventory
-- quick exchange adds Crowns to the shared wallet
 - the hub Merchant has a fixed prototype buy stock
 - Merchant Buy can purchase selected equipment, flasks, and skill books for Crowns
 - current Merchant Buy skill book stock includes books for all current Beginner and first-class prototype skills
@@ -827,6 +824,7 @@ Current merchant behavior:
 - current secondary Merchant Buy filters may separate weapons and offhands by equipment type, armor by slot, and accessories by charm type
 - the Sell panel may be visible as a placeholder only
 - full selling rules are not implemented
+- enemy-part materials are not quick-exchanged or sold by the Merchant in the current prototype
 - this is prototype merchant behavior, not a full shop economy
 
 Current prototype key item behavior:
@@ -843,7 +841,7 @@ Current prototype bank behavior:
 - bank and inventory slots may be locked to prevent selected movement
 - manual deposit, manual withdraw, and deposit-all actions may move eligible items between inventory and bank
 - quest items cannot be deposited
-- bank auto-routing may keep items in inventory, deposit eligible body-part junk only, or deposit all eligible non-quest items
+- bank auto-routing may keep items in inventory, deposit eligible enemy-part materials only, or deposit all eligible non-quest items
 - remote bank viewing may exist through UI, but item movement requires proximity to a Bank Chest
 
 Current prototype crafting behavior:
@@ -1611,17 +1609,16 @@ POI selection should prefer progression-relevant targets before generic local ac
 Current intended POI priority order:
 
 1. active World Travel route target
-2. eligible hub Merchant quick exchange when eligible junk is available and the Merchant is unlocked
-3. active quest objective on the current map
-4. ready quest turn-in target
-5. available quest acceptance target on the current map
-6. quest-required prototype teleport when the active objective is on another reachable prototype map
-7. reachable wild combat target when combat fallback is relevant
-8. reachable wild resource target when gathering fallback is relevant
-9. reachable exploration or inspect target for quest objectives
-10. safe idle hub point
+2. active quest objective on the current map
+3. ready quest turn-in target
+4. available quest acceptance target on the current map
+5. quest-required prototype teleport when the active objective is on another reachable prototype map
+6. reachable wild combat target when combat fallback is relevant
+7. reachable wild resource target when gathering fallback is relevant
+8. reachable exploration or inspect target for quest objectives
+9. safe idle hub point
 
-When the party is in the hub, eligible merchant quick exchange may be considered before quest and idle targets.
+When the party is in the hub, Merchant POI behavior is currently driven by active quest objectives and direct player interaction, not autonomous item selling.
 
 POI selection should avoid selecting invalid, unreachable, depleted, dead, completed, locked, already satisfied, or gatherer-reserved resource targets.
 
@@ -2300,7 +2297,7 @@ Current Harbor Union Bastion prototype hub:
 - Current placeholders may include Quest Giver, Class Mentor, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Dog, Test Blade, a hub target dummy, and a hub AoE target dummy.
 - The Quest Giver supports the lightweight prototype quest chain only.
 - The Class Mentor supports prototype first-class selection for eligible Beginner companions.
-- The Merchant supports prototype quick exchange of eligible junk items for Crowns and a fixed prototype buy stock for selected equipment, flasks, and skill books.
+- The Merchant supports a fixed prototype buy stock for selected equipment, flasks, and skill books.
 - The Smith supports current lightweight prototype crafting only.
 - The Bank Chest supports current lightweight prototype shared bank storage only.
 - The Guild Coordinator and Inn Keeper open the current Guild & Inn Atlas service page.
@@ -2669,7 +2666,7 @@ Do not implement these unless explicitly requested:
 - production asset pipeline
 - final world content pipeline
 - full quest journal, branching dialogue, production quest content, or full quest reward economy beyond prototype quest rewards
-- full shop, selling, buying, and merchant economy beyond prototype quick exchange and fixed prototype Merchant Buy stock
+- full shop, selling, buying, and merchant economy beyond fixed prototype Merchant Buy stock and the current Sell placeholder
 - full production crafting, smithing, profession progression, upgrade chains, or recipe economy beyond current prototype Smith crafting
 - full production bank economy, account storage, remote storage rules, or storage upgrades beyond current prototype Bank Chest storage
 - persistent ground loot beyond prototype drop-to-inventory behavior

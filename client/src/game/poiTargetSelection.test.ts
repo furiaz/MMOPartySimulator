@@ -60,7 +60,7 @@ describe("POI target selection", () => {
     });
   });
 
-  it("orders hub quest giver work before idle while ignoring auto Merchant quick exchange", () => {
+  it("orders hub quest giver work before idle with enemy-part materials in inventory", () => {
     const leader = createLeader({ x: 7, y: 20 });
     let state = createGameState(
       HUB_MAP_ID,
@@ -86,19 +86,19 @@ describe("POI target selection", () => {
     );
 
     expect(selection.localTarget?.poiId).toBe(npcIds[0]);
-    expect(selection.localTarget?.interactionRange).toBe(2);
+    expect(selection.localTarget?.interactionRange).toBe(4);
     expect(selection.consideredTargets.map((target) => target.poiId)).toEqual([
       npcIds[0],
       "hub-idle-city-point",
     ]);
-    expect(selection.consideredTargets[0].interactionRange).toBe(2);
+    expect(selection.consideredTargets[0].interactionRange).toBe(4);
     expect(selection.consideredTargets.map((target) => target.priority)).toEqual([
       30,
       100,
     ]);
   });
 
-  it("guides active merchant item objectives to the Merchant without quick exchange priority", () => {
+  it("guides active merchant item objectives to the Merchant", () => {
     const leader = createLeader({ x: 7, y: 20 });
     let state = createGameState(
       HUB_MAP_ID,
@@ -130,8 +130,8 @@ describe("POI target selection", () => {
       reason: "active quest merchant objective",
       objectiveId: "buy_first_aid_skill_book",
     });
-    expect(selection.consideredTargets[0].reason).not.toBe(
-      "merchant quick exchange",
+    expect(selection.consideredTargets[0].reason).toBe(
+      "active quest merchant objective",
     );
   });
 

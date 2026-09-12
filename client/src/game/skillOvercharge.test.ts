@@ -37,7 +37,7 @@ describe("skill overcharge", () => {
 
     expect(boostedBolt.effect.type).toBe("damage");
     if (boostedBolt.effect.type === "damage") {
-      expect(boostedBolt.effect.powerMultiplier).toBeCloseTo(1.375);
+      expect(boostedBolt.effect.powerMultiplier).toBeCloseTo(1.65);
     }
     expect(
       getOverchargedSkillCooldownMs(

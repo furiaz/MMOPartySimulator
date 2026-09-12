@@ -1,13 +1,15 @@
 import type { NpcEntity } from "./game/types";
+import { BANK_INTERACTION_RANGE } from "./game/bank";
+import { SMITH_CRAFTING_INTERACTION_RANGE } from "./game/crafting";
 import { FARM_INTERACTION_RANGE } from "./game/farm";
 import { GUILD_TAVERN_INTERACTION_RANGE } from "./game/guildTavern";
 
-export const questGiverInteractionRange = 2;
-export const merchantInteractionRange = 2;
-export const bankInteractionRange = 2;
+export const questGiverInteractionRange = 4;
+export const merchantInteractionRange = SMITH_CRAFTING_INTERACTION_RANGE;
+export const bankInteractionRange = BANK_INTERACTION_RANGE;
 export const guildTavernInteractionRange = GUILD_TAVERN_INTERACTION_RANGE;
 export const farmInteractionRange = FARM_INTERACTION_RANGE;
-export const defaultNpcInteractionRange = 1.5;
+export const defaultNpcInteractionRange = 3;
 
 export function getNpcInteractionRange(
   npc: Pick<NpcEntity, "npcRole">,

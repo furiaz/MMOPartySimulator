@@ -17,12 +17,9 @@ import {
 import {
   addItemToInventoryState,
   getAvailableInventorySlots,
-  getInventorySlotIndex,
-  isInventorySlotLocked,
-  removeItemFromInventorySlotState,
 } from "./inventory";
 import { getCraftingRecipeOutputItemIds } from "./crafting";
-import { getItemDefinition, ITEM_DEFINITIONS } from "./items";
+import { getItemDefinition } from "./items";
 import {
   isMerchantUnlockedForQuests,
   recordMerchantItemPurchasedForQuests,
@@ -33,7 +30,6 @@ import { EQUIPMENT_SLOT_LABELS, EQUIPMENT_TYPE_LABELS } from "./equipmentTypes";
 import { isClassAllowedForEquipment } from "./equipmentRules";
 import { SKILL_DEFINITIONS } from "./skills";
 import {
-  addCurrencyToWalletState,
   canAfford,
   getCurrencyBalance,
   removeCurrencyFromWalletState,
@@ -42,7 +38,6 @@ import type {
   DebugTelemetryEventType,
   EquipmentSlot,
   FarmCropId,
-  InventoryRemoveResult,
   ItemDefinition,
   ItemId,
   KeyItemId,
@@ -56,7 +51,6 @@ export type MerchantMenuSelection =
   | "farm_seeds"
   | "livestock"
   | "sell"
-  | "quick_exchange_parts"
   | "leave";
 
 export type MerchantStockGroup =
@@ -90,42 +84,6 @@ export type MerchantSecondaryFilterOption = {
   id: string;
   label: string;
 };
-
-export type QuickExchangeItem = {
-  itemId: ItemId;
-  displayName: string;
-  quantity: number;
-  valueEach: number;
-  totalValue: number;
-};
-
-export type QuickExchangeResult =
-  | {
-      status: "success";
-      merchantNpcId: string;
-      exchangedItems: QuickExchangeItem[];
-      totalExchangeValue: number;
-      previousCrowns: number;
-      newCrowns: number;
-    }
-  | {
-      status: "no_items";
-      merchantNpcId: string;
-      exchangedItems: [];
-      totalExchangeValue: 0;
-      previousCrowns: number;
-      newCrowns: number;
-      reason: "no_exchangeable_parts";
-    }
-  | {
-      status: "failed";
-      merchantNpcId: string;
-      exchangedItems: QuickExchangeItem[];
-      totalExchangeValue: number;
-      previousCrowns: number;
-      newCrowns: number;
-      reason: string;
-    };
 
 export type MerchantBuyFailureReason =
   | "invalid_merchant"
@@ -237,17 +195,6 @@ export type MerchantLivestockBuyResult =
       reason: MerchantLivestockBuyFailureReason;
     };
 
-type RemoveItemFromInventory = (
-  state: GameState,
-  itemId: ItemId,
-  quantity: number,
-  source: "merchant",
-) => { state: GameState; result: InventoryRemoveResult };
-
-type QuickExchangeOptions = {
-  removeItemFromInventory?: RemoveItemFromInventory;
-};
-
 const BASE_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "minor_recovery_flask", priceCrowns: 30, group: "flasks" },
   { itemId: "soldiers_recovery_flask", priceCrowns: 45, group: "flasks" },
@@ -324,6 +271,7 @@ const BASE_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "woodcutting_penance_skill_book", priceCrowns: 60, group: "books" },
   { itemId: "atonement_step_skill_book", priceCrowns: 60, group: "books" },
   { itemId: "training_sword", priceCrowns: 12, group: "weapons" },
+  { itemId: "copper_training_sword", priceCrowns: 28, group: "weapons" },
   { itemId: "iron_sword", priceCrowns: 60, group: "weapons" },
   { itemId: "guard_mace", priceCrowns: 60, group: "weapons" },
   { itemId: "claw_gauntlets", priceCrowns: 65, group: "weapons" },
@@ -1284,292 +1232,6 @@ function isMerchantEquipmentCompatibleWithCompanion(
   return isClassAllowedForEquipment(companion.classId, itemDefinition);
 }
 
-export function getQuickExchangeItemDefinitions(): ItemDefinition[] {
-  return Object.values(ITEM_DEFINITIONS).filter(isQuickExchangeItemDefinition);
-}
-
-export function isQuickExchangeItemDefinition(
-  itemDefinition: ItemDefinition,
-): boolean {
-  return Boolean(
-    itemDefinition.category === "junk" &&
-      itemDefinition.sellValue &&
-      itemDefinition.sellValue > 0,
-  );
-}
-
-export function getQuickExchangeItems(state: GameState): QuickExchangeItem[] {
-  return getQuickExchangeItemDefinitions()
-    .map((itemDefinition) => {
-      const quantity = countUnlockedInventoryItem(state, itemDefinition.id);
-      const valueEach = itemDefinition.sellValue ?? 0;
-
-      return {
-        itemId: itemDefinition.id,
-        displayName: itemDefinition.displayName,
-        quantity,
-        valueEach,
-        totalValue: quantity * valueEach,
-      };
-    })
-    .filter((item) => item.quantity > 0 && item.totalValue > 0);
-}
-
-export function quickExchangeParts(
-  state: GameState,
-  merchantNpcId: string,
-  options: QuickExchangeOptions = {},
-): { state: GameState; result: QuickExchangeResult } {
-  const merchant = state.entities[merchantNpcId];
-  const previousCrowns = getCurrencyBalance(state.wallet, "crowns");
-
-  if (!isMerchantNpc(merchant)) {
-    const failedState = appendMerchantTelemetry(state, "quick_exchange_failed", merchantNpcId, {
-      result: "failed",
-      reason: "invalid_merchant",
-      previousCurrencyBalance: previousCrowns,
-      nextCurrencyBalance: previousCrowns,
-      totalExchangeValue: 0,
-    });
-
-    return {
-      state: failedState,
-      result: {
-        status: "failed",
-        merchantNpcId,
-        exchangedItems: [],
-        totalExchangeValue: 0,
-        previousCrowns,
-        newCrowns: previousCrowns,
-        reason: "invalid_merchant",
-      },
-    };
-  }
-
-  const exchangeItems = getQuickExchangeItems(state);
-  const totalExchangeValue = exchangeItems.reduce(
-    (total, item) => total + item.totalValue,
-    0,
-  );
-  let nextState = appendMerchantTelemetry(state, "quick_exchange_attempt", merchantNpcId, {
-    result: "attempt",
-    previousCurrencyBalance: previousCrowns,
-    nextCurrencyBalance: previousCrowns,
-    totalExchangeValue,
-  });
-
-  if (exchangeItems.length === 0) {
-    nextState = appendMerchantTelemetry(nextState, "quick_exchange_no_items", merchantNpcId, {
-      result: "no_items",
-      reason: "no_exchangeable_parts",
-      previousCurrencyBalance: previousCrowns,
-      nextCurrencyBalance: previousCrowns,
-      totalExchangeValue: 0,
-    });
-
-    return {
-      state: nextState,
-      result: {
-        status: "no_items",
-        merchantNpcId,
-        exchangedItems: [],
-        totalExchangeValue: 0,
-        previousCrowns,
-        newCrowns: previousCrowns,
-        reason: "no_exchangeable_parts",
-      },
-    };
-  }
-
-  for (const item of exchangeItems) {
-    nextState = appendMerchantItemTelemetry(
-      nextState,
-      "quick_exchange_item_selected",
-      merchantNpcId,
-      item,
-      "selected",
-      previousCrowns,
-      previousCrowns,
-      totalExchangeValue,
-    );
-  }
-
-  const removeItem = options.removeItemFromInventory;
-
-  for (const item of exchangeItems) {
-    const removal = removeItem
-      ? removeItem(nextState, item.itemId, item.quantity, "merchant")
-      : removeUnlockedQuickExchangeItem(nextState, item.itemId, item.quantity);
-
-    if (removal.result.status !== "success") {
-      const failedState = appendMerchantItemTelemetry(
-        state,
-        "quick_exchange_failed",
-        merchantNpcId,
-        item,
-        "failed",
-        previousCrowns,
-        previousCrowns,
-        totalExchangeValue,
-        `remove_${removal.result.status}`,
-      );
-
-      return {
-        state: failedState,
-        result: {
-          status: "failed",
-          merchantNpcId,
-          exchangedItems: exchangeItems,
-          totalExchangeValue,
-          previousCrowns,
-          newCrowns: previousCrowns,
-          reason: `remove_${removal.result.status}`,
-        },
-      };
-    }
-
-    nextState = appendMerchantItemTelemetry(
-      removal.state,
-      "quick_exchange_item_removed",
-      merchantNpcId,
-      item,
-      "success",
-      previousCrowns,
-      previousCrowns,
-      totalExchangeValue,
-    );
-  }
-
-  const currencyResult = addCurrencyToWalletState(
-    nextState,
-    "crowns",
-    totalExchangeValue,
-    "merchant",
-  );
-
-  if (currencyResult.result.status !== "success") {
-    const failedState = appendMerchantTelemetry(state, "quick_exchange_failed", merchantNpcId, {
-      result: "failed",
-      reason: `currency_${currencyResult.result.status}`,
-      previousCurrencyBalance: previousCrowns,
-      nextCurrencyBalance: previousCrowns,
-      totalExchangeValue,
-    });
-
-    return {
-      state: failedState,
-      result: {
-        status: "failed",
-        merchantNpcId,
-        exchangedItems: exchangeItems,
-        totalExchangeValue,
-        previousCrowns,
-        newCrowns: previousCrowns,
-        reason: `currency_${currencyResult.result.status}`,
-      },
-    };
-  }
-
-  nextState = appendMerchantTelemetry(
-    currencyResult.state,
-    "quick_exchange_currency_added",
-    merchantNpcId,
-    {
-      result: "success",
-      currencyAmount: totalExchangeValue,
-      previousCurrencyBalance: previousCrowns,
-      nextCurrencyBalance: currencyResult.result.newBalance,
-      totalExchangeValue,
-    },
-  );
-  nextState = appendMerchantTelemetry(nextState, "quick_exchange_completed", merchantNpcId, {
-    result: "success",
-    currencyAmount: totalExchangeValue,
-    previousCurrencyBalance: previousCrowns,
-    nextCurrencyBalance: currencyResult.result.newBalance,
-    totalExchangeValue,
-  });
-
-  return {
-    state: nextState,
-    result: {
-      status: "success",
-      merchantNpcId,
-      exchangedItems: exchangeItems,
-      totalExchangeValue,
-      previousCrowns,
-      newCrowns: currencyResult.result.newBalance,
-    },
-  };
-}
-
-function countUnlockedInventoryItem(state: GameState, itemId: ItemId): number {
-  return state.inventory.slots
-    .filter((slot, fallbackIndex) => {
-      const slotIndex = getInventorySlotIndex(slot, fallbackIndex);
-
-      return (
-        slot.itemId === itemId &&
-        !isInventorySlotLocked(state.inventory, slotIndex)
-      );
-    })
-    .reduce((total, slot) => total + slot.quantity, 0);
-}
-
-function removeUnlockedQuickExchangeItem(
-  state: GameState,
-  itemId: ItemId,
-  quantity: number,
-): { state: GameState; result: InventoryRemoveResult } {
-  let nextState = state;
-  let remainingQuantity = Math.floor(quantity);
-  let removedQuantity = 0;
-
-  for (const slot of [...state.inventory.slots]) {
-    if (remainingQuantity <= 0 || slot.itemId !== itemId) {
-      continue;
-    }
-
-    const fallbackIndex = nextState.inventory.slots.findIndex(
-      (candidate) => candidate === slot,
-    );
-    const slotIndex = getInventorySlotIndex(
-      slot,
-      fallbackIndex >= 0 ? fallbackIndex : 0,
-    );
-
-    if (isInventorySlotLocked(nextState.inventory, slotIndex)) {
-      continue;
-    }
-
-    const removal = removeItemFromInventorySlotState(
-      nextState,
-      slotIndex,
-      remainingQuantity,
-      "merchant",
-    );
-    nextState = removal.state;
-    removedQuantity += removal.result.removedQuantity;
-    remainingQuantity -= removal.result.removedQuantity;
-  }
-
-  return {
-    state: nextState,
-    result: {
-      status:
-        removedQuantity === quantity
-          ? "success"
-          : removedQuantity > 0
-            ? "partial"
-            : "failed_invalid",
-      itemId,
-      requestedQuantity: quantity,
-      removedQuantity,
-      remainingQuantity,
-    },
-  };
-}
-
 export function recordMerchantInteractionOpened(
   state: GameState,
   merchantNpcId: string,
@@ -1817,35 +1479,6 @@ function appendMerchantLivestockTelemetry(
     nextCurrencyBalance: event.nextCurrencyBalance,
     result: event.result,
     reason: event.reason,
-  });
-}
-
-function appendMerchantItemTelemetry(
-  state: GameState,
-  type: DebugTelemetryEventType,
-  merchantNpcId: string,
-  item: QuickExchangeItem,
-  result: string,
-  previousCrowns: number,
-  newCrowns: number,
-  totalExchangeValue: number,
-  reason?: string,
-): GameState {
-  const itemDefinition = getItemDefinition(item.itemId);
-
-  return appendMerchantTelemetry(state, type, merchantNpcId, {
-    itemId: item.itemId,
-    itemDisplayName: itemDefinition.displayName,
-    itemCategory: itemDefinition.category,
-    quantitySold: item.quantity,
-    removedQuantity: type === "quick_exchange_item_removed" ? item.quantity : undefined,
-    valueEach: item.valueEach,
-    totalItemValue: item.totalValue,
-    totalExchangeValue,
-    previousCurrencyBalance: previousCrowns,
-    nextCurrencyBalance: newCrowns,
-    result,
-    reason,
   });
 }
 

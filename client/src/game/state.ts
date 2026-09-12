@@ -76,6 +76,7 @@ import {
 } from "./companionCooldowns";
 import { createPendingRoleBonusState } from "./roleBonus";
 import { ensureCompanionSkillProgressionForClass } from "./skillProgression";
+import { applyFirstClassCatchUpStatGrowth } from "./stats";
 import type {
   GlobalPoiIntent,
   LocalPoiTarget,
@@ -784,8 +785,14 @@ export function setPartyMemberClass(
     return state;
   }
 
+  const currentSkillProgression =
+    ensureCompanionSkillProgressionForClass(partyMember);
+  const classAdjustedPartyMember =
+    partyMember.classId === "beginner" && classId !== "beginner"
+      ? applyFirstClassCatchUpStatGrowth(currentSkillProgression, classId)
+      : currentSkillProgression;
   const nextPartyMember = ensureCompanionSkillProgressionForClass(
-    ensureCompanionSkillProgressionForClass(partyMember),
+    classAdjustedPartyMember,
     classId,
   );
   const nextState = updateEntity(state, nextPartyMember);

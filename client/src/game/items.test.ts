@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getItemDefinitionForResourceType, ITEM_DEFINITIONS } from "./items";
+import {
+  getItemDefinitionForResourceType,
+  isEnemyPartMaterialDefinition,
+  ITEM_DEFINITIONS,
+} from "./items";
 import type { ItemId } from "./types";
 
 const SCALED_EQUIPMENT_LEVEL_REQUIREMENTS: Partial<Record<ItemId, number>> = {
@@ -245,6 +249,41 @@ describe("prototype item definitions", () => {
     }
   });
 
+  it("defines the level 5 Copper Training Sword for Beginners", () => {
+    expect(ITEM_DEFINITIONS.copper_training_sword).toMatchObject({
+      id: "copper_training_sword",
+      displayName: "Copper Training Sword",
+      category: "equipment",
+      equipmentSlot: "mainHand",
+      equipmentKind: "weapon",
+      equipmentType: "training_sword",
+      allowedClassIds: ["beginner"],
+      tier: 1,
+      levelRequirement: 5,
+      statModifiers: { attack: 2 },
+    });
+  });
+
+  it("classifies enemy drops as enemy-part materials instead of junk", () => {
+    const itemDefinitions = Object.values(ITEM_DEFINITIONS);
+    const enemyPartItems = itemDefinitions.filter(isEnemyPartMaterialDefinition);
+
+    expect(enemyPartItems.length).toBeGreaterThan(0);
+    expect(
+      itemDefinitions.some(
+        (itemDefinition) =>
+          (itemDefinition as { category: string }).category === "junk",
+      ),
+    ).toBe(false);
+
+    for (const itemDefinition of enemyPartItems) {
+      expect(itemDefinition.category).toBe("material");
+      expect(itemDefinition.materialKind).toBe("enemy_part");
+      expect(itemDefinition.description).not.toMatch(/junk|quick exchange/i);
+      expect("sellValue" in itemDefinition).toBe(false);
+    }
+  });
+
   it("defines the bronze accessory progression as shared prototype equipment", () => {
     expect(ITEM_DEFINITIONS.plain_charm).toMatchObject({
       equipmentSlot: "accessory1",
@@ -252,7 +291,7 @@ describe("prototype item definitions", () => {
       equipmentType: "accessory",
       tier: 1,
       levelRequirement: 1,
-      statModifiers: { maxHealth: 1, defense: 1 },
+      statModifiers: { defense: 1 },
     });
 
     expect(ITEM_DEFINITIONS.bronze_pendant).toMatchObject({
@@ -261,7 +300,7 @@ describe("prototype item definitions", () => {
       equipmentType: "accessory",
       tier: 1,
       levelRequirement: 10,
-      statModifiers: { maxHealth: 3, defense: 1 },
+      statModifiers: { maxHealth: 3, defense: 2 },
     });
     expect(ITEM_DEFINITIONS.field_bronze_pendant).toMatchObject({
       equipmentSlot: "accessory1",
@@ -269,7 +308,7 @@ describe("prototype item definitions", () => {
       equipmentType: "accessory",
       tier: 1,
       levelRequirement: 10,
-      statModifiers: { maxHealth: 2, healingPower: 1, magicDefense: 1 },
+      statModifiers: { healingPower: 2, magicDefense: 2 },
     });
     expect(ITEM_DEFINITIONS.reinforced_bronze_pendant).toMatchObject({
       equipmentSlot: "accessory1",
@@ -278,7 +317,7 @@ describe("prototype item definitions", () => {
       rarity: "common",
       tier: 2,
       levelRequirement: 15,
-      statModifiers: { maxHealth: 5, defense: 2 },
+      statModifiers: { maxHealth: 5, defense: 3 },
     });
     expect(ITEM_DEFINITIONS.polished_bronze_pendant).toMatchObject({
       equipmentSlot: "accessory1",
@@ -287,7 +326,7 @@ describe("prototype item definitions", () => {
       rarity: "common",
       tier: 2,
       levelRequirement: 15,
-      statModifiers: { maxHealth: 3, healingPower: 2, magicDefense: 2 },
+      statModifiers: { healingPower: 3, magicDefense: 3 },
     });
 
     for (const itemId of [
@@ -314,10 +353,46 @@ describe("prototype item definitions", () => {
     }
   });
 
-  it("uses evasion penalties on mail and plate tradeoff pieces", () => {
-    expect(ITEM_DEFINITIONS.guard_hauberk.statModifiers?.evasion).toBe(-1);
-    expect(ITEM_DEFINITIONS.vanguard_boots.statModifiers?.evasion).toBe(-1);
-    expect(ITEM_DEFINITIONS.bulwark_cuirass.statModifiers?.evasion).toBe(-2);
-    expect(ITEM_DEFINITIONS.warplate_cuirass.statModifiers?.evasion).toBe(-2);
+  it("keeps early equipment to two stat lines without removed crit lines", () => {
+    const earlyEquipmentItems = Object.values(ITEM_DEFINITIONS).filter(
+      (itemDefinition) =>
+        itemDefinition.category === "equipment" &&
+        (itemDefinition.levelRequirement ?? 0) <= 20,
+    );
+
+    for (const itemDefinition of earlyEquipmentItems) {
+      const statModifierCount = Object.keys(itemDefinition.statModifiers ?? {}).length;
+      const primaryStatModifierCount = Object.keys(
+        itemDefinition.primaryStatModifiers ?? {},
+      ).length;
+
+      expect(statModifierCount + primaryStatModifierCount).toBeLessThanOrEqual(2);
+      expect(itemDefinition.statModifiers?.criticalChance).toBeUndefined();
+      expect(itemDefinition.statModifiers?.criticalDamage).toBeUndefined();
+    }
+  });
+
+  it("keeps max health off cloth and leather armor", () => {
+    const clothAndLeatherArmor = getArmorItems().filter(
+      (itemDefinition) =>
+        itemDefinition.armorFamily === "cloth" ||
+        itemDefinition.armorFamily === "leather",
+    );
+
+    for (const itemDefinition of clothAndLeatherArmor) {
+      expect(itemDefinition.statModifiers?.maxHealth).toBeUndefined();
+    }
+  });
+
+  it("keeps heavy armor free of evasion penalties", () => {
+    const heavyArmorItems = Object.values(ITEM_DEFINITIONS).filter(
+      (itemDefinition) =>
+        itemDefinition.armorFamily === "mail" ||
+        itemDefinition.armorFamily === "plate",
+    );
+
+    for (const itemDefinition of heavyArmorItems) {
+      expect(itemDefinition.statModifiers?.evasion ?? 0).toBeGreaterThanOrEqual(0);
+    }
   });
 });

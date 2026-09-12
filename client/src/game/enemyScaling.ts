@@ -16,7 +16,7 @@ export type EnemyScalingResult = EnemyCombatStats & {
 };
 
 export const MIN_ENEMY_SCALING_LEVEL = 1;
-export const MAX_ENEMY_SCALING_LEVEL = 20;
+export const MAX_ENEMY_SCALING_LEVEL = 100;
 
 const DEFAULT_ARCHETYPE_THREAT_MODIFIER = 1;
 
@@ -25,62 +25,21 @@ const BAND_MODIFIERS: Record<EnemyScalingBand, number> = {
   early: 1,
 };
 
-const STANDARD_ENEMY_CURVES: Record<
-  EnemyScalingBand,
-  {
-    minLevel: number;
-    maxLevel: number;
-    minStats: EnemyCombatStats;
-    maxStats: EnemyCombatStats;
-  }
-> = {
-  starter: {
-    minLevel: 1,
-    maxLevel: 10,
-    minStats: {
-      maxHealth: 6,
-      attack: 2,
-      defense: 0,
-      magicDefense: 0,
-      evasion: 0,
-    },
-    maxStats: {
-      maxHealth: 60,
-      attack: 8,
-      defense: 6,
-      magicDefense: 6,
-      evasion: 3,
-    },
-  },
-  early: {
-    minLevel: 11,
-    maxLevel: 20,
-    minStats: {
-      maxHealth: 70,
-      attack: 10,
-      defense: 7,
-      magicDefense: 7,
-      evasion: 3,
-    },
-    maxStats: {
-      maxHealth: 160,
-      attack: 20,
-      defense: 16,
-      magicDefense: 16,
-      evasion: 7,
-    },
-  },
+const ENEMY_SCALING_ANCHORS: Record<number, EnemyCombatStats> = {
+  1: { maxHealth: 12, attack: 2, defense: 0, magicDefense: 0, evasion: 0 },
+  5: { maxHealth: 45, attack: 5, defense: 2, magicDefense: 2, evasion: 1 },
+  10: { maxHealth: 95, attack: 9, defense: 5, magicDefense: 5, evasion: 3 },
+  15: { maxHealth: 160, attack: 15, defense: 8, magicDefense: 8, evasion: 5 },
+  20: { maxHealth: 240, attack: 20, defense: 12, magicDefense: 12, evasion: 7 },
+  30: { maxHealth: 420, attack: 32, defense: 22, magicDefense: 22, evasion: 10 },
+  50: { maxHealth: 850, attack: 55, defense: 40, magicDefense: 40, evasion: 15 },
+  75: { maxHealth: 1450, attack: 82, defense: 65, magicDefense: 65, evasion: 22 },
+  100: { maxHealth: 2200, attack: 110, defense: 90, magicDefense: 90, evasion: 30 },
 };
 
-const STARTER_LEVEL_MAX_HEALTH_OVERRIDES: Partial<Record<number, number>> = {
-  1: 8,
-  2: 14,
-  3: 23,
-  4: 30,
-  5: 37,
-  6: 41,
-  7: 45,
-};
+const ENEMY_SCALING_ANCHOR_LEVELS = Object.keys(ENEMY_SCALING_ANCHORS)
+  .map(Number)
+  .sort((first, second) => first - second);
 
 export function getEnemyScalingBand(level: number): EnemyScalingBand {
   return getEffectiveEnemyScalingLevel(level) <= 10 ? "starter" : "early";
@@ -101,20 +60,7 @@ export function getScaledEnemyStats(
 
   const effectiveLevel = getEffectiveEnemyScalingLevel(level);
   const scalingBand = getEnemyScalingBand(effectiveLevel);
-  const curve = STANDARD_ENEMY_CURVES[scalingBand];
-  const progress =
-    curve.maxLevel === curve.minLevel
-      ? 0
-      : (effectiveLevel - curve.minLevel) / (curve.maxLevel - curve.minLevel);
-  const stats = {
-    ...interpolateStats(curve.minStats, curve.maxStats, progress),
-    maxHealth: getScaledMaxHealth(
-      curve.minStats.maxHealth,
-      curve.maxStats.maxHealth,
-      progress,
-      effectiveLevel,
-    ),
-  };
+  const stats = getAnchoredEnemyCombatStats(effectiveLevel);
   const levelThreat = effectiveLevel;
   const archetypeThreatModifier = getArchetypeThreatModifier();
   const threat = Math.round(
@@ -140,34 +86,43 @@ export function getEnemyCombatStats(enemy: Enemy): EnemyCombatStats {
   };
 }
 
-function interpolateStats(
-  minStats: EnemyCombatStats,
-  maxStats: EnemyCombatStats,
-  progress: number,
-): EnemyCombatStats {
-  return {
-    maxHealth: interpolateStat(minStats.maxHealth, maxStats.maxHealth, progress),
-    attack: interpolateStat(minStats.attack, maxStats.attack, progress),
-    defense: interpolateStat(minStats.defense, maxStats.defense, progress),
-    magicDefense: interpolateStat(
-      minStats.magicDefense,
-      maxStats.magicDefense,
-      progress,
-    ),
-    evasion: interpolateStat(minStats.evasion, maxStats.evasion, progress),
-  };
+function getAnchoredEnemyCombatStats(level: number): EnemyCombatStats {
+  const exactStats = ENEMY_SCALING_ANCHORS[level];
+
+  if (exactStats) {
+    return exactStats;
+  }
+
+  const lowerLevel =
+    [...ENEMY_SCALING_ANCHOR_LEVELS]
+      .reverse()
+      .find((anchorLevel) => anchorLevel < level) ??
+    ENEMY_SCALING_ANCHOR_LEVELS[0];
+  const upperLevel =
+    ENEMY_SCALING_ANCHOR_LEVELS.find((anchorLevel) => anchorLevel > level) ??
+    ENEMY_SCALING_ANCHOR_LEVELS[ENEMY_SCALING_ANCHOR_LEVELS.length - 1];
+  const lowerStats = ENEMY_SCALING_ANCHORS[lowerLevel];
+  const upperStats = ENEMY_SCALING_ANCHORS[upperLevel];
+  const progress =
+    upperLevel === lowerLevel ? 0 : (level - lowerLevel) / (upperLevel - lowerLevel);
+
+  return interpolateStats(lowerStats, upperStats, progress);
 }
 
-function getScaledMaxHealth(
-  minValue: number,
-  maxValue: number,
+function interpolateStats(
+  lowerStats: EnemyCombatStats,
+  upperStats: EnemyCombatStats,
   progress: number,
-  effectiveLevel: number,
-): number {
-  return (
-    STARTER_LEVEL_MAX_HEALTH_OVERRIDES[effectiveLevel] ??
-    interpolateStat(minValue, maxValue, progress)
-  );
+): EnemyCombatStats {
+  const defense = interpolateStat(lowerStats.defense, upperStats.defense, progress);
+
+  return {
+    maxHealth: interpolateStat(lowerStats.maxHealth, upperStats.maxHealth, progress),
+    attack: interpolateStat(lowerStats.attack, upperStats.attack, progress),
+    defense,
+    magicDefense: defense,
+    evasion: interpolateStat(lowerStats.evasion, upperStats.evasion, progress),
+  };
 }
 
 function interpolateStat(minValue: number, maxValue: number, progress: number): number {

@@ -3,78 +3,121 @@ import { createEnemy } from "./entities";
 import { getScaledEnemyStats } from "./enemyScaling";
 
 describe("enemy scaling", () => {
-  it("scales level 1 enemies to the starter baseline", () => {
-    expect(getScaledEnemyStats(1)).toMatchObject({
-      effectiveLevel: 1,
-      scalingBand: "starter",
-      maxHealth: 8,
-      attack: 2,
-      defense: 0,
-      magicDefense: 0,
-      evasion: 0,
-      threat: 1,
-    });
-  });
-
-  it("uses explicit early starter HP tuning through level 7", () => {
+  it("uses anchored enemy combat stats through the level 100 tuning target", () => {
     expect(
-      [1, 2, 3, 4, 5, 6, 7].map((level) => ({
-        level,
-        maxHealth: getScaledEnemyStats(level).maxHealth,
-      })),
+      [1, 5, 10, 15, 20, 30, 50, 75, 100].map((level) =>
+        getScaledEnemyStats(level),
+      ),
     ).toEqual([
-      { level: 1, maxHealth: 8 },
-      { level: 2, maxHealth: 14 },
-      { level: 3, maxHealth: 23 },
-      { level: 4, maxHealth: 30 },
-      { level: 5, maxHealth: 37 },
-      { level: 6, maxHealth: 41 },
-      { level: 7, maxHealth: 45 },
+      {
+        level: 1,
+        effectiveLevel: 1,
+        scalingBand: "starter",
+        maxHealth: 12,
+        attack: 2,
+        defense: 0,
+        magicDefense: 0,
+        evasion: 0,
+        threat: 1,
+      },
+      {
+        level: 5,
+        effectiveLevel: 5,
+        scalingBand: "starter",
+        maxHealth: 45,
+        attack: 5,
+        defense: 2,
+        magicDefense: 2,
+        evasion: 1,
+        threat: 5,
+      },
+      {
+        level: 10,
+        effectiveLevel: 10,
+        scalingBand: "starter",
+        maxHealth: 95,
+        attack: 9,
+        defense: 5,
+        magicDefense: 5,
+        evasion: 3,
+        threat: 10,
+      },
+      {
+        level: 15,
+        effectiveLevel: 15,
+        scalingBand: "early",
+        maxHealth: 160,
+        attack: 15,
+        defense: 8,
+        magicDefense: 8,
+        evasion: 5,
+        threat: 15,
+      },
+      {
+        level: 20,
+        effectiveLevel: 20,
+        scalingBand: "early",
+        maxHealth: 240,
+        attack: 20,
+        defense: 12,
+        magicDefense: 12,
+        evasion: 7,
+        threat: 20,
+      },
+      {
+        level: 30,
+        effectiveLevel: 30,
+        scalingBand: "early",
+        maxHealth: 420,
+        attack: 32,
+        defense: 22,
+        magicDefense: 22,
+        evasion: 10,
+        threat: 30,
+      },
+      {
+        level: 50,
+        effectiveLevel: 50,
+        scalingBand: "early",
+        maxHealth: 850,
+        attack: 55,
+        defense: 40,
+        magicDefense: 40,
+        evasion: 15,
+        threat: 50,
+      },
+      {
+        level: 75,
+        effectiveLevel: 75,
+        scalingBand: "early",
+        maxHealth: 1450,
+        attack: 82,
+        defense: 65,
+        magicDefense: 65,
+        evasion: 22,
+        threat: 75,
+      },
+      {
+        level: 100,
+        effectiveLevel: 100,
+        scalingBand: "early",
+        maxHealth: 2200,
+        attack: 110,
+        defense: 90,
+        magicDefense: 90,
+        evasion: 30,
+        threat: 100,
+      },
     ]);
   });
 
-  it("keeps level 8 and higher starter HP on the existing curve", () => {
-    expect(getScaledEnemyStats(8).maxHealth).toBe(48);
-    expect(getScaledEnemyStats(9).maxHealth).toBe(54);
-    expect(getScaledEnemyStats(10).maxHealth).toBe(60);
-  });
-
-  it("scales level 10 enemies to the starter upper boundary", () => {
-    expect(getScaledEnemyStats(10)).toMatchObject({
-      effectiveLevel: 10,
-      scalingBand: "starter",
-      maxHealth: 60,
-      attack: 8,
+  it("interpolates between enemy scaling anchors", () => {
+    expect(getScaledEnemyStats(12)).toMatchObject({
+      maxHealth: 121,
+      attack: 11,
       defense: 6,
       magicDefense: 6,
-      evasion: 3,
-      threat: 10,
-    });
-  });
-
-  it("scales level 11 enemies to the early lower boundary", () => {
-    expect(getScaledEnemyStats(11)).toMatchObject({
-      effectiveLevel: 11,
-      scalingBand: "early",
-      maxHealth: 70,
-      attack: 10,
-      defense: 7,
-      magicDefense: 7,
-      evasion: 3,
-      threat: 11,
-    });
-  });
-
-  it("scales level 20 enemies to the early upper boundary", () => {
-    expect(getScaledEnemyStats(20)).toMatchObject({
-      effectiveLevel: 20,
-      scalingBand: "early",
-      maxHealth: 160,
-      attack: 20,
-      defense: 16,
-      magicDefense: 16,
-      evasion: 7,
-      threat: 20,
+      evasion: 4,
     });
   });
 
@@ -83,13 +126,13 @@ describe("enemy scaling", () => {
       level: 0,
       effectiveLevel: 1,
       scalingBand: "starter",
-      maxHealth: 8,
+      maxHealth: 12,
     });
-    expect(getScaledEnemyStats(99)).toMatchObject({
-      level: 99,
-      effectiveLevel: 20,
+    expect(getScaledEnemyStats(999)).toMatchObject({
+      level: 999,
+      effectiveLevel: 100,
       scalingBand: "early",
-      maxHealth: 160,
+      maxHealth: 2200,
     });
   });
 

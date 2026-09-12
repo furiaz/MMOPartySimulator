@@ -33,6 +33,7 @@ export const PRIMARY_STAT_IDS: PrimaryStatId[] = [
 
 export const MINIMUM_ACTUAL_PRIMARY_STAT = 1;
 export const STARTING_PRIMARY_STAT_VALUE = 1;
+export const BEGINNER_STAT_GROWTH_MAX_LEVEL = 10;
 export const BEGINNER_STAT_GROWTH_PER_LEVEL = createCompanionPrimaryStats(1);
 export const BASE_CLASS_AUTOMATIC_STAT_POINTS_PER_LEVEL = 5;
 export const PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK = 2;
@@ -99,12 +100,13 @@ export function applyCompanionLevelUpStatGrowth(
     return companion;
   }
 
+  const effectiveLevelUps = getEffectiveStatGrowthLevelUps(companion, levelUps);
   const automaticGrowth = getClassStatGrowth(companion.classId);
   const unspentPointsPerLevel = getPlayerStatPointsPerLevel(companion.classId);
   const naturalStats = addRepeatedCompanionPrimaryStats(
     companion.naturalStats,
     automaticGrowth,
-    levelUps,
+    effectiveLevelUps,
   );
 
   return syncCompanionDerivedMaxHealth({
@@ -112,6 +114,34 @@ export function applyCompanionLevelUpStatGrowth(
     naturalStats,
     unspentStatPoints:
       companion.unspentStatPoints + unspentPointsPerLevel * levelUps,
+  });
+}
+
+export function applyFirstClassCatchUpStatGrowth(
+  companion: Companion,
+  classId: Exclude<ClassId, "beginner">,
+): Companion {
+  const level = Math.max(1, Math.floor(companion.characterLevel));
+  const beginnerGrowthLevelUps = getCappedBeginnerStatGrowthLevelUps(level);
+  const firstClassLevelUps = Math.max(0, level - BEGINNER_STAT_GROWTH_MAX_LEVEL);
+  const naturalStatsWithBeginnerGrowth = addRepeatedCompanionPrimaryStats(
+    createDefaultNaturalCompanionStats(),
+    BEGINNER_STAT_GROWTH_PER_LEVEL,
+    beginnerGrowthLevelUps,
+  );
+  const naturalStats = addRepeatedCompanionPrimaryStats(
+    naturalStatsWithBeginnerGrowth,
+    BASE_CLASS_STAT_GROWTHS[classId],
+    firstClassLevelUps,
+  );
+
+  return syncCompanionDerivedMaxHealth({
+    ...companion,
+    classId,
+    naturalStats,
+    unspentStatPoints:
+      companion.unspentStatPoints +
+      PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK * firstClassLevelUps,
   });
 }
 
@@ -505,6 +535,33 @@ function getPlayerStatPointsPerLevel(classId: ClassId): number {
   return classId === "beginner"
     ? 0
     : PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK;
+}
+
+function getEffectiveStatGrowthLevelUps(
+  companion: Companion,
+  levelUps: number,
+): number {
+  if (companion.classId !== "beginner") {
+    return levelUps;
+  }
+
+  const beginnerStatGrowthRemaining = Math.max(
+    0,
+    BEGINNER_STAT_GROWTH_MAX_LEVEL -
+      Math.min(
+        companion.naturalStats.strength,
+        companion.naturalStats.dexterity,
+        companion.naturalStats.constitution,
+        companion.naturalStats.intelligence,
+        companion.naturalStats.wisdom,
+      ),
+  );
+
+  return Math.min(levelUps, beginnerStatGrowthRemaining);
+}
+
+function getCappedBeginnerStatGrowthLevelUps(level: number): number {
+  return Math.max(0, Math.min(level, BEGINNER_STAT_GROWTH_MAX_LEVEL) - 1);
 }
 
 function addRepeatedCompanionPrimaryStats(

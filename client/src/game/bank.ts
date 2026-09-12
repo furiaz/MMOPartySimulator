@@ -1,4 +1,4 @@
-import { getItemDefinition } from "./items";
+import { getItemDefinition, isEnemyPartMaterialDefinition } from "./items";
 import {
   getInventorySlotAtIndex,
   getInventorySlotIndex,
@@ -22,7 +22,7 @@ import type {
 } from "./types";
 
 export const BANK_CAPACITY = 100;
-export const BANK_INTERACTION_RANGE = 2;
+export const BANK_INTERACTION_RANGE = 4;
 export const BANK_MAX_STACK_QUANTITY = Number.MAX_SAFE_INTEGER;
 
 const DEFAULT_AUTO_ROUTING_MODE: BankAutoRoutingMode = "keep_inventory";
@@ -468,7 +468,7 @@ export function withdrawBankSlotToInventory(
 
 export function depositAllToBank(
   state: GameState,
-  options: { onlyBodyParts?: boolean; requireProximity?: boolean } = {},
+  options: { onlyEnemyParts?: boolean; requireProximity?: boolean } = {},
 ): { state: GameState; movedQuantity: number; stoppedBecauseFull: boolean } {
   const requireProximity = options.requireProximity ?? true;
   let nextState = sanitizeBankState(state);
@@ -487,7 +487,10 @@ export function depositAllToBank(
       continue;
     }
 
-    if (options.onlyBodyParts && !isAutoDepositBodyPartDefinition(itemDefinition)) {
+    if (
+      options.onlyEnemyParts &&
+      !isAutoDepositEnemyPartMaterialDefinition(itemDefinition)
+    ) {
       continue;
     }
 
@@ -535,7 +538,7 @@ export function autoDepositByRoutingMode(state: GameState): BankAutoDepositResul
   }
 
   const result = depositAllToBank(sanitizedState, {
-    onlyBodyParts: mode === "deposit_body_parts",
+    onlyEnemyParts: mode === "deposit_body_parts",
     requireProximity: false,
   });
   const message = result.stoppedBecauseFull
@@ -550,14 +553,10 @@ export function autoDepositByRoutingMode(state: GameState): BankAutoDepositResul
   };
 }
 
-export function isAutoDepositBodyPartDefinition(
+export function isAutoDepositEnemyPartMaterialDefinition(
   itemDefinition: ItemDefinition,
 ): boolean {
-  return Boolean(
-    itemDefinition.category === "junk" &&
-      itemDefinition.sellValue &&
-      itemDefinition.sellValue > 0,
-  );
+  return isEnemyPartMaterialDefinition(itemDefinition);
 }
 
 export function clampBankTransferQuantity(

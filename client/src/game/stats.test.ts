@@ -3,9 +3,11 @@ import { createCompanion } from "./entities";
 import {
   BASE_CLASS_AUTOMATIC_STAT_POINTS_PER_LEVEL,
   BASE_CLASS_STAT_GROWTHS,
+  BEGINNER_STAT_GROWTH_MAX_LEVEL,
   BEGINNER_STAT_GROWTH_PER_LEVEL,
   MAX_ALLOCATED_PRIMARY_STAT_POINTS_PER_STAT,
   allocateCompanionStatPoint,
+  applyFirstClassCatchUpStatGrowth,
   applyCompanionLevelUpStatGrowth,
   createCompanionPrimaryStats,
   getCompanionActualStats,
@@ -66,7 +68,7 @@ describe("prototype companion stats", () => {
 
     expect(getCompanionDerivedStats(companion)).toMatchObject({
       attack: 3,
-      maxHealth: 15,
+      maxHealth: 14,
       accuracy: 1,
       criticalChance: 0.05,
       criticalDamage: 1.2,
@@ -84,7 +86,7 @@ describe("prototype companion stats", () => {
       },
     };
 
-    expect(getCompanionActualStats(companion).wisdom).toBe(2);
+    expect(getCompanionActualStats(companion).wisdom).toBe(4);
   });
 
   it("flows equipped primary stat modifiers and penalties into derived stats", () => {
@@ -100,10 +102,10 @@ describe("prototype companion stats", () => {
     };
 
     expect(getCompanionDerivedStats(companion)).toMatchObject({
-      defense: 8,
-      maxHealth: 37,
-      evasion: -4,
-      block: 1,
+      defense: 11,
+      maxHealth: 42,
+      evasion: 0,
+      block: 0,
     });
   });
 
@@ -132,13 +134,13 @@ describe("prototype companion stats", () => {
     };
 
     expect(getCompanionDerivedStats(aegis)).toMatchObject({
-      attack: 4,
-      defense: 4,
-      block: 3,
+      attack: 6,
+      defense: 8,
+      block: 5,
     });
     expect(getCompanionDerivedStats(blade)).toMatchObject({
-      attack: 8,
-      accuracy: 2,
+      attack: 9,
+      accuracy: 3,
     });
   });
 
@@ -174,16 +176,16 @@ describe("prototype companion stats", () => {
     };
 
     expect(getCompanionDerivedStats(bastionCompanion)).toMatchObject({
-      defense: 17,
-      maxHealth: 54,
-      evasion: -8,
-      block: 5,
+      defense: 28,
+      maxHealth: 61,
+      evasion: 0,
+      block: 8,
     });
     expect(getCompanionDerivedStats(ironholdCompanion)).toMatchObject({
-      defense: 23,
-      maxHealth: 72,
-      evasion: -9,
-      block: 8,
+      defense: 38,
+      maxHealth: 77,
+      evasion: 0,
+      block: 11,
     });
   });
 
@@ -216,14 +218,21 @@ describe("prototype companion stats", () => {
     };
 
     expect(getCompanionDerivedStats(defender)).toMatchObject({
-      defense: getCompanionDerivedStats(noRoleBonus).defense + 10,
-      block: getCompanionDerivedStats(noRoleBonus).block + 5,
+      defense: getCompanionDerivedStats(noRoleBonus).defense + 1,
+      block: getCompanionDerivedStats(noRoleBonus).block + 1,
     });
   });
 
-  it("adds active Fighter role bonuses to derived attack and magic power", () => {
+  it("adds active first-class Fighter role bonuses to derived attack and magic power", () => {
     const fighter = {
-      ...createCompanion("fighter", { x: 0, y: 0 }, "fighter", "fighter"),
+      ...createCompanion(
+        "fighter",
+        { x: 0, y: 0 },
+        "fighter",
+        "fighter",
+        1,
+        "blade",
+      ),
       characterLevel: 10,
     };
     const noRoleBonus = {
@@ -232,8 +241,8 @@ describe("prototype companion stats", () => {
     };
 
     expect(getCompanionDerivedStats(fighter)).toMatchObject({
-      attack: getCompanionDerivedStats(noRoleBonus).attack + 20,
-      magicPower: getCompanionDerivedStats(noRoleBonus).magicPower + 20,
+      attack: getCompanionDerivedStats(noRoleBonus).attack + 3,
+      magicPower: getCompanionDerivedStats(noRoleBonus).magicPower + 3,
     });
   });
 
@@ -250,7 +259,7 @@ describe("prototype companion stats", () => {
     };
 
     expect(getCompanionDerivedStats(support).healingPower).toBe(
-      getCompanionDerivedStats(noRoleBonus).healingPower + 10,
+      getCompanionDerivedStats(noRoleBonus).healingPower + 1,
     );
   });
 
@@ -291,6 +300,7 @@ describe("prototype companion stats", () => {
   });
 
   it("defines 5-point base class growth profiles", () => {
+    expect(BEGINNER_STAT_GROWTH_MAX_LEVEL).toBe(10);
     expect(BEGINNER_STAT_GROWTH_PER_LEVEL).toEqual(createCompanionPrimaryStats(1));
     expect(PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK).toBe(2);
     expect(BASE_CLASS_STAT_GROWTHS).toEqual({
@@ -326,6 +336,19 @@ describe("prototype companion stats", () => {
     );
   });
 
+  it("caps Beginner automatic stat growth after level 10", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 11,
+      naturalStats: createCompanionPrimaryStats(10),
+    };
+
+    const updatedCompanion = applyCompanionLevelUpStatGrowth(companion, 1);
+
+    expect(updatedCompanion.naturalStats).toEqual(createCompanionPrimaryStats(10));
+    expect(updatedCompanion.unspentStatPoints).toBe(0);
+  });
+
   it("applies base-class growth and grants allocation points", () => {
     const companion = {
       ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
@@ -337,6 +360,23 @@ describe("prototype companion stats", () => {
 
     expect(updatedCompanion.naturalStats).toEqual(createPrimaryStats(5, 5, 3, 1, 1));
     expect(updatedCompanion.unspentStatPoints).toBe(4);
+  });
+
+  it("normalizes late first-class selection with capped Beginner and catch-up growth", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 15,
+      naturalStats: createCompanionPrimaryStats(12),
+      unspentStatPoints: 1,
+    };
+
+    const updatedCompanion = applyFirstClassCatchUpStatGrowth(companion, "blade");
+
+    expect(updatedCompanion.naturalStats).toEqual(createPrimaryStats(20, 20, 15, 10, 10));
+    expect(updatedCompanion.unspentStatPoints).toBe(11);
+    expect(updatedCompanion.maxHealth).toBe(
+      getCompanionDerivedStats(updatedCompanion).maxHealth,
+    );
   });
 
   it("allocates stat points through game logic and syncs derived health", () => {

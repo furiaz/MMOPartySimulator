@@ -16,6 +16,14 @@ export const BEGINNER_SKILL_MAX_RANK = 3;
 export const CLASS_SKILL_MAX_RANK = 5;
 export const SKILL_RANK_BONUS_PER_RANK = 0.05;
 
+const DOT_DAMAGE_PERCENT_BY_SKILL_RANK: Partial<Record<SkillId, number[]>> = {
+  poison_coating: [1, 2, 3, 4, 5],
+  flame_step: [4, 6, 8, 10, 12],
+  fire_burst: [2, 3, 4, 5, 6],
+  whip_prison: [3, 4, 5, 6, 7],
+  flagellant_lash: [2, 3, 4, 5, 6],
+};
+
 export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   throw_rock: "throw_rock_skill_book",
   kick: "kick_skill_book",
@@ -411,6 +419,16 @@ export function getScaledSkillDefinitionForCompanion(
               ],
             ),
           ),
+        poisonCoating: effect.poisonCoating
+          ? {
+              ...effect.poisonCoating,
+              poisonDamageAttackPowerPercent: getRankedDotDamagePercent(
+                skill.id,
+                rank,
+                effect.poisonCoating.poisonDamageAttackPowerPercent,
+              ),
+            }
+          : undefined,
       },
     };
   }
@@ -492,7 +510,11 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         poisonDamageAttackPowerPercent:
-          effect.poisonDamageAttackPowerPercent * multiplier,
+          getRankedDotDamagePercent(
+            skill.id,
+            rank,
+            effect.poisonDamageAttackPowerPercent,
+          ),
       },
     };
   }
@@ -544,7 +566,11 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         burnDamageMagicPowerPercent:
-          effect.burnDamageMagicPowerPercent * multiplier,
+          getRankedDotDamagePercent(
+            skill.id,
+            rank,
+            effect.burnDamageMagicPowerPercent,
+          ),
       },
     };
   }
@@ -599,7 +625,11 @@ export function getScaledSkillDefinitionForCompanion(
       effect: {
         ...effect,
         bleedDamageAttackPowerPercent:
-          effect.bleedDamageAttackPowerPercent * multiplier,
+          getRankedDotDamagePercent(
+            skill.id,
+            rank,
+            effect.bleedDamageAttackPowerPercent,
+          ),
       },
     };
   }
@@ -611,7 +641,11 @@ export function getScaledSkillDefinitionForCompanion(
         ...effect,
         powerMultiplier: effect.powerMultiplier * multiplier,
         bleedDamageAttackPowerPercent:
-          effect.bleedDamageAttackPowerPercent * multiplier,
+          getRankedDotDamagePercent(
+            skill.id,
+            rank,
+            effect.bleedDamageAttackPowerPercent,
+          ),
       },
     };
   }
@@ -656,7 +690,11 @@ export function getScaledSkillDefinitionForCompanion(
         ...effect,
         powerMultiplier: effect.powerMultiplier * multiplier,
         burnDamageMagicPowerPercent:
-          effect.burnDamageMagicPowerPercent * multiplier,
+          getRankedDotDamagePercent(
+            skill.id,
+            rank,
+            effect.burnDamageMagicPowerPercent,
+          ),
       },
     };
   }
@@ -749,6 +787,21 @@ function getScaledPartyClassBuffStatPercent(
   const rankBonus = (Math.max(1, Math.floor(rank)) - 1) * 1.25;
 
   return Math.min(10, basePercent + rankBonus);
+}
+
+function getRankedDotDamagePercent(
+  skillId: SkillId,
+  rank: number,
+  fallbackPercent: number,
+): number {
+  const rankTable = DOT_DAMAGE_PERCENT_BY_SKILL_RANK[skillId];
+
+  if (!rankTable) {
+    return fallbackPercent * getSkillRankMultiplier(rank);
+  }
+
+  const rankIndex = Math.min(rankTable.length, Math.max(1, Math.floor(rank))) - 1;
+  return rankTable[rankIndex];
 }
 
 export function isSkillBookItemDefinition(

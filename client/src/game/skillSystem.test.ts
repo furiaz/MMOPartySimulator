@@ -881,10 +881,7 @@ describe("beginner skill system", () => {
     }
 
     expect(healedActiveAlly).toMatchObject({
-      health: Math.min(
-        activeAlly.maxHealth,
-        activeAlly.health + getHealingAmount(activeSupport, 5),
-      ),
+      health: 16,
     });
     expect(healedActiveAlly.health).toBeGreaterThan(healedPendingAlly.health);
   });

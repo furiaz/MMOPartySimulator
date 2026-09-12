@@ -15,8 +15,8 @@ describe("enemy variants", () => {
 
     expect(slime).toMatchObject({
       variant: "superior",
-      maxHealth: 20,
-      health: 20,
+      maxHealth: 30,
+      health: 30,
       attack: 3,
       defense: 0,
       magicDefense: 0,

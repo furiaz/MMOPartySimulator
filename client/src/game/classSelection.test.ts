@@ -5,6 +5,7 @@ import {
   canCompanionEnterFirstClassSelection,
   selectFirstClass,
 } from "./classSelection";
+import { createCompanionPrimaryStats } from "./stats";
 import { createTestGameState } from "./testState";
 
 describe("first class selection", () => {
@@ -31,6 +32,55 @@ describe("first class selection", () => {
         classId,
       });
     }
+  });
+
+  it("normalizes level 10 first-class selection to capped Beginner growth", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 10,
+    };
+    const state = createTestGameState({
+      entities: {
+        [companion.id]: companion,
+      },
+    });
+
+    const result = selectFirstClass(state, companion.id, "blade");
+
+    expect(result.result.status).toBe("success");
+    expect(result.state.entities[companion.id]).toMatchObject({
+      classId: "blade",
+      naturalStats: createCompanionPrimaryStats(10),
+      unspentStatPoints: 0,
+    });
+  });
+
+  it("grants first-class catch-up growth and stat points when selecting late", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 15,
+      naturalStats: createCompanionPrimaryStats(12),
+    };
+    const state = createTestGameState({
+      entities: {
+        [companion.id]: companion,
+      },
+    });
+
+    const result = selectFirstClass(state, companion.id, "blade");
+
+    expect(result.result.status).toBe("success");
+    expect(result.state.entities[companion.id]).toMatchObject({
+      classId: "blade",
+      naturalStats: {
+        strength: 20,
+        dexterity: 20,
+        constitution: 15,
+        intelligence: 10,
+        wisdom: 10,
+      },
+      unspentStatPoints: 10,
+    });
   });
 
   it("rejects a Beginner below level 10", () => {

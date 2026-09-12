@@ -691,9 +691,7 @@ function getDebugCraftingMaterialAndEnemyDropItemIds(): ItemId[] {
   return Object.values(ITEM_DEFINITIONS)
     .filter(
       (itemDefinition) =>
-        itemDefinition.stackable &&
-        (itemDefinition.category === "material" ||
-          itemDefinition.category === "junk"),
+        itemDefinition.stackable && itemDefinition.category === "material",
     )
     .map((itemDefinition) => itemDefinition.id);
 }

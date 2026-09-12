@@ -117,6 +117,63 @@ describe("skill progression", () => {
     expect(getSkillRankMultiplier(5)).toBeCloseTo(1.2);
   });
 
+  it("uses explicit rank tables for damage over time skills", () => {
+    const companion = withSkillRanks(
+      createCompanion("companion", { x: 0, y: 0 }, "companion"),
+      {
+        poison_coating: 3,
+        flame_step: 3,
+        fire_burst: 3,
+        whip_prison: 3,
+        flagellant_lash: 3,
+      },
+    );
+
+    const poisonCoating = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.poison_coating,
+    );
+    const flameStep = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.flame_step,
+    );
+    const fireBurst = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.fire_burst,
+    );
+    const whipPrison = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.whip_prison,
+    );
+    const flagellantLash = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.flagellant_lash,
+    );
+
+    expect(poisonCoating.effect.type).toBe("partyClassBuff");
+    if (poisonCoating.effect.type === "partyClassBuff") {
+      expect(
+        poisonCoating.effect.poisonCoating?.poisonDamageAttackPowerPercent,
+      ).toBe(3);
+    }
+    expect(flameStep.effect.type).toBe("flameStep");
+    if (flameStep.effect.type === "flameStep") {
+      expect(flameStep.effect.burnDamageMagicPowerPercent).toBe(8);
+    }
+    expect(fireBurst.effect.type).toBe("fireBurst");
+    if (fireBurst.effect.type === "fireBurst") {
+      expect(fireBurst.effect.burnDamageMagicPowerPercent).toBe(4);
+    }
+    expect(whipPrison.effect.type).toBe("whipPrison");
+    if (whipPrison.effect.type === "whipPrison") {
+      expect(whipPrison.effect.bleedDamageAttackPowerPercent).toBe(5);
+    }
+    expect(flagellantLash.effect.type).toBe("flagellantLash");
+    if (flagellantLash.effect.type === "flagellantLash") {
+      expect(flagellantLash.effect.bleedDamageAttackPowerPercent).toBe(4);
+    }
+  });
+
   it("scales supported values and leaves unsupported values unchanged", () => {
     const companion = withSkillRanks(createCompanion("companion", { x: 0, y: 0 }, "companion"), {
       kick: 3,
@@ -434,7 +491,7 @@ describe("skill progression", () => {
     }
     expect(shieldShockwave.effect.type).toBe("shockwave");
     if (shieldShockwave.effect.type === "shockwave") {
-      expect(shieldShockwave.effect.powerMultiplier).toBeCloseTo(0.6);
+      expect(shieldShockwave.effect.powerMultiplier).toBeCloseTo(0.84);
     }
     expect(pinningShot.effect.type).toBe("pinningShot");
     if (pinningShot.effect.type === "pinningShot") {
@@ -448,18 +505,18 @@ describe("skill progression", () => {
     if (poisonCoating.effect.type === "partyClassBuff") {
       expect(
         poisonCoating.effect.poisonCoating?.poisonDamageAttackPowerPercent,
-      ).toBe(20);
+      ).toBe(5);
       expect(
         poisonCoating.effect.primaryStatBonusPercentByStat?.dexterity,
       ).toBeCloseTo(10);
     }
     expect(skirmishShot.effect.type).toBe("skirmishShot");
     if (skirmishShot.effect.type === "skirmishShot") {
-      expect(skirmishShot.effect.powerMultiplier).toBeCloseTo(1.2);
+      expect(skirmishShot.effect.powerMultiplier).toBeCloseTo(1.68);
     }
     expect(arrowBurst.effect.type).toBe("arrowBurst");
     if (arrowBurst.effect.type === "arrowBurst") {
-      expect(arrowBurst.effect.powerMultiplier).toBeCloseTo(1.32);
+      expect(arrowBurst.effect.powerMultiplier).toBeCloseTo(1.44);
     }
     expect(bloodFeast.effect.type).toBe("lifestealBuff");
     if (bloodFeast.effect.type === "lifestealBuff") {
@@ -491,15 +548,15 @@ describe("skill progression", () => {
     }
     expect(pounce.effect.type).toBe("pounce");
     if (pounce.effect.type === "pounce") {
-      expect(pounce.effect.powerMultiplier).toBeCloseTo(1.2);
+      expect(pounce.effect.powerMultiplier).toBeCloseTo(1.74);
     }
     expect(maulSweep.effect.type).toBe("maulSweep");
     if (maulSweep.effect.type === "maulSweep") {
-      expect(maulSweep.effect.powerMultiplier).toBeCloseTo(1.08);
+      expect(maulSweep.effect.powerMultiplier).toBeCloseTo(1.38);
     }
     expect(elementalBolt.effect.type).toBe("damage");
     if (elementalBolt.effect.type === "damage") {
-      expect(elementalBolt.effect.powerMultiplier).toBeCloseTo(1.5);
+      expect(elementalBolt.effect.powerMultiplier).toBeCloseTo(1.8);
     }
     expect(manaShield.effect.type).toBe("manaShield");
     if (manaShield.effect.type === "manaShield") {
@@ -529,12 +586,12 @@ describe("skill progression", () => {
     }
     expect(flameStep.effect.type).toBe("flameStep");
     if (flameStep.effect.type === "flameStep") {
-      expect(flameStep.effect.burnDamageMagicPowerPercent).toBeCloseTo(24);
+      expect(flameStep.effect.burnDamageMagicPowerPercent).toBeCloseTo(12);
     }
     expect(fireBurst.effect.type).toBe("fireBurst");
     if (fireBurst.effect.type === "fireBurst") {
-      expect(fireBurst.effect.powerMultiplier).toBeCloseTo(1.2);
-      expect(fireBurst.effect.burnDamageMagicPowerPercent).toBeCloseTo(24);
+      expect(fireBurst.effect.powerMultiplier).toBeCloseTo(1.38);
+      expect(fireBurst.effect.burnDamageMagicPowerPercent).toBeCloseTo(6);
     }
     expect(bindingRune.effect.type).toBe("pinningShot");
     if (bindingRune.effect.type === "pinningShot") {
@@ -542,7 +599,7 @@ describe("skill progression", () => {
     }
     expect(runeLance.effect.type).toBe("damage");
     if (runeLance.effect.type === "damage") {
-      expect(runeLance.effect.powerMultiplier).toBeCloseTo(1.2);
+      expect(runeLance.effect.powerMultiplier).toBeCloseTo(1.68);
     }
     expect(wardingGlyph.effect.type).toBe("barrierBlock");
     if (wardingGlyph.effect.type === "barrierBlock") {
@@ -605,12 +662,12 @@ describe("skill progression", () => {
     }
     expect(whipPrison.effect.type).toBe("whipPrison");
     if (whipPrison.effect.type === "whipPrison") {
-      expect(whipPrison.effect.bleedDamageAttackPowerPercent).toBeCloseTo(12);
+      expect(whipPrison.effect.bleedDamageAttackPowerPercent).toBeCloseTo(7);
     }
     expect(flagellantLash.effect.type).toBe("flagellantLash");
     if (flagellantLash.effect.type === "flagellantLash") {
-      expect(flagellantLash.effect.powerMultiplier).toBeCloseTo(1.44);
-      expect(flagellantLash.effect.bleedDamageAttackPowerPercent).toBeCloseTo(12);
+      expect(flagellantLash.effect.powerMultiplier).toBeCloseTo(1.74);
+      expect(flagellantLash.effect.bleedDamageAttackPowerPercent).toBeCloseTo(6);
     }
     expect(martyrsVeil.effect.type).toBe("sacrificialBarrier");
     if (martyrsVeil.effect.type === "sacrificialBarrier") {

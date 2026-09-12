@@ -2422,7 +2422,7 @@ describe("game update intent priority", () => {
       return;
     }
 
-    expect(nextResource.durability).toBeCloseTo(3.9);
+    expect(nextResource.durability).toBeCloseTo(3.97);
   });
 
   it("uses combat skills for direct attack commands when Auto Mode is off", () => {
@@ -4977,9 +4977,9 @@ describe("game update intent priority", () => {
     });
   });
 
-  it.skip("prioritizes hub quest work instead of autonomous Merchant quick exchange", () => {
+  it.skip("prioritizes hub quest work while enemy parts stay in inventory", () => {
     const leader = createLeader({ x: 7, y: 20 });
-    const stateWithJunk = addItemToInventoryState(
+    const stateWithEnemyPart = addItemToInventoryState(
       createHubState([leader, ...createHubNpcs()], {
         partyLeaderId: leader.id,
         quests: createQuestStates({
@@ -4990,7 +4990,7 @@ describe("game update intent priority", () => {
       1,
     ).state;
 
-    const nextState = updateGame(stateWithJunk);
+    const nextState = updateGame(stateWithEnemyPart);
 
     expect(nextState.localPoiTarget?.poiId).toBe(npcIds[0]);
     expect(nextState.localPoiTarget?.reason).toBe("accept available quest");
@@ -4998,7 +4998,7 @@ describe("game update intent priority", () => {
 
   it.skip("guides the active Merchant purchase quest without auto-selling parts", () => {
     const leader = createLeader({ x: 7, y: 20 });
-    const stateWithJunk = addItemToInventoryState(
+    const stateWithEnemyPart = addItemToInventoryState(
       createHubState([leader, ...createHubNpcs()], {
         partyLeaderId: leader.id,
         quests: createQuestStates({
@@ -5009,7 +5009,7 @@ describe("game update intent priority", () => {
       1,
     ).state;
 
-    const nextState = updateGame(stateWithJunk);
+    const nextState = updateGame(stateWithEnemyPart);
 
     expect(nextState.localPoiTarget).toMatchObject({
       poiId: npcIds[1],
@@ -5019,12 +5019,12 @@ describe("game update intent priority", () => {
     expect(nextState.inventory.slots).toEqual([
       { itemId: "wolf_pelt", quantity: 1 },
     ]);
-    expect(nextState.wallet).toEqual(stateWithJunk.wallet);
+    expect(nextState.wallet).toEqual(stateWithEnemyPart.wallet);
   });
 
-  it.skip("does not choose hub Merchant quick exchange before the equipment tutorial is accepted", () => {
+  it.skip("keeps Merchant idle before the equipment tutorial is accepted", () => {
     const leader = createLeader({ x: 7, y: 20 });
-    const stateWithJunk = addItemToInventoryState(
+    const stateWithEnemyPart = addItemToInventoryState(
       createHubState([leader, ...createHubNpcs()], {
         partyLeaderId: leader.id,
         quests: createQuestStates({
@@ -5035,7 +5035,7 @@ describe("game update intent priority", () => {
       1,
     ).state;
 
-    const nextState = updateGame(stateWithJunk);
+    const nextState = updateGame(stateWithEnemyPart);
 
     expect(nextState.localPoiTarget?.poiId).not.toBe(npcIds[1]);
     expect(nextState.localPoiTarget?.reason).toBe("accept available quest");

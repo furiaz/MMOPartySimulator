@@ -46,7 +46,7 @@ describe("guild tavern proximity", () => {
     const leader = createCompanion("leader", { x: 10, y: 10 }, "leader");
     const coordinator = createNpc(
       "guild-coordinator",
-      { x: 15, y: 10 },
+      { x: 19, y: 10 },
       "Guild Coordinator",
       "guild_coordinator",
     );

@@ -17,6 +17,7 @@ import {
 } from "./guidePopupDefinitions";
 import {
   getGuidePopupsForQuestStatusChanges,
+  shouldRenderNewsBroadcastOverlay,
   type QuestStatusLookup,
 } from "./guidePopupFlow";
 import type {
@@ -26,6 +27,7 @@ import type {
   PartyMenuSection,
 } from "./gameMenuTypes";
 import { getNpcInteractionRange } from "./npcInteractionRange";
+import { getResourceTooltipDetails } from "./resourceTooltip";
 import {
   formatQuestStatus,
   getDisplayQuest,
@@ -514,12 +516,6 @@ const entityStateLabels: Record<GameEntity["state"], string> = {
   gather: "Gathering",
   defend: "Defending",
   dead: "Dead",
-};
-
-const resourceTypeLabels: Record<ResourceEntity["resourceType"], string> = {
-  wood: "Wood",
-  ore: "Ore",
-  herb: "Herb",
 };
 
 const npcRoleLabels: Record<NpcEntity["npcRole"], string> = {
@@ -2757,17 +2753,7 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
   }
 
   if (entity.kind === "resource") {
-    return {
-      title: resourceTypeLabels[entity.resourceType],
-      rows: [
-        { label: "Type", value: resourceTypeLabels[entity.resourceType] },
-        { label: "Tier", value: entity.tier.toString() },
-        {
-          label: "Durability",
-          value: `${entity.durability}/${entity.maxDurability}`,
-        },
-      ],
-    };
+    return getResourceTooltipDetails(entity);
   }
 
   return {
@@ -3730,6 +3716,10 @@ function App() {
   const activeGuidePopup = activeGuidePopupId
     ? guidePopupDefinitions[activeGuidePopupId]
     : null;
+  const shouldShowNewsBroadcasts = shouldRenderNewsBroadcastOverlay(
+    activeGuidePopupId,
+    queuedGuidePopupIds,
+  );
 
   useEffect(() => {
     const menuTarget =
@@ -6885,7 +6875,9 @@ function App() {
             />
           </Suspense>
         ) : null}
-        <NewsBroadcastOverlay broadcasts={gameState.newsBroadcasts ?? []} />
+        {shouldShowNewsBroadcasts ? (
+          <NewsBroadcastOverlay broadcasts={gameState.newsBroadcasts ?? []} />
+        ) : null}
         {offlineSummary ? (
           <OfflineSummaryToast
             summary={offlineSummary}

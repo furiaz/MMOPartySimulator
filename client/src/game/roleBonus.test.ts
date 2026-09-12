@@ -249,32 +249,46 @@ describe("role bonus assignment timing", () => {
     });
   });
 
-  it("returns level-banded flat role bonus modifiers", () => {
-    const levelOneDefender = createCompanion(
+  it("returns class-tier flat role bonus modifiers", () => {
+    const beginnerDefender = createCompanion(
       "defender",
       { x: 0, y: 0 },
       "defender",
       "defender",
     );
-    const levelTenFighter = {
-      ...createCompanion("fighter", { x: 0, y: 0 }, "fighter", "fighter"),
+    const firstClassFighter = {
+      ...createCompanion(
+        "fighter",
+        { x: 0, y: 0 },
+        "fighter",
+        "fighter",
+        1,
+        "blade",
+      ),
       characterLevel: 10,
     };
-    const levelTwentySupport = {
-      ...createCompanion("support", { x: 0, y: 0 }, "support", "support"),
+    const firstClassSupport = {
+      ...createCompanion(
+        "support",
+        { x: 0, y: 0 },
+        "support",
+        "support",
+        1,
+        "lightbearer",
+      ),
       characterLevel: 20,
     };
 
-    expect(getCompanionRoleBonusModifiers(levelOneDefender)).toEqual({
-      statModifiers: { defense: 10, block: 5 },
+    expect(getCompanionRoleBonusModifiers(beginnerDefender)).toEqual({
+      statModifiers: { defense: 1, block: 1 },
       gatherSpeed: 0,
     });
-    expect(getCompanionRoleBonusModifiers(levelTenFighter)).toEqual({
-      statModifiers: { attack: 20, magicPower: 20 },
+    expect(getCompanionRoleBonusModifiers(firstClassFighter)).toEqual({
+      statModifiers: { attack: 3, magicPower: 3 },
       gatherSpeed: 0,
     });
-    expect(getCompanionRoleBonusModifiers(levelTwentySupport)).toEqual({
-      statModifiers: { healingPower: 20 },
+    expect(getCompanionRoleBonusModifiers(firstClassSupport)).toEqual({
+      statModifiers: { healingPower: 3 },
       gatherSpeed: 0,
     });
   });
@@ -295,7 +309,13 @@ describe("role bonus assignment timing", () => {
       },
     };
 
-    expect(getCompanionEffectiveGatherSpeed(gatherer)).toBeCloseTo(1.1);
-    expect(getCompanionEffectiveGatherSpeed(highLevelGatherer)).toBeCloseTo(1.2);
+    expect(getCompanionEffectiveGatherSpeed(gatherer)).toBeCloseTo(1.03);
+    expect(getCompanionEffectiveGatherSpeed(highLevelGatherer)).toBeCloseTo(1.03);
+    expect(
+      getCompanionEffectiveGatherSpeed({
+        ...highLevelGatherer,
+        classId: "hunter",
+      }),
+    ).toBeCloseTo(1.06);
   });
 });

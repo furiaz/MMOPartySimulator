@@ -74,8 +74,8 @@ describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
 
     expect(transformedEnemy?.kind).toBe("enemy");
     expect(transformedEnemy?.kind === "enemy" && isSuperiorEnemy(transformedEnemy)).toBe(true);
-    expect(transformedEnemy?.kind === "enemy" ? transformedEnemy.maxHealth : 0).toBe(20);
-    expect(transformedEnemy?.kind === "enemy" ? transformedEnemy.health : 0).toBe(20);
+    expect(transformedEnemy?.kind === "enemy" ? transformedEnemy.maxHealth : 0).toBe(30);
+    expect(transformedEnemy?.kind === "enemy" ? transformedEnemy.health : 0).toBe(30);
     expect(untouchedEnemy?.kind === "enemy" && isSuperiorEnemy(untouchedEnemy)).toBe(false);
     expect(
       untouchedOtherSubzoneEnemy?.kind === "enemy" &&

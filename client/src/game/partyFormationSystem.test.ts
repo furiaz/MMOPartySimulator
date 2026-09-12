@@ -404,7 +404,7 @@ describe("party formation real-time cohesion", () => {
         position: merchant.position,
         interactionRange: 1.5,
         targetEntityId: merchant.id,
-        reason: "merchant quick exchange",
+        reason: "merchant interaction",
         interactionStandActorId: leader.id,
         interactionStandPosition: { x: 4, y: 5 },
         interactionStandTargetPosition: merchant.position,

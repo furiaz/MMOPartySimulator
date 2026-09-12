@@ -67,7 +67,7 @@ describe("gather system interaction range", () => {
       return;
     }
 
-    expect(nextResource.durability).toBeCloseTo(resource.durability - 1.1);
+    expect(nextResource.durability).toBeCloseTo(resource.durability - 1.03);
   });
 
   it("moves a collector toward the resource when outside interaction range", () => {

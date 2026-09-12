@@ -12,7 +12,7 @@ import {
   updateSkillShieldBlockPositions,
   type SkillUse,
 } from "./skillEffectResolution";
-import { updateRuneSkillRuntime } from "./skillRuntime";
+import { applyCompanionHealing, updateRuneSkillRuntime } from "./skillRuntime";
 import { SKILL_DEFINITIONS } from "./skills";
 import { addEntity, updateEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
@@ -1348,6 +1348,10 @@ describe("skill effect resolution", () => {
       { x: 0, y: 0 },
       "lightbearer",
     );
+    lightbearer.naturalStats = {
+      ...lightbearer.naturalStats,
+      wisdom: 20,
+    };
     const ally = {
       ...createSkillCompanion("ally", "defender", { x: 1, y: 0 }),
       health: 50,
@@ -2024,10 +2028,10 @@ describe("skill effect resolution", () => {
     const tickedState = updateRuneSkillRuntime(state, 3100);
     expect((tickedState.entities.ally as Companion).health).toBe(41);
 
-    const noBuffHealState = resolveSkillEffect(
+    const noBuffHealState = applyCompanionHealing(
       createSkillState([lightbearer, ally]),
-      lightbearer,
-      createSkillUse("light_mend", ally),
+      ally,
+      20,
       1200,
     ).state;
     const buffState = resolveSkillEffect(
@@ -2036,10 +2040,10 @@ describe("skill effect resolution", () => {
       createSkillUse("radiant_benediction", lightbearer),
       1200,
     ).state;
-    const buffedHealState = resolveSkillEffect(
+    const buffedHealState = applyCompanionHealing(
       buffState,
-      lightbearer,
-      createSkillUse("light_mend", ally),
+      ally,
+      20,
       1300,
     ).state;
 

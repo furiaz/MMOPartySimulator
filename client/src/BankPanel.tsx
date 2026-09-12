@@ -23,7 +23,7 @@ type PendingQuantityMove = {
 
 const autoRoutingLabels: Record<BankAutoRoutingMode, string> = {
   keep_inventory: "Keep in inventory",
-  deposit_body_parts: "Deposit body parts only",
+  deposit_body_parts: "Deposit enemy parts only",
   deposit_all: "Deposit all",
 };
 

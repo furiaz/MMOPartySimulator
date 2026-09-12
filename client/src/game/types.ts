@@ -200,8 +200,7 @@ export type ItemCategory =
   | "skill_book"
   | "equipment"
   | "quest"
-  | "event"
-  | "junk";
+  | "event";
 
 export type EquipmentSlot =
   | "head"
@@ -297,7 +296,7 @@ export type ConsumableKind = "flask";
 
 export type ConsumableUseSource = "manual" | "ai";
 
-export type JunkItemId =
+export type EnemyPartItemId =
   | "slime_gel_t1"
   | "slime_core_t1"
   | "bat_wing_t1"
@@ -335,6 +334,7 @@ export type JunkItemId =
 
 export type EquipmentItemId =
   | "training_sword"
+  | "copper_training_sword"
   | "iron_sword"
   | "steel_sword"
   | "veteran_sword"
@@ -597,7 +597,7 @@ export type SkillBookItemId =
 
 export type ItemId =
   | ResourceItemId
-  | JunkItemId
+  | EnemyPartItemId
   | EquipmentItemId
   | ConsumableItemId
   | SkillBookItemId;
@@ -639,9 +639,7 @@ export type ItemDefinition = {
   stackable: boolean;
   maxStack: number;
   value?: number;
-  sellValue?: number;
-  exchangeCategory?: "parts";
-  canQuickExchange?: boolean;
+  materialKind?: "resource" | "enemy_part";
   effectId?: string;
   consumableKind?: ConsumableKind;
   useDurationMs?: number;
@@ -2000,13 +1998,6 @@ export type DebugTelemetryEventType =
   | "merchant_buy_completed"
   | "merchant_buy_failed"
   | "merchant_locked_for_quest"
-  | "quick_exchange_attempt"
-  | "quick_exchange_item_selected"
-  | "quick_exchange_item_removed"
-  | "quick_exchange_currency_added"
-  | "quick_exchange_completed"
-  | "quick_exchange_failed"
-  | "quick_exchange_no_items"
   | "craft_attempted"
   | "craft_succeeded"
   | "craft_failed"
@@ -2290,10 +2281,7 @@ export type DebugTelemetryEvent = {
   addedQuantity?: number;
   removedQuantity?: number;
   overflowQuantity?: number;
-  quantitySold?: number;
   valueEach?: number;
-  totalItemValue?: number;
-  totalExchangeValue?: number;
   slotIndex?: number;
   stackQuantityBefore?: number;
   stackQuantityAfter?: number;

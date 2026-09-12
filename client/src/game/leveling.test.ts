@@ -50,6 +50,23 @@ describe("character leveling", () => {
     expect(updatedCompanion.unspentStatPoints).toBe(2);
   });
 
+  it("does not apply Beginner natural stat growth past level 10", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 10,
+      characterXp: 0,
+      naturalStats: createCompanionPrimaryStats(10),
+    };
+    const xpToNextLevel = getCharacterXpToNextLevel(companion.characterLevel) ?? 0;
+
+    const updatedCompanion = grantCharacterXpToCompanion(companion, xpToNextLevel);
+
+    expect(updatedCompanion.characterLevel).toBe(11);
+    expect(updatedCompanion.naturalStats).toEqual(createCompanionPrimaryStats(10));
+    expect(updatedCompanion.unspentStatPoints).toBe(0);
+  });
+
+
   it("keeps max-level companions at max with zero current XP", () => {
     const companion = {
       ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
@@ -129,7 +146,7 @@ describe("character leveling", () => {
     expect(getPartySizeUnlockRequirement(2)).toBeNull();
     expect(getPartySizeUnlockRequirement(3)).toBe(10);
     expect(getPartySizeUnlockRequirement(4)).toBe(30);
-    expect(getPartySizeUnlockRequirement(5)).toBe(60);
+    expect(getPartySizeUnlockRequirement(5)).toBe(50);
     expect(getPartySizeUnlockRequirement(6)).toBeNull();
   });
 

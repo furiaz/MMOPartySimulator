@@ -3,7 +3,7 @@ import { getEuclideanDistance } from "./positionUtils";
 import type { GameState } from "./state";
 import type { NpcEntity } from "./types";
 
-export const GUILD_TAVERN_INTERACTION_RANGE = 4;
+export const GUILD_TAVERN_INTERACTION_RANGE = 8;
 
 export function isGuildTavernNpc(
   entity: unknown,

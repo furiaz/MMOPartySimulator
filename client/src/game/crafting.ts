@@ -43,7 +43,7 @@ import type {
   PartyInventory,
 } from "./types";
 
-export const SMITH_CRAFTING_INTERACTION_RANGE = 2;
+export const SMITH_CRAFTING_INTERACTION_RANGE = 4;
 
 export type KeyItemCraftingRecipeId = "teleport_echo_harbor_union_bastion";
 export type CraftingRecipeId = EquipmentItemId | KeyItemCraftingRecipeId;
@@ -338,6 +338,15 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
       itemCost("slime_gel_t1", 2),
     ],
     4,
+  ),
+  equipmentRecipe(
+    "copper_training_sword",
+    [
+      previousEquipmentCost("training_sword", undefined, 1),
+      itemCost("softwood", 6),
+      itemCost("copper_ore", 3),
+    ],
+    8,
   ),
   equipmentRecipe(
     "plain_charm",

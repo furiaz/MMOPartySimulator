@@ -93,11 +93,11 @@ describe("prototype enemy identity definitions", () => {
     expect(enemy.archetypeId).toBe("goblin");
     expect(enemy.aggressionMode).toBe("aggressive");
     expect(enemy.level).toBe(7);
-    expect(enemy.health).toBe(45);
-    expect(enemy.maxHealth).toBe(45);
-    expect(enemy.attack).toBe(6);
-    expect(enemy.defense).toBe(4);
-    expect(enemy.magicDefense).toBe(4);
+    expect(enemy.health).toBe(65);
+    expect(enemy.maxHealth).toBe(65);
+    expect(enemy.attack).toBe(7);
+    expect(enemy.defense).toBe(3);
+    expect(enemy.magicDefense).toBe(3);
     expect(enemy.evasion).toBe(2);
     expect(enemy.scalingBand).toBe("starter");
     expect(enemy.attackCooldownMs).toBe(2600);

@@ -109,7 +109,7 @@ describe("combat projectile system", () => {
     const nextTarget = nextState.entities[target.id] as Enemy;
 
     expect(nextState.combatProjectiles).toEqual([]);
-    expect(nextTarget.health).toBe(40);
+    expect(nextTarget.health).toBe(47);
     expect(nextState.combatFeedbackEvents.at(-1)).toMatchObject({
       damageType: "magic",
       sourceEntityId: attacker.id,

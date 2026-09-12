@@ -38,11 +38,11 @@ describe("NPC interaction ranges", () => {
     expect(getNpcInteractionRange({ npcRole: "livestock_keeper" })).toBe(
       farmInteractionRange,
     );
-    expect(merchantInteractionRange).toBe(2);
-    expect(bankInteractionRange).toBe(2);
-    expect(questGiverInteractionRange).toBe(2);
-    expect(guildTavernInteractionRange).toBe(4);
-    expect(farmInteractionRange).toBe(4);
+    expect(merchantInteractionRange).toBe(4);
+    expect(bankInteractionRange).toBe(4);
+    expect(questGiverInteractionRange).toBe(4);
+    expect(guildTavernInteractionRange).toBe(8);
+    expect(farmInteractionRange).toBe(8);
   });
 
   it("keeps other static NPC roles on the default range", () => {
@@ -52,6 +52,6 @@ describe("NPC interaction ranges", () => {
     expect(getNpcInteractionRange({ npcRole: "test_blade" })).toBe(
       defaultNpcInteractionRange,
     );
-    expect(defaultNpcInteractionRange).toBe(1.5);
+    expect(defaultNpcInteractionRange).toBe(3);
   });
 });

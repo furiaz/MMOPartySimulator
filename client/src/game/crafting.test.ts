@@ -432,8 +432,9 @@ describe("Smith crafting", () => {
       .map((status) => status.recipe.outputItemId)
       .filter((itemId): itemId is ItemId => Boolean(itemId));
 
-    expect(sortedRecipeIds.slice(0, 17)).toEqual([
+    expect(sortedRecipeIds.slice(0, 18)).toEqual([
       "training_sword",
+      "copper_training_sword",
       "iron_sword",
       "steel_sword",
       "guard_mace",

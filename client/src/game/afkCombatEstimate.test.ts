@@ -44,7 +44,7 @@ describe("afk combat estimate", () => {
       return;
     }
 
-    expect(estimate.partyDamagePerMinute).toBe(405);
+    expect(estimate.partyDamagePerMinute).toBe(195);
   });
 
   it("caps an overpowered party at the subzone spawn rate", () => {

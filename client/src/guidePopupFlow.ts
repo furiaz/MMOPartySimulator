@@ -74,3 +74,10 @@ export function getGuidePopupsForQuestStatusChanges(
 
   return guidePopupIds;
 }
+
+export function shouldRenderNewsBroadcastOverlay(
+  activeGuidePopupId: GuidePopupId | null,
+  queuedGuidePopupIds: GuidePopupId[],
+): boolean {
+  return activeGuidePopupId === null && queuedGuidePopupIds.length === 0;
+}

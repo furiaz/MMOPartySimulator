@@ -38,59 +38,60 @@ export type RoleBonusDisplayState =
     };
 
 type BonusRole = Exclude<PartyMemberRole, "none">;
+type RoleBonusClassTier = "beginner" | "firstClass";
 
 const EMPTY_ROLE_BONUS_MODIFIERS: CompanionRoleBonusModifiers = {
   statModifiers: {},
   gatherSpeed: 0,
 };
 
-const ROLE_BONUS_LEVEL_BANDS: Array<{
-  minLevel: number;
-  modifiersByRole: Record<BonusRole, CompanionRoleBonusModifiers>;
-}> = [
+const ROLE_BONUS_CLASS_TIERS: Record<
+  RoleBonusClassTier,
   {
-    minLevel: 0,
+    modifiersByRole: Record<BonusRole, CompanionRoleBonusModifiers>;
+  }
+> = {
+  beginner: {
     modifiersByRole: {
       defender: {
-        statModifiers: { defense: 10, block: 5 },
+        statModifiers: { defense: 1, block: 1 },
         gatherSpeed: 0,
       },
       fighter: {
-        statModifiers: { attack: 10, magicPower: 10 },
+        statModifiers: { attack: 1, magicPower: 1 },
         gatherSpeed: 0,
       },
       support: {
-        statModifiers: { healingPower: 10 },
+        statModifiers: { healingPower: 1 },
         gatherSpeed: 0,
       },
       gatherer: {
         statModifiers: {},
-        gatherSpeed: 0.1,
+        gatherSpeed: 0.03,
       },
     },
   },
-  {
-    minLevel: 10,
+  firstClass: {
     modifiersByRole: {
       defender: {
-        statModifiers: { defense: 15, block: 10 },
+        statModifiers: { defense: 3, block: 2 },
         gatherSpeed: 0,
       },
       fighter: {
-        statModifiers: { attack: 20, magicPower: 20 },
+        statModifiers: { attack: 3, magicPower: 3 },
         gatherSpeed: 0,
       },
       support: {
-        statModifiers: { healingPower: 20 },
+        statModifiers: { healingPower: 3 },
         gatherSpeed: 0,
       },
       gatherer: {
         statModifiers: {},
-        gatherSpeed: 0.2,
+        gatherSpeed: 0.06,
       },
     },
   },
-];
+};
 
 export function createAssignedRoleBonusState(
   role: PartyMemberRole,
@@ -149,7 +150,7 @@ export function getCompanionRoleBonusModifiers(
     return EMPTY_ROLE_BONUS_MODIFIERS;
   }
 
-  return getRoleBonusLevelBand(companion.characterLevel).modifiersByRole[
+  return getRoleBonusClassTier(companion).modifiersByRole[
     activeRole
   ];
 }
@@ -311,15 +312,8 @@ function isBonusRole(role: PartyMemberRole | null): role is BonusRole {
   return role !== null && role !== "none";
 }
 
-function getRoleBonusLevelBand(level: number) {
-  const safeLevel = Math.max(0, level);
-  let selectedBand = ROLE_BONUS_LEVEL_BANDS[0];
-
-  for (const band of ROLE_BONUS_LEVEL_BANDS) {
-    if (band.minLevel <= safeLevel) {
-      selectedBand = band;
-    }
-  }
-
-  return selectedBand;
+function getRoleBonusClassTier(companion: Companion) {
+  return companion.classId === "beginner"
+    ? ROLE_BONUS_CLASS_TIERS.beginner
+    : ROLE_BONUS_CLASS_TIERS.firstClass;
 }

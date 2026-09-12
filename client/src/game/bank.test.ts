@@ -6,7 +6,7 @@ import {
   createEmptyPartyBank,
   depositAllToBank,
   depositInventorySlotToBank,
-  isAutoDepositBodyPartDefinition,
+  isAutoDepositEnemyPartMaterialDefinition,
   isPartyLeaderNearBankChest,
   sanitizePartyBank,
   setBankAutoRoutingMode,
@@ -158,14 +158,14 @@ describe("bank storage", () => {
     expect(state.inventory.slots[0]).toMatchObject({ slotIndex: 0 });
   });
 
-  it("deposit all skips locked slots and body-part-only routing skips resources", () => {
+  it("deposit all skips locked slots and enemy-part-only routing skips resources", () => {
     let state = createBankState();
     state = addItemToInventoryState(state, "wolf_pelt", 2, "debug").state;
     state = addItemToInventoryState(state, "softwood", 3, "debug").state;
     state = toggleInventoryBankLock(state, 1);
 
     const deposit = depositAllToBank(state, {
-      onlyBodyParts: true,
+      onlyEnemyParts: true,
       requireProximity: false,
     });
 
@@ -198,7 +198,7 @@ describe("bank storage", () => {
     expect(deposit.state.inventory.slots).toHaveLength(1);
   });
 
-  it("auto-deposit routing deposits body parts without awarding Crowns", () => {
+  it("auto-deposit routing deposits enemy-part materials without awarding Crowns", () => {
     let state = createBankState();
     state = addItemToInventoryState(state, "slime_gel_t1", 4, "debug").state;
     state = addItemToInventoryState(state, "softwood", 4, "debug").state;
@@ -217,12 +217,12 @@ describe("bank storage", () => {
     ]);
   });
 
-  it("treats new Tier 2 monster parts as body parts for auto-deposit", () => {
-    expect(isAutoDepositBodyPartDefinition(getItemDefinition("imp_horn_chip_t2")))
+  it("treats new Tier 2 monster parts as enemy parts for auto-deposit", () => {
+    expect(isAutoDepositEnemyPartMaterialDefinition(getItemDefinition("imp_horn_chip_t2")))
       .toBe(true);
-    expect(isAutoDepositBodyPartDefinition(getItemDefinition("crawler_plate_t2")))
+    expect(isAutoDepositEnemyPartMaterialDefinition(getItemDefinition("crawler_plate_t2")))
       .toBe(true);
-    expect(isAutoDepositBodyPartDefinition(getItemDefinition("redleaf_herb")))
+    expect(isAutoDepositEnemyPartMaterialDefinition(getItemDefinition("redleaf_herb")))
       .toBe(false);
   });
 

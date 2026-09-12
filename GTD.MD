@@ -226,7 +226,7 @@ The player is the manager/controller issuing intent and commands to party member
 
 NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, dungeon chest presentation, bank chest presentation, Guild & Inn service presentation, and non-interactive service placeholders.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, Merchant quick exchange, fixed Merchant Buy stock, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors, Farm and Livestock service opening/proximity anchors, placeholder hub NPC display, Bounty Board placeholder display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors, Farm and Livestock service opening/proximity anchors, placeholder hub NPC display, Bounty Board placeholder display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
 
 Current NPC role values include:
 
@@ -1584,7 +1584,7 @@ Current POI categories are:
 
 `poiSystem.ts` selects global quest intent and coordinates local map target selection for auto-mode behavior.
 
-`poiTargetSelection.ts` builds and scores local POI candidates, handles World Travel route targets, quest targets, hub Merchant quick exchange targets, Smith crafting targets, wild fallback combat/resource targets, leader subzone restrictions, progressive fallback distance tiers, and stable target reuse.
+`poiTargetSelection.ts` builds and scores local POI candidates, handles World Travel route targets, quest targets, Smith crafting targets, wild fallback combat/resource targets, leader subzone restrictions, progressive fallback distance tiers, and stable target reuse.
 
 POI selection should evaluate progression targets before generic map activity.
 
@@ -1595,11 +1595,10 @@ Current intended POI priority order:
 3. ready quest turn-in target
 4. available quest acceptance target on the current map
 5. quest-required prototype teleport when the active objective is on another reachable prototype map
-6. hub Merchant quick exchange when eligible junk is available
-7. reachable wild combat target when combat fallback is relevant
-8. reachable wild resource target when gathering fallback is relevant
-9. reachable exploration or inspect target
-10. safe idle hub point
+6. reachable wild combat target when combat fallback is relevant
+7. reachable wild resource target when gathering fallback is relevant
+8. reachable exploration or inspect target
+9. safe idle hub point
 
 POI selection should skip targets that are invalid, unreachable, depleted, dead, completed, locked, already satisfied, reserved by autonomous gatherer work, blocked by Stay in Subzone rules, or not relevant to the current map.
 
@@ -2380,6 +2379,16 @@ The base `wood`, `ore`, and `herb` item ids are legacy compatibility material id
 
 Current resource yields should use tiered material ids.
 
+Resource hover details are built outside React rendering in `resourceTooltip.ts`.
+
+Current resource hover details include:
+
+- produced item display name from resource type and tier
+- resource type
+- tier
+- durability
+- current quantity only
+
 ---
 
 ## Prototype Inventory, Wallet, Consumables, Drops, and Merchant
@@ -2404,8 +2413,7 @@ type ItemCategory =
   | "skill_book"
   | "equipment"
   | "quest"
-  | "event"
-  | "junk";
+  | "event";
 ```
 Prototype skill book item ids are part of `ItemId`.
 
@@ -2499,7 +2507,7 @@ Current bank behavior:
 - requires the leader to be near a `bank_chest` NPC for manual transfer by default
 - may be viewed remotely through UI while transfer actions remain proximity-gated
 - supports bank slot locks and inventory slot locks for bank movement
-- supports auto-routing modes for keeping inventory, depositing eligible body-part junk, or depositing all eligible non-quest items
+- supports auto-routing modes for keeping inventory, depositing eligible enemy-part materials, or depositing all eligible non-quest items
 - sanitizes missing or old-save bank state into valid default bank state
 
 Prototype Smith crafting logic lives in `crafting.ts`.
@@ -2584,18 +2592,18 @@ Current loot tier behavior:
 
 Current drop table behavior:
 
-- archetype drop tables may roll common and rare junk drops
-- Superior archetype drop tables may roll higher-yield prototype junk drops
+- archetype drop tables may roll common and rare enemy-part material drops
+- Superior archetype drop tables may roll higher-yield prototype enemy-part material drops
 - enemy-type drop tables may add special exceptions
 - `azure_mass` currently has a type-specific Tier 1 Slime loot table
 - `goblin_shaman` currently has a low-chance Tier 2 Holy Lantern equipment drop
 - Superior `goblin_shaman` currently has a higher prototype Tier 2 Holy Lantern equipment drop chance
 - missing archetype, enemy-type, variant, or tier tables simply produce no drops from that table
 
-Current prototype junk item ids:
+Current prototype enemy-part material item ids:
 
 ```ts
-type JunkItemId =
+type EnemyPartItemId =
   | "slime_gel_t1"
   | "slime_core_t1"
   | "bat_wing_t1"
@@ -2626,9 +2634,6 @@ Current merchant behavior:
 
 - identifies Merchant NPCs by `npcRole: "merchant"`
 - can be gated by quest progress where implemented
-- finds eligible junk items with positive sell value for quick exchange
-- removes eligible quick-exchange junk items from shared inventory
-- adds Crowns to the shared wallet
 - exposes fixed prototype Merchant Buy stock
 - supports buying selected equipment, flasks, and skill books for Crowns
 - validates merchant identity, stock membership, item category, price, wallet balance, inventory capacity, and quest gating
@@ -2636,7 +2641,8 @@ Current merchant behavior:
 - supports stock filtering by main group, secondary filter, minimum level requirement, maximum level requirement, and party equipment compatibility where implemented
 - always allows flask and skill-book stock entries through stock compatibility filtering
 - treats party-compatible filtering as an equipment compatibility filter, not a flask or skill-book visibility rule
-- records merchant buy, quick exchange, inventory, wallet, and quest-gating telemetry
+- does not quick-exchange or sell enemy-part materials in the current prototype
+- records merchant buy, inventory, wallet, and quest-gating telemetry
 
 Current Merchant Buy stock groups are:
 
@@ -3454,7 +3460,7 @@ Simulation logic must not depend on PixiJS, sprite assets, floor chunk size, or 
 
 Debug telemetry records simulation information for inspection.
 
-Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, Superior enemy spawning, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, quest drop visuals, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, quick exchange results, merchant quest gating, crafting attempts, crafting successes, crafting failures, debug crafting material grants, skill selection, skill usage, skill skips, skill effects, skill cooldown state, direct command issue/rejection/replacement/completion/cancellation/grace events, resurrection target selection, resurrection participant assignment, resurrection area progress, resurrection participant removal, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
+Current telemetry can track target acquisition, target changes, formation changes, skipped targets, movement failure, path query metrics, navigation distance metrics, attack start, damage dealt, combat resolution, healing resolution, health regeneration, max-health synchronization, entity death, Superior enemy spawning, gathering start, resource depletion, class changes, role changes, character XP awarded, character XP reduced, character level up, character XP skipped, inventory changes, equipment equip/unequip attempts, equipment equip/unequip results, equipment validation failures, teleport start, teleport completion, teleport skips, map transitions, POI selection, POI skips, POI interruption, quest availability, quest dialog opening, quest acceptance, quest objective progress, quest objective completion, quest ready-to-turn-in state, quest finish selection, quest reward validation, quest reward validation failure, quest reward claim start, quest reward claim failure, quest reward claim success, quest repeat reset, quest reward Crowns, quest reward XP, quest reward item and equipment grants, quest turn-in, quest completion, quest unlocks, quest equipment state checks, quest-driven teleport intent, enemy drop rolls, quest drop visuals, drop visual events, drop inventory routing, wallet currency changes, merchant interaction events, Merchant Buy results, merchant quest gating, crafting attempts, crafting successes, crafting failures, debug crafting material grants, skill selection, skill usage, skill skips, skill effects, skill cooldown state, direct command issue/rejection/replacement/completion/cancellation/grace events, resurrection target selection, resurrection participant assignment, resurrection area progress, resurrection participant removal, companion resurrection, flask fountain refills, flask recharge progress, flask charge gains, and capped flask recharge no-ops.
 
 Party-order rejection telemetry currently uses `party_order_rejected` for invalid, blocked, or unreachable party orders.
 
@@ -3548,7 +3554,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, merchant quick exchange UI, Merchant Buy UI, Merchant Sell placeholder UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save controls, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell placeholder UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save controls, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
@@ -3585,7 +3591,7 @@ React may:
 - call existing Farm and Livestock helpers for supported crop, creature, grid, feed, collect, upgrade, helper summary, and pantry/inventory routing actions
 - call existing skill behavior helpers for supported prototype skill behavior settings
 - call existing skill progression helpers for supported skill-book reading and legacy skill toggles
-- call existing merchant helpers for supported quick exchange and Merchant Buy actions
+- call existing merchant helpers for supported Merchant Buy actions
 - call existing bank helpers for supported bank transfers, slot locks, and auto-routing settings
 - call existing crafting helpers for supported recipe status display and craft actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
@@ -3710,7 +3716,7 @@ Do not implement unless requested:
 - production asset pipeline
 - final world content pipeline
 - full quest journal, dialogue system, quest reward economy, or production quest content beyond the prototype quest chain
-- full shop, selling, buying, and merchant economy beyond prototype quick exchange and fixed prototype Merchant Buy stock
+- full shop, selling, buying, and merchant economy beyond fixed prototype Merchant Buy stock and the current Sell placeholder
 - full production crafting, smithing, profession progression, upgrade chains, or recipe economy beyond current prototype Smith crafting
 - full production bank economy, account storage, remote storage rules, or storage upgrades beyond current prototype Bank Chest storage
 - persistent ground loot beyond prototype drop visual events and drop-to-inventory behavior
