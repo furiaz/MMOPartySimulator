@@ -862,6 +862,77 @@ export function debugTeleportToHub(
   });
 }
 
+export function debugTeleportToSlimewardCamp(state: GameState): GameState {
+  const map = createDebugMap(SLIMEWARD_CAMP_ID);
+  const entities: Record<string, GameEntity> = {};
+
+  for (const companionId of companionIds) {
+    const companion = state.entities[companionId];
+
+    if (companion?.kind !== "companion") {
+      continue;
+    }
+
+    const position = slimewardCampArrivalPositions[companionIds.indexOf(companionId)] ??
+      slimewardCampArrivalPositions[0];
+
+    entities[companion.id] = {
+      ...moveEntityTo(companion, position),
+      state: companion.id === state.partyLeaderId ? "idle" : "follow",
+      currentTargetId:
+        companion.id === state.partyLeaderId ? null : state.partyLeaderId,
+      commandPriority: "autonomous",
+      defendPosition: null,
+    };
+  }
+
+  for (const npc of slimewardCampNpcStartData) {
+    entities[npc.id] = createNpc(npc.id, npc.position, npc.displayName, npc.npcRole);
+  }
+
+  return pruneMissingEntityRuntimeState({
+    ...clearSlimewardDungeonRuntime(state),
+    currentMapId: SLIMEWARD_CAMP_ID,
+    map,
+    entities,
+    activeTeleport: null,
+    leaderIntent: null,
+    partyIntent: null,
+    localPoiTarget: null,
+    globalPoiIntent: null,
+    worldTravelTargetMapId: null,
+    lastPoiDecision: undefined,
+    directCompanionCommandsById: {},
+    directCommandGraceUntilByCompanionId: {},
+    interruptedPoiTarget: null,
+    exploredTiles: {},
+    followTrailsByEntityId: Object.fromEntries(
+      Object.keys(entities).map((entityId) => [entityId, []]),
+    ),
+    combatFeedbackEvents: [],
+    combatProjectiles: [],
+    failedMoveByEntityId: {},
+    movementFailuresByEntityId: {},
+    moveIntentsByEntityId: {},
+    reservedPositionsByEntityId: {},
+    movementPathsByEntityId: {},
+    movementDecisionsByEntityId: {},
+    lastPositionsByEntityId: {},
+    defenderWaitTicksByLeaderId: {},
+    defenderBlockedTicksByEntityId: {},
+    defenderWaitMsByLeaderId: {},
+    defenderBlockedMsByEntityId: {},
+    skillVisualEvents: [],
+    companionAoeChannelsByCasterId: {},
+    enemyAoeChannelsByCasterId: {},
+    enemyAoeCooldownsByCasterId: {},
+    dropVisualEvents: [],
+    resurrectionProgressByCompanionId: {},
+    resurrectionChannelsByHelperId: {},
+    worldWipeRecovery: undefined,
+  });
+}
+
 export function debugRefreshResources(state: GameState): GameState {
   let nextState = state;
 

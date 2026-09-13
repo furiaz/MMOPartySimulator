@@ -23,7 +23,9 @@ const EXPECTED_ENEMY_COMBAT_BODY_RADII = {
   ash_wisp: 0.6,
   mossling: 0.6,
   wolf: 0.6,
-  orc: 0.6,
+  orc: 1,
+  orc_raider: 1,
+  orc_shieldbearer: 1.15,
   ember_imp: 0.6,
   tin_crawler: 0.8,
   briar_wolf: 0.65,
@@ -37,7 +39,7 @@ const EXPECTED_ENEMY_COMBAT_BODY_RADII = {
 describe("prototype enemy identity definitions", () => {
   it("defines broad archetypes and specific spawnable enemy types separately", () => {
     expect(Object.keys(ENEMY_ARCHETYPES)).toHaveLength(10);
-    expect(Object.keys(ENEMY_TYPES)).toHaveLength(24);
+    expect(Object.keys(ENEMY_TYPES)).toHaveLength(26);
     expect(ENEMY_ARCHETYPES).toHaveProperty("wolf");
     expect(ENEMY_ARCHETYPES).toHaveProperty("orc");
     expect(ENEMY_ARCHETYPES).toHaveProperty("goblin");
@@ -46,6 +48,8 @@ describe("prototype enemy identity definitions", () => {
     expect(ENEMY_TYPES).toHaveProperty("slimeward_spitter_slime");
     expect(ENEMY_TYPES).toHaveProperty("azure_mass");
     expect(ENEMY_TYPES).toHaveProperty("goblin_shaman");
+    expect(ENEMY_TYPES).toHaveProperty("orc_raider");
+    expect(ENEMY_TYPES).toHaveProperty("orc_shieldbearer");
     expect(ENEMY_TYPES).toHaveProperty("orc_warmaster");
   });
 
@@ -81,6 +85,8 @@ describe("prototype enemy identity definitions", () => {
     expect(ENEMY_TYPES.goblin_thrower.archetypeId).toBe("goblin");
     expect(ENEMY_TYPES.ash_wisp.archetypeId).toBe("wisp");
     expect(ENEMY_TYPES.briar_wolf.archetypeId).toBe("wolf");
+    expect(ENEMY_TYPES.orc_raider.archetypeId).toBe("orc");
+    expect(ENEMY_TYPES.orc_shieldbearer.archetypeId).toBe("orc");
     expect(ENEMY_TYPES.orc_warmaster.archetypeId).toBe("orc");
   });
 

@@ -13,9 +13,13 @@ import {
   getClassIdleFrameSrc,
   getEnemyWalkingAnimation,
   getSpriteAnimation,
+  TICKET_0501_ENEMY_SPRITE_SRC,
   type SpriteDirection,
 } from "./visualAssets";
-import { MAP_VISUAL_OBJECT_SRC } from "./assetIcons";
+import {
+  MAP_VISUAL_OBJECT_SRC,
+  TICKET_0501_HUD_CONTROL_SRC,
+} from "./assetIcons";
 
 const azureMassDirections = [
   "north",
@@ -242,12 +246,45 @@ describe("entity visual assets", () => {
     );
   });
 
+  it("registers Ticket 0501 terrain and HUD asset paths", () => {
+    expect(MAP_VISUAL_OBJECT_SRC.ash_goblin_charred_dead_tree_trunk).toBe(
+      "/assets/Generated/ticket-0501/terrain/ash-goblin-encampment/charred_dead_tree_trunk.png",
+    );
+    expect(MAP_VISUAL_OBJECT_SRC.briar_burrow_mound_entrance).toBe(
+      "/assets/Generated/ticket-0501/terrain/briar-burrows/burrow_mound_entrance.png",
+    );
+    expect(MAP_VISUAL_OBJECT_SRC.nightmire_bat_roost_dead_tree).toBe(
+      "/assets/Generated/ticket-0501/terrain/nightmire-canopy/bat_roost_dead_tree.png",
+    );
+    expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_heavy_orc_spike_barricade).toBe(
+      "/assets/Generated/ticket-0501/terrain/orc-warcamp/heavy_orc_spike_barricade.png",
+    );
+    expect(TICKET_0501_HUD_CONTROL_SRC.autoCombatOn).toBe(
+      "/assets/Generated/ticket-0501/ui/controls/auto_combat_on.png",
+    );
+  });
+
   it("resolves east walking previews for Notice Board monster targets", () => {
     const shamanAnimation = getEnemyWalkingAnimation("goblin_shaman", "east");
     const wispAnimation = getEnemyWalkingAnimation("ash_wisp", "east");
 
-    expect(shamanAnimation.frames[0]).toContain("thorn-shaman-se.png");
-    expect(wispAnimation.frames[0]).toContain("ash-wisp-se.png");
+    expect(shamanAnimation.frames[0]).toBe(TICKET_0501_ENEMY_SPRITE_SRC.goblinShaman);
+    expect(wispAnimation.frames[0]).toBe(TICKET_0501_ENEMY_SPRITE_SRC.ashWisp);
+  });
+
+  it("uses Ticket 0501 south-facing enemy slices for post-Hub-2 enemies", () => {
+    expect(getEnemyWalkingAnimation("ember_imp", "east").frames[0]).toBe(
+      TICKET_0501_ENEMY_SPRITE_SRC.emberImp,
+    );
+    expect(getEnemyWalkingAnimation("tin_crawler", "east").frames[0]).toBe(
+      TICKET_0501_ENEMY_SPRITE_SRC.tinCrawler,
+    );
+    expect(getEnemyWalkingAnimation("orc", "east").frames[0]).toBe(
+      TICKET_0501_ENEMY_SPRITE_SRC.orcGrunt,
+    );
+    expect(getEnemyWalkingAnimation("orc_warmaster", "east").frames[0]).toBe(
+      TICKET_0501_ENEMY_SPRITE_SRC.orcWarmaster,
+    );
   });
 
   it("uses the Beginner cardinal movement fallback for first-class movement", () => {

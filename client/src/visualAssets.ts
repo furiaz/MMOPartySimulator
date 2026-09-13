@@ -70,6 +70,9 @@ const testEnemyBasePath = "/assets/Characters/Test-Enemy";
 const testEnemyTwoBasePath = "/assets/Characters/Test-Enemy2";
 const prototypeEnemyBasePath = "/assets/Characters/Prototype-Enemies";
 const generatedEnemyPlaceholderPath = "/assets/Generated/enemy-placeholders/items";
+const ticket0501EnemyBasePath = "/assets/Generated/ticket-0501/enemies";
+const ticket0501StandardEnemyPath = `${ticket0501EnemyBasePath}/standard-level-10-plus`;
+const ticket0501OrcWarcampEnemyPath = `${ticket0501EnemyBasePath}/orc-warcamp`;
 const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
 const bossSlimeTestAssetPath = "/assets/Characters/BossSlimeTest";
 const testNpcBasePath = "/assets/Characters/Test-NPC";
@@ -295,6 +298,23 @@ function createStaticEnemySprite(
   };
 }
 
+export const TICKET_0501_ENEMY_SPRITE_SRC = {
+  goblinShaman: `${ticket0501StandardEnemyPath}/goblin_shaman.png`,
+  ashWisp: `${ticket0501StandardEnemyPath}/ash_wisp.png`,
+  legacyOrc: `${ticket0501StandardEnemyPath}/orc.png`,
+  emberImp: `${ticket0501StandardEnemyPath}/ember_imp.png`,
+  tinCrawler: `${ticket0501StandardEnemyPath}/tin_crawler.png`,
+  briarWolf: `${ticket0501StandardEnemyPath}/briar_wolf.png`,
+  mireSpider: `${ticket0501StandardEnemyPath}/mire_spider.png`,
+  nightBat: `${ticket0501StandardEnemyPath}/night_bat.png`,
+  elderMossling: `${ticket0501StandardEnemyPath}/elder_mossling.png`,
+  cinderWisp: `${ticket0501StandardEnemyPath}/cinder_wisp.png`,
+  orcGrunt: `${ticket0501OrcWarcampEnemyPath}/orc_grunt.png`,
+  orcRaider: `${ticket0501OrcWarcampEnemyPath}/orc_raider.png`,
+  orcShieldbearer: `${ticket0501OrcWarcampEnemyPath}/orc_shieldbearer.png`,
+  orcWarmaster: `${ticket0501OrcWarcampEnemyPath}/orc_warmaster.png`,
+} as const;
+
 function createBossSlimeDirectionalSprite(
   framePrefix: string,
   naturalSize?: SpriteVisualAsset["naturalSize"],
@@ -340,20 +360,32 @@ const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>
   goblin_thrower: createStaticEnemySprite(`${prototypeEnemyBasePath}/goblin-thrower-se.png`),
   bog_imp: createStaticEnemySprite(`${prototypeEnemyBasePath}/bog-imp-se.png`),
   stone_crawler: createStaticEnemySprite(`${prototypeEnemyBasePath}/stone-crawler-se.png`),
-  goblin_shaman: createStaticEnemySprite(`${prototypeEnemyBasePath}/thorn-shaman-se.png`),
-  ash_wisp: createStaticEnemySprite(`${prototypeEnemyBasePath}/ash-wisp-se.png`),
+  goblin_shaman: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.goblinShaman),
+  ash_wisp: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.ashWisp),
   mossling: createStaticEnemySprite(`${prototypeEnemyBasePath}/mossling-se.png`),
   wolf: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/wolf.png`),
-  ember_imp: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/ember_imp.png`),
-  tin_crawler: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/tin_crawler.png`),
-  briar_wolf: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/briar_wolf.png`),
-  mire_spider: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/mire_spider.png`),
-  night_bat: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/night_bat.png`),
-  elder_mossling: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/elder_mossling.png`),
-  cinder_wisp: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/cinder_wisp.png`),
+  orc: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.orcGrunt, {
+    width: 128,
+    height: 128,
+  }),
+  orc_raider: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.orcRaider, {
+    width: 128,
+    height: 128,
+  }),
+  orc_shieldbearer: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.orcShieldbearer, {
+    width: 128,
+    height: 128,
+  }),
+  ember_imp: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.emberImp),
+  tin_crawler: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.tinCrawler),
+  briar_wolf: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.briarWolf),
+  mire_spider: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.mireSpider),
+  night_bat: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.nightBat),
+  elder_mossling: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.elderMossling),
+  cinder_wisp: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.cinderWisp),
   orc_warmaster: createStaticEnemySprite(
-    `${generatedEnemyPlaceholderPath}/orc_warmaster.png`,
-    { width: 64, height: 64 },
+    TICKET_0501_ENEMY_SPRITE_SRC.orcWarmaster,
+    { width: 128, height: 128 },
   ),
 };
 

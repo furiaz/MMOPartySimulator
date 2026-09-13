@@ -9,7 +9,8 @@ import {
 } from "./index";
 import { getSlimewardDungeonPoiTarget } from "./dungeonSystem";
 import {
-  HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+  MAP_THREE_ID,
+  MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   SLIMEWARD_BOSS_ID,
   SLIMEWARD_CHEST_POSITION,
   SLIMEWARD_CAMP_ID,
@@ -53,7 +54,12 @@ describe("Slimeward dungeon prototype", () => {
     expect(debugMapDefinitions[SLIMEWARD_FLOOR_TWO_ID].subzones).toHaveLength(5);
     expect(
       debugMapDefinitions.hub.teleports.some(
-        (teleport) => teleport.id === HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
+        (teleport) => teleport.targetMapId === SLIMEWARD_CAMP_ID,
+      ),
+    ).toBe(false);
+    expect(
+      debugMapDefinitions[MAP_THREE_ID].teleports.some(
+        (teleport) => teleport.id === MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
       ),
     ).toBe(true);
   });

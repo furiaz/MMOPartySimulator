@@ -153,24 +153,6 @@
   flex-wrap: wrap;
 }
 
-.auto-combat-toggle {
-  padding: 3px 8px;
-  border: 1px solid rgba(51, 65, 85, 0.62);
-  background: rgba(255, 255, 255, 0.78);
-  color: #1f2937;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.1;
-  pointer-events: auto;
-  white-space: nowrap;
-}
-
-.auto-combat-toggle.active {
-  border-color: #b45309;
-  background: #fef3c7;
-  color: #78350f;
-}
-
 .map-version {
   font-size: 11px;
   font-weight: 800;
@@ -556,17 +538,79 @@
   left: 0;
   z-index: 11;
   display: flex;
-  align-items: stretch;
-  height: 13vh;
+  align-items: flex-end;
+  height: calc(13vh + 74px);
   opacity: 1;
   pointer-events: none;
 }
 
+.companion-vitals-lane {
+  display: flex;
+  flex: 0 0 20vw;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.companion-vitals-buff-rail {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  flex: 0 0 72px;
+  width: 100%;
+  height: 72px;
+  box-sizing: border-box;
+  margin-bottom: 2px;
+  padding: 8px 8px 7px;
+  border: 1px solid rgba(87, 72, 50, 0.92);
+  border-bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(27, 22, 18, 0.94),
+    rgba(15, 20, 21, 0.94)
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(230, 184, 93, 0.16),
+    inset 0 -8px 0 rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.companion-vitals-buff-row {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.companion-vitals-buff-row span {
+  aspect-ratio: 1;
+  width: min(100%, 25px);
+  min-width: 0;
+  min-height: 0;
+  justify-self: center;
+  border: 1px solid rgba(135, 103, 57, 0.95);
+  background: rgba(7, 9, 9, 0.86);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 213, 141, 0.1),
+    0 1px 0 rgba(0, 0, 0, 0.58);
+}
+
+.companion-vitals-buff-row-debuffs span {
+  border-color: rgba(110, 62, 62, 0.95);
+}
+
 .companion-vitals-card {
   position: relative;
+  z-index: 0;
   display: grid;
   grid-template-columns: minmax(48px, 34%) minmax(0, 1fr);
-  width: 20vw;
+  width: 100%;
+  height: 13vh;
   min-width: 0;
   box-sizing: border-box;
   gap: 8px;
@@ -992,7 +1036,7 @@
 .bottom-hud-controls {
   position: fixed;
   right: 16px;
-  bottom: calc(13vh + 16px);
+  bottom: calc(13vh + 74px);
   left: 16px;
   z-index: 12;
   display: grid;
@@ -1014,8 +1058,84 @@
   order: 1;
 }
 
+.hud-action-cluster {
+  order: 1;
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 210px;
+  min-height: 50px;
+  pointer-events: auto;
+}
+
+.hud-control-button {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 42px minmax(58px, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 6px;
+  min-width: 104px;
+  min-height: 52px;
+  padding: 4px 7px;
+  border: 1px solid rgba(87, 72, 50, 0.9);
+  border-radius: 4px;
+  background: rgba(33, 28, 24, 0.88);
+  color: #f8ecd2;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: left;
+  text-shadow: 0 1px 0 #111111;
+  box-shadow: inset 0 0 0 1px rgba(245, 213, 141, 0.18);
+}
+
+.hud-control-button:hover,
+.hud-control-button:focus-visible {
+  border-color: #d6aa58;
+  background: rgba(51, 40, 30, 0.92);
+}
+
+.hud-control-button.active {
+  border-color: #e6b85d;
+  background: rgba(64, 45, 28, 0.94);
+  color: #ffe6ab;
+}
+
+.hud-control-icon {
+  grid-row: 1 / 3;
+  width: 48px;
+  height: 48px;
+  margin: -3px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.hud-control-label,
+.hud-control-state {
+  grid-column: 2;
+  justify-self: start;
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-control-state {
+  color: #d7b772;
+  font-size: 9px;
+}
+
 .debug-tools {
-  order: 2;
+  position: fixed;
+  top: 74px;
+  right: 12px;
+  left: 12px;
+  z-index: 13;
   margin: 0;
   padding: 0;
   border-top: 0;
@@ -1029,10 +1149,11 @@
 
 .debug-tools .test-controls {
   position: static;
+  pointer-events: auto;
 }
 
 .debug-tools-hidden {
-  justify-self: center;
+  justify-self: auto;
 }
 
 .game-menu-toggle-button {

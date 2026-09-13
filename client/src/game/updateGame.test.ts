@@ -5373,7 +5373,7 @@ describe("game update intent priority", () => {
   });
 
   it("routes world travel from map 4 toward hub through Hub 2", () => {
-    const leader = createLeader({ x: 130, y: 12 });
+    const leader = createLeader({ x: 80, y: 29 });
 
     const nextState = updateGame(
       createMapFourState([leader], {

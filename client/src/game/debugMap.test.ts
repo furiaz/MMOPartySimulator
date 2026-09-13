@@ -25,6 +25,8 @@ import {
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_TWO_ID,
   MAP_TWO_ROWS,
+  POST_HUB_TWO_MAP_COLUMNS,
+  POST_HUB_TWO_MAP_ROWS,
   WILDERNESS_MAP_COLUMNS,
   WILDERNESS_MAP_ROWS,
   aoeTargetDummyPosition,
@@ -131,9 +133,9 @@ const wildernessMaps = [
     enemyPositions: mapFourEnemyStartPositions,
     resources: mapFourResourceStartData,
     labels: mapFourSubzoneNameLabels,
-    expectedSubzoneCount: 3,
-    expectedEnemyCount: 22,
-    expectedResourceCount: 8,
+    expectedSubzoneCount: 1,
+    expectedEnemyCount: 18,
+    expectedResourceCount: 3,
   },
   {
     mapId: MAP_FIVE_ID,
@@ -142,9 +144,9 @@ const wildernessMaps = [
     enemyPositions: mapFiveEnemyStartPositions,
     resources: mapFiveResourceStartData,
     labels: mapFiveSubzoneNameLabels,
-    expectedSubzoneCount: 3,
+    expectedSubzoneCount: 1,
     expectedEnemyCount: 18,
-    expectedResourceCount: 9,
+    expectedResourceCount: 3,
   },
   {
     mapId: MAP_SIX_ID,
@@ -153,9 +155,9 @@ const wildernessMaps = [
     enemyPositions: mapSixEnemyStartPositions,
     resources: mapSixResourceStartData,
     labels: mapSixSubzoneNameLabels,
-    expectedSubzoneCount: 3,
+    expectedSubzoneCount: 1,
     expectedEnemyCount: 18,
-    expectedResourceCount: 9,
+    expectedResourceCount: 3,
   },
   {
     mapId: MAP_SEVEN_ID,
@@ -164,9 +166,9 @@ const wildernessMaps = [
     enemyPositions: mapSevenEnemyStartPositions,
     resources: mapSevenResourceStartData,
     labels: mapSevenSubzoneNameLabels,
-    expectedSubzoneCount: 2,
-    expectedEnemyCount: 10,
-    expectedResourceCount: 6,
+    expectedSubzoneCount: 1,
+    expectedEnemyCount: 20,
+    expectedResourceCount: 3,
   },
 ] as const;
 
@@ -200,20 +202,20 @@ describe("debug maps", () => {
       rows: MAP_THREE_ROWS,
     });
     expect(createDebugMap(MAP_FOUR_ID)).toMatchObject({
-      columns: WILDERNESS_MAP_COLUMNS,
-      rows: WILDERNESS_MAP_ROWS,
+      columns: POST_HUB_TWO_MAP_COLUMNS,
+      rows: POST_HUB_TWO_MAP_ROWS,
     });
     expect(createDebugMap(MAP_FIVE_ID)).toMatchObject({
-      columns: WILDERNESS_MAP_COLUMNS,
-      rows: MAP_ONE_ROWS,
+      columns: POST_HUB_TWO_MAP_COLUMNS,
+      rows: POST_HUB_TWO_MAP_ROWS,
     });
     expect(createDebugMap(MAP_SIX_ID)).toMatchObject({
-      columns: WILDERNESS_MAP_COLUMNS,
-      rows: MAP_ONE_ROWS,
+      columns: POST_HUB_TWO_MAP_COLUMNS,
+      rows: POST_HUB_TWO_MAP_ROWS,
     });
     expect(createDebugMap(MAP_SEVEN_ID)).toMatchObject({
-      columns: WILDERNESS_MAP_COLUMNS,
-      rows: WILDERNESS_MAP_ROWS,
+      columns: POST_HUB_TWO_MAP_COLUMNS,
+      rows: POST_HUB_TWO_MAP_ROWS,
     });
     expect(createDebugMap(HUB_TWO_MAP_ID)).toMatchObject({
       columns: 132,
@@ -225,19 +227,19 @@ describe("debug maps", () => {
     expect(debugMapDefinitions[MAP_ONE_ID].displayName).toBe("Mosswake Shore");
     expect(debugMapDefinitions[MAP_TWO_ID].displayName).toBe("Briarwood Rise");
     expect(debugMapDefinitions[MAP_THREE_ID].displayName).toBe("Azurefen Hollow");
-    expect(debugMapDefinitions[MAP_FOUR_ID].displayName).toBe("Ashwatch Approach");
-    expect(debugMapDefinitions[MAP_FIVE_ID].displayName).toBe("Emberbriar Crossing");
+    expect(debugMapDefinitions[MAP_FOUR_ID].displayName).toBe("Ash Goblin Encampment");
+    expect(debugMapDefinitions[MAP_FIVE_ID].displayName).toBe("Briar Burrows");
     expect(debugMapDefinitions[MAP_SIX_ID].displayName).toBe("Nightmire Canopy");
-    expect(debugMapDefinitions[MAP_SEVEN_ID].displayName).toBe("Twilight of the Fallen");
+    expect(debugMapDefinitions[MAP_SEVEN_ID].displayName).toBe("Orc Warcamp");
     expect(mapOneSubzones.map((subzone) => subzone.displayName)).toEqual([
       "Shore",
       "Glade",
       "Lowbank",
     ]);
-    expect(mapSevenSubzones.map((subzone) => subzone.displayName)).toEqual([
-      "Plaza",
-      "Garden",
-    ]);
+    expect(mapFourSubzones.map((subzone) => subzone.displayName)).toEqual(["Ash Camp"]);
+    expect(mapFiveSubzones.map((subzone) => subzone.displayName)).toEqual(["Briar Burrows"]);
+    expect(mapSixSubzones.map((subzone) => subzone.displayName)).toEqual(["Nightmire Canopy"]);
+    expect(mapSevenSubzones.map((subzone) => subzone.displayName)).toEqual(["Orc Warcamp"]);
   });
 
   it("places the remade hub dock, base, NPCs, fountain, and teleport on reachable floor", () => {
@@ -247,14 +249,23 @@ describe("debug maps", () => {
     expect(hub.columns).toBe(110);
     expect(hub.rows).toBe(60);
     expect(hubTeleport.position).toMatchObject({ x: 102, y: 30 });
+    expect(
+      debugMapDefinitions[HUB_MAP_ID].teleports.some(
+        (teleport) => teleport.targetMapId === SLIMEWARD_CAMP_ID,
+      ),
+    ).toBe(false);
     expect(hub.visualObjects?.map((visualObject) => visualObject.visualId)).toEqual([
       "hub_dock_shore_connector",
       "hub_house",
       "hub_cabin",
       "hub_tent",
-      "guild_tavern_building",
-      "farm_building",
-      "livestock_building",
+    ]);
+    expect(hubNpcStartData.map((npc) => npc.npcRole)).toEqual([
+      "quest_giver",
+      "merchant",
+      "smith",
+      "bank_chest",
+      "dog",
     ]);
     expect(
       hub.visualObjects?.find(
@@ -302,7 +313,13 @@ describe("debug maps", () => {
         find_slimeward_camp: { status: "completed" },
         azure_trial: { status: "ready_to_turn_in" },
       }).map((npc) => npc.id),
-    ).not.toContain(CLASS_MENTOR_NPC_ID);
+    ).toContain(CLASS_MENTOR_NPC_ID);
+    expect(
+      getHubNpcStartDataForQuestState({
+        find_slimeward_camp: { status: "completed" },
+        azure_trial: { status: "completed" },
+      }).map((npc) => npc.id),
+    ).toContain(CLASS_MENTOR_NPC_ID);
     expect(
       getHubTwoNpcStartDataForQuestState({
         azure_trial: { status: "ready_to_turn_in" },
@@ -341,7 +358,6 @@ describe("debug maps", () => {
       "merchant",
       "smith",
       "bank_chest",
-      "bounty_board",
       "dog",
       "dog",
       "guild_coordinator",

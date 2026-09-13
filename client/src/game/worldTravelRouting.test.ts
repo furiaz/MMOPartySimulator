@@ -4,7 +4,6 @@ import {
   HUB_TWO_MAP_ID,
   HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
   HUB_TWO_TO_MAP_THREE_TELEPORTER_ID,
-  HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   MAP_FIVE_ID,
   MAP_FIVE_TO_MAP_SIX_TELEPORTER_ID,
   MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
@@ -118,14 +117,23 @@ describe("world travel routing", () => {
     expect(teleport?.id).toBe("hub-to-map-1");
   });
 
-  it("routes hub to Slimeward Camp directly", () => {
+  it("routes hub to Slimeward Camp through Azurefen Hollow after that route unlocks", () => {
+    const lockedTeleport = getNextWorldTravelTeleport(
+      createRoutingState(createUnlockedMainRouteTeleportStates()),
+      HUB_MAP_ID,
+      SLIMEWARD_CAMP_ID,
+    );
     const teleport = getNextWorldTravelTeleport(
-      createRoutingState(),
+      createRoutingState({
+        ...createUnlockedMainRouteTeleportStates(),
+        [MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID]: { isWorking: true },
+      }),
       HUB_MAP_ID,
       SLIMEWARD_CAMP_ID,
     );
 
-    expect(teleport?.id).toBe(HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID);
+    expect(lockedTeleport).toBeNull();
+    expect(teleport?.id).toBe("hub-to-map-1");
   });
 
   it("routes map 3 to Slimeward Camp only when that route is unlocked", () => {

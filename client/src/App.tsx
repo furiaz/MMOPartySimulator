@@ -77,6 +77,7 @@ import {
   debugResurrectEnemy,
   debugRestorePartyHealth,
   debugTeleportToHub,
+  debugTeleportToSlimewardCamp,
   debugToggleCompanionInfiniteHealth,
   debugToggleCompanionOneHunterClass,
   debugToggleSuperExp,
@@ -117,7 +118,6 @@ import {
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
-  getPoiSearchScope,
   getTeleportWorkingStateById,
   getHighestCharacterLevelEver,
   hasQuestGiverWork,
@@ -259,7 +259,6 @@ import {
   type PartyMemberRole,
   type PrimaryStatId,
   type PoiConsideration,
-  type PoiSearchScope,
   type Position,
   type QuestId,
   type QuestState,
@@ -278,6 +277,7 @@ import {
   FARM_CROP_ICON_SRC,
   INVENTORY_ITEM_ICON_SRC,
   LIVESTOCK_CREATURE_ICON_SRC,
+  TICKET_0501_HUD_CONTROL_SRC,
 } from "./assetIcons";
 import {
   deleteLocalSave,
@@ -351,6 +351,9 @@ const cameraSettleFactor = 0.08;
 const cameraSnapDistance = 0.35;
 const cameraDeadZoneWidthRatio = 0.34;
 const cameraDeadZoneHeightRatio = 0.3;
+const companionVitalsHeightViewportRatio = 0.13;
+const companionBuffDebuffRailHeightPx = 72;
+const companionBuffDebuffRailGapPx = 2;
 const wildernessMapIds = new Set([
   "map-1",
   "map-2",
@@ -371,17 +374,8 @@ const emptySkillMarks: Record<string, SkillMarkState> = {};
 const emptySkillShieldBlocks: Record<string, SkillShieldBlockState> = {};
 const emptySkillVisualEvents: SkillVisualEvent[] = [];
 
-function getAutoCombatModeLabel(
-  autoModeEnabled: boolean,
-  poiSearchScope: PoiSearchScope,
-): string {
-  if (!autoModeEnabled) {
-    return "Auto Combat: Off";
-  }
-
-  return poiSearchScope === "subzone_only"
-    ? "Auto Combat: On - Subzone Only"
-    : "Auto Combat: On - Zone Only";
+function getAutoCombatModeLabel(autoModeEnabled: boolean): string {
+  return autoModeEnabled ? "Auto Combat On" : "Auto Combat Off";
 }
 
 type EntityVisualMovement = {
@@ -1664,6 +1658,18 @@ function getNextVisualMovementPruneAt(
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function getWorldViewportSize(): ViewportSize {
+  const bottomHudReservedHeight =
+    window.innerHeight * companionVitalsHeightViewportRatio +
+    companionBuffDebuffRailHeightPx +
+    companionBuffDebuffRailGapPx;
+
+  return {
+    width: window.innerWidth,
+    height: Math.max(1, window.innerHeight - bottomHudReservedHeight),
+  };
 }
 
 function getMaximumCameraOffset({
@@ -3066,10 +3072,9 @@ function App() {
   const [movementClickFeedbackEvents, setMovementClickFeedbackEvents] = useState<
     MovementClickFeedbackEvent[]
   >([]);
-  const [viewportSize, setViewportSize] = useState<ViewportSize>(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }));
+  const [viewportSize, setViewportSize] = useState<ViewportSize>(() =>
+    getWorldViewportSize(),
+  );
   const [
     visualMovementByEntityId,
     setVisualMovementByEntityId,
@@ -3360,7 +3365,6 @@ function App() {
     gameState,
     displayQuest,
   );
-  const poiSearchScope = getPoiSearchScope(gameState);
   const activeQuestIds = getQuestLogQuests(gameState.quests).map(
     (quest) => quest.questId,
   );
@@ -4348,12 +4352,10 @@ function App() {
 
   useEffect(() => {
     function updateViewportSize() {
-      setViewportSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      setViewportSize(getWorldViewportSize());
     }
 
+    updateViewportSize();
     window.addEventListener("resize", updateViewportSize);
 
     return () => {
@@ -4437,19 +4439,13 @@ function App() {
     startSimulationLoop();
   }
 
-  function cycleAutoCombatMode() {
+  function toggleAutoCombatMode() {
     setGameState((state) => {
-      const currentScope = getPoiSearchScope(state);
-
       if (!state.autoModeEnabled) {
         return setPoiSearchScope(
           setAutoModeEnabled(state, true),
           "subzone_only",
         );
-      }
-
-      if (currentScope === "subzone_only") {
-        return setPoiSearchScope(state, "zone_only");
       }
 
       return setAutoModeEnabled(state, false);
@@ -5623,6 +5619,12 @@ function App() {
     setGameState((state) => debugTeleportToHub(state, HUB_TWO_MAP_ID));
   }
 
+  function debugTeleportToSlimewardCampForDebug() {
+    queueSaveAfterStateChange("Debug Slimeward Camp teleport saved");
+    setSaveStatusMessage("Debug teleported to Slimeward Camp.");
+    setGameState((state) => debugTeleportToSlimewardCamp(state));
+  }
+
   function openEquipmentManagementFromInventory() {
     setSelectedCompanionId(selectedMenuCompanionId);
     setActiveGameMenuTab("party");
@@ -6272,21 +6274,6 @@ function App() {
               <div className="map-title-row">
                 <span className="map-version">v{gameVersion}</span>
                 <strong>{currentMap.displayName}</strong>
-                <button
-                  className={`auto-combat-toggle${
-                    gameState.autoModeEnabled ? " active" : ""
-                  }`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    cycleAutoCombatMode();
-                  }}
-                  type="button"
-                >
-                  {getAutoCombatModeLabel(
-                    gameState.autoModeEnabled,
-                    poiSearchScope,
-                  )}
-                </button>
               </div>
               <span>Prototype Zone ID: {currentMap.debugName}</span>
             </div>
@@ -6310,6 +6297,15 @@ function App() {
                 type="button"
               >
                 Super Exp {gameState.debugOptions?.superExpEnabled ? "On" : "Off"}
+              </button>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleDebugTools();
+                }}
+                type="button"
+              >
+                {showDebugTools ? "Hide Debug UI" : "Show Debug UI"}
               </button>
             </div>
           </div>
@@ -6942,23 +6938,55 @@ function App() {
         ) : null}
 
         <div className="bottom-hud-controls">
-          <div className="test-controls simulation-controls">
-            <button onClick={toggleSimulationLoop}>
-              {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
+          <div className="hud-action-cluster">
+            <button
+              aria-pressed={gameState.autoModeEnabled}
+              aria-label={getAutoCombatModeLabel(gameState.autoModeEnabled)}
+              className={`hud-control-button${
+                gameState.autoModeEnabled ? " active" : ""
+              }`}
+              onClick={toggleAutoCombatMode}
+              type="button"
+            >
+              <img
+                alt=""
+                className="hud-control-icon"
+                src={
+                  gameState.autoModeEnabled
+                    ? TICKET_0501_HUD_CONTROL_SRC.autoCombatOn
+                    : TICKET_0501_HUD_CONTROL_SRC.autoCombatOff
+                }
+              />
+              <span className="hud-control-label">Auto Combat</span>
+              <span className="hud-control-state">
+                {gameState.autoModeEnabled ? "On" : "Off"}
+              </span>
+            </button>
+            <button
+              aria-label={isSimulationRunning ? "Pause Simulation" : "Resume Simulation"}
+              className="hud-control-button"
+              onClick={toggleSimulationLoop}
+              type="button"
+            >
+              <img
+                alt=""
+                className="hud-control-icon"
+                src={
+                  isSimulationRunning
+                    ? TICKET_0501_HUD_CONTROL_SRC.pause
+                    : TICKET_0501_HUD_CONTROL_SRC.resume
+                }
+              />
+              <span className="hud-control-label">
+                {isSimulationRunning ? "Pause" : "Resume"}
+              </span>
             </button>
           </div>
 
-          <section
-            className={`debug-tools${showDebugTools ? "" : " debug-tools-hidden"}`}
-            aria-label="Debug tools"
-          >
+          {showDebugTools ? (
+          <section className="debug-tools" aria-label="Debug tools">
             <h2>Debug Tools</h2>
             <div className="test-controls">
-              <button onClick={toggleDebugTools}>
-                {showDebugTools ? "Hide Debug UI" : "Show Debug UI"}
-              </button>
-              {showDebugTools ? (
-                <>
                   <button onClick={addCompanionToParty}>
                     Add Companion to Party
                   </button>
@@ -7004,6 +7032,9 @@ function App() {
                   </button>
                   <button onClick={debugTeleportToHubTwo}>
                     Teleport Hub 2
+                  </button>
+                  <button onClick={debugTeleportToSlimewardCampForDebug}>
+                    Teleport Slimeward Camp
                   </button>
                   <button onClick={killOneCompanion}>Kill One Companion</button>
                   <button onClick={forceSuperiorEnemy}>
@@ -7075,10 +7106,9 @@ function App() {
                   <span>
                     POI Reason {gameState.lastPoiDecision?.selectedReason ?? "none"}
                   </span>
-                </>
-              ) : null}
             </div>
           </section>
+          ) : null}
         </div>
       </section>
     </main>

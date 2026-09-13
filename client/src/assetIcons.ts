@@ -20,6 +20,9 @@ const guildTavernAssetPath = "/assets/Generated/guild-tavern";
 const farmLivestockAssetPath = "/assets/Generated/farm-livestock";
 const teleportAssetPath = "/assets/Generated/teleports";
 const passageBlockerAssetPath = "/assets/Generated/passage-blockers";
+const ticket0501AssetPath = "/assets/Generated/ticket-0501";
+const ticket0501TerrainAssetPath = `${ticket0501AssetPath}/terrain`;
+const ticket0501UiAssetPath = `${ticket0501AssetPath}/ui`;
 const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
 const beginnerSkillEffectsPath = "/assets/Generated/beginner-skill-effects-50/sprites";
 const firstClassSkillEffectsPath = "/assets/Generated/first-class-skill-effects";
@@ -405,7 +408,62 @@ export const MAP_VISUAL_OBJECT_SRC: Record<MapVisualObjectId, string> = {
   passage_blocker_repaired_column: `${passageBlockerAssetPath}/passage_blocker_repaired_column_100x350.png`,
   slime_covered_stone: `${slimewardDungeonAssetPath}/slime-covered-stone-64.png`,
   azure_slime_rock_cluster: `${slimewardDungeonAssetPath}/azure-slime-rock-cluster-128.png`,
+  ash_goblin_charred_dead_tree_trunk: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/charred_dead_tree_trunk.png`,
+  ash_goblin_ash_bent_dead_tree: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/ash_bent_dead_tree.png`,
+  ash_goblin_goblin_spike_barricade: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/goblin_spike_barricade.png`,
+  ash_goblin_goblin_watch_post: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/goblin_watch_post.png`,
+  ash_goblin_ember_campfire_pit: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/ember_campfire_pit.png`,
+  ash_goblin_ash_rock_cluster: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/ash_rock_cluster.png`,
+  ash_goblin_broken_cart_debris: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/broken_cart_debris.png`,
+  ash_goblin_bone_skull_warning_totem: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/bone_skull_warning_totem.png`,
+  ash_goblin_sooty_tent_leanto: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/sooty_tent_leanto.png`,
+  ash_goblin_burned_log_pile: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/burned_log_pile.png`,
+  ash_goblin_charcoal_scorch_patch: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/charcoal_scorch_patch.png`,
+  briar_large_briar_thicket: `${ticket0501TerrainAssetPath}/briar-burrows/large_briar_thicket.png`,
+  briar_burrow_mound_entrance: `${ticket0501TerrainAssetPath}/briar-burrows/burrow_mound_entrance.png`,
+  briar_twisted_root_arch: `${ticket0501TerrainAssetPath}/briar-burrows/twisted_root_arch.png`,
+  briar_mire_stone_cluster: `${ticket0501TerrainAssetPath}/briar-burrows/mire_stone_cluster.png`,
+  briar_thorn_fence_bramble_wall: `${ticket0501TerrainAssetPath}/briar-burrows/thorn_fence_bramble_wall.png`,
+  briar_spider_webbed_root_stump: `${ticket0501TerrainAssetPath}/briar-burrows/spider_webbed_root_stump.png`,
+  briar_muddy_insect_tunnel_holes: `${ticket0501TerrainAssetPath}/briar-burrows/muddy_insect_tunnel_holes.png`,
+  briar_wolf_den_bones: `${ticket0501TerrainAssetPath}/briar-burrows/wolf_den_bones.png`,
+  briar_fallen_hollow_log: `${ticket0501TerrainAssetPath}/briar-burrows/fallen_hollow_log.png`,
+  briar_poison_thorn_bulb_cluster: `${ticket0501TerrainAssetPath}/briar-burrows/poison_thorn_bulb_cluster.png`,
+  briar_muddy_bog_patch: `${ticket0501TerrainAssetPath}/briar-burrows/muddy_bog_patch.png`,
+  nightmire_dense_dark_canopy_tree: `${ticket0501TerrainAssetPath}/nightmire-canopy/dense_dark_canopy_tree.png`,
+  nightmire_ancient_elder_moss_stump: `${ticket0501TerrainAssetPath}/nightmire-canopy/ancient_elder_moss_stump.png`,
+  nightmire_bat_roost_dead_tree: `${ticket0501TerrainAssetPath}/nightmire-canopy/bat_roost_dead_tree.png`,
+  nightmire_cinder_veined_standing_stone: `${ticket0501TerrainAssetPath}/nightmire-canopy/cinder_veined_standing_stone.png`,
+  nightmire_shadow_bramble_cluster: `${ticket0501TerrainAssetPath}/nightmire-canopy/shadow_bramble_cluster.png`,
+  nightmire_fallen_canopy_trunk: `${ticket0501TerrainAssetPath}/nightmire-canopy/fallen_canopy_trunk.png`,
+  nightmire_mushroom_ring: `${ticket0501TerrainAssetPath}/nightmire-canopy/mushroom_ring.png`,
+  nightmire_hanging_root_curtain: `${ticket0501TerrainAssetPath}/nightmire-canopy/hanging_root_curtain.png`,
+  nightmire_ash_moss_boulder_cluster: `${ticket0501TerrainAssetPath}/nightmire-canopy/ash_moss_boulder_cluster.png`,
+  nightmire_corrupted_sap_patch: `${ticket0501TerrainAssetPath}/nightmire-canopy/corrupted_sap_patch.png`,
+  nightmire_broken_hunter_signpost: `${ticket0501TerrainAssetPath}/nightmire-canopy/broken_hunter_signpost.png`,
+  orc_warcamp_heavy_orc_spike_barricade: `${ticket0501TerrainAssetPath}/orc-warcamp/heavy_orc_spike_barricade.png`,
+  orc_warcamp_orc_command_banner_standard: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_command_banner_standard.png`,
+  orc_warcamp_crude_war_drum_platform: `${ticket0501TerrainAssetPath}/orc-warcamp/crude_war_drum_platform.png`,
+  orc_warcamp_armored_watchtower_platform: `${ticket0501TerrainAssetPath}/orc-warcamp/armored_watchtower_platform.png`,
+  orc_warcamp_orc_weapon_rack: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_weapon_rack.png`,
+  orc_warcamp_bonfire_meat_spit: `${ticket0501TerrainAssetPath}/orc-warcamp/bonfire_meat_spit.png`,
+  orc_warcamp_orc_training_post: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_training_post.png`,
+  orc_warcamp_orc_supply_pile: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_supply_pile.png`,
+  orc_warcamp_broken_siege_ram: `${ticket0501TerrainAssetPath}/orc-warcamp/broken_siege_ram.png`,
+  orc_warcamp_skull_bone_trophy_mound: `${ticket0501TerrainAssetPath}/orc-warcamp/skull_bone_trophy_mound.png`,
+  orc_warcamp_scorched_battlefield_patch: `${ticket0501TerrainAssetPath}/orc-warcamp/scorched_battlefield_patch.png`,
 };
+
+export const TICKET_0501_HUD_CONTROL_SRC = {
+  autoCombatOff: `${ticket0501UiAssetPath}/controls/auto_combat_off.png`,
+  autoCombatOn: `${ticket0501UiAssetPath}/controls/auto_combat_on.png`,
+  pause: `${ticket0501UiAssetPath}/controls/pause.png`,
+  resume: `${ticket0501UiAssetPath}/controls/resume.png`,
+  autoCombatOffPressed: `${ticket0501UiAssetPath}/controls/auto_combat_off_pressed.png`,
+  autoCombatOnPressed: `${ticket0501UiAssetPath}/controls/auto_combat_on_pressed.png`,
+  pausePressed: `${ticket0501UiAssetPath}/controls/pause_pressed.png`,
+  resumePressed: `${ticket0501UiAssetPath}/controls/resume_pressed.png`,
+} as const;
 
 export const FARM_CROP_ICON_SRC: Record<FarmCropId | "locked", string> = {
   carrot: `${farmLivestockAssetPath}/carrot.png`,

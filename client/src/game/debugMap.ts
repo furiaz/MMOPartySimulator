@@ -22,6 +22,8 @@ export const WILDERNESS_MAP_ROWS = 30;
 export const MAP_ONE_ROWS = 57;
 export const MAP_TWO_ROWS = MAP_ONE_ROWS;
 export const MAP_THREE_ROWS = MAP_ONE_ROWS;
+export const POST_HUB_TWO_MAP_COLUMNS = 110;
+export const POST_HUB_TWO_MAP_ROWS = MAP_ONE_ROWS;
 export const TELEPORTER_ID = "map-1-to-map-2";
 export const MAP_TWO_TO_MAP_THREE_TELEPORTER_ID = "map-2-to-map-3";
 export const MAP_THREE_TO_HUB_TWO_TELEPORTER_ID = "map-3-to-hub-2";
@@ -108,7 +110,6 @@ export const npcIds = [
   "hub-smith",
   "hub-bank-chest",
   "hub-dog",
-  "hub-test-blade",
 ];
 
 export const companionStartPositions: Position[] = [
@@ -151,13 +152,13 @@ export const hubTwoEastTeleporterPosition: Position = { x: 126, y: 36 };
 export const mapOneHubTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapTwoReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapThreeReturnTeleporterPosition: Position = { x: 5, y: 29 };
-export const mapFourReturnTeleporterPosition: Position = { x: 5, y: 12 };
-export const mapFourForwardTeleporterPosition: Position = { x: 154, y: 12 };
-export const mapFiveReturnTeleporterPosition: Position = { x: 5, y: 12 };
-export const mapFiveForwardTeleporterPosition: Position = { x: 154, y: 29 };
+export const mapFourReturnTeleporterPosition: Position = { x: 5, y: 29 };
+export const mapFourForwardTeleporterPosition: Position = { x: 104, y: 29 };
+export const mapFiveReturnTeleporterPosition: Position = { x: 5, y: 29 };
+export const mapFiveForwardTeleporterPosition: Position = { x: 104, y: 29 };
 export const mapSixReturnTeleporterPosition: Position = { x: 5, y: 29 };
-export const mapSixForwardTeleporterPosition: Position = { x: 154, y: 16 };
-export const mapSevenReturnTeleporterPosition: Position = { x: 5, y: 16 };
+export const mapSixForwardTeleporterPosition: Position = { x: 104, y: 29 };
+export const mapSevenReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const HUB_TWO_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
@@ -236,10 +237,10 @@ const hubTwoMapThreeArrivalPositions: Position[] = [
 ];
 
 const hubTwoMapFourArrivalPositions: Position[] = [
-  { x: 8, y: 12 },
-  { x: 9, y: 12 },
-  { x: 8, y: 13 },
-  { x: 9, y: 13 },
+  { x: 8, y: 29 },
+  { x: 9, y: 29 },
+  { x: 8, y: 30 },
+  { x: 9, y: 30 },
 ];
 
 const mapFourHubTwoArrivalPositions: Position[] = [
@@ -250,17 +251,17 @@ const mapFourHubTwoArrivalPositions: Position[] = [
 ];
 
 const mapFourMapFiveArrivalPositions: Position[] = [
-  { x: 7, y: 12 },
-  { x: 8, y: 12 },
-  { x: 7, y: 13 },
-  { x: 8, y: 13 },
+  { x: 7, y: 29 },
+  { x: 8, y: 29 },
+  { x: 7, y: 30 },
+  { x: 8, y: 30 },
 ];
 
 const mapFiveMapFourArrivalPositions: Position[] = [
-  { x: 154, y: 12 },
-  { x: 153, y: 12 },
-  { x: 154, y: 13 },
-  { x: 153, y: 13 },
+  { x: 104, y: 29 },
+  { x: 103, y: 29 },
+  { x: 104, y: 30 },
+  { x: 103, y: 30 },
 ];
 
 const mapFiveMapSixArrivalPositions: Position[] = [
@@ -271,24 +272,24 @@ const mapFiveMapSixArrivalPositions: Position[] = [
 ];
 
 const mapSixMapFiveArrivalPositions: Position[] = [
-  { x: 154, y: 29 },
-  { x: 153, y: 29 },
-  { x: 154, y: 30 },
-  { x: 153, y: 30 },
+  { x: 104, y: 29 },
+  { x: 103, y: 29 },
+  { x: 104, y: 30 },
+  { x: 103, y: 30 },
 ];
 
 const mapSixMapSevenArrivalPositions: Position[] = [
-  { x: 7, y: 16 },
-  { x: 8, y: 16 },
-  { x: 7, y: 17 },
-  { x: 8, y: 17 },
+  { x: 7, y: 29 },
+  { x: 8, y: 29 },
+  { x: 7, y: 30 },
+  { x: 8, y: 30 },
 ];
 
 const mapSevenMapSixArrivalPositions: Position[] = [
-  { x: 154, y: 16 },
-  { x: 153, y: 16 },
-  { x: 154, y: 17 },
-  { x: 153, y: 17 },
+  { x: 104, y: 29 },
+  { x: 103, y: 29 },
+  { x: 104, y: 30 },
+  { x: 103, y: 30 },
 ];
 
 export const slimewardCampArrivalPositions: Position[] = [
@@ -357,36 +358,6 @@ export const hubNpcStartData = [
     displayName: "Dog",
     npcRole: "dog",
   },
-  {
-    id: npcIds[5],
-    position: { x: 73, y: 42 },
-    displayName: "Test Blade",
-    npcRole: "test_blade",
-  },
-  {
-    id: "hub-guild-coordinator",
-    position: { x: 50, y: 56 },
-    displayName: "Guild Coordinator",
-    npcRole: "guild_coordinator",
-  },
-  {
-    id: "hub-tavern-keeper",
-    position: { x: 61, y: 56 },
-    displayName: "Inn Keeper",
-    npcRole: "tavern_keeper",
-  },
-  {
-    id: "hub-farmer",
-    position: { x: 18, y: 46 },
-    displayName: "Farmer",
-    npcRole: "farmer",
-  },
-  {
-    id: "hub-livestock-keeper",
-    position: { x: 18, y: 27 },
-    displayName: "Livestock",
-    npcRole: "livestock_keeper",
-  },
 ] as const;
 
 export const classMentorNpcStartData = {
@@ -420,12 +391,6 @@ export const hubTwoNpcStartData = [
     position: { x: 72, y: 35 },
     displayName: "Bank Chest",
     npcRole: "bank_chest",
-  },
-  {
-    id: "hub-2-bounty-board",
-    position: { x: 66, y: 49 },
-    displayName: "Bounty Board",
-    npcRole: "bounty_board",
   },
   {
     id: "hub-2-dog-west",
@@ -524,60 +489,6 @@ const MAP_THREE_PASSAGES: ZoneSubzonePassage[] = [
   },
 ];
 
-const MAP_FOUR_PASSAGES: ZoneSubzonePassage[] = [
-  {
-    id: "north-center-to-north-east",
-    fromSubzoneId: "north-center",
-    toSubzoneId: "north-east",
-    position: { x: 105, y: 12 },
-  },
-  {
-    id: "south-east-to-north-east",
-    fromSubzoneId: "south-east",
-    toSubzoneId: "north-east",
-    position: { x: 132, y: 24 },
-  },
-];
-
-const MAP_FIVE_PASSAGES: ZoneSubzonePassage[] = [
-  {
-    id: "crossing-to-burrows",
-    fromSubzoneId: "crossing",
-    toSubzoneId: "burrows",
-    position: { x: 52, y: 29 },
-  },
-  {
-    id: "burrows-to-thornfield",
-    fromSubzoneId: "burrows",
-    toSubzoneId: "thornfield",
-    position: { x: 105, y: 29 },
-  },
-];
-
-const MAP_SIX_PASSAGES: ZoneSubzonePassage[] = [
-  {
-    id: "mire-to-canopy",
-    fromSubzoneId: "mire",
-    toSubzoneId: "canopy",
-    position: { x: 52, y: 29 },
-  },
-  {
-    id: "canopy-to-oldroot",
-    fromSubzoneId: "canopy",
-    toSubzoneId: "oldroot",
-    position: { x: 105, y: 29 },
-  },
-];
-
-const MAP_SEVEN_PASSAGES: ZoneSubzonePassage[] = [
-  {
-    id: "plaza-to-garden",
-    fromSubzoneId: "plaza",
-    toSubzoneId: "garden",
-    position: { x: 80, y: 16 },
-  },
-];
-
 const MAP_TWO_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
   {
     id: "scout-rise-to-old-grove",
@@ -607,24 +518,6 @@ const MAP_THREE_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
     position: { x: 105, y: 29 },
   },
 ];
-
-const MAP_FOUR_COMPACT_PASSAGES: ZoneSubzonePassage[] = [
-  {
-    id: "north-center-to-north-east",
-    fromSubzoneId: "north-center",
-    toSubzoneId: "north-east",
-    position: { x: 52, y: 12 },
-  },
-  {
-    id: "north-east-to-south-east",
-    fromSubzoneId: "north-east",
-    toSubzoneId: "south-east",
-    position: { x: 105, y: 12 },
-  },
-];
-
-const MAP_FIVE_COMPACT_PASSAGES = MAP_FIVE_PASSAGES;
-const MAP_SIX_COMPACT_PASSAGES = MAP_SIX_PASSAGES;
 
 const mapOneSourceSubzones: ZoneSubzone[] = [
   {
@@ -788,188 +681,85 @@ const mapThreeSourceSubzones: ZoneSubzone[] = [
 
 const mapFourSourceSubzones: ZoneSubzone[] = [
   {
-    id: "north-center",
-    displayName: "Watch",
-    bounds: { x: 53, y: 1, width: 52, height: 23 },
-    levelRange: { min: 10, max: 11 },
-    enemyTypeIds: ["goblin_shaman", "ash_wisp"],
-    encounterAreas: [{ id: "shaman-watch", subzoneId: "north-center", center: { x: 80, y: 11 }, radius: 17, leashRadius: 19 }],
-    resourceLocations: [
-      { id: resourceIds[3], subzoneId: "north-center", position: { x: 102, y: 20 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[13], subzoneId: "north-center", position: { x: 58, y: 4 }, resourceType: "ore", tier: 2 },
+    id: "ash-goblin-encampment",
+    displayName: "Ash Camp",
+    bounds: { x: 1, y: 1, width: POST_HUB_TWO_MAP_COLUMNS - 2, height: POST_HUB_TWO_MAP_ROWS - 2 },
+    levelRange: { min: 10, max: 12 },
+    enemyTypeIds: ["goblin_shaman", "ash_wisp", "ember_imp"],
+    encounterAreas: [
+      { id: "ash-goblin-west-watch", subzoneId: "ash-goblin-encampment", center: { x: 25, y: 17 }, radius: 20, leashRadius: 23 },
+      { id: "ash-goblin-ember-pits", subzoneId: "ash-goblin-encampment", center: { x: 56, y: 38 }, radius: 23, leashRadius: 26 },
+      { id: "ash-goblin-east-palings", subzoneId: "ash-goblin-encampment", center: { x: 86, y: 19 }, radius: 21, leashRadius: 24 },
     ],
-    passages: getPassagesForSubzone("north-center", MAP_FOUR_PASSAGES),
-  },
-  {
-    id: "north-east",
-    displayName: "Hollow",
-    bounds: { x: 106, y: 1, width: 53, height: 23 },
-    levelRange: { min: 10, max: 11 },
-    enemyTypeIds: ["goblin_shaman", "ash_wisp"],
-    encounterAreas: [{ id: "ash-hollow", subzoneId: "north-east", center: { x: 133, y: 12 }, radius: 19, leashRadius: 21 }],
     resourceLocations: [
-      { id: resourceIds[6], subzoneId: "north-east", position: { x: 109, y: 20 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[7], subzoneId: "north-east", position: { x: 154, y: 21 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[14], subzoneId: "north-east", position: { x: 109, y: 4 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[3], subzoneId: "ash-goblin-encampment", position: { x: 18, y: 49 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[6], subzoneId: "ash-goblin-encampment", position: { x: 76, y: 8 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[8], subzoneId: "ash-goblin-encampment", position: { x: 98, y: 45 }, resourceType: "herb", tier: 2 },
     ],
-    passages: getPassagesForSubzone("north-east", MAP_FOUR_PASSAGES),
-  },
-  {
-    id: "south-east",
-    displayName: "Camp",
-    bounds: { x: 106, y: 25, width: 53, height: 22 },
-    levelRange: { min: 11, max: 12 },
-    enemyTypeIds: ["ash_wisp", "orc"],
-    encounterAreas: [{ id: "orc-approach-camp", subzoneId: "south-east", center: { x: 133, y: 37 }, radius: 20, leashRadius: 22 }],
-    resourceLocations: [
-      { id: resourceIds[8], subzoneId: "south-east", position: { x: 109, y: 43 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[9], subzoneId: "south-east", position: { x: 156, y: 43 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[15], subzoneId: "south-east", position: { x: 154, y: 28 }, resourceType: "ore", tier: 2 },
-    ],
-    passages: getPassagesForSubzone("south-east", MAP_FOUR_PASSAGES),
+    passages: [],
   },
 ];
 
 const mapFiveSourceSubzones: ZoneSubzone[] = [
   {
-    id: "crossing",
-    displayName: "Crossing",
-    bounds: { x: 1, y: 1, width: 51, height: 55 },
-    levelRange: { min: 13, max: 13 },
-    enemyTypeIds: ["ember_imp"],
+    id: "briar-burrows",
+    displayName: "Briar Burrows",
+    bounds: { x: 1, y: 1, width: POST_HUB_TWO_MAP_COLUMNS - 2, height: POST_HUB_TWO_MAP_ROWS - 2 },
+    levelRange: { min: 13, max: 15 },
+    enemyTypeIds: ["tin_crawler", "briar_wolf", "mire_spider"],
     encounterAreas: [
-      { id: "crossing-north-sparks", subzoneId: "crossing", center: { x: 27, y: 16 }, radius: 21, leashRadius: 23 },
-      { id: "crossing-south-sparks", subzoneId: "crossing", center: { x: 28, y: 42 }, radius: 21, leashRadius: 23 },
+      { id: "briar-burrows-shell-ridge", subzoneId: "briar-burrows", center: { x: 24, y: 39 }, radius: 21, leashRadius: 24 },
+      { id: "briar-burrows-wolf-run", subzoneId: "briar-burrows", center: { x: 56, y: 18 }, radius: 23, leashRadius: 26 },
+      { id: "briar-burrows-webbed-den", subzoneId: "briar-burrows", center: { x: 88, y: 37 }, radius: 21, leashRadius: 24 },
     ],
     resourceLocations: [
-      { id: resourceIds[0], subzoneId: "crossing", position: { x: 8, y: 50 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[1], subzoneId: "crossing", position: { x: 46, y: 7 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[2], subzoneId: "crossing", position: { x: 12, y: 8 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[0], subzoneId: "briar-burrows", position: { x: 12, y: 50 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[4], subzoneId: "briar-burrows", position: { x: 50, y: 8 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[7], subzoneId: "briar-burrows", position: { x: 101, y: 49 }, resourceType: "herb", tier: 2 },
     ],
-    passages: getPassagesForSubzone("crossing", MAP_FIVE_PASSAGES),
-  },
-  {
-    id: "burrows",
-    displayName: "Burrows",
-    bounds: { x: 53, y: 1, width: 52, height: 55 },
-    levelRange: { min: 14, max: 14 },
-    enemyTypeIds: ["tin_crawler"],
-    encounterAreas: [
-      { id: "burrows-north-shells", subzoneId: "burrows", center: { x: 79, y: 16 }, radius: 22, leashRadius: 24 },
-      { id: "burrows-south-shells", subzoneId: "burrows", center: { x: 80, y: 42 }, radius: 22, leashRadius: 24 },
-    ],
-    resourceLocations: [
-      { id: resourceIds[3], subzoneId: "burrows", position: { x: 58, y: 50 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[4], subzoneId: "burrows", position: { x: 100, y: 50 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[5], subzoneId: "burrows", position: { x: 101, y: 7 }, resourceType: "herb", tier: 2 },
-    ],
-    passages: getPassagesForSubzone("burrows", MAP_FIVE_PASSAGES),
-  },
-  {
-    id: "thornfield",
-    displayName: "Thornfield",
-    bounds: { x: 106, y: 1, width: 53, height: 55 },
-    levelRange: { min: 15, max: 15 },
-    enemyTypeIds: ["briar_wolf"],
-    encounterAreas: [
-      { id: "thornfield-north-pack", subzoneId: "thornfield", center: { x: 132, y: 16 }, radius: 22, leashRadius: 24 },
-      { id: "thornfield-south-pack", subzoneId: "thornfield", center: { x: 133, y: 42 }, radius: 22, leashRadius: 24 },
-    ],
-    resourceLocations: [
-      { id: resourceIds[6], subzoneId: "thornfield", position: { x: 110, y: 50 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[7], subzoneId: "thornfield", position: { x: 155, y: 50 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[8], subzoneId: "thornfield", position: { x: 110, y: 7 }, resourceType: "ore", tier: 2 },
-    ],
-    passages: getPassagesForSubzone("thornfield", MAP_FIVE_PASSAGES),
+    passages: [],
   },
 ];
 
 const mapSixSourceSubzones: ZoneSubzone[] = [
   {
-    id: "mire",
-    displayName: "Mire",
-    bounds: { x: 1, y: 1, width: 51, height: 55 },
-    levelRange: { min: 16, max: 16 },
-    enemyTypeIds: ["mire_spider"],
+    id: "nightmire-canopy",
+    displayName: "Nightmire Canopy",
+    bounds: { x: 1, y: 1, width: POST_HUB_TWO_MAP_COLUMNS - 2, height: POST_HUB_TWO_MAP_ROWS - 2 },
+    levelRange: { min: 16, max: 18 },
+    enemyTypeIds: ["night_bat", "elder_mossling", "cinder_wisp"],
     encounterAreas: [
-      { id: "mire-north-webs", subzoneId: "mire", center: { x: 27, y: 16 }, radius: 21, leashRadius: 23 },
-      { id: "mire-south-webs", subzoneId: "mire", center: { x: 28, y: 42 }, radius: 21, leashRadius: 23 },
+      { id: "nightmire-bat-roost", subzoneId: "nightmire-canopy", center: { x: 23, y: 18 }, radius: 21, leashRadius: 24 },
+      { id: "nightmire-oldroot-ring", subzoneId: "nightmire-canopy", center: { x: 56, y: 38 }, radius: 23, leashRadius: 26 },
+      { id: "nightmire-cinder-hollow", subzoneId: "nightmire-canopy", center: { x: 87, y: 18 }, radius: 21, leashRadius: 24 },
     ],
     resourceLocations: [
-      { id: resourceIds[9], subzoneId: "mire", position: { x: 8, y: 50 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[10], subzoneId: "mire", position: { x: 46, y: 7 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[11], subzoneId: "mire", position: { x: 12, y: 8 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[9], subzoneId: "nightmire-canopy", position: { x: 11, y: 48 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[12], subzoneId: "nightmire-canopy", position: { x: 62, y: 9 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[15], subzoneId: "nightmire-canopy", position: { x: 101, y: 49 }, resourceType: "ore", tier: 2 },
     ],
-    passages: getPassagesForSubzone("mire", MAP_SIX_PASSAGES),
-  },
-  {
-    id: "canopy",
-    displayName: "Canopy",
-    bounds: { x: 53, y: 1, width: 52, height: 55 },
-    levelRange: { min: 17, max: 17 },
-    enemyTypeIds: ["night_bat"],
-    encounterAreas: [
-      { id: "canopy-north-roost", subzoneId: "canopy", center: { x: 79, y: 16 }, radius: 22, leashRadius: 24 },
-      { id: "canopy-south-roost", subzoneId: "canopy", center: { x: 80, y: 42 }, radius: 22, leashRadius: 24 },
-    ],
-    resourceLocations: [
-      { id: resourceIds[12], subzoneId: "canopy", position: { x: 58, y: 50 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[13], subzoneId: "canopy", position: { x: 100, y: 50 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[14], subzoneId: "canopy", position: { x: 101, y: 7 }, resourceType: "herb", tier: 2 },
-    ],
-    passages: getPassagesForSubzone("canopy", MAP_SIX_PASSAGES),
-  },
-  {
-    id: "oldroot",
-    displayName: "Oldroot",
-    bounds: { x: 106, y: 1, width: 53, height: 55 },
-    levelRange: { min: 18, max: 18 },
-    enemyTypeIds: ["elder_mossling"],
-    encounterAreas: [
-      { id: "oldroot-north-ring", subzoneId: "oldroot", center: { x: 132, y: 16 }, radius: 22, leashRadius: 24 },
-      { id: "oldroot-south-ring", subzoneId: "oldroot", center: { x: 133, y: 42 }, radius: 22, leashRadius: 24 },
-    ],
-    resourceLocations: [
-      { id: resourceIds[15], subzoneId: "oldroot", position: { x: 110, y: 50 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[16], subzoneId: "oldroot", position: { x: 155, y: 50 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[17], subzoneId: "oldroot", position: { x: 110, y: 7 }, resourceType: "ore", tier: 2 },
-    ],
-    passages: getPassagesForSubzone("oldroot", MAP_SIX_PASSAGES),
+    passages: [],
   },
 ];
 
 export const mapSevenSubzones: ZoneSubzone[] = [
   {
-    id: "plaza",
-    displayName: "Plaza",
-    bounds: { x: 1, y: 1, width: 79, height: 28 },
-    levelRange: { min: 19, max: 19 },
-    enemyTypeIds: ["cinder_wisp"],
+    id: "orc-warcamp",
+    displayName: "Orc Warcamp",
+    bounds: { x: 1, y: 1, width: POST_HUB_TWO_MAP_COLUMNS - 2, height: POST_HUB_TWO_MAP_ROWS - 2 },
+    levelRange: { min: 18, max: 20 },
+    enemyTypeIds: ["orc", "orc_raider", "orc_shieldbearer", "orc_warmaster"],
     encounterAreas: [
-      { id: "plaza-ember-ring", subzoneId: "plaza", center: { x: 40, y: 16 }, radius: 25, leashRadius: 29 },
+      { id: "orc-warcamp-outer-patrol", subzoneId: "orc-warcamp", center: { x: 25, y: 19 }, radius: 21, leashRadius: 24 },
+      { id: "orc-warcamp-shield-line", subzoneId: "orc-warcamp", center: { x: 56, y: 39 }, radius: 22, leashRadius: 25 },
+      { id: "orc-warcamp-warmaster-ring", subzoneId: "orc-warcamp", center: { x: 87, y: 20 }, radius: 23, leashRadius: 27 },
     ],
     resourceLocations: [
-      { id: resourceIds[0], subzoneId: "plaza", position: { x: 14, y: 8 }, resourceType: "herb", tier: 2 },
-      { id: resourceIds[1], subzoneId: "plaza", position: { x: 66, y: 8 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[2], subzoneId: "plaza", position: { x: 75, y: 25 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[0], subzoneId: "orc-warcamp", position: { x: 13, y: 48 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[3], subzoneId: "orc-warcamp", position: { x: 51, y: 9 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[5], subzoneId: "orc-warcamp", position: { x: 99, y: 47 }, resourceType: "herb", tier: 2 },
     ],
-    passages: getPassagesForSubzone("plaza", MAP_SEVEN_PASSAGES),
-  },
-  {
-    id: "garden",
-    displayName: "Garden",
-    bounds: { x: 81, y: 1, width: 78, height: 28 },
-    levelRange: { min: 20, max: 20 },
-    enemyTypeIds: ["orc_warmaster"],
-    encounterAreas: [
-      { id: "garden-war-camp", subzoneId: "garden", center: { x: 120, y: 16 }, radius: 25, leashRadius: 29 },
-    ],
-    resourceLocations: [
-      { id: resourceIds[3], subzoneId: "garden", position: { x: 85, y: 26 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[4], subzoneId: "garden", position: { x: 146, y: 8 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[5], subzoneId: "garden", position: { x: 152, y: 26 }, resourceType: "herb", tier: 2 },
-    ],
-    passages: getPassagesForSubzone("garden", MAP_SEVEN_PASSAGES),
+    passages: [],
   },
 ];
 
@@ -977,15 +767,6 @@ const MAP_TWO_COMPACT_OFFSETS: Record<string, Position> = {
 };
 
 const MAP_THREE_COMPACT_OFFSETS: Record<string, Position> = {};
-
-const MAP_FOUR_COMPACT_OFFSETS: Record<string, Position> = {
-  "north-center": { x: -52, y: 0 },
-  "north-east": { x: -52, y: 0 },
-  "south-east": { x: 0, y: -24 },
-};
-
-const MAP_FIVE_COMPACT_OFFSETS: Record<string, Position> = {};
-const MAP_SIX_COMPACT_OFFSETS: Record<string, Position> = {};
 
 export const mapOneSubzones: ZoneSubzone[] = mapOneSourceSubzones;
 
@@ -1001,23 +782,9 @@ export const mapThreeSubzones: ZoneSubzone[] = compactSubzones(
   MAP_THREE_COMPACT_PASSAGES,
 );
 
-export const mapFourSubzones: ZoneSubzone[] = compactSubzones(
-  mapFourSourceSubzones,
-  MAP_FOUR_COMPACT_OFFSETS,
-  MAP_FOUR_COMPACT_PASSAGES,
-);
-
-export const mapFiveSubzones: ZoneSubzone[] = compactSubzones(
-  mapFiveSourceSubzones,
-  MAP_FIVE_COMPACT_OFFSETS,
-  MAP_FIVE_COMPACT_PASSAGES,
-);
-
-export const mapSixSubzones: ZoneSubzone[] = compactSubzones(
-  mapSixSourceSubzones,
-  MAP_SIX_COMPACT_OFFSETS,
-  MAP_SIX_COMPACT_PASSAGES,
-);
+export const mapFourSubzones: ZoneSubzone[] = mapFourSourceSubzones;
+export const mapFiveSubzones: ZoneSubzone[] = mapFiveSourceSubzones;
+export const mapSixSubzones: ZoneSubzone[] = mapSixSourceSubzones;
 
 const mapOneSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
   { id: "map-1-shore-fringe-entry-label", subzoneId: "shore-fringe", text: "Shore", position: { x: 14, y: 29 } },
@@ -1047,36 +814,27 @@ const mapThreeSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
 ];
 
 const mapFourSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-4-shaman-watch-entry-label", subzoneId: "north-center", text: "Watch", position: { x: 60, y: 12 } },
-  { id: "map-4-shaman-watch-ash-label", subzoneId: "north-center", text: "Watch", position: { x: 100, y: 12 } },
-  { id: "map-4-ash-hollow-shaman-label", subzoneId: "north-east", text: "Hollow", position: { x: 110, y: 12 } },
-  { id: "map-4-orc-approach-ash-label", subzoneId: "south-east", text: "Camp", position: { x: 132, y: 27 } },
-  { id: "map-4-ash-hollow-orc-label", subzoneId: "north-east", text: "Hollow", position: { x: 132, y: 21 } },
+  { id: "map-4-ash-camp-entry-label", subzoneId: "ash-goblin-encampment", text: "Ash Camp", position: { x: 15, y: 29 } },
+  { id: "map-4-ash-camp-center-label", subzoneId: "ash-goblin-encampment", text: "Ash Camp", position: { x: 56, y: 29 } },
+  { id: "map-4-ash-camp-exit-label", subzoneId: "ash-goblin-encampment", text: "Ash Camp", position: { x: 94, y: 29 } },
 ];
 
 const mapFiveSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-5-crossing-entry-label", subzoneId: "crossing", text: "Crossing", position: { x: 10, y: 29 } },
-  { id: "map-5-crossing-burrows-label", subzoneId: "crossing", text: "Crossing", position: { x: 45, y: 29 } },
-  { id: "map-5-burrows-crossing-label", subzoneId: "burrows", text: "Burrows", position: { x: 59, y: 29 } },
-  { id: "map-5-burrows-thornfield-label", subzoneId: "burrows", text: "Burrows", position: { x: 99, y: 29 } },
-  { id: "map-5-thornfield-burrows-label", subzoneId: "thornfield", text: "Thornfield", position: { x: 112, y: 29 } },
-  { id: "map-5-thornfield-exit-label", subzoneId: "thornfield", text: "Thornfield", position: { x: 151, y: 29 } },
+  { id: "map-5-briar-entry-label", subzoneId: "briar-burrows", text: "Briar Burrows", position: { x: 18, y: 29 } },
+  { id: "map-5-briar-center-label", subzoneId: "briar-burrows", text: "Briar Burrows", position: { x: 56, y: 29 } },
+  { id: "map-5-briar-exit-label", subzoneId: "briar-burrows", text: "Briar Burrows", position: { x: 92, y: 29 } },
 ];
 
 const mapSixSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-6-mire-entry-label", subzoneId: "mire", text: "Mire", position: { x: 10, y: 29 } },
-  { id: "map-6-mire-canopy-label", subzoneId: "mire", text: "Mire", position: { x: 45, y: 29 } },
-  { id: "map-6-canopy-mire-label", subzoneId: "canopy", text: "Canopy", position: { x: 59, y: 29 } },
-  { id: "map-6-canopy-oldroot-label", subzoneId: "canopy", text: "Canopy", position: { x: 99, y: 29 } },
-  { id: "map-6-oldroot-canopy-label", subzoneId: "oldroot", text: "Oldroot", position: { x: 112, y: 29 } },
-  { id: "map-6-oldroot-exit-label", subzoneId: "oldroot", text: "Oldroot", position: { x: 151, y: 29 } },
+  { id: "map-6-nightmire-entry-label", subzoneId: "nightmire-canopy", text: "Nightmire Canopy", position: { x: 17, y: 29 } },
+  { id: "map-6-nightmire-center-label", subzoneId: "nightmire-canopy", text: "Nightmire Canopy", position: { x: 56, y: 29 } },
+  { id: "map-6-nightmire-exit-label", subzoneId: "nightmire-canopy", text: "Nightmire Canopy", position: { x: 91, y: 29 } },
 ];
 
 export const mapSevenSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-7-plaza-entry-label", subzoneId: "plaza", text: "Plaza", position: { x: 14, y: 16 } },
-  { id: "map-7-plaza-garden-label", subzoneId: "plaza", text: "Plaza", position: { x: 66, y: 16 } },
-  { id: "map-7-garden-plaza-label", subzoneId: "garden", text: "Garden", position: { x: 94, y: 16 } },
-  { id: "map-7-garden-end-label", subzoneId: "garden", text: "Garden", position: { x: 146, y: 16 } },
+  { id: "map-7-warcamp-entry-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 17, y: 29 } },
+  { id: "map-7-warcamp-center-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 56, y: 29 } },
+  { id: "map-7-warcamp-end-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 92, y: 29 } },
 ];
 
 export const mapOneSubzoneNameLabels: ZoneSubzoneNameLabel[] =
@@ -1092,20 +850,12 @@ export const mapThreeSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneN
   MAP_THREE_COMPACT_OFFSETS,
 );
 
-export const mapFourSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
-  mapFourSourceSubzoneNameLabels,
-  MAP_FOUR_COMPACT_OFFSETS,
-);
-
-export const mapFiveSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
-  mapFiveSourceSubzoneNameLabels,
-  MAP_FIVE_COMPACT_OFFSETS,
-);
-
-export const mapSixSubzoneNameLabels: ZoneSubzoneNameLabel[] = compactSubzoneNameLabels(
-  mapSixSourceSubzoneNameLabels,
-  MAP_SIX_COMPACT_OFFSETS,
-);
+export const mapFourSubzoneNameLabels: ZoneSubzoneNameLabel[] =
+  mapFourSourceSubzoneNameLabels;
+export const mapFiveSubzoneNameLabels: ZoneSubzoneNameLabel[] =
+  mapFiveSourceSubzoneNameLabels;
+export const mapSixSubzoneNameLabels: ZoneSubzoneNameLabel[] =
+  mapSixSourceSubzoneNameLabels;
 
 const mapOneStressEnemyStartData: EnemyStartData[] = [
   { id: enemyIds[0], position: { x: 18, y: 13 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
@@ -1269,83 +1019,89 @@ const mapThreeProgressionEnemyStartData: EnemyStartData[] = [
 ];
 
 const mapFourProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[18], position: { x: 64, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
-  { id: enemyIds[19], position: { x: 80, y: 13 }, enemyTypeId: "ash_wisp", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
-  { id: enemyIds[20], position: { x: 96, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
-  { id: enemyIds[21], position: { x: 67, y: 17 }, enemyTypeId: "goblin_shaman", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
-  { id: enemyIds[22], position: { x: 84, y: 6 }, enemyTypeId: "ash_wisp", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
-  { id: enemyIds[23], position: { x: 95, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "north-center", encounterAreaId: "shaman-watch" },
-  { id: enemyIds[24], position: { x: 116, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-east", encounterAreaId: "ash-hollow" },
-  { id: enemyIds[25], position: { x: 133, y: 14 }, enemyTypeId: "ash_wisp", subzoneId: "north-east", encounterAreaId: "ash-hollow" },
-  { id: enemyIds[26], position: { x: 151, y: 9 }, enemyTypeId: "ash_wisp", subzoneId: "north-east", encounterAreaId: "ash-hollow" },
-  { id: enemyIds[27], position: { x: 118, y: 16 }, enemyTypeId: "goblin_shaman", subzoneId: "north-east", encounterAreaId: "ash-hollow" },
-  { id: enemyIds[28], position: { x: 127, y: 6 }, enemyTypeId: "ash_wisp", subzoneId: "north-east", encounterAreaId: "ash-hollow" },
-  { id: enemyIds[29], position: { x: 149, y: 15 }, enemyTypeId: "ash_wisp", subzoneId: "north-east", encounterAreaId: "ash-hollow" },
-  { id: enemyIds[30], position: { x: 116, y: 33 }, enemyTypeId: "ash_wisp", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[31], position: { x: 132, y: 39 }, enemyTypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[32], position: { x: 150, y: 33 }, enemyTypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[33], position: { x: 124, y: 43 }, enemyTypeId: "ash_wisp", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[34], position: { x: 142, y: 43 }, enemyTypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[35], position: { x: 116, y: 40 }, enemyTypeId: "ash_wisp", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[36], position: { x: 124, y: 31 }, enemyTypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[37], position: { x: 134, y: 33 }, enemyTypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[38], position: { x: 143, y: 36 }, enemyTypeId: "ash_wisp", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
-  { id: enemyIds[39], position: { x: 151, y: 40 }, enemyTypeId: "orc", subzoneId: "south-east", encounterAreaId: "orc-approach-camp" },
+  { id: enemyIds[0], position: { x: 18, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { id: enemyIds[1], position: { x: 26, y: 11 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { id: enemyIds[2], position: { x: 34, y: 19 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { id: enemyIds[3], position: { x: 20, y: 24 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { id: enemyIds[4], position: { x: 31, y: 27 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { id: enemyIds[5], position: { x: 42, y: 17 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { id: enemyIds[6], position: { x: 48, y: 36 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { id: enemyIds[7], position: { x: 57, y: 32 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { id: enemyIds[8], position: { x: 66, y: 39 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { id: enemyIds[9], position: { x: 51, y: 47 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { id: enemyIds[10], position: { x: 61, y: 50 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { id: enemyIds[11], position: { x: 71, y: 32 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { id: enemyIds[12], position: { x: 80, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { id: enemyIds[13], position: { x: 90, y: 12 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { id: enemyIds[14], position: { x: 99, y: 20 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { id: enemyIds[15], position: { x: 82, y: 27 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { id: enemyIds[16], position: { x: 92, y: 29 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { id: enemyIds[17], position: { x: 101, y: 28 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
 ];
 
 const mapFiveProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 14, y: 12 }, enemyTypeId: "ember_imp", subzoneId: "crossing", encounterAreaId: "crossing-north-sparks" },
-  { id: enemyIds[1], position: { x: 26, y: 8 }, enemyTypeId: "ember_imp", subzoneId: "crossing", encounterAreaId: "crossing-north-sparks" },
-  { id: enemyIds[2], position: { x: 40, y: 16 }, enemyTypeId: "ember_imp", subzoneId: "crossing", encounterAreaId: "crossing-north-sparks" },
-  { id: enemyIds[3], position: { x: 18, y: 42 }, enemyTypeId: "ember_imp", subzoneId: "crossing", encounterAreaId: "crossing-south-sparks" },
-  { id: enemyIds[4], position: { x: 31, y: 48 }, enemyTypeId: "ember_imp", subzoneId: "crossing", encounterAreaId: "crossing-south-sparks" },
-  { id: enemyIds[5], position: { x: 43, y: 39 }, enemyTypeId: "ember_imp", subzoneId: "crossing", encounterAreaId: "crossing-south-sparks" },
-  { id: enemyIds[6], position: { x: 64, y: 12 }, enemyTypeId: "tin_crawler", subzoneId: "burrows", encounterAreaId: "burrows-north-shells" },
-  { id: enemyIds[7], position: { x: 79, y: 8 }, enemyTypeId: "tin_crawler", subzoneId: "burrows", encounterAreaId: "burrows-north-shells" },
-  { id: enemyIds[8], position: { x: 96, y: 16 }, enemyTypeId: "tin_crawler", subzoneId: "burrows", encounterAreaId: "burrows-north-shells" },
-  { id: enemyIds[9], position: { x: 66, y: 42 }, enemyTypeId: "tin_crawler", subzoneId: "burrows", encounterAreaId: "burrows-south-shells" },
-  { id: enemyIds[10], position: { x: 82, y: 48 }, enemyTypeId: "tin_crawler", subzoneId: "burrows", encounterAreaId: "burrows-south-shells" },
-  { id: enemyIds[11], position: { x: 99, y: 39 }, enemyTypeId: "tin_crawler", subzoneId: "burrows", encounterAreaId: "burrows-south-shells" },
-  { id: enemyIds[12], position: { x: 116, y: 12 }, enemyTypeId: "briar_wolf", subzoneId: "thornfield", encounterAreaId: "thornfield-north-pack" },
-  { id: enemyIds[13], position: { x: 132, y: 8 }, enemyTypeId: "briar_wolf", subzoneId: "thornfield", encounterAreaId: "thornfield-north-pack" },
-  { id: enemyIds[14], position: { x: 151, y: 16 }, enemyTypeId: "briar_wolf", subzoneId: "thornfield", encounterAreaId: "thornfield-north-pack" },
-  { id: enemyIds[15], position: { x: 117, y: 42 }, enemyTypeId: "briar_wolf", subzoneId: "thornfield", encounterAreaId: "thornfield-south-pack" },
-  { id: enemyIds[16], position: { x: 134, y: 48 }, enemyTypeId: "briar_wolf", subzoneId: "thornfield", encounterAreaId: "thornfield-south-pack" },
-  { id: enemyIds[17], position: { x: 151, y: 39 }, enemyTypeId: "briar_wolf", subzoneId: "thornfield", encounterAreaId: "thornfield-south-pack" },
+  { id: enemyIds[0], position: { x: 16, y: 35 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { id: enemyIds[1], position: { x: 25, y: 40 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { id: enemyIds[2], position: { x: 34, y: 35 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { id: enemyIds[3], position: { x: 18, y: 47 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { id: enemyIds[4], position: { x: 31, y: 50 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { id: enemyIds[5], position: { x: 32, y: 43 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { id: enemyIds[6], position: { x: 48, y: 15 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { id: enemyIds[7], position: { x: 56, y: 11 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { id: enemyIds[8], position: { x: 66, y: 18 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { id: enemyIds[9], position: { x: 49, y: 25 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { id: enemyIds[10], position: { x: 61, y: 29 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { id: enemyIds[11], position: { x: 72, y: 22 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { id: enemyIds[12], position: { x: 80, y: 34 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { id: enemyIds[13], position: { x: 90, y: 39 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { id: enemyIds[14], position: { x: 100, y: 35 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { id: enemyIds[15], position: { x: 82, y: 46 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { id: enemyIds[16], position: { x: 92, y: 49 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { id: enemyIds[17], position: { x: 101, y: 47 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
 ];
 
 const mapSixProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 14, y: 12 }, enemyTypeId: "mire_spider", subzoneId: "mire", encounterAreaId: "mire-north-webs" },
-  { id: enemyIds[1], position: { x: 26, y: 8 }, enemyTypeId: "mire_spider", subzoneId: "mire", encounterAreaId: "mire-north-webs" },
-  { id: enemyIds[2], position: { x: 40, y: 16 }, enemyTypeId: "mire_spider", subzoneId: "mire", encounterAreaId: "mire-north-webs" },
-  { id: enemyIds[3], position: { x: 18, y: 42 }, enemyTypeId: "mire_spider", subzoneId: "mire", encounterAreaId: "mire-south-webs" },
-  { id: enemyIds[4], position: { x: 31, y: 48 }, enemyTypeId: "mire_spider", subzoneId: "mire", encounterAreaId: "mire-south-webs" },
-  { id: enemyIds[5], position: { x: 43, y: 39 }, enemyTypeId: "mire_spider", subzoneId: "mire", encounterAreaId: "mire-south-webs" },
-  { id: enemyIds[6], position: { x: 64, y: 12 }, enemyTypeId: "night_bat", subzoneId: "canopy", encounterAreaId: "canopy-north-roost" },
-  { id: enemyIds[7], position: { x: 79, y: 8 }, enemyTypeId: "night_bat", subzoneId: "canopy", encounterAreaId: "canopy-north-roost" },
-  { id: enemyIds[8], position: { x: 96, y: 16 }, enemyTypeId: "night_bat", subzoneId: "canopy", encounterAreaId: "canopy-north-roost" },
-  { id: enemyIds[9], position: { x: 66, y: 42 }, enemyTypeId: "night_bat", subzoneId: "canopy", encounterAreaId: "canopy-south-roost" },
-  { id: enemyIds[10], position: { x: 82, y: 48 }, enemyTypeId: "night_bat", subzoneId: "canopy", encounterAreaId: "canopy-south-roost" },
-  { id: enemyIds[11], position: { x: 99, y: 39 }, enemyTypeId: "night_bat", subzoneId: "canopy", encounterAreaId: "canopy-south-roost" },
-  { id: enemyIds[12], position: { x: 116, y: 12 }, enemyTypeId: "elder_mossling", subzoneId: "oldroot", encounterAreaId: "oldroot-north-ring" },
-  { id: enemyIds[13], position: { x: 132, y: 8 }, enemyTypeId: "elder_mossling", subzoneId: "oldroot", encounterAreaId: "oldroot-north-ring" },
-  { id: enemyIds[14], position: { x: 151, y: 16 }, enemyTypeId: "elder_mossling", subzoneId: "oldroot", encounterAreaId: "oldroot-north-ring" },
-  { id: enemyIds[15], position: { x: 117, y: 42 }, enemyTypeId: "elder_mossling", subzoneId: "oldroot", encounterAreaId: "oldroot-south-ring" },
-  { id: enemyIds[16], position: { x: 134, y: 48 }, enemyTypeId: "elder_mossling", subzoneId: "oldroot", encounterAreaId: "oldroot-south-ring" },
-  { id: enemyIds[17], position: { x: 151, y: 39 }, enemyTypeId: "elder_mossling", subzoneId: "oldroot", encounterAreaId: "oldroot-south-ring" },
+  { id: enemyIds[0], position: { x: 15, y: 14 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { id: enemyIds[1], position: { x: 24, y: 10 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { id: enemyIds[2], position: { x: 34, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { id: enemyIds[3], position: { x: 17, y: 25 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { id: enemyIds[4], position: { x: 29, y: 27 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { id: enemyIds[5], position: { x: 41, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { id: enemyIds[6], position: { x: 48, y: 36 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { id: enemyIds[7], position: { x: 57, y: 32 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { id: enemyIds[8], position: { x: 66, y: 38 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { id: enemyIds[9], position: { x: 51, y: 47 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { id: enemyIds[10], position: { x: 61, y: 50 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { id: enemyIds[11], position: { x: 72, y: 43 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { id: enemyIds[12], position: { x: 80, y: 14 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { id: enemyIds[13], position: { x: 89, y: 11 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { id: enemyIds[14], position: { x: 99, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { id: enemyIds[15], position: { x: 81, y: 27 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { id: enemyIds[16], position: { x: 92, y: 29 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { id: enemyIds[17], position: { x: 101, y: 25 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
 ];
 
 const mapSevenProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 16, y: 10 }, enemyTypeId: "cinder_wisp", subzoneId: "plaza", encounterAreaId: "plaza-ember-ring" },
-  { id: enemyIds[1], position: { x: 31, y: 8 }, enemyTypeId: "cinder_wisp", subzoneId: "plaza", encounterAreaId: "plaza-ember-ring" },
-  { id: enemyIds[2], position: { x: 48, y: 14 }, enemyTypeId: "cinder_wisp", subzoneId: "plaza", encounterAreaId: "plaza-ember-ring" },
-  { id: enemyIds[3], position: { x: 58, y: 20 }, enemyTypeId: "cinder_wisp", subzoneId: "plaza", encounterAreaId: "plaza-ember-ring" },
-  { id: enemyIds[4], position: { x: 27, y: 24 }, enemyTypeId: "cinder_wisp", subzoneId: "plaza", encounterAreaId: "plaza-ember-ring" },
-  { id: enemyIds[5], position: { x: 101, y: 11 }, enemyTypeId: "orc_warmaster", subzoneId: "garden", encounterAreaId: "garden-war-camp", combatBodyRadius: 1.1 },
-  { id: enemyIds[6], position: { x: 116, y: 8 }, enemyTypeId: "orc_warmaster", subzoneId: "garden", encounterAreaId: "garden-war-camp", combatBodyRadius: 1.1 },
-  { id: enemyIds[7], position: { x: 140, y: 13 }, enemyTypeId: "orc_warmaster", subzoneId: "garden", encounterAreaId: "garden-war-camp", combatBodyRadius: 1.1 },
-  { id: enemyIds[8], position: { x: 104, y: 24 }, enemyTypeId: "orc_warmaster", subzoneId: "garden", encounterAreaId: "garden-war-camp", combatBodyRadius: 1.1 },
-  { id: enemyIds[9], position: { x: 135, y: 24 }, enemyTypeId: "orc_warmaster", subzoneId: "garden", encounterAreaId: "garden-war-camp", combatBodyRadius: 1.1 },
+  { id: enemyIds[0], position: { x: 17, y: 15 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { id: enemyIds[1], position: { x: 26, y: 12 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { id: enemyIds[2], position: { x: 36, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { id: enemyIds[3], position: { x: 19, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { id: enemyIds[4], position: { x: 31, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1.15 },
+  { id: enemyIds[5], position: { x: 43, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { id: enemyIds[6], position: { x: 48, y: 37 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
+  { id: enemyIds[7], position: { x: 57, y: 33 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { id: enemyIds[8], position: { x: 66, y: 39 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { id: enemyIds[9], position: { x: 50, y: 48 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
+  { id: enemyIds[10], position: { x: 61, y: 50 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { id: enemyIds[11], position: { x: 72, y: 44 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { id: enemyIds[12], position: { x: 80, y: 15 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
+  { id: enemyIds[13], position: { x: 89, y: 11 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { id: enemyIds[14], position: { x: 99, y: 19 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { id: enemyIds[15], position: { x: 82, y: 29 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
+  { id: enemyIds[16], position: { x: 93, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
+  { id: enemyIds[17], position: { x: 101, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { id: enemyIds[18], position: { x: 88, y: 22 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
+  { id: enemyIds[19], position: { x: 96, y: 24 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
 ];
 
 export const mapThreeEnemyStartData: EnemyStartData[] = createEnemyStartData(
@@ -1355,17 +1111,17 @@ export const mapThreeEnemyStartData: EnemyStartData[] = createEnemyStartData(
 
 export const mapFourEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapFourSubzones,
-  compactEnemyStartData(mapFourProgressionEnemyStartData, MAP_FOUR_COMPACT_OFFSETS),
+  mapFourProgressionEnemyStartData,
 );
 
 export const mapFiveEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapFiveSubzones,
-  compactEnemyStartData(mapFiveProgressionEnemyStartData, MAP_FIVE_COMPACT_OFFSETS),
+  mapFiveProgressionEnemyStartData,
 );
 
 export const mapSixEnemyStartData: EnemyStartData[] = createEnemyStartData(
   mapSixSubzones,
-  compactEnemyStartData(mapSixProgressionEnemyStartData, MAP_SIX_COMPACT_OFFSETS),
+  mapSixProgressionEnemyStartData,
 );
 
 export const mapSevenEnemyStartData: EnemyStartData[] = createEnemyStartData(
@@ -1649,30 +1405,6 @@ const HUB_VISUAL_OBJECTS: MapVisualObject[] = [
     heightCells: 9,
     anchorY: 1,
   },
-  {
-    id: "hub-guild-tavern",
-    visualId: "guild_tavern_building",
-    position: { x: 55, y: 55 },
-    widthCells: 18,
-    heightCells: 13,
-    anchorY: 1,
-  },
-  {
-    id: "hub-farm",
-    visualId: "farm_building",
-    position: { x: 18, y: 44 },
-    widthCells: 14,
-    heightCells: 11,
-    anchorY: 1,
-  },
-  {
-    id: "hub-livestock",
-    visualId: "livestock_building",
-    position: { x: 18, y: 25 },
-    widthCells: 14,
-    heightCells: 11,
-    anchorY: 1,
-  },
 ];
 
 const HUB_TWO_VISUAL_OBJECTS: MapVisualObject[] = [
@@ -1793,6 +1525,38 @@ const HUB_TWO_STRUCTURE_COLLISION_WALLS = dedupeWalls([
   ...createBottomCenteredWallOutline({ x: 119, y: 42 }, 8, 6),
 ]);
 
+const MAP_FOUR_VISUAL_OBJECTS: MapVisualObject[] = [
+  { id: "map-4-charred-oak-west", visualId: "ash_goblin_charred_dead_tree_trunk", position: { x: 22, y: 25 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-4-ember-firepit", visualId: "ash_goblin_ember_campfire_pit", position: { x: 56, y: 42 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-4-palisade-east", visualId: "ash_goblin_goblin_spike_barricade", position: { x: 88, y: 23 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-4-ash-stones", visualId: "ash_goblin_ash_rock_cluster", position: { x: 68, y: 17 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-4-burned-branch", visualId: "ash_goblin_burned_log_pile", position: { x: 40, y: 47 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+];
+
+const MAP_FIVE_VISUAL_OBJECTS: MapVisualObject[] = [
+  { id: "map-5-shell-mound", visualId: "briar_mire_stone_cluster", position: { x: 24, y: 43 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-5-thorn-arch", visualId: "briar_twisted_root_arch", position: { x: 45, y: 16 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-5-burrow-hole", visualId: "briar_burrow_mound_entrance", position: { x: 66, y: 36 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-5-webbed-roots", visualId: "briar_spider_webbed_root_stump", position: { x: 88, y: 40 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-5-moss-rock", visualId: "briar_large_briar_thicket", position: { x: 22, y: 15 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+];
+
+const MAP_SIX_VISUAL_OBJECTS: MapVisualObject[] = [
+  { id: "map-6-bat-roost", visualId: "nightmire_bat_roost_dead_tree", position: { x: 23, y: 20 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-hanging-roots", visualId: "nightmire_hanging_root_curtain", position: { x: 41, y: 44 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-oldroot-stump", visualId: "nightmire_ancient_elder_moss_stump", position: { x: 61, y: 27 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-cinder-pool", visualId: "nightmire_cinder_veined_standing_stone", position: { x: 88, y: 22 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-glowcap-cluster", visualId: "nightmire_mushroom_ring", position: { x: 86, y: 45 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+];
+
+const MAP_SEVEN_VISUAL_OBJECTS: MapVisualObject[] = [
+  { id: "map-7-war-banner", visualId: "orc_warcamp_orc_command_banner_standard", position: { x: 24, y: 18 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-shield-rack", visualId: "orc_warcamp_orc_weapon_rack", position: { x: 56, y: 44 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-spiked-barricade", visualId: "orc_warcamp_heavy_orc_spike_barricade", position: { x: 63, y: 22 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-warmaster-dais", visualId: "orc_warcamp_crude_war_drum_platform", position: { x: 88, y: 28 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-weapon-pile", visualId: "orc_warcamp_skull_bone_trophy_mound", position: { x: 38, y: 49 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+];
+
 const MAP_ONE_WALLS = dedupeWalls([
   ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, MAP_ONE_ROWS),
   ...createVerticalWall(52, 1, MAP_ONE_ROWS - 2, [[24, 34]]),
@@ -1824,36 +1588,35 @@ const MAP_THREE_WALLS = dedupeWalls([
 ]);
 
 const MAP_FOUR_WALLS = dedupeWalls([
-  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(52, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
-  ...createVerticalWall(105, 3, WILDERNESS_MAP_ROWS - 4, [[10, 14]]),
+  ...createPerimeterWalls(POST_HUB_TWO_MAP_COLUMNS, POST_HUB_TWO_MAP_ROWS),
+  ...createWallBlock(18, 28, 30, 40),
+  ...createWallBlock(39, 49, 46, 51),
+  ...createWallBlock(62, 72, 9, 18),
+  ...createWallBlock(84, 95, 38, 48),
 ]);
 
 const MAP_FIVE_WALLS = dedupeWalls([
-  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, MAP_ONE_ROWS),
-  ...createVerticalWall(52, 0, MAP_ONE_ROWS - 1, [[24, 34]]),
-  ...createVerticalWall(105, 0, MAP_ONE_ROWS - 1, [[24, 34]]),
-  ...createWallBlock(18, 30, 21, 24),
-  ...createWallBlock(72, 85, 10, 13),
-  ...createWallBlock(119, 131, 43, 46),
+  ...createPerimeterWalls(POST_HUB_TWO_MAP_COLUMNS, POST_HUB_TWO_MAP_ROWS),
+  ...createWallBlock(17, 28, 9, 17),
+  ...createWallBlock(39, 48, 38, 47),
+  ...createWallBlock(72, 80, 8, 16),
+  ...createWallBlock(84, 94, 7, 14),
 ]);
 
 const MAP_SIX_WALLS = dedupeWalls([
-  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, MAP_ONE_ROWS),
-  ...createVerticalWall(52, 0, MAP_ONE_ROWS - 1, [[24, 34]]),
-  ...createVerticalWall(105, 0, MAP_ONE_ROWS - 1, [[24, 34]]),
-  ...createWallBlock(18, 28, 37, 40),
-  ...createWallBlock(68, 79, 19, 22),
-  ...createWallBlock(130, 143, 35, 38),
+  ...createPerimeterWalls(POST_HUB_TWO_MAP_COLUMNS, POST_HUB_TWO_MAP_ROWS),
+  ...createWallBlock(17, 28, 34, 45),
+  ...createWallBlock(38, 48, 9, 13),
+  ...createWallBlock(59, 70, 25, 34),
+  ...createWallBlock(82, 94, 39, 49),
 ]);
 
 const MAP_SEVEN_WALLS = dedupeWalls([
-  ...createPerimeterWalls(WILDERNESS_MAP_COLUMNS, WILDERNESS_MAP_ROWS),
-  ...createVerticalWall(80, 3, WILDERNESS_MAP_ROWS - 4, [[13, 19]]),
-  ...createWallBlock(38, 45, 3, 6),
-  ...createWallBlock(62, 70, 22, 25),
-  ...createWallBlock(89, 96, 5, 9),
-  ...createWallBlock(124, 130, 19, 22),
+  ...createPerimeterWalls(POST_HUB_TWO_MAP_COLUMNS, POST_HUB_TWO_MAP_ROWS),
+  ...createWallBlock(17, 28, 36, 46),
+  ...createWallBlock(35, 45, 9, 17),
+  ...createWallBlock(57, 68, 12, 22),
+  ...createWallBlock(80, 92, 36, 46),
 ]);
 
 const SLIMEWARD_CAMP_COLUMNS = 44;
@@ -1914,15 +1677,6 @@ export const debugMapDefinitions: Record<
         sourceMapId: HUB_MAP_ID,
         targetMapId: MAP_ONE_ID,
         arrivalPositions: mapOneHubArrivalPositions,
-      },
-      {
-        id: HUB_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
-        position: { x: hubTeleporterPosition.x, y: hubTeleporterPosition.y - 10 },
-        range: TELEPORTER_RANGE,
-        sourceMapId: HUB_MAP_ID,
-        targetMapId: SLIMEWARD_CAMP_ID,
-        arrivalPositions: slimewardCampArrivalPositions,
-        visualTheme: "slimeward",
       },
     ],
   },
@@ -2076,12 +1830,13 @@ export const debugMapDefinitions: Record<
   },
   [MAP_FOUR_ID]: {
     id: MAP_FOUR_ID,
-    displayName: "Ashwatch Approach",
+    displayName: "Ash Goblin Encampment",
     debugName: "zone-4",
-    columns: WILDERNESS_MAP_COLUMNS,
-    rows: WILDERNESS_MAP_ROWS,
+    columns: POST_HUB_TWO_MAP_COLUMNS,
+    rows: POST_HUB_TWO_MAP_ROWS,
     walls: MAP_FOUR_WALLS,
     healingFountains: [],
+    visualObjects: MAP_FOUR_VISUAL_OBJECTS,
     subzones: mapFourSubzones,
     subzoneNameLabels: mapFourSubzoneNameLabels,
     teleports: [
@@ -2106,12 +1861,13 @@ export const debugMapDefinitions: Record<
   },
   [MAP_FIVE_ID]: {
     id: MAP_FIVE_ID,
-    displayName: "Emberbriar Crossing",
+    displayName: "Briar Burrows",
     debugName: "zone-5",
-    columns: WILDERNESS_MAP_COLUMNS,
-    rows: MAP_ONE_ROWS,
+    columns: POST_HUB_TWO_MAP_COLUMNS,
+    rows: POST_HUB_TWO_MAP_ROWS,
     walls: MAP_FIVE_WALLS,
     healingFountains: [],
+    visualObjects: MAP_FIVE_VISUAL_OBJECTS,
     subzones: mapFiveSubzones,
     subzoneNameLabels: mapFiveSubzoneNameLabels,
     teleports: [
@@ -2138,10 +1894,11 @@ export const debugMapDefinitions: Record<
     id: MAP_SIX_ID,
     displayName: "Nightmire Canopy",
     debugName: "zone-6",
-    columns: WILDERNESS_MAP_COLUMNS,
-    rows: MAP_ONE_ROWS,
+    columns: POST_HUB_TWO_MAP_COLUMNS,
+    rows: POST_HUB_TWO_MAP_ROWS,
     walls: MAP_SIX_WALLS,
     healingFountains: [],
+    visualObjects: MAP_SIX_VISUAL_OBJECTS,
     subzones: mapSixSubzones,
     subzoneNameLabels: mapSixSubzoneNameLabels,
     teleports: [
@@ -2166,12 +1923,13 @@ export const debugMapDefinitions: Record<
   },
   [MAP_SEVEN_ID]: {
     id: MAP_SEVEN_ID,
-    displayName: "Twilight of the Fallen",
+    displayName: "Orc Warcamp",
     debugName: "zone-7",
-    columns: WILDERNESS_MAP_COLUMNS,
-    rows: WILDERNESS_MAP_ROWS,
+    columns: POST_HUB_TWO_MAP_COLUMNS,
+    rows: POST_HUB_TWO_MAP_ROWS,
     walls: MAP_SEVEN_WALLS,
     healingFountains: [],
+    visualObjects: MAP_SEVEN_VISUAL_OBJECTS,
     subzones: mapSevenSubzones,
     subzoneNameLabels: mapSevenSubzoneNameLabels,
     teleports: [
@@ -2397,13 +2155,7 @@ export function isClassMentorAvailable(
 export function isHubClassMentorAvailable(
   quests: DebugMapQuestStates = {},
 ): boolean {
-  const azureTrialStatus = quests.azure_trial?.status;
-
-  return (
-    quests.find_slimeward_camp?.status === "completed" &&
-    azureTrialStatus !== "ready_to_turn_in" &&
-    azureTrialStatus !== "completed"
-  );
+  return quests.find_slimeward_camp?.status === "completed";
 }
 
 export function isHubTwoClassMentorAvailable(
@@ -2698,19 +2450,6 @@ function compactSubzoneNameLabels(
     position: offsetPosition(
       label.position,
       getCompactOffset(label.subzoneId, offsetsBySubzoneId),
-    ),
-  }));
-}
-
-function compactEnemyStartData(
-  enemies: EnemyStartData[],
-  offsetsBySubzoneId: Record<string, Position>,
-): EnemyStartData[] {
-  return enemies.map((enemy) => ({
-    ...enemy,
-    position: offsetPosition(
-      enemy.position,
-      getCompactOffset(enemy.subzoneId, offsetsBySubzoneId),
     ),
   }));
 }

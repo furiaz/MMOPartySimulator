@@ -12,6 +12,8 @@ import {
 } from "./game";
 import { CLASS_PORTRAIT_SRC } from "./visualAssets";
 
+const companionBuffSlotIndexes = Array.from({ length: 8 }, (_, index) => index);
+
 const classPathLabels: Record<ClassPath, string> = {
   honor: "Honor Path",
   primal: "Primal Path",
@@ -40,7 +42,7 @@ export function CompanionVitalsPanel({
 
   return (
     <section className="companion-vitals-panel" aria-label="Companion vitals">
-      {orderedMembers.map((member) => {
+      {orderedMembers.map((member, memberIndex) => {
         const classDefinition = CLASS_DEFINITIONS[member.classId];
         const classPath = classDefinition.path;
         const classPathLabel = classPath ? classPathLabels[classPath] : null;
@@ -89,113 +91,134 @@ export function CompanionVitalsPanel({
             (globalCooldownRemainingMs / globalCooldownDurationMs) * 100,
           ),
         );
-
         return (
-          <article
+          <div
             key={member.id}
-            className={`companion-vitals-card companion-vitals-card-${pathClassName}`}
+            className={`companion-vitals-lane${
+              memberIndex === 0 ? " companion-vitals-lane-first" : ""
+            }${
+              memberIndex === orderedMembers.length - 1
+                ? " companion-vitals-lane-last"
+                : ""
+            }`}
           >
-            {globalCooldownRemainingMs > 0 ? (
-              <span
-                className="companion-vitals-gcd-bar"
-                title={`Global cooldown ${Math.ceil(
-                  globalCooldownRemainingMs / 1000,
-                )}s`}
-              >
-                <span style={{ width: `${globalCooldownPercent}%` }} />
-              </span>
-            ) : null}
-            <div className="companion-vitals-portrait-frame">
-              <img
-                alt=""
-                className="companion-vitals-portrait"
-                draggable={false}
-                src={portraitSrc}
-              />
+            <div aria-hidden="true" className="companion-vitals-buff-rail">
+              <div className="companion-vitals-buff-row companion-vitals-buff-row-debuffs">
+                {companionBuffSlotIndexes.map((slotIndex) => (
+                  <span key={`debuff-${slotIndex}`} />
+                ))}
+              </div>
+              <div className="companion-vitals-buff-row companion-vitals-buff-row-buffs">
+                {companionBuffSlotIndexes.map((slotIndex) => (
+                  <span key={`buff-${slotIndex}`} />
+                ))}
+              </div>
             </div>
-            <div className="companion-vitals-main">
-              <div className="companion-vitals-header">
-                <span>{companionLabel}</span>
-                <span>Lv {member.characterLevel}</span>
-              </div>
-              <div className="companion-vitals-class">
-                <span>{classDefinition.displayName}</span>
-                {classPathLabel ? <span>{classPathLabel}</span> : null}
-              </div>
-              <div className="companion-vitals-meter-row">
-                <span>HP</span>
-                <span>
-                  {member.health}/{derivedStats.maxHealth}
-                </span>
-              </div>
-              <span
-                className="companion-vitals-bar companion-vitals-hp"
-                title={`HP ${member.health}/${derivedStats.maxHealth}`}
-              >
-                <span style={{ width: `${healthPercent}%` }} />
-              </span>
-              <div className="companion-vitals-meter-row">
-                <span>Exp</span>
-                <span>{characterXpText}</span>
-              </div>
-              <span
-                className={`companion-vitals-bar companion-vitals-exp${
-                  characterXpProgress.isMaxLevel
-                    ? " companion-vitals-exp-max"
-                    : ""
-                }`}
-                title={`Exp ${characterXpText}`}
-              >
-                <span style={{ width: `${characterXpProgress.percent}%` }} />
-              </span>
-              <div className="companion-vitals-slots">
+            <article
+              className={`companion-vitals-card companion-vitals-card-${pathClassName}`}
+            >
+              {globalCooldownRemainingMs > 0 ? (
                 <span
-                  className="companion-vitals-consumable"
-                  title={
-                    flaskDisplayState
-                      ? `${flaskDisplayState.displayName}: ${flaskDisplayState.usesLeft} uses left${
-                          flaskDisplayState.cooldownRemainingMs > 0
-                            ? `, ${Math.ceil(
-                                flaskDisplayState.cooldownRemainingMs / 1000,
-                              )}s cooldown`
-                            : ", ready"
-                        }`
-                      : "No flask equipped"
-                  }
+                  className="companion-vitals-gcd-bar"
+                  title={`Global cooldown ${Math.ceil(
+                    globalCooldownRemainingMs / 1000,
+                  )}s`}
                 >
-                  {flaskDisplayState?.cooldownRemainingMs ? (
-                    <span
-                      className="companion-vitals-cooldown-fill"
-                      style={{
-                        width: `${flaskDisplayState.cooldownPercent}%`,
-                      }}
-                    />
-                  ) : null}
-                  <span className="companion-vitals-slot-label">Flask</span>
-                  <span className="companion-vitals-icon-frame">
-                    {flaskIconSrc ? (
-                      <img
-                        alt=""
-                        className="companion-vitals-slot-icon"
-                        draggable={false}
-                        src={flaskIconSrc}
+                  <span style={{ width: `${globalCooldownPercent}%` }} />
+                </span>
+              ) : null}
+              <div className="companion-vitals-portrait-frame">
+                <img
+                  alt=""
+                  className="companion-vitals-portrait"
+                  draggable={false}
+                  src={portraitSrc}
+                />
+              </div>
+              <div className="companion-vitals-main">
+                <div className="companion-vitals-header">
+                  <span>{companionLabel}</span>
+                  <span>Lv {member.characterLevel}</span>
+                </div>
+                <div className="companion-vitals-class">
+                  <span>{classDefinition.displayName}</span>
+                  {classPathLabel ? <span>{classPathLabel}</span> : null}
+                </div>
+                <div className="companion-vitals-meter-row">
+                  <span>HP</span>
+                  <span>
+                    {member.health}/{derivedStats.maxHealth}
+                  </span>
+                </div>
+                <span
+                  className="companion-vitals-bar companion-vitals-hp"
+                  title={`HP ${member.health}/${derivedStats.maxHealth}`}
+                >
+                  <span style={{ width: `${healthPercent}%` }} />
+                </span>
+                <div className="companion-vitals-meter-row">
+                  <span>Exp</span>
+                  <span>{characterXpText}</span>
+                </div>
+                <span
+                  className={`companion-vitals-bar companion-vitals-exp${
+                    characterXpProgress.isMaxLevel
+                      ? " companion-vitals-exp-max"
+                      : ""
+                  }`}
+                  title={`Exp ${characterXpText}`}
+                >
+                  <span style={{ width: `${characterXpProgress.percent}%` }} />
+                </span>
+                <div className="companion-vitals-slots">
+                  <span
+                    className="companion-vitals-consumable"
+                    title={
+                      flaskDisplayState
+                        ? `${flaskDisplayState.displayName}: ${flaskDisplayState.usesLeft} uses left${
+                            flaskDisplayState.cooldownRemainingMs > 0
+                              ? `, ${Math.ceil(
+                                  flaskDisplayState.cooldownRemainingMs / 1000,
+                                )}s cooldown`
+                              : ", ready"
+                          }`
+                        : "No flask equipped"
+                    }
+                  >
+                    {flaskDisplayState?.cooldownRemainingMs ? (
+                      <span
+                        className="companion-vitals-cooldown-fill"
+                        style={{
+                          width: `${flaskDisplayState.cooldownPercent}%`,
+                        }}
                       />
                     ) : null}
-                    {flaskDisplayState ? (
-                      <span className="companion-vitals-uses-badge">
-                        {flaskDisplayState.usesLeft}
-                      </span>
-                    ) : null}
+                    <span className="companion-vitals-slot-label">Flask</span>
+                    <span className="companion-vitals-icon-frame">
+                      {flaskIconSrc ? (
+                        <img
+                          alt=""
+                          className="companion-vitals-slot-icon"
+                          draggable={false}
+                          src={flaskIconSrc}
+                        />
+                      ) : null}
+                      {flaskDisplayState ? (
+                        <span className="companion-vitals-uses-badge">
+                          {flaskDisplayState.usesLeft}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span>
+                      {flaskDisplayState
+                        ? `${flaskDisplayState.displayName}`
+                        : "Empty"}
+                    </span>
                   </span>
-                  <span>
-                    {flaskDisplayState
-                      ? `${flaskDisplayState.displayName}`
-                      : "Empty"}
-                  </span>
-                </span>
+                </div>
               </div>
-            </div>
-          </article>
+            </article>
+          </div>
         );
       })}
     </section>

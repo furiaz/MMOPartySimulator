@@ -990,6 +990,7 @@ export {
   debugToggleSuperExp,
   debugToggleSuperSpeed,
   debugTeleportToHub,
+  debugTeleportToSlimewardCamp,
   debugTurnInCurrentQuest,
 } from "./debugTools";
 export {

@@ -767,16 +767,13 @@ describe("save game serialization", () => {
       visitedMapIds: [HUB_MAP_ID],
       visitedSubzonesByMapId: {},
     });
-    expect(restored.state.entities["hub-guild-coordinator"]).toMatchObject({
+    expect(restored.state.entities["hub-merchant"]).toMatchObject({
       kind: "npc",
-      displayName: "Guild Coordinator",
-      npcRole: "guild_coordinator",
+      displayName: "Merchant",
+      npcRole: "merchant",
     });
-    expect(restored.state.entities["hub-tavern-keeper"]).toMatchObject({
-      kind: "npc",
-      displayName: "Inn Keeper",
-      npcRole: "tavern_keeper",
-    });
+    expect(restored.state.entities["hub-guild-coordinator"]).toBeUndefined();
+    expect(restored.state.entities["hub-tavern-keeper"]).toBeUndefined();
   });
 
   it("sanitizes invalid Inn Kitchen meal save entries", () => {

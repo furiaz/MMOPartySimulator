@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { createCompanion, createEnemy, createNpc } from "./entities";
-import { companionIds, createDebugMap, TELEPORTER_ID } from "./debugMap";
+import {
+  companionIds,
+  createDebugMap,
+  slimewardCampArrivalPositions,
+  SLIMEWARD_CAMP_ID,
+  TELEPORTER_ID,
+} from "./debugMap";
 import {
   DEBUG_ADD_ENEMIES_MAX_COUNT,
   debugAddCraftingMaterialsAndEnemyDropsToInventory,
@@ -12,6 +18,7 @@ import {
   debugForceSuperiorEnemyInCurrentSubzone,
   debugLevelUpAllCompanions,
   debugRemoveDebugEnemies,
+  debugTeleportToSlimewardCamp,
   debugToggleCompanionInfiniteHealth,
   debugToggleCompanionOneHunterClass,
   debugTurnInCurrentQuest,
@@ -28,6 +35,63 @@ import { isTeleportWorking } from "./teleportState";
 import { getCurrencyBalance } from "./wallet";
 import type { Enemy } from "./types";
 import type { QuestId, QuestState } from "./questTypes";
+
+describe("debugTeleportToSlimewardCamp", () => {
+  it("moves the party to Slimeward Camp and clears map-local runtime", () => {
+    const companions = companionIds.map((companionId, index) =>
+      createCompanion(companionId, { x: 5 + index, y: 5 }, companionId),
+    );
+    const state = createTestGameState({
+      partyLeaderId: companionIds[0],
+      entities: Object.fromEntries(
+        companions.map((companion) => [companion.id, companion]),
+      ),
+      activeTeleport: {
+        id: TELEPORTER_ID,
+        position: { x: 10, y: 10 },
+        range: 5,
+        sourceMapId: "map-1",
+        targetMapId: "map-2",
+        triggeredBy: "player",
+      },
+      worldTravelTargetMapId: "map-4",
+      combatFeedbackEvents: [
+        {
+          id: "hit-1",
+          entityId: companionIds[0],
+          type: "damage",
+          text: "1",
+          createdAt: 0,
+          expiresAt: 1,
+        },
+      ],
+      dropVisualEvents: [
+        {
+          id: "drop-1",
+          enemyId: "enemy-1",
+          itemId: "slime_gel_t1",
+          quantity: 1,
+          dropChance: 1,
+          position: { x: 1, y: 1 },
+          createdAt: 0,
+          expiresAt: 1,
+        },
+      ],
+    });
+
+    const nextState = debugTeleportToSlimewardCamp(state);
+
+    expect(nextState.currentMapId).toBe(SLIMEWARD_CAMP_ID);
+    expect(nextState.map?.id).toBe(SLIMEWARD_CAMP_ID);
+    expect(nextState.activeTeleport).toBeNull();
+    expect(nextState.worldTravelTargetMapId).toBeNull();
+    expect(nextState.combatFeedbackEvents).toEqual([]);
+    expect(nextState.dropVisualEvents).toEqual([]);
+    expect(nextState.entities[companionIds[0]]?.position).toEqual(
+      slimewardCampArrivalPositions[0],
+    );
+  });
+});
 
 describe("debugForceSuperiorEnemyInCurrentSubzone", () => {
   it("turns the closest normal enemy in the leader subzone into a Superior enemy", () => {
