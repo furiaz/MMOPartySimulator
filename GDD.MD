@@ -1306,23 +1306,31 @@ Current Atlas pages may include:
 
 Atlas pages may be viewed remotely when supported.
 
-Service actions remain gated by their owning system:
+Service actions remain gated by their owning system and by local service presence:
 
 - Smith crafting requires Smith proximity
 - Bank transfers require Bank Chest proximity
 - Guild & Inn service actions require Guild & Inn proximity
-- Farm service actions require Farmer proximity
-- Livestock service actions require Livestock proximity
+- Farm service actions require Farmer proximity in hubs where Farm is present
+- Livestock service actions require Livestock proximity in hubs where Livestock is present
 
 Guild & Inn remote viewing may show current state, upgrades, rooms, recipes, quests, recruits, Field Teams, and timers without allowing gated service actions.
 
 Farm & Livestock remote viewing may show current plots, crop holding, crop rates, livestock grid state, creature ownership, feed requirements, production estimates, upgrades, helper bonuses, and timers without allowing gated service actions.
 
-Guild & Inn, Farm, and Livestock are current town services. Their service actions unlock after The Azure Trial is completed.
+Guild & Inn, Farm, and Livestock are current town services. Their service actions unlock after The Azure Trial is completed and still respect service location and proximity rules.
+
+Current prototype hub service split:
+
+- Harbor Union Bastion / Hub 1 has basic hub services only: Quest Giver, Merchant, Smith, Bank Chest, Dog, Healing Fountain, Target Dummy, AoE Target Dummy, and the quest-unlocked Class Mentor.
+- Harbor Union Bastion / Hub 1 does not include Guild & Inn, Farm, Livestock, their service NPCs, or the old Test Blade placeholder.
+- Forward Bastion / Hub 2 has basic hub services plus Guild & Inn, Farm, and Livestock.
+- Main hubs after Forward Bastion should include basic hub services plus Guild & Inn by default.
+- Farm and Livestock are currently Forward Bastion special services unless a future ticket explicitly shares or relocates them.
 
 Current Guild & Inn behavior:
 
-- the shared service is opened through the Atlas or by interacting with the Guild Coordinator or Inn Keeper
+- the shared service is opened through the Atlas where supported or by interacting with the Guild Coordinator or Inn Keeper in hubs where they are present
 - Guild Recruit shows generated recruit candidates, refresh timing, recruitment upgrades, and destination preview
 - Guild Notice Board shows available, taken, and done board quests, quest refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, rewards, and unseen update sign state
 - Guild Field Teams manage inactive companion assignment, roster movement, upgrades, AFK assignments, redeeming rewards, and return-to-hub behavior
@@ -1331,7 +1339,7 @@ Current Guild & Inn behavior:
 
 Current Farm behavior:
 
-- Farm is opened through the Atlas or by interacting with the Farmer
+- Farm is currently a Forward Bastion special service and is opened through the Atlas where supported or by interacting with the Farmer in hubs where Farm is present
 - crops are permanent plot discoveries and production outputs, not normal inventory clutter
 - Carrots start unlocked at level 0 production
 - Potato, Moonleaf, Bittercap Mushroom, and Ashpepper plots unlock from seed/key-item sources
@@ -1349,7 +1357,7 @@ Current Farm behavior:
 
 Current Livestock behavior:
 
-- Livestock is opened through the Atlas or by interacting with the Livestock keeper
+- Livestock is currently a Forward Bastion special service and is opened through the Atlas where supported or by interacting with the Livestock keeper in hubs where Livestock is present
 - Livestock uses a ranch grid with owned unplaced creatures and placed creatures
 - current creatures are Duskhen, Wolf, Tin Crawler, and Elder Mossling
 - current creature footprints are Duskhen 1x1, Wolf 2x1, Tin Crawler 2x2, and Elder Mossling 2x2
@@ -1624,16 +1632,12 @@ POI selection should avoid selecting invalid, unreachable, depleted, dead, compl
 
 POI selection may use path distance, priority, target scoring, progressive fallback, local target preference, and short commitment windows to avoid unstable target switching.
 
-When Stay in Subzone is enabled, POI selection should prefer targets inside the leader's current subzone while still allowing valid teleport POIs and local quest interactions.
-
-
-Current prototype UI exposes Auto Combat and POI search scope as one combined control:
+Current prototype UI exposes Auto Combat as an Off/On control:
 
 - Auto Combat: Off disables autonomous combat targeting.
-- Auto Combat: On - Subzone Only enables autonomous combat targeting and keeps POI selection inside the leader's current subzone where supported.
-- Auto Combat: On - Zone Only enables autonomous combat targeting and keeps autonomous POI selection on the current prototype map.
+- Auto Combat: On enables autonomous combat targeting and keeps POI selection inside the leader's current internal subzone where supported, while still allowing valid teleport POIs and local quest interactions.
 
-Zone Only is a prototype map-scope control and must not be treated as the final zone system.
+Player-facing Zone/Subzone/Free Travel cycling has been removed. Internal POI scope compatibility may exist, but the current game-facing Auto Combat behavior is Off or On using the local subzone boundary.
 
 POI direction may route the leader toward:
 
@@ -2293,16 +2297,14 @@ Current Harbor Union Bastion prototype hub:
 
 - Harbor Union Bastion is the first prototype hub map.
 - It is a safe port/peninsula settlement.
-- It currently includes a minimal beach/dock entry area, small city square, placeholder NPCs, a Guild & Inn building, a healing fountain, decorative house/cabin/tent/dock-shore structure visuals, and a clear exit to the first wild zone.
-- Current placeholders may include Quest Giver, Class Mentor, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Dog, Test Blade, a hub target dummy, and a hub AoE target dummy.
+- It currently includes a minimal beach/dock entry area, small city square, basic service NPCs, a healing fountain, decorative house/cabin/tent/dock-shore structure visuals, and a clear exit to the first wild zone.
+- Current placeholders may include Quest Giver, quest-unlocked Class Mentor, Merchant, Smith, Bank Chest, Dog, a hub target dummy, and a hub AoE target dummy.
 - The Quest Giver supports the lightweight prototype quest chain only.
-- The Class Mentor supports prototype first-class selection for eligible Beginner companions.
+- The Class Mentor supports prototype first-class selection for eligible Beginner companions after the quest unlocks it and remains available in Hub 1 after The Azure Trial.
 - The Merchant supports a fixed prototype buy stock for selected equipment, flasks, and skill books.
 - The Smith supports current lightweight prototype crafting only.
 - The Bank Chest supports current lightweight prototype shared bank storage only.
-- The Guild Coordinator and Inn Keeper open the current Guild & Inn Atlas service page.
-- Guild & Inn service actions require the party leader to be near either Guild & Inn service NPC.
-- The Guild & Inn Notice Board sign may appear near the building when board work is unseen or claimable.
+- Harbor Union Bastion does not currently include Guild & Inn, Guild Coordinator, Inn Keeper, Farm, Livestock, their service NPCs, Test Blade, or direct physical Slimeward Camp access.
 - Hub target dummies are passive 100 HP debug enemies with no XP reward.
 - The standard hub target dummy can be manually attacked for combat testing, is not selected by autonomous POI behavior, and regenerates health over time.
 - The hub AoE target dummy is a debug combat-test enemy for prototype enemy AoE channel and telegraph behavior.
@@ -2313,14 +2315,15 @@ Current Harbor Union Bastion prototype hub:
 Current Forward Bastion prototype hub:
 
 - Forward Bastion is the second prototype hub map.
-- It is a safe forward settlement connected between Azurefen Hollow and Ashwatch Approach.
-- It currently includes placeholder services, a Guild & Inn building, decorative structure visuals, a healing fountain, and physical route teleports.
-- Current placeholders may include Quest Giver, Class Mentor, Merchant, Smith, Bank Chest, Bounty Board, Guild Coordinator, Inn Keeper, and dog NPCs.
+- It is a safe forward settlement connected between Azurefen Hollow and Ash Goblin Encampment.
+- It currently includes basic hub services, a Guild & Inn building, Farm and Livestock service anchors, decorative structure visuals, a healing fountain, and physical route teleports.
+- Current placeholders may include Quest Giver, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Farmer, Livestock keeper, and dog NPCs.
 - The Class Mentor may appear in Forward Bastion through current quest-aware hub NPC data.
-- The Bounty Board remains a placeholder hub NPC unless explicitly expanded.
+- The standalone Bounty Board NPC is removed; board work is accessed through the Guild & Inn Notice Board UI.
 - The Guild Coordinator and Inn Keeper open the current Guild & Inn Atlas service page.
 - Guild & Inn service actions require the party leader to be near either Guild & Inn service NPC.
 - The Guild & Inn Notice Board sign may appear near the building when board work is unseen or claimable.
+- Farm and Livestock service actions require the party leader to be near the matching Forward Bastion service NPC.
 - The Smith supports current lightweight prototype crafting only.
 - The Bank Chest supports current lightweight prototype shared bank storage only.
 - Forward Bastion should not spawn hostile enemies for now.
@@ -2370,11 +2373,12 @@ Current prototype/debug map routes are:
 - `map-4` <-> `map-5`
 - `map-5` <-> `map-6`
 - `map-6` <-> `map-7`
-- `hub` -> `slimeward-camp`
 - `map-3` <-> `slimeward-camp`
 - `slimeward-camp` <-> `slimeward-floor-1`
 - `slimeward-floor-1` <-> `slimeward-floor-2`
 - `slimeward-floor-2` -> `slimeward-camp`
+
+Slimeward Camp is currently reached from Azurefen Hollow through the map-3 route access. Direct World Travel to Slimeward Camp is available only after the Slimeward Camp Teleportation Echo is unlocked.
 
 Some prototype forward teleports can start non-working and become working through quest route-unlock objectives or dungeon runtime events.
 
@@ -2396,10 +2400,10 @@ Current readable prototype/debug map names:
 - `map-1`: Mosswake Shore
 - `map-2`: Briarwood Rise
 - `map-3`: Azurefen Hollow
-- `map-4`: Ashwatch Approach
-- `map-5`: Emberbriar Crossing
+- `map-4`: Ash Goblin Encampment
+- `map-5`: Briar Burrows
 - `map-6`: Nightmire Canopy
-- `map-7`: Twilight of the Fallen
+- `map-7`: Orc Warcamp
 - `slimeward-camp`: Slimeward Camp
 - `slimeward-floor-1`: Slimeward Floor 1
 - `slimeward-floor-2`: Slimeward Floor 2
@@ -2409,10 +2413,20 @@ Current prototype wilderness subzones are:
 - Mosswake Shore: Shore Fringe, Mossy Glade, Lower Shore
 - Briarwood Rise: Scout Rise, Old Grove, Wolf Causeway
 - Azurefen Hollow: Broken Thicket, Crawler Shelf, Imp Fen
-- Ashwatch Approach: Shaman Watch, Ash Hollow, Orc Approach
-- Emberbriar Crossing: Crossing, Burrows, Thornfield
-- Nightmire Canopy: Mire, Canopy, Oldroot
-- Twilight of the Fallen: Plaza, Garden
+- Ash Goblin Encampment: Ash Camp
+- Briar Burrows: Briar Burrows
+- Nightmire Canopy: Nightmire Canopy
+- Orc Warcamp: Orc Warcamp
+
+Current post-Hub-2 wilderness structure:
+
+- Post-Hub-2 maps are smaller than the pre-Hub-2 wilderness maps and currently use one internal subzone each for POI, Auto Combat, AFK estimate, encounter, resource, and compatibility systems.
+- Post-Hub-2 maps use blockers, negative space, encounter pockets, and landmarks to create denser paths without narrow party-clogging corridors.
+- After Hub 2, each new wilderness map should normally contain around three enemy types as the current standard; exceptions are allowed when the theme benefits from a close variant count.
+- Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12.
+- Briar Burrows contains Tin Crawler level 13, Briar Wolf level 15, and Mire Spider level 15.
+- Nightmire Canopy contains Night Bat level 16, Elder Mossling level 17, and Cinder Wisp level 18.
+- Orc Warcamp contains Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, and Orc Warmaster level 20.
 
 Current Slimeward dungeon prototype rooms/subzones are:
 
@@ -2511,7 +2525,7 @@ Name labels must not define simulation behavior, targeting rules, NPC behavior, 
 
 Current prototype map visuals may use 32px construction-cell anchoring for walls, obstacles, entities, overlays, labels, effects, camera math, and input targeting while rendering larger floor chunks as background terrain.
 
-Current generated terrain, feedback, and map visual asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, Slimeward dungeon floor and wall assets, hub castle wall assets, decorative hub structure assets, generated skill or feedback sprites, first-class skill effect sprites, combat projectile sprites, teleporter active/broken visuals, passage blocker visuals, enemy AoE circles, companion AoE circles, Azure Mass boss sprites, and temporary skill visual events.
+Current generated terrain, feedback, map, and UI asset direction may include 32x32 bush or obstacle assets, 64x64 tree assets, 128x128 floor chunks, hub floor assets, wilderness floor assets, post-Hub-2 enemy and terrain assets, Slimeward dungeon floor and wall assets, hub castle wall assets, decorative hub structure assets, generated skill or feedback sprites, first-class skill effect sprites, combat projectile sprites, teleporter active/broken visuals, passage blocker visuals, enemy AoE circles, companion AoE circles, Azure Mass boss sprites, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, and temporary skill visual events.
 
 Terrain asset size and render scale are UI-facing presentation choices.
 

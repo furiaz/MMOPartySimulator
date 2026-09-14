@@ -224,9 +224,9 @@ The player is not represented as a world entity.
 
 The player is the manager/controller issuing intent and commands to party members.
 
-NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, dungeon chest presentation, bank chest presentation, Guild & Inn service presentation, and non-interactive service placeholders.
+NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, dungeon chest presentation, bank chest presentation, Guild & Inn service presentation, Farm and Livestock service presentation where present, and non-interactive service placeholders.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors, Farm and Livestock service opening/proximity anchors, placeholder hub NPC display, Bounty Board placeholder display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors where present, Farm and Livestock service opening/proximity anchors where present, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
 
 Current NPC role values include:
 
@@ -524,7 +524,9 @@ type PoiSearchScope = "free_travel" | "zone_only" | "subzone_only";
 
 `zone_only` keeps autonomous POI selection on the current prototype map without applying leader-subzone filtering. It is not the final zone system.
 
-The current React map UI exposes Auto Combat and POI search scope through one combined control that cycles between Off, On - Subzone Only, and On - Zone Only. The UI does not add a separate persisted mode; it writes the existing `autoModeEnabled` and `poiPreferences.searchScope` fields.
+The current React map UI exposes Auto Combat as Off or On only. Off clears `autoModeEnabled`. On sets `autoModeEnabled` and writes `poiPreferences.searchScope` to `subzone_only`, using the leader's current internal subzone boundary where supported.
+
+The player-facing Auto Combat UI no longer exposes Free Travel, Zone Only, or Subzone Only cycling. These scope values may remain as internal compatibility state for save migration, POI helpers, tests, or future prototype controls.
 
 Current shared inventory, bank, key item, and wallet fields include:
 
@@ -644,7 +646,9 @@ Current initial prototype state includes:
 - two starting companions
 - the starting leader as a Defender-role companion
 - the second starting companion as a Fighter-role companion
-- hub Quest Giver, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Farmer, Livestock keeper, Dog, and Test Blade NPCs
+- Hub 1 basic service NPCs: Quest Giver, Merchant, Smith, Bank Chest, and Dog
+- quest-unlocked Hub 1 Class Mentor NPC state
+- Hub 2 basic service NPCs plus Guild Coordinator, Inn Keeper, Farmer, Livestock keeper, and dog NPCs where the map is created
 - hub target dummy and hub AoE target dummy
 - empty shared party inventory, bank, key item state, and wallet
 - initial Guild Recruit, Guild Notice Board, Guild Field Team, Inn Rooms, Inn Kitchen, Inn upgrade, Farm, Livestock, and world discovery state
@@ -3021,10 +3025,10 @@ Current readable map names:
 - `map-1`: Mosswake Shore
 - `map-2`: Briarwood Rise
 - `map-3`: Azurefen Hollow
-- `map-4`: Ashwatch Approach
-- `map-5`: Emberbriar Crossing
+- `map-4`: Ash Goblin Encampment
+- `map-5`: Briar Burrows
 - `map-6`: Nightmire Canopy
-- `map-7`: Twilight of the Fallen
+- `map-7`: Orc Warcamp
 - `slimeward-camp`: Slimeward Camp
 - `slimeward-floor-1`: Slimeward Floor 1
 - `slimeward-floor-2`: Slimeward Floor 2
@@ -3039,11 +3043,11 @@ Current prototype map dimensions:
 - `hub-2`: 132 columns by 72 rows
 - `map-1`: 160 columns by 57 rows
 - `map-2`: 160 columns by 57 rows
-- `map-3`: 160 columns by 30 rows
-- `map-4`: 160 columns by 30 rows
-- `map-5`: 160 columns by 57 rows
-- `map-6`: 160 columns by 57 rows
-- `map-7`: 160 columns by 30 rows
+- `map-3`: 160 columns by 57 rows
+- `map-4`: 110 columns by 57 rows
+- `map-5`: 110 columns by 57 rows
+- `map-6`: 110 columns by 57 rows
+- `map-7`: 110 columns by 57 rows
 - `slimeward-camp`: 44 columns by 30 rows
 - `slimeward-floor-1`: 136 columns by 40 rows
 - `slimeward-floor-2`: 152 columns by 44 rows
@@ -3051,6 +3055,20 @@ Current prototype map dimensions:
 The current row count reflects prototype debug-map presentation space.
 
 It is not final world scale or final zone design.
+
+Current wilderness subzone structure:
+
+- `map-1` through `map-3` use three authored wilderness subzones each.
+- `map-4` through `map-7` use one internal subzone each for POI, Auto Combat, AFK estimate, encounter-area, resource-location, and compatibility systems.
+- Post-Hub-2 maps are narrower than the pre-Hub-2 wilderness maps and use denser obstacle, negative-space, encounter-pocket, and landmark layouts.
+- Post-Hub-2 wilderness maps should normally have around three enemy types per map as the current prototype standard, with close exceptions when the theme needs them.
+
+Current post-Hub-2 map enemy groups:
+
+- `map-4`: Goblin Shaman level 10, Ash Wisp level 11, Ember Imp level 12
+- `map-5`: Tin Crawler level 13, Briar Wolf level 15, Mire Spider level 15
+- `map-6`: Night Bat level 16, Elder Mossling level 17, Cinder Wisp level 18
+- `map-7`: Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, Orc Warmaster level 20
 
 ---
 
@@ -3099,7 +3117,6 @@ Current prototype/debug routes:
 - `map-7` -> `map-6`
 - `hub-2` -> `hub-2` north route placeholder
 - `hub-2` -> `hub-2` east route placeholder
-- `hub` -> `slimeward-camp`
 - `map-3` -> `slimeward-camp`
 - `slimeward-camp` -> `map-3`
 - `slimeward-camp` -> `slimeward-floor-1`
@@ -3120,6 +3137,8 @@ Current teleport behavior:
 - can set a teleport point as party movement intent
 - auto mode may select eligible working teleport points after living enemies are cleared or when quest progression requires a connected map
 - World Travel may select an eligible known destination and guide the party toward the matching working teleport point
+- Slimeward Camp is reached from Azurefen Hollow through the prototype route, or by direct World Travel only after the Slimeward Camp Teleportation Echo is unlocked
+- the direct Hub 1 to Slimeward Camp prototype/debug route has been removed from map data
 - direct World Travel teleport may immediately transition to an unlocked supported destination through `teleportWorldTravelDestination`
 - direct World Travel teleport requires a matching key item unlock and is blocked by current-map selection, active transitions, world-wipe recovery, open Slimeward chest UI, or resurrection runtime
 - party members rally to the teleport point
@@ -3416,8 +3435,7 @@ Current resource visuals use generated image icons by resource type.
 
 Current NPC visuals:
 
-- Quest Giver, Class Mentor, Merchant, Smith, Bank Chest, Bounty Board, Guild Coordinator, Inn Keeper, and Dog may use generated image icons
-- Test Blade may use Test-NPC image assets
+- Quest Giver, Class Mentor, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Farmer, Livestock keeper, and Dog may use generated image icons where those NPCs are present
 - quest guide NPCs may use temporary NPC visuals
 - dungeon chest NPCs may use temporary or placeholder presentation
 - unsupported NPC visuals fall back to placeholder classes
@@ -3445,6 +3463,8 @@ Current generated terrain asset direction may include:
 - passage blocker open/repaired and closed/collapsed visuals
 - Slimeward dungeon floor, wall, waypoint, chest, obstacle, slime, and boss visuals
 - class portrait, first-class skill effect, prototype VFX, and combat projectile visuals
+- post-Hub-2 enemy and terrain visuals
+- bottom HUD Auto Combat, Pause/Resume, and companion buff/debuff placeholder visuals
 
 The 32px construction cell is a render and authoring anchor, not tile-by-tile gameplay movement.
 
@@ -3539,6 +3559,7 @@ Debug/testing helpers may exist for development:
 - hub target dummy testing
 - explicit aggressive-enemy test setups
 - prototype teleport/map transition testing
+- debug teleport to Slimeward Camp testing
 - prototype resurrection testing
 - prototype world-wipe recovery testing
 - enemy scaling and respawn testing
@@ -3554,7 +3575,9 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell placeholder UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save controls, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell placeholder UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save controls, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
+
+The full renderer viewport should reserve the bottom HUD area so the map camera and interactable world view do not place important content behind the companion vitals and buff/debuff rail UI.
 
 UI should remain a consumer/controller of game state, not the owner of simulation behavior.
 
