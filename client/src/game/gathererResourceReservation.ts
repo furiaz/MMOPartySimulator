@@ -298,6 +298,8 @@ function isResourceReachableForGatherer(
   }
 
   const reachable = isResourceTargetInRange(state, resource, searchOrigin, {
+    allowPartyPassThrough: true,
+    ignoredEntityId: gatherer.id,
     maxDistance,
   });
 

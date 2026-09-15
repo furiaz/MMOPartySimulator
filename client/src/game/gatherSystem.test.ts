@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createResource } from "./entities";
+import { createResourceWorkContext } from "./gathererResourceReservation";
 import { updateGatherSystem } from "./gatherSystem";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
 import { createTestGameState } from "./testState";
@@ -129,6 +130,64 @@ describe("gather system interaction range", () => {
     );
     expect(nextState.movementFailuresByEntityId?.[collector.id]).toBeUndefined();
   });
+
+  it("lets an autonomous collector pass through a party member toward a resource", () => {
+    const resource = createResource("resource", { x: 5, y: 1 });
+    const collector = {
+      ...createCompanion("collector", { x: 1, y: 1 }, "collector", "fighter"),
+      state: "gather" as const,
+      currentTargetId: resource.id,
+      commandPriority: "autonomous" as const,
+      lastGatherAt: 0,
+    };
+    const blocker = createCompanion("blocker", { x: 2, y: 1 }, collector.id);
+    const state = createTestGameState({
+      entities: {
+        [collector.id]: collector,
+        [blocker.id]: blocker,
+        [resource.id]: resource,
+      },
+      map: createCorridorMap(),
+      partyLeaderId: collector.id,
+      simulationDeltaMs: 100,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = updateGatherSystem(state, new Set(), 1_000);
+
+    expect(nextState.entities[collector.id].position.x).toBeGreaterThan(
+      collector.position.x,
+    );
+    expect(nextState.movementFailuresByEntityId?.[collector.id]).toBeUndefined();
+  });
+
+  it("lets a Gatherer-role companion reserve a resource behind a party member", () => {
+    const leader = createCompanion("leader", { x: 0, y: 1 }, "leader", "fighter");
+    const gatherer = createCompanion(
+      "gatherer",
+      { x: 1, y: 1 },
+      leader.id,
+      "gatherer",
+    );
+    const blocker = createCompanion("blocker", { x: 2, y: 1 }, leader.id);
+    const resource = createResource("resource", { x: 5, y: 1 });
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [gatherer.id]: gatherer,
+        [blocker.id]: blocker,
+        [resource.id]: resource,
+      },
+      map: createCorridorMap(),
+      partyLeaderId: leader.id,
+    });
+
+    const context = createResourceWorkContext(state);
+
+    expect(context.reservations.resourceIdByGathererId.get(gatherer.id)).toBe(
+      resource.id,
+    );
+  });
 });
 
 function createOpenMap(): GameMap {
@@ -138,6 +197,21 @@ function createOpenMap(): GameMap {
     columns: 8,
     rows: 8,
     walls: [],
+    teleports: [],
+    healingFountains: [],
+  };
+}
+
+function createCorridorMap(): GameMap {
+  return {
+    displayName: "Corridor Gather Test Map",
+    debugName: "corridor-gather-test-map",
+    columns: 7,
+    rows: 3,
+    walls: Array.from({ length: 7 }, (_, x) => [
+      { x, y: 0 },
+      { x, y: 2 },
+    ]).flat(),
     teleports: [],
     healingFountains: [],
   };

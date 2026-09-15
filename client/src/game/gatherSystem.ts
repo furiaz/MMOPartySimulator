@@ -89,7 +89,11 @@ export function updateGatherSystem(
         nextState,
         resource,
         gatherer.position,
-        { maxDistance: getReachableSearchLimit(nextState) },
+        {
+          allowPartyPassThrough: true,
+          ignoredEntityId: gatherer.id,
+          maxDistance: getReachableSearchLimit(nextState),
+        },
       )
     ) {
       if (isCommittedGatherer(gatherer)) {
@@ -142,6 +146,7 @@ export function updateGatherSystem(
         ) ?? resource.position;
 
       nextState = moveEntityTowardPositionIfUnoccupied(nextState, gatherer, standPosition, {
+        allowPartyPassThrough: true,
         pathProfile: "gather",
         pathTargetKey: `gather:${resource.id}`,
         pathTargetPosition: standPosition,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, getMovementStepDistance } from "./entities";
 import { updateDefendSystem } from "./defendSystem";
 import { createTestGameState } from "./testState";
-import type { Enemy } from "./types";
+import type { Enemy, GameMap } from "./types";
 
 describe("defender real-time movement", () => {
   it("uses delta-scaled catch-up speed instead of multi-step bursts", () => {
@@ -132,4 +132,52 @@ describe("defender real-time movement", () => {
       currentTargetId: currentThreat.id,
     });
   });
+
+  it("lets a defender pass through a party member toward a guard position", () => {
+    const leader = createCompanion("leader", { x: 0, y: 1 }, "leader", "fighter");
+    const defender = {
+      ...createCompanion("defender", { x: 1, y: 1 }, leader.id, "defender"),
+      state: "defend" as const,
+      defendPosition: { x: 4, y: 1 },
+    };
+    const blocker = createCompanion("blocker", { x: 2, y: 1 }, leader.id);
+    const state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [defender.id]: defender,
+        [blocker.id]: blocker,
+      },
+      map: createCorridorMap(),
+      partyLeaderId: leader.id,
+      simulationDeltaMs: 100,
+      simulationTimeMs: 100,
+    });
+
+    const nextState = updateDefendSystem(state, new Set(), {
+      nowMs: 1000,
+      deltaMs: 100,
+      deltaSeconds: 0.1,
+      frameNumber: 1,
+    });
+
+    expect(nextState.entities[defender.id].position.x).toBeGreaterThan(
+      defender.position.x,
+    );
+    expect(nextState.movementFailuresByEntityId?.[defender.id]).toBeUndefined();
+  });
 });
+
+function createCorridorMap(): GameMap {
+  return {
+    displayName: "Corridor Defender Test Map",
+    debugName: "corridor-defender-test-map",
+    columns: 6,
+    rows: 3,
+    walls: Array.from({ length: 6 }, (_, x) => [
+      { x, y: 0 },
+      { x, y: 2 },
+    ]).flat(),
+    teleports: [],
+    healingFountains: [],
+  };
+}

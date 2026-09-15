@@ -251,7 +251,9 @@ function isReachableDefenderAnchor(
   position: Position,
 ): boolean {
   return (
-    isWalkablePosition(state, position, defender.id) &&
+    isWalkablePosition(state, position, defender.id, {
+      allowPartyPassThrough: true,
+    }) &&
     getBoundedPathDistance(
       state,
       defender,
@@ -485,6 +487,7 @@ function moveDefenderTowardCommittedTarget(
   }
 
   const movementOptions = {
+    allowPartyPassThrough: true,
     pathProfile: "combatSlot" as const,
     pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
     pathTargetPosition: attackPosition,
@@ -568,6 +571,7 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
   }
 
   const movementOptions = {
+    allowPartyPassThrough: true,
     pathProfile: "combatSlot" as const,
     pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
     pathTargetPosition: attackPosition,
@@ -695,7 +699,12 @@ function canLeaderStepTowardDefender(
     return true;
   }
 
-  const nextPosition = previewMoveTowardPosition(state, leader, defender.position);
+  const nextPosition = previewMoveTowardPosition(
+    state,
+    leader,
+    defender.position,
+    { allowPartyPassThrough: true },
+  );
 
   if (nextPosition && !isSamePosition(nextPosition, leader.position)) {
     return true;
@@ -781,6 +790,7 @@ function moveDefenderTowardPosition(
     defender,
     targetPosition,
     {
+      allowPartyPassThrough: true,
       pathProfile: "follow",
       pathTargetKey: `defender-position:${getPositionPathKey(targetPosition)}`,
       pathTargetPosition: targetPosition,

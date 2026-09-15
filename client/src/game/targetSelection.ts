@@ -13,6 +13,8 @@ type EnemyTargetOptions = {
 
 type ResourceTargetOptions = {
   maxDistance: number;
+  allowPartyPassThrough?: boolean;
+  ignoredEntityId?: string;
   isCandidatePositionAllowed?: (position: Position) => boolean;
 };
 
@@ -56,7 +58,8 @@ export function findResourceTarget(
         searchOrigin,
         entity.position,
         getReachabilitySearchLimit(state),
-        entity.id,
+        options.ignoredEntityId ?? entity.id,
+        options,
       ),
   );
 
@@ -77,7 +80,8 @@ export function isResourceTargetInRange(
       searchOrigin,
       resource.position,
       options.maxDistance,
-      resource.id,
+      options.ignoredEntityId ?? resource.id,
+      options,
     )
   );
 }
@@ -173,6 +177,7 @@ function isPositionReachableWithin(
   target: Position,
   maxDistance: number,
   ignoredEntityId?: string,
+  options: Pick<ResourceTargetOptions, "allowPartyPassThrough"> = {},
 ): boolean {
   return (
     getBoundedNavigationDistance(
@@ -181,6 +186,9 @@ function isPositionReachableWithin(
       target,
       maxDistance,
       ignoredEntityId,
+      {
+        allowPartyPassThrough: options.allowPartyPassThrough,
+      },
     ) !== null
   );
 }
