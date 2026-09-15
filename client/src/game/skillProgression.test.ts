@@ -520,7 +520,7 @@ describe("skill progression", () => {
     }
     expect(bloodFeast.effect.type).toBe("lifestealBuff");
     if (bloodFeast.effect.type === "lifestealBuff") {
-      expect(bloodFeast.effect.durationMs).toBe(10000);
+      expect(bloodFeast.effect.durationMs).toBe(12000);
       expect(bloodFeast.effect.lifestealPercent).toBeCloseTo(12);
     }
     expect(ruggedHide.effect.type).toBe("selfMitigationBuff");

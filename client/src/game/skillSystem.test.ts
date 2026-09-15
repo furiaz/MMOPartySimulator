@@ -159,7 +159,7 @@ describe("beginner skill system", () => {
     const gatheredState = updateGatherSystem(buffedState, new Set(), 2000);
 
     expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.bonusGatherSpeed).toBe(1);
-    expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.expiresAt).toBe(10000);
+    expect(buffedState.skillGatherBuffsByCompanionId?.[gatherer.id]?.expiresAt).toBe(91000);
     expect(buffedState.skillCooldownsByCompanionId?.[gatherer.id]?.field_hands).toMatchObject({
       skillId: "field_hands",
       expiresAt: 11000,
@@ -790,7 +790,7 @@ describe("beginner skill system", () => {
     );
     expect(
       nextState.skillShieldBlocksById?.["defender-guard_up"]?.expiresAt,
-    ).toBe(4000);
+    ).toBe(7000);
     expect(nextState.entities.defender.position).toEqual(defender.position);
     expect(
       nextState.debugTelemetry?.events.some(
@@ -1665,7 +1665,7 @@ describe("beginner skill system", () => {
     expect(buffedState.skillGatherBuffsByCompanionId?.blade).toMatchObject({
       bonusGatherSpeed: 2,
       resourceType: "wood",
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
     expect(gatheredState.entities.wood).toMatchObject({
       durability: 3,
@@ -1706,7 +1706,7 @@ describe("beginner skill system", () => {
     expect(buffedState.skillGatherBuffsByCompanionId?.aegis).toMatchObject({
       bonusGatherSpeed: 2,
       resourceType: "ore",
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
     expect(gatheredState.entities.ore).toMatchObject({
       durability: 3,
@@ -1960,7 +1960,7 @@ describe("beginner skill system", () => {
     });
   });
 
-  it("sets Beginner non-block buff durations to 9 seconds", () => {
+  it("sets Beginner non-block buff durations to 90 seconds", () => {
     const deepBreathCaster = createBeginner("fighter", "fighter", { x: 1, y: 1 });
     const deepBreathEnemy = createEnemy("deep-breath-enemy", { x: 6, y: 1 });
     const deepBreathState = updateSkillSystem(
@@ -1991,13 +1991,13 @@ describe("beginner skill system", () => {
       expiresAt: 11000,
     });
     expect(deepBreathState.skillSelfBuffsByCompanionId?.fighter?.expiresAt).toBe(
-      10000,
+      91000,
     );
     expect(rallyState.skillCooldownsByCompanionId?.support?.rally_call).toMatchObject({
       skillId: "rally_call",
       expiresAt: 11000,
     });
-    expect(rallyState.skillSelfBuffsByCompanionId?.ally?.expiresAt).toBe(10000);
+    expect(rallyState.skillSelfBuffsByCompanionId?.ally?.expiresAt).toBe(91000);
   });
 
   it("prioritizes Rally Call targets by role", () => {
@@ -2021,7 +2021,7 @@ describe("beginner skill system", () => {
     );
 
     expect(nextState.skillSelfBuffsByCompanionId?.fighter?.expiresAt).toBe(
-      10000,
+      91000,
     );
     expect(nextState.skillCooldownsByCompanionId?.support?.rally_call).toMatchObject({
       skillId: "rally_call",

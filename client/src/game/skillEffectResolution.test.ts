@@ -409,7 +409,7 @@ describe("skill effect resolution", () => {
       sourceId: elementalist.id,
       defenseBonusPercent: 10,
       mitigationPercent: 10,
-      expiresAt: 21000,
+      expiresAt: 61000,
     });
 
     const armoredHit = resolveAndApplyCombatDamage(
@@ -464,7 +464,7 @@ describe("skill effect resolution", () => {
       companionId: elementalist.id,
       skillPowerBonusPercent: 10,
       cooldownPenaltyPercent: 20,
-      expiresAt: 61000,
+      expiresAt: 121000,
     });
 
     const conduitState = resolveSkillEffect(
@@ -799,7 +799,7 @@ describe("skill effect resolution", () => {
     expect(parryState.skillDamageMitigationsByCompanionId?.blade).toMatchObject({
       remainingProcs: 2,
       mitigationPercent: 50,
-      expiresAt: 11000,
+      expiresAt: 21000,
     });
 
     const firstHit = resolveAndApplyCombatDamage(
@@ -868,13 +868,13 @@ describe("skill effect resolution", () => {
 
     expect(pressState.skillSelfBuffsByCompanionId?.blade).toMatchObject({
       bonusDamage: 1,
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
     expect(pressState.skillPartyClassBuffsByCompanionId?.blade?.blade).toMatchObject({
       sourceClassId: "blade",
       physicalDamageBonusPercent: 5,
       primaryStatBonusPercentByStat: { strength: 5 },
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
     const pressVisualEvents =
       pressState.skillVisualEvents?.filter(
@@ -939,7 +939,7 @@ describe("skill effect resolution", () => {
         strength: 5,
         dexterity: 5,
       },
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
 
     const packFrenzyVisualEvents =
@@ -985,7 +985,7 @@ describe("skill effect resolution", () => {
         "press_the_opening",
         firstState.entities["second-blade"] as Companion,
       ),
-      59000,
+      299000,
     ).state;
 
     expect(
@@ -994,7 +994,7 @@ describe("skill effect resolution", () => {
     expect(refreshedState.skillPartyClassBuffsByCompanionId?.ally?.blade).toMatchObject({
       sourceId: "second-blade",
       sourceClassId: "blade",
-      expiresAt: 119000,
+      expiresAt: 599000,
     });
   });
 
@@ -1017,7 +1017,7 @@ describe("skill effect resolution", () => {
 
     expect(formationState.skillSelfMitigationBuffsByCompanionId?.aegis).toMatchObject({
       mitigationPercent: 10,
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
     expect(
       formationState.skillPartyClassBuffsByCompanionId?.aegis?.aegis,
@@ -1025,7 +1025,7 @@ describe("skill effect resolution", () => {
       sourceClassId: "aegis",
       mitigationPercent: 8,
       primaryStatBonusPercentByStat: { constitution: 5 },
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
 
     const formationVisualEvents =
@@ -1557,7 +1557,7 @@ describe("skill effect resolution", () => {
       primaryStatBonusPercentByStat: { wisdom: 5 },
       mitigationPercent: 8,
       mitigatedDamageTypes: ["magic"],
-      expiresAt: 61000,
+      expiresAt: 301000,
     });
 
     const leylineMatrixVisualEvents =
@@ -1617,7 +1617,7 @@ describe("skill effect resolution", () => {
     expect(buffState.skillLifestealBuffsByCompanionId?.beast).toMatchObject({
       companionId: beast.id,
       lifestealPercent: 10,
-      expiresAt: 9000,
+      expiresAt: 11000,
     });
 
     const physicalState = resolveAndApplyCombatDamage(
@@ -1899,15 +1899,15 @@ describe("skill effect resolution", () => {
     expect((hopeState.entities.penitent as Companion).health).toBe(45);
     expect(hopeState.skillSelfMitigationBuffsByCompanionId?.penitent).toMatchObject({
       mitigationPercent: 20,
-      expiresAt: 16400,
+      expiresAt: 26400,
     });
     expect(hopeState.skillHealOverTimesByCompanionId?.penitent).toMatchObject({
-      healAmountPerTick: 2,
+      healAmountPerTick: 1,
       nextTickAt: 4400,
     });
 
     const hopeTickState = updateRuneSkillRuntime(hopeState, 4400);
-    expect((hopeTickState.entities.penitent as Companion).health).toBe(47);
+    expect((hopeTickState.entities.penitent as Companion).health).toBe(46);
 
     const benedictionState = resolveSkillEffect(
       createSkillState([penitent, ally]),

@@ -1,10 +1,12 @@
 import type { ClassId, SkillDefinition } from "./types";
 
 const BEGINNER_SKILL_COOLDOWN_MS = 10000;
-const BEGINNER_BUFF_DURATION_MS = 9000;
-const FIRST_CLASS_LONG_BUFF_DURATION_MS = 60000;
-const FIRST_CLASS_LONG_BUFF_COOLDOWN_MS = 58000;
+const BEGINNER_BUFF_DURATION_MS = 90000;
+const FIRST_CLASS_LONG_BUFF_DURATION_MS = 300000;
+const FIRST_CLASS_LONG_BUFF_COOLDOWN_MS = 298000;
 const FIRST_CLASS_BUFF_REFRESH_WINDOW_MS = 2000;
+const OVERCHARGE_BUFF_DURATION_MS = 120000;
+const OVERCHARGE_BUFF_COOLDOWN_MS = 118000;
 export const DEFAULT_SKILL_COOLDOWN_MS = 10000;
 
 export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> = {
@@ -43,7 +45,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
     effect: {
       type: "shieldBlock",
-      durationMs: 3000,
+      durationMs: 6000,
       blocks: 1,
       blockedDamageTypes: ["physical"],
     },
@@ -141,7 +143,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     cooldownMs: 15000,
     effect: {
       type: "damageMitigation",
-      durationMs: 10000,
+      durationMs: 20000,
       mitigationPercent: 50,
       procs: 2,
       mitigatedDamageTypes: ["physical"],
@@ -474,7 +476,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     cooldownMs: 30000,
     effect: {
       type: "lifestealBuff",
-      durationMs: 8000,
+      durationMs: 10000,
       lifestealPercent: 10,
     },
   },
@@ -601,7 +603,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     cooldownMs: 6000,
     effect: {
       type: "frostArmor",
-      durationMs: 20000,
+      durationMs: 60000,
       defenseBonusPercent: 10,
       mitigationPercent: 10,
     },
@@ -613,10 +615,10 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     tags: ["Offensive", "Self Buff", "Maintenance"],
     type: "active",
     range: 0,
-    cooldownMs: FIRST_CLASS_LONG_BUFF_COOLDOWN_MS,
+    cooldownMs: OVERCHARGE_BUFF_COOLDOWN_MS,
     effect: {
       type: "overcharge",
-      durationMs: FIRST_CLASS_LONG_BUFF_DURATION_MS,
+      durationMs: OVERCHARGE_BUFF_DURATION_MS,
       skillPowerBonusPercent: 10,
       cooldownPenaltyPercent: 20,
       refreshWindowMs: FIRST_CLASS_BUFF_REFRESH_WINDOW_MS,
@@ -828,7 +830,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     cooldownMs: 15000,
     effect: {
       type: "barrierBlock",
-      durationMs: 5000,
+      durationMs: 6000,
       blocks: 1,
       blockedDamageTypes: ["physical", "magic"],
       healPercentMaxHealthOnConsume: 5,
@@ -994,7 +996,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     effect: {
       type: "eternalHope",
       hpCostCurrentPercent: 10,
-      durationMs: 15000,
+      durationMs: 25000,
       tickIntervalMs: 3000,
       healSacrificeMultiplier: 2,
       mitigationPercent: 20,
