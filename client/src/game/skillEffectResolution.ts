@@ -1178,6 +1178,7 @@ function applySelfBuff(
       ...(state.skillSelfBuffsByCompanionId ?? {}),
       [caster.id]: {
         companionId: caster.id,
+        sourceSkillId: skill.id,
         bonusDamage: skill.effect.bonusDamage,
         movementSpeedBonusPercent: skill.effect.movementSpeedBonusPercent,
         expiresAt: now + skill.effect.durationMs,
@@ -1225,6 +1226,7 @@ function applyPartyBuff(
       ...(state.skillPartyBuffsBySourceId ?? {}),
       [caster.id]: {
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         bonusDamage: skill.effect.bonusDamage,
         expiresAt: now + skill.effect.durationMs,
       },
@@ -1364,6 +1366,7 @@ function applyLifestealBuff(
       ...(state.skillLifestealBuffsByCompanionId ?? {}),
       [caster.id]: {
         companionId: caster.id,
+        sourceSkillId: skill.id,
         lifestealPercent: skill.effect.lifestealPercent,
         expiresAt: now + skill.effect.durationMs,
       },
@@ -1468,6 +1471,7 @@ function applyAllyBuff(
       ...(state.skillSelfBuffsByCompanionId ?? {}),
       [target.id]: {
         companionId: target.id,
+        sourceSkillId: skill.id,
         bonusDamage: skill.effect.bonusDamage,
         expiresAt: now + skill.effect.durationMs,
       },
@@ -1512,6 +1516,7 @@ function applyBarrierBlock(
       [barrierId]: {
         id: barrierId,
         ownerId: target.id,
+        sourceSkillId: skill.id,
         position: barrierPlacement.position,
         rotationRadians: barrierPlacement.rotationRadians,
         expiresAt: now + skill.effect.durationMs,
@@ -1579,6 +1584,7 @@ function applySacrificialBarrier(
       [barrierId]: {
         id: barrierId,
         ownerId: currentTarget.id,
+        sourceSkillId: skill.id,
         position: barrierPlacement.position,
         rotationRadians: barrierPlacement.rotationRadians,
         expiresAt: now + skill.effect.durationMs,
@@ -1627,6 +1633,7 @@ function applyRewindRune(
         id: `${target.id}-${skill.id}`,
         targetId: target.id,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         healPercentRecordedDamage: skill.effect.healPercentRecordedDamage,
         tickIntervalMs: skill.effect.tickIntervalMs,
         nextTickAt: now + skill.effect.tickIntervalMs,
@@ -1715,6 +1722,7 @@ function applyGatherBuff(
       ...(state.skillGatherBuffsByCompanionId ?? {}),
       [caster.id]: {
         companionId: caster.id,
+        sourceSkillId: skill.id,
         bonusGatherSpeed: skill.effect.bonusGatherSpeed,
         expiresAt: now + skill.effect.durationMs,
         resourceType: skill.effect.resourceType,
@@ -1757,6 +1765,7 @@ function applyDamageMitigation(
       [caster.id]: {
         id: mitigationId,
         ownerId: caster.id,
+        sourceSkillId: skill.id,
         expiresAt: now + skill.effect.durationMs,
         remainingProcs: skill.effect.procs,
         mitigationPercent: skill.effect.mitigationPercent,
@@ -1806,6 +1815,7 @@ function applyAbsorbShield(
       [caster.id]: {
         id: `${caster.id}-${skill.id}`,
         ownerId: caster.id,
+        sourceSkillId: skill.id,
         remainingAbsorb: maxAbsorb,
         maxAbsorb,
         expiresAt: now + skill.effect.durationMs,
@@ -1855,6 +1865,7 @@ function applyManaShield(
       [caster.id]: {
         id: `${caster.id}-${skill.id}`,
         ownerId: caster.id,
+        sourceSkillId: skill.id,
         remainingAbsorb: maxAbsorb,
         maxAbsorb,
       },
@@ -1897,6 +1908,7 @@ function applyFrostArmor(
         id: `${target.id}-${skill.id}`,
         targetId: target.id,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         defenseBonusPercent: skill.effect.defenseBonusPercent,
         mitigationPercent: skill.effect.mitigationPercent,
         expiresAt: now + skill.effect.durationMs,
@@ -1941,6 +1953,7 @@ function applyHealOverTime(
         id: `${target.id}-${skill.id}`,
         targetId: target.id,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         healPercentMaxHealth: skill.effect.healPercentMaxHealth,
         tickIntervalMs: skill.effect.tickIntervalMs,
         nextTickAt: now + skill.effect.tickIntervalMs,
@@ -1991,6 +2004,7 @@ function applyOvercharge(
       ...(state.skillOverchargesByCompanionId ?? {}),
       [caster.id]: {
         companionId: caster.id,
+        sourceSkillId: skill.id,
         skillPowerBonusPercent: skill.effect.skillPowerBonusPercent,
         cooldownPenaltyPercent: skill.effect.cooldownPenaltyPercent,
         expiresAt: now + skill.effect.durationMs,
@@ -2039,6 +2053,7 @@ function applyHoldFast(
       [caster.id]: {
         id: `${caster.id}-${skill.id}`,
         ownerId: caster.id,
+        sourceSkillId: skill.id,
         remainingAbsorb: maxAbsorb,
         maxAbsorb,
         expiresAt: now + skill.effect.absorbDurationMs,
@@ -2111,6 +2126,7 @@ function applySelfMitigationBuff(
       [caster.id]: {
         id: `${caster.id}-${skill.id}`,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         mitigationPercent: skill.effect.mitigationPercent,
         expiresAt: now + skill.effect.durationMs,
         mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
@@ -2159,6 +2175,7 @@ function applyPartyMitigationBuff(
       [caster.id]: {
         id: `${caster.id}-${skill.id}`,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         mitigationPercent: skill.effect.mitigationPercent,
         expiresAt: now + skill.effect.durationMs,
         mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
@@ -2791,6 +2808,7 @@ function applyShieldBlock(
       [shieldId]: {
         id: shieldId,
         ownerId: caster.id,
+        sourceSkillId: skill.id,
         position: shieldPlacement.position,
         rotationRadians: shieldPlacement.rotationRadians,
         expiresAt: now + skill.effect.durationMs,
@@ -3337,6 +3355,7 @@ function applyEternalHope(
       [caster.id]: {
         id: `${caster.id}-${skill.id}`,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         mitigationPercent: skill.effect.mitigationPercent,
         expiresAt: now + skill.effect.durationMs,
         mitigatedDamageTypes: skill.effect.mitigatedDamageTypes,
@@ -3348,6 +3367,7 @@ function applyEternalHope(
         id: `${caster.id}-${skill.id}`,
         targetId: caster.id,
         sourceId: caster.id,
+        sourceSkillId: skill.id,
         healAmountPerTick,
         tickIntervalMs: skill.effect.tickIntervalMs,
         nextTickAt: now + skill.effect.tickIntervalMs,

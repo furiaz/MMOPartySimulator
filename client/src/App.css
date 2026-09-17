@@ -587,12 +587,15 @@
   min-width: 0;
 }
 
-.companion-vitals-buff-row span {
+.companion-vitals-buff-row > span {
+  display: grid;
+  place-items: center;
   aspect-ratio: 1;
   width: min(100%, 25px);
   min-width: 0;
   min-height: 0;
   justify-self: center;
+  overflow: hidden;
   border: 1px solid rgba(135, 103, 57, 0.95);
   background: rgba(7, 9, 9, 0.86);
   box-shadow:
@@ -600,8 +603,108 @@
     0 1px 0 rgba(0, 0, 0, 0.58);
 }
 
-.companion-vitals-buff-row-debuffs span {
+.companion-vitals-buff-row > .companion-vitals-buff-slot {
+  position: relative;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.companion-vitals-buff-slot:focus-visible {
+  outline: 1px solid rgba(230, 184, 93, 0.9);
+  outline-offset: 2px;
+}
+
+.companion-vitals-buff-row-debuffs > span {
   border-color: rgba(110, 62, 62, 0.95);
+}
+
+.companion-vitals-buff-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.companion-vitals-buff-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  display: grid;
+  gap: 3px;
+  width: max-content;
+  max-width: 220px;
+  padding: 7px 8px;
+  border: 1px solid rgba(230, 184, 93, 0.46);
+  border-radius: 4px;
+  background: rgba(15, 20, 21, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 213, 141, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.48);
+  color: #f8e7bb;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  white-space: normal;
+}
+
+.companion-vitals-buff-tooltip strong {
+  color: #fff7db;
+  font-size: 12px;
+}
+
+.companion-vitals-buff-tooltip span {
+  color: #d8c9a7;
+}
+
+.companion-vitals-buff-slot:hover .companion-vitals-buff-tooltip,
+.companion-vitals-buff-slot:focus-visible .companion-vitals-buff-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.companion-vitals-buff-row > span:first-child .companion-vitals-buff-tooltip {
+  left: 0;
+  transform: translate(0, 4px);
+}
+
+.companion-vitals-buff-row > span:first-child:hover .companion-vitals-buff-tooltip,
+.companion-vitals-buff-row > span:first-child:focus-visible .companion-vitals-buff-tooltip {
+  transform: translate(0, 0);
+}
+
+.companion-vitals-buff-row > span:last-child .companion-vitals-buff-tooltip {
+  right: 0;
+  left: auto;
+  transform: translate(0, 4px);
+}
+
+.companion-vitals-buff-row > span:last-child:hover .companion-vitals-buff-tooltip,
+.companion-vitals-buff-row > span:last-child:focus-visible .companion-vitals-buff-tooltip {
+  transform: translate(0, 0);
+}
+
+.companion-vitals-buff-slot-expiring .companion-vitals-buff-icon {
+  animation: companion-vitals-buff-expiring-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes companion-vitals-buff-expiring-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .companion-vitals-card {
@@ -1043,6 +1146,75 @@
   justify-items: center;
   gap: 8px;
   pointer-events: none;
+}
+
+.bottom-hud-controls-companion-collapsed {
+  bottom: 20px;
+}
+
+.companion-hud-collapsed-strip {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  height: 18px;
+  border-top: 1px solid var(--main-menu-panel-border);
+  background: linear-gradient(
+    180deg,
+    rgba(27, 22, 18, 0.96),
+    rgba(15, 20, 21, 0.96)
+  );
+  box-shadow: inset 0 1px 0 rgba(230, 184, 93, 0.14);
+  pointer-events: none;
+}
+
+.companion-hud-toggle-button {
+  position: fixed;
+  left: 0;
+  z-index: 14;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(87, 72, 50, 0.95);
+  border-radius: 4px;
+  background: rgba(19, 19, 17, 0.94);
+  box-shadow:
+    inset 0 0 0 1px rgba(230, 184, 93, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.42);
+  cursor: pointer;
+}
+
+.companion-hud-toggle-button:hover,
+.companion-hud-toggle-button:focus-visible {
+  border-color: rgba(230, 184, 93, 0.78);
+  outline: none;
+}
+
+.companion-hud-toggle-button-expanded {
+  bottom: calc(13vh + 78px);
+}
+
+.companion-hud-toggle-button-collapsed {
+  bottom: 2px;
+}
+
+.companion-hud-toggle-arrow {
+  display: block;
+  width: 0;
+  height: 0;
+  border-right: 7px solid transparent;
+  border-left: 7px solid transparent;
+}
+
+.companion-hud-toggle-arrow-down {
+  border-top: 9px solid #e6b85d;
+}
+
+.companion-hud-toggle-arrow-up {
+  border-bottom: 9px solid #e6b85d;
 }
 
 .test-controls {

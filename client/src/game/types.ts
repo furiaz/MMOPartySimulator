@@ -1488,6 +1488,7 @@ export type SkillMarkState = {
 
 export type SkillSelfBuffState = {
   companionId: string;
+  sourceSkillId?: SkillId;
   bonusDamage: number;
   expiresAt: number;
   movementSpeedBonusPercent?: number;
@@ -1495,6 +1496,7 @@ export type SkillSelfBuffState = {
 
 export type SkillGatherBuffState = {
   companionId: string;
+  sourceSkillId?: SkillId;
   bonusGatherSpeed: number;
   expiresAt: number;
   resourceType?: ResourceType;
@@ -1502,6 +1504,7 @@ export type SkillGatherBuffState = {
 
 export type SkillPartyBuffState = {
   sourceId: string;
+  sourceSkillId?: SkillId;
   bonusDamage: number;
   expiresAt: number;
 };
@@ -1537,6 +1540,7 @@ export type SkillPartyClassBuffState = {
 
 export type SkillOverchargeState = {
   companionId: string;
+  sourceSkillId?: SkillId;
   skillPowerBonusPercent: number;
   cooldownPenaltyPercent: number;
   expiresAt: number;
@@ -1545,6 +1549,7 @@ export type SkillOverchargeState = {
 export type SkillManaShieldState = {
   id: string;
   ownerId: string;
+  sourceSkillId?: SkillId;
   remainingAbsorb: number;
   maxAbsorb: number;
   absorbedDamageTypes?: CombatDamageType[];
@@ -1554,6 +1559,7 @@ export type SkillFrostArmorState = {
   id: string;
   targetId: string;
   sourceId: string;
+  sourceSkillId?: SkillId;
   defenseBonusPercent: number;
   mitigationPercent: number;
   expiresAt: number;
@@ -1564,6 +1570,7 @@ export type SkillRewindRuneState = {
   id: string;
   targetId: string;
   sourceId: string;
+  sourceSkillId?: SkillId;
   healPercentRecordedDamage: number;
   tickIntervalMs: number;
   nextTickAt: number;
@@ -1575,6 +1582,7 @@ export type SkillHealOverTimeState = {
   id: string;
   targetId: string;
   sourceId: string;
+  sourceSkillId?: SkillId;
   healPercentMaxHealth?: number;
   healAmountPerTick?: number;
   tickIntervalMs: number;
@@ -1589,6 +1597,7 @@ export type SkillRunicFocusState = {
 
 export type SkillLifestealBuffState = {
   companionId: string;
+  sourceSkillId?: SkillId;
   lifestealPercent: number;
   expiresAt: number;
 };
@@ -1596,6 +1605,7 @@ export type SkillLifestealBuffState = {
 export type SkillAbsorbShieldState = {
   id: string;
   ownerId: string;
+  sourceSkillId?: SkillId;
   remainingAbsorb: number;
   maxAbsorb: number;
   expiresAt: number;
@@ -1611,6 +1621,7 @@ export type SkillBindState = {
 export type SkillShieldBlockState = {
   id: string;
   ownerId: string;
+  sourceSkillId?: SkillId;
   position: Position;
   rotationRadians: number;
   expiresAt: number;
@@ -1623,6 +1634,7 @@ export type SkillShieldBlockState = {
 export type SkillDamageMitigationState = {
   id: string;
   ownerId: string;
+  sourceSkillId?: SkillId;
   expiresAt: number;
   remainingProcs: number;
   mitigationPercent: number;
@@ -1632,6 +1644,7 @@ export type SkillDamageMitigationState = {
 export type SkillMitigationBuffState = {
   id: string;
   sourceId: string;
+  sourceSkillId?: SkillId;
   mitigationPercent: number;
   expiresAt: number;
   mitigatedDamageTypes?: CombatDamageType[];

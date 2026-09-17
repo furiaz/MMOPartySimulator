@@ -1,4 +1,5 @@
 import { INVENTORY_ITEM_ICON_SRC } from "./assetIcons";
+import { getCompanionBuffDisplayEntries } from "./companionBuffPresentation";
 import {
   CLASS_DEFINITIONS,
   companionIds,
@@ -91,6 +92,11 @@ export function CompanionVitalsPanel({
             (globalCooldownRemainingMs / globalCooldownDurationMs) * 100,
           ),
         );
+        const activeBuffs = getCompanionBuffDisplayEntries({
+          companionId: member.id,
+          currentTime,
+          gameState,
+        });
         return (
           <div
             key={member.id}
@@ -102,15 +108,54 @@ export function CompanionVitalsPanel({
                 : ""
             }`}
           >
-            <div aria-hidden="true" className="companion-vitals-buff-rail">
-              <div className="companion-vitals-buff-row companion-vitals-buff-row-debuffs">
-                {companionBuffSlotIndexes.map((slotIndex) => (
-                  <span key={`debuff-${slotIndex}`} />
-                ))}
-              </div>
+            <div className="companion-vitals-buff-rail">
               <div className="companion-vitals-buff-row companion-vitals-buff-row-buffs">
+                {companionBuffSlotIndexes.map((slotIndex) => {
+                  const activeBuff = activeBuffs[slotIndex];
+
+                  return (
+                    <span
+                      key={`buff-${slotIndex}`}
+                      aria-label={activeBuff?.tooltip}
+                      className={
+                        activeBuff?.isExpiring
+                          ? "companion-vitals-buff-slot companion-vitals-buff-slot-expiring"
+                          : "companion-vitals-buff-slot"
+                      }
+                      tabIndex={activeBuff ? 0 : undefined}
+                      title={activeBuff ? undefined : "Buff"}
+                    >
+                      {activeBuff ? (
+                        <>
+                          <img
+                            alt=""
+                            className="companion-vitals-buff-icon"
+                            draggable={false}
+                            src={activeBuff.iconSrc}
+                          />
+                          <span className="companion-vitals-buff-tooltip">
+                            {activeBuff.tooltip
+                              .split("\n")
+                              .map((line, lineIndex) =>
+                                lineIndex === 0 ? (
+                                  <strong key={`${lineIndex}-${line}`}>{line}</strong>
+                                ) : (
+                                  <span key={`${lineIndex}-${line}`}>{line}</span>
+                                ),
+                              )}
+                          </span>
+                        </>
+                      ) : null}
+                    </span>
+                  );
+                })}
+              </div>
+              <div
+                aria-hidden="true"
+                className="companion-vitals-buff-row companion-vitals-buff-row-debuffs"
+              >
                 {companionBuffSlotIndexes.map((slotIndex) => (
-                  <span key={`buff-${slotIndex}`} />
+                  <span key={`debuff-${slotIndex}`} title="Debuff" />
                 ))}
               </div>
             </div>

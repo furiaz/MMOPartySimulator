@@ -354,6 +354,7 @@ const cameraDeadZoneHeightRatio = 0.3;
 const companionVitalsHeightViewportRatio = 0.13;
 const companionBuffDebuffRailHeightPx = 72;
 const companionBuffDebuffRailGapPx = 2;
+const companionHudCollapsedReservedHeightPx = 18;
 const wildernessMapIds = new Set([
   "map-1",
   "map-2",
@@ -1660,11 +1661,12 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-function getWorldViewportSize(): ViewportSize {
-  const bottomHudReservedHeight =
-    window.innerHeight * companionVitalsHeightViewportRatio +
-    companionBuffDebuffRailHeightPx +
-    companionBuffDebuffRailGapPx;
+function getWorldViewportSize(isCompanionHudCollapsed = false): ViewportSize {
+  const bottomHudReservedHeight = isCompanionHudCollapsed
+    ? companionHudCollapsedReservedHeightPx
+    : window.innerHeight * companionVitalsHeightViewportRatio +
+      companionBuffDebuffRailHeightPx +
+      companionBuffDebuffRailGapPx;
 
   return {
     width: window.innerWidth,
@@ -2978,6 +2980,7 @@ function App() {
     useState<OfflineFarmingSummary | null>(null);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [showEntityInfo, setShowEntityInfo] = useState(false);
+  const [isCompanionHudCollapsed, setIsCompanionHudCollapsed] = useState(false);
   const [mapCursorPosition, setMapCursorPosition] =
     useState<Position | null>(null);
   const [entityHoverTooltip, setEntityHoverTooltip] =
@@ -3073,7 +3076,7 @@ function App() {
     MovementClickFeedbackEvent[]
   >([]);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() =>
-    getWorldViewportSize(),
+    getWorldViewportSize(false),
   );
   const [
     visualMovementByEntityId,
@@ -4352,7 +4355,7 @@ function App() {
 
   useEffect(() => {
     function updateViewportSize() {
-      setViewportSize(getWorldViewportSize());
+      setViewportSize(getWorldViewportSize(isCompanionHudCollapsed));
     }
 
     updateViewportSize();
@@ -4361,7 +4364,7 @@ function App() {
     return () => {
       window.removeEventListener("resize", updateViewportSize);
     };
-  }, [rendererPerformanceRef]);
+  }, [isCompanionHudCollapsed, rendererPerformanceRef]);
 
   useEffect(() => {
     const trackedPositions = getTrackedVisualMovementPositions({
@@ -4437,6 +4440,14 @@ function App() {
     }
 
     startSimulationLoop();
+  }
+
+  function toggleCompanionHudCollapsed() {
+    setIsCompanionHudCollapsed((isCollapsed) => {
+      const nextIsCollapsed = !isCollapsed;
+      setViewportSize(getWorldViewportSize(nextIsCollapsed));
+      return nextIsCollapsed;
+    });
   }
 
   function toggleAutoCombatMode() {
@@ -6899,12 +6910,44 @@ function App() {
             Click on ground to stop auto routing
           </div>
         ) : null}
-        <CompanionVitalsPanel
-          currentTime={currentTime}
-          gameState={gameState}
-          globalCooldownsByCompanionId={gameState.globalCooldownsByCompanionId}
-          members={partyMembers}
-        />
+        {isCompanionHudCollapsed ? (
+          <div className="companion-hud-collapsed-strip" aria-hidden="true" />
+        ) : (
+          <CompanionVitalsPanel
+            currentTime={currentTime}
+            gameState={gameState}
+            globalCooldownsByCompanionId={gameState.globalCooldownsByCompanionId}
+            members={partyMembers}
+          />
+        )}
+        <button
+          aria-label={
+            isCompanionHudCollapsed
+              ? "Show companion HUD"
+              : "Hide companion HUD"
+          }
+          className={`companion-hud-toggle-button${
+            isCompanionHudCollapsed
+              ? " companion-hud-toggle-button-collapsed"
+              : " companion-hud-toggle-button-expanded"
+          }`}
+          onClick={toggleCompanionHudCollapsed}
+          title={
+            isCompanionHudCollapsed
+              ? "Show companion HUD"
+              : "Hide companion HUD"
+          }
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className={`companion-hud-toggle-arrow${
+              isCompanionHudCollapsed
+                ? " companion-hud-toggle-arrow-up"
+                : " companion-hud-toggle-arrow-down"
+            }`}
+          />
+        </button>
         <QuestTrackerPanel
           isHidden={isQuestTrackerHidden}
           onOpenQuestMenu={openDisplayedQuestMenu}
@@ -6937,7 +6980,13 @@ function App() {
           </div>
         ) : null}
 
-        <div className="bottom-hud-controls">
+        <div
+          className={`bottom-hud-controls${
+            isCompanionHudCollapsed
+              ? " bottom-hud-controls-companion-collapsed"
+              : ""
+          }`}
+        >
           <div className="hud-action-cluster">
             <button
               aria-pressed={gameState.autoModeEnabled}
