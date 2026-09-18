@@ -463,7 +463,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party bank, shared party key item state, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline farming loot, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, autonomous target suppression state, prototype skill runtime state, status-effect runtime state, prototype skill visual events, companion AoE runtime state, enemy AoE runtime state, prototype consumable use state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, last companion damage timing, short-lived news broadcasts, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party bank, shared party key item state, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline farming loot, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, autonomous target suppression state, skill runtime state, status-effect runtime state, skill visual events, companion AoE runtime state, enemy AoE runtime state, prototype consumable use state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, last companion damage timing, short-lived news broadcasts, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -577,7 +577,7 @@ Basic projectile runtime supports current Hunter basic attack arrows and ranged 
 
 Projectile runtime is cleared by save sanitization and map-local runtime cleanup where appropriate.
 
-Current prototype skill runtime and cooldown fields include:
+Current skill runtime and cooldown fields include:
 
 - `skillMarksByEnemyId`
 - `skillSelfBuffsByCompanionId`
@@ -761,7 +761,7 @@ Equipment rules must not require React rendering logic, sprite swaps, weapon anc
 
 Current class implementation is lightweight and structural.
 
-Classes currently provide prototype skills through `skills.ts`.
+Classes provide alpha active and passive skills through `skills.ts`.
 
 First-class selection from Beginner is handled by `classSelection.ts`.
 
@@ -828,7 +828,7 @@ Current leveling constants:
 
 Current leveling behavior:
 
-- enemies grant XP when killed by party combat or prototype skills
+- enemies grant XP when killed by party combat or skills
 - XP is granted to living companions
 - dead companions do not receive XP
 - max-level companions do not receive XP
@@ -868,11 +868,11 @@ It should remain simple unless expanded intentionally.
 
 ---
 
-## Skills Prototype
+## Alpha Skill System
 
-Skills are simple class-based actions used to extend existing behavior.
+Skills are class-based active actions and always-active passive effects. The alpha system extends the existing game-logic model rather than introducing a second ability framework.
 
-Skill definitions live in `skills.ts`.
+Shared skill definitions live in `skills.ts` and identify each skill with `type: "active" | "passive"`. Active definitions contain executable action metadata; passive definitions contain effect metadata consumed by focused game-logic selectors and helpers.
 
 Skill selection, behavior settings, cooldowns, execution, status-effect gating, overcharge adjustment, companion AoE channeling, runtime ticking, and effect resolution live in:
 
@@ -888,9 +888,7 @@ Skill selection, behavior settings, cooldowns, execution, status-effect gating, 
 - `companionAoeChannelSystem.ts`
 - `skillEffectResolution.ts`
 
-Current skill runtime is prototype-only.
-
-It is not a full ability framework.
+Passive implementation must use focused selectors and existing runtime ownership. Do not introduce a generic event bus solely for passive effects.
 
 Current companion skill behavior settings live in `skillBehavior.ts`.
 
@@ -921,9 +919,9 @@ Current companion skill behavior settings include:
 - `circleOfRenewalTargetMode`
 - `circleOfRenewalMainTargetHpThresholdPercent`
 
-Beginner First Aid self-heal threshold defaults to 20 percent and is clamped from 1 percent to 100 percent.
+Beginner First Aid self-heal threshold defaults to 20 percent and is clamped from 10 percent to 60 percent.
 
-Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped from 10 percent to 60 percent.
 
 Second Wind self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
@@ -972,9 +970,9 @@ type CircleOfRenewalTargetMode =
   | "low_health"
   | "defender";
 ```
-Support Focus, mobility skill use mode, FireBurst target mode, Circle of Renewal target mode, overcharge enablement, and skill HP thresholds are prototype targeting and usage preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
+Support Focus, mobility skill use mode, FireBurst target mode, Circle of Renewal target mode, overcharge enablement, and skill HP thresholds are targeting and usage preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
 
-Current skill ids include Beginner prototype skills and first-class prototype skills:
+Skill ids include active and passive Beginner and first-class skills:
 
 ```ts
 type SkillId =
@@ -985,7 +983,9 @@ type SkillId =
   | "deep_breath" // Beginner
   | "rally_call" // Beginner
   | "field_hands" // Beginner
-  | "quick_step" // Beginner
+  | "follow_through" // Beginner active
+  | "resourcefulness" // Beginner passive
+  | "steady_nerves" // Beginner passive
   | "duelist_challenge" // Blade
   | "second_wind" // Blade
   | "blade_parry" // Blade
@@ -994,6 +994,8 @@ type SkillId =
   | "woodcutter_rhythm" // Blade
   | "flash_step" // Blade
   | "sweeping_strike" // Blade
+  | "duelists_momentum" // Blade passive
+  | "riposte_training" // Blade passive
   | "shield_challenge" // Aegis
   | "hold_fast" // Aegis
   | "guard_wall" // Aegis
@@ -1002,6 +1004,8 @@ type SkillId =
   | "stonebreaker_rhythm" // Aegis
   | "shield_rush" // Aegis
   | "shield_shockwave" // Aegis
+  | "rooted_bastion" // Aegis passive
+  | "unbroken_line" // Aegis passive
   | "pinning_shot" // Hunter
   | "fake_death" // Hunter
   | "evasive_instinct" // Hunter
@@ -1010,6 +1014,8 @@ type SkillId =
   | "herbalist_rhythm" // Hunter
   | "skirmish_shot" // Hunter
   | "arrow_burst" // Hunter
+  | "headhunter" // Hunter passive
+  | "exploit_the_snare" // Hunter passive
   | "threatening_roar" // Beast
   | "blood_feast" // Beast
   | "rugged_hide" // Beast
@@ -1018,6 +1024,8 @@ type SkillId =
   | "stoneclaw_rhythm" // Beast
   | "pounce" // Beast
   | "maul_sweep" // Beast
+  | "blood_scent" // Beast passive
+  | "pack_instinct" // Beast passive
   | "elemental_bolt" // Elementalist
   | "mana_shield" // Elementalist
   | "frost_armor" // Elementalist
@@ -1026,6 +1034,8 @@ type SkillId =
   | "emberwood_rhythm" // Elementalist
   | "flame_step" // Elementalist
   | "fire_burst" // Elementalist
+  | "stable_overcharge" // Elementalist passive
+  | "arcane_crescendo" // Elementalist passive
   | "binding_rune" // Runecaster
   | "rune_lance" // Runecaster
   | "warding_glyph" // Runecaster
@@ -1034,6 +1044,8 @@ type SkillId =
   | "leyline_matrix" // Runecaster
   | "stone_sigil_rhythm" // Runecaster
   | "rune_step" // Runecaster
+  | "word_resonance" // Runecaster passive
+  | "living_inscription" // Runecaster passive
   | "blinding_ray" // Lightbearer
   | "light_mend" // Lightbearer
   | "sanctuary_veil" // Lightbearer
@@ -1042,6 +1054,8 @@ type SkillId =
   | "herbalist_hymn" // Lightbearer
   | "dawn_step" // Lightbearer
   | "circle_of_renewal" // Lightbearer
+  | "overflowing_grace" // Lightbearer passive
+  | "many_beacons" // Lightbearer passive
   | "whip_prison" // Penitent
   | "flagellant_lash" // Penitent
   | "martyrs_veil" // Penitent
@@ -1049,10 +1063,12 @@ type SkillId =
   | "eternal_hope" // Penitent
   | "burdened_benediction" // Penitent
   | "woodcutting_penance" // Penitent
-  | "atonement_step"; // Penitent
+  | "atonement_step" // Penitent
+  | "crimson_authority" // Penitent passive
+  | "cruel_mercy"; // Penitent passive
 ```
 
-Current Beginner prototype skills:
+Beginner active skills:
 
 - Beginner: Throw Rock
 - Beginner: Kick
@@ -1061,9 +1077,9 @@ Current Beginner prototype skills:
 - Beginner: Deep Breath
 - Beginner: Rally Call
 - Beginner: Field Hands
-- Beginner: Quick Step
+- Beginner: Follow Through
 
-Current Blade prototype skills:
+Blade active skills:
 
 - Blade: Duelist Challenge
 - Blade: Second Wind
@@ -1074,7 +1090,7 @@ Current Blade prototype skills:
 - Blade: Flash Step
 - Blade: Sweeping Strike
 
-Current Aegis prototype skills:
+Aegis active skills:
 
 - Aegis: Shield Challenge
 - Aegis: Hold Fast
@@ -1085,7 +1101,7 @@ Current Aegis prototype skills:
 - Aegis: Shield Rush
 - Aegis: Shield Shockwave
 
-Current Hunter prototype skills:
+Hunter active skills:
 
 - Hunter: Pinning Shot
 - Hunter: Fake Death
@@ -1096,7 +1112,7 @@ Current Hunter prototype skills:
 - Hunter: Skirmish Shot
 - Hunter: Arrow Burst
 
-Current Beast prototype skills:
+Beast active skills:
 
 - Beast: Threatening Roar
 - Beast: Blood Feast
@@ -1107,7 +1123,7 @@ Current Beast prototype skills:
 - Beast: Pounce
 - Beast: Maul Sweep
 
-Current Elementalist prototype skills:
+Elementalist active skills:
 
 - Elementalist: Elemental Bolt
 - Elementalist: Mana Shield
@@ -1118,7 +1134,7 @@ Current Elementalist prototype skills:
 - Elementalist: Flame Step
 - Elementalist: FireBurst
 
-Current Runecaster prototype skills:
+Runecaster active skills:
 
 - Runecaster: Binding Rune
 - Runecaster: Rune Lance
@@ -1129,7 +1145,7 @@ Current Runecaster prototype skills:
 - Runecaster: Stone Sigil Rhythm
 - Runecaster: Rune Step
 
-Current Lightbearer prototype skills:
+Lightbearer active skills:
 
 - Lightbearer: Blinding Ray
 - Lightbearer: Light Mend
@@ -1140,7 +1156,7 @@ Current Lightbearer prototype skills:
 - Lightbearer: Dawn Step
 - Lightbearer: Circle of Renewal
 
-Current Penitent prototype skills:
+Penitent active skills:
 
 - Penitent: Whip Prison
 - Penitent: Flagellant Lash
@@ -1151,9 +1167,108 @@ Current Penitent prototype skills:
 - Penitent: Woodcutting Penance
 - Penitent: Atonement Step
 
-Current skill effects may include direct damage, lunge damage, sweeping/splash damage, area damage, taunt, multi-taunt, enemy mark bonus damage, self damage buff, ally damage buff, party damage buff, party class buffs, party poison coating, gathering speed buff, quick-step movement, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, immobilize, disarm, blind/forced evasion, fake death, silence, poison, burning, bleed, heal, self-percent heal, ally heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge, companion AoE channels, beginner fallback damage, beginner emergency recovery, beginner defensive survival, beginner support, and beginner mobility.
+Passive skills by class:
 
-`skillEffectResolution.ts` owns applying current prototype skill effects after selection, including damage, lunge damage, sweeping damage, area damage, taunt, multi-taunt, mark, self buff, party buff, ally buff, party class buff, poison coating, gather buff, quick step, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, status effects, heal, self-percent heal, self-cost heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge setup, companion AoE channel setup, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
+- Beginner: Resourcefulness, Steady Nerves
+- Blade: Duelist's Momentum, Riposte Training
+- Aegis: Rooted Bastion, Unbroken Line
+- Hunter: Headhunter, Exploit the Snare
+- Beast: Blood Scent, Pack Instinct
+- Elementalist: Stable Overcharge, Arcane Crescendo
+- Runecaster: Word Resonance, Living Inscription
+- Lightbearer: Overflowing Grace, Many Beacons
+- Penitent: Crimson Authority, Cruel Mercy
+
+Active-skill lookup and autonomous selection must exclude passive definitions. A learned-passive lookup must include passives from every class tier the companion has unlocked. Passives never enter active slots, legacy selection, cooldown processing, or autonomous action scoring.
+
+Class unlock initializes every active and passive skill for that class at rank 1. Passive-specific skill books use the same learned-skill rank and stored book-progress model as active skills. React presents passive rank, current cap, description, and book progress, but does not calculate passive effects.
+
+Passive mechanics remain owned by focused game-logic modules:
+
+- combat damage and healing modifiers resolve beside the existing damage or healing calculation
+- incoming control reduction resolves when status duration is applied
+- position, recent-hit, recent-kill, prior-target, and prior-rune memory is stored and updated by game logic
+- barriers, charges, stack expiration, and source-owned rune effects are stored in explicit runtime state and cleaned by the existing runtime cleanup path
+- passive bonuses are queried from learned skill state and never duplicated into React state
+
+The exact passive formulas and qualifying conditions are authoritative in GDD.md. Continuous passive scaling uses the shared `U(rank)` helper; discrete and bespoke effects use explicit helpers and milestone tests.
+
+### Beginner active-skill implementation rules
+
+Beginner active definitions and resolution must implement these rank behaviors through the currently reachable rank 10:
+
+- Throw Rock taunt duration: 3 seconds at rank 1, +0.5 seconds per rank through rank 5, then +0.25 seconds per rank; rank 10 is 6.25 seconds.
+- Kick damage: 100 percent at rank 1, +5 percentage points per rank through rank 5, then +2.5 points per rank; rank 10 is 132.5 percent.
+- Guard Up: 6–10 seconds at ranks 1–5, then +0.5 seconds per rank; one block at ranks 1–4, two at ranks 5–9, and three at rank 10.
+- First Aid normal healing uses the generic potency curve before the target-health effectiveness multiplier is applied.
+- Deep Breath and Rally Call: +1 damage per rank through rank 5, then +0.5 per rank; rank 10 is +7.5.
+- Field Hands uses generic gathering-power scaling and does not modify item quantity, tier, or rarity.
+- Follow Through replaces Quick Step and its book id. It is a range-1, 10-second-cooldown direct physical melee skill. Its base damage is 100–140 percent in 10-point rank steps through rank 5, then +5 points per rank; rank 10 is 165 percent. Its conditional bonus is 20–40 points in 5-point steps through rank 5, then +2.5 points per rank; rank 10 is 52.5 points. The bonus applies when the target is currently attacking another living companion. Autonomous targeting prefers, but does not require, such a target.
+
+First Aid resolution must reject targets above 60 percent health. Its effectiveness is a portion of the already rank-scaled normal heal:
+
+```text
+target HP >= 60%: 10% effectiveness at exactly 60%, invalid above 60%
+target HP 30–60%: linear interpolation from 60% effectiveness at 30% HP to 10% at 60% HP
+target HP 10–30%: linear interpolation from 100% effectiveness at 10% HP to 60% at 30% HP
+target HP <= 10%: 100% effectiveness
+```
+
+The First Aid self and ally threshold controls clamp to 10–60 percent. The UI may display the selected threshold and computed effectiveness, but the interpolation helper and cast validation remain in game logic.
+
+### Overcharge implementation rules
+
+Overcharge bypasses generic effect scaling:
+
+```text
+powerBonusPercent(rank):
+rank 1–5 = 10 + (rank - 1) × 2.5
+rank 6+  = 20 + (rank - 5) × 1.25
+
+cooldownPenaltyPercent(rank):
+rank 1–5 = 20 + (rank - 1) × 2
+rank 6+  = 28 + (rank - 5) × 1
+```
+
+Milestones are 10/20 percent at rank 1, 20/28 at rank 5, 26.25/33 at rank 10, and 32.5/38 at rank 15. Stable Overcharge subtracts `1 × U(rank)` percentage points from the cooldown penalty with a zero floor. Overcharge and Arcane Crescendo damage bonuses combine additively. Existing duration, refresh-window, enable-toggle, and base-cooldown ownership remains unchanged. The UI reads and displays calculated power and cooldown values rather than reproducing these formulas.
+
+### Runecaster rune-word metadata
+
+Every current Runecaster active skill stores exactly two complete rune-word records. The definition data must preserve Unicode text exactly and expose it to presentation without using glyphs as mechanical identifiers.
+
+```ts
+type RuneWordDefinition = {
+  glyphs: string;
+  transliterations: readonly string[];
+  meaning: string;
+  mechanicalConcept: string;
+};
+
+type RunecasterRuneWords = {
+  primary: RuneWordDefinition;
+  secondary: RuneWordDefinition;
+  presentationGuidance: string;
+};
+```
+
+Canonical definition data:
+
+| Skill | Primary | Secondary | Concepts |
+|---|---|---|---|
+| Binding Rune | `ⵇⵇⵏ` — qqen / qqn | `ⴰⵙⵇⵇⵏ` — asqqen / asqqn | Bind + Tether |
+| Rune Lance | `ⵜⴰⴼⴰⵍⴰ` — tafala | `ⵜⴰⵣⵎⵎⴰⵔⵜ` — tazmmart / tazmert | Lance + Power |
+| Warding Glyph | `ⴰⵎⵙⵜⵏ` — amesten | `ⴰⴼⵔⴰⴳ` — afrag | Protection + Barrier |
+| Rewind Rune | `ⵓⵖⴰⵍ` — uɣal | `ⵜⵓⴷⵔⵜ` — tudert | Return + Life |
+| Runic Focus | `ⴰⵍⵙ` — als | `ⴰⵎⵎⴰⵙ` — ammas | Repeat + Center |
+| Leyline Matrix | `ⴰⵣⵟⵟⴰ` — azṭṭa | `ⴰⴱⵔⵉⴷ` — abrid | Network + Path |
+| Stone Sigil Rhythm | `ⴰⵣⵔⵓ` — azru | `ⴰⵏⵢⴰ` — anya | Stone + Rhythm |
+| Rune Step | `ⴰⵙⵓⵔⵉⴼ` — asurif | `ⵇⵇⵏ` — qqen / qqn | Step + Bind |
+
+Meanings and presentation guidance are the complete entries in GDD.md and must be carried in the structured definitions. Glyph sequences are immutable content: do not normalize their order, invent substitutions, merge the two words, or treat individual letters as independent magical symbols. The default visual arrangement is primary-center and secondary-outer; per-skill guidance overrides it. Runic Focus specifically places Ammas at the center and Als around it. The UI list renders a compact two-word inscription and the details view renders both transliterations, meanings, mechanical contribution, and rune-word count with a Neo-Tifinagh-capable fallback font. In-world copy must not mention a real-world region.
+
+Current skill effects may include direct damage, lunge damage, sweeping/splash damage, area damage, taunt, multi-taunt, enemy mark bonus damage, self damage buff, ally damage buff, party damage buff, party class buffs, party poison coating, gathering power buff, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, immobilize, disarm, blind/forced evasion, fake death, silence, poison, burning, bleed, heal, self-percent heal, ally heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge, companion AoE channels, Beginner fallback damage, Beginner emergency recovery, Beginner defensive survival, Beginner support, and passive modifiers.
+
+`skillEffectResolution.ts` owns applying active skill effects after selection, including damage, lunge damage, sweeping damage, area damage, taunt, multi-taunt, mark, self buff, party buff, ally buff, party class buff, poison coating, gather buff, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, status effects, heal, self-percent heal, self-cost heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge setup, companion AoE channel setup, visual events, combat feedback, cooldown consumption decisions, XP grants, quest defeat progress, and enemy drop handling where relevant.
 
 Current skill rules:
 
@@ -1161,14 +1276,15 @@ Current skill rules:
 - roles determine preferred skill usage
 - skill tags affect role scoring
 - skill tags are typed metadata on skill definitions and may describe targeting, effect family, role scoring, maintenance behavior, mobility, gathering, defensive, support, or self-cost traits
+- offensive-spell and area-of-effect classification is explicit typed skill metadata so Arcane Crescendo never infers eligibility from presentation text
 - skill selection must validate target, range, cooldown, companion state, and current context
 - skill movement helpers must validate map bounds, walls, active resources, and blocking entity collision before moving companions
-- direct-commanded companions do not use autonomous prototype skills
+- direct-commanded companions do not use autonomous active skills
 - dead companions do not use skills
 - skills may use individual per-skill cooldowns
-- skills without an explicit cooldown fall back to the shared prototype skill cooldown value
-- current fallback prototype skill cooldown is 10000ms
-- Beginner prototype skills currently use explicit 10000ms cooldowns
+- skills without an explicit cooldown fall back to the shared skill cooldown value
+- current fallback skill cooldown is 10000ms
+- Beginner active skills currently use explicit 10000ms cooldowns
 - basic attacks and successful skill uses start a companion global cooldown
 - current companion global cooldown is 2000ms
 - skill ranges use numeric values
@@ -1197,22 +1313,44 @@ type AoeVisualIntent =
 
 AoE visual intent is presentation metadata for renderer feedback. It must not define damage ownership, targeting, faction logic, or simulation behavior.
 
-Current skill runtime state includes marks, self buffs, party buffs, poison coatings, class buffs, overcharges, mana shields, frost armor, heal-over-time effects, lifesteal buffs, rewind runes, runic focus, gather buffs, damage mitigations, absorb shields, self mitigation buffs, party mitigation buffs, binds, shield blocks, status effects, companion AoE channels, per-skill cooldowns, companion global cooldowns, and visual events.
+Current skill runtime state includes marks, self buffs, party buffs, poison coatings, class buffs, overcharges, mana shields, frost armor, heal-over-time effects, lifesteal buffs, rewind runes, runic focus, gather buffs, damage mitigations, absorb shields, self mitigation buffs, party mitigation buffs, binds, shield blocks, status effects, passive charges and sequence memory, recent qualifying kills, source-owned rune effects, companion AoE channels, per-skill cooldowns, companion global cooldowns, and visual events.
 
-`skillProgression.ts` owns current prototype skill ranks, skill-book reading, active skill lookup, scaled skill definitions, and legacy-enabled Beginner skill carry-over.
+`skillProgression.ts` owns learned skill ranks, stored book progress, skill-book reading, active and passive lookup, companion-aware caps, scaled skill definitions, and legacy-enabled active skill carry-over.
 
-Current skill progression behavior:
+Skill progression behavior:
 
-- companions automatically have rank 1 for current class skills
-- Beginner skills max at rank 3
-- first-class skills max at rank 5
-- each rank adds a small prototype multiplier to supported skill effect values
-- skill books raise matching learned skills by one rank
-- failed skill-book reads do not consume inventory
-- maxed eligible Beginner skills can be legacy-enabled on first-class companions
-- legacy-enabled skills are added to the active skill pool only when eligibility checks pass
+- all active and passive skills for a newly unlocked class initialize at rank 1
+- a Beginner companion has a Beginner cap of 5
+- after first-class selection, the Beginner cap becomes 10 and the current first-class cap is 5
+- the documented future rule adds 5 to each earlier class tier whenever a later class tier is unlocked; future second- and third-class systems are not implemented now
+- rank 5 is a fixed `legacyUnlockRank` for active skills and does not move when a cap increases
+- eligible legacy active skills remain individually enabled without an active-skill slot limit
+- passive skills are always active after unlock and never use legacy toggles or active-skill slots
+- cap lookup must accept companion class-depth context; a skill-only `getSkillMaxRank(skill)` is insufficient
+- book cost for target rank `B` is `B(B + 1) / 2 - 2`
+- stored progress is tracked per learned skill
+- one Study or Read command consumes up to the remaining cost of the next rank, advances at most one rank, preserves insufficient partial progress, and leaves excess books in inventory
+- invalid, unavailable, and maxed reads consume nothing
+- Beginner and first-class skill-book price categories and the item stack limit remain unchanged
+- active legacy eligibility checks compare rank to `legacyUnlockRank`, not the current companion-aware maximum
+- legacy-enabled active skills enter the active pool only when class-lineage and eligibility checks pass
+- no prototype-save migration is required
 
-Do not expand this into a full ability framework unless explicitly requested.
+Shared scaling helpers use:
+
+```text
+U(rank):
+rank 1–5 = rank
+rank 6+  = 5 + (rank - 5) × 0.5
+
+G(rank):
+rank 1–5 = rank - 1
+rank 6+  = 4 + (rank - 5) × 0.5
+```
+
+Supported generic effects gain their normal rank-1-through-5 step through rank 5 and half that step after rank 5. Discrete effects use explicit milestone helpers. First Aid, Follow Through, Guard Up, Overcharge, Arcane Crescendo, Overflowing Grace, and every other bespoke formula must bypass inappropriate generic scaling and match GDD.md.
+
+Do not expand this into a second or full ability framework unless explicitly requested.
 
 Do not add a mana resource, casting framework, advanced targeting, equipment requirements, complex cooldown systems, skill trees, hotbars, or player-triggered active skill input unless explicitly requested.
 
@@ -1740,7 +1878,7 @@ Current high-level order:
 25. Update healing fountain system
 26. Rebuild resource work context
 27. If auto mode is enabled, update role behavior
-28. If auto mode is enabled, update prototype skills
+28. If auto mode is enabled, update active skills and passive runtime
 29. If party execution intent, auto mode, or teleport POI movement is active, update party formation movement
 30. If auto mode is enabled, reserve exploration movement
 31. Update defender behavior
@@ -1985,7 +2123,7 @@ Defender behavior is skipped during active party travel movement.
 
 Direct-commanded defenders are not controlled by autonomous defend behavior.
 
-Aegis shield-block skill behavior is handled by the prototype skill system, not by the defender system directly.
+Aegis shield-block skill behavior is handled by the skill system, not by the defender system directly.
 
 ---
 
@@ -2017,8 +2155,8 @@ Current attack behavior:
 - enemies may use entity-specific attack cooldowns
 - enemies use a short basic attack windup before impact or projectile launch
 - attackers can take a small final positioning step when just outside range
-- damage is resolved through `combatResolver.ts` using derived combat stats, mitigation, evasion, forced evasion, block, critical hits, defense buffs, absorb shields, mana shields, frost armor, next-attack bonuses, and prototype skill damage modifiers
-- prototype skill damage modifiers, class buffs, party buffs, lifesteal buffs, and status-driven next-attack bonuses can affect combat impact
+- damage is resolved through `combatResolver.ts` using derived combat stats, mitigation, evasion, forced evasion, block, critical hits, defense buffs, absorb shields, mana shields, frost armor, next-attack bonuses, and skill damage modifiers
+- skill damage modifiers, class buffs, party buffs, lifesteal buffs, passive modifiers, and status-driven next-attack bonuses can affect combat impact
 - shield blocks, absorb shields, mana shields, frost armor, defense buffs, and mitigation buffs can reduce, absorb, block, reflect, or respond to incoming damage where implemented
 - defeated targets enter dead state
 - enemies attacked by party members fight back
@@ -2075,7 +2213,7 @@ Current status-effect behavior:
 - bleed deals physical damage over time
 - damage-over-time effects can expire, tick, kill targets, grant XP, progress quests, and trigger drops through normal damage resolution where supported
 
-Status effects are prototype skill/combat runtime, not a final crowd-control, buff/debuff, dispel, resistance, or condition-stacking framework.
+Status effects are skill/combat runtime, not a full crowd-control, buff/debuff, dispel, resistance, or condition-stacking framework.
 
 ---
 
@@ -2092,7 +2230,7 @@ Current companion AoE channel behavior:
 - Maul Sweep damages nearby enemies and can apply `disarmed`
 - companion AoE impact can grant XP, progress quest defeat objectives, and trigger enemy drops through normal combat resolution where supported
 
-Companion AoE channel runtime is prototype skill runtime and should stay in game logic.
+Companion AoE channel runtime is skill runtime and should stay in game logic.
 
 ---
 
@@ -2419,23 +2557,25 @@ type ItemCategory =
   | "quest"
   | "event";
 ```
-Prototype skill book item ids are part of `ItemId`.
+Skill book item ids are part of `ItemId`.
 
 Current skill book items map one inventory item to one `SkillId` through `skillBookSkillId`.
 
 Skill-book reading logic lives in `skillProgression.ts`, not in React UI or merchant logic.
 
-Current skill-book behavior:
+Skill-book behavior:
 
 - skill books are normal inventory items with `category: "skill_book"`
 - skill books are stackable and currently use `maxStack: 99`
 - each skill book points to exactly one `SkillId` through `skillBookSkillId`
 - `getSkillBookReadCandidates` returns companions that can currently read the selected book
 - `canCompanionReadSkillBook` returns `eligible`, `unavailable`, or `maxed`
-- `readSkillBook` validates item definition, known skill id, companion id, inventory quantity, learned skill availability, and max rank
+- `readSkillBook` validates item definition, known skill id, companion id, inventory quantity, learned skill availability, companion-aware max rank, current stored progress, and the cost of the next rank
 - failed skill-book reads do not remove the book from inventory
-- successful skill-book reads remove one book item and increase the matching learned skill rank by one, capped by that skill's max rank
-- skill progression sanitization keeps known skill ids, clamps ranks, preserves valid legacy-enabled skill ids, and ensures current-class skills remain learned
+- a successful read removes at most the remaining number of matching books needed for the next rank, applies that quantity to stored progress, and advances at most one rank
+- insufficient inventory quantity is preserved as partial progress, while quantity beyond the next-rank requirement remains in inventory
+- when a rank advances, progress for the completed rank is cleared before the next rank's requirement is displayed
+- skill progression sanitization keeps known skill ids, clamps ranks to companion-aware caps, preserves valid partial progress, preserves valid legacy-enabled active skill ids, and ensures every unlocked class's active and passive skills remain learned
 
 The shared prototype wallet is stored on `GameState` as `wallet`.
 
@@ -2674,7 +2814,7 @@ type MerchantStockFilterOptions = {
 };
 ```
 
-Current Merchant Buy stock includes Beginner skill books and first-class skill books for all currently implemented prototype skills.
+Current Merchant Buy stock includes Beginner and first-class books for all implemented active and passive skills. Existing Beginner and first-class price categories remain unchanged.
 
 Merchant stock, pricing, filtering, quest gating, buying, wallet mutation, and inventory mutation must remain in `merchant.ts` and related game-logic helpers.
 
@@ -3612,8 +3752,8 @@ React may:
 - call existing consumable helpers for supported flask and auto-flask actions
 - call existing Guild & Inn helpers for supported recruit, board, Field Team, room, Kitchen, Hearth's Fire, and upgrade actions
 - call existing Farm and Livestock helpers for supported crop, creature, grid, feed, collect, upgrade, helper summary, and pantry/inventory routing actions
-- call existing skill behavior helpers for supported prototype skill behavior settings
-- call existing skill progression helpers for supported skill-book reading and legacy skill toggles
+- call existing skill behavior helpers for supported skill behavior settings
+- call existing skill progression helpers for supported skill-book reading and legacy active-skill toggles
 - call existing merchant helpers for supported Merchant Buy actions
 - call existing bank helpers for supported bank transfers, slot locks, and auto-routing settings
 - call existing crafting helpers for supported recipe status display and craft actions
@@ -3645,9 +3785,10 @@ Current intended Party sections and controls:
 - Stats
 - Equipment
 - Skills
-- learned skill display
-- legacy skill toggles where eligible
-- Skill Preferences for supported prototype skill behavior settings
+- learned active and passive skill display with current rank, companion-aware cap, and book progress
+- legacy active-skill toggles where the fixed rank-5 threshold is met
+- no passive skill toggles or legacy controls
+- Skill Preferences for supported skill behavior settings
 - HP threshold controls for supported self-heal, ally-heal, defensive, and safety skills
 - target mode controls for supported FireBurst and Circle of Renewal behavior
 - Overcharge toggle control for supported Elementalist behavior

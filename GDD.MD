@@ -423,7 +423,7 @@ Projectile travel and enemy attack windup are prototype readability layers for c
 
 Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, barriers, absorbs, mitigation, and passive health regeneration.
 
-Current prototype skill runtime may apply temporary combat state such as shields, barriers, absorbs, damage mitigation, mana shields, frost armor, Overcharge, party class buffs, gather buffs, healing over time, lifesteal, Runic Focus, forced evasion, fake death, next-attack damage bonuses, defense buffs, poison, burning, bleed, immobilize, disarm, silence, taunt, and temporary aggro drops.
+Current skill runtime may apply temporary combat state such as shields, barriers, absorbs, damage mitigation, mana shields, frost armor, Overcharge, party class buffs, gather buffs, healing over time, lifesteal, Runic Focus, forced evasion, fake death, next-attack damage bonuses, defense buffs, poison, burning, bleed, immobilize, disarm, silence, taunt, and temporary aggro drops.
 
 Poison, burning, and bleed may deal periodic damage while active.
 
@@ -814,8 +814,8 @@ Current merchant behavior:
 
 - the hub Merchant has a fixed prototype buy stock
 - Merchant Buy can purchase selected equipment, flasks, and skill books for Crowns
-- current Merchant Buy skill book stock includes books for all current Beginner and first-class prototype skills
-- current prototype Merchant Buy pricing uses lower prices for Beginner skill books and higher prices for first-class skill books
+- current Merchant Buy skill book stock includes books for all current Beginner and first-class active and passive skills
+- current Merchant Buy pricing uses the existing lower price category for Beginner skill books and higher price category for first-class skill books
 - Merchant Buy validates merchant identity, quest unlock state, stock membership, price, wallet balance, item category, and inventory capacity
 - purchased items are added to shared party inventory
 - Merchant Buy may filter stock by group, secondary item type or slot, minimum level requirement, maximum level requirement, and party equipment compatibility
@@ -1154,28 +1154,27 @@ Current Equipment section may also show prototype consumable controls:
 
 Inn Kitchen meal buffs are managed through Guild & Inn -> Inn -> Kitchen, not through Party Equipment.
 
-Skills may show the selected companion's learned current-class skills.
+Skills may show the selected companion's learned active and passive skills from every unlocked class tier.
 
 Current Skills UI may show:
 
 - skill display name
 - effect summary
 - current rank and max rank
+- book progress toward the next rank
 - cooldown
 - range
 - role score
 - skill tags
 
-Current class tabs may show only the companion's current class until class-history or multi-class progression data exists.
+Active skills are grouped by class. Learned earlier-class active skills may appear in a separate legacy section when they have reached the fixed rank-5 eligibility threshold. Passives appear in a separate passive presentation and never show legacy controls.
 
-Legacy-enabled Beginner skills may appear separately when the selected companion is eligible.
-
-Skill Preferences may show supported prototype skill behavior settings.
+Skill Preferences may show supported skill behavior settings.
 
 Current supported Skill Preferences may include:
 
-- First Aid Self-Heal Threshold from 1 percent to 100 percent
-- First Aid Ally-Heal Threshold from 1 percent to 100 percent
+- First Aid Self-Heal Threshold from 10 percent to 60 percent, with the resulting healing effectiveness shown beside the slider
+- First Aid Ally-Heal Threshold from 10 percent to 60 percent, with the resulting healing effectiveness shown beside the slider
 - Second Wind Self-Heal Threshold up to the current prototype cap
 - Hold Fast Use Threshold
 - Fake Death Use Threshold up to the current prototype cap
@@ -1238,7 +1237,7 @@ Behavior Settings currently supports prototype companion behavior controls:
 - Auto-use Flask toggle
 - Flask HP Threshold setting from 1 percent to 100 percent
 
-Prototype skill behavior settings such as First Aid thresholds and Support Focus may live in companion Skill Preferences instead of whole-party Behavior Settings.
+Skill behavior settings such as First Aid thresholds and Support Focus may live in companion Skill Preferences instead of whole-party Behavior Settings.
 
 Behavior Settings should not define new autonomous behavior outside supported game-logic settings.
 
@@ -1805,7 +1804,7 @@ Party members may begin as:
 
 Beginner is the starting class before choosing a first class.
 
-Beginner should feel simple, flexible, and unfinished.
+Beginner should feel simple, flexible, and broadly useful across every later class path.
 
 Current prototype first-class selection:
 
@@ -1928,20 +1927,28 @@ Roles determine how those tools are prioritized.
 
 ---
 
-## Skills Prototype
+## Alpha Skill System
 
-Skills are simple active abilities tied to classes.
+Skills are class-based abilities that form a persistent part of companion progression. The alpha system supports active skills and always-active passive skills without adding mana, skill trees, hotbars, or an advanced casting framework.
 
-Skills:
+Active skills:
 
 - are defined by tags
 - use simple effects
 - use numeric ranges
-- may use per-skill prototype cooldowns
+- may use per-skill cooldowns
 - may use a short companion global cooldown after basic attacks or skill use
 - do not yet use mana or advanced resource systems
 - are used as simple extensions of existing party, role, combat, support, movement, and gathering behavior
 - should be selected through role priorities and context instead of hardcoded class behavior
+
+Passive skills:
+
+- are learned automatically at rank 1 when their class is unlocked
+- remain active after later class changes
+- do not use equipment slots, activation toggles, or legacy enabling
+- may be broadly useful or may require a specific class skill, status, or combat event before they can have an effect
+- use the same rank and skill-book progression foundation as active skills
 
 Skill usage is determined by:
 
@@ -1954,7 +1961,7 @@ Skill usage is determined by:
 - individual skill cooldown availability
 - companion skill behavior settings where supported
 
-Current prototype skill effects may include:
+Alpha skill effects may include:
 
 - direct physical or magic damage
 - lunge damage
@@ -1977,42 +1984,52 @@ Current prototype skill effects may include:
 - maintenance-style buffs
 - beginner fallback combat or survival tools
 
-Current prototype skill cooldown behavior:
+Alpha skill cooldown behavior:
 
-- Beginner prototype skills may have longer individual cooldowns than some first-class prototype skills
-- first-class prototype skills may define individual cooldowns or fall back to the shared prototype skill cooldown value
+- Beginner active skills may have longer individual cooldowns than some first-class active skills
+- first-class active skills may define individual cooldowns or fall back to the shared skill cooldown value
 - long-duration first-class buffs may use long cooldowns and refresh windows
 - individual skill cooldowns should not block other ready skills
 - companion global cooldown prevents immediate repeated basic attacks or skill use
 - failed skill effects should not consume cooldown when no effect is applied
 - Overcharge may temporarily increase supported skill power while adding a cooldown penalty
 
-Current prototype skill progression:
+Alpha skill progression:
 
-- companions automatically know their current class skills at rank 1
-- Beginner skills can currently rank up to rank 3
-- first-class skills can currently rank up to rank 5
-- each skill rank currently increases supported effect values by a small prototype multiplier
-- skill books can raise an already learned skill by one rank
-- skill books are consumed only when the skill rank increase succeeds
-- a skill book cannot teach a skill outside the companion's current class lineage
-- maxed Beginner skills may be legacy-enabled after a companion chooses a first class
-- legacy-enabled Beginner skills are added to the active skill pool for eligible first-class companions
-- legacy skill carry-over is a prototype bridge, not a final multiclass, mastery, or subclass system
+- companions automatically learn every active and passive skill belonging to a newly unlocked class at rank 1
+- a Beginner companion has a rank cap of 5 for Beginner skills
+- after a first class is unlocked, Beginner skills have a rank cap of 10 and first-class skills have a rank cap of 5
+- each later class tier is intended to add 5 ranks to every earlier class tier: Beginner caps progress 5/10/15/20, first-class caps progress 5/10/15, second-class caps progress 5/10, and third-class skills begin at cap 5
+- future class tiers and their content are not implemented by the alpha skill work
+- an earlier-class active skill becomes eligible for cross-class legacy enabling at rank 5, regardless of its current maximum rank
+- legacy enabling applies only to active skills
+- eligible legacy active skills remain individually enabled without a slot limit
+- learned passive skills remain active automatically and never require legacy enabling
+- a skill book cannot teach a skill outside the companion's learned class lineage
 
-Current prototype skills are not the full final ability system.
+Continuous rank scaling uses two shared units unless a skill defines a bespoke progression:
+
+```text
+Scale units U(rank):
+rank 1–5: U = rank
+rank 6+:  U = 5 + (rank - 5) × 0.5
+
+Growth steps G(rank):
+rank 1–5: G = rank - 1
+rank 6+:  G = 4 + (rank - 5) × 0.5
+```
+
+Effects expressed as a value per rank use `U(rank)`. Effects that start from a rank-1 base and grow afterward use `G(rank)`. Discrete effects use explicit milestones. Arcane Crescendo, Overflowing Grace, Overcharge, and other explicitly listed skills use their own formulas.
 
 Skill logic should remain in game logic, not React UI.
 
 ---
 
-## Prototype Beginner Skills
+## Beginner Active Skills
 
-Beginner may have simple prototype skills before choosing a first class.
+Beginner has eight broad active skills that remain useful after first-class selection without replacing first-class identity.
 
-Beginner skills should feel basic, flexible, and transitional.
-
-Current Beginner prototype skill identities:
+Beginner active skill identities:
 
 - Throw Rock
 - Kick
@@ -2021,41 +2038,40 @@ Current Beginner prototype skill identities:
 - Deep Breath
 - Rally Call
 - Field Hands
-- Quick Step
+- Follow Through
 
-Throw Rock is a simple ranged taunt tool.
+Beginner active scaling through the currently reachable rank 10:
 
-Kick is a simple opening lunge and melee fallback attack.
+- **Throw Rock:** a ranged taunt. Taunt duration is 3 seconds at rank 1, gains 0.5 seconds per rank through rank 5, then gains 0.25 seconds per rank. Rank 10 lasts 6.25 seconds.
+- **Kick:** an opening lunge and melee fallback attack. Direct physical damage is 100 percent at rank 1, gains 5 percentage points per rank through rank 5, then gains 2.5 percentage points per rank. Rank 10 deals 132.5 percent.
+- **Guard Up:** a defensive survival skill. Duration is 6, 7, 8, 9, and 10 seconds at ranks 1–5, then gains 0.5 seconds per rank. It blocks one physical hit at ranks 1–4, two at ranks 5–9, and three at rank 10.
+- **First Aid:** an emergency heal whose normal healing uses the generic rank potency curve. Its actual healing is reduced according to the target's current health as described below.
+- **Deep Breath:** a self damage buff. It grants +1 damage per rank through rank 5, then +0.5 damage per rank. Rank 10 grants +7.5 damage.
+- **Rally Call:** an ally damage buff. It grants +1 damage per rank through rank 5, then +0.5 damage per rank. Rank 10 grants +7.5 damage.
+- **Field Hands:** its gathering-power bonus uses the generic rank potency curve. Its player-facing description is: "For 90 seconds, increases gathering power for any resource. Each one-second gathering attempt removes more resource durability, so items are collected sooner. It does not improve item quantity, tier, or rarity."
+- **Follow Through:** a range-1 melee skill with a 10-second cooldown that deals direct physical damage. Base damage is 100, 110, 120, 130, and 140 percent at ranks 1–5, then gains 5 percentage points per rank; rank 10 deals 165 percent. When the target is currently attacking another living companion, Follow Through gains a conditional 20, 25, 30, 35, or 40 percentage points at ranks 1–5, then gains 2.5 points per rank; rank 10 gains 52.5 points. Autonomous targeting prefers a qualifying enemy but may use the baseline attack when none qualifies.
 
-Guard Up is a simple defensive survival skill.
+First Aid targeting and effectiveness:
 
-First Aid is a small emergency recovery skill.
+- First Aid cannot be cast on a target above 60 percent health.
+- At 60 percent target health, it applies 10 percent of its normal rank-scaled heal.
+- At 30 percent target health, it applies 60 percent of its normal rank-scaled heal.
+- At 10 percent target health or lower, it applies 100 percent of its normal rank-scaled heal.
+- Effectiveness is linearly interpolated between the 60-to-30-percent and 30-to-10-percent anchors.
+- The self-heal and ally-heal preference sliders are clamped from 10 through 60 percent and show the resulting effectiveness beside the selected threshold.
+- Beginner companions may prioritize themselves at or below the configured self-heal threshold. Support-role Beginner companions may heal an ally when supported targeting context and the ally-heal threshold allow it.
 
-Beginner companions may prioritize First Aid on themselves when their health is at or below the configured First Aid self-heal threshold.
+Follow Through replaces Quick Step and its skill-book identity. Prototype saves do not require migration.
 
-Support-role Beginner companions may use First Aid on allies when supported targeting context and the configured ally-heal threshold allow it.
-
-Deep Breath is a simple self-buff.
-
-Rally Call is a simple ally buff.
-
-Field Hands is a simple gathering support skill.
-
-Quick Step is a simple mobility and escape skill.
-
-Beginner skills should not compete with first-class identity.
-
-Beginner skills exist to make early party members feel functional before level 10.
-
-Beginner skills may be replaced, renamed, retuned, or removed later.
+Beginner active skills use the normal two-second companion global cooldown. No attack-speed or global-cooldown scaling is added by this roster.
 
 ---
 
-## Prototype First-Class Skills
+## First-Class Active Skills
 
-First classes currently have simple prototype skill sets.
+Each current first class has eight active skills. These skills establish the class's alpha identity and use the shared active-skill progression rules unless an explicit formula overrides them.
 
-Current Blade prototype skill identities:
+Blade active skill identities:
 
 - Duelist Challenge
 - Second Wind
@@ -2066,7 +2082,7 @@ Current Blade prototype skill identities:
 - Flash Step
 - Sweeping Strike
 
-Current Aegis prototype skill identities:
+Aegis active skill identities:
 
 - Shield Challenge
 - Hold Fast
@@ -2077,7 +2093,7 @@ Current Aegis prototype skill identities:
 - Shield Rush
 - Shield Shockwave
 
-Current Hunter prototype skill identities:
+Hunter active skill identities:
 
 - Pinning Shot
 - Fake Death
@@ -2088,7 +2104,7 @@ Current Hunter prototype skill identities:
 - Skirmish Shot
 - Arrow Burst
 
-Current Beast prototype skill identities:
+Beast active skill identities:
 
 - Threatening Roar
 - Blood Feast
@@ -2099,7 +2115,7 @@ Current Beast prototype skill identities:
 - Pounce
 - Maul Sweep
 
-Current Elementalist prototype skill identities:
+Elementalist active skill identities:
 
 - Elemental Bolt
 - Mana Shield
@@ -2110,7 +2126,7 @@ Current Elementalist prototype skill identities:
 - Flame Step
 - FireBurst
 
-Current Runecaster prototype skill identities:
+Runecaster active skill identities:
 
 - Binding Rune
 - Rune Lance
@@ -2121,7 +2137,7 @@ Current Runecaster prototype skill identities:
 - Stone Sigil Rhythm
 - Rune Step
 
-Current Lightbearer prototype skill identities:
+Lightbearer active skill identities:
 
 - Blinding Ray
 - Light Mend
@@ -2132,7 +2148,7 @@ Current Lightbearer prototype skill identities:
 - Dawn Step
 - Circle of Renewal
 
-Current Penitent prototype skill identities:
+Penitent active skill identities:
 
 - Whip Prison
 - Flagellant Lash
@@ -2143,39 +2159,153 @@ Current Penitent prototype skill identities:
 - Woodcutting Penance
 - Atonement Step
 
-These skills are placeholders for class identity, role interaction, and skill progression behavior.
+Balance may continue to change during alpha, but names, progression ownership, and cross-class rules are no longer disposable prototype behavior.
 
-They may be replaced, renamed, retuned, or expanded later.
+---
 
-The current first-class sets are prototype proving grounds for class breadth and should not imply that every first class is final, complete, or balanced.
+## Elementalist Overcharge Progression
+
+Overcharge uses explicit power and cooldown-penalty formulas instead of the generic rank curve:
+
+```text
+Power bonus:
+rank 1–5 = 10% + 2.5 percentage points per rank after rank 1
+rank 6+  = rank-5 value + 1.25 percentage points per rank
+
+Cooldown penalty:
+rank 1–5 = 20% + 2 percentage points per rank after rank 1
+rank 6+  = rank-5 value + 1 percentage point per rank
+```
+
+| Rank | Power bonus | Cooldown penalty |
+|---:|---:|---:|
+| 1 | 10% | 20% |
+| 5 | 20% | 28% |
+| 10 | 26.25% | 33% |
+| 15 | 32.5% | 38% |
+
+Overcharge duration, refresh window, enable preference, and base cooldown remain unchanged. Stable Overcharge subtracts its reduction from the cooldown penalty, never below zero. Overcharge and Arcane Crescendo damage bonuses combine additively.
+
+---
+
+## Passive Skills
+
+Every current class has two passive skills. They unlock at rank 1 with the class, use matching skill books and normal class-dependent rank caps, and remain active after later class changes. General percentage passives use `U(rank)` unless a bespoke formula is stated.
+
+Beginner passives:
+
+- **Resourcefulness:** equipped flasks restore `2% × U(rank)` more health. This is 10 percent at rank 5 and 15 percent at rank 10.
+- **Steady Nerves:** harmful control durations applied to the companion are reduced by `2% × U(rank)`. It applies to immobilize, bind, disarm, blind or forced evasion, silence, and taunt, but not damage-over-time effects. This is 10 percent at rank 5 and 15 percent at rank 10.
+
+Blade passives:
+
+- **Duelist's Momentum:** successful direct physical hits against the same enemy build up to three stacks. Each stack grants `1% × U(rank)` physical damage. Changing targets or the target's death clears all stacks. The hit that creates a stack does not benefit from that new stack.
+- **Riposte Training:** Blade Parry mitigation grants one 10-second charge. The next successful direct physical hit gains `5% × U(rank)` damage and consumes the charge. A new charge refreshes the duration and never stacks.
+
+Aegis passives:
+
+- **Rooted Bastion:** after five seconds without changing position, gain `3% × U(rank)` Defense. Walking, forced movement, or teleporting resets the condition; being immobilized does not.
+- **Unbroken Line:** enemies taunted by this companion deal `3% × U(rank)` less damage to other companions, but not to the taunting companion. Multiple sources use only the strongest value.
+
+Hunter passives:
+
+- **Headhunter:** each XP-granting party kill in the last 30 seconds grants one percentage point of critical chance. Maximum stacks at ranks 1–5 are 3, 4, 5, 6, and 7. Test targets, summons, and enemies that grant no kill credit do not count. The maximum gains one additional stack at each later five-rank milestone, reaching 8 at rank 10 and 9 at rank 15.
+- **Exploit the Snare:** deal `3% × U(rank)` additional direct physical damage to enemies that are bound, immobilized, disarmed, blinded, or silenced. Damage-over-time effects and taunt do not qualify.
+
+Beast passives:
+
+- **Blood Scent:** deal `3% × U(rank)` additional physical damage to enemies at or below 30 percent health.
+- **Pack Instinct:** deal `2% × U(rank)` additional damage when another living companion is within two spaces of the target.
+
+Elementalist passives:
+
+- **Stable Overcharge:** subtract `1 percentage point × U(rank)` from Overcharge's cooldown penalty, never below zero. This is 5 points at rank 5 and 10 points at rank 15.
+- **Arcane Crescendo:** each successful skill explicitly classified as an offensive spell builds one charge. Buffs, shields, heals, gathering skills, failed casts, and duplicated resolutions do not count. After reaching the threshold, the next successful offensive area-of-effect spell gains `4% × rank` damage and consumes the charge. The threshold-building spell cannot also trigger the bonus, the unused charge persists until consumed, and the triggering area spell begins the next cycle at zero.
+
+```text
+Arcane Crescendo threshold:
+ranks 1–5:  10 successful offensive spells
+ranks 6–10: 9 successful offensive spells
+ranks 11–15: 8 successful offensive spells
+general formula: max(6, 10 - floor((rank - 1) / 5))
+```
+
+Runecaster passives:
+
+- **Word Resonance:** when the current successful Runecaster skill has a different primary rune-word from the previous successful Runecaster skill, it gains `2% × U(rank)` effect strength. The first cast receives no bonus. Runic Focus duplicates neither trigger nor advance the sequence. Resonance can strengthen damage, healing, relevant buff strength, gathering power, or control and effect duration. It does not change cooldown, range, movement distance, target count, block count, or Runic Focus duplication count.
+- **Living Inscription:** each active rune effect created by the companion grants `1% × U(rank)` Runecaster-skill effectiveness, with at most two effects contributing. Eligible effects are Binding Rune, Warding Glyph, Rewind Rune, one Leyline Matrix cast, and an active Rune Step trap. Count source-owned effects, not every entity affected by one source effect. Word Resonance and Living Inscription combine additively.
+
+Lightbearer passives:
+
+- **Overflowing Grace:** converts `5% × rank` of direct overhealing into an eight-second absorb barrier capped at `1% × rank` of the target's maximum health. At rank 5 this is 25 percent conversion and a 5 percent cap; at rank 15 it is 75 percent conversion and a 15 percent cap. Applications merge and refresh up to the cap. Direct single-target and direct area heals qualify; healing-over-time ticks and recursive barrier effects do not.
+- **Many Beacons:** a direct heal whose selected or main target differs from the previous direct-heal target gains `2% × U(rank)` healing. The first heal receives no bonus, repeating a target has no bonus or penalty, the memory expires after ten seconds, and healing-over-time ticks do not change the memory.
+
+Penitent passives:
+
+- **Crimson Authority:** while at or below 50 percent health, control and bleed durations created by the Penitent gain `3% × U(rank)`. Determine the duration when the effect is applied; later healing does not shorten an existing effect.
+- **Cruel Mercy:** successfully healing or shielding another companion grants one ten-second charge. The next successful damaging Penitent skill gains `3% × U(rank)` direct and bleed damage and consumes the charge. Self-healing does not prime it, and failed skills or old damage-over-time ticks do not consume it. A new charge refreshes the duration and never stacks.
+
+---
+
+## Runecaster Tifinagh Rune-Word System
+
+Runecaster magic uses real Amazigh words written in Neo-Tifinagh. Tifinagh glyphs are letters, not independent mystical symbols. Each complete word functions as one magical rune-word. Exact glyph order and character count must be preserved; letters must not be replaced with invented pseudo-runes or fused until unreadable. This linguistic origin is presented as in-world Runecaster lore without referring to a real-world region.
+
+When a skill uses two rune-words, the default presentation shows the primary word as the large central inscription and the secondary word in an outer ring, smaller plate, or supporting pattern. Skill-specific directions below override that default. The two words are separate symbolic concepts and do not need to form one grammatical sentence.
+
+| Skill | Primary rune-word | Primary meaning | Secondary rune-word | Secondary meaning | Concepts |
+|---|---|---|---|---|---|
+| Binding Rune | `ⵇⵇⵏ` — qqen / qqn | tie, bind, attach, or restrain | `ⴰⵙⵇⵇⵏ` — asqqen / asqqn | rope, tether, or physical bond | Bind + Tether |
+| Rune Lance | `ⵜⴰⴼⴰⵍⴰ` — tafala | spear or lance | `ⵜⴰⵣⵎⵎⴰⵔⵜ` — tazmmart / tazmert | power, capacity, strength, or ability | Lance + Power |
+| Warding Glyph | `ⴰⵎⵙⵜⵏ` — amesten | protection or defense | `ⴰⴼⵔⴰⴳ` — afrag | fence, enclosure, barricade, or protective boundary | Protection + Barrier |
+| Rewind Rune | `ⵓⵖⴰⵍ` — uɣal | return, go back, or come back | `ⵜⵓⴷⵔⵜ` — tudert | life | Return + Life |
+| Runic Focus | `ⴰⵍⵙ` — als | repeat, perform again, redo, or begin again | `ⴰⵎⵎⴰⵙ` — ammas | center or middle | Repeat + Center |
+| Leyline Matrix | `ⴰⵣⵟⵟⴰ` — azṭṭa | weaving, loom, web, or network | `ⴰⴱⵔⵉⴷ` — abrid | path, way, route, or road | Network + Path |
+| Stone Sigil Rhythm | `ⴰⵣⵔⵓ` — azru | rock or stone | `ⴰⵏⵢⴰ` — anya | rhythm, cadence, air, or melody | Stone + Rhythm |
+| Rune Step | `ⴰⵙⵓⵔⵉⴼ` — asurif | step, stride, or stage of movement | `ⵇⵇⵏ` — qqen / qqn | tie, bind, attach, or restrain | Step + Bind |
+
+Skill-specific presentation:
+
+- Binding Rune places `ⵇⵇⵏ` centrally as the binding command and `ⴰⵙⵇⵇⵏ` around it as tightening links or a closing tether.
+- Rune Lance forms the shaft or projectile from `ⵜⴰⴼⴰⵍⴰ`, with `ⵜⴰⵣⵎⵎⴰⵔⵜ` surrounding or trailing it as propelling force.
+- Warding Glyph displays `ⴰⵎⵙⵜⵏ` and `ⴰⴼⵔⴰⴳ` as two defensive layers: protection and boundary.
+- Rewind Rune lets `ⵓⵖⴰⵍ` rotate backward while the inner life-word `ⵜⵓⴷⵔⵜ` brightens during healing ticks.
+- Runic Focus overrides the default layout: `ⴰⵎⵎⴰⵙ` sits at the center while `ⴰⵍⵙ` surrounds it and may split into two matching copies when the duplicated skill resolves.
+- Leyline Matrix emphasizes `ⴰⵣⵟⵟⴰ` on the caster as the network while connected party members receive smaller `ⴰⴱⵔⵉⴷ` path inscriptions.
+- Stone Sigil Rhythm keeps `ⴰⵣⵔⵓ` heavy and stable while `ⴰⵏⵢⴰ` pulses around it at an even cadence.
+- Rune Step carries `ⴰⵙⵓⵔⵉⴼ` with the moving caster, then leaves `ⵇⵇⵏ` at the destination as the binding trap.
+
+The skill list shows a compact two-word inscription. Skill details show both transliterations, meanings, mechanical concepts, and a rune-word count. Text rendering must use a Neo-Tifinagh-capable fallback font. A cumulative rune meter, a third Runic Focus copy, pseudo-rune art, and new animated visual effects are outside the current alpha scope.
 
 ---
 
 ## Skill Books
 
-Skill books are prototype inventory items used to raise skill ranks.
+Skill books are stackable, skill-specific inventory items used to raise active and passive skill ranks.
 
-Current skill book behavior:
+Skill-book behavior:
 
 - skill books are stackable inventory items
-- each skill book maps to one current prototype skill
-- current prototype skill books exist for all current Beginner and first-class skills
-- Beginner skill books are current prototype Tier 1 books
-- first-class skill books are current prototype Tier 1 books
+- each skill book maps to one active or passive skill
+- skill books exist for all current Beginner and first-class active and passive skills
+- Beginner and first-class books retain their existing price categories and stack limit of 99
 - a companion can read a skill book only for a skill in their current class lineage
 - a companion can read an eligible Beginner skill book while Beginner
-- a first-class companion can read eligible books for their current first-class skills
-- a first-class companion can read eligible Beginner skill books only when the Beginner skill remains valid through current prototype lineage and progression rules
-- a skill book raises the matching learned skill by one rank
+- a first-class companion can read eligible books for current first-class skills and learned Beginner skills
+- every unlocked class skill begins at rank 1
+- the number of books required to reach target rank `B` is `cost(B) = B(B + 1) / 2 - 2`
+- examples are 1 book from rank 1 to 2, 4 from rank 2 to 3, 8 from rank 3 to 4, 13 from rank 4 to 5, and 53 from rank 9 to 10
+- advancing one skill from rank 1 through rank 10 requires 201 books in total
+- book progress is stored separately for every learned skill and preserved when the available books are insufficient
+- one Study or Read action consumes no more than the amount still required for the next rank and advances at most one rank
+- excess matching books remain in shared inventory after that action
 - reading fails if the companion is invalid, the book is missing, the item is not a skill book, the skill is unknown, the skill is unavailable to that companion, the skill is already maxed, or inventory removal fails
 - failed reads do not consume the book
-- successful reads consume one book from shared party inventory
+- skill presentation shows current rank, the selected companion's current maximum rank, and book progress as `current/required`
 
-Skill books are a prototype skill-rank item path, not a final training, tutor, talent, mastery, or respec system.
+Skill books are primarily obtained through Merchant Buy stock unless another current reward, drop, or debug path explicitly grants one.
 
-Current prototype skill books are primarily obtained through Merchant Buy stock unless another current reward, drop, or debug path explicitly grants one.
-
-Skill book availability through the Merchant is broad prototype access for testing skill progression, not a final trainer, loot, class tutor, or skill acquisition economy.
+Broad Merchant availability supports alpha progression testing and does not define the final trainer, loot, class tutor, or skill acquisition economy. No prototype-save migration is required for this transition.
 
 ---
 
