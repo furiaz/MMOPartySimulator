@@ -586,6 +586,7 @@ const skillBookFailureMessages: Record<ReadSkillBookFailureReason, string> = {
   unknown_skill: "Skill is unknown",
   skill_unavailable: "Companion has not learned this skill",
   skill_maxed: "Skill is already maxed",
+  insufficient_books: "Not enough books for the next rank",
   inventory_remove_failed: "Book could not be consumed",
 };
 
@@ -4742,7 +4743,7 @@ function App() {
     if (bookRead.result.status === "success") {
       queueSaveAfterStateChange("Skill rank saved");
       setInventoryResultMessage(
-        `${bookRead.result.displayName} rank ${bookRead.result.newRank}/${bookRead.result.maxRank}`,
+        `${bookRead.result.displayName} rank ${bookRead.result.newRank}/${bookRead.result.maxRank} — ${bookRead.result.booksConsumed} book${bookRead.result.booksConsumed === 1 ? "" : "s"} used`,
       );
     } else {
       setInventoryResultMessage(skillBookFailureMessages[bookRead.result.reason]);

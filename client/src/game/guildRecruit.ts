@@ -27,7 +27,8 @@ import {
   syncCompanionDerivedMaxHealth,
 } from "./stats";
 import {
-  getSkillMaxRank,
+  BEGINNER_SKILL_MAX_RANK,
+  getCompanionSkillMaxRank,
   sanitizeProgressionForCompanion,
 } from "./skillProgression";
 import type {
@@ -417,7 +418,7 @@ function rollRecruitStartingSkills(
     41,
   );
   const beginnerSkills = Object.values(SKILL_DEFINITIONS).filter(
-    (skill) => skill.classId === "beginner" && getSkillMaxRank(skill) > 1,
+    (skill) => skill.classId === "beginner",
   );
   const selectedSkillIds = new Set<SkillId>();
   const ranksBySkillId: Partial<Record<SkillId, number>> = {};
@@ -438,7 +439,7 @@ function rollRecruitStartingSkills(
 
     if (!selectedSkillIds.has(skill.id)) {
       selectedSkillIds.add(skill.id);
-      ranksBySkillId[skill.id] = Math.min(2, getSkillMaxRank(skill));
+      ranksBySkillId[skill.id] = Math.min(2, BEGINNER_SKILL_MAX_RANK);
     }
   }
 
@@ -491,7 +492,7 @@ function applyRecruitStartingSkills(
 
     if (skill?.classId === companion.classId) {
       ranksBySkillId[skill.id] = Math.min(
-        getSkillMaxRank(skill),
+        getCompanionSkillMaxRank(companion, skill),
         Math.max(ranksBySkillId[skill.id] ?? 1, sanitizeSequence(rank, 1)),
       );
     }
@@ -550,7 +551,7 @@ function sanitizeRecruitStartingSkillRanks(
 
     if (skill?.classId === "beginner") {
       sanitized[skill.id] = Math.min(
-        getSkillMaxRank(skill),
+        BEGINNER_SKILL_MAX_RANK,
         Math.max(1, Math.floor(Number(rank) || 1)),
       );
     }

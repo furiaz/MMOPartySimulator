@@ -9,9 +9,7 @@ import {
   getOwnedKeyItemEntries,
   getQuestItemInventoryEntries,
   formatCurrencyDisplay,
-  getCompanionSkillRank,
   getSkillBookReadCandidates,
-  getSkillMaxRank,
   getUsedInventorySlots,
   ITEM_DEFINITIONS,
   SKILL_DEFINITIONS,
@@ -116,7 +114,7 @@ export function InventoryPanel({
     : null;
   const skillBookReadCandidates =
     selectedSlot && selectedItemDefinition?.category === "skill_book"
-      ? getSkillBookReadCandidates(members, selectedSlot.itemId)
+      ? getSkillBookReadCandidates(members, selectedSlot.itemId, inventory)
       : [];
   const selectedQuestItem =
     activeCategory === "questItems"
@@ -223,7 +221,7 @@ export function InventoryPanel({
             <span>
               {selectedItemDefinition.category === "skill_book" &&
               selectedSkillBookSkill
-                ? "Read to raise this skill by one rank."
+                ? "Study by spending the exact number of books required for one rank."
                 : getItemModifierText(selectedItemDefinition)}
             </span>
             {skillBookReadMessage ? <span>{skillBookReadMessage}</span> : null}
@@ -237,19 +235,23 @@ export function InventoryPanel({
             selectedSkillBookSkill ? (
             <div className="inventory-skill-book-actions">
               {skillBookReadCandidates.length > 0 ? (
-                skillBookReadCandidates.map((member) => (
+                skillBookReadCandidates.map((candidate) => (
                   <button
-                    key={member.id}
-                    onClick={() => onReadSkillBook(member.id, selectedSlot.itemId)}
+                    disabled={candidate.status === "insufficient_books"}
+                    key={candidate.companion.id}
+                    onClick={() =>
+                      onReadSkillBook(candidate.companion.id, selectedSlot.itemId)
+                    }
                     type="button"
                   >
-                    Read: {member.id}{" "}
-                    {getCompanionSkillRank(member, selectedSkillBookSkill.id)}/
-                    {getSkillMaxRank(selectedSkillBookSkill)}
+                    Study: Companion {members.indexOf(candidate.companion) + 1} —{" "}
+                    {candidate.requiredBooks} book
+                    {candidate.requiredBooks === 1 ? "" : "s"} needed (Rank{" "}
+                    {candidate.currentRank}/{candidate.maxRank})
                   </button>
                 ))
               ) : (
-                <span>No eligible companion</span>
+                <span>No companion can study this skill</span>
               )}
             </div>
           ) : null}
@@ -418,7 +420,7 @@ function getEquipmentDetailText(itemDefinition: ItemDefinition): string {
 }
 
 function getSkillBookDetailText(skill: SkillDefinition): string {
-  return `${skill.displayName} | Max rank ${getSkillMaxRank(skill)}`;
+  return `${skill.displayName} | Skill Book`;
 }
 
 function getItemModifierText(itemDefinition: ItemDefinition): string {

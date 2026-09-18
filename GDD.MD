@@ -1161,7 +1161,7 @@ Current Skills UI may show:
 - skill display name
 - effect summary
 - current rank and max rank
-- book progress toward the next rank
+- books required for the next rank
 - cooldown
 - range
 - role score
@@ -2296,12 +2296,14 @@ Skill-book behavior:
 - the number of books required to reach target rank `B` is `cost(B) = B(B + 1) / 2 - 2`
 - examples are 1 book from rank 1 to 2, 4 from rank 2 to 3, 8 from rank 3 to 4, 13 from rank 4 to 5, and 53 from rank 9 to 10
 - advancing one skill from rank 1 through rank 10 requires 201 books in total
-- book progress is stored separately for every learned skill and preserved when the available books are insufficient
-- one Study or Read action consumes no more than the amount still required for the next rank and advances at most one rank
+- no partial book progress is stored
+- a Study action is available only when shared inventory contains the full number of matching books required for the next rank
+- one Study action consumes exactly that requirement and advances exactly one rank
 - excess matching books remain in shared inventory after that action
-- reading fails if the companion is invalid, the book is missing, the item is not a skill book, the skill is unknown, the skill is unavailable to that companion, the skill is already maxed, or inventory removal fails
-- failed reads do not consume the book
-- skill presentation shows current rank, the selected companion's current maximum rank, and book progress as `current/required`
+- studying fails if the companion is invalid, the item is not a skill book, the skill is unknown, the skill is unavailable to that companion, the skill is already maxed, the full required quantity is unavailable, or inventory removal fails
+- failed Study actions consume no books
+- companion selection shows the companion name and the exact number of books required for that companion's next rank; the action is disabled when inventory has fewer books
+- skill presentation shows current rank, the selected companion's current maximum rank, and the books required for the next rank; a maxed skill shows `Max`
 
 Skill books are primarily obtained through Merchant Buy stock unless another current reward, drop, or debug path explicitly grants one.
 

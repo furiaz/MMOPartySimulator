@@ -55,6 +55,7 @@ import {
   getItemDefinition,
   getActiveSkillsForCompanion,
   getCompanionSkillRank,
+  getCompanionSkillMaxRank,
   getLegacySkillCandidatesForCompanion,
   getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
@@ -63,7 +64,7 @@ import {
   getPartySizeUnlockRequirement,
   getSkillRoleScore,
   getSkillCooldownMs,
-  getSkillMaxRank,
+  getSkillBooksRequiredForNextRank,
   isLegacySkillEnabledForCompanion,
   validateEquipmentItemForCompanion,
   type Companion,
@@ -457,7 +458,13 @@ function CompanionSkillSummary({
       <span className="equipment-section-label">{title}</span>
       {skills.length > 0 ? (
         <div className="companion-skill-list">
-          {orderedSkills.map(({ score, skill, scaledSkill }) => (
+          {orderedSkills.map(({ score, skill, scaledSkill }) => {
+            const requiredBooks = getSkillBooksRequiredForNextRank(
+              member,
+              skill.id,
+            );
+
+            return (
             <div key={skill.id} className="companion-skill-row">
               <div>
                 <strong>{skill.displayName}</strong>
@@ -468,8 +475,12 @@ function CompanionSkillSummary({
                   <dt>Rank</dt>
                   <dd>
                     {getCompanionSkillRank(member, skill.id)}/
-                    {getSkillMaxRank(skill)}
+                    {getCompanionSkillMaxRank(member, skill)}
                   </dd>
+                </div>
+                <div>
+                  <dt>Books</dt>
+                  <dd>{requiredBooks === null ? "Max" : requiredBooks}</dd>
                 </div>
                 <div>
                   <dt>Cooldown</dt>
@@ -490,7 +501,8 @@ function CompanionSkillSummary({
                 {skill.tags.join(", ")}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <span className="party-menu-empty">No skills for this class</span>
@@ -2256,7 +2268,7 @@ function SkillPreferencesSection({
                       <span>
                         {CLASS_DEFINITIONS[skill.classId].displayName} | Rank{" "}
                         {getCompanionSkillRank(member, skill.id)}/
-                        {getSkillMaxRank(skill)}
+                        {getCompanionSkillMaxRank(member, skill)}
                       </span>
                     </div>
                     <button

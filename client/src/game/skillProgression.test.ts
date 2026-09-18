@@ -5,10 +5,12 @@ import { createCompanion } from "./entities";
 import { sanitizeGameStateForSave } from "./saveGame";
 import {
   getActiveSkillsForCompanion,
+  getCompanionSkillMaxRank,
   getCompanionSkillRank,
   getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
-  getSkillMaxRank,
+  getSkillBookReadCandidates,
+  getSkillBooksRequiredForTargetRank,
   getSkillRankMultiplier,
   readSkillBook,
   setCompanionLegacySkillEnabled,
@@ -107,14 +109,76 @@ const PENITENT_SKILL_IDS: SkillId[] = [
 
 describe("skill progression", () => {
   it("uses beginner and class rank caps", () => {
-    expect(getSkillMaxRank(SKILL_DEFINITIONS.kick)).toBe(3);
-    expect(getSkillMaxRank(SKILL_DEFINITIONS.sweeping_strike)).toBe(5);
+    const beginner = createCompanion(
+      "beginner",
+      { x: 0, y: 0 },
+      "companion",
+    );
+    const blade = createCompanion(
+      "blade",
+      { x: 0, y: 0 },
+      "companion",
+      "fighter",
+      1,
+      "blade",
+    );
+
+    expect(getCompanionSkillMaxRank(beginner, SKILL_DEFINITIONS.kick)).toBe(5);
+    expect(getCompanionSkillMaxRank(blade, SKILL_DEFINITIONS.kick)).toBe(10);
+    expect(
+      getCompanionSkillMaxRank(blade, SKILL_DEFINITIONS.sweeping_strike),
+    ).toBe(5);
   });
 
-  it("uses small 5 percent rank multipliers after rank 1", () => {
+  it("uses 5 percent growth steps through rank 5 and half steps afterward", () => {
     expect(getSkillRankMultiplier(1)).toBe(1);
     expect(getSkillRankMultiplier(3)).toBeCloseTo(1.1);
     expect(getSkillRankMultiplier(5)).toBeCloseTo(1.2);
+    expect(getSkillRankMultiplier(6)).toBeCloseTo(1.225);
+    expect(getSkillRankMultiplier(10)).toBeCloseTo(1.325);
+  });
+
+  it("calculates exact next-rank book costs", () => {
+    expect(getSkillBooksRequiredForTargetRank(2)).toBe(1);
+    expect(getSkillBooksRequiredForTargetRank(3)).toBe(4);
+    expect(getSkillBooksRequiredForTargetRank(4)).toBe(8);
+    expect(getSkillBooksRequiredForTargetRank(5)).toBe(13);
+    expect(getSkillBooksRequiredForTargetRank(10)).toBe(53);
+    expect(
+      Array.from({ length: 9 }, (_, index) =>
+        getSkillBooksRequiredForTargetRank(index + 2),
+      ).reduce((total, cost) => total + cost, 0),
+    ).toBe(201);
+  });
+
+  it("raises the Beginner cap after first-class selection", () => {
+    const companion = withSkillRanks(
+      createCompanion("companion", { x: 0, y: 0 }, "companion"),
+      { kick: 5 },
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(state, "kick_skill_book", 19, "debug").state;
+
+    const beginnerRead = readSkillBook(state, companion.id, "kick_skill_book");
+    expect(beginnerRead.result).toMatchObject({
+      status: "failed",
+      reason: "skill_maxed",
+      maxRank: 5,
+    });
+
+    const bladeState = setPartyMemberClass(state, companion.id, "blade");
+    const bladeRead = readSkillBook(bladeState, companion.id, "kick_skill_book");
+
+    expect(bladeRead.result).toMatchObject({
+      status: "success",
+      previousRank: 5,
+      newRank: 6,
+      maxRank: 10,
+      booksConsumed: 19,
+    });
   });
 
   it("uses explicit rank tables for damage over time skills", () => {
@@ -698,13 +762,13 @@ describe("skill progression", () => {
     }
   });
 
-  it("reads a skill book, consumes one item, and increments rank", () => {
+  it("consumes only one rank's exact cost even when excess books could fund more", () => {
     const companion = createCompanion("companion", { x: 0, y: 0 }, "companion");
     let state = addEntity(
       createTestGameState({ partyLeaderId: companion.id }),
       companion,
     );
-    state = addItemToInventoryState(state, "first_aid_skill_book", 2, "debug").state;
+    state = addItemToInventoryState(state, "first_aid_skill_book", 10, "debug").state;
 
     const result = readSkillBook(state, companion.id, "first_aid_skill_book");
     const nextCompanion = result.state.entities[companion.id] as Companion;
@@ -714,10 +778,119 @@ describe("skill progression", () => {
       skillId: "first_aid",
       previousRank: 1,
       newRank: 2,
-      maxRank: 3,
+      maxRank: 5,
+      booksConsumed: 1,
     });
-    expect(countInventoryItem(result.state.inventory, "first_aid_skill_book")).toBe(1);
+    expect(countInventoryItem(result.state.inventory, "first_aid_skill_book")).toBe(9);
     expect(getCompanionSkillRank(nextCompanion, "first_aid")).toBe(2);
+  });
+
+  it("requires the full next-rank cost and consumes nothing when short", () => {
+    const companion = withSkillRanks(
+      createCompanion("companion", { x: 0, y: 0 }, "companion"),
+      { first_aid: 3 },
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "first_aid_skill_book",
+      7,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(state, companion.id, "first_aid_skill_book");
+
+    expect(result.result).toMatchObject({
+      status: "failed",
+      reason: "insufficient_books",
+      currentRank: 3,
+      requiredBooks: 8,
+      availableBooks: 7,
+    });
+    expect(result.state).toBe(state);
+    expect(countInventoryItem(result.state.inventory, "first_aid_skill_book")).toBe(7);
+    expect(
+      getCompanionSkillRank(
+        result.state.entities[companion.id] as Companion,
+        "first_aid",
+      ),
+    ).toBe(3);
+  });
+
+  it("consumes the exact cost across stacks, advances once, and leaves excess", () => {
+    const companion = withSkillRanks(
+      createCompanion("companion", { x: 0, y: 0 }, "companion"),
+      { first_aid: 3 },
+    );
+    const state = {
+      ...addEntity(
+        createTestGameState({ partyLeaderId: companion.id }),
+        companion,
+      ),
+      inventory: {
+        ...createTestGameState().inventory,
+        slots: [
+          { itemId: "first_aid_skill_book" as const, quantity: 4 },
+          { itemId: "first_aid_skill_book" as const, quantity: 6 },
+        ],
+      },
+    };
+
+    const result = readSkillBook(state, companion.id, "first_aid_skill_book");
+    const nextCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      previousRank: 3,
+      newRank: 4,
+      maxRank: 5,
+      booksConsumed: 8,
+    });
+    expect(countInventoryItem(result.state.inventory, "first_aid_skill_book")).toBe(2);
+    expect(getCompanionSkillRank(nextCompanion, "first_aid")).toBe(4);
+  });
+
+  it("presents learned companions with their exact requirement and availability", () => {
+    const ready = withSkillRanks(
+      createCompanion("ready", { x: 0, y: 0 }, "companion"),
+      { first_aid: 2 },
+    );
+    const waiting = withSkillRanks(
+      createCompanion("waiting", { x: 1, y: 0 }, "companion"),
+      { first_aid: 3 },
+    );
+    const inventory = {
+      ...createTestGameState().inventory,
+      slots: [{ itemId: "first_aid_skill_book" as const, quantity: 4 }],
+    };
+
+    const candidates = getSkillBookReadCandidates(
+      [ready, waiting],
+      "first_aid_skill_book",
+      inventory,
+    );
+
+    expect(candidates).toMatchObject([
+      {
+        companion: { id: "ready" },
+        currentRank: 2,
+        maxRank: 5,
+        requiredBooks: 4,
+        availableBooks: 4,
+        status: "eligible",
+      },
+      {
+        companion: { id: "waiting" },
+        currentRank: 3,
+        maxRank: 5,
+        requiredBooks: 8,
+        availableBooks: 4,
+        status: "insufficient_books",
+      },
+    ]);
   });
 
   it("reads new Blade skill books for eligible Blade companions", () => {
@@ -991,7 +1164,7 @@ describe("skill progression", () => {
   it("fails book reads without consuming when maxed, unavailable, or missing", () => {
     const companion = withSkillRanks(
       createCompanion("companion", { x: 0, y: 0 }, "companion"),
-      { first_aid: 3 },
+      { first_aid: 5 },
     );
     let state = addEntity(
       createTestGameState({ partyLeaderId: companion.id }),
@@ -1025,10 +1198,10 @@ describe("skill progression", () => {
     expect(countInventoryItem(missing.state.inventory, "kick_skill_book")).toBe(0);
   });
 
-  it("keeps old skills out of the active pool until maxed and legacy-enabled", () => {
+  it("uses fixed rank 5 legacy eligibility below the raised Beginner cap", () => {
     const companion = withSkillRanks(
       createCompanion("companion", { x: 0, y: 0 }, "companion", "fighter", 1, "blade"),
-      { kick: 3 },
+      { kick: 5 },
     );
     const state = addEntity(
       createTestGameState({ partyLeaderId: companion.id }),
@@ -1205,7 +1378,7 @@ describe("skill progression", () => {
       ...createCompanion("invalid", { x: 0, y: 0 }, "companion", "fighter", 1, "blade"),
       skillProgression: {
         ranksBySkillId: {
-          kick: 4,
+          kick: 99,
           not_a_skill: 99,
         } as Partial<Record<SkillId, number>>,
         legacyEnabledSkillIds: ["kick", "not_a_skill"] as SkillId[],
@@ -1221,7 +1394,7 @@ describe("skill progression", () => {
     const savedInvalidCompanion = saved.entities[invalidCompanion.id] as Companion;
 
     expect(savedCompanion.skillProgression?.ranksBySkillId.first_aid).toBe(1);
-    expect(savedInvalidCompanion.skillProgression?.ranksBySkillId.kick).toBe(3);
+    expect(savedInvalidCompanion.skillProgression?.ranksBySkillId.kick).toBe(10);
     expect(savedInvalidCompanion.skillProgression?.ranksBySkillId).not.toHaveProperty(
       "not_a_skill",
     );

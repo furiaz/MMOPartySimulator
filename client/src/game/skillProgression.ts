@@ -8,12 +8,15 @@ import type {
   CompanionSkillProgression,
   ItemDefinition,
   ItemId,
+  PartyInventory,
   SkillDefinition,
   SkillId,
 } from "./types";
 
-export const BEGINNER_SKILL_MAX_RANK = 3;
+export const BEGINNER_SKILL_MAX_RANK = 5;
+export const BEGINNER_SKILL_MAX_RANK_AFTER_FIRST_CLASS = 10;
 export const CLASS_SKILL_MAX_RANK = 5;
+export const LEGACY_SKILL_UNLOCK_RANK = 5;
 export const SKILL_RANK_BONUS_PER_RANK = 0.05;
 
 const DOT_DAMAGE_PERCENT_BY_SKILL_RANK: Partial<Record<SkillId, number[]>> = {
@@ -107,6 +110,7 @@ export type ReadSkillBookFailureReason =
   | "unknown_skill"
   | "skill_unavailable"
   | "skill_maxed"
+  | "insufficient_books"
   | "inventory_remove_failed";
 
 export type ReadSkillBookResult =
@@ -119,6 +123,7 @@ export type ReadSkillBookResult =
       previousRank: number;
       newRank: number;
       maxRank: number;
+      booksConsumed: number;
     }
   | {
       status: "failed";
@@ -128,8 +133,19 @@ export type ReadSkillBookResult =
       displayName?: string;
       currentRank?: number;
       maxRank?: number;
+      requiredBooks?: number;
+      availableBooks?: number;
       reason: ReadSkillBookFailureReason;
     };
+
+export type SkillBookReadCandidate = {
+  companion: Companion;
+  currentRank: number;
+  maxRank: number;
+  requiredBooks: number;
+  availableBooks: number;
+  status: "eligible" | "insufficient_books";
+};
 
 export type LearnedSkillGroup = {
   classId: ClassId;
@@ -160,7 +176,7 @@ export function ensureCompanionSkillProgressionForClass(
   for (const skill of getSkillsForClass(classId)) {
     ranksBySkillId[skill.id] = clampRank(
       ranksBySkillId[skill.id] ?? 1,
-      getSkillMaxRank(skill),
+      getCompanionSkillMaxRank(companion, skill),
     );
   }
 
@@ -178,7 +194,14 @@ export function ensureCompanionSkillProgressionForClass(
   };
 }
 
-export function getSkillMaxRank(skill: SkillDefinition): number {
+export function getCompanionSkillMaxRank(
+  companion: Companion,
+  skill: SkillDefinition,
+): number {
+  if (skill.classId === "beginner" && companion.classId !== "beginner") {
+    return BEGINNER_SKILL_MAX_RANK_AFTER_FIRST_CLASS;
+  }
+
   return skill.classId === "beginner"
     ? BEGINNER_SKILL_MAX_RANK
     : CLASS_SKILL_MAX_RANK;
@@ -191,11 +214,19 @@ export function getCompanionSkillRank(
   const skill = SKILL_DEFINITIONS[skillId];
   const storedRank = companion.skillProgression?.ranksBySkillId?.[skillId];
 
-  return clampRank(storedRank ?? 1, getSkillMaxRank(skill));
+  return clampRank(storedRank ?? 1, getCompanionSkillMaxRank(companion, skill));
 }
 
 export function getSkillRankMultiplier(rank: number): number {
-  return 1 + (Math.max(1, Math.floor(rank)) - 1) * SKILL_RANK_BONUS_PER_RANK;
+  return 1 + getSkillRankGrowthSteps(rank) * SKILL_RANK_BONUS_PER_RANK;
+}
+
+export function getSkillRankGrowthSteps(rank: number): number {
+  const normalizedRank = Math.max(1, Math.floor(rank));
+
+  return normalizedRank <= 5
+    ? normalizedRank - 1
+    : 4 + (normalizedRank - 5) * 0.5;
 }
 
 export function getActiveSkillsForCompanion(
@@ -256,6 +287,7 @@ export function isLegacySkillEligibleForCompanion(
 
   if (
     !skill ||
+    skill.type !== "active" ||
     skill.classId === companion.classId ||
     skill.canLegacyCarry === false ||
     !isSkillInCompanionClassLineage(companion, skill)
@@ -265,7 +297,7 @@ export function isLegacySkillEligibleForCompanion(
 
   return (
     hasCompanionLearnedSkill(companion, skillId) &&
-    getCompanionSkillRank(companion, skillId) >= getSkillMaxRank(skill)
+    getCompanionSkillRank(companion, skillId) >= LEGACY_SKILL_UNLOCK_RANK
   );
 }
 
@@ -824,32 +856,90 @@ export function getSkillBookSkillId(itemId: ItemId): SkillId | null {
 export function getSkillBookReadCandidates(
   companions: Companion[],
   itemId: ItemId,
-): Companion[] {
+  inventory: PartyInventory,
+): SkillBookReadCandidate[] {
   const skillId = getSkillBookSkillId(itemId);
 
   if (!skillId) {
     return [];
   }
 
-  return companions.filter(
-    (companion) =>
-      canCompanionReadSkillBook(companion, skillId) === "eligible",
-  );
+  const availableBooks = countInventoryItem(inventory, itemId);
+
+  return companions.flatMap((companion) => {
+    const status = canCompanionReadSkillBook(
+      companion,
+      skillId,
+      availableBooks,
+    );
+    const requiredBooks = getSkillBooksRequiredForNextRank(companion, skillId);
+
+    if (
+      (status !== "eligible" && status !== "insufficient_books") ||
+      requiredBooks === null
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        companion,
+        currentRank: getCompanionSkillRank(companion, skillId),
+        maxRank: getCompanionSkillMaxRank(companion, SKILL_DEFINITIONS[skillId]),
+        requiredBooks,
+        availableBooks,
+        status,
+      },
+    ];
+  });
 }
 
 export function canCompanionReadSkillBook(
   companion: Companion,
   skillId: SkillId,
-): "eligible" | "unavailable" | "maxed" {
+  availableBooks: number,
+): "eligible" | "insufficient_books" | "unavailable" | "maxed" {
   const skill = SKILL_DEFINITIONS[skillId];
 
   if (!skill || !hasCompanionLearnedSkill(companion, skillId)) {
     return "unavailable";
   }
 
-  return getCompanionSkillRank(companion, skillId) >= getSkillMaxRank(skill)
-    ? "maxed"
-    : "eligible";
+  if (
+    getCompanionSkillRank(companion, skillId) >=
+    getCompanionSkillMaxRank(companion, skill)
+  ) {
+    return "maxed";
+  }
+
+  const requiredBooks = getSkillBooksRequiredForNextRank(companion, skillId);
+
+  return requiredBooks !== null && availableBooks >= requiredBooks
+    ? "eligible"
+    : "insufficient_books";
+}
+
+export function getSkillBooksRequiredForTargetRank(targetRank: number): number {
+  const normalizedTargetRank = Math.max(2, Math.floor(targetRank));
+
+  return (normalizedTargetRank * (normalizedTargetRank + 1)) / 2 - 2;
+}
+
+export function getSkillBooksRequiredForNextRank(
+  companion: Companion,
+  skillId: SkillId,
+): number | null {
+  const skill = SKILL_DEFINITIONS[skillId];
+
+  if (!skill || !hasCompanionLearnedSkill(companion, skillId)) {
+    return null;
+  }
+
+  const currentRank = getCompanionSkillRank(companion, skillId);
+
+  return currentRank >= getCompanionSkillMaxRank(companion, skill)
+    ? null
+    : getSkillBooksRequiredForTargetRank(currentRank + 1);
 }
 
 export function readSkillBook(
@@ -906,7 +996,9 @@ export function readSkillBook(
     };
   }
 
-  if (countInventoryItem(state.inventory, itemId) <= 0) {
+  const availableBooks = countInventoryItem(state.inventory, itemId);
+
+  if (availableBooks <= 0) {
     return {
       state,
       result: {
@@ -915,6 +1007,7 @@ export function readSkillBook(
         itemId,
         skillId,
         displayName: skill.displayName,
+        availableBooks,
         reason: "book_not_in_inventory",
       },
     };
@@ -935,7 +1028,7 @@ export function readSkillBook(
   }
 
   const currentRank = getCompanionSkillRank(companion, skillId);
-  const maxRank = getSkillMaxRank(skill);
+  const maxRank = getCompanionSkillMaxRank(companion, skill);
 
   if (currentRank >= maxRank) {
     return {
@@ -953,10 +1046,30 @@ export function readSkillBook(
     };
   }
 
+  const requiredBooks = getSkillBooksRequiredForTargetRank(currentRank + 1);
+
+  if (availableBooks < requiredBooks) {
+    return {
+      state,
+      result: {
+        status: "failed",
+        companionId,
+        itemId,
+        skillId,
+        displayName: skill.displayName,
+        currentRank,
+        maxRank,
+        requiredBooks,
+        availableBooks,
+        reason: "insufficient_books",
+      },
+    };
+  }
+
   const removeResult = removeItemFromInventoryState(
     state,
     itemId,
-    1,
+    requiredBooks,
     "skill_book",
   );
 
@@ -969,6 +1082,10 @@ export function readSkillBook(
         itemId,
         skillId,
         displayName: skill.displayName,
+        currentRank,
+        maxRank,
+        requiredBooks,
+        availableBooks,
         reason: "inventory_remove_failed",
       },
     };
@@ -1004,6 +1121,7 @@ export function readSkillBook(
       previousRank: currentRank,
       newRank: nextRank,
       maxRank,
+      booksConsumed: requiredBooks,
     },
   };
 }
@@ -1037,13 +1155,16 @@ export function sanitizeCompanionSkillProgression(
       continue;
     }
 
-    ranksBySkillId[skillId] = clampRank(rank, getSkillMaxRank(skill));
+    ranksBySkillId[skillId] = clampRank(
+      rank,
+      getCompanionSkillMaxRank(companion, skill),
+    );
   }
 
   for (const skill of getSkillsForClass(companion.classId)) {
     ranksBySkillId[skill.id] = clampRank(
       ranksBySkillId[skill.id] ?? 1,
-      getSkillMaxRank(skill),
+      getCompanionSkillMaxRank(companion, skill),
     );
   }
 

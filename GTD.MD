@@ -1181,7 +1181,7 @@ Passive skills by class:
 
 Active-skill lookup and autonomous selection must exclude passive definitions. A learned-passive lookup must include passives from every class tier the companion has unlocked. Passives never enter active slots, legacy selection, cooldown processing, or autonomous action scoring.
 
-Class unlock initializes every active and passive skill for that class at rank 1. Passive-specific skill books use the same learned-skill rank and stored book-progress model as active skills. React presents passive rank, current cap, description, and book progress, but does not calculate passive effects.
+Class unlock initializes every active and passive skill for that class at rank 1. Passive-specific skill books use the same learned-skill rank and exact-cost Study model as active skills. React presents passive rank, current cap, description, and books required for the next rank, but does not calculate passive effects.
 
 Passive mechanics remain owned by focused game-logic modules:
 
@@ -1315,7 +1315,7 @@ AoE visual intent is presentation metadata for renderer feedback. It must not de
 
 Current skill runtime state includes marks, self buffs, party buffs, poison coatings, class buffs, overcharges, mana shields, frost armor, heal-over-time effects, lifesteal buffs, rewind runes, runic focus, gather buffs, damage mitigations, absorb shields, self mitigation buffs, party mitigation buffs, binds, shield blocks, status effects, passive charges and sequence memory, recent qualifying kills, source-owned rune effects, companion AoE channels, per-skill cooldowns, companion global cooldowns, and visual events.
 
-`skillProgression.ts` owns learned skill ranks, stored book progress, skill-book reading, active and passive lookup, companion-aware caps, scaled skill definitions, and legacy-enabled active skill carry-over.
+`skillProgression.ts` owns learned skill ranks, next-rank book costs, skill-book Study actions, active and passive lookup, companion-aware caps, scaled skill definitions, and legacy-enabled active skill carry-over.
 
 Skill progression behavior:
 
@@ -1328,9 +1328,10 @@ Skill progression behavior:
 - passive skills are always active after unlock and never use legacy toggles or active-skill slots
 - cap lookup must accept companion class-depth context; a skill-only `getSkillMaxRank(skill)` is insufficient
 - book cost for target rank `B` is `B(B + 1) / 2 - 2`
-- stored progress is tracked per learned skill
-- one Study or Read command consumes up to the remaining cost of the next rank, advances at most one rank, preserves insufficient partial progress, and leaves excess books in inventory
-- invalid, unavailable, and maxed reads consume nothing
+- no partial book progress is stored
+- a Study command is enabled only when shared inventory contains the full next-rank cost for the matching skill book
+- one successful Study command consumes exactly the next-rank cost, advances exactly one rank, and leaves excess books in inventory
+- invalid, unavailable, maxed, and insufficient-quantity Study commands consume nothing
 - Beginner and first-class skill-book price categories and the item stack limit remain unchanged
 - active legacy eligibility checks compare rank to `legacyUnlockRank`, not the current companion-aware maximum
 - legacy-enabled active skills enter the active pool only when class-lineage and eligibility checks pass
@@ -2568,14 +2569,13 @@ Skill-book behavior:
 - skill books are normal inventory items with `category: "skill_book"`
 - skill books are stackable and currently use `maxStack: 99`
 - each skill book points to exactly one `SkillId` through `skillBookSkillId`
-- `getSkillBookReadCandidates` returns companions that can currently read the selected book
-- `canCompanionReadSkillBook` returns `eligible`, `unavailable`, or `maxed`
-- `readSkillBook` validates item definition, known skill id, companion id, inventory quantity, learned skill availability, companion-aware max rank, current stored progress, and the cost of the next rank
-- failed skill-book reads do not remove the book from inventory
-- a successful read removes at most the remaining number of matching books needed for the next rank, applies that quantity to stored progress, and advances at most one rank
-- insufficient inventory quantity is preserved as partial progress, while quantity beyond the next-rank requirement remains in inventory
-- when a rank advances, progress for the completed rank is cleared before the next rank's requirement is displayed
-- skill progression sanitization keeps known skill ids, clamps ranks to companion-aware caps, preserves valid partial progress, preserves valid legacy-enabled active skill ids, and ensures every unlocked class's active and passive skills remain learned
+- `getSkillBookReadCandidates` returns learned companions that can be presented for the selected book together with their next-rank requirement and availability state
+- `canCompanionReadSkillBook` distinguishes `eligible`, `insufficient_books`, `unavailable`, and `maxed`
+- `readSkillBook` validates item definition, known skill id, companion id, learned skill availability, companion-aware max rank, next-rank cost, total matching inventory quantity, and exact inventory removal
+- failed skill-book Study actions do not remove books from inventory
+- a successful Study action removes exactly the next-rank requirement across matching shared-inventory stacks and advances exactly one rank
+- inventory quantity beyond the next-rank requirement remains in inventory and never spills into a second rank
+- skill progression sanitization keeps known skill ids, clamps ranks to companion-aware caps, preserves valid legacy-enabled active skill ids, and ensures every unlocked class's active and passive skills remain learned
 
 The shared prototype wallet is stored on `GameState` as `wallet`.
 
@@ -3785,7 +3785,7 @@ Current intended Party sections and controls:
 - Stats
 - Equipment
 - Skills
-- learned active and passive skill display with current rank, companion-aware cap, and book progress
+- learned active and passive skill display with current rank, companion-aware cap, and books required for the next rank
 - legacy active-skill toggles where the fixed rank-5 threshold is met
 - no passive skill toggles or legacy controls
 - Skill Preferences for supported skill behavior settings
