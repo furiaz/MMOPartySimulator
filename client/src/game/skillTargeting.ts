@@ -21,6 +21,7 @@ import {
 } from "./partyTargetSystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
 import {
+  FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
   getCompanionSkillBehavior,
   isBeginnerFirstAidSelfHealPriorityActive,
 } from "./skillBehavior";
@@ -334,6 +335,17 @@ export function getSkillTarget(
       : undefined;
   }
 
+  if (skill.effect.type === "followThrough") {
+    return (
+      findEnemyTarget(state, caster, skill.range, {
+        ...options,
+        enemyFilter: (enemy) =>
+          isFollowThroughBonusTarget(state, caster, enemy) &&
+          (!options.enemyFilter || options.enemyFilter(enemy)),
+      }) ?? findEnemyTarget(state, caster, skill.range, options)
+    );
+  }
+
   const enemy =
     skill.id === "throw_rock"
       ? findProtectiveTauntTarget(state, caster, skill.range, options) ??
@@ -454,6 +466,26 @@ export function findEnemyTarget(
       isEnemyInRange(caster, entity, range) &&
       isSkillEnemyTargetAvailable(state, caster, entity) &&
       isAllowedEnemyTarget(entity, options),
+  );
+}
+
+export function isFollowThroughBonusTarget(
+  state: GameState,
+  caster: Companion,
+  enemy: Enemy,
+): boolean {
+  const currentEnemy = state.entities[enemy.id];
+
+  if (!isLivingEnemy(currentEnemy) || currentEnemy.state !== "attack") {
+    return false;
+  }
+
+  const attackedCompanion = currentEnemy.currentTargetId
+    ? state.entities[currentEnemy.currentTargetId]
+    : undefined;
+
+  return (
+    isLivingCompanion(attackedCompanion) && attackedCompanion.id !== caster.id
   );
 }
 
@@ -616,6 +648,10 @@ function isFirstAidAllyCandidate(
     member.id !== caster.id &&
     isLivingCompanion(member) &&
     member.health < member.maxHealth &&
+    isCompanionAtOrBelowHpThreshold(
+      member,
+      FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
+    ) &&
     isCompanionAtOrBelowHpThreshold(member, hpThresholdPercent) &&
     getGridDistance(caster.position, member.position) <= range &&
     (inCombat || !options.firstAidReservedTargetIds?.has(member.id))
@@ -681,6 +717,10 @@ function isFirstAidFocusedAllyCandidate(
     member.id !== caster.id &&
     isLivingCompanion(member) &&
     member.health < member.maxHealth &&
+    isCompanionAtOrBelowHpThreshold(
+      member,
+      FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
+    ) &&
     isCompanionAtOrBelowHpThreshold(member, SUPPORT_FOCUS_HP_THRESHOLD_PERCENT) &&
     getGridDistance(caster.position, member.position) <= range &&
     (inCombat || !options.firstAidReservedTargetIds?.has(member.id))

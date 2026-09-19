@@ -3,6 +3,7 @@ import { createCompanion, createEnemy, createResource } from "./entities";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { updateGatherSystem } from "./gatherSystem";
 import { getHealingAmount } from "./combatResolver";
+import { getFirstAidHealingEffectiveness } from "./skillBehavior";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { createPendingRoleBonusState } from "./roleBonus";
@@ -317,14 +318,6 @@ describe("beginner skill system", () => {
           event.reason === "no_target",
       ),
     ).toBe(true);
-    expect(
-      events.some(
-        (event) =>
-          event.type === "skill_skipped" &&
-          event.skillId === "quick_step" &&
-          event.reason === "no_target",
-      ),
-    ).toBe(true);
   });
 
   it("records attack no-target skips when enemy context exists", () => {
@@ -440,7 +433,7 @@ describe("beginner skill system", () => {
         (event) =>
           event.type === "skill_skipped" &&
           event.entityId === fighter.id &&
-          event.skillId === "quick_step" &&
+          event.skillId === "guard_up" &&
           event.reason === "no_target",
       ) ?? [];
 
@@ -510,27 +503,28 @@ describe("beginner skill system", () => {
         },
       },
       {
-        skillId: "quick_step",
+        skillId: "follow_through",
         entities: [
-          createBeginner("gatherer", "gatherer", { x: 0, y: 0 }),
+          createBeginner("fighter", "fighter", { x: 0, y: 0 }),
+          createBeginner("ally", "support", { x: 1, y: 1 }),
           {
             ...createEnemy("enemy", { x: 1, y: 0 }),
             state: "attack",
-            currentTargetId: "gatherer",
+            currentTargetId: "ally",
           },
         ],
         overrides: {
           skillSelfBuffsByCompanionId: {
-            gatherer: {
-              companionId: "gatherer",
+            fighter: {
+              companionId: "fighter",
               bonusDamage: 1,
               expiresAt: 5000,
             },
           },
           skillShieldBlocksById: {
-            "gatherer-guard_up": {
-              id: "gatherer-guard_up",
-              ownerId: "gatherer",
+            "fighter-guard_up": {
+              id: "fighter-guard_up",
+              ownerId: "fighter",
               position: { x: 0, y: -1 },
               rotationRadians: 0,
               expiresAt: 5000,
@@ -828,7 +822,7 @@ describe("beginner skill system", () => {
     expect(nextState.entities.ally).toMatchObject({
       health: Math.min(
         ally.maxHealth,
-        ally.health + getHealingAmount(support, 5),
+        ally.health + getExpectedFirstAidHealing(support, ally),
       ),
     });
     expect(
@@ -907,7 +901,7 @@ describe("beginner skill system", () => {
     expect(nextState.entities.support).toMatchObject({
       health: Math.min(
         support.maxHealth,
-        support.health + getHealingAmount(support, 5),
+        support.health + getExpectedFirstAidHealing(support, support),
       ),
     });
     expect(nextState.entities.ally).toMatchObject({
@@ -942,7 +936,7 @@ describe("beginner skill system", () => {
     expect(nextState.entities.ally).toMatchObject({
       health: Math.min(
         ally.maxHealth,
-        ally.health + getHealingAmount(support, 5),
+        ally.health + getExpectedFirstAidHealing(support, ally),
       ),
     });
     expect(
@@ -974,7 +968,7 @@ describe("beginner skill system", () => {
     expect(nextState.entities.fighter).toMatchObject({
       health: Math.min(
         fighter.maxHealth,
-        fighter.health + getHealingAmount(fighter, 5),
+        fighter.health + getExpectedFirstAidHealing(fighter, fighter),
       ),
     });
     expect(nextState.entities.ally).toMatchObject({
@@ -1018,7 +1012,7 @@ describe("beginner skill system", () => {
       expect(nextState.entities.companion).toMatchObject({
         health: Math.min(
           companion.maxHealth,
-          companion.health + getHealingAmount(companion, 5),
+          companion.health + getExpectedFirstAidHealing(companion, companion),
         ),
       });
       expect(
@@ -1064,7 +1058,10 @@ describe("beginner skill system", () => {
       fighterState.skillCooldownsByCompanionId?.fighter?.first_aid,
     ).toBeUndefined();
     expect(supportState.entities.ally).toMatchObject({
-      health: Math.min(ally.maxHealth, ally.health + getHealingAmount(support, 5)),
+      health: Math.min(
+        ally.maxHealth,
+        ally.health + getExpectedFirstAidHealing(support, ally),
+      ),
     });
     expect(
       supportState.skillCooldownsByCompanionId?.support?.first_aid?.skillId,
@@ -1137,14 +1134,17 @@ describe("beginner skill system", () => {
     );
 
     expect(nextState.entities.ally).toMatchObject({
-      health: Math.min(ally.maxHealth, ally.health + getHealingAmount(support, 5)),
+      health: Math.min(
+        ally.maxHealth,
+        ally.health + getExpectedFirstAidHealing(support, ally),
+      ),
     });
     expect(
       nextState.skillCooldownsByCompanionId?.support?.first_aid?.skillId,
     ).toBe("first_aid");
   });
 
-  it("lets Support Focus prefer an injured leader", () => {
+  it("does not let Support Focus bypass First Aid's 60-percent hard cap", () => {
     const support = createBeginner("support", "support", { x: 1, y: 1 });
     const focusedSupport = {
       ...support,
@@ -1179,14 +1179,12 @@ describe("beginner skill system", () => {
       1000,
     );
 
-    expect(nextState.entities.leader).toMatchObject({
-      health: Math.min(
-        leader.maxHealth,
-        leader.health + getHealingAmount(support, 5),
-      ),
-    });
+    expect(nextState.entities.leader).toMatchObject({ health: leader.health });
     expect(nextState.entities["urgent-ally"]).toMatchObject({
-      health: urgentAlly.health,
+      health: Math.min(
+        urgentAlly.maxHealth,
+        urgentAlly.health + getExpectedFirstAidHealing(support, urgentAlly),
+      ),
     });
   });
 
@@ -1229,7 +1227,7 @@ describe("beginner skill system", () => {
     expect(nextState.entities["urgent-ally"]).toMatchObject({
       health: Math.min(
         urgentAlly.maxHealth,
-        urgentAlly.health + getHealingAmount(support, 5),
+        urgentAlly.health + getExpectedFirstAidHealing(support, urgentAlly),
       ),
     });
   });
@@ -1280,7 +1278,8 @@ describe("beginner skill system", () => {
     expect(nextState.entities["injured-defender"]).toMatchObject({
       health: Math.min(
         injuredDefender.maxHealth,
-        injuredDefender.health + getHealingAmount(support, 5),
+        injuredDefender.health +
+          getExpectedFirstAidHealing(support, injuredDefender),
       ),
     });
     expect(nextState.entities["healthier-defender"]).toMatchObject({
@@ -1320,13 +1319,14 @@ describe("beginner skill system", () => {
     expect(nextState.entities["first-ally"]).toMatchObject({
       health: Math.min(
         firstAlly.maxHealth,
-        firstAlly.health + getHealingAmount(firstFighter, 5),
+        firstAlly.health + getExpectedFirstAidHealing(firstFighter, firstAlly),
       ),
     });
     expect(nextState.entities["second-ally"]).toMatchObject({
       health: Math.min(
         secondAlly.maxHealth,
-        secondAlly.health + getHealingAmount(secondFighter, 5),
+        secondAlly.health +
+          getExpectedFirstAidHealing(secondFighter, secondAlly),
       ),
     });
     expect(
@@ -1360,77 +1360,6 @@ describe("beginner skill system", () => {
     expect(nextState.entities.enemy).toMatchObject({
       health: enemy.health,
     });
-  });
-
-  it("moves Fighter Quick Step toward a valid enemy", () => {
-    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 3 });
-    const enemy = createEnemy("enemy", { x: 7, y: 3 });
-    const nextState = updateSkillSystem(
-      createSkillState([fighter, enemy], {
-        map: createSkillMap(),
-        leaderIntent: {
-          type: "attack",
-          targetId: enemy.id,
-          targetPosition: enemy.position,
-          source: "ai",
-        },
-        ...createActiveSelfBuff(fighter.id),
-      }),
-      1000,
-    );
-
-    expect(nextState.entities.fighter.position.x).toBeGreaterThan(
-      fighter.position.x,
-    );
-    expect(nextState.skillCooldownsByCompanionId?.fighter?.quick_step?.skillId).toBe(
-      "quick_step",
-    );
-    expect(nextState.skillCooldownsByCompanionId?.fighter?.quick_step?.expiresAt).toBe(
-      11000,
-    );
-  });
-
-  it("does not use offensive Quick Step without combat context", () => {
-    const fighter = createBeginner("fighter", "fighter", { x: 1, y: 3 });
-    const enemy = createEnemy("enemy", { x: 7, y: 3 });
-    const nextState = updateSkillSystem(
-      createSkillState([fighter, enemy], {
-        map: createSkillMap(),
-        ...createActiveSelfBuff(fighter.id),
-      }),
-      1000,
-    );
-
-    expect(nextState.entities.fighter.position).toEqual(fighter.position);
-    expect(
-      nextState.skillCooldownsByCompanionId?.fighter?.quick_step,
-    ).toBeUndefined();
-  });
-
-  it("uses Quick Step offensively by default even for non-frontline roles", () => {
-    const support = createBeginner("support", "support", { x: 1, y: 3 });
-    const enemy = createEnemy("enemy", { x: 7, y: 3 });
-    const nextState = updateSkillSystem(
-      createSkillState([support, enemy], {
-        map: createSkillMap(),
-        leaderIntent: {
-          type: "attack",
-          targetId: enemy.id,
-          targetPosition: enemy.position,
-          source: "ai",
-        },
-        ...createActiveSelfBuff(support.id),
-        ...createActiveShield(support.id),
-      }),
-      1000,
-    );
-
-    expect(nextState.entities.support.position.x).toBeGreaterThan(
-      support.position.x,
-    );
-    expect(nextState.skillCooldownsByCompanionId?.support?.quick_step?.skillId).toBe(
-      "quick_step",
-    );
   });
 
   it("uses Second Wind at the configured threshold and caps the heal threshold at 30 percent", () => {
@@ -2028,105 +1957,6 @@ describe("beginner skill system", () => {
     });
   });
 
-  it.each<Companion["role"]>(["support", "gatherer", "none"])(
-    "moves %s Quick Step away from an attacking enemy",
-    (role) => {
-      const companion = createBeginner("companion", role, { x: 3, y: 3 });
-      companion.skillBehavior = {
-        ...companion.skillBehavior,
-        mobilitySkillUseMode: "defensive",
-      };
-      const enemy = {
-        ...createEnemy("enemy", { x: 4, y: 3 }),
-        state: "attack" as const,
-        currentTargetId: companion.id,
-      };
-      const nextState = updateSkillSystem(
-        createSkillState([companion, enemy], {
-          map: createSkillMap(),
-          ...createActiveSelfBuff(companion.id),
-          ...createActiveShield(companion.id),
-        }),
-        1000,
-      );
-
-      expect(nextState.entities.companion.position.x).toBeLessThan(
-        companion.position.x,
-      );
-      expect(nextState.skillCooldownsByCompanionId?.companion?.quick_step?.skillId).toBe(
-        "quick_step",
-      );
-    },
-  );
-
-  it("tries angled Quick Step alternatives when the direct destination is blocked", () => {
-    const baseSupport = createBeginner("support", "support", { x: 3, y: 3 });
-    const support = {
-      ...baseSupport,
-      skillBehavior: {
-        ...baseSupport.skillBehavior,
-        mobilitySkillUseMode: "defensive" as const,
-      },
-    };
-    const enemy = {
-      ...createEnemy("enemy", { x: 4, y: 3 }),
-      state: "attack" as const,
-      currentTargetId: support.id,
-    };
-    const nextState = updateSkillSystem(
-      createSkillState([support, enemy], {
-        map: createSkillMap([{ x: 2, y: 3 }]),
-        ...createActiveSelfBuff(support.id),
-        ...createActiveShield(support.id),
-      }),
-      1000,
-    );
-
-    expect(nextState.entities.support.position.x).toBeLessThan(
-      support.position.x,
-    );
-    expect(nextState.entities.support.position.y).not.toBe(support.position.y);
-    expect(nextState.skillCooldownsByCompanionId?.support?.quick_step?.skillId).toBe(
-      "quick_step",
-    );
-  });
-
-  it("does not start Quick Step cooldown when all candidate destinations are blocked", () => {
-    const baseSupport = createBeginner("support", "support", { x: 3, y: 3 });
-    const support = {
-      ...baseSupport,
-      skillBehavior: {
-        ...baseSupport.skillBehavior,
-        mobilitySkillUseMode: "defensive" as const,
-      },
-    };
-    const enemy = {
-      ...createEnemy("enemy", { x: 9, y: 3 }),
-      state: "attack" as const,
-      currentTargetId: support.id,
-    };
-    const nextState = updateSkillSystem(
-      createSkillState([support, enemy], {
-        map: createSkillMap(
-          [
-            { x: 2, y: 3 },
-            { x: 2, y: 2 },
-            { x: 2, y: 4 },
-            { x: 3, y: 2 },
-            { x: 3, y: 4 },
-          ],
-          12,
-        ),
-        ...createActiveSelfBuff(support.id),
-        ...createActiveShield(support.id),
-      }),
-      1000,
-    );
-
-    expect(nextState.entities.support.position).toEqual(support.position);
-    expect(nextState.skillCooldownsByCompanionId?.support).toBeUndefined();
-    expect(nextState.globalCooldownsByCompanionId?.support).toBeUndefined();
-  });
 });
 
 function createBeginner(
@@ -2139,6 +1969,24 @@ function createBeginner(
     state: "idle",
     currentTargetId: null,
   };
+}
+
+function getExpectedFirstAidHealing(
+  caster: Companion,
+  target: Companion,
+): number {
+  const normalHealing = getHealingAmount(caster, 5);
+  const targetHealthPercent = (target.health / target.maxHealth) * 100;
+  const effectiveness = getFirstAidHealingEffectiveness(targetHealthPercent);
+
+  if (effectiveness <= 0) {
+    return 0;
+  }
+
+  return Math.max(
+    1,
+    Math.round(normalHealing * effectiveness),
+  );
 }
 
 function createSkillState(

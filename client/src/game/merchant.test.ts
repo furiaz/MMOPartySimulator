@@ -52,6 +52,11 @@ describe("merchant buy", () => {
           group: "books",
         }),
         expect.objectContaining({
+          itemId: "follow_through_skill_book",
+          priceCrowns: 25,
+          group: "books",
+        }),
+        expect.objectContaining({
           itemId: "duelist_challenge_skill_book",
           priceCrowns: 60,
           group: "books",

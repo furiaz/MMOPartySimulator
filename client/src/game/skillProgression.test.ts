@@ -108,6 +108,137 @@ const PENITENT_SKILL_IDS: SkillId[] = [
 ];
 
 describe("skill progression", () => {
+  it.each([
+    {
+      rank: 1,
+      tauntMs: 3000,
+      kick: 1,
+      guardMs: 6000,
+      blocks: 1,
+      heal: 5,
+      flatBuff: 1,
+      gather: 1,
+      follow: 1,
+      conditional: 0.2,
+    },
+    {
+      rank: 5,
+      tauntMs: 5000,
+      kick: 1.2,
+      guardMs: 10000,
+      blocks: 2,
+      heal: 6,
+      flatBuff: 5,
+      gather: 1.2,
+      follow: 1.4,
+      conditional: 0.4,
+    },
+    {
+      rank: 6,
+      tauntMs: 5250,
+      kick: 1.225,
+      guardMs: 10500,
+      blocks: 2,
+      heal: 6.125,
+      flatBuff: 5.5,
+      gather: 1.225,
+      follow: 1.45,
+      conditional: 0.425,
+    },
+    {
+      rank: 10,
+      tauntMs: 6250,
+      kick: 1.325,
+      guardMs: 12500,
+      blocks: 3,
+      heal: 6.625,
+      flatBuff: 7.5,
+      gather: 1.325,
+      follow: 1.65,
+      conditional: 0.525,
+    },
+  ])("scales every Beginner active skill at rank $rank", (expected) => {
+    const ranks = Object.fromEntries(
+      [
+        "throw_rock",
+        "kick",
+        "guard_up",
+        "first_aid",
+        "deep_breath",
+        "rally_call",
+        "field_hands",
+        "follow_through",
+      ].map((skillId) => [skillId, expected.rank]),
+    ) as Partial<Record<SkillId, number>>;
+    const companion = withSkillRanks(
+      createCompanion(
+        "companion",
+        { x: 0, y: 0 },
+        "companion",
+        "none",
+        1,
+        "blade",
+      ),
+      ranks,
+    );
+    const scaled = (skillId: SkillId) =>
+      getScaledSkillDefinitionForCompanion(
+        companion,
+        SKILL_DEFINITIONS[skillId],
+      ).effect;
+    const throwRock = scaled("throw_rock");
+    const kick = scaled("kick");
+    const guardUp = scaled("guard_up");
+    const firstAid = scaled("first_aid");
+    const deepBreath = scaled("deep_breath");
+    const rallyCall = scaled("rally_call");
+    const fieldHands = scaled("field_hands");
+    const followThrough = scaled("follow_through");
+
+    expect(throwRock).toMatchObject({ durationMs: expected.tauntMs });
+    expect(kick).toMatchObject({ powerMultiplier: expected.kick });
+    expect(guardUp).toMatchObject({
+      durationMs: expected.guardMs,
+      blocks: expected.blocks,
+    });
+    expect(firstAid).toMatchObject({ powerMultiplier: expected.heal });
+    expect(deepBreath).toMatchObject({ bonusDamage: expected.flatBuff });
+    expect(rallyCall).toMatchObject({ bonusDamage: expected.flatBuff });
+    expect(fieldHands).toMatchObject({ bonusGatherSpeed: expected.gather });
+    expect(followThrough.type).toBe("followThrough");
+    if (followThrough.type === "followThrough") {
+      expect(followThrough.powerMultiplier).toBeCloseTo(expected.follow);
+      expect(followThrough.conditionalBonusMultiplier).toBeCloseTo(
+        expected.conditional,
+      );
+    }
+  });
+
+  it.each([
+    [4, 1],
+    [5, 2],
+    [9, 2],
+    [10, 3],
+  ])("uses %s Guard Up ranks to grant %s blocks", (rank, expectedBlocks) => {
+    const companion = withSkillRanks(
+      createCompanion(
+        "companion",
+        { x: 0, y: 0 },
+        "companion",
+        "none",
+        1,
+        "blade",
+      ),
+      { guard_up: rank },
+    );
+    const guardUp = getScaledSkillDefinitionForCompanion(
+      companion,
+      SKILL_DEFINITIONS.guard_up,
+    );
+
+    expect(guardUp.effect).toMatchObject({ blocks: expectedBlocks });
+  });
+
   it("uses beginner and class rank caps", () => {
     const beginner = createCompanion(
       "beginner",
@@ -508,7 +639,11 @@ describe("skill progression", () => {
     if (kick.effect.type === "lungeDamage") {
       expect(kick.effect.powerMultiplier).toBeCloseTo(1.1);
     }
-    expect(guardUp.effect).toEqual(SKILL_DEFINITIONS.guard_up.effect);
+    expect(guardUp.effect).toMatchObject({
+      type: "shieldBlock",
+      durationMs: 8000,
+      blocks: 1,
+    });
     expect(secondWind.effect.type).toBe("selfPercentHeal");
     if (secondWind.effect.type === "selfPercentHeal") {
       expect(secondWind.effect.healPercent).toBeCloseTo(24);

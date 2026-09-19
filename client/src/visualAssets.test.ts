@@ -17,7 +17,9 @@ import {
   type SpriteDirection,
 } from "./visualAssets";
 import {
+  INVENTORY_ITEM_ICON_SRC,
   MAP_VISUAL_OBJECT_SRC,
+  SKILL_VISUAL_ICON_SRC,
   TICKET_0501_HUD_CONTROL_SRC,
 } from "./assetIcons";
 
@@ -44,6 +46,15 @@ const azureMassFrames = {
 } satisfies Record<SpriteDirection, string>;
 
 describe("entity visual assets", () => {
+  it("reuses approved existing art for Follow Through", () => {
+    expect(SKILL_VISUAL_ICON_SRC.follow_through).toContain(
+      "/first-class-skill-effects/blade/sprites/sweeping_strike.png",
+    );
+    expect(INVENTORY_ITEM_ICON_SRC.follow_through_skill_book).toContain(
+      "/beginner/kick_skill_book.png",
+    );
+  });
+
   it("uses real-size Test-Character Idle and Run art for quest guide NPCs", () => {
     const questGuide = createNpc(
       "guide",

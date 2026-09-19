@@ -11,6 +11,8 @@ import type {
 
 export const DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT = 20;
 export const DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT = 35;
+export const FIRST_AID_HP_THRESHOLD_MIN_PERCENT = 10;
+export const FIRST_AID_HP_THRESHOLD_MAX_PERCENT = 60;
 export const DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT = 30;
 export const SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT = 30;
 export const DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT = 30;
@@ -103,11 +105,11 @@ export function getCompanionSkillBehavior(
   return {
     ...createDefaultCompanionSkillBehavior(),
     ...storedBehavior,
-    beginnerFirstAidSelfHealHpThresholdPercent: clampHpThresholdPercent(
+    beginnerFirstAidSelfHealHpThresholdPercent: clampFirstAidHpThresholdPercent(
       storedBehavior.beginnerFirstAidSelfHealHpThresholdPercent ??
         DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
     ),
-    beginnerFirstAidAllyHealHpThresholdPercent: clampHpThresholdPercent(
+    beginnerFirstAidAllyHealHpThresholdPercent: clampFirstAidHpThresholdPercent(
       storedBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
         DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
     ),
@@ -199,13 +201,13 @@ export function updateCompanionSkillBehavior(
       ...getCompanionSkillBehavior(companion),
       ...update,
       beginnerFirstAidSelfHealHpThresholdPercent:
-        clampHpThresholdPercent(
+        clampFirstAidHpThresholdPercent(
           update.beginnerFirstAidSelfHealHpThresholdPercent ??
             getCompanionSkillBehavior(companion)
               .beginnerFirstAidSelfHealHpThresholdPercent,
         ),
       beginnerFirstAidAllyHealHpThresholdPercent:
-        clampHpThresholdPercent(
+        clampFirstAidHpThresholdPercent(
           update.beginnerFirstAidAllyHealHpThresholdPercent ??
             getCompanionSkillBehavior(companion)
               .beginnerFirstAidAllyHealHpThresholdPercent,
@@ -326,6 +328,31 @@ export function isBeginnerFirstAidSelfHealPriorityActive(
     (caster.health / caster.maxHealth) * 100 <=
       getCompanionSkillBehavior(caster)
         .beginnerFirstAidSelfHealHpThresholdPercent
+  );
+}
+
+export function getFirstAidHealingEffectiveness(
+  targetHealthPercent: number,
+): number {
+  if (targetHealthPercent > FIRST_AID_HP_THRESHOLD_MAX_PERCENT) {
+    return 0;
+  }
+
+  if (targetHealthPercent <= FIRST_AID_HP_THRESHOLD_MIN_PERCENT) {
+    return 1;
+  }
+
+  if (targetHealthPercent <= 30) {
+    return 0.6 + ((30 - targetHealthPercent) / 20) * 0.4;
+  }
+
+  return 0.1 + ((60 - targetHealthPercent) / 30) * 0.5;
+}
+
+function clampFirstAidHpThresholdPercent(value: number): number {
+  return Math.min(
+    FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
+    Math.max(FIRST_AID_HP_THRESHOLD_MIN_PERCENT, Math.round(value)),
   );
 }
 

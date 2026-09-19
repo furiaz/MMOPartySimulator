@@ -12,6 +12,8 @@ import {
   CLASS_DEFINITIONS,
   DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
   DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
+  FIRST_AID_HP_THRESHOLD_MIN_PERCENT,
+  FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
   DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
   DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
@@ -44,6 +46,7 @@ import {
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
   getConsumableCooldownRemainingMs,
+  getFirstAidHealingEffectiveness,
   getCharacterXpProgress,
   canCompanionEnterFirstClassSelection,
   getCompanionEquipmentPrimaryStatModifiers,
@@ -518,6 +521,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
     return `Deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
   }
 
+  if (effect.type === "followThrough") {
+    return `Deals ${formatPercent(effect.powerMultiplier * 100)}% physical damage, plus ${formatPercent(effect.conditionalBonusMultiplier * 100)} percentage points when the target is attacking another living companion.`;
+  }
+
   if (effect.type === "lungeDamage") {
     return `Lunges ${effect.lungeDistance} spaces and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
   }
@@ -527,9 +534,11 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   if (effect.type === "taunt") {
+    const duration = formatDuration(effect.durationMs);
+
     return effect.powerMultiplier && effect.powerMultiplier > 0
-      ? `Pulls attention and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType ?? "physical"} damage.`
-      : "Pulls enemy attention.";
+      ? `Pulls attention for ${duration} and deals ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType ?? "physical"} damage.`
+      : `Pulls enemy attention for ${duration}.`;
   }
 
   if (effect.type === "multiTaunt") {
@@ -619,6 +628,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   if (effect.type === "gatherBuff") {
+    if (skill.id === "field_hands") {
+      return `+${formatPercent(effect.bonusGatherSpeed)} gathering power. For 90 seconds, increases gathering power for any resource. Each one-second gathering attempt removes more resource durability, so items are collected sooner. It does not improve item quantity, tier, or rarity.`;
+    }
+
     return effect.resourceType
       ? `Self +${effect.bonusGatherSpeed} ${effect.resourceType} gather speed.`
       : `Self +${effect.bonusGatherSpeed} gather speed.`;
@@ -689,7 +702,7 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   if (effect.type === "shieldBlock") {
-    return `Blocks ${effect.blocks} hit.`;
+    return `For ${formatDuration(effect.durationMs)}, blocks ${effect.blocks} physical ${effect.blocks === 1 ? "hit" : "hits"}.`;
   }
 
   if (effect.type === "absorbShield") {
@@ -721,6 +734,10 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
   }
 
   if (effect.type === "heal") {
+    if (skill.id === "first_aid") {
+      return `Emergency heal at 60% HP or lower. Normal healing is ${formatPercent(effect.powerMultiplier * 100)}% healing power, then scales from 10% effectiveness at 60% HP to 100% at 10% HP.`;
+    }
+
     return `Heals ${Math.round(effect.powerMultiplier * 100)}% healing power.`;
   }
 
@@ -745,6 +762,22 @@ function getSkillEffectSummary(skill: SkillDefinition): string {
 
 function formatSkillCooldown(cooldownMs: number): string {
   return `${Math.round(cooldownMs / 1000)}s`;
+}
+
+function formatDuration(durationMs: number): string {
+  return `${formatPercent(durationMs / 1000)}s`;
+}
+
+function formatPercent(value: number): string {
+  return String(Number(value.toFixed(3)));
+}
+
+function getFirstAidEffectivenessText(thresholdPercent: number): string {
+  const effectivenessPercent = Math.round(
+    getFirstAidHealingEffectiveness(thresholdPercent) * 100,
+  );
+
+  return `${thresholdPercent}% HP → ${effectivenessPercent}% normal healing`;
 }
 
 function CompanionMenuList({
@@ -1668,7 +1701,6 @@ function SkillPreferencesSection({
   );
   const hasMobilitySkill = learnedSkillGroups.some((group) =>
     group.skills.some((skill) =>
-      skill.id === "quick_step" ||
       skill.id === "flash_step" ||
       skill.id === "shield_rush" ||
       skill.id === "skirmish_shot" ||
@@ -1739,8 +1771,8 @@ function SkillPreferencesSection({
             <label className="behavior-range-row">
               <span>First Aid Self-Heal Threshold</span>
               <input
-                max={100}
-                min={1}
+                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
+                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
                 onChange={(event) =>
                   onChangeSkillBehavior(member.id, {
                     beginnerFirstAidSelfHealHpThresholdPercent: Number(
@@ -1752,8 +1784,8 @@ function SkillPreferencesSection({
                 value={firstAidSelfThreshold}
               />
               <input
-                max={100}
-                min={1}
+                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
+                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
                 onChange={(event) =>
                   onChangeSkillBehavior(member.id, {
                     beginnerFirstAidSelfHealHpThresholdPercent: Number(
@@ -1764,13 +1796,15 @@ function SkillPreferencesSection({
                 type="number"
                 value={firstAidSelfThreshold}
               />
-              <strong>{firstAidSelfThreshold}%</strong>
+              <strong>
+                {getFirstAidEffectivenessText(firstAidSelfThreshold)}
+              </strong>
             </label>
             <label className="behavior-range-row">
               <span>First Aid Ally-Heal Threshold</span>
               <input
-                max={100}
-                min={1}
+                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
+                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
                 onChange={(event) =>
                   onChangeSkillBehavior(member.id, {
                     beginnerFirstAidAllyHealHpThresholdPercent: Number(
@@ -1782,8 +1816,8 @@ function SkillPreferencesSection({
                 value={firstAidAllyThreshold}
               />
               <input
-                max={100}
-                min={1}
+                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
+                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
                 onChange={(event) =>
                   onChangeSkillBehavior(member.id, {
                     beginnerFirstAidAllyHealHpThresholdPercent: Number(
@@ -1794,7 +1828,9 @@ function SkillPreferencesSection({
                 type="number"
                 value={firstAidAllyThreshold}
               />
-              <strong>{firstAidAllyThreshold}%</strong>
+              <strong>
+                {getFirstAidEffectivenessText(firstAidAllyThreshold)}
+              </strong>
             </label>
           </>
         ) : null}

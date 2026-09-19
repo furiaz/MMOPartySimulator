@@ -585,6 +585,15 @@ function isRecoveryAreaSkillUseAllowed(
     return true;
   }
 
+  if (skill.effect.type === "followThrough" && isLivingEnemy(target)) {
+    return (
+      caster.state === "attack" &&
+      caster.currentTargetId === target.id &&
+      getGridDistance(caster.position, target.position) <=
+        getCompanionAttackRange(caster)
+    );
+  }
+
   if (isLivingEnemy(target)) {
     return (
       getGridDistance(caster.position, target.position) <=
@@ -729,6 +738,7 @@ function shouldSuppressSkillSkipTelemetry(
 function isAttackRelatedEnemySkill(skill: SkillDefinition): boolean {
   switch (skill.effect.type) {
     case "damage":
+    case "followThrough":
     case "lungeDamage":
     case "sweepingDamage":
     case "taunt":

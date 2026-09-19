@@ -28,10 +28,16 @@ import {
   getDirectionToward,
   getSkillDashPosition,
 } from "./skillMovement";
-import { getCompanionSkillBehavior } from "./skillBehavior";
+import {
+  getCompanionSkillBehavior,
+  getFirstAidHealingEffectiveness,
+} from "./skillBehavior";
 import { applyOverchargeToSkillDefinition } from "./skillOvercharge";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
-import { findEnemyTarget } from "./skillTargeting";
+import {
+  findEnemyTarget,
+  isFollowThroughBonusTarget,
+} from "./skillTargeting";
 import { getCompanionDerivedStatsWithPartyBuffs } from "./stats";
 import { applyCompanionHealing, canUsePartyClassBuff } from "./skillRuntime";
 import { applyStatusEffect, dropAggroFromTarget } from "./statusEffects";
@@ -115,6 +121,14 @@ function resolveSkillEffectOnce(
     return resolveAppliedSkillEffect(
       state,
       applyDamageSkill(state, caster, target, skill, now),
+      target.id,
+    );
+  }
+
+  if (skill.effect.type === "followThrough" && isLivingEnemy(target)) {
+    return resolveAppliedSkillEffect(
+      state,
+      applyFollowThrough(state, caster, target, skill, now),
       target.id,
     );
   }
@@ -663,6 +677,7 @@ function applyRunicFocusDuplicate(
 function isRunicFocusEligibleSkill(skill: SkillDefinition): boolean {
   switch (skill.effect.type) {
     case "damage":
+    case "followThrough":
     case "taunt":
     case "pinningShot":
     case "silencingRay":
@@ -689,6 +704,7 @@ function findRunicFocusDuplicateTarget(
 ): Enemy | Companion | undefined {
   if (
     skill.effect.type === "damage" ||
+    skill.effect.type === "followThrough" ||
     skill.effect.type === "taunt" ||
     skill.effect.type === "pinningShot" ||
     skill.effect.type === "silencingRay" ||
@@ -744,6 +760,43 @@ function applyDamageSkill(
 
   nextState = addSkillVisualEvent(nextState, {
     type: "projectile",
+    skillId: skill.id,
+    sourceId: caster.id,
+    targetId: target.id,
+    now,
+    durationMs: VISUAL_DURATION_MS,
+  });
+
+  return nextState;
+}
+
+function applyFollowThrough(
+  state: GameState,
+  caster: Companion,
+  target: Enemy,
+  skill: SkillDefinition,
+  now: number,
+): GameState {
+  if (skill.effect.type !== "followThrough") {
+    return state;
+  }
+
+  const conditionalBonus = isFollowThroughBonusTarget(state, caster, target)
+    ? skill.effect.conditionalBonusMultiplier
+    : 0;
+  let nextState = damageEnemy(
+    state,
+    caster,
+    target,
+    skill.displayName,
+    now,
+    skill.effect.damageType,
+    skill.effect.powerMultiplier + conditionalBonus,
+    true,
+  );
+
+  nextState = addSkillVisualEvent(nextState, {
+    type: "slash",
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
@@ -3057,8 +3110,28 @@ function applyHeal(
     return state;
   }
 
-  const amount = getHealingAmount(caster, powerMultiplier, state);
-  const healResult = applyCompanionHealing(state, target, amount, now, {
+  const currentTarget = state.entities[target.id];
+
+  if (!isLivingCompanion(currentTarget)) {
+    return state;
+  }
+
+  const normalAmount = getHealingAmount(caster, powerMultiplier, state);
+  const targetHealthPercent =
+    currentTarget.maxHealth > 0
+      ? (currentTarget.health / currentTarget.maxHealth) * 100
+      : 100;
+  const effectiveness =
+    skillId === "first_aid"
+      ? getFirstAidHealingEffectiveness(targetHealthPercent)
+      : 1;
+
+  if (effectiveness <= 0) {
+    return state;
+  }
+
+  const amount = Math.max(1, Math.round(normalAmount * effectiveness));
+  const healResult = applyCompanionHealing(state, currentTarget, amount, now, {
     sourceId: caster.id,
     feedback: false,
   });
@@ -3089,28 +3162,28 @@ function applyHeal(
     type: "heal",
     skillId,
     sourceId: caster.id,
-    targetId: target.id,
+    targetId: currentTarget.id,
     now,
     durationMs: 1000,
   });
   nextState = addCombatFeedback(nextState, {
     type: "heal",
-    entityId: target.id,
+    entityId: currentTarget.id,
     amount: healResult.healedAmount,
     sourceEntityId: caster.id,
-    targetEntityId: target.id,
+    targetEntityId: currentTarget.id,
     text: `+${healResult.healedAmount} HP`,
     now,
   });
   nextState = appendDebugTelemetryEvent(nextState, {
     type: "healing_resolved",
     entityId: caster.id,
-    targetId: target.id,
+    targetId: currentTarget.id,
     healingPowerRating: getCompanionDerivedStatsWithPartyBuffs(state, caster)
       .healingPower,
     healingMultiplier: powerMultiplier,
     healingAmount: healResult.healedAmount,
-    previousHealth: target.health,
+    previousHealth: currentTarget.health,
     nextHealth: healedTarget.health,
     skillId,
   });

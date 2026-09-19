@@ -127,6 +127,17 @@ describe("prototype item definitions", () => {
       .map((itemDefinition) => itemDefinition.id)
       .sort();
 
+  it("defines the Follow Through skill book as a stackable Beginner book", () => {
+    expect(ITEM_DEFINITIONS.follow_through_skill_book).toMatchObject({
+      id: "follow_through_skill_book",
+      displayName: "Follow Through Skill Book",
+      category: "skill_book",
+      maxStack: 99,
+      skillBookSkillId: "follow_through",
+      stackable: true,
+    });
+  });
+
   it("maps resource type and tier to the intended gathered item", () => {
     expect(getItemDefinitionForResourceType("wood", 1).id).toBe("softwood");
     expect(getItemDefinitionForResourceType("ore", 1).id).toBe("copper_ore");

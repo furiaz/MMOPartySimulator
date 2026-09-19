@@ -531,7 +531,7 @@ export type SkillBookItemId =
   | "deep_breath_skill_book"
   | "rally_call_skill_book"
   | "field_hands_skill_book"
-  | "quick_step_skill_book"
+  | "follow_through_skill_book"
   | "duelist_challenge_skill_book"
   | "second_wind_skill_book"
   | "blade_parry_skill_book"
@@ -1061,7 +1061,7 @@ export type SkillId =
   | "deep_breath"
   | "rally_call"
   | "field_hands"
-  | "quick_step"
+  | "follow_through"
   | "duelist_challenge"
   | "second_wind"
   | "blade_parry"
@@ -1201,6 +1201,12 @@ export type SkillDefinition = {
   canLegacyCarry?: boolean;
   effect:
     | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
+    | {
+        type: "followThrough";
+        damageType: "physical";
+        powerMultiplier: number;
+        conditionalBonusMultiplier: number;
+      }
     | {
         type: "lungeDamage";
         damageType: CombatDamageType;

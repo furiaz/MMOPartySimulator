@@ -213,16 +213,16 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     maxStack: 99,
     skillBookSkillId: "field_hands",
   },
-  quick_step_skill_book: {
-    id: "quick_step_skill_book",
-    displayName: "Quick Step Skill Book",
+  follow_through_skill_book: {
+    id: "follow_through_skill_book",
+    displayName: "Follow Through Skill Book",
     category: "skill_book",
-    description: "A training book that raises Quick Step by one rank.",
+    description: "A training book used to raise Follow Through.",
     rarity: "common",
     tier: 1,
     stackable: true,
     maxStack: 99,
-    skillBookSkillId: "quick_step",
+    skillBookSkillId: "follow_through",
   },
   duelist_challenge_skill_book: {
     id: "duelist_challenge_skill_book",

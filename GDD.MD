@@ -2375,12 +2375,12 @@ Important rules:
 
 - Roles determine preferred skill usage, not classes
 - Classes define available skills, not behavior
-- Beginner skills are temporary prototype tools, not a final class kit
-- First-class skills are prototype class identity tools, not final complete class kits
-- Skill ranks and legacy-enabled Beginner skills are prototype progression support, not final mastery or multiclass systems
-- Skill Preferences are UI controls backed by game-logic behavior settings
-- Skills must remain simple during this phase
-- This is a prototype system, not a full ability system
+- Beginner active skills are the definitive alpha Beginner kit and remain useful after first-class selection.
+- First-class active skills define current alpha class identity but are not final content-complete class kits.
+- Skill ranks and legacy-enabled earlier-class active skills are the alpha progression foundation, not a mastery or multiclass system.
+- Skill Preferences remain UI controls backed by game logic.
+- Skills remain deliberately simple and data-driven during alpha.
+- The alpha system extends the existing skill-definition/progression model rather than creating a separate full ability framework.
 
 ---
 

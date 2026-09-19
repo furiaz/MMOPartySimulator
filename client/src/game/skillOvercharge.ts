@@ -52,6 +52,16 @@ function scaleSkillEffect(
   const { effect } = skill;
 
   switch (effect.type) {
+    case "followThrough":
+      return {
+        ...skill,
+        effect: {
+          ...effect,
+          powerMultiplier: effect.powerMultiplier * multiplier,
+          conditionalBonusMultiplier:
+            effect.conditionalBonusMultiplier * multiplier,
+        },
+      };
     case "damage":
     case "lungeDamage":
     case "skirmishShot":

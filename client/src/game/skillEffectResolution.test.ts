@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import { MAP_ONE_ID } from "./debugMap";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
-import { resolveAndApplyCombatDamage } from "./combatResolver";
+import {
+  getHealingAmount,
+  resolveAndApplyCombatDamage,
+} from "./combatResolver";
 import {
   SHIELD_SHOCKWAVE_CHANNEL_MS,
   updateCompanionAoeChannelSystem,
@@ -14,6 +17,11 @@ import {
 } from "./skillEffectResolution";
 import { applyCompanionHealing, updateRuneSkillRuntime } from "./skillRuntime";
 import { SKILL_DEFINITIONS } from "./skills";
+import { getFirstAidHealingEffectiveness } from "./skillBehavior";
+import {
+  getSkillTarget,
+  isFollowThroughBonusTarget,
+} from "./skillTargeting";
 import { addEntity, updateEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type {
@@ -76,6 +84,194 @@ describe("skill effect resolution", () => {
       type: "projectile",
       skillId: "elemental_bolt",
     });
+  });
+
+  it("defines Follow Through as a range-one physical attack on a ten-second cooldown", () => {
+    expect(SKILL_DEFINITIONS.follow_through).toMatchObject({
+      classId: "beginner",
+      cooldownMs: 10000,
+      range: 1,
+      effect: {
+        type: "followThrough",
+        damageType: "physical",
+        powerMultiplier: 1,
+        conditionalBonusMultiplier: 0.2,
+      },
+    });
+  });
+
+  it("applies Follow Through's conditional damage only at resolution time", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const caster = createSkillCompanion("caster", "fighter", { x: 0, y: 0 });
+    const ally = createSkillCompanion("ally", "support", { x: 0, y: 1 });
+    const enemy = createSkillEnemy("enemy", { x: 1, y: 0 }, { maxHealth: 500 });
+    const baselineEnemy = {
+      ...enemy,
+      state: "attack" as const,
+      currentTargetId: caster.id,
+    };
+    const qualifyingEnemy = {
+      ...enemy,
+      state: "attack" as const,
+      currentTargetId: ally.id,
+    };
+    const baselineState = createSkillState([caster, ally, baselineEnemy]);
+    const qualifyingState = createSkillState([caster, ally, qualifyingEnemy]);
+    const baseline = resolveSkillEffect(
+      baselineState,
+      caster,
+      createSkillUse("follow_through", qualifyingEnemy),
+      1000,
+    );
+    const qualified = resolveSkillEffect(
+      qualifyingState,
+      caster,
+      createSkillUse("follow_through", qualifyingEnemy),
+      1000,
+    );
+    const baselineDamage =
+      enemy.health - (baseline.state.entities.enemy as Enemy).health;
+    const qualifiedDamage =
+      enemy.health - (qualified.state.entities.enemy as Enemy).health;
+
+    expect(baseline.shouldConsumeCooldown).toBe(true);
+    expect(qualifiedDamage).toBeGreaterThan(baselineDamage);
+    expect(qualified.state.skillVisualEvents?.at(-1)).toMatchObject({
+      type: "slash",
+      skillId: "follow_through",
+    });
+  });
+
+  it("prefers a Follow Through target attacking another living companion", () => {
+    const baseCaster = createSkillCompanion("caster", "fighter", { x: 0, y: 0 });
+    const caster = { ...baseCaster, currentTargetId: "baseline" };
+    const ally = createSkillCompanion("ally", "support", { x: 0, y: 1 });
+    const baseline = {
+      ...createSkillEnemy("baseline", { x: 1, y: 0 }),
+      state: "attack" as const,
+      currentTargetId: caster.id,
+    };
+    const qualifying = {
+      ...createSkillEnemy("qualifying", { x: 1, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: ally.id,
+    };
+    const state = createSkillState([caster, ally, baseline, qualifying]);
+
+    expect(
+      getSkillTarget(state, caster, SKILL_DEFINITIONS.follow_through)?.id,
+    ).toBe(qualifying.id);
+    expect(
+      getSkillTarget(state, caster, SKILL_DEFINITIONS.follow_through, {
+        forcedEnemyTargetId: baseline.id,
+      })?.id,
+    ).toBe(baseline.id);
+  });
+
+  it("does not qualify Follow Through against non-attacking or dead-companion targets", () => {
+    const caster = createSkillCompanion("caster", "fighter", { x: 0, y: 0 });
+    const livingAlly = createSkillCompanion("living", "support", { x: 0, y: 1 });
+    const deadAlly = {
+      ...createSkillCompanion("dead", "support", { x: 0, y: 2 }),
+      health: 0,
+      state: "dead" as const,
+    };
+    const nonAttackingEnemy = {
+      ...createSkillEnemy("idle", { x: 1, y: 0 }),
+      currentTargetId: livingAlly.id,
+    };
+    const deadTargetEnemy = {
+      ...createSkillEnemy("dead-target", { x: 1, y: 1 }),
+      state: "attack" as const,
+      currentTargetId: deadAlly.id,
+    };
+    const state = createSkillState([
+      caster,
+      livingAlly,
+      deadAlly,
+      nonAttackingEnemy,
+      deadTargetEnemy,
+    ]);
+
+    expect(isFollowThroughBonusTarget(state, caster, nonAttackingEnemy)).toBe(
+      false,
+    );
+    expect(isFollowThroughBonusTarget(state, caster, deadTargetEnemy)).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    [60, 0.1],
+    [45, 0.35],
+    [30, 0.6],
+    [20, 0.8],
+    [10, 1],
+    [5, 1],
+  ])("applies First Aid effectiveness at %s percent HP", (health, effectiveness) => {
+    const caster = createSkillCompanion("caster", "support", { x: 0, y: 0 });
+    const target = {
+      ...createSkillCompanion("target", "fighter", { x: 1, y: 0 }),
+      health,
+      maxHealth: 100,
+    };
+    const state = createSkillState([caster, target]);
+    const normalHealing = getHealingAmount(caster, 5, state);
+    const result = resolveSkillEffect(
+      state,
+      caster,
+      createSkillUse("first_aid", target),
+      1000,
+    );
+    const expectedHealing = Math.max(
+      1,
+      Math.round(normalHealing * effectiveness),
+    );
+
+    expect((result.state.entities.target as Companion).health).toBe(
+      health + expectedHealing,
+    );
+    expect(getFirstAidHealingEffectiveness(health)).toBeCloseTo(effectiveness);
+    expect(result.shouldConsumeCooldown).toBe(true);
+  });
+
+  it("rejects First Aid above 60 percent HP without consuming cooldown", () => {
+    const caster = createSkillCompanion("caster", "support", { x: 0, y: 0 });
+    const target = {
+      ...createSkillCompanion("target", "fighter", { x: 1, y: 0 }),
+      health: 61,
+      maxHealth: 100,
+    };
+    const state = createSkillState([caster, target]);
+    const result = resolveSkillEffect(
+      state,
+      caster,
+      createSkillUse("first_aid", target),
+      1000,
+    );
+
+    expect(result.state).toBe(state);
+    expect(result.shouldConsumeCooldown).toBe(false);
+  });
+
+  it("rechecks current First Aid target health when the effect resolves", () => {
+    const caster = createSkillCompanion("caster", "support", { x: 0, y: 0 });
+    const selectedTarget = {
+      ...createSkillCompanion("target", "fighter", { x: 1, y: 0 }),
+      health: 50,
+      maxHealth: 100,
+    };
+    const currentTarget = { ...selectedTarget, health: 61 };
+    const state = createSkillState([caster, currentTarget]);
+    const result = resolveSkillEffect(
+      state,
+      caster,
+      createSkillUse("first_aid", selectedTarget),
+      1000,
+    );
+
+    expect(result.state).toBe(state);
+    expect(result.shouldConsumeCooldown).toBe(false);
   });
 
   it("routes lethal skill damage through XP and drop side effects", () => {
@@ -2136,8 +2332,13 @@ describe("skill effect resolution", () => {
     );
   });
 
-  it("returns no cooldown consumption when quick step cannot dash", () => {
-    const baseSupport = createSkillCompanion("support", "support", { x: 3, y: 3 });
+  it("returns no cooldown consumption when a first-class quick-step effect cannot dash", () => {
+    const baseSupport = createSkillCompanion(
+      "support",
+      "support",
+      { x: 3, y: 3 },
+      "blade",
+    );
     const support = {
       ...baseSupport,
       skillBehavior: {
@@ -2164,7 +2365,7 @@ describe("skill effect resolution", () => {
         ),
       }),
       support,
-      createSkillUse("quick_step", enemy),
+      createSkillUse("flash_step", enemy),
       1000,
     );
 

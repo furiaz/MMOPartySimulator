@@ -35,7 +35,7 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   deep_breath: "deep_breath_skill_book",
   rally_call: "rally_call_skill_book",
   field_hands: "field_hands_skill_book",
-  quick_step: "quick_step_skill_book",
+  follow_through: "follow_through_skill_book",
   duelist_challenge: "duelist_challenge_skill_book",
   second_wind: "second_wind_skill_book",
   blade_parry: "blade_parry_skill_book",
@@ -348,6 +348,68 @@ export function getScaledSkillDefinitionForCompanion(
 ): SkillDefinition {
   const rank = getCompanionSkillRank(companion, skill.id);
   const multiplier = getSkillRankMultiplier(rank);
+
+  if (skill.id === "throw_rock" && skill.effect.type === "taunt") {
+    return {
+      ...skill,
+      effect: {
+        ...skill.effect,
+        durationMs:
+          3000 +
+          500 * Math.min(rank - 1, 4) +
+          250 * Math.max(rank - 5, 0),
+      },
+    };
+  }
+
+  if (skill.id === "guard_up" && skill.effect.type === "shieldBlock") {
+    return {
+      ...skill,
+      effect: {
+        ...skill.effect,
+        durationMs:
+          6000 +
+          1000 * Math.min(rank - 1, 4) +
+          500 * Math.max(rank - 5, 0),
+        blocks: rank >= 10 ? 3 : rank >= 5 ? 2 : 1,
+      },
+    };
+  }
+
+  if (skill.id === "deep_breath" && skill.effect.type === "selfBuff") {
+    return {
+      ...skill,
+      effect: {
+        ...skill.effect,
+        bonusDamage: getBeginnerFlatDamageBonus(rank),
+      },
+    };
+  }
+
+  if (skill.id === "rally_call" && skill.effect.type === "allyBuff") {
+    return {
+      ...skill,
+      effect: {
+        ...skill.effect,
+        bonusDamage: getBeginnerFlatDamageBonus(rank),
+      },
+    };
+  }
+
+  if (skill.effect.type === "followThrough") {
+    return {
+      ...skill,
+      effect: {
+        ...skill.effect,
+        powerMultiplier:
+          1 + 0.1 * Math.min(rank - 1, 4) + 0.05 * Math.max(rank - 5, 0),
+        conditionalBonusMultiplier:
+          0.2 +
+          0.05 * Math.min(rank - 1, 4) +
+          0.025 * Math.max(rank - 5, 0),
+      },
+    };
+  }
 
   if (multiplier === 1) {
     return skill;
@@ -810,6 +872,10 @@ export function getScaledSkillDefinitionForCompanion(
   }
 
   return skill;
+}
+
+function getBeginnerFlatDamageBonus(rank: number): number {
+  return Math.min(rank, 5) + 0.5 * Math.max(rank - 5, 0);
 }
 
 function getScaledPartyClassBuffStatPercent(

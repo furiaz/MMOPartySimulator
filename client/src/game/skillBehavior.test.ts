@@ -24,6 +24,8 @@ import {
   DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
   ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT,
   FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
+  FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
+  FIRST_AID_HP_THRESHOLD_MIN_PERCENT,
   HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
   PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
   PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
@@ -32,6 +34,7 @@ import {
   DEFAULT_SUPPORT_FOCUS,
   createDefaultCompanionSkillBehavior,
   getCompanionSkillBehavior,
+  getFirstAidHealingEffectiveness,
   updateCompanionSkillBehavior,
 } from "./skillBehavior";
 import { addEntity } from "./state";
@@ -90,25 +93,38 @@ describe("companion skill behavior", () => {
         ? belowMinimum.entities.companion.skillBehavior
             .beginnerFirstAidSelfHealHpThresholdPercent
         : null,
-    ).toBe(1);
+    ).toBe(FIRST_AID_HP_THRESHOLD_MIN_PERCENT);
     expect(
       belowMinimum.entities.companion.kind === "companion"
         ? belowMinimum.entities.companion.skillBehavior
             .beginnerFirstAidAllyHealHpThresholdPercent
         : null,
-    ).toBe(1);
+    ).toBe(FIRST_AID_HP_THRESHOLD_MIN_PERCENT);
     expect(
       aboveMaximum.entities.companion.kind === "companion"
         ? aboveMaximum.entities.companion.skillBehavior
             .beginnerFirstAidSelfHealHpThresholdPercent
         : null,
-    ).toBe(100);
+    ).toBe(FIRST_AID_HP_THRESHOLD_MAX_PERCENT);
     expect(
       aboveMaximum.entities.companion.kind === "companion"
         ? aboveMaximum.entities.companion.skillBehavior
             .beginnerFirstAidAllyHealHpThresholdPercent
         : null,
-    ).toBe(100);
+    ).toBe(FIRST_AID_HP_THRESHOLD_MAX_PERCENT);
+  });
+
+  it.each([
+    [61, 0],
+    [60, 0.1],
+    [45, 0.35],
+    [35, 31 / 60],
+    [30, 0.6],
+    [20, 0.8],
+    [10, 1],
+    [5, 1],
+  ])("calculates First Aid effectiveness at %s percent HP", (hp, expected) => {
+    expect(getFirstAidHealingEffectiveness(hp)).toBeCloseTo(expected);
   });
 
   it("clamps Second Wind threshold updates to the hard cap", () => {

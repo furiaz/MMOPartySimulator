@@ -103,15 +103,20 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
       durationMs: BEGINNER_BUFF_DURATION_MS,
     },
   },
-  quick_step: {
-    id: "quick_step",
+  follow_through: {
+    id: "follow_through",
     classId: "beginner",
-    displayName: "Quick Step",
-    tags: ["Mobility", "Dash", "Escape"],
+    displayName: "Follow Through",
+    tags: ["Offensive", "Damage", "Single Target"],
     type: "active",
-    range: 0,
+    range: 1,
     cooldownMs: BEGINNER_SKILL_COOLDOWN_MS,
-    effect: { type: "quickStep", distance: 1 },
+    effect: {
+      type: "followThrough",
+      damageType: "physical",
+      powerMultiplier: 1,
+      conditionalBonusMultiplier: 0.2,
+    },
   },
   duelist_challenge: {
     id: "duelist_challenge",
