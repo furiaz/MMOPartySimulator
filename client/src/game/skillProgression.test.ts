@@ -7,11 +7,14 @@ import {
   getActiveSkillsForCompanion,
   getCompanionSkillMaxRank,
   getCompanionSkillRank,
+  getLegacySkillCandidatesForCompanion,
+  getLearnedPassivesForCompanion,
   getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
   getSkillBookReadCandidates,
   getSkillBooksRequiredForTargetRank,
   getSkillRankMultiplier,
+  getSkillScaleUnits,
   readSkillBook,
   setCompanionLegacySkillEnabled,
 } from "./skillProgression";
@@ -1502,6 +1505,88 @@ describe("skill progression", () => {
     expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).toEqual([
       ...PENITENT_SKILL_IDS,
     ]);
+  });
+
+  it("learns Beginner passives at rank 1 without adding them to the active pool", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+    );
+
+    expect(getLearnedPassivesForCompanion(companion).map((skill) => skill.id)).toEqual([
+      "resourcefulness",
+      "steady_nerves",
+    ]);
+    expect(getCompanionSkillRank(companion, "resourcefulness")).toBe(1);
+    expect(getCompanionSkillRank(companion, "steady_nerves")).toBe(1);
+    expect(getActiveSkillsForCompanion(companion).map((skill) => skill.id)).not.toEqual(
+      expect.arrayContaining(["resourcefulness", "steady_nerves"]),
+    );
+    expect(getLegacySkillCandidatesForCompanion(companion)).toEqual([]);
+  });
+
+  it("keeps learned Beginner passives always active after a first-class change", () => {
+    const beginner = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+    );
+    const state = addEntity(
+      createTestGameState({ partyLeaderId: beginner.id }),
+      beginner,
+    );
+    const nextState = setPartyMemberClass(state, beginner.id, "blade");
+    const blade = nextState.entities[beginner.id] as Companion;
+
+    expect(getLearnedPassivesForCompanion(blade).map((skill) => skill.id)).toEqual([
+      "resourcefulness",
+      "steady_nerves",
+    ]);
+    expect(
+      getCompanionSkillMaxRank(blade, SKILL_DEFINITIONS.resourcefulness),
+    ).toBe(10);
+    expect(getActiveSkillsForCompanion(blade).map((skill) => skill.id)).toEqual(
+      BLADE_SKILL_IDS,
+    );
+  });
+
+  it("uses the shared rank curve and exact book costs for passive skills", () => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+    );
+    let state = addEntity(
+      createTestGameState({ partyLeaderId: companion.id }),
+      companion,
+    );
+    state = addItemToInventoryState(
+      state,
+      "resourcefulness_skill_book",
+      1,
+      "debug",
+    ).state;
+
+    const result = readSkillBook(
+      state,
+      companion.id,
+      "resourcefulness_skill_book",
+    );
+    const rankedCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({
+      status: "success",
+      skillId: "resourcefulness",
+      previousRank: 1,
+      newRank: 2,
+      booksConsumed: 1,
+    });
+    expect(getCompanionSkillRank(rankedCompanion, "resourcefulness")).toBe(2);
+    expect(getSkillScaleUnits(1)).toBe(1);
+    expect(getSkillScaleUnits(5)).toBe(5);
+    expect(getSkillScaleUnits(6)).toBe(5.5);
+    expect(getSkillScaleUnits(10)).toBe(7.5);
   });
 
   it("sanitizes missing fields and invalid skill ids for saves", () => {

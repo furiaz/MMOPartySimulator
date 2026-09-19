@@ -532,6 +532,8 @@ export type SkillBookItemId =
   | "rally_call_skill_book"
   | "field_hands_skill_book"
   | "follow_through_skill_book"
+  | "resourcefulness_skill_book"
+  | "steady_nerves_skill_book"
   | "duelist_challenge_skill_book"
   | "second_wind_skill_book"
   | "blade_parry_skill_book"
@@ -1062,6 +1064,8 @@ export type SkillId =
   | "rally_call"
   | "field_hands"
   | "follow_through"
+  | "resourcefulness"
+  | "steady_nerves"
   | "duelist_challenge"
   | "second_wind"
   | "blade_parry"
@@ -1190,7 +1194,7 @@ export type ActiveCombatProjectile = {
   powerMultiplier: number;
 };
 
-export type SkillDefinition = {
+export type ActiveSkillDefinition = {
   id: SkillId;
   classId: ClassId;
   displayName: string;
@@ -1484,6 +1488,22 @@ export type SkillDefinition = {
     | { type: "selfPercentHeal"; healPercent: number }
     | { type: "selfCostHeal"; powerMultiplier: number; hpCost: number };
 };
+
+export type PassiveSkillDefinition = {
+  id: SkillId;
+  classId: ClassId;
+  displayName: string;
+  tags: SkillTag[];
+  type: "passive";
+  range: 0;
+  cooldownMs?: never;
+  canLegacyCarry?: never;
+  effect:
+    | { type: "resourcefulness" }
+    | { type: "steadyNerves" };
+};
+
+export type SkillDefinition = ActiveSkillDefinition | PassiveSkillDefinition;
 
 export type SkillMarkState = {
   sourceId: string;

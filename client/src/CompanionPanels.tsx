@@ -60,7 +60,9 @@ import {
   getCompanionSkillRank,
   getCompanionSkillMaxRank,
   getLegacySkillCandidatesForCompanion,
+  getLearnedPassivesForCompanion,
   getLearnedSkillGroupsForCompanion,
+  getPassiveSkillEffectSummary,
   getScaledSkillDefinitionForCompanion,
   getRoleBonusDisplayState,
   isFlaskItemDefinition,
@@ -81,7 +83,8 @@ import {
   type PartyInventory,
   type PartyMemberRole,
   type PrimaryStatId,
-  type SkillDefinition,
+  type ActiveSkillDefinition,
+  type PassiveSkillDefinition,
   type SkillId,
   type FireBurstTargetMode,
   type CircleOfRenewalTargetMode,
@@ -443,7 +446,7 @@ function CompanionSkillSummary({
   showRoleScore = true,
 }: {
   member: Companion;
-  skills: SkillDefinition[];
+  skills: ActiveSkillDefinition[];
   title: string;
   showRoleScore?: boolean;
 }) {
@@ -514,7 +517,62 @@ function CompanionSkillSummary({
   );
 }
 
-function getSkillEffectSummary(skill: SkillDefinition): string {
+function CompanionPassiveSummary({
+  member,
+  passives,
+}: {
+  member: Companion;
+  passives: PassiveSkillDefinition[];
+}) {
+  return (
+    <div className="companion-skill-summary" aria-label="Companion passives">
+      <span className="equipment-section-label">Always-Active Passives</span>
+      {passives.length > 0 ? (
+        <div className="companion-skill-list">
+          {passives.map((skill) => {
+            const requiredBooks = getSkillBooksRequiredForNextRank(
+              member,
+              skill.id,
+            );
+
+            return (
+              <div key={skill.id} className="companion-skill-row">
+                <div>
+                  <strong>{skill.displayName}</strong>
+                  <span>{getPassiveSkillEffectSummary(member, skill)}</span>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Rank</dt>
+                    <dd>
+                      {getCompanionSkillRank(member, skill.id)}/
+                      {getCompanionSkillMaxRank(member, skill)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Books</dt>
+                    <dd>{requiredBooks === null ? "Max" : requiredBooks}</dd>
+                  </div>
+                  <div>
+                    <dt>Class</dt>
+                    <dd>{CLASS_DEFINITIONS[skill.classId].displayName}</dd>
+                  </div>
+                </dl>
+                <span className="companion-skill-tags">
+                  {skill.tags.join(", ")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <span className="party-menu-empty">No learned passives</span>
+      )}
+    </div>
+  );
+}
+
+function getSkillEffectSummary(skill: ActiveSkillDefinition): string {
   const { effect } = skill;
 
   if (effect.type === "damage") {
@@ -2550,6 +2608,7 @@ function PartySkillsSection({ member }: { member: Companion }) {
   const classDefinition = CLASS_DEFINITIONS[member.classId];
   const skills = getActiveSkillsForCompanion(member);
   const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
+  const learnedPassives = getLearnedPassivesForCompanion(member);
 
   return (
     <section className="management-section-card" aria-label="Skills">
@@ -2573,6 +2632,7 @@ function PartySkillsSection({ member }: { member: Companion }) {
           showRoleScore={false}
         />
       ))}
+      <CompanionPassiveSummary member={member} passives={learnedPassives} />
     </section>
   );
 }

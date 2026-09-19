@@ -136,6 +136,18 @@ describe("prototype item definitions", () => {
       skillBookSkillId: "follow_through",
       stackable: true,
     });
+    expect(ITEM_DEFINITIONS.resourcefulness_skill_book).toMatchObject({
+      category: "skill_book",
+      maxStack: 99,
+      skillBookSkillId: "resourcefulness",
+      stackable: true,
+    });
+    expect(ITEM_DEFINITIONS.steady_nerves_skill_book).toMatchObject({
+      category: "skill_book",
+      maxStack: 99,
+      skillBookSkillId: "steady_nerves",
+      stackable: true,
+    });
   });
 
   it("maps resource type and tier to the intended gathered item", () => {

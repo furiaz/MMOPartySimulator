@@ -11,6 +11,7 @@ import {
 } from "./inventory";
 import { getItemDefinition } from "./items";
 import { getPartyMembers } from "./partySystem";
+import { getResourcefulnessHealingBonusPercent } from "./passiveSkills";
 import { recordEquippedItemObjectivesForQuests } from "./questSystem";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import { applyCompanionHealing } from "./skillRuntime";
@@ -777,9 +778,17 @@ function completeFlaskUse(
     return removeConsumableUse(state, companion.id);
   }
 
-  const healedAmount = Math.max(
+  const normalHealingAmount = Math.max(
     0,
     Math.ceil(companion.maxHealth * (itemDefinition.healPercent ?? 0)),
+  );
+  const healedAmount = Math.max(
+    0,
+    Math.ceil(
+      normalHealingAmount *
+        (1 + getResourcefulnessHealingBonusPercent(companion) / 100) -
+        1e-9,
+    ),
   );
   const healResult = applyCompanionHealing(state, companion, healedAmount, now, {
     feedback: false,

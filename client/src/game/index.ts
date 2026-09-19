@@ -181,7 +181,9 @@ export type {
   SkillCooldownState,
   SkillCooldownsBySkillId,
   SkillDamageMitigationState,
+  ActiveSkillDefinition,
   SkillDefinition,
+  PassiveSkillDefinition,
   SkillBookItemId,
   CompanionSkillProgression,
   SkillGatherBuffState,
@@ -631,6 +633,7 @@ export {
 export {
   DEFAULT_SKILL_COOLDOWN_MS,
   SKILL_DEFINITIONS,
+  getActiveSkillsForClass,
   getSkillCooldownMs,
   getSkillsForClass,
 } from "./skills";
@@ -648,6 +651,7 @@ export {
   getCompanionSkillMaxRank,
   getCompanionSkillRank,
   getLegacySkillCandidatesForCompanion,
+  getLearnedPassivesForCompanion,
   getLearnedSkillGroupsForCompanion,
   getScaledSkillDefinitionForCompanion,
   getSkillBookReadCandidates,
@@ -656,6 +660,7 @@ export {
   getSkillBooksRequiredForTargetRank,
   getSkillRankGrowthSteps,
   getSkillRankMultiplier,
+  getSkillScaleUnits,
   isLegacySkillEnabledForCompanion,
   isLegacySkillEligibleForCompanion,
   isSkillBookItemDefinition,
@@ -668,6 +673,12 @@ export {
   type SkillBookReadCandidate,
   type LearnedSkillGroup,
 } from "./skillProgression";
+export {
+  getAdjustedHostileControlDurationMs,
+  getPassiveSkillEffectSummary,
+  getResourcefulnessHealingBonusPercent,
+  getSteadyNervesControlReductionPercent,
+} from "./passiveSkills";
 export {
   SKILL_ROLE_PREFERENCES,
   getSkillRoleScore,

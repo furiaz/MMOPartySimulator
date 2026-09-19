@@ -167,7 +167,7 @@ describe("prototype consumables", () => {
 
     expect(beforeCompanion.health).toBe(10);
     expect(beforeCompanion.consumables.flask?.charges).toBe(1);
-    expect(completedCompanion.health).toBe(60);
+    expect(completedCompanion.health).toBe(61);
     expect(completedCompanion.consumables.flask?.charges).toBe(0);
   });
 
@@ -191,8 +191,79 @@ describe("prototype consumables", () => {
     const completed = updateConsumableSystem(damaged, 3000);
     const completedCompanion = completed.entities[companion.id] as Companion;
 
-    expect(completedCompanion.health).toBe(55);
+    expect(completedCompanion.health).toBe(56);
     expect(completedCompanion.consumables.flask?.charges).toBe(0);
+  });
+
+  it.each([
+    { rank: 1, classId: "beginner" as const, expectedHealth: 61 },
+    { rank: 5, classId: "beginner" as const, expectedHealth: 65 },
+    { rank: 10, classId: "blade" as const, expectedHealth: 68 },
+  ])(
+    "applies Resourcefulness at rank $rank before missing-health capping",
+    ({ rank, classId, expectedHealth }) => {
+      const { state, companion } = createConsumableState([
+        "minor_recovery_flask",
+      ]);
+      const rankedState = updateEntity(state, {
+        ...companion,
+        classId,
+        skillProgression: {
+          ranksBySkillId: {
+            ...(companion.skillProgression?.ranksBySkillId ?? {}),
+            resourcefulness: rank,
+          },
+          legacyEnabledSkillIds: [],
+        },
+      });
+      const equipped = equipFlaskToCompanion(
+        rankedState,
+        companion.id,
+        "minor_recovery_flask",
+      ).state;
+      const charged = setEquippedFlaskCharges(equipped, companion.id, 1);
+      const completed = updateConsumableSystem(
+        startPartyConsumableUse(charged, "flask", 1000),
+        3000,
+      );
+
+      expect((completed.entities[companion.id] as Companion).health).toBe(
+        expectedHealth,
+      );
+    },
+  );
+
+  it("caps Resourcefulness flask healing at missing health", () => {
+    const { state, companion } = createConsumableState([
+      "minor_recovery_flask",
+    ]);
+    const rankedState = updateEntity(state, {
+      ...companion,
+      classId: "blade",
+      health: 98,
+      skillProgression: {
+        ranksBySkillId: {
+          ...(companion.skillProgression?.ranksBySkillId ?? {}),
+          resourcefulness: 10,
+        },
+        legacyEnabledSkillIds: [],
+      },
+    });
+    const equipped = equipFlaskToCompanion(
+      rankedState,
+      companion.id,
+      "minor_recovery_flask",
+    ).state;
+    const completed = updateConsumableSystem(
+      startPartyConsumableUse(
+        setEquippedFlaskCharges(equipped, companion.id, 1),
+        "flask",
+        1000,
+      ),
+      3000,
+    );
+
+    expect((completed.entities[companion.id] as Companion).health).toBe(100);
   });
 
   it("cancels flask use on death without spending charges", () => {

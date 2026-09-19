@@ -138,6 +138,8 @@ describe("skill role preferences", () => {
       "rally_call",
       "field_hands",
       "follow_through",
+      "resourcefulness",
+      "steady_nerves",
     ]);
     expect(getSkillsForClass("blade").map((skill) => skill.id)).toEqual([
       "duelist_challenge",

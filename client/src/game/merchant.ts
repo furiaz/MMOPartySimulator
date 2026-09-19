@@ -206,6 +206,8 @@ const BASE_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "rally_call_skill_book", priceCrowns: 25, group: "books" },
   { itemId: "field_hands_skill_book", priceCrowns: 25, group: "books" },
   { itemId: "follow_through_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "resourcefulness_skill_book", priceCrowns: 25, group: "books" },
+  { itemId: "steady_nerves_skill_book", priceCrowns: 25, group: "books" },
   { itemId: "duelist_challenge_skill_book", priceCrowns: 60, group: "books" },
   { itemId: "second_wind_skill_book", priceCrowns: 60, group: "books" },
   { itemId: "blade_parry_skill_book", priceCrowns: 60, group: "books" },

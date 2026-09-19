@@ -1,15 +1,16 @@
 {
-  "ticket": 510,
+  "ticket": 511,
   "cellSize": 32,
   "notes": [
     "Generated source sheets and cut 32x32 icons for skill book inventory items.",
     "Item ids are listed in left-to-right, top-to-bottom grid order.",
-    "Path-paired book colors: Blade/Aegis red, Hunter/Beast green, Elementalist/Runecaster blue, Lightbearer/Penitent ivory with brown edges."
+    "Path-paired book colors: Blade/Aegis red, Hunter/Beast green, Elementalist/Runecaster blue, Lightbearer/Penitent ivory with brown edges.",
+    "All current Beginner books use the shared tan/brown Beginner base with the exact matching skill icon."
   ],
   "sheets": [
     {
       "file": "sheets/skill-books-beginner-grid.png",
-      "columns": 4,
+      "columns": 5,
       "rows": 2,
       "group": "beginner",
       "items": [
@@ -20,7 +21,9 @@
         "deep_breath_skill_book",
         "rally_call_skill_book",
         "field_hands_skill_book",
-        "quick_step_skill_book"
+        "follow_through_skill_book",
+        "resourcefulness_skill_book",
+        "steady_nerves_skill_book"
       ]
     },
     {

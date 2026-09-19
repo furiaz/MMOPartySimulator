@@ -1,4 +1,8 @@
-import type { ClassId, SkillDefinition } from "./types";
+import type {
+  ActiveSkillDefinition,
+  ClassId,
+  SkillDefinition,
+} from "./types";
 
 const BEGINNER_SKILL_COOLDOWN_MS = 10000;
 const BEGINNER_BUFF_DURATION_MS = 90000;
@@ -117,6 +121,24 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
       powerMultiplier: 1,
       conditionalBonusMultiplier: 0.2,
     },
+  },
+  resourcefulness: {
+    id: "resourcefulness",
+    classId: "beginner",
+    displayName: "Resourcefulness",
+    tags: ["Heal", "Safety"],
+    type: "passive",
+    range: 0,
+    effect: { type: "resourcefulness" },
+  },
+  steady_nerves: {
+    id: "steady_nerves",
+    classId: "beginner",
+    displayName: "Steady Nerves",
+    tags: ["Defensive", "Safety", "Control"],
+    type: "passive",
+    range: 0,
+    effect: { type: "steadyNerves" },
   },
   duelist_challenge: {
     id: "duelist_challenge",
@@ -1070,6 +1092,14 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
 export function getSkillsForClass(classId: ClassId): SkillDefinition[] {
   return Object.values(SKILL_DEFINITIONS).filter(
     (skill) => skill.classId === classId,
+  );
+}
+
+export function getActiveSkillsForClass(
+  classId: ClassId,
+): ActiveSkillDefinition[] {
+  return getSkillsForClass(classId).filter(
+    (skill): skill is ActiveSkillDefinition => skill.type === "active",
   );
 }
 

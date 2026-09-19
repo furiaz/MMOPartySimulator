@@ -51,7 +51,19 @@ describe("entity visual assets", () => {
       "/first-class-skill-effects/blade/sprites/sweeping_strike.png",
     );
     expect(INVENTORY_ITEM_ICON_SRC.follow_through_skill_book).toContain(
-      "/beginner/kick_skill_book.png",
+      "/beginner/follow_through_skill_book.png",
+    );
+    expect(SKILL_VISUAL_ICON_SRC.resourcefulness).toContain(
+      "/beginner-skill-effects-50/sprites/resourcefulness.png",
+    );
+    expect(SKILL_VISUAL_ICON_SRC.steady_nerves).toContain(
+      "/beginner-skill-effects-50/sprites/steady_nerves.png",
+    );
+    expect(INVENTORY_ITEM_ICON_SRC.resourcefulness_skill_book).toContain(
+      "/beginner/resourcefulness_skill_book.png",
+    );
+    expect(INVENTORY_ITEM_ICON_SRC.steady_nerves_skill_book).toContain(
+      "/beginner/steady_nerves_skill_book.png",
     );
   });
 

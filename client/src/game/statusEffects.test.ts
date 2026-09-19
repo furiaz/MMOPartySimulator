@@ -575,6 +575,137 @@ describe("status effects", () => {
       }).statusEffectsById,
     ).toEqual({});
   });
+
+  it.each([
+    { rank: 1, classId: "beginner" as const, expectedDuration: 980 },
+    { rank: 5, classId: "beginner" as const, expectedDuration: 900 },
+    { rank: 10, classId: "blade" as const, expectedDuration: 850 },
+  ])(
+    "reduces hostile control with Steady Nerves at rank $rank",
+    ({ rank, classId, expectedDuration }) => {
+      const baseCompanion = createCompanion(
+        "companion",
+        { x: 0, y: 0 },
+        "companion",
+      );
+      const companion = {
+        ...baseCompanion,
+        classId,
+        skillProgression: {
+          ranksBySkillId: {
+            ...(baseCompanion.skillProgression?.ranksBySkillId ?? {}),
+            steady_nerves: rank,
+          },
+          legacyEnabledSkillIds: [],
+        },
+      };
+      const enemy = createEnemy("enemy", { x: 1, y: 0 });
+      const controlTypes = [
+        "immobilized",
+        "disarmed",
+        "forcedEvasion",
+        "silenced",
+        "taunted",
+      ] as const;
+
+      for (const type of controlTypes) {
+        const nextState = applyStatusEffect(
+          createState([companion, enemy]),
+          {
+            type,
+            targetId: companion.id,
+            durationMs: 1_000,
+            sourceId: enemy.id,
+          },
+          0,
+        );
+        const status = Object.values(nextState.statusEffectsById ?? {}).find(
+          (candidate) => candidate.type === type,
+        );
+
+        expect(status?.expiresAt).toBe(expectedDuration);
+      }
+    },
+  );
+
+  it("does not reduce self-applied, beneficial, incapacitating, fake-death, or damage-over-time statuses", () => {
+    const baseCompanion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+    );
+    const companion = {
+      ...baseCompanion,
+      skillProgression: {
+        ranksBySkillId: {
+          ...(baseCompanion.skillProgression?.ranksBySkillId ?? {}),
+          steady_nerves: 5,
+        },
+        legacyEnabledSkillIds: [],
+      },
+    };
+    const enemy = createEnemy("enemy", { x: 1, y: 0 });
+    let state = createState([companion, enemy]);
+
+    state = applyStatusEffect(
+      state,
+      {
+        type: "immobilized",
+        targetId: companion.id,
+        durationMs: 1_000,
+        sourceId: companion.id,
+        sourceKey: "self-control",
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "forcedEvasion",
+        targetId: companion.id,
+        durationMs: 1_000,
+        sourceId: companion.id,
+        sourceKey: "beneficial-evasion",
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "incapacitated",
+        targetId: companion.id,
+        durationMs: 1_000,
+        sourceId: enemy.id,
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "fakeDeath",
+        targetId: companion.id,
+        durationMs: 1_000,
+        sourceId: companion.id,
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "poison",
+        targetId: companion.id,
+        durationMs: 1_000,
+        tickDamage: 1,
+        sourceKey: "enemy-poison",
+        sourceId: enemy.id,
+      },
+      0,
+    );
+
+    expect(
+      Object.values(state.statusEffectsById ?? {}).map((status) => status.expiresAt),
+    ).toEqual([1_000, 1_000, 1_000, 1_000, 1_000]);
+  });
 });
 
 function createState(

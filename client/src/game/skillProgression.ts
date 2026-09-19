@@ -1,14 +1,20 @@
 import { countInventoryItem, removeItemFromInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
-import { getSkillsForClass, SKILL_DEFINITIONS } from "./skills";
+import {
+  getActiveSkillsForClass,
+  getSkillsForClass,
+  SKILL_DEFINITIONS,
+} from "./skills";
 import type { GameState } from "./state";
 import type {
   ClassId,
   Companion,
   CompanionSkillProgression,
+  ActiveSkillDefinition,
   ItemDefinition,
   ItemId,
   PartyInventory,
+  PassiveSkillDefinition,
   SkillDefinition,
   SkillId,
 } from "./types";
@@ -36,6 +42,8 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   rally_call: "rally_call_skill_book",
   field_hands: "field_hands_skill_book",
   follow_through: "follow_through_skill_book",
+  resourcefulness: "resourcefulness_skill_book",
+  steady_nerves: "steady_nerves_skill_book",
   duelist_challenge: "duelist_challenge_skill_book",
   second_wind: "second_wind_skill_book",
   blade_parry: "blade_parry_skill_book",
@@ -149,7 +157,7 @@ export type SkillBookReadCandidate = {
 
 export type LearnedSkillGroup = {
   classId: ClassId;
-  skills: SkillDefinition[];
+  skills: ActiveSkillDefinition[];
 };
 
 export function createCompanionSkillProgressionForClass(
@@ -229,19 +237,30 @@ export function getSkillRankGrowthSteps(rank: number): number {
     : 4 + (normalizedRank - 5) * 0.5;
 }
 
+export function getSkillScaleUnits(rank: number): number {
+  const normalizedRank = Math.max(1, Math.floor(rank));
+
+  return normalizedRank <= 5
+    ? normalizedRank
+    : 5 + (normalizedRank - 5) * 0.5;
+}
+
 export function getActiveSkillsForCompanion(
   companion: Companion,
-): SkillDefinition[] {
-  const activeSkillsById = new Map<SkillId, SkillDefinition>();
+): ActiveSkillDefinition[] {
+  const activeSkillsById = new Map<SkillId, ActiveSkillDefinition>();
 
-  for (const skill of getSkillsForClass(companion.classId)) {
+  for (const skill of getActiveSkillsForClass(companion.classId)) {
     activeSkillsById.set(skill.id, skill);
   }
 
   for (const skillId of companion.skillProgression?.legacyEnabledSkillIds ?? []) {
     const skill = SKILL_DEFINITIONS[skillId];
 
-    if (skill && isLegacySkillEligibleForCompanion(companion, skillId)) {
+    if (
+      skill?.type === "active" &&
+      isLegacySkillEligibleForCompanion(companion, skillId)
+    ) {
       activeSkillsById.set(skill.id, skill);
     }
   }
@@ -251,9 +270,23 @@ export function getActiveSkillsForCompanion(
 
 export function getLegacySkillCandidatesForCompanion(
   companion: Companion,
-): SkillDefinition[] {
-  return Object.values(SKILL_DEFINITIONS).filter((skill) =>
-    isLegacySkillEligibleForCompanion(companion, skill.id),
+): ActiveSkillDefinition[] {
+  return Object.values(SKILL_DEFINITIONS).filter(
+    (skill): skill is ActiveSkillDefinition =>
+      skill.type === "active" &&
+      isLegacySkillEligibleForCompanion(companion, skill.id),
+  );
+}
+
+export function getLearnedPassivesForCompanion(
+  companion: Companion,
+): PassiveSkillDefinition[] {
+  return getCompanionClassLineageIds(companion).flatMap((classId) =>
+    getSkillsForClass(classId).filter(
+      (skill): skill is PassiveSkillDefinition =>
+        skill.type === "passive" &&
+        hasCompanionLearnedSkill(companion, skill.id),
+    ),
   );
 }
 
@@ -265,8 +298,10 @@ export function getLearnedSkillGroupsForCompanion(
   return classIds
     .map((classId) => ({
       classId,
-      skills: getSkillsForClass(classId).filter(
-        (skill) => skill.classId === companion.classId || hasCompanionLearnedSkill(companion, skill.id),
+      skills: getActiveSkillsForClass(classId).filter(
+        (skill) =>
+          skill.classId === companion.classId ||
+          hasCompanionLearnedSkill(companion, skill.id),
       ),
     }))
     .filter((group) => group.skills.length > 0);
@@ -344,8 +379,20 @@ export function setCompanionLegacySkillEnabled(
 
 export function getScaledSkillDefinitionForCompanion(
   companion: Companion,
+  skill: ActiveSkillDefinition,
+): ActiveSkillDefinition;
+export function getScaledSkillDefinitionForCompanion(
+  companion: Companion,
+  skill: SkillDefinition,
+): SkillDefinition;
+export function getScaledSkillDefinitionForCompanion(
+  companion: Companion,
   skill: SkillDefinition,
 ): SkillDefinition {
+  if (skill.type === "passive") {
+    return skill;
+  }
+
   const rank = getCompanionSkillRank(companion, skill.id);
   const multiplier = getSkillRankMultiplier(rank);
 

@@ -57,6 +57,16 @@ describe("merchant buy", () => {
           group: "books",
         }),
         expect.objectContaining({
+          itemId: "resourcefulness_skill_book",
+          priceCrowns: 25,
+          group: "books",
+        }),
+        expect.objectContaining({
+          itemId: "steady_nerves_skill_book",
+          priceCrowns: 25,
+          group: "books",
+        }),
+        expect.objectContaining({
           itemId: "duelist_challenge_skill_book",
           priceCrowns: 60,
           group: "books",
@@ -450,6 +460,17 @@ describe("merchant buy", () => {
         secondaryFilter: "beginner",
       }).map((entry) => entry.itemId),
     ).toContain("first_aid_skill_book");
+    expect(
+      getFilteredMerchantBuyStock(state, MERCHANT_ID, {
+        mainFilter: "books",
+        secondaryFilter: "beginner",
+      }).map((entry) => entry.itemId),
+    ).toEqual(
+      expect.arrayContaining([
+        "resourcefulness_skill_book",
+        "steady_nerves_skill_book",
+      ]),
+    );
     expect(
       getFilteredMerchantBuyStock(state, MERCHANT_ID, {
         mainFilter: "books",

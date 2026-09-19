@@ -1,6 +1,7 @@
 import { damageEntity } from "./entities";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getEuclideanDistance } from "./positionUtils";
+import { getAdjustedHostileControlDurationMs } from "./passiveSkills";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   CombatDamageType,
@@ -90,13 +91,23 @@ export function applyStatusEffect(
 
   const statusEffectsById = { ...(state.statusEffectsById ?? {}) };
   const id = createStatusEffectId(input.targetId, input.type, input.sourceKey ?? input.sourceId);
+  const durationMs =
+    target.kind === "companion"
+      ? getAdjustedHostileControlDurationMs(
+          state,
+          target,
+          input.type,
+          input.sourceId,
+          input.durationMs,
+        )
+      : Math.max(0, input.durationMs);
   const baseStatus = {
     id,
     targetId: input.targetId,
     sourceId: input.sourceId,
     sourceKey: input.sourceKey,
     appliedAt: now,
-    expiresAt: now + Math.max(0, input.durationMs),
+    expiresAt: now + durationMs,
   };
 
   if (input.type === "nextAttackDamageBonus") {

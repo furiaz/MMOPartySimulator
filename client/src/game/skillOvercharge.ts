@@ -49,6 +49,10 @@ function scaleSkillEffect(
   skill: SkillDefinition,
   multiplier: number,
 ): SkillDefinition {
+  if (skill.type === "passive") {
+    return skill;
+  }
+
   const { effect } = skill;
 
   switch (effect.type) {
