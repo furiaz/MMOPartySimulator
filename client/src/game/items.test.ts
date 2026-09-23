@@ -150,6 +150,28 @@ describe("prototype item definitions", () => {
     });
   });
 
+  it("defines every martial passive book as a stackable first-class book", () => {
+    const passiveSkillIds = [
+      "duelists_momentum",
+      "riposte_training",
+      "rooted_bastion",
+      "unbroken_line",
+      "headhunter",
+      "exploit_the_snare",
+      "blood_scent",
+      "pack_instinct",
+    ] as const;
+
+    for (const skillId of passiveSkillIds) {
+      expect(ITEM_DEFINITIONS[`${skillId}_skill_book`]).toMatchObject({
+        category: "skill_book",
+        maxStack: 99,
+        skillBookSkillId: skillId,
+        stackable: true,
+      });
+    }
+  });
+
   it("maps resource type and tier to the intended gathered item", () => {
     expect(getItemDefinitionForResourceType("wood", 1).id).toBe("softwood");
     expect(getItemDefinitionForResourceType("ore", 1).id).toBe("copper_ore");

@@ -18,6 +18,7 @@ import type {
   SkillPartyClassBuffState,
   SkillShieldBlockState,
 } from "./types";
+import { grantRiposteTrainingCharge } from "./martialPassives";
 
 export function getPrototypeAttackDamage(
   state: GameState,
@@ -318,6 +319,7 @@ export function applyIncomingDamageMitigation(
   target: Companion,
   rawDamage: number,
   damageType: CombatDamageType,
+  now = state.simulationTimeMs ?? Date.now(),
 ): { state: GameState; mitigatedDamage: number; mitigationPercent: number } {
   const mitigation = getDamageMitigation(state, target, damageType);
   const timedMitigationPercent = getTimedMitigationPercent(
@@ -361,11 +363,16 @@ export function applyIncomingDamageMitigation(
     mitigation.mitigationPercent + timedMitigationPercent,
   );
 
-  return {
-    state: {
+  let nextState: GameState = {
       ...state,
       skillDamageMitigationsByCompanionId,
-    },
+    };
+  if (mitigation.sourceSkillId === "blade_parry") {
+    nextState = grantRiposteTrainingCharge(nextState, target, now);
+  }
+
+  return {
+    state: nextState,
     mitigatedDamage: rawDamage * (1 - totalMitigationPercent / 100),
     mitigationPercent: totalMitigationPercent,
   };

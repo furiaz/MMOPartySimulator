@@ -5,6 +5,12 @@ import {
   type SkillId,
   type StatusEffectState,
 } from "./game";
+import {
+  getHeadhunterStackCap,
+  getLearnedPassiveRank,
+} from "./game/passiveSkills";
+import { getActiveHeadhunterKillTimestamps } from "./game/martialPassives";
+import { getSkillScaleUnits } from "./game/skillProgression";
 
 const defaultVisibleBuffCount = 8;
 const expiringBuffThresholdMs = 10_000;
@@ -42,6 +48,58 @@ export function getCompanionBuffDisplayEntries({
   maxEntries?: number;
 }): CompanionBuffDisplayEntry[] {
   const drafts = new Map<SkillId, CompanionBuffDisplayDraft>();
+  const companion = gameState.entities[companionId];
+  if (companion?.kind === "companion") {
+    const momentum = gameState.duelistsMomentumByCompanionId?.[companionId];
+    const momentumRank = getLearnedPassiveRank(companion, "duelists_momentum");
+    addUntimedBuff(
+      drafts,
+      "duelists_momentum",
+      momentum && momentumRank
+        ? `${momentum.stacks}/3 stacks, physical damage +${formatNumber(momentum.stacks * getSkillScaleUnits(momentumRank))}%`
+        : "Momentum",
+      Boolean(momentum && momentumRank),
+    );
+
+    const riposte = gameState.riposteTrainingByCompanionId?.[companionId];
+    const riposteRank = getLearnedPassiveRank(companion, "riposte_training");
+    addTimedBuff(
+      drafts,
+      "riposte_training",
+      riposteRank
+        ? `Next direct physical hit +${formatNumber(5 * getSkillScaleUnits(riposteRank))}%`
+        : "Riposte ready",
+      riposte?.expiresAt,
+      currentTime,
+    );
+
+    const rooted = gameState.rootedBastionByCompanionId?.[companionId];
+    const rootedRank = getLearnedPassiveRank(companion, "rooted_bastion");
+    addUntimedBuff(
+      drafts,
+      "rooted_bastion",
+      rootedRank
+        ? `Defense +${formatNumber(3 * getSkillScaleUnits(rootedRank))}%`
+        : "Rooted",
+      Boolean(rooted?.active && rootedRank),
+    );
+
+    const headhunterRank = getLearnedPassiveRank(companion, "headhunter");
+    const killTimestamps = headhunterRank
+      ? getActiveHeadhunterKillTimestamps(gameState, companionId, currentTime)
+      : [];
+    const headhunterExpiry =
+      killTimestamps.length > 0 ? Math.min(...killTimestamps) + 30_000 : undefined;
+    addTimedBuff(
+      drafts,
+      "headhunter",
+      headhunterRank
+        ? `${killTimestamps.length}/${getHeadhunterStackCap(headhunterRank)} stacks, critical chance +${killTimestamps.length}%`
+        : "Recent-kill critical chance",
+      headhunterExpiry,
+      currentTime,
+    );
+  }
   const selfBuff = gameState.skillSelfBuffsByCompanionId?.[companionId];
 
   addTimedBuff(

@@ -62,14 +62,34 @@ export function getPassiveSkillEffectSummary(
   companion: Companion,
   skill: PassiveSkillDefinition,
 ): string {
-  if (skill.effect.type === "resourcefulness") {
-    return `Equipped flasks restore ${formatPercent(getResourcefulnessHealingBonusPercent(companion))}% more health.`;
-  }
+  const rank = getLearnedPassiveRank(companion, skill.id) ?? 1;
+  const units = getSkillScaleUnits(rank);
 
-  return `Harmful bind, immobilize, disarm, blind, silence, and taunt durations are reduced by ${formatPercent(getSteadyNervesControlReductionPercent(companion))}%.`;
+  switch (skill.effect.type) {
+    case "resourcefulness":
+      return `Equipped flasks restore ${formatPercent(2 * units)}% more health.`;
+    case "steadyNerves":
+      return `Harmful bind, immobilize, disarm, blind, silence, and taunt durations are reduced by ${formatPercent(2 * units)}%.`;
+    case "duelistsMomentum":
+      return `Direct physical hits against the same enemy build up to 3 stacks. Each existing stack grants ${formatPercent(units)}% physical damage.`;
+    case "riposteTraining":
+      return `Blade Parry mitigation primes the next direct physical hit within 10 seconds for ${formatPercent(5 * units)}% more damage.`;
+    case "rootedBastion":
+      return `After 5 seconds without moving, Defense increases by ${formatPercent(3 * units)}% until movement.`;
+    case "unbrokenLine":
+      return `Enemies taunted by this companion deal ${formatPercent(3 * units)}% less damage to other companions.`;
+    case "headhunter":
+      return `Each XP-granting party kill in the last 30 seconds grants +1% critical chance, up to ${getHeadhunterStackCap(rank)} stacks.`;
+    case "exploitTheSnare":
+      return `Direct physical damage is increased by ${formatPercent(3 * units)}% against controlled enemies.`;
+    case "bloodScent":
+      return `Physical direct and bleed damage is increased by ${formatPercent(3 * units)}% against enemies at or below 30% health.`;
+    case "packInstinct":
+      return `Direct and damage-over-time damage is increased by ${formatPercent(2 * units)}% while another living companion is within 2 spaces of the target.`;
+  }
 }
 
-function getLearnedPassiveRank(
+export function getLearnedPassiveRank(
   companion: Companion,
   skillId: PassiveSkillDefinition["id"],
 ): number | null {
@@ -78,6 +98,10 @@ function getLearnedPassiveRank(
   );
 
   return learned ? getCompanionSkillRank(companion, skillId) : null;
+}
+
+export function getHeadhunterStackCap(rank: number): number {
+  return Math.min(9, 2 + Math.min(5, rank) + Math.floor(Math.max(0, rank - 5) / 5));
 }
 
 function formatPercent(value: number): string {

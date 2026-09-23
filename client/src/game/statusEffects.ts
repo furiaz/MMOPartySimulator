@@ -2,6 +2,10 @@ import { damageEntity } from "./entities";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getEuclideanDistance } from "./positionUtils";
 import { getAdjustedHostileControlDurationMs } from "./passiveSkills";
+import {
+  getMartialPassiveDamageBonusPercent,
+  getUnbrokenLineDamageReductionPercent,
+} from "./martialPassives";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   CombatDamageType,
@@ -312,16 +316,55 @@ export function updateStatusEffects(
 
     let nextTickAt = status.nextTickAt;
     let totalDotDamage = 0;
+    let appliedDotDamage = 0;
+    let targetDied = false;
 
     while (nextTickAt <= now && nextTickAt <= status.expiresAt) {
-      totalDotDamage += status.tickDamage;
+      const currentTarget = nextState.entities[status.targetId];
+      const source = status.sourceId
+        ? nextState.entities[status.sourceId]
+        : undefined;
+      if (!isCombatEntity(currentTarget)) {
+        break;
+      }
+      const damageType = status.type === "bleed" ? "physical" : "magic";
+      const outgoingBonus = isCombatEntity(source)
+        ? getMartialPassiveDamageBonusPercent(
+            nextState,
+            source,
+            currentTarget,
+            damageType,
+            "dot",
+            nextTickAt,
+          )
+        : 0;
+      const incomingReduction = isCombatEntity(source)
+        ? getUnbrokenLineDamageReductionPercent(
+            nextState,
+            source,
+            currentTarget,
+            nextTickAt,
+          )
+        : 0;
+      totalDotDamage +=
+        status.tickDamage *
+        (1 + outgoingBonus / 100) *
+        (1 - Math.min(100, incomingReduction) / 100);
+      const nextAppliedDamage = Math.max(1, Math.round(totalDotDamage));
+      const incrementalDamage = nextAppliedDamage - appliedDotDamage;
+      if (incrementalDamage > 0) {
+        const damagedTarget = damageEntity(currentTarget, incrementalDamage);
+        nextState = updateEntity(nextState, damagedTarget);
+        appliedDotDamage = nextAppliedDamage;
+        if (damagedTarget.state === "dead" || damagedTarget.health <= 0) {
+          targetDied = true;
+          break;
+        }
+      }
       nextTickAt += status.tickIntervalMs;
     }
 
-    if (totalDotDamage > 0 && isCombatEntity(target)) {
-      const dotDamage = Math.max(1, Math.round(totalDotDamage));
-      const damagedTarget = damageEntity(target, dotDamage);
-      nextState = updateEntity(nextState, damagedTarget);
+    if (appliedDotDamage > 0 && isCombatEntity(target)) {
       nextState = addCombatFeedback(nextState, {
         type: "damage",
         entityId: target.id,
@@ -330,18 +373,18 @@ export function updateStatusEffects(
         damageType: status.type === "bleed" ? "physical" : "magic",
         dotStatusType: status.type,
         feedbackKind: "damage",
-        amount: dotDamage,
-        text: `-${dotDamage}`,
+        amount: appliedDotDamage,
+        text: `-${appliedDotDamage}`,
         now,
       });
 
-      if (damagedTarget.state === "dead" || damagedTarget.health <= 0) {
+      if (targetDied) {
         nextState = clearStatusEffectsForEntity(
           {
             ...nextState,
             statusEffectsById,
           },
-          damagedTarget.id,
+          target.id,
         );
         statusEffectsById = { ...(nextState.statusEffectsById ?? {}) };
         continue;

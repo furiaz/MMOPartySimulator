@@ -12,6 +12,7 @@ import {
   getHighestCharacterLevelEver,
   recordHighestCharacterLevelEver,
 } from "./partySystem";
+import { recordHeadhunterPartyKill } from "./martialPassives";
 
 export const MAX_CHARACTER_LEVEL = 200;
 export const BEGINNER_CLASS_UNLOCK_LEVEL = 10;
@@ -266,7 +267,9 @@ export function grantCharacterXpToParty(
     }
   }
 
-  return nextState;
+  return baseXpAmount > 0
+    ? recordHeadhunterPartyKill(nextState, now)
+    : nextState;
 }
 
 export function getDebugXpMultiplier(state: GameState): number {

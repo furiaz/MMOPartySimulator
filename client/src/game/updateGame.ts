@@ -57,6 +57,7 @@ import {
 } from "./skillSystem";
 import { updateStatusEffects } from "./statusEffects";
 import { updateRuneSkillRuntime } from "./skillRuntime";
+import { updateMartialPassiveRuntime } from "./martialPassives";
 import {
   isMapTeleportPoiActive,
   updateTeleportSystem,
@@ -100,6 +101,7 @@ export function updateGame(
   nextState = updateStatusEffects(nextState, timing.nowMs);
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
+  nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = updateRoleBonusAssignments(nextState, timing.nowMs);
   const movedEntityIds = new Set<string>();
@@ -119,6 +121,11 @@ export function updateGame(
 
   const mapIdBeforeWipeRecovery = nextState.currentMapId;
   nextState = updateWorldWipeRecovery(nextState, timing.nowMs);
+  nextState = updateMartialPassiveRuntime(
+    nextState,
+    timing.nowMs,
+    movedEntityIds,
+  );
 
   if (
     nextState.worldWipeRecovery?.status === "pending_choice" ||
@@ -143,6 +150,11 @@ export function updateGame(
   nextState = updatePartyIntentRecoverySystem(nextState);
 
   nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = updateMartialPassiveRuntime(
+    nextState,
+    timing.nowMs,
+    movedEntityIds,
+  );
 
   if (
     wasTeleportActive ||
@@ -192,10 +204,20 @@ export function updateGame(
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
   nextState = updateAzureMassFleeBehavior(nextState, timing, movedEntityIds);
+  nextState = updateMartialPassiveRuntime(
+    nextState,
+    timing.nowMs,
+    movedEntityIds,
+  );
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateCombatSkillSystem(nextState, timing.nowMs);
+  nextState = updateMartialPassiveRuntime(
+    nextState,
+    timing.nowMs,
+    movedEntityIds,
+  );
   nextState = updateAttackSystem(
     nextState,
     movedEntityIds,
@@ -221,6 +243,11 @@ export function updateGame(
   );
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
   nextState = updateEntitySeparationSystem(nextState, movedEntityIds);
+  nextState = updateMartialPassiveRuntime(
+    nextState,
+    timing.nowMs,
+    movedEntityIds,
+  );
   nextState = updateSkillShieldBlockPositions(nextState);
   nextState = idleAutonomousPartyMembersWithoutPoi(nextState);
   nextState = debugApplyCompanionInfiniteHealth(nextState);

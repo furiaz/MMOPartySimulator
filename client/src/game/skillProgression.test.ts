@@ -1540,6 +1540,8 @@ describe("skill progression", () => {
     const blade = nextState.entities[beginner.id] as Companion;
 
     expect(getLearnedPassivesForCompanion(blade).map((skill) => skill.id)).toEqual([
+      "duelists_momentum",
+      "riposte_training",
       "resourcefulness",
       "steady_nerves",
     ]);

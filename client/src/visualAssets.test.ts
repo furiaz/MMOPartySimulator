@@ -67,6 +67,43 @@ describe("entity visual assets", () => {
     );
   });
 
+  it("uses class-specific books and martial passive icons", () => {
+    const passiveClassBySkillId = {
+      duelists_momentum: "blade",
+      riposte_training: "blade",
+      rooted_bastion: "aegis",
+      unbroken_line: "aegis",
+      headhunter: "hunter",
+      exploit_the_snare: "hunter",
+      blood_scent: "beast",
+      pack_instinct: "beast",
+    } as const;
+
+    for (const [skillId, classId] of Object.entries(passiveClassBySkillId)) {
+      expect(SKILL_VISUAL_ICON_SRC[skillId as keyof typeof passiveClassBySkillId]).toContain(
+        `/first-class-skill-effects/${classId}/sprites/${skillId}.png`,
+      );
+      expect(
+        INVENTORY_ITEM_ICON_SRC[
+          `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
+        ],
+      ).toContain(`/skill-book-icons/items/${classId}/${skillId}_skill_book.png`);
+    }
+
+    expect(INVENTORY_ITEM_ICON_SRC.press_the_opening_skill_book).toContain(
+      "/skill-book-icons/items/blade/",
+    );
+    expect(INVENTORY_ITEM_ICON_SRC.shield_formation_skill_book).toContain(
+      "/skill-book-icons/items/aegis/",
+    );
+    expect(INVENTORY_ITEM_ICON_SRC.poison_coating_skill_book).toContain(
+      "/skill-book-icons/items/hunter/",
+    );
+    expect(INVENTORY_ITEM_ICON_SRC.pack_frenzy_skill_book).toContain(
+      "/skill-book-icons/items/beast/",
+    );
+  });
+
   it("uses real-size Test-Character Idle and Run art for quest guide NPCs", () => {
     const questGuide = createNpc(
       "guide",

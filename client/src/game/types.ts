@@ -534,6 +534,8 @@ export type SkillBookItemId =
   | "follow_through_skill_book"
   | "resourcefulness_skill_book"
   | "steady_nerves_skill_book"
+  | "duelists_momentum_skill_book"
+  | "riposte_training_skill_book"
   | "duelist_challenge_skill_book"
   | "second_wind_skill_book"
   | "blade_parry_skill_book"
@@ -542,6 +544,8 @@ export type SkillBookItemId =
   | "woodcutter_rhythm_skill_book"
   | "flash_step_skill_book"
   | "sweeping_strike_skill_book"
+  | "rooted_bastion_skill_book"
+  | "unbroken_line_skill_book"
   | "shield_challenge_skill_book"
   | "hold_fast_skill_book"
   | "guard_wall_skill_book"
@@ -558,6 +562,8 @@ export type SkillBookItemId =
   | "herbalist_rhythm_skill_book"
   | "skirmish_shot_skill_book"
   | "arrow_burst_skill_book"
+  | "headhunter_skill_book"
+  | "exploit_the_snare_skill_book"
   | "threatening_roar_skill_book"
   | "blood_feast_skill_book"
   | "rugged_hide_skill_book"
@@ -566,6 +572,8 @@ export type SkillBookItemId =
   | "stoneclaw_rhythm_skill_book"
   | "pounce_skill_book"
   | "maul_sweep_skill_book"
+  | "blood_scent_skill_book"
+  | "pack_instinct_skill_book"
   | "elemental_bolt_skill_book"
   | "mana_shield_skill_book"
   | "frost_armor_skill_book"
@@ -1066,6 +1074,8 @@ export type SkillId =
   | "follow_through"
   | "resourcefulness"
   | "steady_nerves"
+  | "duelists_momentum"
+  | "riposte_training"
   | "duelist_challenge"
   | "second_wind"
   | "blade_parry"
@@ -1074,6 +1084,8 @@ export type SkillId =
   | "woodcutter_rhythm"
   | "flash_step"
   | "sweeping_strike"
+  | "rooted_bastion"
+  | "unbroken_line"
   | "shield_challenge"
   | "hold_fast"
   | "guard_wall"
@@ -1090,6 +1102,8 @@ export type SkillId =
   | "herbalist_rhythm"
   | "skirmish_shot"
   | "arrow_burst"
+  | "headhunter"
+  | "exploit_the_snare"
   | "threatening_roar"
   | "blood_feast"
   | "rugged_hide"
@@ -1098,6 +1112,8 @@ export type SkillId =
   | "stoneclaw_rhythm"
   | "pounce"
   | "maul_sweep"
+  | "blood_scent"
+  | "pack_instinct"
   | "elemental_bolt"
   | "mana_shield"
   | "frost_armor"
@@ -1500,7 +1516,15 @@ export type PassiveSkillDefinition = {
   canLegacyCarry?: never;
   effect:
     | { type: "resourcefulness" }
-    | { type: "steadyNerves" };
+    | { type: "steadyNerves" }
+    | { type: "duelistsMomentum" }
+    | { type: "riposteTraining" }
+    | { type: "rootedBastion" }
+    | { type: "unbrokenLine" }
+    | { type: "headhunter" }
+    | { type: "exploitTheSnare" }
+    | { type: "bloodScent" }
+    | { type: "packInstinct" };
 };
 
 export type SkillDefinition = ActiveSkillDefinition | PassiveSkillDefinition;
@@ -1518,6 +1542,30 @@ export type SkillSelfBuffState = {
   bonusDamage: number;
   expiresAt: number;
   movementSpeedBonusPercent?: number;
+};
+
+export type DuelistsMomentumState = {
+  companionId: string;
+  targetId: string;
+  stacks: number;
+};
+
+export type RiposteTrainingState = {
+  companionId: string;
+  expiresAt: number;
+};
+
+export type RootedBastionState = {
+  companionId: string;
+  mapId?: DebugMapId;
+  position: Position;
+  stationarySince: number;
+  active: boolean;
+};
+
+export type HeadhunterState = {
+  companionId: string;
+  killTimestamps: number[];
 };
 
 export type SkillGatherBuffState = {

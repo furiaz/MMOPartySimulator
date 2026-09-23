@@ -150,6 +150,8 @@ describe("skill role preferences", () => {
       "woodcutter_rhythm",
       "flash_step",
       "sweeping_strike",
+      "duelists_momentum",
+      "riposte_training",
     ]);
     expect(getSkillsForClass("aegis").map((skill) => skill.id)).toEqual([
       "shield_challenge",
@@ -160,6 +162,8 @@ describe("skill role preferences", () => {
       "stonebreaker_rhythm",
       "shield_rush",
       "shield_shockwave",
+      "rooted_bastion",
+      "unbroken_line",
     ]);
     expect(getSkillsForClass("hunter").map((skill) => skill.id)).toEqual([
       "pinning_shot",
@@ -170,6 +174,8 @@ describe("skill role preferences", () => {
       "herbalist_rhythm",
       "skirmish_shot",
       "arrow_burst",
+      "headhunter",
+      "exploit_the_snare",
     ]);
     expect(getSkillsForClass("beast").map((skill) => skill.id)).toEqual([
       "threatening_roar",
@@ -180,6 +186,8 @@ describe("skill role preferences", () => {
       "stoneclaw_rhythm",
       "pounce",
       "maul_sweep",
+      "blood_scent",
+      "pack_instinct",
     ]);
     expect(getSkillsForClass("elementalist").map((skill) => skill.id)).toEqual([
       "elemental_bolt",

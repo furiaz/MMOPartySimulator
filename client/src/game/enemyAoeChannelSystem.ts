@@ -3,6 +3,7 @@ import { damageEntity } from "./entities";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyMembers } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
+import { getUnbrokenLineDamageReductionPercent } from "./martialPassives";
 import { blockIncomingAttackIfShielded, isEnemyBound } from "./skillRuntime";
 import { isFakeDeathActive } from "./statusEffects";
 import { getCompanionDerivedStats } from "./stats";
@@ -253,7 +254,17 @@ function applyFlatAoeDamage(
     });
   }
 
-  const damagedTarget = damageEntity(target, AOE_DUMMY_STOMP_DAMAGE);
+  const reductionPercent = getUnbrokenLineDamageReductionPercent(
+    nextState,
+    caster,
+    target,
+    now,
+  );
+  const damage = Math.max(
+    1,
+    Math.round(AOE_DUMMY_STOMP_DAMAGE * (1 - reductionPercent / 100)),
+  );
+  const damagedTarget = damageEntity(target, damage);
   nextState = updateEntity(nextState, damagedTarget);
 
   return addCombatFeedback(nextState, {
@@ -263,8 +274,8 @@ function applyFlatAoeDamage(
     targetEntityId: target.id,
     damageType: "physical",
     feedbackKind: "damage",
-    amount: AOE_DUMMY_STOMP_DAMAGE,
-    text: `-${AOE_DUMMY_STOMP_DAMAGE} HP`,
+    amount: damage,
+    text: `-${damage} HP`,
     now,
   });
 }

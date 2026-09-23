@@ -22,6 +22,14 @@ import {
   consumeNextAttackDamageBonus,
   getStatusDefenseBonusPercent,
 } from "./statusEffects";
+import {
+  getHeadhunterCriticalChanceBonus,
+  getMartialPassiveDamageBonusPercent,
+  getRootedBastionDefenseBonusPercent,
+  getUnbrokenLineDamageReductionPercent,
+  prepareDuelistsMomentumForDirectAttack,
+  recordSuccessfulDirectPhysicalHit,
+} from "./martialPassives";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   CombatDamageType,
@@ -93,30 +101,48 @@ export function resolveAndApplyCombatDamage(
   const targetEvasion = targetStats.evasion;
   const targetBlock = targetStats.block;
 
-  let nextState = state;
+  let nextState = prepareDuelistsMomentumForDirectAttack(
+    state,
+    attacker,
+    target,
+    options.damageType,
+  );
   const attackBonusResult = consumeNextAttackDamageBonus(
     nextState,
     attacker.id,
     options.damageType,
   );
   nextState = attackBonusResult.state;
+  const outgoingDamageBonusPercent =
+    getPartyClassDamageBonusPercent(nextState, attacker, options.damageType) +
+    getMartialPassiveDamageBonusPercent(
+      nextState,
+      attacker,
+      target,
+      options.damageType,
+      "direct",
+      options.now,
+    );
+  const incomingDamageReductionPercent =
+    getUnbrokenLineDamageReductionPercent(
+      nextState,
+      attacker,
+      target,
+      options.now,
+    );
   const rawDamage =
     (basePower * options.powerMultiplier + bonusDamage) *
     (1 + attackBonusResult.damageMultiplierBonus) *
-    (1 +
-      getPartyClassDamageBonusPercent(nextState, attacker, options.damageType) /
-        100);
+    (1 + outgoingDamageBonusPercent / 100) *
+    (1 - Math.min(100, incomingDamageReductionPercent) / 100);
   const targetDefense =
     options.damageType === "physical"
       ? baseTargetDefense *
         (1 +
           (getStatusDefenseBonusPercent(nextState, target.id) +
             (target.kind === "companion"
-              ? getFrostArmorDefenseBonusPercent(
-                  nextState,
-                  target,
-                  options.damageType,
-                )
+              ? getFrostArmorDefenseBonusPercent(nextState, target, options.damageType) +
+                getRootedBastionDefenseBonusPercent(nextState, target)
               : 0)) /
             100)
       : baseTargetDefense;
@@ -141,7 +167,11 @@ export function resolveAndApplyCombatDamage(
     options.damageType === "physical" && options.allowPassiveBlock
       ? getBlockChance(targetBlock)
       : 0;
-  const criticalChance = attackerStats?.criticalChance ?? 0;
+  const criticalChance =
+    (attackerStats?.criticalChance ?? 0) +
+    (attacker.kind === "companion"
+      ? getHeadhunterCriticalChanceBonus(nextState, attacker, options.now)
+      : 0);
   let finalDamage = 0;
   let defenseReduction = 0;
 
@@ -197,6 +227,7 @@ export function resolveAndApplyCombatDamage(
         target,
         mitigatedDamage,
         options.damageType,
+        options.now,
       );
       nextState = mitigationResult.state;
       mitigatedDamage = mitigationResult.mitigatedDamage;
@@ -241,6 +272,13 @@ export function resolveAndApplyCombatDamage(
         finalDamage,
         options.now,
       );
+      if (options.damageType === "physical") {
+        nextState = recordSuccessfulDirectPhysicalHit(
+          nextState,
+          attacker,
+          damagedTarget,
+        );
+      }
       if (damagedTarget.state === "dead" || damagedTarget.health <= 0) {
         nextState = clearStatusEffectsForEntity(nextState, damagedTarget.id);
       }

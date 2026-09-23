@@ -40,8 +40,10 @@ import type {
   PartyMemberRole,
   Position,
   DropVisualEvent,
+  DuelistsMomentumState,
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
+  HeadhunterState,
   SkillAbsorbShieldState,
   SkillBindState,
   SkillCooldownsBySkillId,
@@ -61,6 +63,8 @@ import type {
   SkillRunicFocusState,
   ResurrectionProgressState,
   ResurrectionRecoveryAssignmentState,
+  RiposteTrainingState,
+  RootedBastionState,
   SkillSelfBuffState,
   SkillShieldBlockState,
   SkillVisualEvent,
@@ -232,6 +236,10 @@ export type GameState = {
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles?: ActiveCombatProjectile[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
+  duelistsMomentumByCompanionId?: Record<string, DuelistsMomentumState>;
+  riposteTrainingByCompanionId?: Record<string, RiposteTrainingState>;
+  rootedBastionByCompanionId?: Record<string, RootedBastionState>;
+  headhunterByCompanionId?: Record<string, HeadhunterState>;
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
   skillPartyBuffsBySourceId?: Record<string, SkillPartyBuffState>;
   skillPartyPoisonCoatingsBySourceId?: Record<string, SkillPartyPoisonCoatingState>;

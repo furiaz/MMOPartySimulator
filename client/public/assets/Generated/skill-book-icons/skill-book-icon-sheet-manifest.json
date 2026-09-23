@@ -1,10 +1,11 @@
 {
-  "ticket": 511,
+  "ticket": 512,
   "cellSize": 32,
   "notes": [
     "Generated source sheets and cut 32x32 icons for skill book inventory items.",
     "Item ids are listed in left-to-right, top-to-bottom grid order.",
-    "Path-paired book colors: Blade/Aegis red, Hunter/Beast green, Elementalist/Runecaster blue, Lightbearer/Penitent ivory with brown edges.",
+    "Ticket 0512 gives Blade, Aegis, Hunter, and Beast class-color treatments on the same open-folio silhouette, proportions, and icon composition used by Beginner books.",
+    "Other first-class book groups retain their existing shared colors until their implementation tickets.",
     "All current Beginner books use the shared tan/brown Beginner base with the exact matching skill icon."
   ],
   "sheets": [
@@ -27,10 +28,10 @@
       ]
     },
     {
-      "file": "sheets/skill-books-blade-aegis-grid.png",
-      "columns": 4,
-      "rows": 4,
-      "group": "blade-aegis",
+      "file": "sheets/skill-books-blade-grid.png",
+      "columns": 5,
+      "rows": 2,
+      "group": "blade",
       "items": [
         "duelist_challenge_skill_book",
         "second_wind_skill_book",
@@ -40,6 +41,16 @@
         "woodcutter_rhythm_skill_book",
         "flash_step_skill_book",
         "sweeping_strike_skill_book",
+        "duelists_momentum_skill_book",
+        "riposte_training_skill_book"
+      ]
+    },
+    {
+      "file": "sheets/skill-books-aegis-grid.png",
+      "columns": 5,
+      "rows": 2,
+      "group": "aegis",
+      "items": [
         "shield_challenge_skill_book",
         "hold_fast_skill_book",
         "guard_wall_skill_book",
@@ -47,14 +58,16 @@
         "shield_formation_skill_book",
         "stonebreaker_rhythm_skill_book",
         "shield_rush_skill_book",
-        "shield_shockwave_skill_book"
+        "shield_shockwave_skill_book",
+        "rooted_bastion_skill_book",
+        "unbroken_line_skill_book"
       ]
     },
     {
-      "file": "sheets/skill-books-hunter-beast-grid.png",
-      "columns": 4,
-      "rows": 4,
-      "group": "hunter-beast",
+      "file": "sheets/skill-books-hunter-grid.png",
+      "columns": 5,
+      "rows": 2,
+      "group": "hunter",
       "items": [
         "pinning_shot_skill_book",
         "fake_death_skill_book",
@@ -64,6 +77,16 @@
         "herbalist_rhythm_skill_book",
         "skirmish_shot_skill_book",
         "arrow_burst_skill_book",
+        "headhunter_skill_book",
+        "exploit_the_snare_skill_book"
+      ]
+    },
+    {
+      "file": "sheets/skill-books-beast-grid.png",
+      "columns": 5,
+      "rows": 2,
+      "group": "beast",
+      "items": [
         "threatening_roar_skill_book",
         "blood_feast_skill_book",
         "rugged_hide_skill_book",
@@ -71,7 +94,9 @@
         "pack_frenzy_skill_book",
         "stoneclaw_rhythm_skill_book",
         "pounce_skill_book",
-        "maul_sweep_skill_book"
+        "maul_sweep_skill_book",
+        "blood_scent_skill_book",
+        "pack_instinct_skill_book"
       ]
     },
     {
