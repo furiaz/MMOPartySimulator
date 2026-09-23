@@ -1,19 +1,61 @@
 import type { GameState } from "./state";
 import type { Companion, PrimaryStatId, SkillDefinition } from "./types";
 
-export function applyOverchargeToSkillDefinition(
+export type OverchargeRankValues = {
+  skillPowerBonusPercent: number;
+  cooldownPenaltyPercent: number;
+};
+
+export type SkillPowerBonusOptions = {
+  now?: number;
+  additionalBonusPercent?: number;
+};
+
+export function getOverchargeRankValues(
+  rank: number,
+  cooldownPenaltyReductionPoints = 0,
+): OverchargeRankValues {
+  const normalizedRank = Math.max(1, Math.floor(rank));
+  const earlyRankSteps = Math.min(normalizedRank - 1, 4);
+  const laterRankSteps = Math.max(normalizedRank - 5, 0);
+  const cooldownPenaltyPercent =
+    20 + earlyRankSteps * 2 + laterRankSteps;
+
+  return {
+    skillPowerBonusPercent:
+      10 + earlyRankSteps * 2.5 + laterRankSteps * 1.25,
+    cooldownPenaltyPercent: Math.max(
+      0,
+      cooldownPenaltyPercent - Math.max(0, cooldownPenaltyReductionPoints),
+    ),
+  };
+}
+
+export function applySkillPowerBonusesToSkillDefinition(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
-  now = Date.now(),
+  options: SkillPowerBonusOptions = {},
 ): SkillDefinition {
-  const overcharge = getActiveOvercharge(state, caster, skill, now);
-
-  if (!overcharge) {
+  if (skill.type === "passive" || skill.id === "overcharge") {
     return skill;
   }
 
-  return scaleSkillEffect(skill, 1 + overcharge.skillPowerBonusPercent / 100);
+  const overcharge = getActiveOvercharge(
+    state,
+    caster,
+    skill,
+    options.now ?? Date.now(),
+  );
+  const totalBonusPercent =
+    (overcharge?.skillPowerBonusPercent ?? 0) +
+    Math.max(0, options.additionalBonusPercent ?? 0);
+
+  if (totalBonusPercent === 0) {
+    return skill;
+  }
+
+  return scaleSkillEffect(skill, 1 + totalBonusPercent / 100);
 }
 
 export function getOverchargedSkillCooldownMs(

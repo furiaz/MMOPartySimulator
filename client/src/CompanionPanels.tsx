@@ -682,7 +682,7 @@ function getSkillEffectSummary(skill: ActiveSkillDefinition): string {
   }
 
   if (effect.type === "overcharge") {
-    return `Self skills are ${Math.round(effect.skillPowerBonusPercent)}% stronger with ${Math.round(effect.cooldownPenaltyPercent)}% longer cooldowns.`;
+    return `Self skills are ${formatPercent(effect.skillPowerBonusPercent)}% stronger with ${formatPercent(effect.cooldownPenaltyPercent)}% longer cooldowns.`;
   }
 
   if (effect.type === "gatherBuff") {

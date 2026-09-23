@@ -639,12 +639,23 @@ describe("skill effect resolution", () => {
   });
 
   it("applies Overcharge and Arcane Conduit runtime buffs", () => {
-    const elementalist = createSkillCompanion(
+    const elementalistBase = createSkillCompanion(
       "elementalist",
       "fighter",
       { x: 0, y: 0 },
       "elementalist",
     );
+    const elementalist: Companion = {
+      ...elementalistBase,
+      skillProgression: {
+        ranksBySkillId: {
+          ...(elementalistBase.skillProgression?.ranksBySkillId ?? {}),
+          overcharge: 5,
+        },
+        legacyEnabledSkillIds:
+          elementalistBase.skillProgression?.legacyEnabledSkillIds ?? [],
+      },
+    };
     const ally = createSkillCompanion("ally", "fighter", { x: 1, y: 0 }, "blade");
     const enemy = createSkillEnemy("enemy", { x: 1, y: 1 });
     const overchargeState = resolveSkillEffect(
@@ -658,8 +669,8 @@ describe("skill effect resolution", () => {
       overchargeState.skillOverchargesByCompanionId?.elementalist,
     ).toMatchObject({
       companionId: elementalist.id,
-      skillPowerBonusPercent: 10,
-      cooldownPenaltyPercent: 20,
+      skillPowerBonusPercent: 20,
+      cooldownPenaltyPercent: 28,
       expiresAt: 121000,
     });
 
@@ -677,8 +688,8 @@ describe("skill effect resolution", () => {
       conduitState.skillPartyClassBuffsByCompanionId?.ally?.elementalist,
     ).toMatchObject({
       sourceClassId: "elementalist",
-      magicDamageBonusPercent: 5.5,
-      primaryStatBonusPercentByStat: { intelligence: 5.5 },
+      magicDamageBonusPercent: 6,
+      primaryStatBonusPercentByStat: { intelligence: 6 },
     });
 
     const conduitVisualEvents =
@@ -694,6 +705,97 @@ describe("skill effect resolution", () => {
       "elementalist",
       "ally",
     ]);
+  });
+
+  it("refreshes Overcharge only in its refresh window and snapshots the new rank", () => {
+    const elementalist = createSkillCompanion(
+      "elementalist",
+      "fighter",
+      { x: 0, y: 0 },
+      "elementalist",
+    );
+    const initialResult = resolveSkillEffect(
+      createSkillState([elementalist]),
+      elementalist,
+      createSkillUse("overcharge", elementalist),
+      1_000,
+    );
+    const earlyRefresh = resolveSkillEffect(
+      initialResult.state,
+      initialResult.state.entities.elementalist as Companion,
+      createSkillUse("overcharge", elementalist),
+      10_000,
+    );
+
+    expect(earlyRefresh.shouldConsumeCooldown).toBe(false);
+    expect(
+      earlyRefresh.state.skillOverchargesByCompanionId?.elementalist,
+    ).toMatchObject({
+      skillPowerBonusPercent: 10,
+      cooldownPenaltyPercent: 20,
+      expiresAt: 121_000,
+    });
+
+    const currentElementalist = earlyRefresh.state.entities
+      .elementalist as Companion;
+    const rankedElementalist: Companion = {
+      ...currentElementalist,
+      skillProgression: {
+        ranksBySkillId: {
+          ...(currentElementalist.skillProgression?.ranksBySkillId ?? {}),
+          overcharge: 5,
+        },
+        legacyEnabledSkillIds:
+          currentElementalist.skillProgression?.legacyEnabledSkillIds ?? [],
+      },
+    };
+    const rankedState: GameState = {
+      ...earlyRefresh.state,
+      entities: {
+        ...earlyRefresh.state.entities,
+        [rankedElementalist.id]: rankedElementalist,
+      },
+    };
+    const refreshed = resolveSkillEffect(
+      rankedState,
+      rankedElementalist,
+      createSkillUse("overcharge", rankedElementalist),
+      119_000,
+    );
+
+    expect(refreshed.shouldConsumeCooldown).toBe(true);
+    expect(
+      refreshed.state.skillOverchargesByCompanionId?.elementalist,
+    ).toMatchObject({
+      skillPowerBonusPercent: 20,
+      cooldownPenaltyPercent: 28,
+      expiresAt: 239_000,
+    });
+  });
+
+  it("does not apply Overcharge while its behavior toggle is disabled", () => {
+    const elementalistBase = createSkillCompanion(
+      "elementalist",
+      "fighter",
+      { x: 0, y: 0 },
+      "elementalist",
+    );
+    const elementalist: Companion = {
+      ...elementalistBase,
+      skillBehavior: {
+        ...elementalistBase.skillBehavior,
+        overchargeEnabled: false,
+      },
+    };
+    const result = resolveSkillEffect(
+      createSkillState([elementalist]),
+      elementalist,
+      createSkillUse("overcharge", elementalist),
+      1_000,
+    );
+
+    expect(result.shouldConsumeCooldown).toBe(false);
+    expect(result.state.skillOverchargesByCompanionId).toBeUndefined();
   });
 
   it("moves with Flame Step and applies burning", () => {

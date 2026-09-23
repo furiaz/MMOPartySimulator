@@ -32,7 +32,7 @@ import {
   getCompanionSkillBehavior,
   getFirstAidHealingEffectiveness,
 } from "./skillBehavior";
-import { applyOverchargeToSkillDefinition } from "./skillOvercharge";
+import { applySkillPowerBonusesToSkillDefinition } from "./skillOvercharge";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import {
   findEnemyTarget,
@@ -110,11 +110,11 @@ function resolveSkillEffectOnce(
   now: number,
 ): SkillEffectResolutionResult {
   const { target } = skillUse;
-  const skill = applyOverchargeToSkillDefinition(
+  const skill = applySkillPowerBonusesToSkillDefinition(
     state,
     caster,
     getScaledSkillDefinitionForCompanion(caster, skillUse.skill),
-    now,
+    { now },
   );
 
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {

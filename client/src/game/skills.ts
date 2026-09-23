@@ -3,6 +3,7 @@ import type {
   ClassId,
   SkillDefinition,
 } from "./types";
+import { getOverchargeRankValues } from "./skillOvercharge";
 
 const BEGINNER_SKILL_COOLDOWN_MS = 10000;
 const BEGINNER_BUFF_DURATION_MS = 90000;
@@ -718,8 +719,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     effect: {
       type: "overcharge",
       durationMs: OVERCHARGE_BUFF_DURATION_MS,
-      skillPowerBonusPercent: 10,
-      cooldownPenaltyPercent: 20,
+      ...getOverchargeRankValues(1),
       refreshWindowMs: FIRST_CLASS_BUFF_REFRESH_WINDOW_MS,
     },
   },

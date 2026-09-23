@@ -99,6 +99,31 @@ describe("companion buff presentation", () => {
     ]);
   });
 
+  it("shows precise trimmed Overcharge values", () => {
+    const state = createTestGameState({
+      skillOverchargesByCompanionId: {
+        [companionId]: {
+          companionId,
+          sourceSkillId: "overcharge",
+          skillPowerBonusPercent: 26.25,
+          cooldownPenaltyPercent: 33,
+          expiresAt: now + 30_000,
+        },
+      },
+    });
+
+    const entries = getCompanionBuffDisplayEntries({
+      companionId,
+      currentTime: now,
+      gameState: state,
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].effectLines).toEqual([
+      "Skill power +26.25%, cooldowns +33%: 30s",
+    ]);
+  });
+
   it("caps visible buffs at eight with lowest remaining timed buffs first", () => {
     const skillIds: SkillId[] = [
       "deep_breath",

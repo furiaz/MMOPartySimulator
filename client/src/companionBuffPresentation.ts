@@ -465,9 +465,9 @@ function formatOverchargeLine(buff: {
   skillPowerBonusPercent: number;
   cooldownPenaltyPercent: number;
 }): string {
-  return `Skill power ${formatPercent(
+  return `Skill power ${formatPrecisePercent(
     buff.skillPowerBonusPercent,
-  )}, cooldowns +${formatNumber(buff.cooldownPenaltyPercent)}%`;
+  )}, cooldowns ${formatPrecisePercent(buff.cooldownPenaltyPercent)}`;
 }
 
 function formatAbsorbShieldLine(
@@ -640,6 +640,11 @@ function formatSignedNumber(value: number): string {
 
 function formatPercent(value: number): string {
   return `${formatSignedNumber(value)}%`;
+}
+
+function formatPrecisePercent(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${Number(value.toFixed(2))}%`;
 }
 
 function formatNumber(value: number): string {

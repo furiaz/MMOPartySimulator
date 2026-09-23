@@ -5,6 +5,7 @@ import {
   getSkillsForClass,
   SKILL_DEFINITIONS,
 } from "./skills";
+import { getOverchargeRankValues } from "./skillOvercharge";
 import type { GameState } from "./state";
 import type {
   ClassId,
@@ -466,6 +467,16 @@ export function getScaledSkillDefinitionForCompanion(
     };
   }
 
+  if (skill.effect.type === "overcharge") {
+    return {
+      ...skill,
+      effect: {
+        ...skill.effect,
+        ...getOverchargeRankValues(rank),
+      },
+    };
+  }
+
   if (multiplier === 1) {
     return skill;
   }
@@ -626,18 +637,6 @@ export function getScaledSkillDefinitionForCompanion(
         healPercentRecordedDamage:
           effect.healPercentRecordedDamage +
           (Math.max(1, Math.floor(rank)) - 1) * 3.75,
-      },
-    };
-  }
-
-  if (effect.type === "overcharge") {
-    return {
-      ...skill,
-      effect: {
-        ...effect,
-        skillPowerBonusPercent:
-          effect.skillPowerBonusPercent +
-          (Math.max(1, Math.floor(rank)) - 1) * 2.5,
       },
     };
   }

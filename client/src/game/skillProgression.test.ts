@@ -111,6 +111,36 @@ const PENITENT_SKILL_IDS: SkillId[] = [
 ];
 
 describe("skill progression", () => {
+  it("uses bespoke Overcharge values for reachable companion ranks", () => {
+    const rankOneCompanion = withSkillRanks(
+      createCompanion("rank-one", { x: 0, y: 0 }, "rank-one"),
+      { overcharge: 1 },
+    );
+    const rankFiveCompanion = withSkillRanks(
+      createCompanion("rank-five", { x: 0, y: 0 }, "rank-five"),
+      { overcharge: 5 },
+    );
+
+    expect(
+      getScaledSkillDefinitionForCompanion(
+        rankOneCompanion,
+        SKILL_DEFINITIONS.overcharge,
+      ).effect,
+    ).toMatchObject({
+      skillPowerBonusPercent: 10,
+      cooldownPenaltyPercent: 20,
+    });
+    expect(
+      getScaledSkillDefinitionForCompanion(
+        rankFiveCompanion,
+        SKILL_DEFINITIONS.overcharge,
+      ).effect,
+    ).toMatchObject({
+      skillPowerBonusPercent: 20,
+      cooldownPenaltyPercent: 28,
+    });
+  });
+
   it.each([
     {
       rank: 1,
@@ -772,7 +802,7 @@ describe("skill progression", () => {
     expect(overcharge.effect.type).toBe("overcharge");
     if (overcharge.effect.type === "overcharge") {
       expect(overcharge.effect.skillPowerBonusPercent).toBeCloseTo(20);
-      expect(overcharge.effect.cooldownPenaltyPercent).toBe(20);
+      expect(overcharge.effect.cooldownPenaltyPercent).toBe(28);
     }
     expect(arcaneConduit.effect.type).toBe("partyClassBuff");
     if (arcaneConduit.effect.type === "partyClassBuff") {
