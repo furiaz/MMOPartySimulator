@@ -1273,6 +1273,13 @@ Current skill book inventory interactions may include:
 
 Skill book reading must call game-logic skill progression helpers and must not duplicate skill lineage, rank cap, inventory removal, or eligibility rules inside React UI.
 
+Current skill-book visual standard:
+
+- each class uses one clean, icon-free book-cover design shared by every active and passive skill book for that class
+- each individual book places the exact icon used by its mapped skill on that class-standard cover; books do not use alternate one-off skill emblems
+- current cover identities are Beginner parchment, Blade crimson, Aegis steel blue, Hunter forest green, Beast deep evergreen, Elementalist teal, Runecaster violet, Lightbearer pearl-silver, and Penitent graphite
+- the common silhouette and gold trim remain consistent while the distinct cover colors identify class ownership
+
 ### Quests Menu
 
 The Quests menu displays the current prototype quest log.
@@ -2184,7 +2191,7 @@ rank 6+  = rank-5 value + 1 percentage point per rank
 | 10 | 26.25% | 33% |
 | 15 | 32.5% | 38% |
 
-Overcharge duration, refresh window, enable preference, and base cooldown remain unchanged. Stable Overcharge subtracts its reduction from the cooldown penalty, never below zero. Overcharge and Arcane Crescendo damage bonuses combine additively.
+Overcharge duration, refresh window, enable preference, and base cooldown remain unchanged. Stable Overcharge subtracts its reduction from the cooldown penalty, never below zero. A successful Overcharge cast or refresh snapshots the current rank-scaled power and reduced cooldown penalty for that application; later rank changes apply on the next cast or refresh. Overcharge and Arcane Crescendo damage bonuses combine additively.
 
 ---
 
@@ -2192,10 +2199,12 @@ Overcharge duration, refresh window, enable preference, and base cooldown remain
 
 Every current class has two passive skills. They unlock at rank 1 with the class, use matching skill books and normal class-dependent rank caps, and remain active after later class changes. General percentage passives use `U(rank)` unless a bespoke formula is stated.
 
+Passive counters, charges, prior-target or prior-rune memories, and barriers are temporary skill runtime. Map transitions, world-wipe recovery, and save restoration clear them through the normal skill-runtime cleanup rules.
+
 Beginner passives:
 
 - **Resourcefulness:** equipped flasks restore `2% × U(rank)` more health. This is 10 percent at rank 5 and 15 percent at rank 10.
-- **Steady Nerves:** harmful control durations applied to the companion are reduced by `2% × U(rank)`. It applies to immobilize, bind, disarm, blind or forced evasion, silence, and taunt, but not damage-over-time effects. This is 10 percent at rank 5 and 15 percent at rank 10.
+- **Steady Nerves:** harmful control durations applied by enemies to the companion are reduced by `2% × U(rank)`. It applies to immobilize or bind, disarm, blind or forced evasion, silence, and taunt, but not allied or self-inflicted control and not damage-over-time effects. This is 10 percent at rank 5 and 15 percent at rank 10.
 
 Blade passives:
 
@@ -2214,13 +2223,13 @@ Hunter passives:
 
 Beast passives:
 
-- **Blood Scent:** deal `3% × U(rank)` additional physical damage to enemies at or below 30 percent health.
-- **Pack Instinct:** deal `2% × U(rank)` additional damage when another living companion is within two spaces of the target.
+- **Blood Scent:** deal `3% × U(rank)` additional physical damage to enemies at or below 30 percent health, including qualifying physical damage-over-time ticks. Recheck the health threshold for each resolved tick.
+- **Pack Instinct:** deal `2% × U(rank)` additional direct and damage-over-time damage when another living companion is within two spaces of the target. Recheck party proximity for each resolved tick.
 
 Elementalist passives:
 
 - **Stable Overcharge:** subtract `1 percentage point × U(rank)` from Overcharge's cooldown penalty, never below zero. This is 5 points at rank 5 and 10 points at rank 15.
-- **Arcane Crescendo:** each successful skill explicitly classified as an offensive spell builds one charge. Buffs, shields, heals, gathering skills, failed casts, and duplicated resolutions do not count. After reaching the threshold, the next successful offensive area-of-effect spell gains `4% × rank` damage and consumes the charge. The threshold-building spell cannot also trigger the bonus, the unused charge persists until consumed, and the triggering area spell begins the next cycle at zero.
+- **Arcane Crescendo:** each successful skill explicitly classified as an offensive spell builds one charge. Buffs, shields, heals, gathering skills, failed casts, and duplicated resolutions do not count. After reaching the threshold, the next successful offensive area-of-effect spell gains `4% × rank` damage and consumes the charge. The threshold-building spell cannot also trigger the bonus, the unused charge persists until consumed or normal skill-runtime cleanup occurs, and the triggering area spell begins the next cycle at zero.
 
 ```text
 Arcane Crescendo threshold:
@@ -2237,12 +2246,12 @@ Runecaster passives:
 
 Lightbearer passives:
 
-- **Overflowing Grace:** converts `5% × rank` of direct overhealing into an eight-second absorb barrier capped at `1% × rank` of the target's maximum health. At rank 5 this is 25 percent conversion and a 5 percent cap; at rank 15 it is 75 percent conversion and a 15 percent cap. Applications merge and refresh up to the cap. Direct single-target and direct area heals qualify; healing-over-time ticks and recursive barrier effects do not.
+- **Overflowing Grace:** converts `5% × rank` of direct overhealing into an eight-second absorb barrier capped at `1% × rank` of the target's maximum health. At rank 5 this is 25 percent conversion and a 5 percent cap; at rank 15 it is 75 percent conversion and a 15 percent cap. Applications merge and refresh up to the cap. Direct single-target and direct area heals qualify; healing-over-time ticks and recursive barrier effects do not. When several absorb effects are present, damage uses Mana Shield first, a standard absorb shield second, and Overflowing Grace last.
 - **Many Beacons:** a direct heal whose selected or main target differs from the previous direct-heal target gains `2% × U(rank)` healing. The first heal receives no bonus, repeating a target has no bonus or penalty, the memory expires after ten seconds, and healing-over-time ticks do not change the memory.
 
 Penitent passives:
 
-- **Crimson Authority:** while at or below 50 percent health, control and bleed durations created by the Penitent gain `3% × U(rank)`. Determine the duration when the effect is applied; later healing does not shorten an existing effect.
+- **Crimson Authority:** while at or below 50 percent health, enemy-facing control and bleed durations created by the Penitent gain `3% × U(rank)`. It does not extend self-inflicted control drawbacks such as Whip Prison's restriction on its caster. Determine the duration when the effect is applied; later healing does not shorten an existing effect.
 - **Cruel Mercy:** successfully healing or shielding another companion grants one ten-second charge. The next successful damaging Penitent skill gains `3% × U(rank)` direct and bleed damage and consumes the charge. Self-healing does not prime it, and failed skills or old damage-over-time ticks do not consume it. A new charge refreshes the duration and never stacks.
 
 ---

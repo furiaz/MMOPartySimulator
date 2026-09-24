@@ -1186,10 +1186,19 @@ Class unlock initializes every active and passive skill for that class at rank 1
 Passive mechanics remain owned by focused game-logic modules:
 
 - combat damage and healing modifiers resolve beside the existing damage or healing calculation
-- incoming control reduction resolves when status duration is applied
+- incoming control reduction resolves when status duration is applied, and Steady Nerves only adjusts supported control whose source resolves to an enemy; current bind behavior uses the `immobilized` runtime status
 - position, recent-hit, recent-kill, prior-target, and prior-rune memory is stored and updated by game logic
 - barriers, charges, stack expiration, and source-owned rune effects are stored in explicit runtime state and cleaned by the existing runtime cleanup path
 - passive bonuses are queried from learned skill state and never duplicated into React state
+
+Current passive resolution details:
+
+- Arcane Crescendo counters and charged state, Word Resonance prior-rune memory, Many Beacons prior-target memory, Cruel Mercy charges, and Overflowing Grace barriers are transient runtime records
+- map transitions, world-wipe recovery, and save restoration clear those records with other transient skill runtime
+- Crimson Authority modifies enemy-facing Penitent control and bleed durations, while Whip Prison applies its unmodified base control duration to the caster's self-inflicted immobilize, disarm, and silence
+- incoming absorb order is Mana Shield, then the standard absorb-shield record, then the Overflowing Grace barrier
+- Blood Scent and Pack Instinct re-evaluate their health and proximity conditions independently for each qualifying damage-over-time tick
+- the existing companion buff presentation exposes Duelist's Momentum, Riposte Training, Rooted Bastion, Headhunter, Arcane Crescendo progress or charged state, Cruel Mercy charges, and Overflowing Grace barrier state; prior-target and prior-rune memories remain simulation state rather than separate buff icons
 
 The exact passive formulas and qualifying conditions are authoritative in GDD.md. Continuous passive scaling uses the shared `U(rank)` helper; discrete and bespoke effects use explicit helpers and milestone tests.
 
@@ -1230,7 +1239,7 @@ rank 1–5 = 20 + (rank - 1) × 2
 rank 6+  = 28 + (rank - 5) × 1
 ```
 
-Milestones are 10/20 percent at rank 1, 20/28 at rank 5, 26.25/33 at rank 10, and 32.5/38 at rank 15. Stable Overcharge subtracts `1 × U(rank)` percentage points from the cooldown penalty with a zero floor. Overcharge and Arcane Crescendo damage bonuses combine additively. Existing duration, refresh-window, enable-toggle, and base-cooldown ownership remains unchanged. The UI reads and displays calculated power and cooldown values rather than reproducing these formulas.
+Milestones are 10/20 percent at rank 1, 20/28 at rank 5, 26.25/33 at rank 10, and 32.5/38 at rank 15. Stable Overcharge subtracts `1 × U(rank)` percentage points from the cooldown penalty with a zero floor. A successful Overcharge cast or refresh stores a snapshot of the scaled power and effective cooldown penalty in `SkillOverchargeState`; later rank changes do not mutate the active snapshot. Overcharge and Arcane Crescendo damage bonuses combine additively. Existing duration, refresh-window, enable-toggle, and base-cooldown ownership remains unchanged. The UI reads and displays calculated power and cooldown values rather than reproducing these formulas.
 
 ### Runecaster rune-word and word-seal metadata
 
@@ -2601,6 +2610,16 @@ Skill-book behavior:
 - a successful Study action removes exactly the next-rank requirement across matching shared-inventory stacks and advances exactly one rank
 - inventory quantity beyond the next-rank requirement remains in inventory and never spills into a second rank
 - skill progression sanitization keeps known skill ids, clamps ranks to companion-aware caps, preserves valid legacy-enabled active skill ids, and ensures every unlocked class's active and passive skills remain learned
+
+Skill-book asset composition follows one technical standard:
+
+- canonical icon-free 32×32 class covers live under `client/public/assets/Generated/skill-book-icons/bases/`
+- composed skill-specific 32×32 books live under `client/public/assets/Generated/skill-book-icons/items/<class>/`
+- every composed book overlays the exact icon mapped to the skill on its class cover at native output size; active and passive books use the same rule
+- deterministic asset scripts preserve the common silhouette and gold trim instead of generating a separate book illustration for every skill
+- current class cover colors are Blade `#8E2634`, Aegis `#4F718C`, Hunter `#3F6B46`, Beast `#234D35`, Elementalist `#177C82`, Runecaster `#6846A5`, Lightbearer `#BBC2CC`, and Penitent `#3B4148`; Beginner retains its parchment source color
+- Beast uses a `0.68` cover-lightness multiplier and Penitent uses `0.58` so their covers remain distinct from Beginner and Lightbearer respectively
+- composition should begin from native small-format cover and icon assets rather than shrinking a large generated book into the 32×32 inventory slot
 
 The shared prototype wallet is stored on `GameState` as `wallet`.
 
