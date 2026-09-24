@@ -24,7 +24,14 @@ CLASS_BOOK_COLORS = {
     "blade": "#8E2634",
     "aegis": "#4F718C",
     "hunter": "#3F6B46",
-    "beast": "#A7682E",
+    "beast": "#234D35",
+}
+
+CLASS_BOOK_LIGHTNESS_MULTIPLIERS = {
+    "blade": 1.0,
+    "aegis": 1.0,
+    "hunter": 1.0,
+    "beast": 0.68,
 }
 
 CLASS_SKILLS = {
@@ -123,6 +130,7 @@ def recolor_beginner_book_base(class_id: str) -> Image.Image:
     target_hue, _, target_saturation = colorsys.rgb_to_hls(
         *(channel / 255 for channel in target_rgb)
     )
+    lightness_multiplier = CLASS_BOOK_LIGHTNESS_MULTIPLIERS[class_id]
 
     recolored_pixels = []
     for red, green, blue, alpha in base.get_flattened_data():
@@ -146,7 +154,8 @@ def recolor_beginner_book_base(class_id: str) -> Image.Image:
             continue
 
         saturation = max(target_saturation * 0.9, 0.45)
-        recolored = colorsys.hls_to_rgb(target_hue, source_lightness, saturation)
+        lightness = max(0.0, min(1.0, source_lightness * lightness_multiplier))
+        recolored = colorsys.hls_to_rgb(target_hue, lightness, saturation)
         recolored_pixels.append(
             tuple(round(channel * 255) for channel in recolored) + (alpha,)
         )
@@ -241,7 +250,7 @@ def build_passive_sheet() -> None:
         "blade": (142, 38, 52, 255),
         "aegis": (79, 113, 140, 255),
         "hunter": (63, 107, 70, 255),
-        "beast": (167, 104, 46, 255),
+        "beast": (35, 77, 53, 255),
     }
 
     for index, (class_id, skill_id, label) in enumerate(entries):
