@@ -2247,35 +2247,39 @@ Penitent passives:
 
 ---
 
-## Runecaster Tifinagh Rune-Word System
+## Runecaster Tifinagh Rune-Word and Word-Seal System
 
-Runecaster magic uses real Amazigh words written in Neo-Tifinagh. Tifinagh glyphs are letters, not independent mystical symbols. Each complete word functions as one magical rune-word. Exact glyph order and character count must be preserved; letters must not be replaced with invented pseudo-runes or fused until unreadable. This linguistic origin is presented as in-world Runecaster lore without referring to a real-world region.
+Runecaster magic uses real Amazigh words written in Neo-Tifinagh. Tifinagh glyphs are letters, not independent mystical symbols. Each complete word functions as one magical rune-word. Exact glyph order and character count must be preserved. This linguistic origin is presented as in-world Runecaster lore without referring to a real-world region.
 
-When a skill uses two rune-words, the default presentation shows the primary word as the large central inscription and the secondary word in an outer ring, smaller plate, or supporting pattern. Skill-specific directions below override that default. The two words are separate symbolic concepts and do not need to form one grammatical sentence.
+For readable combat presentation, each complete rune-word maps to one compact magical **word seal**. A word seal is invented visual shorthand for the complete word; it is not a Tifinagh letter, does not replace the canonical spelling, and must never be presented as part of the Tifinagh alphabet. The same rune-word always uses the same seal, and seal identity comes from its silhouette rather than its color.
 
-| Skill | Primary rune-word | Primary meaning | Secondary rune-word | Secondary meaning | Concepts |
+Each current Runecaster skill uses one unique ordered sequence of two word seals: primary, then secondary. The two complete words remain separate symbolic concepts and do not need to form one grammatical sentence. Reversing an existing sequence is permitted for a future skill because order carries meaning. Future effects should show no more than three seals simultaneously; longer future sequences should appear in readable stages.
+
+| Skill | Primary rune-word and seal ID | Primary meaning | Secondary rune-word and seal ID | Secondary meaning | Ordered concepts |
 |---|---|---|---|---|---|
-| Binding Rune | `ⵇⵇⵏ` — qqen / qqn | tie, bind, attach, or restrain | `ⴰⵙⵇⵇⵏ` — asqqen / asqqn | rope, tether, or physical bond | Bind + Tether |
-| Rune Lance | `ⵜⴰⴼⴰⵍⴰ` — tafala | spear or lance | `ⵜⴰⵣⵎⵎⴰⵔⵜ` — tazmmart / tazmert | power, capacity, strength, or ability | Lance + Power |
-| Warding Glyph | `ⴰⵎⵙⵜⵏ` — amesten | protection or defense | `ⴰⴼⵔⴰⴳ` — afrag | fence, enclosure, barricade, or protective boundary | Protection + Barrier |
-| Rewind Rune | `ⵓⵖⴰⵍ` — uɣal | return, go back, or come back | `ⵜⵓⴷⵔⵜ` — tudert | life | Return + Life |
-| Runic Focus | `ⴰⵍⵙ` — als | repeat, perform again, redo, or begin again | `ⴰⵎⵎⴰⵙ` — ammas | center or middle | Repeat + Center |
-| Leyline Matrix | `ⴰⵣⵟⵟⴰ` — azṭṭa | weaving, loom, web, or network | `ⴰⴱⵔⵉⴷ` — abrid | path, way, route, or road | Network + Path |
-| Stone Sigil Rhythm | `ⴰⵣⵔⵓ` — azru | rock or stone | `ⴰⵏⵢⴰ` — anya | rhythm, cadence, air, or melody | Stone + Rhythm |
-| Rune Step | `ⴰⵙⵓⵔⵉⴼ` — asurif | step, stride, or stage of movement | `ⵇⵇⵏ` — qqen / qqn | tie, bind, attach, or restrain | Step + Bind |
+| Binding Rune | `ⵇⵇⵏ` — qqen / qqn — `qqen` | tie, bind, attach, or restrain | `ⴰⵙⵇⵇⵏ` — asqqen / asqqn — `asqqen` | rope, tether, or physical bond | Bind → Tether |
+| Rune Lance | `ⵜⴰⴼⴰⵍⴰ` — tafala — `tafala` | spear or lance | `ⵜⴰⵣⵎⵎⴰⵔⵜ` — tazmmart / tazmert — `tazmert` | power, capacity, strength, or ability | Lance → Power |
+| Warding Glyph | `ⴰⵎⵙⵜⵏ` — amesten — `amesten` | protection or defense | `ⴰⴼⵔⴰⴳ` — afrag — `afrag` | fence, enclosure, barricade, or protective boundary | Protection → Barrier |
+| Rewind Rune | `ⵓⵖⴰⵍ` — uɣal — `ughal` | return, go back, or come back | `ⵜⵓⴷⵔⵜ` — tudert — `tudert` | life | Return → Life |
+| Runic Focus | `ⴰⵍⵙ` — als — `als` | repeat, perform again, redo, or begin again | `ⴰⵎⵎⴰⵙ` — ammas — `ammas` | center or middle | Repeat → Center |
+| Leyline Matrix | `ⴰⵣⵟⵟⴰ` — azṭṭa — `aztta` | weaving, loom, web, or network | `ⴰⴱⵔⵉⴷ` — abrid — `abrid` | path, way, route, or road | Network → Path |
+| Stone Sigil Rhythm | `ⴰⵣⵔⵓ` — azru — `azru` | rock or stone | `ⴰⵏⵢⴰ` — anya — `anya` | rhythm, cadence, air, or melody | Stone → Rhythm |
+| Rune Step | `ⴰⵙⵓⵔⵉⴼ` — asurif — `asurif` | step, stride, or stage of movement | `ⵇⵇⵏ` — qqen / qqn — `qqen` | tie, bind, attach, or restrain | Step → Bind |
 
-Skill-specific presentation:
+Skill-specific seal presentation:
 
-- Binding Rune places `ⵇⵇⵏ` centrally as the binding command and `ⴰⵙⵇⵇⵏ` around it as tightening links or a closing tether.
-- Rune Lance forms the shaft or projectile from `ⵜⴰⴼⴰⵍⴰ`, with `ⵜⴰⵣⵎⵎⴰⵔⵜ` surrounding or trailing it as propelling force.
-- Warding Glyph displays `ⴰⵎⵙⵜⵏ` and `ⴰⴼⵔⴰⴳ` as two defensive layers: protection and boundary.
-- Rewind Rune lets `ⵓⵖⴰⵍ` rotate backward while the inner life-word `ⵜⵓⴷⵔⵜ` brightens during healing ticks.
-- Runic Focus overrides the default layout: `ⴰⵎⵎⴰⵙ` sits at the center while `ⴰⵍⵙ` surrounds it and may split into two matching copies when the duplicated skill resolves.
-- Leyline Matrix emphasizes `ⴰⵣⵟⵟⴰ` on the caster as the network while connected party members receive smaller `ⴰⴱⵔⵉⴷ` path inscriptions.
-- Stone Sigil Rhythm keeps `ⴰⵣⵔⵓ` heavy and stable while `ⴰⵏⵢⴰ` pulses around it at an even cadence.
-- Rune Step carries `ⴰⵙⵓⵔⵉⴼ` with the moving caster, then leaves `ⵇⵇⵏ` at the destination as the binding trap.
+- Binding Rune places the Qqen seal centrally as the binding command and the Asqqen seal around or behind it as tightening links or a closing tether.
+- Rune Lance forms the shaft or forward line from the Tafala seal, with the Tazmert seal supporting or trailing it as propelling force.
+- Warding Glyph displays the Amesten and Afrag seals as two defensive layers: protection and boundary.
+- Rewind Rune presents Uɣal as the returning motion while Tudert remains the life-bearing center.
+- Runic Focus overrides the normal primary emphasis: Ammas sits at the center while Als surrounds it as repetition.
+- Leyline Matrix emphasizes Azṭṭa on the caster as the network while connected party members receive the smaller Abrid path seal.
+- Stone Sigil Rhythm keeps Azru heavy and stable while Anya supplies the repeated cadence.
+- Rune Step carries Asurif with the moving caster, then leaves Qqen at the destination as the binding trap.
 
-The skill list shows a compact two-word inscription. Skill details show both transliterations, meanings, mechanical concepts, and a rune-word count. Text rendering must use a Neo-Tifinagh-capable fallback font. A cumulative rune meter, a third Runic Focus copy, pseudo-rune art, and new animated visual effects are outside the current alpha scope.
+The skill list shows a compact ordered two-seal icon with transliterated rune-word names. Skill details show the full Neo-Tifinagh spellings, all accepted transliterations, meanings, mechanical concepts, sequence order, and rune-word count. Text rendering must use a Neo-Tifinagh-capable fallback font. Skill books reuse the exact compact skill-sequence icon on the Runecaster book design. Battlefield composites may add the existing violet and cyan class presentation around the same canonical seals without changing their silhouettes.
+
+A cumulative rune meter, a third Runic Focus copy, invented marks presented as Tifinagh letters, and new animated visual behavior are outside the current alpha scope.
 
 ---
 

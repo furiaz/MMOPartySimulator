@@ -188,6 +188,10 @@ export type {
   CompanionSkillProgression,
   SkillGatherBuffState,
   SkillId,
+  RunecasterSkillId,
+  RunecasterRuneWordId,
+  RuneWordDefinition,
+  RunecasterRuneSequence,
   SkillMarkState,
   SkillPartyClassBuffState,
   SkillPartyBuffState,
@@ -637,6 +641,14 @@ export {
   getSkillCooldownMs,
   getSkillsForClass,
 } from "./skills";
+export {
+  RUNECASTER_SKILL_IDS,
+  RUNECASTER_SKILL_RUNE_SEQUENCES,
+  RUNE_WORD_DEFINITIONS,
+  getRunecasterRuneSequence,
+  getRunecasterRuneValidationErrors,
+  isRunecasterSkillId,
+} from "./runecasterRunes";
 export {
   BEGINNER_SKILL_MAX_RANK,
   BEGINNER_SKILL_MAX_RANK_AFTER_FIRST_CLASS,

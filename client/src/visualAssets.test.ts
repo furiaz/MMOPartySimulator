@@ -19,6 +19,8 @@ import {
 import {
   INVENTORY_ITEM_ICON_SRC,
   MAP_VISUAL_OBJECT_SRC,
+  RUNECASTER_SKILL_ICON_SRC,
+  RUNE_WORD_SEAL_SRC,
   SKILL_VISUAL_ICON_SRC,
   TICKET_0501_HUD_CONTROL_SRC,
 } from "./assetIcons";
@@ -101,6 +103,28 @@ describe("entity visual assets", () => {
     );
     expect(INVENTORY_ITEM_ICON_SRC.pack_frenzy_skill_book).toContain(
       "/skill-book-icons/items/beast/",
+    );
+  });
+
+  it("maps Runecaster words, compact sequences, world effects, and books", () => {
+    expect(Object.keys(RUNE_WORD_SEAL_SRC)).toHaveLength(15);
+    expect(new Set(Object.values(RUNE_WORD_SEAL_SRC)).size).toBe(15);
+    expect(Object.keys(RUNECASTER_SKILL_ICON_SRC)).toHaveLength(8);
+
+    for (const [skillId, iconSrc] of Object.entries(RUNECASTER_SKILL_ICON_SRC)) {
+      expect(iconSrc).toContain(`/ticket-0515/runecaster/icons/${skillId}.png`);
+      expect(SKILL_VISUAL_ICON_SRC[skillId as keyof typeof SKILL_VISUAL_ICON_SRC]).toBe(
+        iconSrc,
+      );
+      expect(
+        INVENTORY_ITEM_ICON_SRC[
+          `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
+        ],
+      ).toContain(`/ticket-0515/runecaster/books/${skillId}_skill_book.png`);
+    }
+
+    expect(RUNE_WORD_SEAL_SRC.qqen).toContain(
+      "/ticket-0515/runecaster/seals/qqen.png",
     );
   });
 

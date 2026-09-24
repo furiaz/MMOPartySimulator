@@ -1232,39 +1232,64 @@ rank 6+  = 28 + (rank - 5) × 1
 
 Milestones are 10/20 percent at rank 1, 20/28 at rank 5, 26.25/33 at rank 10, and 32.5/38 at rank 15. Stable Overcharge subtracts `1 × U(rank)` percentage points from the cooldown penalty with a zero floor. Overcharge and Arcane Crescendo damage bonuses combine additively. Existing duration, refresh-window, enable-toggle, and base-cooldown ownership remains unchanged. The UI reads and displays calculated power and cooldown values rather than reproducing these formulas.
 
-### Runecaster rune-word metadata
+### Runecaster rune-word and word-seal metadata
 
-Every current Runecaster active skill stores exactly two complete rune-word records. The definition data must preserve Unicode text exactly and expose it to presentation without using glyphs as mechanical identifiers.
+Every current Runecaster active skill stores exactly two complete rune-word records in an ordered primary/secondary sequence. The definition data preserves Unicode text exactly and exposes it to presentation without using glyph strings or asset paths as mechanical identifiers.
 
 ```ts
+type RunecasterRuneWordId =
+  | "qqen"
+  | "asqqen"
+  | "tafala"
+  | "tazmert"
+  | "amesten"
+  | "afrag"
+  | "ughal"
+  | "tudert"
+  | "als"
+  | "ammas"
+  | "aztta"
+  | "abrid"
+  | "azru"
+  | "anya"
+  | "asurif";
+
 type RuneWordDefinition = {
+  id: RunecasterRuneWordId;
   glyphs: string;
   transliterations: readonly string[];
   meaning: string;
   mechanicalConcept: string;
+  sealAssetKey: RunecasterRuneWordId;
 };
 
-type RunecasterRuneWords = {
+type RunecasterRuneSequence = {
   primary: RuneWordDefinition;
   secondary: RuneWordDefinition;
   presentationGuidance: string;
 };
 ```
 
-Canonical definition data:
+A word seal is a compact visual shorthand for one complete rune-word. It is not a Tifinagh letter and must not be presented as one. Each `RunecasterRuneWordId` resolves to one stable reusable seal asset. The same word always resolves to the same seal, including Qqen in Binding Rune and Rune Step. Seal identity must remain readable by silhouette without relying on color.
 
-| Skill | Primary | Secondary | Concepts |
+Canonical ordered definition data:
+
+| Skill | Primary | Secondary | Ordered concepts |
 |---|---|---|---|
-| Binding Rune | `ⵇⵇⵏ` — qqen / qqn | `ⴰⵙⵇⵇⵏ` — asqqen / asqqn | Bind + Tether |
-| Rune Lance | `ⵜⴰⴼⴰⵍⴰ` — tafala | `ⵜⴰⵣⵎⵎⴰⵔⵜ` — tazmmart / tazmert | Lance + Power |
-| Warding Glyph | `ⴰⵎⵙⵜⵏ` — amesten | `ⴰⴼⵔⴰⴳ` — afrag | Protection + Barrier |
-| Rewind Rune | `ⵓⵖⴰⵍ` — uɣal | `ⵜⵓⴷⵔⵜ` — tudert | Return + Life |
-| Runic Focus | `ⴰⵍⵙ` — als | `ⴰⵎⵎⴰⵙ` — ammas | Repeat + Center |
-| Leyline Matrix | `ⴰⵣⵟⵟⴰ` — azṭṭa | `ⴰⴱⵔⵉⴷ` — abrid | Network + Path |
-| Stone Sigil Rhythm | `ⴰⵣⵔⵓ` — azru | `ⴰⵏⵢⴰ` — anya | Stone + Rhythm |
-| Rune Step | `ⴰⵙⵓⵔⵉⴼ` — asurif | `ⵇⵇⵏ` — qqen / qqn | Step + Bind |
+| Binding Rune | `ⵇⵇⵏ` — qqen / qqn — `qqen` | `ⴰⵙⵇⵇⵏ` — asqqen / asqqn — `asqqen` | Bind → Tether |
+| Rune Lance | `ⵜⴰⴼⴰⵍⴰ` — tafala — `tafala` | `ⵜⴰⵣⵎⵎⴰⵔⵜ` — tazmmart / tazmert — `tazmert` | Lance → Power |
+| Warding Glyph | `ⴰⵎⵙⵜⵏ` — amesten — `amesten` | `ⴰⴼⵔⴰⴳ` — afrag — `afrag` | Protection → Barrier |
+| Rewind Rune | `ⵓⵖⴰⵍ` — uɣal — `ughal` | `ⵜⵓⴷⵔⵜ` — tudert — `tudert` | Return → Life |
+| Runic Focus | `ⴰⵍⵙ` — als — `als` | `ⴰⵎⵎⴰⵙ` — ammas — `ammas` | Repeat → Center |
+| Leyline Matrix | `ⴰⵣⵟⵟⴰ` — azṭṭa — `aztta` | `ⴰⴱⵔⵉⴷ` — abrid — `abrid` | Network → Path |
+| Stone Sigil Rhythm | `ⴰⵣⵔⵓ` — azru — `azru` | `ⴰⵏⵢⴰ` — anya — `anya` | Stone → Rhythm |
+| Rune Step | `ⴰⵙⵓⵔⵉⴼ` — asurif — `asurif` | `ⵇⵇⵏ` — qqen / qqn — `qqen` | Step → Bind |
 
-Meanings and presentation guidance are the complete entries in GDD.md and must be carried in the structured definitions. Glyph sequences are immutable content: do not normalize their order, invent substitutions, merge the two words, or treat individual letters as independent magical symbols. The default visual arrangement is primary-center and secondary-outer; per-skill guidance overrides it. Runic Focus specifically places Ammas at the center and Als around it. The UI list renders a compact two-word inscription and the details view renders both transliterations, meanings, mechanical contribution, and rune-word count with a Neo-Tifinagh-capable fallback font. In-world copy must not mention a real-world region.
+Validation must assert that all current Runecaster active skills have two known word definitions, all ordered skill pairs are unique, and reused words keep the same object and seal identity. Reversed ordered pairs remain valid for future skills. Future effects should display at most three seals simultaneously and stage any longer future sequence.
+
+Meanings and presentation guidance are the complete entries in GDD.md and must be carried in structured game-logic definitions. Glyph sequences are immutable content: do not normalize their order, invent substitutions, merge the two words, or treat individual letters as independent magical symbols. Compact 32×32 skill icons compose the two stable seals in sequence order. Dedicated 64×64 seal assets and 128×128 battlefield composites prevent large source art from being compressed directly into small UI slots. The Leyline Matrix companion composite is 64×64. Runic Focus specifically places Ammas at the center and Als around it.
+
+The UI list renders the compact ordered two-seal icon and transliterated names. Skill details render exact glyphs, all transliterations, meanings, mechanical contribution, sequence order, and rune-word count with a Neo-Tifinagh-capable fallback font. Runecaster skill books reuse the exact compact skill icon on the class-standard book. React does not recreate rune vocabulary, validate sequences, or infer asset identities. In-world copy must not mention a real-world region.
 
 Current skill effects may include direct damage, lunge damage, sweeping/splash damage, area damage, taunt, multi-taunt, enemy mark bonus damage, self damage buff, ally damage buff, party damage buff, party class buffs, party poison coating, gathering power buff, shield block, absorb shields, mana shields, frost armor, damage mitigation, self mitigation, party mitigation, bind, immobilize, disarm, blind/forced evasion, fake death, silence, poison, burning, bleed, heal, self-percent heal, ally heal, heal-over-time effects, lifesteal, rewind runes, runic focus, overcharge, companion AoE channels, Beginner fallback damage, Beginner emergency recovery, Beginner defensive survival, Beginner support, and passive modifiers.
 

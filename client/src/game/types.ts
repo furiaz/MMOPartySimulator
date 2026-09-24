@@ -1147,6 +1147,48 @@ export type SkillId =
   | "woodcutting_penance"
   | "atonement_step";
 
+export type RunecasterSkillId =
+  | "binding_rune"
+  | "rune_lance"
+  | "warding_glyph"
+  | "rewind_rune"
+  | "runic_focus"
+  | "leyline_matrix"
+  | "stone_sigil_rhythm"
+  | "rune_step";
+
+export type RunecasterRuneWordId =
+  | "qqen"
+  | "asqqen"
+  | "tafala"
+  | "tazmert"
+  | "amesten"
+  | "afrag"
+  | "ughal"
+  | "tudert"
+  | "als"
+  | "ammas"
+  | "aztta"
+  | "abrid"
+  | "azru"
+  | "anya"
+  | "asurif";
+
+export type RuneWordDefinition = {
+  id: RunecasterRuneWordId;
+  glyphs: string;
+  transliterations: readonly string[];
+  meaning: string;
+  mechanicalConcept: string;
+  sealAssetKey: RunecasterRuneWordId;
+};
+
+export type RunecasterRuneSequence = {
+  primary: RuneWordDefinition;
+  secondary: RuneWordDefinition;
+  presentationGuidance: string;
+};
+
 export type SkillTag =
   | "Offensive"
   | "Damage"
@@ -1219,6 +1261,7 @@ export type ActiveSkillDefinition = {
   range: number;
   cooldownMs?: number;
   canLegacyCarry?: boolean;
+  runeWords?: RunecasterRuneSequence;
   effect:
     | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
     | {

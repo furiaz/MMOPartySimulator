@@ -2,6 +2,8 @@ import { useState, type ReactNode } from "react";
 import {
   EMPTY_EQUIPMENT_SLOT_ICON_SRC,
   INVENTORY_ITEM_ICON_SRC,
+  RUNECASTER_SKILL_ICON_SRC,
+  RUNE_WORD_SEAL_SRC,
 } from "./assetIcons";
 import type {
   PartyManagementSection,
@@ -66,6 +68,7 @@ import {
   getScaledSkillDefinitionForCompanion,
   getRoleBonusDisplayState,
   isFlaskItemDefinition,
+  isRunecasterSkillId,
   getPartySizeUnlockRequirement,
   getSkillRoleScore,
   getSkillCooldownMs,
@@ -476,6 +479,7 @@ function CompanionSkillSummary({
                 <strong>{skill.displayName}</strong>
                 <span>{getSkillEffectSummary(scaledSkill)}</span>
               </div>
+              <RunecasterRuneWords skill={skill} />
               <dl>
                 <div>
                   <dt>Rank</dt>
@@ -513,6 +517,54 @@ function CompanionSkillSummary({
       ) : (
         <span className="party-menu-empty">No skills for this class</span>
       )}
+    </div>
+  );
+}
+
+function RunecasterRuneWords({ skill }: { skill: ActiveSkillDefinition }) {
+  if (!skill.runeWords || !isRunecasterSkillId(skill.id)) {
+    return null;
+  }
+
+  const { primary, secondary, presentationGuidance } = skill.runeWords;
+
+  return (
+    <div className="runecaster-rune-presentation">
+      <div className="runecaster-rune-compact">
+        <img
+          alt={`${skill.displayName} ordered rune-seal sequence`}
+          className="runecaster-rune-sequence-icon"
+          src={RUNECASTER_SKILL_ICON_SRC[skill.id]}
+        />
+        <span>
+          {primary.transliterations[0]} → {secondary.transliterations[0]}
+        </span>
+      </div>
+      <details className="runecaster-rune-details">
+        <summary>Rune-word details · 2 words</summary>
+        <ol>
+          {[primary, secondary].map((word, index) => (
+            <li key={word.id}>
+              <img
+                alt={`${word.transliterations[0]} word seal`}
+                className="runecaster-word-seal"
+                src={RUNE_WORD_SEAL_SRC[word.sealAssetKey]}
+              />
+              <div>
+                <strong>
+                  {index === 0 ? "1. Primary" : "2. Secondary"} · {word.mechanicalConcept}
+                </strong>
+                <span className="runecaster-tifinagh" lang="zgh-Tfng">
+                  {word.glyphs}
+                </span>
+                <span>{word.transliterations.join(" / ")}</span>
+                <span>{word.meaning}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p>{presentationGuidance}</p>
+      </details>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type {
   SkillDefinition,
 } from "./types";
 import { getOverchargeRankValues } from "./skillOvercharge";
+import { RUNECASTER_SKILL_RUNE_SEQUENCES } from "./runecasterRunes";
 
 const BEGINNER_SKILL_COOLDOWN_MS = 10000;
 const BEGINNER_BUFF_DURATION_MS = 90000;
@@ -799,6 +800,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 5,
     cooldownMs: 12000,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.binding_rune,
     effect: { type: "pinningShot", durationMs: 3500 },
   },
   rune_lance: {
@@ -809,6 +811,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 5,
     cooldownMs: 12000,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.rune_lance,
     effect: { type: "damage", damageType: "magic", powerMultiplier: 1.4 },
   },
   warding_glyph: {
@@ -819,6 +822,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 5,
     cooldownMs: 15000,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.warding_glyph,
     effect: {
       type: "barrierBlock",
       durationMs: 10000,
@@ -834,6 +838,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 5,
     cooldownMs: 10000,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.rewind_rune,
     effect: {
       type: "rewindRune",
       durationMs: 20000,
@@ -849,6 +854,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 0,
     cooldownMs: 15000,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.runic_focus,
     effect: { type: "runicFocus" },
   },
   leyline_matrix: {
@@ -859,6 +865,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 0,
     cooldownMs: FIRST_CLASS_LONG_BUFF_COOLDOWN_MS,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.leyline_matrix,
     effect: {
       type: "partyClassBuff",
       durationMs: FIRST_CLASS_LONG_BUFF_DURATION_MS,
@@ -876,6 +883,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 0,
     cooldownMs: FIRST_CLASS_LONG_BUFF_COOLDOWN_MS,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.stone_sigil_rhythm,
     effect: {
       type: "gatherBuff",
       bonusGatherSpeed: 2,
@@ -892,6 +900,7 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     type: "active",
     range: 5,
     cooldownMs: 20000,
+    runeWords: RUNECASTER_SKILL_RUNE_SEQUENCES.rune_step,
     effect: {
       type: "runeStep",
       distance: 2,

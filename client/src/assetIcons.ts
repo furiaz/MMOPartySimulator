@@ -6,6 +6,8 @@ import type {
   MapVisualObjectId,
   NpcEntity,
   ResourceType,
+  RunecasterRuneWordId,
+  RunecasterSkillId,
   SkillId,
 } from "./game";
 
@@ -31,7 +33,11 @@ const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
 const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
 const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
 const elementalistSkillEffectsPath = `${firstClassSkillEffectsPath}/elementalist/sprites`;
-const runecasterSkillEffectsPath = `${firstClassSkillEffectsPath}/runecaster/sprites`;
+const ticket0515RunecasterPath = "/assets/Generated/ticket-0515/runecaster";
+const runecasterSealPath = `${ticket0515RunecasterPath}/seals`;
+const runecasterSkillIconPath = `${ticket0515RunecasterPath}/icons`;
+const runecasterSkillEffectsPath = `${ticket0515RunecasterPath}/battlefield`;
+const runecasterSkillBookPath = `${ticket0515RunecasterPath}/books`;
 const lightbearerSkillEffectsPath = `${firstClassSkillEffectsPath}/lightbearer/sprites`;
 const penitentSkillEffectsPath = `${firstClassSkillEffectsPath}/penitent/sprites`;
 const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
@@ -143,14 +149,14 @@ export const INVENTORY_ITEM_ICON_SRC: Partial<Record<ItemId, string>> = {
   emberwood_rhythm_skill_book: `${skillBookIconPath}/mages/emberwood_rhythm_skill_book.png`,
   flame_step_skill_book: `${skillBookIconPath}/mages/flame_step_skill_book.png`,
   fire_burst_skill_book: `${skillBookIconPath}/mages/fire_burst_skill_book.png`,
-  binding_rune_skill_book: `${skillBookIconPath}/mages/binding_rune_skill_book.png`,
-  rune_lance_skill_book: `${skillBookIconPath}/mages/rune_lance_skill_book.png`,
-  warding_glyph_skill_book: `${skillBookIconPath}/mages/warding_glyph_skill_book.png`,
-  rewind_rune_skill_book: `${skillBookIconPath}/mages/rewind_rune_skill_book.png`,
-  runic_focus_skill_book: `${skillBookIconPath}/mages/runic_focus_skill_book.png`,
-  leyline_matrix_skill_book: `${skillBookIconPath}/mages/leyline_matrix_skill_book.png`,
-  stone_sigil_rhythm_skill_book: `${skillBookIconPath}/mages/stone_sigil_rhythm_skill_book.png`,
-  rune_step_skill_book: `${skillBookIconPath}/mages/rune_step_skill_book.png`,
+  binding_rune_skill_book: `${runecasterSkillBookPath}/binding_rune_skill_book.png`,
+  rune_lance_skill_book: `${runecasterSkillBookPath}/rune_lance_skill_book.png`,
+  warding_glyph_skill_book: `${runecasterSkillBookPath}/warding_glyph_skill_book.png`,
+  rewind_rune_skill_book: `${runecasterSkillBookPath}/rewind_rune_skill_book.png`,
+  runic_focus_skill_book: `${runecasterSkillBookPath}/runic_focus_skill_book.png`,
+  leyline_matrix_skill_book: `${runecasterSkillBookPath}/leyline_matrix_skill_book.png`,
+  stone_sigil_rhythm_skill_book: `${runecasterSkillBookPath}/stone_sigil_rhythm_skill_book.png`,
+  rune_step_skill_book: `${runecasterSkillBookPath}/rune_step_skill_book.png`,
   blinding_ray_skill_book: `${skillBookIconPath}/lightbearer-penitent/blinding_ray_skill_book.png`,
   light_mend_skill_book: `${skillBookIconPath}/lightbearer-penitent/light_mend_skill_book.png`,
   sanctuary_veil_skill_book: `${skillBookIconPath}/lightbearer-penitent/sanctuary_veil_skill_book.png`,
@@ -495,6 +501,35 @@ export const LIVESTOCK_CREATURE_ICON_SRC: Record<
   locked: `${farmLivestockAssetPath}/locked-crop.png`,
 };
 
+export const RUNE_WORD_SEAL_SRC: Record<RunecasterRuneWordId, string> = {
+  qqen: `${runecasterSealPath}/qqen.png`,
+  asqqen: `${runecasterSealPath}/asqqen.png`,
+  tafala: `${runecasterSealPath}/tafala.png`,
+  tazmert: `${runecasterSealPath}/tazmert.png`,
+  amesten: `${runecasterSealPath}/amesten.png`,
+  afrag: `${runecasterSealPath}/afrag.png`,
+  ughal: `${runecasterSealPath}/ughal.png`,
+  tudert: `${runecasterSealPath}/tudert.png`,
+  als: `${runecasterSealPath}/als.png`,
+  ammas: `${runecasterSealPath}/ammas.png`,
+  aztta: `${runecasterSealPath}/aztta.png`,
+  abrid: `${runecasterSealPath}/abrid.png`,
+  azru: `${runecasterSealPath}/azru.png`,
+  anya: `${runecasterSealPath}/anya.png`,
+  asurif: `${runecasterSealPath}/asurif.png`,
+};
+
+export const RUNECASTER_SKILL_ICON_SRC: Record<RunecasterSkillId, string> = {
+  binding_rune: `${runecasterSkillIconPath}/binding_rune.png`,
+  rune_lance: `${runecasterSkillIconPath}/rune_lance.png`,
+  warding_glyph: `${runecasterSkillIconPath}/warding_glyph.png`,
+  rewind_rune: `${runecasterSkillIconPath}/rewind_rune.png`,
+  runic_focus: `${runecasterSkillIconPath}/runic_focus.png`,
+  leyline_matrix: `${runecasterSkillIconPath}/leyline_matrix.png`,
+  stone_sigil_rhythm: `${runecasterSkillIconPath}/stone_sigil_rhythm.png`,
+  rune_step: `${runecasterSkillIconPath}/rune_step.png`,
+};
+
 export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   throw_rock: `${beginnerSkillEffectsPath}/throw_rock.png`,
   kick: `${beginnerSkillEffectsPath}/kick.png`,
@@ -554,14 +589,14 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   emberwood_rhythm: `${elementalistSkillEffectsPath}/emberwood_rhythm.png`,
   flame_step: `${elementalistSkillEffectsPath}/flame_step.png`,
   fire_burst: `${elementalistSkillEffectsPath}/fire_burst.png`,
-  binding_rune: `${runecasterSkillEffectsPath}/binding_rune.png`,
-  rune_lance: `${runecasterSkillEffectsPath}/rune_lance.png`,
-  warding_glyph: `${runecasterSkillEffectsPath}/warding_glyph.png`,
-  rewind_rune: `${runecasterSkillEffectsPath}/rewind_rune.png`,
-  runic_focus: `${runecasterSkillEffectsPath}/runic_focus.png`,
-  leyline_matrix: `${runecasterSkillEffectsPath}/leyline_matrix_caster.png`,
-  stone_sigil_rhythm: `${runecasterSkillEffectsPath}/stone_sigil_rhythm.png`,
-  rune_step: `${runecasterSkillEffectsPath}/rune_step.png`,
+  binding_rune: RUNECASTER_SKILL_ICON_SRC.binding_rune,
+  rune_lance: RUNECASTER_SKILL_ICON_SRC.rune_lance,
+  warding_glyph: RUNECASTER_SKILL_ICON_SRC.warding_glyph,
+  rewind_rune: RUNECASTER_SKILL_ICON_SRC.rewind_rune,
+  runic_focus: RUNECASTER_SKILL_ICON_SRC.runic_focus,
+  leyline_matrix: RUNECASTER_SKILL_ICON_SRC.leyline_matrix,
+  stone_sigil_rhythm: RUNECASTER_SKILL_ICON_SRC.stone_sigil_rhythm,
+  rune_step: RUNECASTER_SKILL_ICON_SRC.rune_step,
   blinding_ray: `${lightbearerSkillEffectsPath}/blinding_ray.png`,
   light_mend: `${lightbearerSkillEffectsPath}/light_mend.png`,
   sanctuary_veil: `${lightbearerSkillEffectsPath}/sanctuary_veil.png`,
