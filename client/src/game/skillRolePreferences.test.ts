@@ -198,6 +198,8 @@ describe("skill role preferences", () => {
       "emberwood_rhythm",
       "flame_step",
       "fire_burst",
+      "stable_overcharge",
+      "arcane_crescendo",
     ]);
     expect(getSkillsForClass("runecaster").map((skill) => skill.id)).toEqual([
       "binding_rune",
@@ -208,6 +210,8 @@ describe("skill role preferences", () => {
       "leyline_matrix",
       "stone_sigil_rhythm",
       "rune_step",
+      "word_resonance",
+      "living_inscription",
     ]);
     expect(getSkillsForClass("lightbearer").map((skill) => skill.id)).toEqual([
       "blinding_ray",
@@ -218,6 +222,8 @@ describe("skill role preferences", () => {
       "herbalist_hymn",
       "dawn_step",
       "circle_of_renewal",
+      "overflowing_grace",
+      "many_beacons",
     ]);
     expect(getSkillsForClass("penitent").map((skill) => skill.id)).toEqual([
       "whip_prison",
@@ -228,6 +234,8 @@ describe("skill role preferences", () => {
       "burdened_benediction",
       "woodcutting_penance",
       "atonement_step",
+      "crimson_authority",
+      "cruel_mercy",
     ]);
   });
 });

@@ -33,6 +33,13 @@ import {
   getFirstAidHealingEffectiveness,
 } from "./skillBehavior";
 import { applySkillPowerBonusesToSkillDefinition } from "./skillOvercharge";
+import {
+  applyOverflowingGraceFromDirectHeal,
+  getCrimsonAuthorityDurationMs,
+  getStableOverchargeReductionPoints,
+  prepareMagicSupportSkill,
+  recordSuccessfulMagicSupportSkill,
+} from "./magicSupportPassives";
 import { getScaledSkillDefinitionForCompanion } from "./skillProgression";
 import {
   findEnemyTarget,
@@ -48,6 +55,7 @@ import {
   type GameState,
 } from "./state";
 import type {
+  ActiveSkillDefinition,
   Companion,
   Enemy,
   Position,
@@ -108,14 +116,59 @@ function resolveSkillEffectOnce(
   caster: Companion,
   skillUse: SkillUse,
   now: number,
+  isRunicFocusDuplicate = false,
 ): SkillEffectResolutionResult {
-  const { target } = skillUse;
+  const scaledSkill = getScaledSkillDefinitionForCompanion(caster, skillUse.skill);
+  if (scaledSkill.type !== "active") {
+    return skipSkillEffect(state);
+  }
+  const prepared = prepareMagicSupportSkill(
+    state,
+    caster,
+    scaledSkill,
+    skillUse.target?.id,
+    now,
+    isRunicFocusDuplicate,
+  );
   const skill = applySkillPowerBonusesToSkillDefinition(
     state,
     caster,
-    getScaledSkillDefinitionForCompanion(caster, skillUse.skill),
-    { now },
+    prepared.skill,
+    { now, additionalBonusPercent: prepared.additionalPowerBonusPercent },
   );
+  if (skill.type !== "active") {
+    return skipSkillEffect(state);
+  }
+  const result = resolvePreparedSkillEffect(
+    state,
+    caster,
+    { ...skillUse, skill },
+    now,
+  );
+
+  return result.shouldConsumeCooldown
+    ? {
+        ...result,
+        state: recordSuccessfulMagicSupportSkill(
+          state,
+          result.state,
+          caster,
+          skill,
+          skillUse.target?.id,
+          now,
+          isRunicFocusDuplicate,
+        ),
+      }
+    : result;
+}
+
+function resolvePreparedSkillEffect(
+  state: GameState,
+  caster: Companion,
+  skillUse: SkillUse & { skill: ActiveSkillDefinition },
+  now: number,
+): SkillEffectResolutionResult {
+  const { target, skill } = skillUse;
 
   if (skill.effect.type === "damage" && isLivingEnemy(target)) {
     return resolveAppliedSkillEffect(
@@ -664,6 +717,7 @@ function applyRunicFocusDuplicate(
       target: duplicateTarget,
     },
     now,
+    true,
   );
 
   return {
@@ -2059,7 +2113,11 @@ function applyOvercharge(
         companionId: caster.id,
         sourceSkillId: skill.id,
         skillPowerBonusPercent: skill.effect.skillPowerBonusPercent,
-        cooldownPenaltyPercent: skill.effect.cooldownPenaltyPercent,
+        cooldownPenaltyPercent: Math.max(
+          0,
+          skill.effect.cooldownPenaltyPercent -
+            getStableOverchargeReductionPoints(caster),
+        ),
         expiresAt: now + skill.effect.durationMs,
       },
     },
@@ -3011,7 +3069,11 @@ function applyAtonementStep(
         {
           type: "disarmed",
           targetId: enemy.id,
-            durationMs: effect.disarmDurationMs,
+          durationMs: getCrimsonAuthorityDurationMs(
+            sacrifice.caster,
+            skill,
+            effect.disarmDurationMs,
+          ),
           sourceId: caster.id,
           sourceKey: skill.id,
         },
@@ -3031,9 +3093,16 @@ function applyAtonementStep(
         continue;
       }
 
-      nextState = applyCompanionHealing(nextState, currentTarget, healAmount, now, {
+      const healResult = applyCompanionHealing(nextState, currentTarget, healAmount, now, {
         sourceId: caster.id,
-      }).state;
+      });
+      nextState = applyOverflowingGraceFromDirectHeal(
+        healResult.state,
+        caster,
+        healResult.target,
+        healResult.overhealingAmount,
+        now,
+      );
     }
   }
 
@@ -3135,7 +3204,13 @@ function applyHeal(
     sourceId: caster.id,
     feedback: false,
   });
-  let nextState = healResult.state;
+  let nextState = applyOverflowingGraceFromDirectHeal(
+    healResult.state,
+    caster,
+    healResult.target,
+    healResult.overhealingAmount,
+    now,
+  );
   const healedTarget = healResult.target;
 
   if (hpCost > 0) {
@@ -3218,7 +3293,13 @@ function applyCircleOfRenewal(
     const result = applyCompanionHealing(nextState, member, healAmount, now, {
       sourceId: caster.id,
     });
-    nextState = result.state;
+    nextState = applyOverflowingGraceFromDirectHeal(
+      result.state,
+      caster,
+      result.target,
+      result.overhealingAmount,
+      now,
+    );
     healedAny ||= result.healedAmount > 0;
   }
 
@@ -3279,7 +3360,13 @@ function applySelfPercentHeal(
     sourceId: caster.id,
     feedback: false,
   });
-  let nextState = healResult.state;
+  let nextState = applyOverflowingGraceFromDirectHeal(
+    healResult.state,
+    caster,
+    healResult.target,
+    healResult.overhealingAmount,
+    now,
+  );
   const healedTarget = healResult.target;
 
   nextState = addSkillVisualEvent(nextState, {
@@ -3352,7 +3439,13 @@ function applySacrificeHeal(
     now,
     { sourceId: caster.id, feedback: false },
   );
-  let nextState = healResult.state;
+  let nextState = applyOverflowingGraceFromDirectHeal(
+    healResult.state,
+    caster,
+    healResult.target,
+    healResult.overhealingAmount,
+    now,
+  );
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
@@ -3591,6 +3684,16 @@ function applyWhipPrison(
 
   let nextState = state;
   const controlTargets = [caster.id, target.id];
+  const controlDurationMs = getCrimsonAuthorityDurationMs(
+    caster,
+    skill,
+    skill.effect.controlDurationMs,
+  );
+  const bleedDurationMs = getCrimsonAuthorityDurationMs(
+    caster,
+    skill,
+    skill.effect.bleedDurationMs,
+  );
 
   for (const targetId of controlTargets) {
     for (const type of ["immobilized", "disarmed", "silenced"] as const) {
@@ -3599,7 +3702,10 @@ function applyWhipPrison(
         {
           type,
           targetId,
-          durationMs: skill.effect.controlDurationMs,
+          durationMs:
+            targetId === caster.id
+              ? skill.effect.controlDurationMs
+              : controlDurationMs,
           sourceId: caster.id,
           sourceKey: skill.id,
         },
@@ -3609,7 +3715,7 @@ function applyWhipPrison(
   }
 
   nextState = applyBleed(nextState, caster, target, {
-    durationMs: skill.effect.bleedDurationMs,
+    durationMs: bleedDurationMs,
     tickIntervalMs: skill.effect.bleedTickIntervalMs,
     damageAttackPowerPercent: skill.effect.bleedDamageAttackPowerPercent,
     sourceKey: skill.effect.sourceKey,
@@ -3621,8 +3727,8 @@ function applyWhipPrison(
     currentTargetId: caster.id,
   });
   const visualDurationMs = Math.max(
-    skill.effect.controlDurationMs,
-    skill.effect.bleedDurationMs,
+    controlDurationMs,
+    bleedDurationMs,
   );
 
   nextState = addSkillVisualEvent(nextState, {
@@ -3687,7 +3793,11 @@ function applyFlagellantLash(
 
   if (isLivingEnemy(currentTarget)) {
     nextState = applyBleed(nextState, currentCaster, currentTarget, {
-      durationMs: skill.effect.bleedDurationMs,
+      durationMs: getCrimsonAuthorityDurationMs(
+        currentCaster,
+        skill,
+        skill.effect.bleedDurationMs,
+      ),
       tickIntervalMs: skill.effect.bleedTickIntervalMs,
       damageAttackPowerPercent: skill.effect.bleedDamageAttackPowerPercent,
       sourceKey: skill.effect.sourceKey,

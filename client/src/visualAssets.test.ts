@@ -120,12 +120,52 @@ describe("entity visual assets", () => {
         INVENTORY_ITEM_ICON_SRC[
           `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
         ],
-      ).toContain(`/ticket-0515/runecaster/books/${skillId}_skill_book.png`);
+      ).toContain(`/skill-book-icons/items/runecaster/${skillId}_skill_book.png`);
     }
 
     expect(RUNE_WORD_SEAL_SRC.qqen).toContain(
       "/ticket-0515/runecaster/seals/qqen.png",
     );
+  });
+
+  it("uses class-specific books and icons for magic and support passives", () => {
+    const passiveClassBySkillId = {
+      stable_overcharge: "elementalist",
+      arcane_crescendo: "elementalist",
+      word_resonance: "runecaster",
+      living_inscription: "runecaster",
+      overflowing_grace: "lightbearer",
+      many_beacons: "lightbearer",
+      crimson_authority: "penitent",
+      cruel_mercy: "penitent",
+    } as const;
+
+    for (const [skillId, classId] of Object.entries(passiveClassBySkillId)) {
+      expect(
+        SKILL_VISUAL_ICON_SRC[
+          skillId as keyof typeof passiveClassBySkillId
+        ],
+      ).toContain(
+        `/first-class-skill-effects/${classId}/sprites/${skillId}.png`,
+      );
+      expect(
+        INVENTORY_ITEM_ICON_SRC[
+          `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
+        ],
+      ).toContain(`/skill-book-icons/items/${classId}/${skillId}_skill_book.png`);
+    }
+
+    for (const classId of [
+      "elementalist",
+      "runecaster",
+      "lightbearer",
+      "penitent",
+    ] as const) {
+      const classSkillIds = Object.entries(INVENTORY_ITEM_ICON_SRC).filter(
+        ([, source]) => source?.includes(`/skill-book-icons/items/${classId}/`),
+      );
+      expect(classSkillIds).toHaveLength(10);
+    }
   });
 
   it("uses real-size Test-Character Idle and Run art for quest guide NPCs", () => {

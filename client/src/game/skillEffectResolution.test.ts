@@ -670,7 +670,7 @@ describe("skill effect resolution", () => {
     ).toMatchObject({
       companionId: elementalist.id,
       skillPowerBonusPercent: 20,
-      cooldownPenaltyPercent: 28,
+      cooldownPenaltyPercent: 27,
       expiresAt: 121000,
     });
 
@@ -732,7 +732,7 @@ describe("skill effect resolution", () => {
       earlyRefresh.state.skillOverchargesByCompanionId?.elementalist,
     ).toMatchObject({
       skillPowerBonusPercent: 10,
-      cooldownPenaltyPercent: 20,
+      cooldownPenaltyPercent: 19,
       expiresAt: 121_000,
     });
 
@@ -768,7 +768,7 @@ describe("skill effect resolution", () => {
       refreshed.state.skillOverchargesByCompanionId?.elementalist,
     ).toMatchObject({
       skillPowerBonusPercent: 20,
-      cooldownPenaltyPercent: 28,
+      cooldownPenaltyPercent: 27,
       expiresAt: 239_000,
     });
   });

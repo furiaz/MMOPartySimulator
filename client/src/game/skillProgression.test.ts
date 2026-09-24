@@ -1583,6 +1583,30 @@ describe("skill progression", () => {
     );
   });
 
+  it.each([
+    ["elementalist", ["stable_overcharge", "arcane_crescendo"]],
+    ["runecaster", ["word_resonance", "living_inscription"]],
+    ["lightbearer", ["overflowing_grace", "many_beacons"]],
+    ["penitent", ["crimson_authority", "cruel_mercy"]],
+  ] as const)("learns the %s passives at rank 1", (classId, passiveIds) => {
+    const companion = createCompanion(
+      "companion",
+      { x: 0, y: 0 },
+      "companion",
+      "support",
+      1,
+      classId,
+    );
+
+    expect(getLearnedPassivesForCompanion(companion).map((skill) => skill.id)).toEqual([
+      ...passiveIds,
+    ]);
+    for (const passiveId of passiveIds) {
+      expect(getCompanionSkillRank(companion, passiveId)).toBe(1);
+    }
+    expect(getActiveSkillsForCompanion(companion)).toHaveLength(8);
+  });
+
   it("uses the shared rank curve and exact book costs for passive skills", () => {
     const companion = createCompanion(
       "companion",

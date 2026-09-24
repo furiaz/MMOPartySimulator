@@ -19,6 +19,7 @@ import type {
   SkillShieldBlockState,
 } from "./types";
 import { grantRiposteTrainingCharge } from "./martialPassives";
+import { absorbWithOverflowingGrace } from "./magicSupportPassives";
 
 export function getPrototypeAttackDamage(
   state: GameState,
@@ -81,11 +82,16 @@ export function applyCompanionHealing(
     sourceId,
     feedback = true,
   }: { sourceId?: string; feedback?: boolean } = {},
-): { state: GameState; healedAmount: number; target: Companion } {
+): {
+  state: GameState;
+  healedAmount: number;
+  overhealingAmount: number;
+  target: Companion;
+} {
   const currentTarget = state.entities[target.id];
 
   if (!isLivingCompanion(currentTarget) || baseAmount <= 0) {
-    return { state, healedAmount: 0, target };
+    return { state, healedAmount: 0, overhealingAmount: 0, target };
   }
 
   const healingReceivedBonusPercent = getHealingReceivedBonusPercent(
@@ -101,9 +107,13 @@ export function applyCompanionHealing(
     currentTarget.health + amount,
   );
   const healedAmount = nextHealth - currentTarget.health;
+  const overhealingAmount = Math.max(
+    0,
+    amount - (currentTarget.maxHealth - currentTarget.health),
+  );
 
   if (healedAmount <= 0) {
-    return { state, healedAmount: 0, target: currentTarget };
+    return { state, healedAmount: 0, overhealingAmount, target: currentTarget };
   }
 
   let nextState = updateEntity(state, {
@@ -128,6 +138,7 @@ export function applyCompanionHealing(
   return {
     state: nextState,
     healedAmount,
+    overhealingAmount,
     target: isLivingCompanion(healedTarget) ? healedTarget : currentTarget,
   };
 }
@@ -424,45 +435,50 @@ export function applyIncomingDamageAbsorb(
   }
 
   const absorbShield = getAbsorbShield(nextState, target, damageType);
-
-  if (!absorbShield || remainingDamage <= 0) {
-    return { state: nextState, remainingDamage, absorbedDamage };
-  }
-
-  const shieldAbsorbedDamage = Math.min(
-    remainingDamage,
-    absorbShield.remainingAbsorb,
-  );
-  const remainingAbsorb = absorbShield.remainingAbsorb - shieldAbsorbedDamage;
-  const skillAbsorbShieldsByCompanionId = {
-    ...(nextState.skillAbsorbShieldsByCompanionId ?? {}),
-  };
-
-  if (remainingAbsorb > 0) {
-    skillAbsorbShieldsByCompanionId[target.id] = {
-      ...absorbShield,
-      remainingAbsorb,
+  if (absorbShield && remainingDamage > 0) {
+    const shieldAbsorbedDamage = Math.min(
+      remainingDamage,
+      absorbShield.remainingAbsorb,
+    );
+    const remainingAbsorb = absorbShield.remainingAbsorb - shieldAbsorbedDamage;
+    const skillAbsorbShieldsByCompanionId = {
+      ...(nextState.skillAbsorbShieldsByCompanionId ?? {}),
     };
-  } else {
-    delete skillAbsorbShieldsByCompanionId[target.id];
+
+    if (remainingAbsorb > 0) {
+      skillAbsorbShieldsByCompanionId[target.id] = {
+        ...absorbShield,
+        remainingAbsorb,
+      };
+    } else {
+      delete skillAbsorbShieldsByCompanionId[target.id];
+    }
+
+    nextState = {
+      ...nextState,
+      skillAbsorbShieldsByCompanionId,
+    };
+    nextState = addCombatFeedback(nextState, {
+      type: "attack",
+      entityId: target.id,
+      text: "Absorbed",
+      now,
+    });
+    remainingDamage = Math.max(0, remainingDamage - shieldAbsorbedDamage);
+    absorbedDamage += shieldAbsorbedDamage;
   }
 
-  nextState = {
-    ...nextState,
-    skillAbsorbShieldsByCompanionId,
-  };
-
-  nextState = addCombatFeedback(nextState, {
-    type: "attack",
-    entityId: target.id,
-    text: "Absorbed",
+  const graceResult = absorbWithOverflowingGrace(
+    nextState,
+    target,
+    remainingDamage,
     now,
-  });
+  );
 
   return {
-    state: nextState,
-    remainingDamage: Math.max(0, remainingDamage - shieldAbsorbedDamage),
-    absorbedDamage: absorbedDamage + shieldAbsorbedDamage,
+    state: graceResult.state,
+    remainingDamage: graceResult.remainingDamage,
+    absorbedDamage: absorbedDamage + graceResult.absorbedDamage,
   };
 }
 

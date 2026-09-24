@@ -58,6 +58,7 @@ import {
 import { updateStatusEffects } from "./statusEffects";
 import { updateRuneSkillRuntime } from "./skillRuntime";
 import { updateMartialPassiveRuntime } from "./martialPassives";
+import { updateMagicSupportPassiveRuntime } from "./magicSupportPassives";
 import {
   isMapTeleportPoiActive,
   updateTeleportSystem,
@@ -102,6 +103,7 @@ export function updateGame(
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
+  nextState = updateMagicSupportPassiveRuntime(nextState, timing.nowMs);
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = updateRoleBonusAssignments(nextState, timing.nowMs);
   const movedEntityIds = new Set<string>();

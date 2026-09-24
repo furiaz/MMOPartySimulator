@@ -57,6 +57,11 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     riposteTrainingByCompanionId: {},
     rootedBastionByCompanionId: {},
     headhunterByCompanionId: {},
+    arcaneCrescendoByCompanionId: {},
+    wordResonanceByCompanionId: {},
+    manyBeaconsByCompanionId: {},
+    cruelMercyByCompanionId: {},
+    overflowingGraceBarriersByCompanionId: {},
     skillSelfBuffsByCompanionId: {},
     skillPartyBuffsBySourceId: {},
     skillPartyPoisonCoatingsBySourceId: {},
@@ -137,6 +142,26 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   );
   const skillOverchargesByCompanionId = pruneRecordById(
     state.skillOverchargesByCompanionId,
+    currentEntityIds,
+  );
+  const arcaneCrescendoByCompanionId = pruneRecordById(
+    state.arcaneCrescendoByCompanionId,
+    currentEntityIds,
+  );
+  const wordResonanceByCompanionId = pruneRecordById(
+    state.wordResonanceByCompanionId,
+    currentEntityIds,
+  );
+  const manyBeaconsByCompanionId = pruneRecordById(
+    state.manyBeaconsByCompanionId,
+    currentEntityIds,
+  );
+  const cruelMercyByCompanionId = pruneRecordById(
+    state.cruelMercyByCompanionId,
+    currentEntityIds,
+  );
+  const overflowingGraceBarriersByCompanionId = pruneRecordById(
+    state.overflowingGraceBarriersByCompanionId,
     currentEntityIds,
   );
   const skillManaShieldsByCompanionId = pruneRecordById(
@@ -249,6 +274,12 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillPartyClassBuffsByCompanionId ===
       state.skillPartyClassBuffsByCompanionId &&
     skillOverchargesByCompanionId === state.skillOverchargesByCompanionId &&
+    arcaneCrescendoByCompanionId === state.arcaneCrescendoByCompanionId &&
+    wordResonanceByCompanionId === state.wordResonanceByCompanionId &&
+    manyBeaconsByCompanionId === state.manyBeaconsByCompanionId &&
+    cruelMercyByCompanionId === state.cruelMercyByCompanionId &&
+    overflowingGraceBarriersByCompanionId ===
+      state.overflowingGraceBarriersByCompanionId &&
     skillManaShieldsByCompanionId === state.skillManaShieldsByCompanionId &&
     skillFrostArmorsByCompanionId === state.skillFrostArmorsByCompanionId &&
     skillHealOverTimesByCompanionId === state.skillHealOverTimesByCompanionId &&
@@ -296,6 +327,11 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     skillPartyPoisonCoatingsBySourceId,
     skillPartyClassBuffsByCompanionId,
     skillOverchargesByCompanionId,
+    arcaneCrescendoByCompanionId,
+    wordResonanceByCompanionId,
+    manyBeaconsByCompanionId,
+    cruelMercyByCompanionId,
+    overflowingGraceBarriersByCompanionId,
     skillManaShieldsByCompanionId,
     skillFrostArmorsByCompanionId,
     skillHealOverTimesByCompanionId,

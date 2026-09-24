@@ -86,6 +86,22 @@ export function getPassiveSkillEffectSummary(
       return `Physical direct and bleed damage is increased by ${formatPercent(3 * units)}% against enemies at or below 30% health.`;
     case "packInstinct":
       return `Direct and damage-over-time damage is increased by ${formatPercent(2 * units)}% while another living companion is within 2 spaces of the target.`;
+    case "stableOvercharge":
+      return `Overcharge's cooldown penalty is reduced by ${formatPercent(units)} percentage points.`;
+    case "arcaneCrescendo":
+      return `After ${Math.max(6, 10 - Math.floor((rank - 1) / 5))} successful offensive spells, the next successful offensive AoE deals ${formatPercent(4 * rank)}% more damage.`;
+    case "wordResonance":
+      return `A successful Runecaster skill gains ${formatPercent(2 * units)}% effect strength when its primary rune-word differs from the previous successful Runecaster skill.`;
+    case "livingInscription":
+      return `Each source-owned active rune effect grants ${formatPercent(units)}% Runecaster-skill effectiveness, with up to 2 effects contributing.`;
+    case "overflowingGrace":
+      return `Converts ${formatPercent(5 * rank)}% of direct overhealing into an 8-second barrier, capped at ${formatPercent(rank)}% of the target's maximum health.`;
+    case "manyBeacons":
+      return `A direct heal aimed at a different main target within 10 seconds gains ${formatPercent(2 * units)}% healing.`;
+    case "crimsonAuthority":
+      return `At or below 50% health, Penitent control and bleed durations increase by ${formatPercent(3 * units)}%.`;
+    case "cruelMercy":
+      return `Healing or shielding another companion primes the next damaging Penitent skill within 10 seconds for ${formatPercent(3 * units)}% more direct and bleed damage.`;
   }
 }
 

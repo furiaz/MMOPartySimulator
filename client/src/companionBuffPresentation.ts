@@ -10,6 +10,10 @@ import {
   getLearnedPassiveRank,
 } from "./game/passiveSkills";
 import { getActiveHeadhunterKillTimestamps } from "./game/martialPassives";
+import {
+  getArcaneCrescendoDamageBonusPercent,
+  getArcaneCrescendoSpellThreshold,
+} from "./game/magicSupportPassives";
 import { getSkillScaleUnits } from "./game/skillProgression";
 
 const defaultVisibleBuffCount = 8;
@@ -99,6 +103,36 @@ export function getCompanionBuffDisplayEntries({
       headhunterExpiry,
       currentTime,
     );
+
+    const crescendoRank = getLearnedPassiveRank(companion, "arcane_crescendo");
+    const crescendo = gameState.arcaneCrescendoByCompanionId?.[companionId];
+    const crescendoThreshold = crescendoRank
+      ? getArcaneCrescendoSpellThreshold(crescendoRank)
+      : 10;
+    addUntimedBuff(
+      drafts,
+      "arcane_crescendo",
+      crescendo?.charged && crescendoRank
+        ? `Next offensive AoE +${formatNumber(
+            getArcaneCrescendoDamageBonusPercent(crescendoRank),
+          )}% damage`
+        : `${crescendo?.offensiveSpellCount ?? 0}/${crescendoThreshold} offensive spells`,
+      Boolean(crescendoRank && crescendo && (crescendo.charged || crescendo.offensiveSpellCount > 0)),
+    );
+
+    const cruelMercyRank = getLearnedPassiveRank(companion, "cruel_mercy");
+    const cruelMercy = gameState.cruelMercyByCompanionId?.[companionId];
+    addTimedBuff(
+      drafts,
+      "cruel_mercy",
+      cruelMercyRank
+        ? `Next damaging Penitent skill +${formatNumber(
+            3 * getSkillScaleUnits(cruelMercyRank),
+          )}% direct and bleed damage`
+        : "Cruel Mercy ready",
+      cruelMercy?.expiresAt,
+      currentTime,
+    );
   }
   const selfBuff = gameState.skillSelfBuffsByCompanionId?.[companionId];
 
@@ -155,6 +189,17 @@ export function getCompanionBuffDisplayEntries({
     ),
     manaShield ? formatAbsorbShieldLine("Mana shield", manaShield) : "Mana shield",
     Boolean(manaShield),
+  );
+  const overflowingGrace =
+    gameState.overflowingGraceBarriersByCompanionId?.[companionId];
+  addTimedBuff(
+    drafts,
+    "overflowing_grace",
+    overflowingGrace
+      ? formatAbsorbShieldLine("Grace barrier", overflowingGrace)
+      : "Grace barrier",
+    overflowingGrace?.expiresAt,
+    currentTime,
   );
   const frostArmor = gameState.skillFrostArmorsByCompanionId?.[companionId];
   addTimedBuff(

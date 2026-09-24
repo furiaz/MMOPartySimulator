@@ -13,6 +13,7 @@ import type {
   DirectCompanionCommand,
   ActiveCombatProjectile,
   ActiveTeleport,
+  ArcaneCrescendoState,
   AutoRouteRuntimeState,
   AutonomousTargetSuppressionState,
   DebugMapId,
@@ -44,6 +45,9 @@ import type {
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
   HeadhunterState,
+  CruelMercyState,
+  ManyBeaconsState,
+  OverflowingGraceBarrierState,
   SkillAbsorbShieldState,
   SkillBindState,
   SkillCooldownsBySkillId,
@@ -73,6 +77,7 @@ import type {
   TeleportRuntimeState,
   WorldDiscoveryState,
   WorldWipeRecoveryState,
+  WordResonanceState,
 } from "./types";
 import {
   filterExpiredGlobalCooldowns,
@@ -240,6 +245,14 @@ export type GameState = {
   riposteTrainingByCompanionId?: Record<string, RiposteTrainingState>;
   rootedBastionByCompanionId?: Record<string, RootedBastionState>;
   headhunterByCompanionId?: Record<string, HeadhunterState>;
+  arcaneCrescendoByCompanionId?: Record<string, ArcaneCrescendoState>;
+  wordResonanceByCompanionId?: Record<string, WordResonanceState>;
+  manyBeaconsByCompanionId?: Record<string, ManyBeaconsState>;
+  cruelMercyByCompanionId?: Record<string, CruelMercyState>;
+  overflowingGraceBarriersByCompanionId?: Record<
+    string,
+    OverflowingGraceBarrierState
+  >;
   skillSelfBuffsByCompanionId?: Record<string, SkillSelfBuffState>;
   skillPartyBuffsBySourceId?: Record<string, SkillPartyBuffState>;
   skillPartyPoisonCoatingsBySourceId?: Record<string, SkillPartyPoisonCoatingState>;

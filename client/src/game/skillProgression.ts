@@ -93,6 +93,8 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   emberwood_rhythm: "emberwood_rhythm_skill_book",
   flame_step: "flame_step_skill_book",
   fire_burst: "fire_burst_skill_book",
+  stable_overcharge: "stable_overcharge_skill_book",
+  arcane_crescendo: "arcane_crescendo_skill_book",
   binding_rune: "binding_rune_skill_book",
   rune_lance: "rune_lance_skill_book",
   warding_glyph: "warding_glyph_skill_book",
@@ -101,6 +103,8 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   leyline_matrix: "leyline_matrix_skill_book",
   stone_sigil_rhythm: "stone_sigil_rhythm_skill_book",
   rune_step: "rune_step_skill_book",
+  word_resonance: "word_resonance_skill_book",
+  living_inscription: "living_inscription_skill_book",
   blinding_ray: "blinding_ray_skill_book",
   light_mend: "light_mend_skill_book",
   sanctuary_veil: "sanctuary_veil_skill_book",
@@ -109,6 +113,8 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   herbalist_hymn: "herbalist_hymn_skill_book",
   dawn_step: "dawn_step_skill_book",
   circle_of_renewal: "circle_of_renewal_skill_book",
+  overflowing_grace: "overflowing_grace_skill_book",
+  many_beacons: "many_beacons_skill_book",
   whip_prison: "whip_prison_skill_book",
   flagellant_lash: "flagellant_lash_skill_book",
   martyrs_veil: "martyrs_veil_skill_book",
@@ -117,6 +123,8 @@ export const SKILL_BOOK_ITEM_IDS_BY_SKILL_ID: Record<SkillId, ItemId> = {
   burdened_benediction: "burdened_benediction_skill_book",
   woodcutting_penance: "woodcutting_penance_skill_book",
   atonement_step: "atonement_step_skill_book",
+  crimson_authority: "crimson_authority_skill_book",
+  cruel_mercy: "cruel_mercy_skill_book",
 };
 
 export type ReadSkillBookFailureReason =

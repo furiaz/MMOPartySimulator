@@ -582,6 +582,8 @@ export type SkillBookItemId =
   | "emberwood_rhythm_skill_book"
   | "flame_step_skill_book"
   | "fire_burst_skill_book"
+  | "stable_overcharge_skill_book"
+  | "arcane_crescendo_skill_book"
   | "binding_rune_skill_book"
   | "rune_lance_skill_book"
   | "warding_glyph_skill_book"
@@ -590,6 +592,8 @@ export type SkillBookItemId =
   | "leyline_matrix_skill_book"
   | "stone_sigil_rhythm_skill_book"
   | "rune_step_skill_book"
+  | "word_resonance_skill_book"
+  | "living_inscription_skill_book"
   | "blinding_ray_skill_book"
   | "light_mend_skill_book"
   | "sanctuary_veil_skill_book"
@@ -598,6 +602,8 @@ export type SkillBookItemId =
   | "herbalist_hymn_skill_book"
   | "dawn_step_skill_book"
   | "circle_of_renewal_skill_book"
+  | "overflowing_grace_skill_book"
+  | "many_beacons_skill_book"
   | "whip_prison_skill_book"
   | "flagellant_lash_skill_book"
   | "martyrs_veil_skill_book"
@@ -605,7 +611,9 @@ export type SkillBookItemId =
   | "eternal_hope_skill_book"
   | "burdened_benediction_skill_book"
   | "woodcutting_penance_skill_book"
-  | "atonement_step_skill_book";
+  | "atonement_step_skill_book"
+  | "crimson_authority_skill_book"
+  | "cruel_mercy_skill_book";
 
 export type ItemId =
   | ResourceItemId
@@ -1122,6 +1130,8 @@ export type SkillId =
   | "emberwood_rhythm"
   | "flame_step"
   | "fire_burst"
+  | "stable_overcharge"
+  | "arcane_crescendo"
   | "binding_rune"
   | "rune_lance"
   | "warding_glyph"
@@ -1130,6 +1140,8 @@ export type SkillId =
   | "leyline_matrix"
   | "stone_sigil_rhythm"
   | "rune_step"
+  | "word_resonance"
+  | "living_inscription"
   | "blinding_ray"
   | "light_mend"
   | "sanctuary_veil"
@@ -1138,6 +1150,8 @@ export type SkillId =
   | "herbalist_hymn"
   | "dawn_step"
   | "circle_of_renewal"
+  | "overflowing_grace"
+  | "many_beacons"
   | "whip_prison"
   | "flagellant_lash"
   | "martyrs_veil"
@@ -1145,7 +1159,9 @@ export type SkillId =
   | "eternal_hope"
   | "burdened_benediction"
   | "woodcutting_penance"
-  | "atonement_step";
+  | "atonement_step"
+  | "crimson_authority"
+  | "cruel_mercy";
 
 export type RunecasterSkillId =
   | "binding_rune"
@@ -1261,6 +1277,7 @@ export type ActiveSkillDefinition = {
   range: number;
   cooldownMs?: number;
   canLegacyCarry?: boolean;
+  offensiveSpell?: true;
   runeWords?: RunecasterRuneSequence;
   effect:
     | { type: "damage"; damageType: CombatDamageType; powerMultiplier: number }
@@ -1567,7 +1584,15 @@ export type PassiveSkillDefinition = {
     | { type: "headhunter" }
     | { type: "exploitTheSnare" }
     | { type: "bloodScent" }
-    | { type: "packInstinct" };
+    | { type: "packInstinct" }
+    | { type: "stableOvercharge" }
+    | { type: "arcaneCrescendo" }
+    | { type: "wordResonance" }
+    | { type: "livingInscription" }
+    | { type: "overflowingGrace" }
+    | { type: "manyBeacons" }
+    | { type: "crimsonAuthority" }
+    | { type: "cruelMercy" };
 };
 
 export type SkillDefinition = ActiveSkillDefinition | PassiveSkillDefinition;
@@ -1609,6 +1634,36 @@ export type RootedBastionState = {
 export type HeadhunterState = {
   companionId: string;
   killTimestamps: number[];
+};
+
+export type ArcaneCrescendoState = {
+  companionId: string;
+  offensiveSpellCount: number;
+  charged: boolean;
+};
+
+export type WordResonanceState = {
+  companionId: string;
+  previousPrimaryRuneWordId: RunecasterRuneWordId;
+};
+
+export type ManyBeaconsState = {
+  companionId: string;
+  previousTargetId: string;
+  expiresAt: number;
+};
+
+export type CruelMercyState = {
+  companionId: string;
+  expiresAt: number;
+};
+
+export type OverflowingGraceBarrierState = {
+  targetId: string;
+  sourceId: string;
+  remainingAbsorb: number;
+  maxAbsorb: number;
+  expiresAt: number;
 };
 
 export type SkillGatherBuffState = {
