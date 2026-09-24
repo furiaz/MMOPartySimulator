@@ -1304,28 +1304,220 @@
 
 .debug-tools {
   position: fixed;
-  top: 74px;
-  right: 12px;
-  left: 12px;
+  top: 82px;
+  left: 50%;
   z-index: 13;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(940px, calc(100vw - 24px));
+  max-height: min(66vh, 620px);
   margin: 0;
-  padding: 0;
-  border-top: 0;
-  background: transparent;
+  overflow: hidden;
+  border: 1px solid rgba(202, 158, 79, 0.82);
+  border-radius: 8px;
+  background: rgba(18, 22, 24, 0.97);
+  color: #f8ecd2;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.48),
+    inset 0 0 0 1px rgba(245, 213, 141, 0.1);
   pointer-events: auto;
+  transform: translateX(-50%);
 }
 
 .debug-tools h2 {
-  display: none;
+  margin: 0;
+  color: #ffe6ab;
+  font-size: 17px;
+  letter-spacing: 0.03em;
 }
 
-.debug-tools .test-controls {
-  position: static;
-  pointer-events: auto;
+.debug-tools button,
+.debug-tools select {
+  border: 1px solid rgba(122, 99, 64, 0.92);
+  border-radius: 4px;
+  background: rgba(42, 36, 31, 0.96);
+  color: #f8ecd2;
+  font: inherit;
+}
+
+.debug-tools button {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.debug-tools button:hover,
+.debug-tools button:focus-visible,
+.debug-tools select:focus-visible {
+  border-color: #e6b85d;
+  background: rgba(61, 47, 34, 0.98);
+  outline: none;
+}
+
+.debug-tools button.active,
+.debug-tools button[aria-selected="true"] {
+  border-color: #e6b85d;
+  background: rgba(105, 72, 36, 0.9);
+  color: #ffe7ad;
+}
+
+.debug-tools button:disabled,
+.debug-tools select:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.debug-tools-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(122, 99, 64, 0.62);
+  background: linear-gradient(180deg, rgba(55, 43, 32, 0.96), rgba(31, 28, 26, 0.96));
+}
+
+.debug-tools-header p {
+  margin: 2px 0 0;
+  color: #b9aa8d;
+  font-size: 11px;
+}
+
+.debug-tools-pinned-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.debug-tools-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 7px 8px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(122, 99, 64, 0.62);
+  background: rgba(25, 27, 28, 0.98);
+  scrollbar-width: thin;
+}
+
+.debug-tools-tabs button {
+  flex: 1 0 auto;
+  min-height: 33px;
+  padding: 6px 12px;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+  color: #cbbd9f;
+}
+
+.debug-tools-content {
+  min-height: 118px;
+  padding: 14px;
+  overflow: auto;
+}
+
+.debug-tool-section {
+  display: grid;
+  gap: 12px;
+}
+
+.debug-tool-section h3 {
+  margin: 0;
+  color: #d7b772;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.debug-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(154px, 1fr));
+  gap: 8px;
+}
+
+.debug-tool-inline-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.debug-tool-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #d7b772;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.debug-tool-field select {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 28px 6px 9px;
+  font-size: 12px;
+}
+
+.debug-status-grid {
+  display: flex;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid rgba(122, 99, 64, 0.36);
+  color: #b9aa8d;
+  font-size: 11px;
+}
+
+.debug-tools-placeholder {
+  margin: 0;
+  color: #b9aa8d;
+  font-size: 12px;
+}
+
+.debug-tools-feedback {
+  min-height: 16px;
+  margin: 0;
+  color: #d9c9a7;
+  font-size: 11px;
 }
 
 .debug-tools-hidden {
   justify-self: auto;
+}
+
+@media (max-width: 680px) {
+  .debug-tools {
+    top: 76px;
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 154px);
+  }
+
+  .debug-tools-header {
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .debug-tools-pinned-controls {
+    gap: 5px;
+  }
+
+  .debug-tools-pinned-controls button {
+    min-height: 30px;
+    padding: 5px 7px;
+    font-size: 10px;
+  }
+
+  .debug-tools-content {
+    padding: 10px;
+  }
+
+  .debug-tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .debug-tool-inline-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .game-menu-toggle-button {

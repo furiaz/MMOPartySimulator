@@ -9,6 +9,10 @@ import {
 } from "react";
 import "./App.css";
 import { CompanionVitalsPanel } from "./CompanionVitalsPanel";
+import {
+  DebugToolsPanel,
+  type DebugToolsSection,
+} from "./DebugToolsPanel";
 import { GuidePopup } from "./GuidePopup";
 import {
   guidePopupDefinitions,
@@ -61,28 +65,36 @@ import {
   closeSlimewardDungeonChestUi,
   continueSlimewardDungeonChest,
   craftRecipe,
+  DEBUG_CLASS_CYCLE_ORDER,
   debugAddCraftingMaterialsAndEnemyDropsToInventory,
   debugAddCompanionToParty,
   debugAddEnemiesToCurrentSubzone,
-  debugAddPrototypeConsumablesToInventory,
+  debugAddOwnedLivestockCreature,
+  debugAddPrototypeFlasksToInventory,
   debugAddTestCrowns,
+  debugCycleCompanionClass,
   debugFinishCurrentQuest,
   debugForceSuperiorEnemyInCurrentSubzone,
+  debugKillCompanion,
   debugKillOneCompanion,
+  debugLevelUpCompanion,
   debugLevelUpAllCompanions,
   debugRefreshResources,
   debugRemoveCompanionFromParty,
   debugRemoveDebugEnemies,
   debugResetSlimewardDungeon,
   debugResurrectEnemy,
+  debugRestoreCompanionHealth,
   debugRestorePartyHealth,
+  debugSummonEnemy,
   debugTeleportToHub,
   debugTeleportToSlimewardCamp,
   debugToggleCompanionInfiniteHealth,
-  debugToggleCompanionOneHunterClass,
   debugToggleSuperExp,
   debugToggleSuperSpeed,
   debugTurnInCurrentQuest,
+  debugUnlockFarmCrop,
+  debugUnlockTownServices,
   enemyIds,
   equipItemToCompanion,
   equipFlaskToCompanion,
@@ -93,15 +105,20 @@ import {
   getCompanionDerivedStatsWithPartyBuffs,
   getEnemyArchetype,
   getEnemyType,
+  getDebugEnemySummonGroups,
+  getDefaultDebugSummonEnemyTypeId,
   getFilteredMerchantBuyStock,
   getActiveQuest,
   getActiveCompanions,
   getFarmCropDefinition,
+  getFarmCropDefinitions,
   getItemDefinition,
   getMerchantFarmSeedStock,
   getMerchantLivestockStock,
   getMerchantBuyStock,
   getMerchantSecondaryFilterOptions,
+  getLivestockCreatureDefinitions,
+  getLivestockState,
   hubCompanionStartPositions,
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
@@ -140,6 +157,7 @@ import {
   isPartyLeaderNearBankChest,
   isPartyLeaderNearGuildTavern,
   isTownServicesUnlocked,
+  isFarmCropUnlocked,
   isCompanionHubEligibleForInnKitchen,
   collectAllLivestockOutputs,
   feedHungryLivestockNow,
@@ -228,6 +246,7 @@ import {
   type DropVisualEvent,
   type Enemy,
   type EnemyAoeChannelState,
+  type EnemyTypeId,
   type EquipmentSlot,
   type EquipmentStatModifiers,
   type FirstClassId,
@@ -2987,6 +3006,18 @@ function App() {
   const [entityHoverTooltip, setEntityHoverTooltip] =
     useState<EntityHoverTooltipState | null>(null);
   const [showDebugTools, setShowDebugTools] = useState(false);
+  const [activeDebugToolsSection, setActiveDebugToolsSection] =
+    useState<DebugToolsSection>("companion");
+  const [selectedDebugCompanionId, setSelectedDebugCompanionId] =
+    useState<string | null>(null);
+  const [selectedDebugEnemyTypeId, setSelectedDebugEnemyTypeId] =
+    useState<EnemyTypeId>(() => getDefaultDebugSummonEnemyTypeId(gameState));
+  const [selectedDebugCropId, setSelectedDebugCropId] =
+    useState<FarmCropId>("potato");
+  const [selectedDebugCreatureId, setSelectedDebugCreatureId] =
+    useState<LivestockCreatureId>("duskhen");
+  const [debugActionFeedback, setDebugActionFeedback] =
+    useState<string | null>(null);
   const [isGameMenuOpen, setIsGameMenuOpen] = useState(false);
   const [activeGameMenuTab, setActiveGameMenuTab] =
     useState<GameMenuTab | null>(null);
@@ -3327,6 +3358,45 @@ function App() {
   )
     ? selectedCompanionId
     : partyMembers[0]?.id ?? null;
+  const selectedDebugCompanion =
+    partyMembers.find((member) => member.id === selectedDebugCompanionId) ??
+    partyMembers.find((member) => member.id === gameState.partyLeaderId) ??
+    partyMembers[0] ??
+    null;
+  const effectiveSelectedDebugCompanionId = selectedDebugCompanion?.id ?? "";
+  const selectedDebugClassIndex = selectedDebugCompanion
+    ? DEBUG_CLASS_CYCLE_ORDER.indexOf(selectedDebugCompanion.classId)
+    : 0;
+  const nextDebugClassId =
+    DEBUG_CLASS_CYCLE_ORDER[
+      (Math.max(0, selectedDebugClassIndex) + 1) %
+        DEBUG_CLASS_CYCLE_ORDER.length
+    ];
+  const debugEnemySummonGroups = useMemo(getDebugEnemySummonGroups, []);
+  const debugCropDefinitions = useMemo(
+    () =>
+      getFarmCropDefinitions().filter((definition) => definition.id !== "carrot"),
+    [],
+  );
+  const debugLivestockDefinitions = useMemo(
+    getLivestockCreatureDefinitions,
+    [],
+  );
+  const selectedDebugCropUnlocked = isFarmCropUnlocked(
+    gameState,
+    selectedDebugCropId,
+  );
+  const debugLivestockState = getLivestockState(gameState);
+
+  useEffect(() => {
+    if (
+      effectiveSelectedDebugCompanionId &&
+      selectedDebugCompanionId !== effectiveSelectedDebugCompanionId
+    ) {
+      setSelectedDebugCompanionId(effectiveSelectedDebugCompanionId);
+    }
+  }, [effectiveSelectedDebugCompanionId, selectedDebugCompanionId]);
+
   const eligibleFirstClassCompanions = useMemo(
     () => partyMembers.filter(canCompanionEnterFirstClassSelection),
     [partyMembers],
@@ -4617,16 +4687,79 @@ function App() {
     setGameState(debugToggleCompanionInfiniteHealth);
   }
 
-  function toggleCompanionOneHunterClass() {
-    setGameState(debugToggleCompanionOneHunterClass);
+  function cycleSelectedCompanionClass() {
+    if (!effectiveSelectedDebugCompanionId) {
+      setDebugActionFeedback("No companion is available.");
+      return;
+    }
+
+    setGameState((state) => {
+      const outcome = debugCycleCompanionClass(
+        state,
+        effectiveSelectedDebugCompanionId,
+      );
+
+      if (outcome.result.status === "success") {
+        const unequippedText =
+          outcome.result.unequippedItemIds.length > 0
+            ? ` Unequipped ${outcome.result.unequippedItemIds
+                .map((itemId) => getItemDefinition(itemId).displayName)
+                .join(", ")}.`
+            : "";
+        setDebugActionFeedback(
+          `${CLASS_DEFINITIONS[outcome.result.previousClassId].displayName} → ${CLASS_DEFINITIONS[outcome.result.nextClassId].displayName}.${unequippedText}`,
+        );
+      } else if (outcome.result.status === "failed_inventory_full") {
+        setDebugActionFeedback(
+          "Class change cancelled: inventory is full, so incompatible gear could not be removed.",
+        );
+      } else {
+        setDebugActionFeedback("Class change cancelled: companion unavailable.");
+      }
+
+      return outcome.state;
+    });
+  }
+
+  function restoreSelectedCompanionHealth() {
+    if (!effectiveSelectedDebugCompanionId) {
+      return;
+    }
+
+    setGameState((state) =>
+      debugRestoreCompanionHealth(state, effectiveSelectedDebugCompanionId),
+    );
+    setDebugActionFeedback("Selected companion restored.");
+  }
+
+  function levelUpSelectedCompanion() {
+    if (!effectiveSelectedDebugCompanionId) {
+      return;
+    }
+
+    setGameState((state) =>
+      debugLevelUpCompanion(state, effectiveSelectedDebugCompanionId),
+    );
+    setDebugActionFeedback("Selected companion leveled when eligible.");
+  }
+
+  function killSelectedCompanion() {
+    if (!effectiveSelectedDebugCompanionId) {
+      return;
+    }
+
+    setGameState((state) =>
+      debugKillCompanion(state, effectiveSelectedDebugCompanionId),
+    );
+    setDebugActionFeedback("Selected companion defeated.");
   }
 
   function addTestCrowns() {
     setGameState(debugAddTestCrowns);
   }
 
-  function addPrototypeConsumables() {
-    setGameState(debugAddPrototypeConsumablesToInventory);
+  function addPrototypeFlasks() {
+    setGameState(debugAddPrototypeFlasksToInventory);
   }
 
   function addCraftingMaterialsAndEnemyDrops() {
@@ -4676,6 +4809,46 @@ function App() {
 
   function removeDebugEnemies() {
     setGameState(debugRemoveDebugEnemies);
+  }
+
+  function summonSelectedEnemy() {
+    setGameState((state) =>
+      debugSummonEnemy(state, selectedDebugEnemyTypeId),
+    );
+    const enemyType = getEnemyType(selectedDebugEnemyTypeId);
+    setDebugActionFeedback(
+      enemyType
+        ? `${enemyType.displayName} summoned in the current subzone.`
+        : "Enemy summon failed.",
+    );
+  }
+
+  function unlockTownServicesForDebug() {
+    setGameState(debugUnlockTownServices);
+    setDebugActionFeedback(
+      "The Azure Trial prerequisite was completed without quest rewards.",
+    );
+  }
+
+  function unlockSelectedCropForDebug() {
+    setGameState((state) =>
+      debugUnlockFarmCrop(state, selectedDebugCropId),
+    );
+    setDebugActionFeedback(
+      `${getFarmCropDefinition(selectedDebugCropId).displayName} unlocked.`,
+    );
+  }
+
+  function addSelectedOwnedCreatureForDebug() {
+    setGameState((state) =>
+      debugAddOwnedLivestockCreature(state, selectedDebugCreatureId),
+    );
+    const creature = debugLivestockDefinitions.find(
+      (definition) => definition.id === selectedDebugCreatureId,
+    );
+    setDebugActionFeedback(
+      `${creature?.id === "wolf" ? "Wolf Pup" : creature?.displayName ?? "Creature"} added to Livestock ownership.`,
+    );
   }
 
   function resetSlimewardDungeon() {
@@ -4809,7 +4982,25 @@ function App() {
   );
 
   function toggleDebugTools() {
-    setShowDebugTools((isVisible) => !isVisible);
+    setShowDebugTools((isVisible) => {
+      if (!isVisible) {
+        setSelectedDebugEnemyTypeId(
+          getDefaultDebugSummonEnemyTypeId(latestGameStateRef.current),
+        );
+      }
+
+      return !isVisible;
+    });
+  }
+
+  function selectDebugToolsSection(section: DebugToolsSection) {
+    if (section === "encounters") {
+      setSelectedDebugEnemyTypeId(
+        getDefaultDebugSummonEnemyTypeId(latestGameStateRef.current),
+      );
+    }
+
+    setActiveDebugToolsSection(section);
   }
 
   function toggleSuperSpeed() {
@@ -6289,27 +6480,7 @@ function App() {
               </div>
               <span>Prototype Zone ID: {currentMap.debugName}</span>
             </div>
-            <div className="map-debug-toggle-controls" aria-label="Debug multipliers">
-              <button
-                className={gameState.debugOptions?.superSpeedEnabled ? "active" : ""}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleSuperSpeed();
-                }}
-                type="button"
-              >
-                Super Speed {gameState.debugOptions?.superSpeedEnabled ? "On" : "Off"}
-              </button>
-              <button
-                className={gameState.debugOptions?.superExpEnabled ? "active" : ""}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleSuperExp();
-                }}
-                type="button"
-              >
-                Super Exp {gameState.debugOptions?.superExpEnabled ? "On" : "Off"}
-              </button>
+            <div className="map-debug-toggle-controls" aria-label="Debug tools visibility">
               <button
                 onClick={(event) => {
                   event.stopPropagation();
@@ -7034,130 +7205,112 @@ function App() {
           </div>
 
           {showDebugTools ? (
-          <section className="debug-tools" aria-label="Debug tools">
-            <h2>Debug Tools</h2>
-            <div className="test-controls">
-                  <button onClick={addCompanionToParty}>
-                    Add Companion to Party
-                  </button>
-                  <button onClick={removeCompanionFromParty}>
-                    Remove Companion from Party
-                  </button>
-                  <button onClick={resurrectEnemy}>Resurrect Enemy</button>
-                  <button onClick={restorePartyHealth}>Restore Party HP</button>
-                  <button onClick={levelUpAllCompanions}>
-                    Level Up All Companions
-                  </button>
-                  <button onClick={toggleCompanionOneHunterClass}>
-                    Toggle Companion 1 Hunter
-                  </button>
-                  <button
-                    className={
-                      gameState.debugOptions?.companionInfiniteHealthEnabled
-                        ? "active"
-                        : ""
-                    }
-                    onClick={toggleCompanionInfiniteHealth}
-                  >
-                    Companion Infinite Health{" "}
-                    {gameState.debugOptions?.companionInfiniteHealthEnabled
-                      ? "On"
-                      : "Off"}
-                  </button>
-                  <button onClick={addTestCrowns}>+100 Crowns</button>
-                  <button onClick={addPrototypeConsumables}>
-                    Add Prototype Consumables
-                  </button>
-                  <button onClick={addCraftingMaterialsAndEnemyDrops}>
-                    Add Craft Materials x20
-                  </button>
-                  <button onClick={finishCurrentQuestForDebug}>
-                    Finish Current Quest
-                  </button>
-                  <button onClick={turnInCurrentQuestForDebug}>
-                    Turn In Current Quest
-                  </button>
-                  <button onClick={debugTeleportToHubOne}>
-                    Teleport Hub 1
-                  </button>
-                  <button onClick={debugTeleportToHubTwo}>
-                    Teleport Hub 2
-                  </button>
-                  <button onClick={debugTeleportToSlimewardCampForDebug}>
-                    Teleport Slimeward Camp
-                  </button>
-                  <button onClick={killOneCompanion}>Kill One Companion</button>
-                  <button onClick={forceSuperiorEnemy}>
-                    Force Superior Enemy
-                  </button>
-                  <button onClick={addEnemiesToCurrentSubzone}>
-                    Add Enemies to Subzone
-                  </button>
-                  <button onClick={removeDebugEnemies}>
-                    Remove Debug Enemies
-                  </button>
-                  <button onClick={resetSlimewardDungeon}>
-                    Reset Slimeward Dungeon
-                  </button>
-                  <button onClick={refreshGatherPoints}>
-                    Refresh Gather Points
-                  </button>
-                  <button onClick={toggleEntityInfo}>
-                    {showEntityInfo ? "Hide Entity Info" : "Show Entity Info"}
-                  </button>
-                  <button onClick={toggleDebugTelemetryRecording}>
-                    {gameState.debugTelemetry?.isRecording
-                      ? "Stop Debug Recording"
-                      : "Start Debug Recording"}
-                  </button>
-                  <button onClick={() => exportDebugTelemetryJson()}>
-                    Export Debug JSON
-                  </button>
-                  <button
-                    onClick={() =>
-                      exportDebugTelemetryJson({ clearAfterExport: true })
-                    }
-                  >
-                    Export & Clear JSON
-                  </button>
-                  <button onClick={clearDebugTelemetryReport}>
-                    Clear Debug Report
-                  </button>
-                  <button onClick={releaseRendererCache}>
-                    Release Renderer Cache
-                  </button>
-                  <span>
-                    Debug Recording{" "}
-                    {gameState.debugTelemetry?.isRecording ? "On" : "Off"} | Samples{" "}
-                    {gameState.debugTelemetry?.ticks.length ?? 0}/
-                    {gameState.debugTelemetry?.maxTicks ?? 1000} | Events{" "}
-                    {gameState.debugTelemetry?.events.length ?? 0}
-                  </span>
-                  <span>
-                    Direct Commands {activeDirectCommandCount} | Rejoin Grace{" "}
-                    {directCommandGraceCount}
-                  </span>
-                  <span>
-                    Quest{" "}
-                    {displayQuest
-                      ? `${QUEST_DEFINITIONS[displayQuest.questId].displayName} (${formatQuestStatus(displayQuest.status)})`
-                      : "none"}
-                  </span>
-                  <span>Objective {getQuestObjectiveText(displayQuest)}</span>
-                  <span>
-                    Global POI {gameState.globalPoiIntent?.reason ?? "none"}
-                  </span>
-                  <span>
-                    Local POI{" "}
-                    {gameState.localPoiTarget
-                      ? `${gameState.localPoiTarget.poiId} (${gameState.localPoiTarget.category})`
-                      : "none"}
-                  </span>
-                  <span>
-                    POI Reason {gameState.lastPoiDecision?.selectedReason ?? "none"}
-                  </span>
-            </div>
-          </section>
+            <DebugToolsPanel
+              actionFeedback={debugActionFeedback}
+              activeSection={activeDebugToolsSection}
+              canAddCompanion={partyMembers.length < companionIds.length}
+              canRemoveCompanion={partyMembers.length > 1}
+              companionInfiniteHealthEnabled={Boolean(
+                gameState.debugOptions?.companionInfiniteHealthEnabled,
+              )}
+              companions={partyMembers.map((companion) => ({
+                id: companion.id,
+                displayName: getCompanionDisplayName(companion),
+                className: CLASS_DEFINITIONS[companion.classId].displayName,
+                level: companion.characterLevel,
+              }))}
+              creatureOptions={debugLivestockDefinitions.map((creature) => ({
+                id: creature.id,
+                displayName:
+                  creature.id === "wolf" ? "Wolf Pup" : creature.displayName,
+                ownedCount:
+                  debugLivestockState.ownedCreaturesById[creature.id] ?? 0,
+              }))}
+              cropOptions={debugCropDefinitions.map((crop) => ({
+                id: crop.id,
+                displayName: crop.displayName,
+                unlocked: isFarmCropUnlocked(gameState, crop.id),
+              }))}
+              directCommandCount={activeDirectCommandCount}
+              directCommandGraceCount={directCommandGraceCount}
+              enemyGroups={debugEnemySummonGroups}
+              entityInfoVisible={showEntityInfo}
+              globalPoiText={gameState.globalPoiIntent?.reason ?? "none"}
+              localPoiText={
+                gameState.localPoiTarget
+                  ? `${gameState.localPoiTarget.poiId} (${gameState.localPoiTarget.category})`
+                  : "none"
+              }
+              onAddCompanion={addCompanionToParty}
+              onAddCraftingMaterials={addCraftingMaterialsAndEnemyDrops}
+              onAddCrowns={addTestCrowns}
+              onAddEnemiesToSubzone={addEnemiesToCurrentSubzone}
+              onAddFlasks={addPrototypeFlasks}
+              onAddOwnedCreature={addSelectedOwnedCreatureForDebug}
+              onClearTelemetry={clearDebugTelemetryReport}
+              onCycleCompanionClass={cycleSelectedCompanionClass}
+              onExportAndClearTelemetry={() =>
+                exportDebugTelemetryJson({ clearAfterExport: true })
+              }
+              onExportTelemetry={() => exportDebugTelemetryJson()}
+              onFinishCurrentQuest={finishCurrentQuestForDebug}
+              onForceSuperiorEnemy={forceSuperiorEnemy}
+              onKillCompanion={killSelectedCompanion}
+              onKillOneCompanion={killOneCompanion}
+              onLevelUpCompanion={levelUpSelectedCompanion}
+              onLevelUpAllCompanions={levelUpAllCompanions}
+              onRefreshGatherPoints={refreshGatherPoints}
+              onReleaseRendererCache={releaseRendererCache}
+              onRemoveCompanion={removeCompanionFromParty}
+              onRemoveDebugEnemies={removeDebugEnemies}
+              onResetSlimewardDungeon={resetSlimewardDungeon}
+              onRestoreCompanionHealth={restoreSelectedCompanionHealth}
+              onRestorePartyHealth={restorePartyHealth}
+              onResurrectEnemy={resurrectEnemy}
+              onSectionChange={selectDebugToolsSection}
+              onSelectedCompanionChange={setSelectedDebugCompanionId}
+              onSelectedCreatureChange={(creatureId) =>
+                setSelectedDebugCreatureId(creatureId as LivestockCreatureId)
+              }
+              onSelectedCropChange={(cropId) =>
+                setSelectedDebugCropId(cropId as FarmCropId)
+              }
+              onSelectedEnemyTypeChange={(enemyTypeId) =>
+                setSelectedDebugEnemyTypeId(enemyTypeId as EnemyTypeId)
+              }
+              onSummonEnemy={summonSelectedEnemy}
+              onTeleportHubOne={debugTeleportToHubOne}
+              onTeleportHubTwo={debugTeleportToHubTwo}
+              onTeleportSlimewardCamp={debugTeleportToSlimewardCampForDebug}
+              onToggleCompanionInfiniteHealth={toggleCompanionInfiniteHealth}
+              onToggleEntityInfo={toggleEntityInfo}
+              onToggleSuperExp={toggleSuperExp}
+              onToggleSuperSpeed={toggleSuperSpeed}
+              onToggleTelemetryRecording={toggleDebugTelemetryRecording}
+              onTurnInCurrentQuest={turnInCurrentQuestForDebug}
+              onUnlockCrop={unlockSelectedCropForDebug}
+              onUnlockTownServices={unlockTownServicesForDebug}
+              poiReasonText={gameState.lastPoiDecision?.selectedReason ?? "none"}
+              questObjectiveText={getQuestObjectiveText(displayQuest)}
+              questStatusText={
+                displayQuest
+                  ? `${QUEST_DEFINITIONS[displayQuest.questId].displayName} (${formatQuestStatus(displayQuest.status)})`
+                  : "none"
+              }
+              nextCompanionClassName={CLASS_DEFINITIONS[nextDebugClassId].displayName}
+              selectedCompanionId={effectiveSelectedDebugCompanionId}
+              selectedCreatureId={selectedDebugCreatureId}
+              selectedCropId={selectedDebugCropId}
+              selectedCropUnlocked={selectedDebugCropUnlocked}
+              selectedEnemyTypeId={selectedDebugEnemyTypeId}
+              superExpEnabled={Boolean(gameState.debugOptions?.superExpEnabled)}
+              superSpeedEnabled={Boolean(gameState.debugOptions?.superSpeedEnabled)}
+              telemetryEventCount={gameState.debugTelemetry?.events.length ?? 0}
+              telemetryMaxSamples={gameState.debugTelemetry?.maxTicks ?? 1000}
+              telemetryRecording={Boolean(gameState.debugTelemetry?.isRecording)}
+              telemetrySampleCount={gameState.debugTelemetry?.ticks.length ?? 0}
+              townServicesUnlocked={isTownServicesUnlocked(gameState)}
+            />
           ) : null}
         </div>
       </section>

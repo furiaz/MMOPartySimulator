@@ -5,9 +5,28 @@ import {
   isResourceEntity,
   moveEntityTo,
 } from "./entities";
-import { PROTOTYPE_CONSUMABLE_ITEM_IDS } from "./consumables";
+import { PROTOTYPE_FLASK_ITEM_IDS } from "./consumables";
+import { FIRST_CLASS_IDS } from "./classes";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { ENEMY_TYPES, getEnemyType } from "./enemyArchetypes";
+import { isClassAllowedForEquipment } from "./equipmentRules";
+import { unequipItemFromCompanion } from "./equipmentSystem";
+import { EQUIPMENT_SLOTS } from "./equipmentTypes";
+import {
+  FARM_CARROT_CROP_ID,
+  getFarmCropDefinition,
+  unlockFarmCrop,
+} from "./farm";
 import { ITEM_DEFINITIONS } from "./items";
+import {
+  LIVESTOCK_CREATURE_DEFINITIONS,
+  LIVESTOCK_DUSKHEN_CREATURE_ID,
+  LIVESTOCK_ELDER_MOSSLING_CREATURE_ID,
+  LIVESTOCK_TIN_CRAWLER_CREATURE_ID,
+  LIVESTOCK_WOLF_CREATURE_ID,
+  addOwnedLivestockCreature,
+  type LivestockCreatureUnlockSource,
+} from "./livestock";
 import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import {
   clearSlimewardDungeonRuntime,
@@ -17,7 +36,16 @@ import { applyEnemyVariantStats, isSuperiorEnemy } from "./enemyVariants";
 import {
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
+  MAP_FIVE_ID,
+  MAP_FOUR_ID,
+  MAP_ONE_ID,
+  MAP_SEVEN_ID,
+  MAP_SIX_ID,
+  MAP_THREE_ID,
+  MAP_TWO_ID,
   SLIMEWARD_CAMP_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
   companionIds,
   createDebugMap,
   createDebugMapForQuestState,
@@ -33,7 +61,10 @@ import {
   recordHighestCharacterLevelEver,
 } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
-import { syncCompanionDerivedMaxHealth } from "./stats";
+import {
+  normalizeCompanionNaturalStatsForClass,
+  syncCompanionDerivedMaxHealth,
+} from "./stats";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import {
   addItemToInventoryState,
@@ -70,18 +101,68 @@ import {
   isWallPosition,
 } from "./movementPlanning";
 import type {
+  ClassId,
   Companion,
+  DebugMapId,
   EncounterArea,
   Enemy,
+  EnemyTypeId,
+  FarmCropId,
   GameEntity,
   ItemId,
+  LivestockCreatureId,
   Position,
   ResourceEntity,
   ZoneSubzone,
 } from "./types";
 import type { QuestId, QuestObjectiveDefinition } from "./questTypes";
+import { TOWN_SERVICES_UNLOCK_QUEST_ID } from "./townServices";
 
 export const DEBUG_ADD_ENEMIES_MAX_COUNT = 50;
+export const DEBUG_CLASS_CYCLE_ORDER: readonly ClassId[] = [
+  "beginner",
+  ...FIRST_CLASS_IDS,
+];
+
+export type DebugClassCycleResult =
+  | {
+      status: "success";
+      companionId: string;
+      previousClassId: ClassId;
+      nextClassId: ClassId;
+      unequippedItemIds: ItemId[];
+    }
+  | {
+      status: "failed_companion_not_found";
+      companionId: string;
+    }
+  | {
+      status: "failed_inventory_full";
+      companionId: string;
+      nextClassId: ClassId;
+    };
+
+export type DebugEnemySummonGroup = {
+  mapId: DebugMapId;
+  mapDisplayName: string;
+  enemies: Array<{
+    id: EnemyTypeId;
+    displayName: string;
+    level: number;
+  }>;
+};
+
+const DEBUG_ENEMY_MAP_ORDER: DebugMapId[] = [
+  MAP_ONE_ID,
+  MAP_TWO_ID,
+  MAP_THREE_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
+  SLIMEWARD_FLOOR_TWO_ID,
+  MAP_FOUR_ID,
+  MAP_FIVE_ID,
+  MAP_SIX_ID,
+  MAP_SEVEN_ID,
+];
 
 const DEBUG_ENEMY_HEALTH = 3;
 const DEBUG_RESOURCE_DURABILITY = 5;
@@ -260,18 +341,140 @@ export function debugToggleCompanionInfiniteHealth(state: GameState): GameState 
     : nextState;
 }
 
-export function debugToggleCompanionOneHunterClass(state: GameState): GameState {
-  const companion = getEntityById(state, companionIds[0]);
+export function debugCycleCompanionClass(
+  state: GameState,
+  companionId: string,
+): { state: GameState; result: DebugClassCycleResult } {
+  const companion = getEntityById(state, companionId);
 
   if (companion?.kind !== "companion") {
+    return {
+      state,
+      result: {
+        status: "failed_companion_not_found",
+        companionId,
+      },
+    };
+  }
+
+  const currentClassIndex = DEBUG_CLASS_CYCLE_ORDER.indexOf(companion.classId);
+  const nextClassId =
+    DEBUG_CLASS_CYCLE_ORDER[
+      (Math.max(0, currentClassIndex) + 1) % DEBUG_CLASS_CYCLE_ORDER.length
+    ];
+  const incompatibleSlots = EQUIPMENT_SLOTS.filter((slot) => {
+    const itemId = companion.equipment[slot];
+    const itemDefinition = itemId ? ITEM_DEFINITIONS[itemId] : undefined;
+
+    return Boolean(
+      itemDefinition && !isClassAllowedForEquipment(nextClassId, itemDefinition),
+    );
+  });
+  const unequippedItemIds: ItemId[] = [];
+  let workingState = state;
+
+  for (const slot of incompatibleSlots) {
+    const itemId = companion.equipment[slot];
+    const outcome = unequipItemFromCompanion(workingState, companionId, slot);
+
+    if (outcome.result.status !== "success") {
+      return {
+        state,
+        result: {
+          status: "failed_inventory_full",
+          companionId,
+          nextClassId,
+        },
+      };
+    }
+
+    if (itemId) {
+      unequippedItemIds.push(itemId);
+    }
+    workingState = outcome.state;
+  }
+
+  const classChangedState = setPartyMemberClass(
+    workingState,
+    companionId,
+    nextClassId,
+  );
+  const classChangedCompanion = getEntityById(classChangedState, companionId);
+
+  if (classChangedCompanion?.kind !== "companion") {
+    return {
+      state,
+      result: {
+        status: "failed_companion_not_found",
+        companionId,
+      },
+    };
+  }
+
+  const normalizedCompanion = normalizeCompanionNaturalStatsForClass(
+    {
+      ...classChangedCompanion,
+      characterLevel: companion.characterLevel,
+      characterXp: companion.characterXp,
+      allocatedStats: companion.allocatedStats,
+      unspentStatPoints: companion.unspentStatPoints,
+    },
+    nextClassId,
+  );
+  const healthClampedCompanion = {
+    ...normalizedCompanion,
+    health:
+      companion.health <= 0
+        ? 0
+        : Math.min(companion.health, normalizedCompanion.maxHealth),
+  };
+
+  return {
+    state: updateEntity(classChangedState, healthClampedCompanion),
+    result: {
+      status: "success",
+      companionId,
+      previousClassId: companion.classId,
+      nextClassId,
+      unequippedItemIds,
+    },
+  };
+}
+
+export function debugLevelUpCompanion(
+  state: GameState,
+  companionId: string,
+  now = Date.now(),
+): GameState {
+  const entity = getEntityById(state, companionId);
+
+  if (entity?.kind !== "companion") {
     return state;
   }
 
-  return setPartyMemberClass(
-    state,
-    companion.id,
-    companion.classId === "hunter" ? "beginner" : "hunter",
+  const xpToNextLevel = getCharacterXpToNextLevel(entity.characterLevel);
+
+  if (xpToNextLevel === null) {
+    return state;
+  }
+
+  const xpNeeded = Math.max(1, xpToNextLevel - entity.characterXp);
+  const updatedCompanion = grantCharacterXpToCompanion(entity, xpNeeded);
+  let nextState = updateEntity(state, updatedCompanion);
+  nextState = recordHighestCharacterLevelEver(
+    nextState,
+    updatedCompanion.characterLevel,
   );
+
+  return updatedCompanion.characterLevel > entity.characterLevel
+    ? addCombatFeedback(nextState, {
+        type: "level_up",
+        entityId: updatedCompanion.id,
+        text: "Level Up",
+        now,
+        durationMs: PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
+      })
+    : nextState;
 }
 
 export function debugLevelUpAllCompanions(
@@ -285,30 +488,7 @@ export function debugLevelUpAllCompanions(
       continue;
     }
 
-    const xpToNextLevel = getCharacterXpToNextLevel(entity.characterLevel);
-
-    if (xpToNextLevel === null) {
-      continue;
-    }
-
-    const xpNeeded = Math.max(1, xpToNextLevel - entity.characterXp);
-    const updatedCompanion = grantCharacterXpToCompanion(entity, xpNeeded);
-
-    nextState = updateEntity(nextState, updatedCompanion);
-    nextState = recordHighestCharacterLevelEver(
-      nextState,
-      updatedCompanion.characterLevel,
-    );
-
-    if (updatedCompanion.characterLevel > entity.characterLevel) {
-      nextState = addCombatFeedback(nextState, {
-        type: "level_up",
-        entityId: updatedCompanion.id,
-        text: "Level Up",
-        now,
-        durationMs: PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
-      });
-    }
+    nextState = debugLevelUpCompanion(nextState, entity.id, now);
   }
 
   return nextState;
@@ -426,6 +606,37 @@ export function debugRestorePartyHealth(state: GameState): GameState {
   return nextState;
 }
 
+export function debugRestoreCompanionHealth(
+  state: GameState,
+  companionId: string,
+): GameState {
+  const companion = getEntityById(state, companionId);
+
+  return companion?.kind === "companion"
+    ? updateEntity(state, restorePartyMember(companion))
+    : state;
+}
+
+export function debugKillCompanion(
+  state: GameState,
+  companionId: string,
+): GameState {
+  const companion = getEntityById(state, companionId);
+
+  if (companion?.kind !== "companion" || companion.state === "dead") {
+    return state;
+  }
+
+  return updateEntity(state, {
+    ...companion,
+    state: "dead",
+    health: 0,
+    currentTargetId: null,
+    defendPosition: null,
+    commandPriority: "autonomous",
+  });
+}
+
 export function debugKillOneCompanion(state: GameState): GameState {
   const companion = Object.values(state.entities)
     .filter(
@@ -440,14 +651,7 @@ export function debugKillOneCompanion(state: GameState): GameState {
     return state;
   }
 
-  return updateEntity(state, {
-    ...companion,
-    state: "dead",
-    health: 0,
-    currentTargetId: null,
-    defendPosition: null,
-    commandPriority: "autonomous",
-  });
+  return debugKillCompanion(state, companion.id);
 }
 
 export function debugForceSuperiorEnemyInCurrentSubzone(
@@ -507,6 +711,108 @@ export function debugForceSuperiorEnemyInCurrentSubzone(
     enemyPosition: superiorEnemy.position,
     enemyLevel: superiorEnemy.level,
     reason: "debug_force",
+  });
+}
+
+export function isDebugSummonableEnemyType(
+  enemyTypeId: EnemyTypeId | undefined,
+): enemyTypeId is EnemyTypeId {
+  return Boolean(enemyTypeId && enemyTypeId !== "azure_mass" && getEnemyType(enemyTypeId));
+}
+
+export function getDebugEnemySummonGroups(): DebugEnemySummonGroup[] {
+  const includedEnemyTypeIds = new Set<EnemyTypeId>();
+
+  return DEBUG_ENEMY_MAP_ORDER.map((mapId) => {
+    const map = createDebugMap(mapId);
+    const enemyTypeIds = Array.from(
+      new Set(map.subzones?.flatMap((subzone) => subzone.enemyTypeIds) ?? []),
+    ).filter((enemyTypeId) => {
+      if (
+        !isDebugSummonableEnemyType(enemyTypeId) ||
+        includedEnemyTypeIds.has(enemyTypeId)
+      ) {
+        return false;
+      }
+
+      includedEnemyTypeIds.add(enemyTypeId);
+      return true;
+    });
+    const enemies = enemyTypeIds
+      .map((enemyTypeId) => ENEMY_TYPES[enemyTypeId])
+      .sort(
+        (first, second) =>
+          first.level - second.level ||
+          first.displayName.localeCompare(second.displayName),
+      )
+      .map((enemyType) => ({
+        id: enemyType.id,
+        displayName: enemyType.displayName,
+        level: enemyType.level,
+      }));
+
+    return {
+      mapId,
+      mapDisplayName: map.displayName,
+      enemies,
+    };
+  }).filter((group) => group.enemies.length > 0);
+}
+
+export function getDefaultDebugSummonEnemyTypeId(
+  state: GameState,
+): EnemyTypeId {
+  const leader = getPartyLeader(state);
+  const subzone = getSubzoneAtPosition(state.map, leader?.position);
+  const subzoneEnemyTypeId = subzone?.enemyTypeIds.find(
+    isDebugSummonableEnemyType,
+  );
+
+  return subzoneEnemyTypeId ?? "green_slime";
+}
+
+export function debugSummonEnemy(
+  state: GameState,
+  enemyTypeId: EnemyTypeId,
+): GameState {
+  if (!isDebugSummonableEnemyType(enemyTypeId)) {
+    return state;
+  }
+
+  const leader = getPartyLeader(state);
+  const subzone = getSubzoneAtPosition(state.map, leader?.position);
+  const enemyType = getEnemyType(enemyTypeId);
+
+  if (!leader || !subzone || !enemyType) {
+    return state;
+  }
+
+  const spawnIndex = Object.values(state.entities).filter(isDebugSpawnEnemy).length;
+  const encounterArea = getDebugSpawnEncounterArea(
+    subzone,
+    leader.position,
+    spawnIndex,
+  );
+  const enemy = createEnemy(
+    `debug-subzone-enemy-${getNextDebugSubzoneEnemyIndex(state)}`,
+    getDebugEnemySpawnPosition(
+      subzone,
+      encounterArea,
+      leader.position,
+      spawnIndex,
+    ),
+    undefined,
+    {
+      enemyTypeId,
+      level: enemyType.level,
+      subzoneId: subzone.id,
+      encounterAreaId: encounterArea?.id,
+    },
+  );
+
+  return addEnemy(state, {
+    ...enemy,
+    debugSpawn: true,
   });
 }
 
@@ -625,17 +931,81 @@ export function debugAddPrototypeEquipmentToInventory(state: GameState): GameSta
   );
 }
 
-export function debugAddPrototypeConsumablesToInventory(state: GameState): GameState {
-  return PROTOTYPE_CONSUMABLE_ITEM_IDS.reduce(
+export function debugAddPrototypeFlasksToInventory(state: GameState): GameState {
+  return PROTOTYPE_FLASK_ITEM_IDS.reduce(
     (nextState, itemId) =>
       addItemToInventoryState(
         nextState,
         itemId,
-        itemId.endsWith("_rations") ? 5 : 1,
+        1,
         "debug",
       ).state,
     state,
   );
+}
+
+export function debugUnlockTownServices(state: GameState): GameState {
+  const quest = state.quests[TOWN_SERVICES_UNLOCK_QUEST_ID];
+
+  if (!quest || quest.status === "completed") {
+    return state;
+  }
+
+  const cleanedState = clearDebugQuestRuntime(
+    state,
+    TOWN_SERVICES_UNLOCK_QUEST_ID,
+  );
+  const completedCycle = Math.max(1, quest.completedCycle);
+
+  return {
+    ...cleanedState,
+    quests: {
+      ...cleanedState.quests,
+      [TOWN_SERVICES_UNLOCK_QUEST_ID]: {
+        ...cleanedState.quests[TOWN_SERVICES_UNLOCK_QUEST_ID],
+        status: "completed",
+        completedCycle,
+        rewardClaimedCycle: completedCycle,
+        lastTurnInError: undefined,
+        runtime: undefined,
+      },
+    },
+  };
+}
+
+export function debugUnlockFarmCrop(
+  state: GameState,
+  cropId: FarmCropId,
+  now = Date.now(),
+): GameState {
+  const crop = getFarmCropDefinition(cropId);
+
+  if (crop.id === FARM_CARROT_CROP_ID) {
+    return state;
+  }
+
+  return unlockFarmCrop(state, crop.id, crop.unlockSource, now).state;
+}
+
+export function debugAddOwnedLivestockCreature(
+  state: GameState,
+  creatureId: LivestockCreatureId,
+  now = Date.now(),
+): GameState {
+  if (
+    !LIVESTOCK_CREATURE_DEFINITIONS.some(
+      (definition) => definition.id === creatureId,
+    )
+  ) {
+    return state;
+  }
+
+  return addOwnedLivestockCreature(
+    state,
+    creatureId,
+    getDebugLivestockUnlockSource(creatureId),
+    now,
+  ).state;
 }
 
 export function debugAddCraftingMaterialsAndEnemyDropsToInventory(
@@ -1175,6 +1545,22 @@ function isDebugSpawnEnemy(entity: GameEntity): entity is Enemy {
     entity.kind === "enemy" &&
     (entity.debugSpawn === true || entity.id.startsWith("debug-subzone-enemy-"))
   );
+}
+
+function getDebugLivestockUnlockSource(
+  creatureId: LivestockCreatureId,
+): LivestockCreatureUnlockSource {
+  switch (creatureId) {
+    case LIVESTOCK_WOLF_CREATURE_ID:
+      return "wolf_defeat";
+    case LIVESTOCK_TIN_CRAWLER_CREATURE_ID:
+      return "tin_crawler_defeat";
+    case LIVESTOCK_ELDER_MOSSLING_CREATURE_ID:
+      return "elder_mossling_defeat";
+    case LIVESTOCK_DUSKHEN_CREATURE_ID:
+    default:
+      return "merchant";
+  }
 }
 
 function normalizeDebugEnemyCount(count: number): number {

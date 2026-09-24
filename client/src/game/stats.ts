@@ -121,27 +121,45 @@ export function applyFirstClassCatchUpStatGrowth(
   companion: Companion,
   classId: Exclude<ClassId, "beginner">,
 ): Companion {
+  const normalizedCompanion = normalizeCompanionNaturalStatsForClass(
+    companion,
+    classId,
+  );
+  const level = Math.max(1, Math.floor(companion.characterLevel));
+  const firstClassLevelUps = Math.max(0, level - BEGINNER_STAT_GROWTH_MAX_LEVEL);
+
+  return {
+    ...normalizedCompanion,
+    unspentStatPoints:
+      companion.unspentStatPoints +
+      PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK * firstClassLevelUps,
+  };
+}
+
+export function normalizeCompanionNaturalStatsForClass(
+  companion: Companion,
+  classId: ClassId,
+): Companion {
   const level = Math.max(1, Math.floor(companion.characterLevel));
   const beginnerGrowthLevelUps = getCappedBeginnerStatGrowthLevelUps(level);
-  const firstClassLevelUps = Math.max(0, level - BEGINNER_STAT_GROWTH_MAX_LEVEL);
   const naturalStatsWithBeginnerGrowth = addRepeatedCompanionPrimaryStats(
     createDefaultNaturalCompanionStats(),
     BEGINNER_STAT_GROWTH_PER_LEVEL,
     beginnerGrowthLevelUps,
   );
-  const naturalStats = addRepeatedCompanionPrimaryStats(
-    naturalStatsWithBeginnerGrowth,
-    BASE_CLASS_STAT_GROWTHS[classId],
-    firstClassLevelUps,
-  );
+  const naturalStats =
+    classId === "beginner"
+      ? naturalStatsWithBeginnerGrowth
+      : addRepeatedCompanionPrimaryStats(
+          naturalStatsWithBeginnerGrowth,
+          BASE_CLASS_STAT_GROWTHS[classId],
+          Math.max(0, level - BEGINNER_STAT_GROWTH_MAX_LEVEL),
+        );
 
   return syncCompanionDerivedMaxHealth({
     ...companion,
     classId,
     naturalStats,
-    unspentStatPoints:
-      companion.unspentStatPoints +
-      PLAYER_STAT_POINTS_PER_LEVEL_AFTER_CLASS_UNLOCK * firstClassLevelUps,
   });
 }
 

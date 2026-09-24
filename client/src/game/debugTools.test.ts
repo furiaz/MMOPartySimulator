@@ -14,21 +14,41 @@ import {
   debugAddCompanionToParty,
   debugAddCraftingMaterialsAndEnemyDropsToInventory,
   debugAddEnemiesToCurrentSubzone,
+  debugAddOwnedLivestockCreature,
+  debugAddPrototypeFlasksToInventory,
   debugAddTestCrowns,
   debugApplyCompanionInfiniteHealth,
   debugFinishCurrentQuest,
   debugForceSuperiorEnemyInCurrentSubzone,
+  debugCycleCompanionClass,
+  debugKillCompanion,
+  debugLevelUpCompanion,
   debugLevelUpAllCompanions,
   debugRemoveDebugEnemies,
+  debugRestoreCompanionHealth,
+  debugSummonEnemy,
   debugTeleportToSlimewardCamp,
   debugToggleCompanionInfiniteHealth,
-  debugToggleCompanionOneHunterClass,
   debugTurnInCurrentQuest,
+  debugUnlockFarmCrop,
+  debugUnlockTownServices,
+  getDebugEnemySummonGroups,
+  isDebugSummonableEnemyType,
 } from "./debugTools";
 import { createInitialGameState } from "./createInitialGameState";
 import { isSuperiorEnemy } from "./enemyVariants";
+import {
+  FARM_POTATO_CROP_ID,
+  getFarmCropDefinition,
+  isFarmCropUnlocked,
+} from "./farm";
 import { countInventoryItem, createEmptyPartyInventory } from "./inventory";
 import { MAX_CHARACTER_LEVEL } from "./leveling";
+import {
+  LIVESTOCK_WOLF_CREATURE_ID,
+  getLivestockCreatureDefinition,
+  getLivestockState,
+} from "./livestock";
 import { createInitialQuestStates } from "./questSystem";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS } from "./state";
@@ -404,6 +424,127 @@ describe("debugAddEnemiesToCurrentSubzone", () => {
   });
 });
 
+describe("debugSummonEnemy", () => {
+  it("offers normal map enemies by map while excluding The Azure Mass", () => {
+    const groups = getDebugEnemySummonGroups();
+    const enemyIds = groups.flatMap((group) =>
+      group.enemies.map((enemy) => enemy.id),
+    );
+
+    expect(groups.length).toBeGreaterThan(0);
+    expect(enemyIds).toContain("green_slime");
+    expect(enemyIds).toContain("orc_warmaster");
+    expect(enemyIds).not.toContain("azure_mass");
+    expect(isDebugSummonableEnemyType("azure_mass")).toBe(false);
+  });
+
+  it("summons one selected enemy at its default level in the current subzone", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const map = createDebugMap("map-1");
+    const state = createTestGameState({
+      currentMapId: "map-1",
+      map,
+      partyLeaderId: leader.id,
+      entities: { [leader.id]: leader },
+    });
+
+    const nextState = debugSummonEnemy(state, "tin_crawler");
+    const enemies = getDebugSubzoneEnemies(nextState);
+
+    expect(enemies).toHaveLength(1);
+    expect(enemies[0]).toMatchObject({
+      id: "debug-subzone-enemy-1",
+      enemyTypeId: "tin_crawler",
+      level: 13,
+      subzoneId: "shore-fringe",
+      debugSpawn: true,
+    });
+    expect(enemies[0].questSpawn).toBeUndefined();
+    expect(enemies[0].isTargetDummy).toBeUndefined();
+  });
+
+  it("rejects the dungeon boss and removes a summoned enemy by its stable prefix", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 10, y: 10 },
+      "companion-1",
+    );
+    const state = createTestGameState({
+      currentMapId: "map-1",
+      map: createDebugMap("map-1"),
+      partyLeaderId: leader.id,
+      entities: { [leader.id]: leader },
+    });
+
+    expect(debugSummonEnemy(state, "azure_mass")).toBe(state);
+
+    const summoned = debugSummonEnemy(state, "green_slime");
+    const enemy = getDebugSubzoneEnemies(summoned)[0];
+    const respawnedState = {
+      ...summoned,
+      entities: {
+        ...summoned.entities,
+        [enemy.id]: { ...enemy, debugSpawn: undefined },
+      },
+    };
+
+    expect(debugRemoveDebugEnemies(respawnedState).entities[enemy.id]).toBeUndefined();
+  });
+});
+
+describe("town debug setup tools", () => {
+  it("completes the Town prerequisite without granting quest rewards", () => {
+    const state = createTestGameState();
+
+    const nextState = debugUnlockTownServices(state);
+
+    expect(nextState.quests.azure_trial.status).toBe("completed");
+    expect(nextState.quests.azure_trial.completedCycle).toBe(1);
+    expect(nextState.quests.azure_trial.rewardClaimedCycle).toBe(1);
+    expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(0);
+    expect(nextState.inventory).toEqual(state.inventory);
+    expect(nextState.newsBroadcasts).toEqual([]);
+  });
+
+  it("unlocks a selected crop through its canonical Farm path", () => {
+    const state = createTestGameState();
+    const crop = getFarmCropDefinition(FARM_POTATO_CROP_ID);
+
+    const nextState = debugUnlockFarmCrop(state, FARM_POTATO_CROP_ID, 1_000);
+
+    expect(isFarmCropUnlocked(nextState, FARM_POTATO_CROP_ID)).toBe(true);
+    expect(nextState.farm?.fieldsById[crop.fieldId]).toBeDefined();
+    expect(crop.seedKeyItemId && nextState.keyItemsById?.[crop.seedKeyItemId]).toBe(1);
+    expect(debugUnlockFarmCrop(nextState, FARM_POTATO_CROP_ID, 2_000).farm).toEqual(
+      nextState.farm,
+    );
+  });
+
+  it("adds exactly one selected owned creature and its discovery key item", () => {
+    const state = createTestGameState();
+    const creature = getLivestockCreatureDefinition(LIVESTOCK_WOLF_CREATURE_ID);
+
+    if (!creature) {
+      throw new Error("Expected Wolf livestock definition");
+    }
+
+    const nextState = debugAddOwnedLivestockCreature(
+      state,
+      LIVESTOCK_WOLF_CREATURE_ID,
+      1_000,
+    );
+
+    expect(
+      getLivestockState(nextState).ownedCreaturesById[LIVESTOCK_WOLF_CREATURE_ID],
+    ).toBe(1);
+    expect(nextState.keyItemsById?.[creature.discoveryKeyItemId]).toBe(1);
+  });
+});
+
 describe("companion debug test tools", () => {
   it("levels up every eligible companion once", () => {
     const leader = createCompanion(
@@ -471,33 +612,188 @@ describe("companion debug test tools", () => {
     expect(restoredCompanion?.state).toBe("idle");
   });
 
-  it("toggles companion 1 between Beginner and Hunter for ranged combat testing", () => {
-    const companion = createCompanion(
+  it("targets the selected fifth companion when cycling classes", () => {
+    const leader = createCompanion(
       companionIds[0],
       { x: 10, y: 10 },
       companionIds[0],
     );
+    const selectedCompanion = {
+      ...createCompanion(
+        companionIds[4],
+        { x: 11, y: 10 },
+        companionIds[0],
+      ),
+      health: 1,
+    };
     const state = createTestGameState({
-      partyLeaderId: companion.id,
+      partyLeaderId: leader.id,
       entities: {
-        [companion.id]: companion,
+        [leader.id]: leader,
+        [selectedCompanion.id]: selectedCompanion,
       },
     });
 
-    const hunterState = debugToggleCompanionOneHunterClass(state);
-    const beginnerState = debugToggleCompanionOneHunterClass(hunterState);
-    const hunterCompanion = hunterState.entities[companion.id];
-    const beginnerCompanion = beginnerState.entities[companion.id];
+    const outcome = debugCycleCompanionClass(state, selectedCompanion.id);
+    const nextLeader = outcome.state.entities[leader.id];
+    const nextSelectedCompanion = outcome.state.entities[selectedCompanion.id];
 
-    expect(hunterCompanion?.kind).toBe("companion");
-    expect(beginnerCompanion?.kind).toBe("companion");
+    expect(outcome.result).toMatchObject({
+      status: "success",
+      previousClassId: "beginner",
+      nextClassId: "blade",
+    });
+    expect(nextLeader?.kind === "companion" && nextLeader.classId).toBe("beginner");
+    expect(
+      nextSelectedCompanion?.kind === "companion" && nextSelectedCompanion.classId,
+    ).toBe("blade");
+    expect(
+      nextSelectedCompanion?.kind === "companion" && nextSelectedCompanion.health,
+    ).toBe(1);
+  });
 
-    if (hunterCompanion?.kind !== "companion" || beginnerCompanion?.kind !== "companion") {
-      throw new Error("Expected companion test entities");
+  it("loops every class without adding unspent points or changing progression", () => {
+    const baseCompanion = createCompanion(
+      companionIds[0],
+      { x: 10, y: 10 },
+      companionIds[0],
+    );
+    const companion = {
+      ...baseCompanion,
+      characterLevel: 20,
+      characterXp: 37,
+      unspentStatPoints: 7,
+      allocatedStats: {
+        ...baseCompanion.allocatedStats,
+        strength: 3,
+      },
+    };
+    let state = createTestGameState({
+      partyLeaderId: companion.id,
+      entities: { [companion.id]: companion },
+    });
+    const classIds = [];
+    const expectedNaturalStatsByClass = {
+      beginner: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10 },
+      blade: { strength: 30, dexterity: 30, constitution: 20, intelligence: 10, wisdom: 10 },
+      aegis: { strength: 20, dexterity: 10, constitution: 40, intelligence: 10, wisdom: 20 },
+      hunter: { strength: 20, dexterity: 40, constitution: 10, intelligence: 10, wisdom: 20 },
+      beast: { strength: 30, dexterity: 20, constitution: 30, intelligence: 10, wisdom: 10 },
+      elementalist: { strength: 10, dexterity: 10, constitution: 20, intelligence: 50, wisdom: 10 },
+      runecaster: { strength: 10, dexterity: 10, constitution: 20, intelligence: 30, wisdom: 30 },
+      lightbearer: { strength: 10, dexterity: 10, constitution: 20, intelligence: 20, wisdom: 40 },
+      penitent: { strength: 20, dexterity: 10, constitution: 30, intelligence: 10, wisdom: 30 },
+    };
+
+    for (let index = 0; index < 9; index += 1) {
+      const outcome = debugCycleCompanionClass(state, companion.id);
+      state = outcome.state;
+      const cycledCompanion = state.entities[companion.id];
+
+      if (cycledCompanion?.kind !== "companion") {
+        throw new Error("Expected companion test entity");
+      }
+      classIds.push(cycledCompanion.classId);
+      expect(cycledCompanion.naturalStats).toEqual(
+        expectedNaturalStatsByClass[cycledCompanion.classId],
+      );
     }
 
-    expect(hunterCompanion.classId).toBe("hunter");
-    expect(beginnerCompanion.classId).toBe("beginner");
+    const finalCompanion = state.entities[companion.id];
+    expect(classIds).toEqual([
+      "blade",
+      "aegis",
+      "hunter",
+      "beast",
+      "elementalist",
+      "runecaster",
+      "lightbearer",
+      "penitent",
+      "beginner",
+    ]);
+    expect(finalCompanion?.kind === "companion" && finalCompanion.characterLevel).toBe(20);
+    expect(finalCompanion?.kind === "companion" && finalCompanion.characterXp).toBe(37);
+    expect(finalCompanion?.kind === "companion" && finalCompanion.unspentStatPoints).toBe(7);
+    expect(finalCompanion?.kind === "companion" && finalCompanion.allocatedStats.strength).toBe(3);
+  });
+
+  it("auto-unequips incompatible gear and cancels atomically when inventory is full", () => {
+    const baseCompanion = createCompanion(
+      companionIds[0],
+      { x: 10, y: 10 },
+      companionIds[0],
+      "fighter",
+      0,
+      "blade",
+    );
+    const companion = {
+      ...baseCompanion,
+      equipment: {
+        ...baseCompanion.equipment,
+        mainHand: "iron_sword" as const,
+      },
+    };
+    const state = createTestGameState({
+      partyLeaderId: companion.id,
+      entities: { [companion.id]: companion },
+      inventory: createEmptyPartyInventory(10),
+    });
+
+    const success = debugCycleCompanionClass(state, companion.id);
+    const changedCompanion = success.state.entities[companion.id];
+
+    expect(success.result).toMatchObject({
+      status: "success",
+      nextClassId: "aegis",
+      unequippedItemIds: ["iron_sword"],
+    });
+    expect(changedCompanion?.kind === "companion" && changedCompanion.equipment.mainHand).toBeNull();
+    expect(countInventoryItem(success.state.inventory, "iron_sword")).toBe(1);
+
+    const fullState = {
+      ...state,
+      inventory: createEmptyPartyInventory(0),
+    };
+    const failure = debugCycleCompanionClass(fullState, companion.id);
+
+    expect(failure.state).toBe(fullState);
+    expect(failure.result.status).toBe("failed_inventory_full");
+  });
+
+  it("restores, levels, and kills only the selected companion", () => {
+    const first = {
+      ...createCompanion("companion-1", { x: 10, y: 10 }, "companion-1"),
+      health: 1,
+    };
+    const second = {
+      ...createCompanion("companion-2", { x: 11, y: 10 }, "companion-1"),
+      health: 1,
+    };
+    const state = createTestGameState({
+      partyLeaderId: first.id,
+      entities: { [first.id]: first, [second.id]: second },
+    });
+
+    const restored = debugRestoreCompanionHealth(state, second.id);
+    const restoredSecond = restored.entities[second.id];
+    expect(restored.entities[first.id]).toEqual(first);
+    expect(
+      restoredSecond?.kind === "companion" && restoredSecond.health,
+    ).toBe(second.maxHealth);
+
+    const leveled = debugLevelUpCompanion(restored, second.id, 1_000);
+    const leveledFirst = leveled.entities[first.id];
+    const leveledSecond = leveled.entities[second.id];
+    expect(
+      leveledFirst?.kind === "companion" && leveledFirst.characterLevel,
+    ).toBe(1);
+    expect(
+      leveledSecond?.kind === "companion" && leveledSecond.characterLevel,
+    ).toBe(2);
+
+    const killed = debugKillCompanion(leveled, second.id);
+    expect(killed.entities[first.id]?.state).not.toBe("dead");
+    expect(killed.entities[second.id]).toMatchObject({ state: "dead", health: 0 });
   });
 
   it("adds 100 Crowns through the debug wallet helper", () => {
@@ -507,6 +803,17 @@ describe("companion debug test tools", () => {
 
     expect(getCurrencyBalance(nextState.wallet, "crowns")).toBe(100);
     expect(nextState.wallet.visibleUntil).toBeGreaterThan(Date.now() - 1);
+  });
+
+  it("adds one of each prototype flask to inventory", () => {
+    const state = createTestGameState({
+      inventory: createEmptyPartyInventory(10),
+    });
+
+    const nextState = debugAddPrototypeFlasksToInventory(state);
+
+    expect(countInventoryItem(nextState.inventory, "minor_recovery_flask")).toBe(1);
+    expect(countInventoryItem(nextState.inventory, "soldiers_recovery_flask")).toBe(1);
   });
 
   it("adds 20 of each crafting material and enemy drop to inventory", () => {
