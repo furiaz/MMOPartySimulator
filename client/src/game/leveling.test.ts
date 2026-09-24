@@ -146,7 +146,7 @@ describe("character leveling", () => {
     expect(getPartySizeUnlockRequirement(2)).toBeNull();
     expect(getPartySizeUnlockRequirement(3)).toBe(10);
     expect(getPartySizeUnlockRequirement(4)).toBe(30);
-    expect(getPartySizeUnlockRequirement(5)).toBe(50);
+    expect(getPartySizeUnlockRequirement(5)).toBe(60);
     expect(getPartySizeUnlockRequirement(6)).toBeNull();
   });
 

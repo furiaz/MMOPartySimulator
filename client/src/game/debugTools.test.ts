@@ -4,12 +4,14 @@ import { createCompanion, createEnemy, createNpc } from "./entities";
 import {
   companionIds,
   createDebugMap,
+  hubCompanionStartPositions,
   slimewardCampArrivalPositions,
   SLIMEWARD_CAMP_ID,
   TELEPORTER_ID,
 } from "./debugMap";
 import {
   DEBUG_ADD_ENEMIES_MAX_COUNT,
+  debugAddCompanionToParty,
   debugAddCraftingMaterialsAndEnemyDropsToInventory,
   debugAddEnemiesToCurrentSubzone,
   debugAddTestCrowns,
@@ -23,6 +25,7 @@ import {
   debugToggleCompanionOneHunterClass,
   debugTurnInCurrentQuest,
 } from "./debugTools";
+import { createInitialGameState } from "./createInitialGameState";
 import { isSuperiorEnemy } from "./enemyVariants";
 import { countInventoryItem, createEmptyPartyInventory } from "./inventory";
 import { MAX_CHARACTER_LEVEL } from "./leveling";
@@ -35,6 +38,40 @@ import { isTeleportWorking } from "./teleportState";
 import { getCurrencyBalance } from "./wallet";
 import type { Enemy } from "./types";
 import type { QuestId, QuestState } from "./questTypes";
+
+describe("debugAddCompanionToParty", () => {
+  it("adds the fifth fixed companion and stops when the roster is full", () => {
+    let state = createInitialGameState();
+
+    for (let additionCount = 0; additionCount < 3; additionCount += 1) {
+      state = debugAddCompanionToParty(
+        state,
+        companionIds,
+        state.partyLeaderId,
+        hubCompanionStartPositions,
+      );
+    }
+
+    expect(
+      Object.values(state.entities).filter(
+        (entity) => entity.kind === "companion",
+      ),
+    ).toHaveLength(5);
+    expect(state.entities[companionIds[4]]).toMatchObject({
+      kind: "companion",
+      partyOrder: 4,
+      position: hubCompanionStartPositions[4],
+    });
+    expect(
+      debugAddCompanionToParty(
+        state,
+        companionIds,
+        state.partyLeaderId,
+        hubCompanionStartPositions,
+      ),
+    ).toBe(state);
+  });
+});
 
 describe("debugTeleportToSlimewardCamp", () => {
   it("moves the party to Slimeward Camp and clears map-local runtime", () => {

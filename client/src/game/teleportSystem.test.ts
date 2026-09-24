@@ -31,6 +31,45 @@ describe("teleport system", () => {
     expect("hubDepartureFoodWarning" in nextState).toBe(false);
   });
 
+  it("preserves all five fixed companions at distinct arrival positions", () => {
+    const baseState = createHubTeleportReadyState();
+    const teleport = baseState.activeTeleport;
+
+    if (!teleport) {
+      throw new Error("Missing active teleport in test state.");
+    }
+
+    const companions = companionIds.map((companionId, index) =>
+      createCompanion(
+        companionId,
+        teleport.position,
+        companionIds[0],
+        index === 0 ? "defender" : "fighter",
+        index,
+      ),
+    );
+    const state = {
+      ...baseState,
+      entities: Object.fromEntries(
+        companions.map((companion) => [companion.id, companion]),
+      ),
+    };
+
+    const nextState = updateTeleportSystem(state, new Set(), 12345);
+    const arrivalPositions = companionIds.map(
+      (companionId) => nextState.entities[companionId]?.position,
+    );
+
+    expect(
+      companionIds.every(
+        (companionId) => nextState.entities[companionId]?.kind === "companion",
+      ),
+    ).toBe(true);
+    expect(
+      new Set(arrivalPositions.map((position) => JSON.stringify(position))),
+    ).toHaveLength(companionIds.length);
+  });
+
   it("clears transient movement runtime after teleport completion", () => {
     const state = createHubTeleportReadyState({
       movementFailureMsByEntityId: {

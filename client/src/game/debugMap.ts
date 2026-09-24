@@ -77,6 +77,7 @@ export const companionIds = [
   "test-companion-2",
   "test-companion-3",
   "test-companion-4",
+  "test-companion-5",
 ];
 
 export const enemyIds = Array.from({ length: 72 }, (_, index) =>
@@ -117,6 +118,7 @@ export const companionStartPositions: Position[] = [
   { x: 4, y: 3 },
   { x: 3, y: 4 },
   { x: 4, y: 4 },
+  { x: 3, y: 5 },
 ];
 
 export const hubCompanionStartPositions: Position[] = [
@@ -124,6 +126,7 @@ export const hubCompanionStartPositions: Position[] = [
   { x: 13, y: 51 },
   { x: 12, y: 52 },
   { x: 13, y: 52 },
+  { x: 12, y: 53 },
 ];
 
 export const hubTwoCompanionStartPositions: Position[] = [
@@ -131,6 +134,7 @@ export const hubTwoCompanionStartPositions: Position[] = [
   { x: 65, y: 36 },
   { x: 64, y: 37 },
   { x: 65, y: 37 },
+  { x: 64, y: 38 },
 ];
 
 export const mapTwoCompanionStartPositions: Position[] = [
@@ -138,6 +142,7 @@ export const mapTwoCompanionStartPositions: Position[] = [
   { x: 29, y: 29 },
   { x: 28, y: 30 },
   { x: 29, y: 30 },
+  { x: 28, y: 31 },
 ];
 
 export const teleporterPosition: Position = { x: 154, y: 29 };
@@ -185,6 +190,7 @@ const hubArrivalPositions: Position[] = [
   { x: 100, y: 30 },
   { x: 99, y: 31 },
   { x: 100, y: 31 },
+  { x: 99, y: 32 },
 ];
 
 const mapOneHubArrivalPositions: Position[] = [
@@ -192,6 +198,7 @@ const mapOneHubArrivalPositions: Position[] = [
   { x: 8, y: 29 },
   { x: 7, y: 30 },
   { x: 8, y: 30 },
+  { x: 7, y: 31 },
 ];
 
 const mapOneMapTwoArrivalPositions: Position[] = [
@@ -199,6 +206,7 @@ const mapOneMapTwoArrivalPositions: Position[] = [
   { x: 8, y: 29 },
   { x: 7, y: 30 },
   { x: 8, y: 30 },
+  { x: 7, y: 31 },
 ];
 
 const mapTwoMapOneArrivalPositions: Position[] = [
@@ -206,6 +214,7 @@ const mapTwoMapOneArrivalPositions: Position[] = [
   { x: 153, y: 31 },
   { x: 154, y: 32 },
   { x: 153, y: 32 },
+  { x: 154, y: 33 },
 ];
 
 const mapTwoMapThreeArrivalPositions: Position[] = [
@@ -213,6 +222,7 @@ const mapTwoMapThreeArrivalPositions: Position[] = [
   { x: 8, y: 29 },
   { x: 7, y: 30 },
   { x: 8, y: 30 },
+  { x: 7, y: 31 },
 ];
 
 const mapThreeMapTwoArrivalPositions: Position[] = [
@@ -220,6 +230,7 @@ const mapThreeMapTwoArrivalPositions: Position[] = [
   { x: 153, y: 29 },
   { x: 154, y: 30 },
   { x: 153, y: 30 },
+  { x: 154, y: 31 },
 ];
 
 const mapThreeHubTwoArrivalPositions: Position[] = [
@@ -227,6 +238,7 @@ const mapThreeHubTwoArrivalPositions: Position[] = [
   { x: 11, y: 36 },
   { x: 10, y: 37 },
   { x: 11, y: 37 },
+  { x: 10, y: 38 },
 ];
 
 const hubTwoMapThreeArrivalPositions: Position[] = [
@@ -234,6 +246,7 @@ const hubTwoMapThreeArrivalPositions: Position[] = [
   { x: 153, y: 29 },
   { x: 154, y: 30 },
   { x: 153, y: 30 },
+  { x: 154, y: 31 },
 ];
 
 const hubTwoMapFourArrivalPositions: Position[] = [
@@ -241,6 +254,7 @@ const hubTwoMapFourArrivalPositions: Position[] = [
   { x: 9, y: 29 },
   { x: 8, y: 30 },
   { x: 9, y: 30 },
+  { x: 8, y: 31 },
 ];
 
 const mapFourHubTwoArrivalPositions: Position[] = [
@@ -248,6 +262,7 @@ const mapFourHubTwoArrivalPositions: Position[] = [
   { x: 66, y: 62 },
   { x: 65, y: 63 },
   { x: 66, y: 63 },
+  { x: 65, y: 64 },
 ];
 
 const mapFourMapFiveArrivalPositions: Position[] = [
@@ -255,6 +270,7 @@ const mapFourMapFiveArrivalPositions: Position[] = [
   { x: 8, y: 29 },
   { x: 7, y: 30 },
   { x: 8, y: 30 },
+  { x: 7, y: 31 },
 ];
 
 const mapFiveMapFourArrivalPositions: Position[] = [
@@ -262,6 +278,7 @@ const mapFiveMapFourArrivalPositions: Position[] = [
   { x: 103, y: 29 },
   { x: 104, y: 30 },
   { x: 103, y: 30 },
+  { x: 104, y: 31 },
 ];
 
 const mapFiveMapSixArrivalPositions: Position[] = [
@@ -269,6 +286,7 @@ const mapFiveMapSixArrivalPositions: Position[] = [
   { x: 8, y: 29 },
   { x: 7, y: 30 },
   { x: 8, y: 30 },
+  { x: 7, y: 31 },
 ];
 
 const mapSixMapFiveArrivalPositions: Position[] = [
@@ -276,6 +294,7 @@ const mapSixMapFiveArrivalPositions: Position[] = [
   { x: 103, y: 29 },
   { x: 104, y: 30 },
   { x: 103, y: 30 },
+  { x: 104, y: 31 },
 ];
 
 const mapSixMapSevenArrivalPositions: Position[] = [
@@ -283,6 +302,7 @@ const mapSixMapSevenArrivalPositions: Position[] = [
   { x: 8, y: 29 },
   { x: 7, y: 30 },
   { x: 8, y: 30 },
+  { x: 7, y: 31 },
 ];
 
 const mapSevenMapSixArrivalPositions: Position[] = [
@@ -290,6 +310,7 @@ const mapSevenMapSixArrivalPositions: Position[] = [
   { x: 103, y: 29 },
   { x: 104, y: 30 },
   { x: 103, y: 30 },
+  { x: 104, y: 31 },
 ];
 
 export const slimewardCampArrivalPositions: Position[] = [
@@ -297,6 +318,7 @@ export const slimewardCampArrivalPositions: Position[] = [
   { x: 13, y: 17 },
   { x: 12, y: 18 },
   { x: 13, y: 18 },
+  { x: 12, y: 19 },
 ];
 
 export const slimewardCampDungeonEntranceArrivalPositions: Position[] = [
@@ -304,6 +326,7 @@ export const slimewardCampDungeonEntranceArrivalPositions: Position[] = [
   { x: 29, y: 17 },
   { x: 28, y: 18 },
   { x: 29, y: 18 },
+  { x: 28, y: 19 },
 ];
 
 export const mapThreeSlimewardArrivalPositions: Position[] = [
@@ -311,6 +334,7 @@ export const mapThreeSlimewardArrivalPositions: Position[] = [
   { x: 153, y: 8 },
   { x: 154, y: 9 },
   { x: 153, y: 9 },
+  { x: 154, y: 10 },
 ];
 
 export const slimewardFloorOneArrivalPositions: Position[] = [
@@ -318,6 +342,7 @@ export const slimewardFloorOneArrivalPositions: Position[] = [
   { x: 9, y: 20 },
   { x: 8, y: 21 },
   { x: 9, y: 21 },
+  { x: 8, y: 22 },
 ];
 
 export const slimewardFloorTwoArrivalPositions: Position[] = [
@@ -325,6 +350,7 @@ export const slimewardFloorTwoArrivalPositions: Position[] = [
   { x: 9, y: 20 },
   { x: 8, y: 21 },
   { x: 9, y: 21 },
+  { x: 8, y: 22 },
 ];
 
 export const hubNpcStartData = [

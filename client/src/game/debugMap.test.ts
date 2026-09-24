@@ -31,6 +31,8 @@ import {
   WILDERNESS_MAP_ROWS,
   aoeTargetDummyPosition,
   CLASS_MENTOR_NPC_ID,
+  companionIds,
+  companionStartPositions,
   createDebugMap,
   createDebugMapForQuestState,
   debugMapDefinitions,
@@ -69,6 +71,7 @@ import {
   mapThreeSubzoneNameLabels,
   mapThreeResourceStartData,
   mapThreeSubzones,
+  mapTwoCompanionStartPositions,
   mapTwoEnemyStartPositions,
   mapTwoEnemyStartData,
   mapTwoSubzoneNameLabels,
@@ -440,6 +443,29 @@ describe("debug maps", () => {
       ).toBe(false);
       expect(hubTwo.walls).not.toContainEqual(lowerFootprintEdge);
       expect(hubTwo.collisionWalls).toContainEqual(lowerFootprintEdge);
+    }
+  });
+
+  it("provides one distinct start and arrival position per fixed companion", () => {
+    for (const positions of [
+      companionStartPositions,
+      hubCompanionStartPositions,
+      hubTwoCompanionStartPositions,
+      mapTwoCompanionStartPositions,
+    ]) {
+      expect(positions).toHaveLength(companionIds.length);
+      expect(new Set(positions.map(({ x, y }) => `${x},${y}`))).toHaveLength(
+        companionIds.length,
+      );
+    }
+
+    for (const definition of Object.values(debugMapDefinitions)) {
+      for (const teleport of definition.teleports) {
+        expect(teleport.arrivalPositions).toHaveLength(companionIds.length);
+        expect(
+          new Set(teleport.arrivalPositions.map(({ x, y }) => `${x},${y}`)),
+        ).toHaveLength(companionIds.length);
+      }
     }
   });
 

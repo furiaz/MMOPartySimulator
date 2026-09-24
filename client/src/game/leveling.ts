@@ -91,7 +91,7 @@ export type CharacterXpProgress = {
 const PARTY_SIZE_UNLOCK_REQUIREMENTS: Record<number, number> = {
   3: 10,
   4: 30,
-  5: 50,
+  5: 60,
 };
 
 export function getCharacterXpToNextLevel(level: number): number | null {
