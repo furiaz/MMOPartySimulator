@@ -2617,7 +2617,7 @@ Skill-book asset composition follows one technical standard:
 - icon-free class covers, source art, and review sheets are generation inputs rather than runtime assets; after Ticket 0523 they are retained in the external Library archive instead of under `client/public`
 - the external Library archive is not part of the Git repository and is not required by the game at build time or runtime
 - every composed book overlays the exact icon mapped to the skill on its class cover at native output size; active and passive books use the same rule
-- the historical Ticket 0512 and Ticket 0516 generation scripts preserve the common silhouette and gold trim, but their archived inputs must be restored to the scripts' expected project paths before those scripts can be rerun
+- the historical Ticket 0512 and Ticket 0516 generation scripts are retained with their inputs under the external Library archive at `Unused assets/MMOPartySimulator/tracked/client/scripts/`; they are provenance records rather than project-local tooling or build/runtime dependencies
 - current class cover colors are Blade `#8E2634`, Aegis `#4F718C`, Hunter `#3F6B46`, Beast `#234D35`, Elementalist `#177C82`, Runecaster `#6846A5`, Lightbearer `#BBC2CC`, and Penitent `#3B4148`; Beginner retains its parchment source color
 - Beast uses a `0.68` cover-lightness multiplier and Penitent uses `0.58` so their covers remain distinct from Beginner and Lightbearer respectively
 - composition should begin from native small-format cover and icon assets rather than shrinking a large generated book into the 32×32 inventory slot
