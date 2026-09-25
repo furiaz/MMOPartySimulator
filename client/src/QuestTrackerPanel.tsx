@@ -6,7 +6,7 @@ import {
 } from "./questUiHelpers";
 
 const questObjectiveCompleteSrc =
-  "assets/Generated/prototype-vfx/sprites/quest-objective-complete.png";
+  "assets/effects/gameplay/quest-objective-complete.png";
 
 export function QuestTrackerPanel({
   isHidden,

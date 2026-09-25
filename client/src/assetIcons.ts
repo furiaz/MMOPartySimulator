@@ -11,82 +11,88 @@ import type {
   SkillId,
 } from "./game";
 
-const nowAssetPackPath = "/assets/Generated/now-pack";
-const equipmentIconPath = "/assets/Generated/equipment-icons/items";
-const skillBookIconPath = "/assets/Generated/skill-book-icons/items";
-const wildernessMapAssetPath = "/assets/Generated/map-wilderness";
-const hubFloorAssetPath = "/assets/Generated/hub-floors";
-const hubCastleWallAssetPath = "/assets/Generated/hub-castle-walls";
-const hubStructureAssetPath = "/assets/Generated/hub-structures/256";
-const guildTavernAssetPath = "/assets/Generated/guild-tavern";
-const farmLivestockAssetPath = "/assets/Generated/farm-livestock";
-const teleportAssetPath = "/assets/Generated/teleports";
-const passageBlockerAssetPath = "/assets/Generated/passage-blockers";
-const ticket0501AssetPath = "/assets/Generated/ticket-0501";
-const ticket0501TerrainAssetPath = `${ticket0501AssetPath}/terrain`;
-const ticket0501UiAssetPath = `${ticket0501AssetPath}/ui`;
-const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
-const beginnerSkillEffectsPath = "/assets/Generated/beginner-skill-effects-50/sprites";
-const firstClassSkillEffectsPath = "/assets/Generated/first-class-skill-effects";
-const bladeSkillEffectsPath = `${firstClassSkillEffectsPath}/blade/sprites`;
-const aegisSkillEffectsPath = `${firstClassSkillEffectsPath}/aegis/sprites`;
-const hunterSkillEffectsPath = `${firstClassSkillEffectsPath}/hunter/sprites`;
-const beastSkillEffectsPath = `${firstClassSkillEffectsPath}/beast/sprites`;
-const elementalistSkillEffectsPath = `${firstClassSkillEffectsPath}/elementalist/sprites`;
-const ticket0515RunecasterPath = "/assets/Generated/ticket-0515/runecaster";
-const runecasterSealPath = `${ticket0515RunecasterPath}/seals`;
-const runecasterSkillIconPath = `${ticket0515RunecasterPath}/icons`;
-const runecasterSkillEffectsPath = `${ticket0515RunecasterPath}/battlefield`;
-const lightbearerSkillEffectsPath = `${firstClassSkillEffectsPath}/lightbearer/sprites`;
-const penitentSkillEffectsPath = `${firstClassSkillEffectsPath}/penitent/sprites`;
-const wildernessMapFloor128AssetPath = `${wildernessMapAssetPath}/128`;
-const hubFloor128AssetPath = `${hubFloorAssetPath}/New/128`;
+const equipmentIconPath = "/assets/items/equipment";
+const skillBookIconPath = "/assets/items/skill-books";
+const resourceNodeAssetPath = "/assets/world/resources/nodes";
+const hubNpcAssetPath = "/assets/entities/npcs/hub";
+const equipmentPlaceholderAssetPath = "/assets/ui/equipment-placeholders";
+const wildernessFloorAssetPath = "/assets/world/terrain/wilderness/floors";
+const wildernessVegetationAssetPath =
+  "/assets/world/terrain/wilderness/vegetation";
+const hubFloorAssetPath = "/assets/world/terrain/hub/floors";
+const hubWallAssetPath = "/assets/world/terrain/hub/walls";
+const hubStructureAssetPath = "/assets/world/structures/hub";
+const hubPropAssetPath = "/assets/world/props/hub";
+const farmCropAssetPath = "/assets/ui/farm/crops";
+const farmLivestockAssetPath = "/assets/ui/farm/livestock";
+const farmUiAssetPath = "/assets/ui/farm";
+const teleportAssetPath = "/assets/world/teleports";
+const passageBlockerAssetPath =
+  "/assets/world/props/hub/passage-blockers";
+const regionalPropAssetPath = "/assets/world/props/regions";
+const gameplayControlAssetPath = "/assets/ui/controls/gameplay";
+const slimewardDungeonAssetPath = "/assets/world/dungeons/slimeward";
+const slimewardDungeonPropPath = `${slimewardDungeonAssetPath}/props`;
+const slimewardDungeonTeleportPath = `${slimewardDungeonAssetPath}/teleports`;
+const slimewardDungeonTerrainPath = `${slimewardDungeonAssetPath}/terrain`;
+const beginnerSkillEffectsPath = "/assets/skills/effects/beginner";
+const classSkillEffectsPath = "/assets/skills/effects";
+const bladeSkillEffectsPath = `${classSkillEffectsPath}/blade`;
+const aegisSkillEffectsPath = `${classSkillEffectsPath}/aegis`;
+const hunterSkillEffectsPath = `${classSkillEffectsPath}/hunter`;
+const beastSkillEffectsPath = `${classSkillEffectsPath}/beast`;
+const elementalistSkillEffectsPath = `${classSkillEffectsPath}/elementalist`;
+const runecasterSealPath = "/assets/skills/rune-seals/runecaster";
+const runecasterSkillIconPath = "/assets/skills/icons/runecaster";
+const runecasterSkillEffectsPath = `${classSkillEffectsPath}/runecaster`;
+const lightbearerSkillEffectsPath = `${classSkillEffectsPath}/lightbearer`;
+const penitentSkillEffectsPath = `${classSkillEffectsPath}/penitent`;
 
 export const INVENTORY_ITEM_ICON_SRC: Partial<Record<ItemId, string>> = {
-  wood: `${nowAssetPackPath}/wood-node.png`,
-  ore: `${nowAssetPackPath}/ore-node.png`,
-  herb: `${nowAssetPackPath}/herb-node.png`,
-  softwood: `${nowAssetPackPath}/wood-node.png`,
-  copper_ore: `${nowAssetPackPath}/ore-node.png`,
-  field_herb: `${nowAssetPackPath}/herb-node.png`,
-  hardwood: `${nowAssetPackPath}/wood-node.png`,
-  iron_ore: `${nowAssetPackPath}/ore-node.png`,
-  redleaf_herb: `${nowAssetPackPath}/herb-node.png`,
-  tin_ore: `${nowAssetPackPath}/ore-node.png`,
-  slime_gel_t1: `${nowAssetPackPath}/herb-node.png`,
-  slime_core_t1: `${nowAssetPackPath}/ore-node.png`,
-  bat_wing_t1: `${nowAssetPackPath}/wood-node.png`,
-  bat_ear_t1: `${nowAssetPackPath}/wood-node.png`,
-  spider_silk_t1: `${nowAssetPackPath}/herb-node.png`,
-  spider_fang_t1: `${nowAssetPackPath}/ore-node.png`,
-  goblin_ear_t1: `${nowAssetPackPath}/wood-node.png`,
-  goblin_tooth_t1: `${nowAssetPackPath}/ore-node.png`,
-  imp_horn_chip_t1: `${nowAssetPackPath}/ore-node.png`,
-  imp_tail_t1: `${nowAssetPackPath}/wood-node.png`,
-  wolf_pelt: `${nowAssetPackPath}/wood-node.png`,
-  wolf_fang: `${nowAssetPackPath}/ore-node.png`,
-  crawler_pebble_t1: `${nowAssetPackPath}/ore-node.png`,
-  crawler_plate_t1: `${nowAssetPackPath}/ore-node.png`,
-  moss_tuft_t1: `${nowAssetPackPath}/herb-node.png`,
-  mossling_cap_t1: `${nowAssetPackPath}/herb-node.png`,
-  bat_wing_t2: `${nowAssetPackPath}/wood-node.png`,
-  bat_ear_t2: `${nowAssetPackPath}/wood-node.png`,
-  spider_silk_t2: `${nowAssetPackPath}/herb-node.png`,
-  spider_fang_t2: `${nowAssetPackPath}/ore-node.png`,
-  goblin_ear_t2: `${nowAssetPackPath}/wood-node.png`,
-  goblin_tooth_t2: `${nowAssetPackPath}/ore-node.png`,
-  imp_horn_chip_t2: `${nowAssetPackPath}/ore-node.png`,
-  imp_tail_t2: `${nowAssetPackPath}/wood-node.png`,
-  wolf_pelt_t2: `${nowAssetPackPath}/wood-node.png`,
-  wolf_fang_t2: `${nowAssetPackPath}/ore-node.png`,
-  crawler_pebble_t2: `${nowAssetPackPath}/ore-node.png`,
-  crawler_plate_t2: `${nowAssetPackPath}/ore-node.png`,
-  moss_tuft_t2: `${nowAssetPackPath}/herb-node.png`,
-  mossling_cap_t2: `${nowAssetPackPath}/herb-node.png`,
-  wisp_ash_t2: `${nowAssetPackPath}/ore-node.png`,
-  wisp_ember_t2: `${nowAssetPackPath}/ore-node.png`,
-  orc_tusk: `${nowAssetPackPath}/ore-node.png`,
-  orc_hide: `${nowAssetPackPath}/wood-node.png`,
+  wood: `${resourceNodeAssetPath}/wood-node.png`,
+  ore: `${resourceNodeAssetPath}/ore-node.png`,
+  herb: `${resourceNodeAssetPath}/herb-node.png`,
+  softwood: `${resourceNodeAssetPath}/wood-node.png`,
+  copper_ore: `${resourceNodeAssetPath}/ore-node.png`,
+  field_herb: `${resourceNodeAssetPath}/herb-node.png`,
+  hardwood: `${resourceNodeAssetPath}/wood-node.png`,
+  iron_ore: `${resourceNodeAssetPath}/ore-node.png`,
+  redleaf_herb: `${resourceNodeAssetPath}/herb-node.png`,
+  tin_ore: `${resourceNodeAssetPath}/ore-node.png`,
+  slime_gel_t1: `${resourceNodeAssetPath}/herb-node.png`,
+  slime_core_t1: `${resourceNodeAssetPath}/ore-node.png`,
+  bat_wing_t1: `${resourceNodeAssetPath}/wood-node.png`,
+  bat_ear_t1: `${resourceNodeAssetPath}/wood-node.png`,
+  spider_silk_t1: `${resourceNodeAssetPath}/herb-node.png`,
+  spider_fang_t1: `${resourceNodeAssetPath}/ore-node.png`,
+  goblin_ear_t1: `${resourceNodeAssetPath}/wood-node.png`,
+  goblin_tooth_t1: `${resourceNodeAssetPath}/ore-node.png`,
+  imp_horn_chip_t1: `${resourceNodeAssetPath}/ore-node.png`,
+  imp_tail_t1: `${resourceNodeAssetPath}/wood-node.png`,
+  wolf_pelt: `${resourceNodeAssetPath}/wood-node.png`,
+  wolf_fang: `${resourceNodeAssetPath}/ore-node.png`,
+  crawler_pebble_t1: `${resourceNodeAssetPath}/ore-node.png`,
+  crawler_plate_t1: `${resourceNodeAssetPath}/ore-node.png`,
+  moss_tuft_t1: `${resourceNodeAssetPath}/herb-node.png`,
+  mossling_cap_t1: `${resourceNodeAssetPath}/herb-node.png`,
+  bat_wing_t2: `${resourceNodeAssetPath}/wood-node.png`,
+  bat_ear_t2: `${resourceNodeAssetPath}/wood-node.png`,
+  spider_silk_t2: `${resourceNodeAssetPath}/herb-node.png`,
+  spider_fang_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  goblin_ear_t2: `${resourceNodeAssetPath}/wood-node.png`,
+  goblin_tooth_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  imp_horn_chip_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  imp_tail_t2: `${resourceNodeAssetPath}/wood-node.png`,
+  wolf_pelt_t2: `${resourceNodeAssetPath}/wood-node.png`,
+  wolf_fang_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  crawler_pebble_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  crawler_plate_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  moss_tuft_t2: `${resourceNodeAssetPath}/herb-node.png`,
+  mossling_cap_t2: `${resourceNodeAssetPath}/herb-node.png`,
+  wisp_ash_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  wisp_ember_t2: `${resourceNodeAssetPath}/ore-node.png`,
+  orc_tusk: `${resourceNodeAssetPath}/ore-node.png`,
+  orc_hide: `${resourceNodeAssetPath}/wood-node.png`,
   minor_recovery_flask: `${beginnerSkillEffectsPath}/first_aid.png`,
   soldiers_recovery_flask: `${beginnerSkillEffectsPath}/rally_call.png`,
   // skill-book-icons-grid
@@ -367,134 +373,134 @@ export const INVENTORY_ITEM_ICON_SRC: Partial<Record<ItemId, string>> = {
 };
 
 export const EMPTY_EQUIPMENT_SLOT_ICON_SRC: Partial<Record<EquipmentSlot, string>> = {
-  mainHand: `${nowAssetPackPath}/empty-main-hand.png`,
-  offhand: `${nowAssetPackPath}/empty-offhand.png`,
+  mainHand: `${equipmentPlaceholderAssetPath}/empty-main-hand.png`,
+  offhand: `${equipmentPlaceholderAssetPath}/empty-offhand.png`,
 };
 
 export const RESOURCE_ICON_SRC = {
-  wood: `${nowAssetPackPath}/wood-node.png`,
-  ore: `${nowAssetPackPath}/ore-node.png`,
-  herb: `${nowAssetPackPath}/herb-node.png`,
+  wood: `${resourceNodeAssetPath}/wood-node.png`,
+  ore: `${resourceNodeAssetPath}/ore-node.png`,
+  herb: `${resourceNodeAssetPath}/herb-node.png`,
 } satisfies Record<ResourceType, string>;
 
 export const NPC_ICON_SRC: Partial<Record<NpcEntity["npcRole"], string>> = {
-  quest_giver: `${nowAssetPackPath}/quest-giver.png`,
-  class_mentor: `${nowAssetPackPath}/class-mentor.png`,
-  merchant: `${nowAssetPackPath}/merchant.png`,
-  smith: `${nowAssetPackPath}/smith.png`,
-  guild_coordinator: `${guildTavernAssetPath}/guild-coordinator.png`,
-  tavern_keeper: `${guildTavernAssetPath}/tavern-keeper.png`,
-  farmer: `${farmLivestockAssetPath}/farmer.png`,
-  livestock_keeper: `${farmLivestockAssetPath}/livestock-keeper.png`,
-  bank_chest: `${slimewardDungeonAssetPath}/dungeon-chest-closed-64.png`,
-  dog: `${nowAssetPackPath}/dog.png`,
-  dungeon_chest_closed: `${slimewardDungeonAssetPath}/dungeon-chest-closed-64.png`,
-  dungeon_chest_open: `${slimewardDungeonAssetPath}/dungeon-chest-open-64.png`,
+  quest_giver: `${hubNpcAssetPath}/quest-giver.png`,
+  class_mentor: `${hubNpcAssetPath}/class-mentor.png`,
+  merchant: `${hubNpcAssetPath}/merchant.png`,
+  smith: `${hubNpcAssetPath}/smith.png`,
+  guild_coordinator: `${hubNpcAssetPath}/guild-coordinator.png`,
+  tavern_keeper: `${hubNpcAssetPath}/tavern-keeper.png`,
+  farmer: `${hubNpcAssetPath}/farmer.png`,
+  livestock_keeper: `${hubNpcAssetPath}/livestock-keeper.png`,
+  bank_chest: `${slimewardDungeonPropPath}/dungeon-chest-closed-64.png`,
+  dog: `${hubNpcAssetPath}/dog.png`,
+  dungeon_chest_closed: `${slimewardDungeonPropPath}/dungeon-chest-closed-64.png`,
+  dungeon_chest_open: `${slimewardDungeonPropPath}/dungeon-chest-open-64.png`,
 };
 
 export const WILDERNESS_MAP_TILE_SRC = {
-  grassA: `${wildernessMapAssetPath}/grass-a.png`,
-  grassB: `${wildernessMapAssetPath}/grass-b.png`,
-  grass128: `${wildernessMapFloor128AssetPath}/forest-grass-floor-atlas-128.png`,
-  grassDetail128: `${wildernessMapFloor128AssetPath}/forest-grass-detail-floor-atlas-128.png`,
-  grassBackup128: `${wildernessMapFloor128AssetPath}/forest-grass-backup-floor-atlas-128.png`,
-  grassFlowers128: `${wildernessMapFloor128AssetPath}/forest-grass-flowers-floor-atlas-128.png`,
-  tree: `${wildernessMapAssetPath}/tree.png`,
-  bush: `${wildernessMapAssetPath}/bush.png`,
+  grassA: `${wildernessFloorAssetPath}/grass-a.png`,
+  grassB: `${wildernessFloorAssetPath}/grass-b.png`,
+  grass128: `${wildernessFloorAssetPath}/forest-grass-floor-atlas-128.png`,
+  grassDetail128: `${wildernessFloorAssetPath}/forest-grass-detail-floor-atlas-128.png`,
+  grassBackup128: `${wildernessFloorAssetPath}/forest-grass-backup-floor-atlas-128.png`,
+  grassFlowers128: `${wildernessFloorAssetPath}/forest-grass-flowers-floor-atlas-128.png`,
+  tree: `${wildernessVegetationAssetPath}/tree.png`,
+  bush: `${wildernessVegetationAssetPath}/bush.png`,
 } as const;
 
 export const HUB_MAP_TILE_SRC = {
   stone: `${hubFloorAssetPath}/hub-city-stone-seamless.png`,
-  grass128: `${hubFloor128AssetPath}/hub-outside-grass-floor-atlas-128.png`,
-  stone128: `${hubFloor128AssetPath}/hub-stone-floor-atlas-128.png`,
+  grass128: `${hubFloorAssetPath}/hub-outside-grass-floor-atlas-128.png`,
+  stone128: `${hubFloorAssetPath}/hub-stone-floor-atlas-128.png`,
 } as const;
 
 export const HUB_WALL_TILE_SRC = {
-  north: `${hubCastleWallAssetPath}/castle-wall-north.png`,
-  east: `${hubCastleWallAssetPath}/castle-wall-east.png`,
-  south: `${hubCastleWallAssetPath}/castle-wall-south.png`,
-  west: `${hubCastleWallAssetPath}/castle-wall-west.png`,
+  north: `${hubWallAssetPath}/castle-wall-north.png`,
+  east: `${hubWallAssetPath}/castle-wall-east.png`,
+  south: `${hubWallAssetPath}/castle-wall-south.png`,
+  west: `${hubWallAssetPath}/castle-wall-west.png`,
 } as const;
 
 export const MAP_VISUAL_OBJECT_SRC: Record<MapVisualObjectId, string> = {
   hub_house: `${hubStructureAssetPath}/hub_house.png`,
   hub_cabin: `${hubStructureAssetPath}/hub_cabin.png`,
   hub_tent: `${hubStructureAssetPath}/hub_tent.png`,
-  guild_tavern_building: `${guildTavernAssetPath}/guild-tavern-building.png`,
-  farm_building: `${farmLivestockAssetPath}/farm-building.png`,
-  livestock_building: `${farmLivestockAssetPath}/livestock-building.png`,
-  guild_notice_board_new_quest_sign: `${guildTavernAssetPath}/notice-board-new-quest-sign.png`,
+  guild_tavern_building: `${hubStructureAssetPath}/guild-tavern-building.png`,
+  farm_building: `${hubStructureAssetPath}/farm-building.png`,
+  livestock_building: `${hubStructureAssetPath}/livestock-building.png`,
+  guild_notice_board_new_quest_sign: `${hubPropAssetPath}/notice-board-new-quest-sign.png`,
   hub_dock_shore_connector: `${hubStructureAssetPath}/hub_dock_shore_connector.png`,
   passage_gate_closed: `${passageBlockerAssetPath}/passage_gate_closed_edge_v2_100x350.png`,
   passage_gate_open: `${passageBlockerAssetPath}/passage_gate_open_faces_v2_100x350.png`,
   passage_blocker_collapsed_column: `${passageBlockerAssetPath}/passage_blocker_collapsed_column_100x350.png`,
   passage_blocker_repaired_column: `${passageBlockerAssetPath}/passage_blocker_repaired_column_100x350.png`,
-  slime_covered_stone: `${slimewardDungeonAssetPath}/slime-covered-stone-64.png`,
-  azure_slime_rock_cluster: `${slimewardDungeonAssetPath}/azure-slime-rock-cluster-128.png`,
-  ash_goblin_charred_dead_tree_trunk: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/charred_dead_tree_trunk.png`,
-  ash_goblin_ash_bent_dead_tree: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/ash_bent_dead_tree.png`,
-  ash_goblin_goblin_spike_barricade: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/goblin_spike_barricade.png`,
-  ash_goblin_goblin_watch_post: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/goblin_watch_post.png`,
-  ash_goblin_ember_campfire_pit: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/ember_campfire_pit.png`,
-  ash_goblin_ash_rock_cluster: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/ash_rock_cluster.png`,
-  ash_goblin_broken_cart_debris: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/broken_cart_debris.png`,
-  ash_goblin_bone_skull_warning_totem: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/bone_skull_warning_totem.png`,
-  ash_goblin_sooty_tent_leanto: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/sooty_tent_leanto.png`,
-  ash_goblin_burned_log_pile: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/burned_log_pile.png`,
-  ash_goblin_charcoal_scorch_patch: `${ticket0501TerrainAssetPath}/ash-goblin-encampment/charcoal_scorch_patch.png`,
-  briar_large_briar_thicket: `${ticket0501TerrainAssetPath}/briar-burrows/large_briar_thicket.png`,
-  briar_burrow_mound_entrance: `${ticket0501TerrainAssetPath}/briar-burrows/burrow_mound_entrance.png`,
-  briar_twisted_root_arch: `${ticket0501TerrainAssetPath}/briar-burrows/twisted_root_arch.png`,
-  briar_mire_stone_cluster: `${ticket0501TerrainAssetPath}/briar-burrows/mire_stone_cluster.png`,
-  briar_thorn_fence_bramble_wall: `${ticket0501TerrainAssetPath}/briar-burrows/thorn_fence_bramble_wall.png`,
-  briar_spider_webbed_root_stump: `${ticket0501TerrainAssetPath}/briar-burrows/spider_webbed_root_stump.png`,
-  briar_muddy_insect_tunnel_holes: `${ticket0501TerrainAssetPath}/briar-burrows/muddy_insect_tunnel_holes.png`,
-  briar_wolf_den_bones: `${ticket0501TerrainAssetPath}/briar-burrows/wolf_den_bones.png`,
-  briar_fallen_hollow_log: `${ticket0501TerrainAssetPath}/briar-burrows/fallen_hollow_log.png`,
-  briar_poison_thorn_bulb_cluster: `${ticket0501TerrainAssetPath}/briar-burrows/poison_thorn_bulb_cluster.png`,
-  briar_muddy_bog_patch: `${ticket0501TerrainAssetPath}/briar-burrows/muddy_bog_patch.png`,
-  nightmire_dense_dark_canopy_tree: `${ticket0501TerrainAssetPath}/nightmire-canopy/dense_dark_canopy_tree.png`,
-  nightmire_ancient_elder_moss_stump: `${ticket0501TerrainAssetPath}/nightmire-canopy/ancient_elder_moss_stump.png`,
-  nightmire_bat_roost_dead_tree: `${ticket0501TerrainAssetPath}/nightmire-canopy/bat_roost_dead_tree.png`,
-  nightmire_cinder_veined_standing_stone: `${ticket0501TerrainAssetPath}/nightmire-canopy/cinder_veined_standing_stone.png`,
-  nightmire_shadow_bramble_cluster: `${ticket0501TerrainAssetPath}/nightmire-canopy/shadow_bramble_cluster.png`,
-  nightmire_fallen_canopy_trunk: `${ticket0501TerrainAssetPath}/nightmire-canopy/fallen_canopy_trunk.png`,
-  nightmire_mushroom_ring: `${ticket0501TerrainAssetPath}/nightmire-canopy/mushroom_ring.png`,
-  nightmire_hanging_root_curtain: `${ticket0501TerrainAssetPath}/nightmire-canopy/hanging_root_curtain.png`,
-  nightmire_ash_moss_boulder_cluster: `${ticket0501TerrainAssetPath}/nightmire-canopy/ash_moss_boulder_cluster.png`,
-  nightmire_corrupted_sap_patch: `${ticket0501TerrainAssetPath}/nightmire-canopy/corrupted_sap_patch.png`,
-  nightmire_broken_hunter_signpost: `${ticket0501TerrainAssetPath}/nightmire-canopy/broken_hunter_signpost.png`,
-  orc_warcamp_heavy_orc_spike_barricade: `${ticket0501TerrainAssetPath}/orc-warcamp/heavy_orc_spike_barricade.png`,
-  orc_warcamp_orc_command_banner_standard: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_command_banner_standard.png`,
-  orc_warcamp_crude_war_drum_platform: `${ticket0501TerrainAssetPath}/orc-warcamp/crude_war_drum_platform.png`,
-  orc_warcamp_armored_watchtower_platform: `${ticket0501TerrainAssetPath}/orc-warcamp/armored_watchtower_platform.png`,
-  orc_warcamp_orc_weapon_rack: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_weapon_rack.png`,
-  orc_warcamp_bonfire_meat_spit: `${ticket0501TerrainAssetPath}/orc-warcamp/bonfire_meat_spit.png`,
-  orc_warcamp_orc_training_post: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_training_post.png`,
-  orc_warcamp_orc_supply_pile: `${ticket0501TerrainAssetPath}/orc-warcamp/orc_supply_pile.png`,
-  orc_warcamp_broken_siege_ram: `${ticket0501TerrainAssetPath}/orc-warcamp/broken_siege_ram.png`,
-  orc_warcamp_skull_bone_trophy_mound: `${ticket0501TerrainAssetPath}/orc-warcamp/skull_bone_trophy_mound.png`,
-  orc_warcamp_scorched_battlefield_patch: `${ticket0501TerrainAssetPath}/orc-warcamp/scorched_battlefield_patch.png`,
+  slime_covered_stone: `${slimewardDungeonPropPath}/slime-covered-stone-64.png`,
+  azure_slime_rock_cluster: `${slimewardDungeonPropPath}/azure-slime-rock-cluster-128.png`,
+  ash_goblin_charred_dead_tree_trunk: `${regionalPropAssetPath}/ash-goblin-encampment/charred_dead_tree_trunk.png`,
+  ash_goblin_ash_bent_dead_tree: `${regionalPropAssetPath}/ash-goblin-encampment/ash_bent_dead_tree.png`,
+  ash_goblin_goblin_spike_barricade: `${regionalPropAssetPath}/ash-goblin-encampment/goblin_spike_barricade.png`,
+  ash_goblin_goblin_watch_post: `${regionalPropAssetPath}/ash-goblin-encampment/goblin_watch_post.png`,
+  ash_goblin_ember_campfire_pit: `${regionalPropAssetPath}/ash-goblin-encampment/ember_campfire_pit.png`,
+  ash_goblin_ash_rock_cluster: `${regionalPropAssetPath}/ash-goblin-encampment/ash_rock_cluster.png`,
+  ash_goblin_broken_cart_debris: `${regionalPropAssetPath}/ash-goblin-encampment/broken_cart_debris.png`,
+  ash_goblin_bone_skull_warning_totem: `${regionalPropAssetPath}/ash-goblin-encampment/bone_skull_warning_totem.png`,
+  ash_goblin_sooty_tent_leanto: `${regionalPropAssetPath}/ash-goblin-encampment/sooty_tent_leanto.png`,
+  ash_goblin_burned_log_pile: `${regionalPropAssetPath}/ash-goblin-encampment/burned_log_pile.png`,
+  ash_goblin_charcoal_scorch_patch: `${regionalPropAssetPath}/ash-goblin-encampment/charcoal_scorch_patch.png`,
+  briar_large_briar_thicket: `${regionalPropAssetPath}/briar-burrows/large_briar_thicket.png`,
+  briar_burrow_mound_entrance: `${regionalPropAssetPath}/briar-burrows/burrow_mound_entrance.png`,
+  briar_twisted_root_arch: `${regionalPropAssetPath}/briar-burrows/twisted_root_arch.png`,
+  briar_mire_stone_cluster: `${regionalPropAssetPath}/briar-burrows/mire_stone_cluster.png`,
+  briar_thorn_fence_bramble_wall: `${regionalPropAssetPath}/briar-burrows/thorn_fence_bramble_wall.png`,
+  briar_spider_webbed_root_stump: `${regionalPropAssetPath}/briar-burrows/spider_webbed_root_stump.png`,
+  briar_muddy_insect_tunnel_holes: `${regionalPropAssetPath}/briar-burrows/muddy_insect_tunnel_holes.png`,
+  briar_wolf_den_bones: `${regionalPropAssetPath}/briar-burrows/wolf_den_bones.png`,
+  briar_fallen_hollow_log: `${regionalPropAssetPath}/briar-burrows/fallen_hollow_log.png`,
+  briar_poison_thorn_bulb_cluster: `${regionalPropAssetPath}/briar-burrows/poison_thorn_bulb_cluster.png`,
+  briar_muddy_bog_patch: `${regionalPropAssetPath}/briar-burrows/muddy_bog_patch.png`,
+  nightmire_dense_dark_canopy_tree: `${regionalPropAssetPath}/nightmire-canopy/dense_dark_canopy_tree.png`,
+  nightmire_ancient_elder_moss_stump: `${regionalPropAssetPath}/nightmire-canopy/ancient_elder_moss_stump.png`,
+  nightmire_bat_roost_dead_tree: `${regionalPropAssetPath}/nightmire-canopy/bat_roost_dead_tree.png`,
+  nightmire_cinder_veined_standing_stone: `${regionalPropAssetPath}/nightmire-canopy/cinder_veined_standing_stone.png`,
+  nightmire_shadow_bramble_cluster: `${regionalPropAssetPath}/nightmire-canopy/shadow_bramble_cluster.png`,
+  nightmire_fallen_canopy_trunk: `${regionalPropAssetPath}/nightmire-canopy/fallen_canopy_trunk.png`,
+  nightmire_mushroom_ring: `${regionalPropAssetPath}/nightmire-canopy/mushroom_ring.png`,
+  nightmire_hanging_root_curtain: `${regionalPropAssetPath}/nightmire-canopy/hanging_root_curtain.png`,
+  nightmire_ash_moss_boulder_cluster: `${regionalPropAssetPath}/nightmire-canopy/ash_moss_boulder_cluster.png`,
+  nightmire_corrupted_sap_patch: `${regionalPropAssetPath}/nightmire-canopy/corrupted_sap_patch.png`,
+  nightmire_broken_hunter_signpost: `${regionalPropAssetPath}/nightmire-canopy/broken_hunter_signpost.png`,
+  orc_warcamp_heavy_orc_spike_barricade: `${regionalPropAssetPath}/orc-warcamp/heavy_orc_spike_barricade.png`,
+  orc_warcamp_orc_command_banner_standard: `${regionalPropAssetPath}/orc-warcamp/orc_command_banner_standard.png`,
+  orc_warcamp_crude_war_drum_platform: `${regionalPropAssetPath}/orc-warcamp/crude_war_drum_platform.png`,
+  orc_warcamp_armored_watchtower_platform: `${regionalPropAssetPath}/orc-warcamp/armored_watchtower_platform.png`,
+  orc_warcamp_orc_weapon_rack: `${regionalPropAssetPath}/orc-warcamp/orc_weapon_rack.png`,
+  orc_warcamp_bonfire_meat_spit: `${regionalPropAssetPath}/orc-warcamp/bonfire_meat_spit.png`,
+  orc_warcamp_orc_training_post: `${regionalPropAssetPath}/orc-warcamp/orc_training_post.png`,
+  orc_warcamp_orc_supply_pile: `${regionalPropAssetPath}/orc-warcamp/orc_supply_pile.png`,
+  orc_warcamp_broken_siege_ram: `${regionalPropAssetPath}/orc-warcamp/broken_siege_ram.png`,
+  orc_warcamp_skull_bone_trophy_mound: `${regionalPropAssetPath}/orc-warcamp/skull_bone_trophy_mound.png`,
+  orc_warcamp_scorched_battlefield_patch: `${regionalPropAssetPath}/orc-warcamp/scorched_battlefield_patch.png`,
 };
 
-export const TICKET_0501_HUD_CONTROL_SRC = {
-  autoCombatOff: `${ticket0501UiAssetPath}/controls/auto_combat_off.png`,
-  autoCombatOn: `${ticket0501UiAssetPath}/controls/auto_combat_on.png`,
-  pause: `${ticket0501UiAssetPath}/controls/pause.png`,
-  resume: `${ticket0501UiAssetPath}/controls/resume.png`,
-  autoCombatOffPressed: `${ticket0501UiAssetPath}/controls/auto_combat_off_pressed.png`,
-  autoCombatOnPressed: `${ticket0501UiAssetPath}/controls/auto_combat_on_pressed.png`,
-  pausePressed: `${ticket0501UiAssetPath}/controls/pause_pressed.png`,
-  resumePressed: `${ticket0501UiAssetPath}/controls/resume_pressed.png`,
+export const GAMEPLAY_HUD_CONTROL_SRC = {
+  autoCombatOff: `${gameplayControlAssetPath}/auto_combat_off.png`,
+  autoCombatOn: `${gameplayControlAssetPath}/auto_combat_on.png`,
+  pause: `${gameplayControlAssetPath}/pause.png`,
+  resume: `${gameplayControlAssetPath}/resume.png`,
+  autoCombatOffPressed: `${gameplayControlAssetPath}/auto_combat_off_pressed.png`,
+  autoCombatOnPressed: `${gameplayControlAssetPath}/auto_combat_on_pressed.png`,
+  pausePressed: `${gameplayControlAssetPath}/pause_pressed.png`,
+  resumePressed: `${gameplayControlAssetPath}/resume_pressed.png`,
 } as const;
 
 export const FARM_CROP_ICON_SRC: Record<FarmCropId | "locked", string> = {
-  carrot: `${farmLivestockAssetPath}/carrot.png`,
-  potato: `${farmLivestockAssetPath}/potato.png`,
-  moonleaf: `${farmLivestockAssetPath}/moonleaf.png`,
-  bittercap_mushroom: `${farmLivestockAssetPath}/bittercap-mushroom.png`,
-  ashpepper: `${farmLivestockAssetPath}/ashpepper.png`,
-  locked: `${farmLivestockAssetPath}/locked-crop.png`,
+  carrot: `${farmCropAssetPath}/carrot.png`,
+  potato: `${farmCropAssetPath}/potato.png`,
+  moonleaf: `${farmCropAssetPath}/moonleaf.png`,
+  bittercap_mushroom: `${farmCropAssetPath}/bittercap-mushroom.png`,
+  ashpepper: `${farmCropAssetPath}/ashpepper.png`,
+  locked: `${farmUiAssetPath}/locked-crop.png`,
 };
 
 export const LIVESTOCK_CREATURE_ICON_SRC: Record<
@@ -505,7 +511,7 @@ export const LIVESTOCK_CREATURE_ICON_SRC: Record<
   wolf: `${farmLivestockAssetPath}/wolf.png`,
   tin_crawler: `${farmLivestockAssetPath}/tin-crawler.png`,
   elder_mossling: `${farmLivestockAssetPath}/elder-mossling.png`,
-  locked: `${farmLivestockAssetPath}/locked-crop.png`,
+  locked: `${farmUiAssetPath}/locked-crop.png`,
 };
 
 export const RUNE_WORD_SEAL_SRC: Record<RunecasterRuneWordId, string> = {
@@ -606,8 +612,8 @@ export const SKILL_VISUAL_ICON_SRC: Partial<Record<SkillId, string>> = {
   leyline_matrix: RUNECASTER_SKILL_ICON_SRC.leyline_matrix,
   stone_sigil_rhythm: RUNECASTER_SKILL_ICON_SRC.stone_sigil_rhythm,
   rune_step: RUNECASTER_SKILL_ICON_SRC.rune_step,
-  word_resonance: `${firstClassSkillEffectsPath}/runecaster/sprites/word_resonance.png`,
-  living_inscription: `${firstClassSkillEffectsPath}/runecaster/sprites/living_inscription.png`,
+  word_resonance: `${runecasterSkillEffectsPath}/word_resonance.png`,
+  living_inscription: `${runecasterSkillEffectsPath}/living_inscription.png`,
   blinding_ray: `${lightbearerSkillEffectsPath}/blinding_ray.png`,
   light_mend: `${lightbearerSkillEffectsPath}/light_mend.png`,
   sanctuary_veil: `${lightbearerSkillEffectsPath}/sanctuary_veil.png`,
@@ -1014,13 +1020,13 @@ export const MAP_OBJECT_ICON_SRC = {
   healingFountain: `${beginnerSkillEffectsPath}/hub_healing_fountain.png`,
   teleportBroken: `${teleportAssetPath}/TeleportBroken.png`,
   teleportGood: `${teleportAssetPath}/TeleportGood.png`,
-  slimewardTeleportBroken: `${slimewardDungeonAssetPath}/slimeward-teleporter-broken.png`,
-  slimewardTeleportGood: `${slimewardDungeonAssetPath}/slimeward-teleporter-active.png`,
-  slimewardWaypoint: `${slimewardDungeonAssetPath}/dungeon-waypoint-marker-32.png`,
+  slimewardTeleportBroken: `${slimewardDungeonTeleportPath}/slimeward-teleporter-broken.png`,
+  slimewardTeleportGood: `${slimewardDungeonTeleportPath}/slimeward-teleporter-active.png`,
+  slimewardWaypoint: `${slimewardDungeonPropPath}/dungeon-waypoint-marker-32.png`,
 } as const;
 
 export const SLIMEWARD_DUNGEON_TILE_SRC = {
-  floorDamp: `${slimewardDungeonAssetPath}/slimeward-floor-damp-stone-128.png`,
-  floorAzure: `${slimewardDungeonAssetPath}/slimeward-floor-azure-slime-stone-128.png`,
-  wall: `${slimewardDungeonAssetPath}/slimeward-wall-azure-stone-64.png`,
+  floorDamp: `${slimewardDungeonTerrainPath}/slimeward-floor-damp-stone-128.png`,
+  floorAzure: `${slimewardDungeonTerrainPath}/slimeward-floor-azure-slime-stone-128.png`,
+  wall: `${slimewardDungeonTerrainPath}/slimeward-wall-azure-stone-64.png`,
 } as const;

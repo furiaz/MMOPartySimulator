@@ -71,7 +71,7 @@ const wildernessMapIds = new Set([
 ]);
 const aggressiveEnemyNameplateColor = 0xdc2626;
 const passiveEnemyNameplateColor = 0x1f2937;
-const prototypeVfxSpritePath = "assets/Generated/prototype-vfx/sprites";
+const prototypeVfxSpritePath = "assets/effects/gameplay";
 
 export const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 export const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;

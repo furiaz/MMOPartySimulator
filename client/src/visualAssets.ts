@@ -63,20 +63,19 @@ export type MapTileVisualAsset = {
   className: string;
 };
 
-const testCharacterBasePath = "/assets/Characters/Test-Character";
-const beginnerCharacterBasePath = "/assets/Characters/Beginner";
-const firstClassCharacterBasePath = "/assets/Characters";
-const testEnemyBasePath = "/assets/Characters/Test-Enemy";
-const testEnemyTwoBasePath = "/assets/Characters/Test-Enemy2";
-const prototypeEnemyBasePath = "/assets/Characters/Prototype-Enemies";
-const generatedEnemyPlaceholderPath = "/assets/Generated/enemy-placeholders/items";
-const ticket0501EnemyBasePath = "/assets/Generated/ticket-0501/enemies";
-const ticket0501StandardEnemyPath = `${ticket0501EnemyBasePath}/standard-level-10-plus`;
-const ticket0501OrcWarcampEnemyPath = `${ticket0501EnemyBasePath}/orc-warcamp`;
-const slimewardDungeonAssetPath = "/assets/Generated/Dungeon Generation";
-const bossSlimeTestAssetPath = "/assets/Characters/BossSlimeTest";
-const testNpcBasePath = "/assets/Characters/Test-NPC";
-const classPortraitBasePath = "/assets/Generated/class-portraits";
+const fallbackCompanionBasePath = "/assets/entities/companions/fallback";
+const beginnerCompanionBasePath = "/assets/entities/companions/beginner";
+const firstClassCompanionBasePath = "/assets/entities/companions";
+const fallbackWolfEnemyBasePath = "/assets/entities/enemies/fallback-wolf";
+const fallbackOrcEnemyBasePath = "/assets/entities/enemies/fallback-orc";
+const commonEnemyBasePath = "/assets/entities/enemies/common";
+const regionalEnemyBasePath = "/assets/entities/enemies";
+const standardRegionalEnemyPath = `${regionalEnemyBasePath}/standard-level-10-plus`;
+const orcWarcampEnemyPath = `${regionalEnemyBasePath}/orc-warcamp`;
+const slimewardEnemyPath = "/assets/world/dungeons/slimeward/enemies";
+const azureMassAssetPath = "/assets/entities/enemies/bosses/azure-mass";
+const classPlaceholderNpcPath = "/assets/entities/npcs/class-placeholders";
+const classPortraitBasePath = "/assets/ui/portraits/classes";
 const defaultFrameDurationMs = 100;
 const companionCharacterNaturalSize = {
   width: 172,
@@ -108,25 +107,25 @@ function createBeginnerDirectionalFrames(): Record<
   SpriteAnimationAsset
 > {
   const northFrames = createFrames(
-    beginnerCharacterBasePath,
+    beginnerCompanionBasePath,
     "Walk",
     "BeginnerWalkingNorth",
     7,
   );
   const southFrames = createFrames(
-    beginnerCharacterBasePath,
+    beginnerCompanionBasePath,
     "Walk",
     "BeginnerWalkingSouth",
     7,
   );
   const westFrames = createFrames(
-    beginnerCharacterBasePath,
+    beginnerCompanionBasePath,
     "Walk",
     "BeginnerWalkingWest",
     7,
   );
   const eastFrames = createFrames(
-    beginnerCharacterBasePath,
+    beginnerCompanionBasePath,
     "Walk",
     "BeginnerWalkingEast",
     7,
@@ -178,35 +177,35 @@ type FirstClassCharacterAssetDefinition = {
 
 const firstClassCharacterAssetDefinitions = {
   blade: {
-    folderName: "Blade",
+    folderName: "blade",
     framePrefix: "Blade",
   },
   aegis: {
-    folderName: "Aegis",
+    folderName: "aegis",
     framePrefix: "Aegis",
   },
   hunter: {
-    folderName: "Hunter",
+    folderName: "hunter",
     framePrefix: "Hunter",
   },
   beast: {
-    folderName: "Beast",
+    folderName: "beast",
     framePrefix: "Beast",
   },
   elementalist: {
-    folderName: "Elementalist",
+    folderName: "elementalist",
     framePrefix: "Elementalist",
   },
   runecaster: {
-    folderName: "Runecaster",
+    folderName: "runecaster",
     framePrefix: "Runecaster",
   },
   lightbearer: {
-    folderName: "Lightbearer",
+    folderName: "lightbearer",
     framePrefix: "Lightbearer",
   },
   penitent: {
-    folderName: "Penitent",
+    folderName: "penitent",
     framePrefix: "Penitent",
   },
 } satisfies Record<
@@ -218,7 +217,7 @@ function createFirstClassCharacterVisualAsset({
   folderName,
   framePrefix,
 }: FirstClassCharacterAssetDefinition): SpriteVisualAsset {
-  const basePath = `${firstClassCharacterBasePath}/${folderName}`;
+  const basePath = `${firstClassCompanionBasePath}/${folderName}`;
   const idle = Object.fromEntries(
     Object.entries(spriteDirectionAssetNames).map(([direction, assetName]) => [
       direction,
@@ -230,7 +229,7 @@ function createFirstClassCharacterVisualAsset({
       direction,
       {
         frames: createFrames(
-          firstClassCharacterBasePath,
+          firstClassCompanionBasePath,
           folderName,
           `${framePrefix}Running_${spriteDirectionAssetNames[direction]}`,
           7,
@@ -252,14 +251,14 @@ function createFirstClassCharacterVisualAsset({
 
 function createEnemyTwoDirectionalFrames() {
   return {
-    north: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_North.png`),
-    northEast: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_NorthEast.png`),
-    east: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_East.png`),
-    southEast: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_SouthEast.png`),
-    south: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_South.png`),
-    southWest: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_SouthWest.png`),
-    west: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_West.png`),
-    northWest: createSingleFrame(`${testEnemyTwoBasePath}/Enemy2_NorthWest.png`),
+    north: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_North.png`),
+    northEast: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_NorthEast.png`),
+    east: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_East.png`),
+    southEast: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_SouthEast.png`),
+    south: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_South.png`),
+    southWest: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_SouthWest.png`),
+    west: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_West.png`),
+    northWest: createSingleFrame(`${fallbackOrcEnemyBasePath}/Enemy2_NorthWest.png`),
   } satisfies Record<SpriteDirection, SpriteAnimationAsset>;
 }
 
@@ -298,21 +297,21 @@ function createStaticEnemySprite(
   };
 }
 
-export const TICKET_0501_ENEMY_SPRITE_SRC = {
-  goblinShaman: `${ticket0501StandardEnemyPath}/goblin_shaman.png`,
-  ashWisp: `${ticket0501StandardEnemyPath}/ash_wisp.png`,
-  legacyOrc: `${ticket0501StandardEnemyPath}/orc.png`,
-  emberImp: `${ticket0501StandardEnemyPath}/ember_imp.png`,
-  tinCrawler: `${ticket0501StandardEnemyPath}/tin_crawler.png`,
-  briarWolf: `${ticket0501StandardEnemyPath}/briar_wolf.png`,
-  mireSpider: `${ticket0501StandardEnemyPath}/mire_spider.png`,
-  nightBat: `${ticket0501StandardEnemyPath}/night_bat.png`,
-  elderMossling: `${ticket0501StandardEnemyPath}/elder_mossling.png`,
-  cinderWisp: `${ticket0501StandardEnemyPath}/cinder_wisp.png`,
-  orcGrunt: `${ticket0501OrcWarcampEnemyPath}/orc_grunt.png`,
-  orcRaider: `${ticket0501OrcWarcampEnemyPath}/orc_raider.png`,
-  orcShieldbearer: `${ticket0501OrcWarcampEnemyPath}/orc_shieldbearer.png`,
-  orcWarmaster: `${ticket0501OrcWarcampEnemyPath}/orc_warmaster.png`,
+export const REGIONAL_ENEMY_SPRITE_SRC = {
+  goblinShaman: `${standardRegionalEnemyPath}/goblin_shaman.png`,
+  ashWisp: `${standardRegionalEnemyPath}/ash_wisp.png`,
+  legacyOrc: `${standardRegionalEnemyPath}/orc.png`,
+  emberImp: `${standardRegionalEnemyPath}/ember_imp.png`,
+  tinCrawler: `${standardRegionalEnemyPath}/tin_crawler.png`,
+  briarWolf: `${standardRegionalEnemyPath}/briar_wolf.png`,
+  mireSpider: `${standardRegionalEnemyPath}/mire_spider.png`,
+  nightBat: `${standardRegionalEnemyPath}/night_bat.png`,
+  elderMossling: `${standardRegionalEnemyPath}/elder_mossling.png`,
+  cinderWisp: `${standardRegionalEnemyPath}/cinder_wisp.png`,
+  orcGrunt: `${orcWarcampEnemyPath}/orc_grunt.png`,
+  orcRaider: `${orcWarcampEnemyPath}/orc_raider.png`,
+  orcShieldbearer: `${orcWarcampEnemyPath}/orc_shieldbearer.png`,
+  orcWarmaster: `${orcWarcampEnemyPath}/orc_warmaster.png`,
 } as const;
 
 function createBossSlimeDirectionalSprite(
@@ -322,7 +321,7 @@ function createBossSlimeDirectionalSprite(
   const frames = Object.fromEntries(
     Object.entries(spriteDirectionAssetNames).map(([direction, assetName]) => [
       direction,
-      createSingleFrame(`${bossSlimeTestAssetPath}/${framePrefix}${assetName}.png`),
+      createSingleFrame(`${azureMassAssetPath}/${framePrefix}${assetName}.png`),
     ]),
   ) as Record<SpriteDirection, SpriteAnimationAsset>;
 
@@ -337,54 +336,54 @@ function createBossSlimeDirectionalSprite(
 }
 
 const prototypeEnemyVisualAssets: Partial<Record<EnemyTypeId, SpriteVisualAsset>> = {
-  green_slime: createStaticEnemySprite(`${prototypeEnemyBasePath}/slime-se.png`),
+  green_slime: createStaticEnemySprite(`${commonEnemyBasePath}/slime-se.png`),
   slimeward_heavy_slime: createStaticEnemySprite(
-    `${slimewardDungeonAssetPath}/cave-slime-heavy-128.png`,
+    `${slimewardEnemyPath}/cave-slime-heavy-128.png`,
     { width: 104, height: 104 },
   ),
   slimeward_pale_ooze: createStaticEnemySprite(
-    `${slimewardDungeonAssetPath}/pale-ooze-dripper-128.png`,
+    `${slimewardEnemyPath}/pale-ooze-dripper-128.png`,
     { width: 96, height: 96 },
   ),
   slimeward_spitter_slime: createStaticEnemySprite(
-    `${slimewardDungeonAssetPath}/spitter-slime-sac-128.png`,
+    `${slimewardEnemyPath}/spitter-slime-sac-128.png`,
     { width: 112, height: 112 },
   ),
   azure_mass: createBossSlimeDirectionalSprite(
     "TheAzureMass",
     { width: 260, height: 260 },
   ),
-  cave_bat: createStaticEnemySprite(`${prototypeEnemyBasePath}/cave-bat-se.png`),
-  forest_spider: createStaticEnemySprite(`${prototypeEnemyBasePath}/forest-spider-se.png`),
-  goblin_scout: createStaticEnemySprite(`${prototypeEnemyBasePath}/goblin-scout-se.png`),
-  goblin_thrower: createStaticEnemySprite(`${prototypeEnemyBasePath}/goblin-thrower-se.png`),
-  bog_imp: createStaticEnemySprite(`${prototypeEnemyBasePath}/bog-imp-se.png`),
-  stone_crawler: createStaticEnemySprite(`${prototypeEnemyBasePath}/stone-crawler-se.png`),
-  goblin_shaman: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.goblinShaman),
-  ash_wisp: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.ashWisp),
-  mossling: createStaticEnemySprite(`${prototypeEnemyBasePath}/mossling-se.png`),
-  wolf: createStaticEnemySprite(`${generatedEnemyPlaceholderPath}/wolf.png`),
-  orc: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.orcGrunt, {
+  cave_bat: createStaticEnemySprite(`${commonEnemyBasePath}/cave-bat-se.png`),
+  forest_spider: createStaticEnemySprite(`${commonEnemyBasePath}/forest-spider-se.png`),
+  goblin_scout: createStaticEnemySprite(`${commonEnemyBasePath}/goblin-scout-se.png`),
+  goblin_thrower: createStaticEnemySprite(`${commonEnemyBasePath}/goblin-thrower-se.png`),
+  bog_imp: createStaticEnemySprite(`${commonEnemyBasePath}/bog-imp-se.png`),
+  stone_crawler: createStaticEnemySprite(`${commonEnemyBasePath}/stone-crawler-se.png`),
+  goblin_shaman: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.goblinShaman),
+  ash_wisp: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.ashWisp),
+  mossling: createStaticEnemySprite(`${commonEnemyBasePath}/mossling-se.png`),
+  wolf: createStaticEnemySprite(`${commonEnemyBasePath}/wolf.png`),
+  orc: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.orcGrunt, {
     width: 128,
     height: 128,
   }),
-  orc_raider: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.orcRaider, {
+  orc_raider: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.orcRaider, {
     width: 128,
     height: 128,
   }),
-  orc_shieldbearer: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.orcShieldbearer, {
+  orc_shieldbearer: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.orcShieldbearer, {
     width: 128,
     height: 128,
   }),
-  ember_imp: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.emberImp),
-  tin_crawler: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.tinCrawler),
-  briar_wolf: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.briarWolf),
-  mire_spider: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.mireSpider),
-  night_bat: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.nightBat),
-  elder_mossling: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.elderMossling),
-  cinder_wisp: createStaticEnemySprite(TICKET_0501_ENEMY_SPRITE_SRC.cinderWisp),
+  ember_imp: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.emberImp),
+  tin_crawler: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.tinCrawler),
+  briar_wolf: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.briarWolf),
+  mire_spider: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.mireSpider),
+  night_bat: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.nightBat),
+  elder_mossling: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.elderMossling),
+  cinder_wisp: createStaticEnemySprite(REGIONAL_ENEMY_SPRITE_SRC.cinderWisp),
   orc_warmaster: createStaticEnemySprite(
-    TICKET_0501_ENEMY_SPRITE_SRC.orcWarmaster,
+    REGIONAL_ENEMY_SPRITE_SRC.orcWarmaster,
     { width: 128, height: 128 },
   ),
 };
@@ -405,24 +404,24 @@ const testCharacterVisualAsset = {
   kind: "sprite",
   animations: {
     idle: {
-      frames: [`${testCharacterBasePath}/Idle/Idle_000.png`],
+      frames: [`${fallbackCompanionBasePath}/Idle/Idle_000.png`],
       frameDurationMs: defaultFrameDurationMs,
     },
     run: {
       north: {
-        frames: createFrames(testCharacterBasePath, "Run", "Honor_North", 8),
+        frames: createFrames(fallbackCompanionBasePath, "Run", "Honor_North", 8),
         frameDurationMs: defaultFrameDurationMs,
       },
       south: {
-        frames: createFrames(testCharacterBasePath, "Run", "Honor_South", 8),
+        frames: createFrames(fallbackCompanionBasePath, "Run", "Honor_South", 8),
         frameDurationMs: defaultFrameDurationMs,
       },
       west: {
-        frames: createFrames(testCharacterBasePath, "Run", "Honor_West", 8),
+        frames: createFrames(fallbackCompanionBasePath, "Run", "Honor_West", 8),
         frameDurationMs: defaultFrameDurationMs,
       },
       east: {
-        frames: createFrames(testCharacterBasePath, "Run", "Honor_East", 8),
+        frames: createFrames(fallbackCompanionBasePath, "Run", "Honor_East", 8),
         frameDurationMs: defaultFrameDurationMs,
       },
     },
@@ -452,24 +451,24 @@ export const entityVisualAssets = {
     kind: "sprite",
     animations: {
       idle: {
-        frames: createFrames(testEnemyBasePath, "Idle", "WolfRunSouth", 9),
+        frames: createFrames(fallbackWolfEnemyBasePath, "Idle", "WolfRunSouth", 9),
         frameDurationMs: defaultFrameDurationMs,
       },
       run: {
         north: {
-          frames: createFrames(testEnemyBasePath, "Run", "WolfRunNorth", 4),
+          frames: createFrames(fallbackWolfEnemyBasePath, "Run", "WolfRunNorth", 4),
           frameDurationMs: defaultFrameDurationMs,
         },
         south: {
-          frames: createFrames(testEnemyBasePath, "Run", "WolfRunSouth", 4),
+          frames: createFrames(fallbackWolfEnemyBasePath, "Run", "WolfRunSouth", 4),
           frameDurationMs: defaultFrameDurationMs,
         },
         west: {
-          frames: createFrames(testEnemyBasePath, "Run", "WolfRunWest", 4),
+          frames: createFrames(fallbackWolfEnemyBasePath, "Run", "WolfRunWest", 4),
           frameDurationMs: defaultFrameDurationMs,
         },
         east: {
-          frames: createFrames(testEnemyBasePath, "Run", "WolfRunEast", 4),
+          frames: createFrames(fallbackWolfEnemyBasePath, "Run", "WolfRunEast", 4),
           frameDurationMs: defaultFrameDurationMs,
         },
       },
@@ -506,7 +505,7 @@ export const entityVisualAssets = {
   },
   testBlade: {
     kind: "image",
-    src: `${testNpcBasePath}/Bladesouth.png`,
+    src: `${classPlaceholderNpcPath}/Bladesouth.png`,
     naturalSize: {
       width: 224,
       height: 224,
@@ -520,7 +519,7 @@ export const entityVisualAssets = {
   },
   testHunter: {
     kind: "image",
-    src: `${testNpcBasePath}/Huntersouth.png`,
+    src: `${classPlaceholderNpcPath}/Huntersouth.png`,
     naturalSize: {
       width: 124,
       height: 124,
@@ -534,7 +533,7 @@ export const entityVisualAssets = {
   },
   classMentor: {
     kind: "image",
-    src: NPC_ICON_SRC.class_mentor ?? "/assets/Generated/now-pack/class-mentor.png",
+    src: NPC_ICON_SRC.class_mentor ?? "/assets/entities/npcs/hub/class-mentor.png",
     naturalSize: {
       width: 144,
       height: 144,

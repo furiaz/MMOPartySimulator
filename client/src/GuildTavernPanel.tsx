@@ -474,8 +474,8 @@ export function GuildTavernPanel({
               alt=""
               src={
                 activeSection === "guild"
-                  ? "/assets/Generated/guild-tavern/guild-coordinator.png"
-                  : "/assets/Generated/guild-tavern/tavern-keeper.png"
+                  ? "/assets/entities/npcs/hub/guild-coordinator.png"
+                  : "/assets/entities/npcs/hub/tavern-keeper.png"
               }
             />
           </div>

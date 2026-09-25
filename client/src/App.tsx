@@ -296,7 +296,7 @@ import {
   FARM_CROP_ICON_SRC,
   INVENTORY_ITEM_ICON_SRC,
   LIVESTOCK_CREATURE_ICON_SRC,
-  TICKET_0501_HUD_CONTROL_SRC,
+  GAMEPLAY_HUD_CONTROL_SRC,
 } from "./assetIcons";
 import {
   deleteLocalSave,
@@ -361,7 +361,7 @@ const currencyGainFeedbackDurationMs = 1200;
 const directCommandFeedbackDurationMs = 1400;
 const movementClickFeedbackDurationMs = 900;
 const currencyGainBurstSrc =
-  "assets/Generated/prototype-vfx/sprites/currency-gain-burst.png";
+  "assets/effects/gameplay/currency-gain-burst.png";
 const mapConstructionCellPixelSize = 32;
 const visualMovementGraceMs = 180;
 const visualMovementEnemyViewportMarginTiles = 6;
@@ -7174,8 +7174,8 @@ function App() {
                 className="hud-control-icon"
                 src={
                   gameState.autoModeEnabled
-                    ? TICKET_0501_HUD_CONTROL_SRC.autoCombatOn
-                    : TICKET_0501_HUD_CONTROL_SRC.autoCombatOff
+                    ? GAMEPLAY_HUD_CONTROL_SRC.autoCombatOn
+                    : GAMEPLAY_HUD_CONTROL_SRC.autoCombatOff
                 }
               />
               <span className="hud-control-label">Auto Combat</span>
@@ -7194,8 +7194,8 @@ function App() {
                 className="hud-control-icon"
                 src={
                   isSimulationRunning
-                    ? TICKET_0501_HUD_CONTROL_SRC.pause
-                    : TICKET_0501_HUD_CONTROL_SRC.resume
+                    ? GAMEPLAY_HUD_CONTROL_SRC.pause
+                    : GAMEPLAY_HUD_CONTROL_SRC.resume
                 }
               />
               <span className="hud-control-label">

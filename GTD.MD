@@ -2613,7 +2613,7 @@ Skill-book behavior:
 
 Skill-book asset composition follows one technical standard:
 
-- composed skill-specific 32×32 books live under `client/public/assets/Generated/skill-book-icons/items/<class>/`
+- composed skill-specific 32×32 books live under `client/public/assets/items/skill-books/<class>/`
 - icon-free class covers, source art, and review sheets are generation inputs rather than runtime assets; after Ticket 0523 they are retained in the external Library archive instead of under `client/public`
 - the external Library archive is not part of the Git repository and is not required by the game at build time or runtime
 - every composed book overlays the exact icon mapped to the skill on its class cover at native output size; active and passive books use the same rule
@@ -3549,41 +3549,28 @@ Current public asset path root:
 
 - `client/public/assets/`
 
-Current generated asset groups referenced by UI include:
+Current semantic asset groups referenced by the UI include:
 
-- `assets/Generated/now-pack`
-- `assets/Generated/map-wilderness`
-- `assets/Generated/map-wilderness/128`
-- `assets/Generated/hub-floors`
-- `assets/Generated/hub-floors/New/128`
-- `assets/Generated/beginner-skill-effects-50/sprites`
-- `assets/Generated/first-class-skill-effects`
-- `assets/Generated/prototype-vfx/sprites`
-- `assets/Generated/class-portraits`
-- `assets/Generated/hub-castle-walls`
-- `assets/Generated/hub-structures/256`
-- `assets/Generated/teleports`
-- `assets/Generated/passage-blockers`
-- `assets/Generated/Dungeon Generation`
-- `assets/Generated/combat-projectiles`
-
-Current sprite asset groups include:
-
-- `assets/Characters/Beginner`
-- `assets/Characters/Test-Character`
-- `assets/Characters/Test-Enemy`
-- `assets/Characters/Test-Enemy2`
-- `assets/Characters/Test-NPC`
-- `assets/Characters/Prototype-Enemies`
-- `assets/Characters/Blade`
-- `assets/Characters/Aegis`
-- `assets/Characters/Hunter`
-- `assets/Characters/Beast`
-- `assets/Characters/Elementalist`
-- `assets/Characters/Runecaster`
-- `assets/Characters/Lightbearer`
-- `assets/Characters/Penitent`
-- `assets/Characters/BossSlimeTest`
+- `assets/effects/gameplay`
+- `assets/effects/projectiles`
+- `assets/entities/companions`
+- `assets/entities/enemies`
+- `assets/entities/npcs`
+- `assets/items/equipment`
+- `assets/items/skill-books`
+- `assets/skills/effects`
+- `assets/skills/icons`
+- `assets/skills/rune-seals`
+- `assets/ui/controls`
+- `assets/ui/equipment-placeholders`
+- `assets/ui/farm`
+- `assets/ui/portraits`
+- `assets/world/dungeons`
+- `assets/world/props`
+- `assets/world/resources`
+- `assets/world/structures`
+- `assets/world/teleports`
+- `assets/world/terrain`
 
 Current world renderer behavior:
 
@@ -3613,7 +3600,7 @@ Current enemy visuals:
 - Orc-style enemies may use the Test-Enemy2 directional static sprites
 - prototype enemy archetypes may use static generated archetype sprites
 - Slimeward dungeon enemies may use generated dungeon enemy images
-- The Azure Mass currently uses eight-direction BossSlimeTest sprites
+- The Azure Mass currently uses eight-direction Azure Mass sprites
 - fallback enemy visuals depend on current map/debug context
 
 Current resource visuals use generated image icons by resource type.

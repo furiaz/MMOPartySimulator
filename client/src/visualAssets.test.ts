@@ -13,7 +13,7 @@ import {
   getClassIdleFrameSrc,
   getEnemyWalkingAnimation,
   getSpriteAnimation,
-  TICKET_0501_ENEMY_SPRITE_SRC,
+  REGIONAL_ENEMY_SPRITE_SRC,
   type SpriteDirection,
 } from "./visualAssets";
 import {
@@ -22,7 +22,7 @@ import {
   RUNECASTER_SKILL_ICON_SRC,
   RUNE_WORD_SEAL_SRC,
   SKILL_VISUAL_ICON_SRC,
-  TICKET_0501_HUD_CONTROL_SRC,
+  GAMEPLAY_HUD_CONTROL_SRC,
 } from "./assetIcons";
 
 const azureMassDirections = [
@@ -37,29 +37,29 @@ const azureMassDirections = [
 ] satisfies SpriteDirection[];
 
 const azureMassFrames = {
-  north: "/assets/Characters/BossSlimeTest/TheAzureMassNorth.png",
-  northEast: "/assets/Characters/BossSlimeTest/TheAzureMassNorthEast.png",
-  east: "/assets/Characters/BossSlimeTest/TheAzureMassEast.png",
-  southEast: "/assets/Characters/BossSlimeTest/TheAzureMassSouthEast.png",
-  south: "/assets/Characters/BossSlimeTest/TheAzureMassSouth.png",
-  southWest: "/assets/Characters/BossSlimeTest/TheAzureMassSouthWest.png",
-  west: "/assets/Characters/BossSlimeTest/TheAzureMassWest.png",
-  northWest: "/assets/Characters/BossSlimeTest/TheAzureMassNorthWest.png",
+  north: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassNorth.png",
+  northEast: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassNorthEast.png",
+  east: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassEast.png",
+  southEast: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassSouthEast.png",
+  south: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassSouth.png",
+  southWest: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassSouthWest.png",
+  west: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassWest.png",
+  northWest: "/assets/entities/enemies/bosses/azure-mass/TheAzureMassNorthWest.png",
 } satisfies Record<SpriteDirection, string>;
 
 describe("entity visual assets", () => {
   it("reuses approved existing art for Follow Through", () => {
     expect(SKILL_VISUAL_ICON_SRC.follow_through).toContain(
-      "/first-class-skill-effects/blade/sprites/sweeping_strike.png",
+      "/skills/effects/blade/sweeping_strike.png",
     );
     expect(INVENTORY_ITEM_ICON_SRC.follow_through_skill_book).toContain(
       "/beginner/follow_through_skill_book.png",
     );
     expect(SKILL_VISUAL_ICON_SRC.resourcefulness).toContain(
-      "/beginner-skill-effects-50/sprites/resourcefulness.png",
+      "/skills/effects/beginner/resourcefulness.png",
     );
     expect(SKILL_VISUAL_ICON_SRC.steady_nerves).toContain(
-      "/beginner-skill-effects-50/sprites/steady_nerves.png",
+      "/skills/effects/beginner/steady_nerves.png",
     );
     expect(INVENTORY_ITEM_ICON_SRC.resourcefulness_skill_book).toContain(
       "/beginner/resourcefulness_skill_book.png",
@@ -83,26 +83,26 @@ describe("entity visual assets", () => {
 
     for (const [skillId, classId] of Object.entries(passiveClassBySkillId)) {
       expect(SKILL_VISUAL_ICON_SRC[skillId as keyof typeof passiveClassBySkillId]).toContain(
-        `/first-class-skill-effects/${classId}/sprites/${skillId}.png`,
+        `/skills/effects/${classId}/${skillId}.png`,
       );
       expect(
         INVENTORY_ITEM_ICON_SRC[
           `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
         ],
-      ).toContain(`/skill-book-icons/items/${classId}/${skillId}_skill_book.png`);
+      ).toContain(`/items/skill-books/${classId}/${skillId}_skill_book.png`);
     }
 
     expect(INVENTORY_ITEM_ICON_SRC.press_the_opening_skill_book).toContain(
-      "/skill-book-icons/items/blade/",
+      "/items/skill-books/blade/",
     );
     expect(INVENTORY_ITEM_ICON_SRC.shield_formation_skill_book).toContain(
-      "/skill-book-icons/items/aegis/",
+      "/items/skill-books/aegis/",
     );
     expect(INVENTORY_ITEM_ICON_SRC.poison_coating_skill_book).toContain(
-      "/skill-book-icons/items/hunter/",
+      "/items/skill-books/hunter/",
     );
     expect(INVENTORY_ITEM_ICON_SRC.pack_frenzy_skill_book).toContain(
-      "/skill-book-icons/items/beast/",
+      "/items/skill-books/beast/",
     );
   });
 
@@ -112,7 +112,7 @@ describe("entity visual assets", () => {
     expect(Object.keys(RUNECASTER_SKILL_ICON_SRC)).toHaveLength(8);
 
     for (const [skillId, iconSrc] of Object.entries(RUNECASTER_SKILL_ICON_SRC)) {
-      expect(iconSrc).toContain(`/ticket-0515/runecaster/icons/${skillId}.png`);
+      expect(iconSrc).toContain(`/skills/icons/runecaster/${skillId}.png`);
       expect(SKILL_VISUAL_ICON_SRC[skillId as keyof typeof SKILL_VISUAL_ICON_SRC]).toBe(
         iconSrc,
       );
@@ -120,11 +120,11 @@ describe("entity visual assets", () => {
         INVENTORY_ITEM_ICON_SRC[
           `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
         ],
-      ).toContain(`/skill-book-icons/items/runecaster/${skillId}_skill_book.png`);
+      ).toContain(`/items/skill-books/runecaster/${skillId}_skill_book.png`);
     }
 
     expect(RUNE_WORD_SEAL_SRC.qqen).toContain(
-      "/ticket-0515/runecaster/seals/qqen.png",
+      "/skills/rune-seals/runecaster/qqen.png",
     );
   });
 
@@ -146,13 +146,13 @@ describe("entity visual assets", () => {
           skillId as keyof typeof passiveClassBySkillId
         ],
       ).toContain(
-        `/first-class-skill-effects/${classId}/sprites/${skillId}.png`,
+        `/skills/effects/${classId}/${skillId}.png`,
       );
       expect(
         INVENTORY_ITEM_ICON_SRC[
           `${skillId}_skill_book` as keyof typeof INVENTORY_ITEM_ICON_SRC
         ],
-      ).toContain(`/skill-book-icons/items/${classId}/${skillId}_skill_book.png`);
+      ).toContain(`/items/skill-books/${classId}/${skillId}_skill_book.png`);
     }
 
     for (const classId of [
@@ -162,7 +162,7 @@ describe("entity visual assets", () => {
       "penitent",
     ] as const) {
       const classSkillIds = Object.entries(INVENTORY_ITEM_ICON_SRC).filter(
-        ([, source]) => source?.includes(`/skill-book-icons/items/${classId}/`),
+        ([, source]) => source?.includes(`/items/skill-books/${classId}/`),
       );
       expect(classSkillIds).toHaveLength(10);
     }
@@ -189,7 +189,7 @@ describe("entity visual assets", () => {
     const eastRunAnimation = getSpriteAnimation(visualAsset, true, "east");
 
     expect(idleAnimation.frames).toEqual([
-      "/assets/Characters/Test-Character/Idle/Idle_000.png",
+      "/assets/entities/companions/fallback/Idle/Idle_000.png",
     ]);
     expect(eastRunAnimation.frames).toHaveLength(8);
     expect(eastRunAnimation.frames.every((frame) => frame.includes("/Run/"))).toBe(
@@ -366,25 +366,25 @@ describe("entity visual assets", () => {
 
   it("maps the Guild Notice Board sign to the generated asset", () => {
     expect(MAP_VISUAL_OBJECT_SRC.guild_notice_board_new_quest_sign).toBe(
-      "/assets/Generated/guild-tavern/notice-board-new-quest-sign.png",
+      "/assets/world/props/hub/notice-board-new-quest-sign.png",
     );
   });
 
-  it("registers Ticket 0501 terrain and HUD asset paths", () => {
+  it("registers regional terrain and gameplay HUD asset paths", () => {
     expect(MAP_VISUAL_OBJECT_SRC.ash_goblin_charred_dead_tree_trunk).toBe(
-      "/assets/Generated/ticket-0501/terrain/ash-goblin-encampment/charred_dead_tree_trunk.png",
+      "/assets/world/props/regions/ash-goblin-encampment/charred_dead_tree_trunk.png",
     );
     expect(MAP_VISUAL_OBJECT_SRC.briar_burrow_mound_entrance).toBe(
-      "/assets/Generated/ticket-0501/terrain/briar-burrows/burrow_mound_entrance.png",
+      "/assets/world/props/regions/briar-burrows/burrow_mound_entrance.png",
     );
     expect(MAP_VISUAL_OBJECT_SRC.nightmire_bat_roost_dead_tree).toBe(
-      "/assets/Generated/ticket-0501/terrain/nightmire-canopy/bat_roost_dead_tree.png",
+      "/assets/world/props/regions/nightmire-canopy/bat_roost_dead_tree.png",
     );
     expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_heavy_orc_spike_barricade).toBe(
-      "/assets/Generated/ticket-0501/terrain/orc-warcamp/heavy_orc_spike_barricade.png",
+      "/assets/world/props/regions/orc-warcamp/heavy_orc_spike_barricade.png",
     );
-    expect(TICKET_0501_HUD_CONTROL_SRC.autoCombatOn).toBe(
-      "/assets/Generated/ticket-0501/ui/controls/auto_combat_on.png",
+    expect(GAMEPLAY_HUD_CONTROL_SRC.autoCombatOn).toBe(
+      "/assets/ui/controls/gameplay/auto_combat_on.png",
     );
   });
 
@@ -392,22 +392,22 @@ describe("entity visual assets", () => {
     const shamanAnimation = getEnemyWalkingAnimation("goblin_shaman", "east");
     const wispAnimation = getEnemyWalkingAnimation("ash_wisp", "east");
 
-    expect(shamanAnimation.frames[0]).toBe(TICKET_0501_ENEMY_SPRITE_SRC.goblinShaman);
-    expect(wispAnimation.frames[0]).toBe(TICKET_0501_ENEMY_SPRITE_SRC.ashWisp);
+    expect(shamanAnimation.frames[0]).toBe(REGIONAL_ENEMY_SPRITE_SRC.goblinShaman);
+    expect(wispAnimation.frames[0]).toBe(REGIONAL_ENEMY_SPRITE_SRC.ashWisp);
   });
 
-  it("uses Ticket 0501 south-facing enemy slices for post-Hub-2 enemies", () => {
+  it("uses regional south-facing enemy slices for post-Hub-2 enemies", () => {
     expect(getEnemyWalkingAnimation("ember_imp", "east").frames[0]).toBe(
-      TICKET_0501_ENEMY_SPRITE_SRC.emberImp,
+      REGIONAL_ENEMY_SPRITE_SRC.emberImp,
     );
     expect(getEnemyWalkingAnimation("tin_crawler", "east").frames[0]).toBe(
-      TICKET_0501_ENEMY_SPRITE_SRC.tinCrawler,
+      REGIONAL_ENEMY_SPRITE_SRC.tinCrawler,
     );
     expect(getEnemyWalkingAnimation("orc", "east").frames[0]).toBe(
-      TICKET_0501_ENEMY_SPRITE_SRC.orcGrunt,
+      REGIONAL_ENEMY_SPRITE_SRC.orcGrunt,
     );
     expect(getEnemyWalkingAnimation("orc_warmaster", "east").frames[0]).toBe(
-      TICKET_0501_ENEMY_SPRITE_SRC.orcWarmaster,
+      REGIONAL_ENEMY_SPRITE_SRC.orcWarmaster,
     );
   });
 

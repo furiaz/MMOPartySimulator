@@ -697,11 +697,15 @@ describe("texture lifetime classification", () => {
     expect(durableSources.has(enemySpottedAlertSrc)).toBe(true);
     expect(durableSources.has(MAP_OBJECT_ICON_SRC.teleportGood)).toBe(false);
     expect(
-      [...durableSources].some((src) => src.includes("/assets/Characters/Beginner/")),
+      [...durableSources].some((src) =>
+        src.includes("/assets/entities/companions/beginner/"),
+      ),
     ).toBe(true);
     expect(
       [...durableSources].some((src) =>
-        src.includes("/assets/Characters/Hunter/HunterRunning_East_0000.png"),
+        src.includes(
+          "/assets/entities/companions/hunter/HunterRunning_East_0000.png",
+        ),
       ),
     ).toBe(true);
   });
@@ -740,7 +744,11 @@ describe("texture lifetime classification", () => {
     expect(scopedSources).toContain(MAP_OBJECT_ICON_SRC.teleportGood);
     expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.passage_gate_closed);
     expect(scopedSources).toContain(MAP_VISUAL_OBJECT_SRC.passage_gate_open);
-    expect(scopedSources.some((src) => src.includes("map-wilderness"))).toBe(true);
+    expect(
+      scopedSources.some((src) =>
+        src.includes("/assets/world/terrain/wilderness/floors/"),
+      ),
+    ).toBe(true);
     expect(scopedSources.some((src) => src.includes("slime-se.png"))).toBe(true);
     expect(scopedSources).not.toContain(enemySpottedAlertSrc);
   });
