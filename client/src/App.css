@@ -4380,6 +4380,52 @@
   min-height: 220px;
 }
 
+.options-audio-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.4);
+}
+
+.options-volume-control {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #e6f0f2;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.options-volume-control input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: #7aa6ad;
+}
+
+.options-volume-control output {
+  color: var(--main-menu-panel-muted-text);
+  text-align: right;
+}
+
+.options-mute-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e6f0f2;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.options-mute-control input {
+  accent-color: #7aa6ad;
+}
+
 .options-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6359,6 +6405,22 @@ button {
 }
 
 @media (max-width: 520px) {
+  .options-audio-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .options-volume-control {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .options-volume-control > span {
+    grid-column: 1 / -1;
+  }
+
+  .options-mute-control {
+    justify-self: start;
+  }
+
   .merchant-interaction {
     --npc-interaction-left: 16px;
     left: 16px;

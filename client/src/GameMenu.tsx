@@ -65,6 +65,8 @@ export function GameMenu({
   currentTime,
   quests,
   currentMapId,
+  backgroundMusicMuted,
+  backgroundMusicVolumePercent,
   skillBookReadMessage,
   worldTravelTargetMapId,
   selectedCompanionId,
@@ -134,6 +136,8 @@ export function GameMenu({
   onUnequipEquipment,
   onUnequipFlask,
   onMovePartyOrder,
+  onChangeBackgroundMusicMuted,
+  onChangeBackgroundMusicVolume,
   saveStatusMessage,
   onExportSave,
   onImportSaveFile,
@@ -151,6 +155,8 @@ export function GameMenu({
   currentTime: number;
   quests: GameState["quests"];
   currentMapId?: DebugMapId;
+  backgroundMusicMuted: boolean;
+  backgroundMusicVolumePercent: number;
   skillBookReadMessage?: string | null;
   worldTravelTargetMapId: DebugMapId | null;
   selectedCompanionId: string | null;
@@ -267,6 +273,8 @@ export function GameMenu({
   onUnequipEquipment: (companionId: string, targetSlot: EquipmentSlot) => void;
   onUnequipFlask: (companionId: string) => void;
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
+  onChangeBackgroundMusicMuted: (muted: boolean) => void;
+  onChangeBackgroundMusicVolume: (volumePercent: number) => void;
   saveStatusMessage: string | null;
   onExportSave: () => void;
   onImportSaveFile: (file: File) => void | Promise<void>;
@@ -444,7 +452,11 @@ export function GameMenu({
                 />
               ) : (
                 <OptionsPanel
+                  backgroundMusicMuted={backgroundMusicMuted}
+                  backgroundMusicVolumePercent={backgroundMusicVolumePercent}
                   saveStatusMessage={saveStatusMessage}
+                  onChangeBackgroundMusicMuted={onChangeBackgroundMusicMuted}
+                  onChangeBackgroundMusicVolume={onChangeBackgroundMusicVolume}
                   onExportSave={onExportSave}
                   onImportSaveFile={onImportSaveFile}
                   onManualSave={onManualSave}
@@ -965,18 +977,52 @@ function formatDecimal(value: number): string {
 }
 
 function OptionsPanel({
+  backgroundMusicMuted,
+  backgroundMusicVolumePercent,
   saveStatusMessage,
+  onChangeBackgroundMusicMuted,
+  onChangeBackgroundMusicVolume,
   onExportSave,
   onImportSaveFile,
   onManualSave,
 }: {
+  backgroundMusicMuted: boolean;
+  backgroundMusicVolumePercent: number;
   saveStatusMessage: string | null;
+  onChangeBackgroundMusicMuted: (muted: boolean) => void;
+  onChangeBackgroundMusicVolume: (volumePercent: number) => void;
   onExportSave: () => void;
   onImportSaveFile: (file: File) => void | Promise<void>;
   onManualSave: () => void;
 }) {
   return (
     <section className="options-panel" aria-label="Options">
+      <div className="options-audio-settings">
+        <label className="options-volume-control">
+          <span>Background Music</span>
+          <input
+            max="100"
+            min="0"
+            onChange={(event) =>
+              onChangeBackgroundMusicVolume(Number(event.currentTarget.value))
+            }
+            step="1"
+            type="range"
+            value={backgroundMusicVolumePercent}
+          />
+          <output>{backgroundMusicVolumePercent}%</output>
+        </label>
+        <label className="options-mute-control">
+          <input
+            checked={backgroundMusicMuted}
+            onChange={(event) =>
+              onChangeBackgroundMusicMuted(event.currentTarget.checked)
+            }
+            type="checkbox"
+          />
+          Mute
+        </label>
+      </div>
       <div className="options-actions">
         <button onClick={onManualSave} type="button">
           Manual Save

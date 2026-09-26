@@ -57,6 +57,12 @@ import { getQuestEntityIndicators } from "./questEntityIndicators";
 import { QuestTrackerPanel } from "./QuestTrackerPanel";
 import { BankPanel } from "./BankPanel";
 import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
+import {
+  normalizeBackgroundMusicPreferences,
+  readBackgroundMusicPreferences,
+  useHubBackgroundMusic,
+  writeBackgroundMusicPreferences,
+} from "./backgroundMusic";
 
 import {
   allocateCompanionStatPoint,
@@ -3002,6 +3008,9 @@ function applyGuidePopupMenuTarget(
 function App() {
   const [appMode, setAppMode] = useState<AppMode>("start");
   const [gameState, setGameState] = useState<GameState>(createInitialGameState);
+  const [backgroundMusicPreferences, setBackgroundMusicPreferences] = useState(
+    readBackgroundMusicPreferences,
+  );
   const [hasLocalSaveFile, setHasLocalSaveFile] = useState(hasStoredSaveFile);
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(
     null,
@@ -3037,6 +3046,12 @@ function App() {
     useState<PartyManagementSection>("role");
   const [activePartyMenuSection, setActivePartyMenuSection] =
     useState<PartyMenuSection>("stats");
+
+  useHubBackgroundMusic({
+    enabled: appMode === "playing",
+    mapId: gameState.currentMapId,
+    preferences: backgroundMusicPreferences,
+  });
   const [selectedCompanionId, setSelectedCompanionId] = useState<string | null>(
     null,
   );
@@ -4012,6 +4027,30 @@ function App() {
 
   function manualSave() {
     writeCurrentSave("Manual save");
+  }
+
+  function changeBackgroundMusicVolume(volumePercent: number) {
+    setBackgroundMusicPreferences((currentPreferences) => {
+      const nextPreferences = normalizeBackgroundMusicPreferences({
+        ...currentPreferences,
+        volumePercent,
+      });
+
+      writeBackgroundMusicPreferences(nextPreferences);
+      return nextPreferences;
+    });
+  }
+
+  function changeBackgroundMusicMuted(muted: boolean) {
+    setBackgroundMusicPreferences((currentPreferences) => {
+      const nextPreferences = normalizeBackgroundMusicPreferences({
+        ...currentPreferences,
+        muted,
+      });
+
+      writeBackgroundMusicPreferences(nextPreferences);
+      return nextPreferences;
+    });
   }
 
   function exportSave() {
@@ -7143,6 +7182,10 @@ function App() {
               currentTime={currentTime}
               quests={gameState.quests}
               currentMapId={gameState.currentMapId}
+              backgroundMusicMuted={backgroundMusicPreferences.muted}
+              backgroundMusicVolumePercent={
+                backgroundMusicPreferences.volumePercent
+              }
               skillBookReadMessage={inventoryResultMessage}
               worldTravelTargetMapId={gameState.worldTravelTargetMapId}
               selectedCompanionId={selectedMenuCompanionId}
@@ -7226,6 +7269,8 @@ function App() {
               onUnequipEquipment={unequipEquipment}
               onUnequipFlask={unequipFlask}
               onMovePartyOrder={movePartyMemberOrder}
+              onChangeBackgroundMusicMuted={changeBackgroundMusicMuted}
+              onChangeBackgroundMusicVolume={changeBackgroundMusicVolume}
               saveStatusMessage={saveStatusMessage}
               onExportSave={exportSave}
               onImportSaveFile={importSaveFile}
