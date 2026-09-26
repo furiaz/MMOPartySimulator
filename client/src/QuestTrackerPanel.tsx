@@ -4,9 +4,10 @@ import {
   getObjectiveLabel,
   getQuestRuntimeProgressDisplay,
 } from "./questUiHelpers";
+import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 
 const questObjectiveCompleteSrc =
-  "assets/effects/gameplay/quest-objective-complete.png";
+  `${PUBLIC_ASSET_ROOT}/effects/gameplay/quest-objective-complete.png`;
 
 export function QuestTrackerPanel({
   isHidden,

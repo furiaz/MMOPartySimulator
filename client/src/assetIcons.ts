@@ -10,40 +10,41 @@ import type {
   RunecasterSkillId,
   SkillId,
 } from "./game";
+import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 
-const equipmentIconPath = "/assets/items/equipment";
-const skillBookIconPath = "/assets/items/skill-books";
-const resourceNodeAssetPath = "/assets/world/resources/nodes";
-const hubNpcAssetPath = "/assets/entities/npcs/hub";
-const equipmentPlaceholderAssetPath = "/assets/ui/equipment-placeholders";
-const wildernessFloorAssetPath = "/assets/world/terrain/wilderness/floors";
+const equipmentIconPath = `${PUBLIC_ASSET_ROOT}/items/equipment`;
+const skillBookIconPath = `${PUBLIC_ASSET_ROOT}/items/skill-books`;
+const resourceNodeAssetPath = `${PUBLIC_ASSET_ROOT}/world/resources/nodes`;
+const hubNpcAssetPath = `${PUBLIC_ASSET_ROOT}/entities/npcs/hub`;
+const equipmentPlaceholderAssetPath = `${PUBLIC_ASSET_ROOT}/ui/equipment-placeholders`;
+const wildernessFloorAssetPath = `${PUBLIC_ASSET_ROOT}/world/terrain/wilderness/floors`;
 const wildernessVegetationAssetPath =
-  "/assets/world/terrain/wilderness/vegetation";
-const hubFloorAssetPath = "/assets/world/terrain/hub/floors";
-const hubWallAssetPath = "/assets/world/terrain/hub/walls";
-const hubStructureAssetPath = "/assets/world/structures/hub";
-const hubPropAssetPath = "/assets/world/props/hub";
-const farmCropAssetPath = "/assets/ui/farm/crops";
-const farmLivestockAssetPath = "/assets/ui/farm/livestock";
-const farmUiAssetPath = "/assets/ui/farm";
-const teleportAssetPath = "/assets/world/teleports";
+  `${PUBLIC_ASSET_ROOT}/world/terrain/wilderness/vegetation`;
+const hubFloorAssetPath = `${PUBLIC_ASSET_ROOT}/world/terrain/hub/floors`;
+const hubWallAssetPath = `${PUBLIC_ASSET_ROOT}/world/terrain/hub/walls`;
+const hubStructureAssetPath = `${PUBLIC_ASSET_ROOT}/world/structures/hub`;
+const hubPropAssetPath = `${PUBLIC_ASSET_ROOT}/world/props/hub`;
+const farmCropAssetPath = `${PUBLIC_ASSET_ROOT}/ui/farm/crops`;
+const farmLivestockAssetPath = `${PUBLIC_ASSET_ROOT}/ui/farm/livestock`;
+const farmUiAssetPath = `${PUBLIC_ASSET_ROOT}/ui/farm`;
+const teleportAssetPath = `${PUBLIC_ASSET_ROOT}/world/teleports`;
 const passageBlockerAssetPath =
-  "/assets/world/props/hub/passage-blockers";
-const regionalPropAssetPath = "/assets/world/props/regions";
-const gameplayControlAssetPath = "/assets/ui/controls/gameplay";
-const slimewardDungeonAssetPath = "/assets/world/dungeons/slimeward";
+  `${PUBLIC_ASSET_ROOT}/world/props/hub/passage-blockers`;
+const regionalPropAssetPath = `${PUBLIC_ASSET_ROOT}/world/props/regions`;
+const gameplayControlAssetPath = `${PUBLIC_ASSET_ROOT}/ui/controls/gameplay`;
+const slimewardDungeonAssetPath = `${PUBLIC_ASSET_ROOT}/world/dungeons/slimeward`;
 const slimewardDungeonPropPath = `${slimewardDungeonAssetPath}/props`;
 const slimewardDungeonTeleportPath = `${slimewardDungeonAssetPath}/teleports`;
 const slimewardDungeonTerrainPath = `${slimewardDungeonAssetPath}/terrain`;
-const beginnerSkillEffectsPath = "/assets/skills/effects/beginner";
-const classSkillEffectsPath = "/assets/skills/effects";
+const beginnerSkillEffectsPath = `${PUBLIC_ASSET_ROOT}/skills/effects/beginner`;
+const classSkillEffectsPath = `${PUBLIC_ASSET_ROOT}/skills/effects`;
 const bladeSkillEffectsPath = `${classSkillEffectsPath}/blade`;
 const aegisSkillEffectsPath = `${classSkillEffectsPath}/aegis`;
 const hunterSkillEffectsPath = `${classSkillEffectsPath}/hunter`;
 const beastSkillEffectsPath = `${classSkillEffectsPath}/beast`;
 const elementalistSkillEffectsPath = `${classSkillEffectsPath}/elementalist`;
-const runecasterSealPath = "/assets/skills/rune-seals/runecaster";
-const runecasterSkillIconPath = "/assets/skills/icons/runecaster";
+const runecasterSealPath = `${PUBLIC_ASSET_ROOT}/skills/rune-seals/runecaster`;
+const runecasterSkillIconPath = `${PUBLIC_ASSET_ROOT}/skills/icons/runecaster`;
 const runecasterSkillEffectsPath = `${classSkillEffectsPath}/runecaster`;
 const lightbearerSkillEffectsPath = `${classSkillEffectsPath}/lightbearer`;
 const penitentSkillEffectsPath = `${classSkillEffectsPath}/penitent`;
