@@ -1,5 +1,6 @@
 import type { ClassId, DebugMapId, EnemyTypeId, GameEntity } from "./game";
 import { NPC_ICON_SRC, RESOURCE_ICON_SRC } from "./assetIcons";
+import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 
 export type SpriteAnimationAsset = {
   frames: string[];
@@ -63,19 +64,19 @@ export type MapTileVisualAsset = {
   className: string;
 };
 
-const fallbackCompanionBasePath = "/assets/entities/companions/fallback";
-const beginnerCompanionBasePath = "/assets/entities/companions/beginner";
-const firstClassCompanionBasePath = "/assets/entities/companions";
-const fallbackWolfEnemyBasePath = "/assets/entities/enemies/fallback-wolf";
-const fallbackOrcEnemyBasePath = "/assets/entities/enemies/fallback-orc";
-const commonEnemyBasePath = "/assets/entities/enemies/common";
-const regionalEnemyBasePath = "/assets/entities/enemies";
+const fallbackCompanionBasePath = `${PUBLIC_ASSET_ROOT}/entities/companions/fallback`;
+const beginnerCompanionBasePath = `${PUBLIC_ASSET_ROOT}/entities/companions/beginner`;
+const firstClassCompanionBasePath = `${PUBLIC_ASSET_ROOT}/entities/companions`;
+const fallbackWolfEnemyBasePath = `${PUBLIC_ASSET_ROOT}/entities/enemies/fallback-wolf`;
+const fallbackOrcEnemyBasePath = `${PUBLIC_ASSET_ROOT}/entities/enemies/fallback-orc`;
+const commonEnemyBasePath = `${PUBLIC_ASSET_ROOT}/entities/enemies/common`;
+const regionalEnemyBasePath = `${PUBLIC_ASSET_ROOT}/entities/enemies`;
 const standardRegionalEnemyPath = `${regionalEnemyBasePath}/standard-level-10-plus`;
 const orcWarcampEnemyPath = `${regionalEnemyBasePath}/orc-warcamp`;
-const slimewardEnemyPath = "/assets/world/dungeons/slimeward/enemies";
-const azureMassAssetPath = "/assets/entities/enemies/bosses/azure-mass";
-const classPlaceholderNpcPath = "/assets/entities/npcs/class-placeholders";
-const classPortraitBasePath = "/assets/ui/portraits/classes";
+const slimewardEnemyPath = `${PUBLIC_ASSET_ROOT}/world/dungeons/slimeward/enemies`;
+const azureMassAssetPath = `${PUBLIC_ASSET_ROOT}/entities/enemies/bosses/azure-mass`;
+const classPlaceholderNpcPath = `${PUBLIC_ASSET_ROOT}/entities/npcs/class-placeholders`;
+const classPortraitBasePath = `${PUBLIC_ASSET_ROOT}/ui/portraits/classes`;
 const defaultFrameDurationMs = 100;
 const companionCharacterNaturalSize = {
   width: 172,
@@ -533,7 +534,9 @@ export const entityVisualAssets = {
   },
   classMentor: {
     kind: "image",
-    src: NPC_ICON_SRC.class_mentor ?? "/assets/entities/npcs/hub/class-mentor.png",
+    src:
+      NPC_ICON_SRC.class_mentor ??
+      `${PUBLIC_ASSET_ROOT}/entities/npcs/hub/class-mentor.png`,
     naturalSize: {
       width: 144,
       height: 144,

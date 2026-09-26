@@ -73,6 +73,7 @@ import {
   type SpriteDirection,
   type SpriteVisualAsset,
 } from "../visualAssets";
+import { PUBLIC_ASSET_ROOT } from "../publicAssetUrl";
 import {
   createRendererFrameScheduler,
   doOverheadUiBoxesOverlap,
@@ -138,8 +139,8 @@ const partyOffensiveAoeFillColor = 0x2563eb;
 const partyOffensiveAoeStrokeColor = 0x1d4ed8;
 const partyHealingAoeFillColor = 0x16a34a;
 const partyHealingAoeStrokeColor = 0x15803d;
-const prototypeVfxSpritePath = "assets/effects/gameplay";
-const combatProjectileSpritePath = "assets/effects/projectiles";
+const prototypeVfxSpritePath = `${PUBLIC_ASSET_ROOT}/effects/gameplay`;
+const combatProjectileSpritePath = `${PUBLIC_ASSET_ROOT}/effects/projectiles`;
 const targetDummyDistanceMarkers = [5, 10, 20];
 const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;

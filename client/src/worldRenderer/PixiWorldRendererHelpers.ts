@@ -51,6 +51,7 @@ import {
   type SpriteDirection,
   type SpriteVisualAsset,
 } from "../visualAssets";
+import { PUBLIC_ASSET_ROOT } from "../publicAssetUrl";
 
 export const previewWidth = 256;
 export const previewHeight = 144;
@@ -71,7 +72,7 @@ const wildernessMapIds = new Set([
 ]);
 const aggressiveEnemyNameplateColor = 0xdc2626;
 const passiveEnemyNameplateColor = 0x1f2937;
-const prototypeVfxSpritePath = "assets/effects/gameplay";
+const prototypeVfxSpritePath = `${PUBLIC_ASSET_ROOT}/effects/gameplay`;
 
 export const blockImpactSrc = `${prototypeVfxSpritePath}/block-impact.png`;
 export const criticalHitBackingSrc = `${prototypeVfxSpritePath}/critical-hit-backing.png`;
