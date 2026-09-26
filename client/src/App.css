@@ -250,24 +250,6 @@
   padding: 7px 10px;
 }
 
-.map-debug-toggle-controls {
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  pointer-events: auto;
-}
-
-.map-debug-toggle-controls button {
-  min-width: 112px;
-  color: #1f2937;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
 .pixi-world-renderer {
   overflow: hidden;
   background: rgba(15, 23, 42, 0.88);
@@ -6363,18 +6345,6 @@ button {
   border: 1px solid #334155;
   background: #ffffff;
   color: #1f2937;
-}
-
-.map-debug-toggle-controls button {
-  padding: 7px 10px;
-  border-color: rgba(51, 65, 85, 0.72);
-  background: rgba(255, 255, 255, 0.86);
-}
-
-.map-debug-toggle-controls button.active {
-  border-color: #15803d;
-  background: #dcfce7;
-  color: #14532d;
 }
 
 .game-menu-panel button {

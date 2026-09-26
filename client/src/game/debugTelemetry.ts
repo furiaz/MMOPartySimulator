@@ -15,6 +15,8 @@ import {
 import type {
   ClassId,
   CommandPriority,
+  DebugDismissibleUiTarget,
+  DebugKeyboardShortcutId,
   DebugMovementResult,
   DebugNavigationTelemetry,
   DebugTelemetryEntitySnapshot,
@@ -136,6 +138,21 @@ export function appendDebugTelemetryEvent(
       ),
     },
   };
+}
+
+export function recordKeyboardShortcutTelemetry(
+  state: GameState,
+  shortcut: {
+    keyboardShortcutId: DebugKeyboardShortcutId;
+    result: string;
+    dismissedUiTargets?: DebugDismissibleUiTarget[];
+  },
+): GameState {
+  return appendDebugTelemetryEvent(state, {
+    type: "keyboard_shortcut_used",
+    entityId: "__ui__",
+    ...shortcut,
+  });
 }
 
 export function recordDebugTelemetryTick(

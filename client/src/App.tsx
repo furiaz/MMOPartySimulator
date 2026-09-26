@@ -24,6 +24,15 @@ import {
   shouldRenderNewsBroadcastOverlay,
   type QuestStatusLookup,
 } from "./guidePopupFlow";
+import {
+  getCycledMainMenuTransition,
+  getDirectMainMenuTransition,
+  getDismissibleUiTargets,
+  getGuideSequenceDismissal,
+  getMenuShortcutTelemetryResult,
+  resolveGameplayShortcut,
+  type MainMenuShortcutTransition,
+} from "./gameplayShortcuts";
 import type {
   AtlasSubpage,
   GameMenuTab,
@@ -149,6 +158,7 @@ import {
   recordMerchantMenuSelected,
   resourceIds,
   readSkillBook,
+  recordKeyboardShortcutTelemetry,
   restoreGameStateFromSave,
   buildNavigationClickAccessibility,
   depositAllToBank,
@@ -3124,6 +3134,9 @@ function App() {
   const queuedGuidePopupIdsRef = useRef<GuidePopupId[]>([]);
   const isGuideSequenceActiveRef = useRef(false);
   const shouldResumeAfterGuideSequenceRef = useRef(false);
+  const gameplayShortcutHandlerRef = useRef<(event: KeyboardEvent) => void>(
+    () => {},
+  );
   const latestAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
   const latestTrackedVisualMovementEntityIdsRef = useRef<Set<string>>(new Set());
   const previousAnimatedEntityPositionsRef = useRef<Record<string, Position>>({});
@@ -4187,27 +4200,6 @@ function App() {
   }, [appMode, gameState, queueGuidePopup, writeCurrentSave]);
 
   useEffect(() => {
-    if (!activeMerchantNpcId && !activeQuestGiverNpcId) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeNpcInteractions();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    activeBankChestNpcId,
-    activeMerchantNpcId,
-    activeQuestGiverNpcId,
-    closeNpcInteractions,
-  ]);
-
-  useEffect(() => {
     if (!activeMerchantNpcId && !activeQuestGiverNpcId && !activeBankChestNpcId) {
       return;
     }
@@ -4474,33 +4466,14 @@ function App() {
   ]);
 
   useEffect(() => {
-    function handleConsumableShortcut(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const tagName = target?.tagName.toLowerCase();
-
-      if (
-        tagName === "input" ||
-        tagName === "textarea" ||
-        tagName === "select" ||
-        target?.isContentEditable
-      ) {
-        return;
-      }
-
-      if (event.key !== "1") {
-        return;
-      }
-
-      event.preventDefault();
-      setGameState((state) =>
-        startPartyConsumableUse(state, "flask", Date.now()),
-      );
+    function handleGameplayShortcutEvent(event: KeyboardEvent) {
+      gameplayShortcutHandlerRef.current(event);
     }
 
-    window.addEventListener("keydown", handleConsumableShortcut);
+    window.addEventListener("keydown", handleGameplayShortcutEvent);
 
     return () => {
-      window.removeEventListener("keydown", handleConsumableShortcut);
+      window.removeEventListener("keydown", handleGameplayShortcutEvent);
     };
   }, []);
 
@@ -4561,29 +4534,42 @@ function App() {
     );
   }
 
-  function closeActiveGuidePopup() {
-    if (!activeGuidePopupId) {
+  function dismissGuidePopups(includeQueuedGuidePopups: boolean) {
+    const guideDismissal = getGuideSequenceDismissal(
+      activeGuidePopupIdRef.current,
+      queuedGuidePopupIdsRef.current,
+      includeQueuedGuidePopups,
+      shouldResumeAfterGuideSequenceRef.current,
+    );
+
+    if (guideDismissal.dismissedGuidePopupIds.length === 0) {
       return;
     }
 
-    const closedGuidePopupId = activeGuidePopupId;
-
-    viewedGuidePopupIdsRef.current.add(activeGuidePopupId);
-    setViewedGuidePopupIds((currentViewedIds) =>
-      currentViewedIds.includes(activeGuidePopupId)
-        ? currentViewedIds
-        : [...currentViewedIds, activeGuidePopupId],
-    );
+    for (const guidePopupId of guideDismissal.dismissedGuidePopupIds) {
+      viewedGuidePopupIdsRef.current.add(guidePopupId);
+    }
+    setViewedGuidePopupIds((currentViewedIds) => [
+      ...new Set([
+        ...currentViewedIds,
+        ...guideDismissal.dismissedGuidePopupIds,
+      ]),
+    ]);
     activeGuidePopupIdRef.current = null;
     setActiveGuidePopupId(null);
     setActiveGuidePanelIndex(0);
 
-    if (closedGuidePopupId === "welcome") {
+    if (includeQueuedGuidePopups) {
+      queuedGuidePopupIdsRef.current = [];
+      setQueuedGuidePopupIds([]);
+    }
+
+    if (guideDismissal.dismissedGuidePopupIds.includes("welcome")) {
       setIsGameMenuOpen(false);
       setActiveGameMenuTab(null);
     }
 
-    if (queuedGuidePopupIdsRef.current.length > 0) {
+    if (!guideDismissal.shouldFinishSequence) {
       return;
     }
 
@@ -4591,13 +4577,16 @@ function App() {
       restartNewsBroadcastDisplayDuration(state, Date.now()),
     );
 
-    const shouldResumeSimulation = shouldResumeAfterGuideSequenceRef.current;
     isGuideSequenceActiveRef.current = false;
     shouldResumeAfterGuideSequenceRef.current = false;
 
-    if (shouldResumeSimulation) {
+    if (guideDismissal.shouldResumeSimulation) {
       startSimulationLoop();
     }
+  }
+
+  function closeActiveGuidePopup() {
+    dismissGuidePopups(false);
   }
 
   function changePartyMemberRole(
@@ -6143,6 +6132,194 @@ function App() {
     setGameState(closeSlimewardDungeonChestUi);
   }
 
+  function recordAppliedGameplayShortcut(
+    shortcut: Parameters<typeof recordKeyboardShortcutTelemetry>[1],
+  ) {
+    setGameState((state) => recordKeyboardShortcutTelemetry(state, shortcut));
+  }
+
+  function closeAllDismissibleUi() {
+    const dismissedUiTargets = getDismissibleUiTargets({
+      gameMenuOpen: isGameMenuOpen,
+      debugToolsOpen: showDebugTools,
+      npcInteractionOpen: Boolean(
+        activeMerchantNpcId ||
+          activeQuestGiverNpcId ||
+          activeBankChestNpcId ||
+          pendingNpcInteractionId,
+      ),
+      guidePopupOpen: Boolean(activeGuidePopupIdRef.current),
+      queuedGuidePopups: queuedGuidePopupIdsRef.current.length > 0,
+      dungeonChestOpen: Boolean(activeDungeonChest),
+      offlineSummaryOpen: Boolean(offlineSummary),
+      secondaryPartySummaryOpen: Boolean(guildSecondaryPartyRedeemSummary),
+    });
+
+    if (isGameMenuOpen) {
+      setIsGameMenuOpen(false);
+    }
+    if (showDebugTools) {
+      setShowDebugTools(false);
+    }
+    if (
+      activeMerchantNpcId ||
+      activeQuestGiverNpcId ||
+      activeBankChestNpcId ||
+      pendingNpcInteractionId
+    ) {
+      closeNpcInteractions();
+    }
+    if (
+      activeGuidePopupIdRef.current ||
+      queuedGuidePopupIdsRef.current.length > 0
+    ) {
+      dismissGuidePopups(true);
+    }
+    if (activeDungeonChest) {
+      closeDungeonChest();
+    }
+    if (offlineSummary) {
+      setOfflineSummary(null);
+    }
+    if (guildSecondaryPartyRedeemSummary) {
+      setGuildSecondaryPartyRedeemSummary(null);
+    }
+
+    return dismissedUiTargets;
+  }
+
+  function applyMainMenuShortcutTransition(
+    transition: MainMenuShortcutTransition,
+  ) {
+    if (!transition.isOpen) {
+      setIsGameMenuOpen(false);
+      return;
+    }
+
+    closeNpcInteractions();
+    setIsGameMenuOpen(true);
+    selectGameMenuTab(transition.activeTab);
+  }
+
+  function handleGameplayShortcut(event: KeyboardEvent) {
+    const shortcut = resolveGameplayShortcut(event, {
+      enabled: appMode === "playing",
+      blockingOverlayActive: Boolean(
+        pendingWorldWipeRecovery ||
+          activeWorldWipeRescue ||
+          activeGuidePopupIdRef.current ||
+          queuedGuidePopupIdsRef.current.length > 0 ||
+          activeDungeonChest,
+      ),
+    });
+
+    if (!shortcut) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!shortcut.shouldExecute) {
+      return;
+    }
+
+    switch (shortcut.action.type) {
+      case "dismiss_ui": {
+        const dismissedUiTargets = closeAllDismissibleUi();
+
+        if (dismissedUiTargets.length > 0) {
+          recordAppliedGameplayShortcut({
+            keyboardShortcutId: shortcut.action.shortcutId,
+            result: "dismissed",
+            dismissedUiTargets,
+          });
+        }
+        return;
+      }
+      case "cycle_main_menu": {
+        const transition = getCycledMainMenuTransition(
+          isGameMenuOpen,
+          activeGameMenuTab,
+        );
+        applyMainMenuShortcutTransition(transition);
+        recordAppliedGameplayShortcut({
+          keyboardShortcutId: shortcut.action.shortcutId,
+          result: getMenuShortcutTelemetryResult(transition),
+        });
+        return;
+      }
+      case "toggle_atlas":
+      case "toggle_inventory":
+      case "toggle_world_travel": {
+        const targetTab =
+          shortcut.action.type === "toggle_atlas"
+            ? "atlas"
+            : shortcut.action.type === "toggle_inventory"
+              ? "inventory"
+              : "world";
+        const transition = getDirectMainMenuTransition(
+          isGameMenuOpen,
+          activeGameMenuTab,
+          targetTab,
+        );
+        applyMainMenuShortcutTransition(transition);
+        recordAppliedGameplayShortcut({
+          keyboardShortcutId: shortcut.action.shortcutId,
+          result: getMenuShortcutTelemetryResult(transition),
+        });
+        return;
+      }
+      case "toggle_simulation": {
+        const wasRunning = Boolean(stopLoopRef.current);
+        toggleSimulationLoop();
+        recordAppliedGameplayShortcut({
+          keyboardShortcutId: shortcut.action.shortcutId,
+          result: wasRunning ? "paused" : "resumed",
+        });
+        return;
+      }
+      case "toggle_auto_combat": {
+        setGameState((state) => {
+          const nextAutoModeEnabled = !state.autoModeEnabled;
+          const nextState = nextAutoModeEnabled
+            ? setPoiSearchScope(
+                setAutoModeEnabled(state, true),
+                "subzone_only",
+              )
+            : setAutoModeEnabled(state, false);
+
+          return recordKeyboardShortcutTelemetry(nextState, {
+            keyboardShortcutId: shortcut.action.shortcutId,
+            result: nextAutoModeEnabled ? "enabled" : "disabled",
+          });
+        });
+        return;
+      }
+      case "use_flask": {
+        const now = Date.now();
+        setGameState((state) => {
+          const nextState = startPartyConsumableUse(state, "flask", now);
+
+          return recordKeyboardShortcutTelemetry(nextState, {
+            keyboardShortcutId: shortcut.action.shortcutId,
+            result: nextState === state ? "no_effect" : "started",
+          });
+        });
+        return;
+      }
+      case "toggle_debug_tools": {
+        const result = showDebugTools ? "hidden" : "shown";
+        toggleDebugTools();
+        recordAppliedGameplayShortcut({
+          keyboardShortcutId: shortcut.action.shortcutId,
+          result,
+        });
+      }
+    }
+  }
+
+  gameplayShortcutHandlerRef.current = handleGameplayShortcut;
+
   function toggleGameMenu() {
     setIsGameMenuOpen((isOpen) => {
       const nextIsOpen = !isOpen;
@@ -6479,17 +6656,6 @@ function App() {
                 <strong>{currentMap.displayName}</strong>
               </div>
               <span>Prototype Zone ID: {currentMap.debugName}</span>
-            </div>
-            <div className="map-debug-toggle-controls" aria-label="Debug tools visibility">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleDebugTools();
-                }}
-                type="button"
-              >
-                {showDebugTools ? "Hide Debug UI" : "Show Debug UI"}
-              </button>
             </div>
           </div>
           <PerformanceOverlay

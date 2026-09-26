@@ -2092,6 +2092,27 @@ export type DebugNavigationTelemetry = {
   nearbyBlockedCellSummary?: Partial<Record<DebugNavigationBlocker, number>>;
 };
 
+export type DebugKeyboardShortcutId =
+  | "escape"
+  | "main_menu_cycle"
+  | "pause_toggle"
+  | "auto_combat_toggle"
+  | "atlas_toggle"
+  | "inventory_toggle"
+  | "flask_use"
+  | "world_travel_toggle"
+  | "debug_tools_toggle";
+
+export type DebugDismissibleUiTarget =
+  | "game_menu"
+  | "debug_tools"
+  | "npc_interaction"
+  | "guide_popup"
+  | "queued_guide_popups"
+  | "dungeon_chest"
+  | "offline_summary"
+  | "secondary_party_summary";
+
 export type DebugTelemetryEventType =
   | "target_acquired"
   | "target_changed"
@@ -2257,7 +2278,8 @@ export type DebugTelemetryEventType =
   | "livestock_resumed_production"
   | "livestock_upgrade_attempt"
   | "livestock_upgrade_succeeded"
-  | "livestock_upgrade_failed";
+  | "livestock_upgrade_failed"
+  | "keyboard_shortcut_used";
 
 export type ResurrectionCancelReason =
   | "attacked"
@@ -2432,6 +2454,8 @@ export type DebugTelemetryEvent = {
   nextRole?: PartyMemberRole;
   result?: string;
   reason?: string;
+  keyboardShortcutId?: DebugKeyboardShortcutId;
+  dismissedUiTargets?: DebugDismissibleUiTarget[];
   directCommandType?: DirectCompanionCommandType;
   directCommandTargetPosition?: Position | null;
   progressBeforeMs?: number;
