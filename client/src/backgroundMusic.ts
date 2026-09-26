@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { HUB_MAP_ID, HUB_TWO_MAP_ID } from "./game";
 
-export const HUB_BACKGROUND_MUSIC_SRC = "/assets/Sounds/BG/Hubs/Hubs.ogg";
+export const HUB_BACKGROUND_MUSIC_SRC = "/assets/sounds/bg/hubs/hubs.ogg";
 export const BACKGROUND_MUSIC_STORAGE_KEY =
   "mmo-party-simulator.background-music.v1";
 
