@@ -31,6 +31,49 @@ For technical architecture, refer to GTD.md
 
 ---
 
+## File and Asset Organization Rules
+
+### Project File Placement
+
+- Put new files in the existing folder that owns the same responsibility.
+- Reuse the nearest established structure before creating a new folder.
+- Keep React UI and UI-only rendering code under `client/src/` and keep simulation rules, state changes, and game systems under `client/src/game/`.
+- Keep renderer-specific code with the existing renderer files and keep reusable game logic independent from React, PixiJS, and asset dimensions.
+- Keep repository tooling, tests, configuration, and documentation with the existing files of the same type.
+- Do not create generic dumping folders such as `misc`, `temp`, `new`, `final`, or ticket-number folders.
+- Do not duplicate a file into multiple project folders to avoid choosing an owner.
+- Generated output, review sheets, source art, alternates, rejected variants, and retired files must not remain in the runtime project unless they are directly required to build, test, or run the game.
+
+### Runtime Assets
+
+- `client/public/assets/` contains only assets required by the current game at build time or runtime.
+- Place runtime assets in the nearest existing semantic folder for their owner and purpose. Create a new semantic folder only when no current folder fits.
+- New asset directory names must use lowercase kebab-case. Do not mass-rename legacy paths without a dedicated ticket.
+- Do not create ticket-number folders under `client/public/assets/`.
+- Asset references must match Git-tracked path casing exactly and must follow the project's base-path-aware URL convention rather than assuming deployment at a domain root.
+- A case-only rename on a case-insensitive filesystem is not complete until Git records the old path removal and the new path addition.
+
+### External Asset Library
+
+- The full asset Library lives outside this repository at the portable sibling path `../AssetList/Library`.
+- The Library is a source, reference, mirror, and archive location. It must never be required to build, test, preview, deploy, or run the game.
+- Every asset in `client/public/` must have an exact-copy mirror at `../AssetList/Library/Used assets/MMOPartySimulator/client/public/` using the same project-relative path and filename.
+- Maintain `../AssetList/Library/Used assets/MMOPartySimulator/used-assets-manifest.csv` with the project path, Library path, byte size, SHA-256 hash, and category for every mirrored runtime asset.
+- Raw source files, alternates, rejected variants, retired assets, unused assets, review sheets, and historical generation inputs belong in the appropriate Library collection, not in the runtime project.
+- Preserve existing top-level Library source and reference collections. Do not reorganize or rename them automatically.
+
+### Asset Lifecycle
+
+- When adding a runtime asset: place it in the correct project folder, add its exact mirror, update the used-assets manifest, add or update the code reference, and verify the served asset.
+- When replacing or removing a runtime asset: audit references first, archive a Git-tracked outgoing file under `../AssetList/Library/Unused assets/MMOPartySimulator/tracked/` using its original project-relative path, and update `../AssetList/Library/Unused assets/MMOPartySimulator/archive-manifest.csv` with its source kind, original path, archive path, byte size, SHA-256 hash, and reason.
+- Use the existing `local-only/` archive subtree only for outgoing files that were never Git-tracked.
+- Verify an archived copy by size and SHA-256 before deleting the project source. If the archive destination already exists with a different hash, stop and report the conflict.
+- Remove retired files from the Used assets mirror and regenerate or update both affected manifests.
+- For bulk moves or renames, keep a migration manifest with old path, new path, size, and hash so every move is auditable.
+- Verify project-to-Used-mirror path parity, byte sizes, hashes, exact path casing, stale code references, the client build, a fresh production preview, and representative HTTP asset responses. For bulk asset changes, verify all affected served asset URLs.
+
+---
+
 ## Codex Instructions (IMPORTANT)
 
 Before making any changes:
@@ -109,6 +152,46 @@ Debugging / Fixing:
   - If port 4173 is occupied by an unrelated process, stop and ask before using another port.
   - The final response must say whether the build passed, whether the preview was restarted, and whether the local URL responded.
 - Build systems before UI when possible
+
+---
+
+## Branch and Release Workflow
+
+### Permanent Branches
+
+- This repository has exactly two permanent branches:
+  - `main` is the integration branch for reviewed development work and the base for normal ticket branches.
+  - `live` is the production branch and must represent the exact version intended to be publicly playable.
+- Only `live` may trigger the production GitHub Pages deployment.
+- Work on `main` or any temporary branch must not change the public game until an approved release is merged into `live`.
+- Do not implement ticket changes directly on `main` or `live`.
+- Protect `main` and `live` from force pushes and deletion. Require their configured checks and pull-request workflow when repository settings support it.
+- A second-account approval must not be required while the repository has only one active maintainer. Manual review and explicit user authorization are still required.
+
+### Ticket Branches
+
+- Create a temporary branch for each approved leaf implementation ticket.
+- Start normal ticket branches from the latest `main`.
+- Codex-created branches must use `codex/ticket-####-short-description`, using the ticket number assigned by the issue workflow.
+- Keep each branch scoped to its ticket so it can be reviewed and reverted independently.
+- Merge a completed ticket branch into `main` through a pull request only after ticket verification, Manual Review, and explicit user authorization for the pull request and merge.
+- Delete temporary branches only after their work is safely integrated and the user explicitly authorizes deletion.
+
+### Releases
+
+- Promote a release with a pull request from `main` into `live`.
+- A release must pass the configured build and deployment checks and receive explicit user authorization before merge.
+- Deploy the public site from the merged `live` commit only. Do not deploy pull-request heads, ticket branches, or `main` to the production GitHub Pages site.
+- Record the deployed commit in the release summary so the public version is traceable.
+- Roll back production by reverting the responsible release commit or promoting a known-good commit through the reviewed release workflow. Do not rewrite `live` history.
+
+### Production Hotfixes
+
+- Create an approved hotfix branch from `live` only when the public build needs an urgent isolated fix.
+- Merge the verified hotfix into `live` through the protected release workflow.
+- Immediately forward-port the same hotfix into `main` through a separate pull request so the permanent branches do not diverge.
+
+This workflow does not grant Git authorization. The Explicit Git Authorization Required rules below still apply to every commit, push, pull request, and merge.
 
 ---
 
