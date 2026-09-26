@@ -68,6 +68,7 @@ import {
   getInnKitchenRecipeDisplay,
 } from "./innKitchenPresentation";
 import { getClassIdleFrameSrc, getEnemyWalkingAnimation } from "./visualAssets";
+import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 
 type GuildTavernSection = "guild" | "inn";
 type GuildView =
@@ -474,8 +475,8 @@ export function GuildTavernPanel({
               alt=""
               src={
                 activeSection === "guild"
-                  ? "/assets/entities/npcs/hub/guild-coordinator.png"
-                  : "/assets/entities/npcs/hub/tavern-keeper.png"
+                  ? `${PUBLIC_ASSET_ROOT}/entities/npcs/hub/guild-coordinator.png`
+                  : `${PUBLIC_ASSET_ROOT}/entities/npcs/hub/tavern-keeper.png`
               }
             />
           </div>

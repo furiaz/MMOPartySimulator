@@ -2,7 +2,8 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === 'github-pages' ? '/MMOPartySimulator/' : '/',
   plugins: [react()],
   build: {
     assetsDir: 'build',
@@ -59,4 +60,4 @@ export default defineConfig({
       ],
     },
   },
-})
+}))

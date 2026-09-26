@@ -40,6 +40,7 @@ import type {
   PartyMenuSection,
 } from "./gameMenuTypes";
 import { getNpcInteractionRange } from "./npcInteractionRange";
+import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 import { getResourceTooltipDetails } from "./resourceTooltip";
 import {
   formatQuestStatus,
@@ -377,7 +378,7 @@ const currencyGainFeedbackDurationMs = 1200;
 const directCommandFeedbackDurationMs = 1400;
 const movementClickFeedbackDurationMs = 900;
 const currencyGainBurstSrc =
-  "assets/effects/gameplay/currency-gain-burst.png";
+  `${PUBLIC_ASSET_ROOT}/effects/gameplay/currency-gain-burst.png`;
 const mapConstructionCellPixelSize = 32;
 const visualMovementGraceMs = 180;
 const visualMovementEnemyViewportMarginTiles = 6;
