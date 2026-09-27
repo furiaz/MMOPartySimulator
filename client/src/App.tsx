@@ -1212,7 +1212,7 @@ function PerformanceOverlay({
   rendererPerformanceRef: { current: RendererPerformanceAccumulator };
   visualMovementEntryCount: number;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [stats, setStats] = useState<PerformanceOverlayStats>(() =>
     getPerformanceOverlayStats(gameState, currentMap, {
       gameMetrics: consumeGamePerformanceMetrics(),
