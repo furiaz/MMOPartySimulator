@@ -822,9 +822,16 @@ Current merchant behavior:
 - party-compatible filtering applies to equipment compatibility and does not hide flasks or skill books
 - current Merchant Buy stock groups include flasks, books, weapons, offhands, cloth armor, leather armor, mail armor, plate armor, and accessories
 - current secondary Merchant Buy filters may separate weapons and offhands by equipment type, armor by slot, and accessories by charm type
-- the Sell panel may be visible as a placeholder only
-- full selling rules are not implemented
-- enemy-part materials are not quick-exchanged or sold by the Merchant in the current prototype
+- Merchant Sell can sell unlocked shared-inventory slots containing current regular Merchant Buy stock items or enemy-part materials
+- current regular Merchant Buy stock items sell for 100 percent of their current per-unit Buy price
+- enemy-part materials sell for their explicit per-unit item value
+- enemy-part values increase with the difficulty of the easiest normal enemy source; current common values rise from 1 Crown at levels 1-3 to 6 Crowns at levels 16-18, and matching rare parts are worth four times the common value
+- parts shared by enemies at multiple levels use the easiest normal source, and Superior enemies keep the same per-unit value because their increased drop quantities already provide the reward increase
+- equipped items, banked items, locked inventory slots, quest items, event items, key items, gathered resource materials, Farm ownership, Livestock ownership, and items outside the current Merchant Sell rules cannot be sold
+- stackable sales use a player-selected quantity and show the live total Crown payout before confirmation
+- Merchant Sell does not include Sell All, automatic selling, remote selling, dynamic prices, purchase provenance, or a full shop economy
+- while Outfit the Expedition is active and its First Aid purchase objective is incomplete, First Aid is the only enabled Merchant purchase; other regular stock remains visible but unavailable, Farm Seed and Livestock purchases are unavailable, and Merchant Sell remains available
+- purchasing First Aid immediately unlocks the normal Merchant purchase options, and later selling First Aid does not reverse completed purchase-objective progress
 - this is prototype merchant behavior, not a full shop economy
 
 Current prototype key item behavior:
@@ -861,7 +868,7 @@ Do not implement these unless explicitly requested:
 
 - production bank storage beyond the current prototype Bank Chest system
 - persistent ground loot
-- full selling flows
+- full selling flows beyond the current prototype Merchant Sell rules
 - dynamic shop inventories or full shop economy beyond the fixed prototype Merchant buy stock
 - advanced consumable systems beyond current prototype flasks, auto-flask behavior, flask recharge, and Inn Kitchen meal buffs
 - full crafting chains, profession progression, upgrades, durability, or production crafting economy beyond the current prototype Smith crafting system
@@ -2825,7 +2832,7 @@ Do not implement these unless explicitly requested:
 - production asset pipeline
 - final world content pipeline
 - full quest journal, branching dialogue, production quest content, or full quest reward economy beyond prototype quest rewards
-- full shop, selling, buying, and merchant economy beyond fixed prototype Merchant Buy stock and the current Sell placeholder
+- full shop, selling, buying, and merchant economy beyond fixed prototype Merchant Buy stock and the current prototype Merchant Sell rules
 - full production crafting, smithing, profession progression, upgrade chains, or recipe economy beyond current prototype Smith crafting
 - full production bank economy, account storage, remote storage rules, or storage upgrades beyond current prototype Bank Chest storage
 - persistent ground loot beyond prototype drop-to-inventory behavior

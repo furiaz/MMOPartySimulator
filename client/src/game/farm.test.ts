@@ -537,6 +537,15 @@ describe("Farm upgrades", () => {
         [EQUIPMENT_TUTORIAL_QUEST_ID]: {
           ...state.quests[EQUIPMENT_TUTORIAL_QUEST_ID],
           status: "active",
+          objectiveProgress: {
+            ...state.quests[EQUIPMENT_TUTORIAL_QUEST_ID].objectiveProgress,
+            buy_first_aid_skill_book: {
+              ...state.quests[EQUIPMENT_TUTORIAL_QUEST_ID].objectiveProgress
+                .buy_first_aid_skill_book,
+              currentCount: 1,
+              completed: true,
+            },
+          },
         },
       },
     };

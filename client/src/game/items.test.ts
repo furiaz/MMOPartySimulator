@@ -351,6 +351,54 @@ describe("prototype item definitions", () => {
     }
   });
 
+  it("assigns enemy-part values from source difficulty and drop rarity", () => {
+    const expectedValues: Partial<Record<ItemId, number>> = {
+      slime_gel_t1: 1,
+      slime_core_t1: 4,
+      bat_wing_t1: 1,
+      bat_ear_t1: 4,
+      spider_silk_t1: 1,
+      spider_fang_t1: 4,
+      goblin_ear_t1: 2,
+      goblin_tooth_t1: 8,
+      imp_horn_chip_t1: 2,
+      imp_tail_t1: 8,
+      wolf_pelt: 2,
+      wolf_fang: 8,
+      crawler_pebble_t1: 3,
+      crawler_plate_t1: 12,
+      moss_tuft_t1: 3,
+      mossling_cap_t1: 12,
+      goblin_ear_t2: 4,
+      goblin_tooth_t2: 16,
+      wisp_ash_t2: 4,
+      wisp_ember_t2: 16,
+      imp_horn_chip_t2: 4,
+      imp_tail_t2: 16,
+      crawler_pebble_t2: 5,
+      crawler_plate_t2: 20,
+      wolf_pelt_t2: 5,
+      wolf_fang_t2: 20,
+      spider_silk_t2: 5,
+      spider_fang_t2: 20,
+      bat_wing_t2: 6,
+      bat_ear_t2: 24,
+      moss_tuft_t2: 6,
+      mossling_cap_t2: 24,
+      orc_hide: 6,
+      orc_tusk: 24,
+    };
+
+    expect(
+      Object.fromEntries(
+        Object.keys(expectedValues).map((itemId) => [
+          itemId,
+          ITEM_DEFINITIONS[itemId as ItemId].value,
+        ]),
+      ),
+    ).toEqual(expectedValues);
+  });
+
   it("defines the bronze accessory progression as shared prototype equipment", () => {
     expect(ITEM_DEFINITIONS.plain_charm).toMatchObject({
       equipmentSlot: "accessory1",
