@@ -4749,6 +4749,11 @@
   opacity: 0.72;
 }
 
+.merchant-stock-row.restricted {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .merchant-stock-row span {
   display: grid;
   gap: 3px;
@@ -4818,6 +4823,37 @@
 
 .merchant-buy-action {
   min-height: 42px;
+  font-weight: 800;
+}
+
+.merchant-sell-quantity {
+  display: grid;
+  gap: 6px;
+}
+
+.merchant-sell-quantity > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.merchant-sell-quantity input {
+  width: 72px;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 1px solid #3a5a60;
+  background: rgba(12, 22, 26, 0.72);
+  color: #e6f0f2;
+  text-align: center;
+}
+
+.merchant-sell-preview {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(122, 166, 173, 0.7);
+  background: rgba(58, 90, 96, 0.32);
+  color: #f3df93;
   font-weight: 800;
 }
 

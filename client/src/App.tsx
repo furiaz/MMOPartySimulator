@@ -57,6 +57,7 @@ import { getQuestObjectiveMarkers } from "./questObjectiveMarkers";
 import { getQuestEntityIndicators } from "./questEntityIndicators";
 import { QuestTrackerPanel } from "./QuestTrackerPanel";
 import { BankPanel } from "./BankPanel";
+import { MerchantSellPanel } from "./MerchantSellPanel";
 import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
 import {
   normalizeBackgroundMusicPreferences,
@@ -71,6 +72,7 @@ import {
   buyMerchantFarmSeed,
   buyMerchantItem,
   buyMerchantLivestockCreature,
+  sellMerchantItem,
   canCompanionEnterFirstClassSelection,
   CLASS_DEFINITIONS,
   companionIds,
@@ -158,6 +160,7 @@ import {
   issuePartyOrder,
   isActiveResource,
   isMerchantUnlockedForQuests,
+  isMerchantFirstAidPurchaseRequired,
   isMerchantNpc,
   recordMerchantInteractionClosed,
   recordMerchantInteractionOpened,
@@ -286,6 +289,7 @@ import {
   type MerchantBuyFailureReason,
   type MerchantFarmSeedBuyFailureReason,
   type MerchantLivestockBuyFailureReason,
+  type MerchantSellFailureReason,
   type MerchantStockEntry,
   type MerchantStockGroup,
   type NavigationClickAccessibility,
@@ -589,6 +593,7 @@ const merchantBuyFailureMessages: Record<MerchantBuyFailureReason, string> = {
   inventory_add_failed: "Inventory could not receive the item",
   currency_remove_failed: "Crowns could not be spent",
   merchant_locked_for_quest: "Merchant unlocks during Outfit the Expedition",
+  first_aid_purchase_required: "Purchase the First Aid Skill Book first",
 };
 
 const merchantFarmSeedFailureMessages: Record<
@@ -597,6 +602,7 @@ const merchantFarmSeedFailureMessages: Record<
 > = {
   invalid_merchant: "Merchant unavailable",
   merchant_locked_for_quest: "Merchant unlocks during Outfit the Expedition",
+  first_aid_purchase_required: "Purchase the First Aid Skill Book first",
   item_not_in_stock: "Seed is not in stock",
   already_owned: "Seed already owned",
   insufficient_crowns: "Not enough Crowns",
@@ -609,9 +615,22 @@ const merchantLivestockFailureMessages: Record<
 > = {
   invalid_merchant: "Merchant unavailable",
   merchant_locked_for_quest: "Merchant unlocks during Outfit the Expedition",
+  first_aid_purchase_required: "Purchase the First Aid Skill Book first",
   item_not_in_stock: "Livestock creature is not in stock",
   insufficient_crowns: "Not enough Crowns",
   currency_remove_failed: "Crowns could not be spent",
+};
+
+const merchantSellFailureMessages: Record<MerchantSellFailureReason, string> = {
+  invalid_merchant: "Merchant unavailable",
+  merchant_locked_for_quest: "Merchant unlocks during Outfit the Expedition",
+  invalid_slot: "Inventory item is no longer available",
+  slot_locked: "Unlock this inventory slot before selling",
+  item_not_sellable: "The Merchant will not buy this item",
+  invalid_price: "Item sale value is invalid",
+  invalid_quantity: "Choose a valid quantity",
+  inventory_remove_failed: "Inventory could not remove the selected items",
+  currency_add_failed: "Crowns could not be added",
 };
 
 const skillBookFailureMessages: Record<ReadSkillBookFailureReason, string> = {
@@ -1928,6 +1947,7 @@ function MerchantBuyPanel({
   const [maxLevelFilter, setMaxLevelFilter] = useState("");
   const [partyCompatibleOnly, setPartyCompatibleOnly] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<ItemId | null>(null);
+  const firstAidPurchaseRequired = isMerchantFirstAidPurchaseRequired(state);
   const stock = getMerchantBuyStock(state, merchantNpcId);
   const secondaryFilterOptions = useMemo(
     () =>
@@ -2064,14 +2084,25 @@ function MerchantBuyPanel({
               const itemDefinition = getItemDefinition(entry.itemId);
               const isSelected = selectedEntry?.itemId === entry.itemId;
               const canAffordItem = crownBalance >= entry.priceCrowns;
+              const isTutorialRestricted =
+                firstAidPurchaseRequired &&
+                entry.itemId !== "first_aid_skill_book";
 
               return (
                 <button
                   key={entry.itemId}
                   className={`merchant-stock-row${
                     isSelected ? " selected" : ""
-                  }${canAffordItem ? "" : " unaffordable"}`}
+                  }${canAffordItem ? "" : " unaffordable"}${
+                    isTutorialRestricted ? " restricted" : ""
+                  }`}
+                  disabled={isTutorialRestricted}
                   onClick={() => setSelectedItemId(entry.itemId)}
+                  title={
+                    isTutorialRestricted
+                      ? "Purchase the First Aid Skill Book first"
+                      : undefined
+                  }
                   type="button"
                 >
                   <span>
@@ -2159,6 +2190,7 @@ function MerchantFarmSeedPanel({
 }) {
   const stock = getMerchantFarmSeedStock(state, merchantNpcId);
   const crownBalance = getCurrencyBalance(state.wallet, "crowns");
+  const firstAidPurchaseRequired = isMerchantFirstAidPurchaseRequired(state);
 
   return (
     <aside
@@ -2183,9 +2215,14 @@ function MerchantFarmSeedPanel({
                   key={entry.cropId}
                   className={`merchant-stock-row${
                     canAffordSeed || entry.isOwned ? "" : " unaffordable"
-                  }`}
-                  disabled={entry.isOwned}
+                  }${firstAidPurchaseRequired ? " restricted" : ""}`}
+                  disabled={entry.isOwned || firstAidPurchaseRequired}
                   onClick={() => onBuy(entry.cropId)}
+                  title={
+                    firstAidPurchaseRequired
+                      ? "Purchase the First Aid Skill Book first"
+                      : undefined
+                  }
                   type="button"
                 >
                   <span>
@@ -2240,6 +2277,7 @@ function MerchantLivestockPanel({
 }) {
   const stock = getMerchantLivestockStock(state, merchantNpcId);
   const crownBalance = getCurrencyBalance(state.wallet, "crowns");
+  const firstAidPurchaseRequired = isMerchantFirstAidPurchaseRequired(state);
 
   return (
     <aside
@@ -2264,8 +2302,14 @@ function MerchantLivestockPanel({
                   key={entry.creatureId}
                   className={`merchant-stock-row${
                     canAffordCreature ? "" : " unaffordable"
-                  }`}
+                  }${firstAidPurchaseRequired ? " restricted" : ""}`}
+                  disabled={firstAidPurchaseRequired}
                   onClick={() => onBuy(entry.creatureId)}
+                  title={
+                    firstAidPurchaseRequired
+                      ? "Purchase the First Aid Skill Book first"
+                      : undefined
+                  }
                   type="button"
                 >
                   <span>
@@ -2569,6 +2613,13 @@ function getMerchantBuyBlockReason(
   entry: MerchantStockEntry,
   state: GameState,
 ): string | null {
+  if (
+    isMerchantFirstAidPurchaseRequired(state) &&
+    entry.itemId !== "first_aid_skill_book"
+  ) {
+    return "Purchase the First Aid Skill Book first";
+  }
+
   if (getCurrencyBalance(state.wallet, "crowns") < entry.priceCrowns) {
     return "Not enough Crowns";
   }
@@ -3538,6 +3589,8 @@ function App() {
     isPartyLeaderNearGuildTavern(gameState);
   const activeMerchantLocked =
     Boolean(activeMerchant) && !isMerchantUnlockedForQuests(gameState);
+  const activeMerchantFirstAidPurchaseRequired =
+    Boolean(activeMerchant) && isMerchantFirstAidPurchaseRequired(gameState);
   const activeQuestGiver =
     activeQuestGiverNpcId &&
     gameState.entities[activeQuestGiverNpcId]?.kind === "npc" &&
@@ -5998,6 +6051,30 @@ function App() {
     setGameState(purchase.state);
   }
 
+  function sellMerchantInventoryItem(slotIndex: number, quantity: number) {
+    if (!activeMerchantNpcId) {
+      return;
+    }
+
+    const sale = sellMerchantItem(
+      gameState,
+      activeMerchantNpcId,
+      slotIndex,
+      quantity,
+    );
+
+    if (sale.result.status === "success") {
+      queueSaveAfterStateChange("Merchant sale saved");
+      setMerchantResultMessage(
+        `Sold ${sale.result.displayName} ×${sale.result.soldQuantity} for ${sale.result.totalPriceCrowns} Crowns`,
+      );
+    } else {
+      setMerchantResultMessage(merchantSellFailureMessages[sale.result.reason]);
+    }
+
+    setGameState(sale.state);
+  }
+
   function depositInventorySlot(slotIndex: number, quantity: number) {
     const transfer = depositInventorySlotToBank(gameState, slotIndex, quantity);
 
@@ -6808,16 +6885,30 @@ function App() {
               </button>
               <button
                 className={activeMerchantPanel === "farm_seeds" ? "active" : ""}
-                disabled={activeMerchantLocked}
+                disabled={
+                  activeMerchantLocked || activeMerchantFirstAidPurchaseRequired
+                }
                 onClick={() => selectMerchantPanel("farm_seeds")}
+                title={
+                  activeMerchantFirstAidPurchaseRequired
+                    ? "Purchase the First Aid Skill Book first"
+                    : undefined
+                }
                 type="button"
               >
                 Farm Seeds
               </button>
               <button
                 className={activeMerchantPanel === "livestock" ? "active" : ""}
-                disabled={activeMerchantLocked}
+                disabled={
+                  activeMerchantLocked || activeMerchantFirstAidPurchaseRequired
+                }
                 onClick={() => selectMerchantPanel("livestock")}
+                title={
+                  activeMerchantFirstAidPurchaseRequired
+                    ? "Purchase the First Aid Skill Book first"
+                    : undefined
+                }
                 type="button"
               >
                 Livestock
@@ -6857,10 +6948,11 @@ function App() {
                   onBuy={buyMerchantLivestockFromMenu}
                 />
               ) : (
-                <aside className="merchant-detail-panel">
-                  <h2>Sell</h2>
-                  <p>Placeholder</p>
-                </aside>
+                <MerchantSellPanel
+                  merchantNpcId={activeMerchant.id}
+                  state={gameState}
+                  onSell={sellMerchantInventoryItem}
+                />
               )
             ) : null}
           </section>
