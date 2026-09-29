@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { addEntity } from "./state";
-import { addItemToInventoryState, countInventoryItem } from "./inventory";
+import {
+  addItemToInventoryState,
+  countInventoryItem,
+  toggleInventorySlotLock,
+} from "./inventory";
 import { createCompanion, createNpc } from "./entities";
 import { createTestGameState } from "./testState";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
@@ -10,15 +14,20 @@ import {
 } from "./wallet";
 import {
   buyMerchantItem,
+  buyMerchantFarmSeed,
   buyMerchantLivestockCreature,
   getFilteredMerchantBuyStock,
   getMerchantLivestockStock,
   getMerchantBuyStock,
+  getMerchantSellEntries,
   getMerchantSecondaryFilterOptions,
+  isMerchantFirstAidPurchaseRequired,
+  sellMerchantItem,
 } from "./merchant";
 import { getItemDefinition } from "./items";
 import { createInitialQuestStates } from "./questSystem";
 import { LIVESTOCK_DUSKHEN_CREATURE_ID } from "./livestock";
+import { FARM_POTATO_CROP_ID } from "./farm";
 
 const MERCHANT_ID = "test-merchant";
 
@@ -27,6 +36,19 @@ function createMerchantState() {
   quests.outfit_the_expedition = {
     ...quests.outfit_the_expedition,
     status: "completed",
+  };
+
+  return addEntity(
+    createTestGameState({ currentMapId: "hub", quests }),
+    createNpc(MERCHANT_ID, { x: 1, y: 1 }, "Merchant", "merchant"),
+  );
+}
+
+function createMerchantTutorialState() {
+  const quests = createInitialQuestStates();
+  quests.outfit_the_expedition = {
+    ...quests.outfit_the_expedition,
+    status: "active",
   };
 
   return addEntity(
@@ -616,6 +638,202 @@ describe("merchant livestock", () => {
       newCrowns: 50,
     });
     expect(purchase.state.livestock?.ownedCreaturesById.duskhen).toBe(2);
+  });
+});
+
+describe("merchant sell", () => {
+  it("lists merchant stock and enemy parts under their sell filters", () => {
+    let state = createMerchantState();
+    state = addItemToInventoryState(state, "minor_recovery_flask", 2, "debug").state;
+    state = addItemToInventoryState(state, "goblin_tooth_t2", 3, "debug").state;
+    state = addItemToInventoryState(state, "wood", 4, "debug").state;
+
+    expect(getMerchantSellEntries(state, MERCHANT_ID)).toEqual([
+      expect.objectContaining({
+        itemId: "minor_recovery_flask",
+        quantity: 2,
+        unitPriceCrowns: 30,
+        source: "merchant_stock",
+      }),
+      expect.objectContaining({
+        itemId: "goblin_tooth_t2",
+        quantity: 3,
+        unitPriceCrowns: 16,
+        source: "enemy_part",
+      }),
+    ]);
+    expect(
+      getMerchantSellEntries(state, MERCHANT_ID, "merchant_items").map(
+        (entry) => entry.itemId,
+      ),
+    ).toEqual(["minor_recovery_flask"]);
+    expect(
+      getMerchantSellEntries(state, MERCHANT_ID, "enemy_parts").map(
+        (entry) => entry.itemId,
+      ),
+    ).toEqual(["goblin_tooth_t2"]);
+  });
+
+  it("sells a selected quantity from one enemy-part stack", () => {
+    let state = createMerchantState();
+    state = addItemToInventoryState(state, "crawler_plate_t2", 5, "debug").state;
+
+    const sale = sellMerchantItem(state, MERCHANT_ID, 0, 3);
+
+    expect(sale.result).toMatchObject({
+      status: "success",
+      itemId: "crawler_plate_t2",
+      soldQuantity: 3,
+      unitPriceCrowns: 20,
+      totalPriceCrowns: 60,
+      previousCrowns: 0,
+      newCrowns: 60,
+    });
+    expect(countInventoryItem(sale.state.inventory, "crawler_plate_t2")).toBe(2);
+    expect(getCurrencyBalance(sale.state.wallet, "crowns")).toBe(60);
+  });
+
+  it("refunds merchant stock items at their full current buy price", () => {
+    let state = createMerchantState();
+    state = addItemToInventoryState(state, "veteran_sword", 1, "debug").state;
+
+    const sale = sellMerchantItem(state, MERCHANT_ID, 0, 1);
+
+    expect(sale.result).toMatchObject({
+      status: "success",
+      itemId: "veteran_sword",
+      soldQuantity: 1,
+      unitPriceCrowns: 180,
+      totalPriceCrowns: 180,
+      newCrowns: 180,
+    });
+    expect(countInventoryItem(sale.state.inventory, "veteran_sword")).toBe(0);
+  });
+
+  it("rejects locked slots, ineligible materials, and invalid quantities without mutation", () => {
+    let state = createMerchantState();
+    state = addItemToInventoryState(state, "slime_gel_t1", 4, "debug").state;
+    state = addItemToInventoryState(state, "wood", 4, "debug").state;
+    const unlockedState = state;
+    state = {
+      ...state,
+      inventory: toggleInventorySlotLock(state.inventory, 0),
+    };
+
+    const lockedSale = sellMerchantItem(state, MERCHANT_ID, 0, 1);
+    const ineligibleSale = sellMerchantItem(state, MERCHANT_ID, 1, 1);
+    const oversizedSale = sellMerchantItem(unlockedState, MERCHANT_ID, 0, 5);
+
+    expect(lockedSale.result).toMatchObject({
+      status: "failed",
+      reason: "slot_locked",
+    });
+    expect(ineligibleSale.result).toMatchObject({
+      status: "failed",
+      reason: "item_not_sellable",
+    });
+    expect(oversizedSale.result).toMatchObject({
+      status: "failed",
+      reason: "invalid_quantity",
+    });
+    expect(lockedSale.state.inventory).toEqual(state.inventory);
+    expect(ineligibleSale.state.inventory).toEqual(state.inventory);
+    expect(lockedSale.state.wallet).toEqual(state.wallet);
+    expect(ineligibleSale.state.wallet).toEqual(state.wallet);
+    expect(oversizedSale.state.inventory).toEqual(unlockedState.inventory);
+    expect(oversizedSale.state.wallet).toEqual(unlockedState.wallet);
+  });
+
+  it("records sale telemetry while debug recording is active", () => {
+    let state = startDebugTelemetryRecording(createMerchantState());
+    state = addItemToInventoryState(state, "slime_core_t1", 2, "debug").state;
+
+    const sale = sellMerchantItem(state, MERCHANT_ID, 0, 2);
+
+    expect(sale.state.debugTelemetry?.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "merchant_sell_attempt",
+        "merchant_sell_item_removed",
+        "merchant_sell_currency_added",
+        "merchant_sell_completed",
+      ]),
+    );
+    expect(sale.state.debugTelemetry?.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "merchant_sell_completed",
+          entityId: MERCHANT_ID,
+          itemId: "slime_core_t1",
+          requestedQuantity: 2,
+          removedQuantity: 2,
+          currencyAmount: 8,
+          previousCurrencyBalance: 0,
+          nextCurrencyBalance: 8,
+        }),
+      ]),
+    );
+  });
+});
+
+describe("merchant First Aid tutorial gate", () => {
+  it("pins First Aid, blocks other purchases, and leaves selling available", () => {
+    let state = createMerchantTutorialState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 500).state;
+    state = addItemToInventoryState(state, "slime_gel_t1", 2, "debug").state;
+
+    expect(isMerchantFirstAidPurchaseRequired(state)).toBe(true);
+    expect(getMerchantBuyStock(state, MERCHANT_ID)[0]?.itemId).toBe(
+      "first_aid_skill_book",
+    );
+    expect(
+      buyMerchantItem(state, MERCHANT_ID, "minor_recovery_flask").result,
+    ).toMatchObject({ status: "failed", reason: "first_aid_purchase_required" });
+    expect(
+      buyMerchantFarmSeed(
+        state,
+        MERCHANT_ID,
+        FARM_POTATO_CROP_ID,
+        1000,
+      ).result,
+    ).toMatchObject({ status: "failed", reason: "first_aid_purchase_required" });
+    expect(
+      buyMerchantLivestockCreature(
+        state,
+        MERCHANT_ID,
+        LIVESTOCK_DUSKHEN_CREATURE_ID,
+        1000,
+      ).result,
+    ).toMatchObject({ status: "failed", reason: "first_aid_purchase_required" });
+
+    const saleEntry = getMerchantSellEntries(state, MERCHANT_ID)[0];
+    const sale = sellMerchantItem(state, MERCHANT_ID, saleEntry.slotIndex, 2);
+
+    expect(sale.result).toMatchObject({
+      status: "success",
+      itemId: "slime_gel_t1",
+      totalPriceCrowns: 2,
+    });
+  });
+
+  it("unlocks the remaining stock immediately after First Aid is purchased", () => {
+    let state = createMerchantTutorialState();
+    state = setCurrencyBalanceForDebug(state, "crowns", 100).state;
+
+    const firstAidPurchase = buyMerchantItem(
+      state,
+      MERCHANT_ID,
+      "first_aid_skill_book",
+    );
+
+    expect(firstAidPurchase.result.status).toBe("success");
+    expect(isMerchantFirstAidPurchaseRequired(firstAidPurchase.state)).toBe(false);
+    expect(
+      buyMerchantItem(
+        firstAidPurchase.state,
+        MERCHANT_ID,
+        "minor_recovery_flask",
+      ).result.status,
+    ).toBe("success");
   });
 });
 

@@ -40,7 +40,7 @@ For technical architecture, refer to GTD.md
 - Keep React UI and UI-only rendering code under `client/src/` and keep simulation rules, state changes, and game systems under `client/src/game/`.
 - Keep renderer-specific code with the existing renderer files and keep reusable game logic independent from React, PixiJS, and asset dimensions.
 - Keep repository tooling, tests, configuration, and documentation with the existing files of the same type.
-- Do not create generic dumping folders such as `misc`, `temp`, `new`, `final`, or ticket-number folders.
+- Do not create generic dumping folders such as `misc`, `temp`, `new`, `final`, or issue-number folders.
 - Do not duplicate a file into multiple project folders to avoid choosing an owner.
 - Generated output, review sheets, source art, alternates, rejected variants, and retired files must not remain in the runtime project unless they are directly required to build, test, or run the game.
 
@@ -48,8 +48,8 @@ For technical architecture, refer to GTD.md
 
 - `client/public/assets/` contains only assets required by the current game at build time or runtime.
 - Place runtime assets in the nearest existing semantic folder for their owner and purpose. Create a new semantic folder only when no current folder fits.
-- New asset directory names must use lowercase kebab-case. Do not mass-rename legacy paths without a dedicated ticket.
-- Do not create ticket-number folders under `client/public/assets/`.
+- New asset directory names must use lowercase kebab-case. Do not mass-rename legacy paths without a dedicated GitHub Issue.
+- Do not create issue-number folders under `client/public/assets/`.
 - Asset references must match Git-tracked path casing exactly and must follow the project's base-path-aware URL convention rather than assuming deployment at a domain root.
 - A case-only rename on a case-insensitive filesystem is not complete until Git records the old path removal and the new path addition.
 
@@ -118,7 +118,7 @@ Use precise party behavior terminology:
 - `gathering` means the current action/state of collecting a resource.
 - `collector` means any companion currently gathering or assigned to gather a resource whose role is not Gatherer.
 
-When describing behavior, bugs, plans, tickets, tests, or code comments:
+When describing behavior, bugs, plans, issues, tests, or code comments:
 
 - Do not call a non-Gatherer-role companion a Gatherer just because they are gathering.
 - Say `collector` for non-Gatherer-role companions gathering resources.
@@ -160,28 +160,28 @@ Debugging / Fixing:
 ### Permanent Branches
 
 - This repository has exactly two permanent branches:
-  - `main` is the integration branch for reviewed development work and the base for normal ticket branches.
+  - `main` is the integration branch for reviewed development work and the base for normal issue branches.
   - `live` is the production branch and must represent the exact version intended to be publicly playable.
 - Only `live` may trigger the production GitHub Pages deployment.
 - Work on `main` or any temporary branch must not change the public game until an approved release is merged into `live`.
-- Do not implement ticket changes directly on `main` or `live`.
+- Do not implement issue changes directly on `main` or `live`.
 - Protect `main` and `live` from force pushes and deletion. Require their configured checks and pull-request workflow when repository settings support it.
 - A second-account approval must not be required while the repository has only one active maintainer. Manual review and explicit user authorization are still required.
 
-### Ticket Branches
+### Issue Branches
 
-- Create a temporary branch for each approved leaf implementation ticket.
-- Start normal ticket branches from the latest `main`.
-- Codex-created branches must use `codex/ticket-####-short-description`, using the ticket number assigned by the issue workflow.
-- Keep each branch scoped to its ticket so it can be reviewed and reverted independently.
-- Merge a completed ticket branch into `main` through a pull request only after ticket verification, Manual Review, and explicit user authorization for the pull request and merge.
+- Create a temporary branch for each approved leaf implementation issue.
+- Start normal issue branches from the latest `main`.
+- Codex-created branches must use `codex/issue-<issue-number>-short-description`, using the GitHub Issue number.
+- Keep each branch scoped to its issue so it can be reviewed and reverted independently.
+- Merge a completed issue branch into `main` through a pull request only after issue verification, Manual Review, and explicit user authorization for the pull request and merge.
 - Delete temporary branches only after their work is safely integrated and the user explicitly authorizes deletion.
 
 ### Releases
 
 - Promote a release with a pull request from `main` into `live`.
 - A release must pass the configured build and deployment checks and receive explicit user authorization before merge.
-- Deploy the public site from the merged `live` commit only. Do not deploy pull-request heads, ticket branches, or `main` to the production GitHub Pages site.
+- Deploy the public site from the merged `live` commit only. Do not deploy pull-request heads, issue branches, or `main` to the production GitHub Pages site.
 - Record the deployed commit in the release summary so the public version is traceable.
 - Roll back production by reverting the responsible release commit or promoting a known-good commit through the reviewed release workflow. Do not rewrite `live` history.
 
@@ -274,18 +274,18 @@ If no existing text should be removed, Codex must say where to insert the new te
 This rule does not override protected documentation approval rules. Codex still must not directly edit AGENTS.md, GDD.md, or GTD.md without explicit approval naming the exact protected document.
 ---
 
-## Ticket Workflow Rules
+## Issue Workflow Rules
 
 Before making any code, asset, or documentation changes:
 
-- A GitHub Issue ticket must exist first.
-- No implementation work may begin without a ticket.
-- Tickets must be created from an implementation plan.
+- A GitHub Issue must exist first.
+- No implementation work may begin without an issue.
+- Implementation issues must be created from an implementation plan.
 - Brainstorming, design exploration, research, recommendations, and searches do not authorize code changes.
-- If the user asks for ideas, designs, plans, recommendations, or searches, do not implement changes unless they explicitly approve a ticket and request implementation.
-- If no ticket exists, stop before editing and ask to create one.
+- If the user asks for ideas, designs, plans, recommendations, or searches, do not implement changes unless they explicitly approve an issue and request implementation.
+- If no issue exists, stop before editing and ask to create one.
 
-Each ticket should include:
+Each implementation issue should include:
 
 - What will happen
 - What will change
@@ -299,84 +299,67 @@ Each ticket should include:
 
 When implementation begins:
 
-- Reference the ticket number in the work summary.
-- Keep changes scoped to the ticket.
-- Do not expand into future systems unless the ticket explicitly includes them.
-- Update or close the ticket when the work is complete.
-Ticket titles must use the format:
+- Reference the GitHub Issue number in the work summary, such as `Issue #641`.
+- Keep changes scoped to the issue.
+- Do not expand into future systems unless the issue explicitly includes them.
+- Update or close the issue when the work is complete.
 
-- [Ticket 0001]: Short descriptive title
-- [Ticket 0002]: Short descriptive title
+Issue titles should be short, descriptive, and must not repeat the GitHub Issue number.
 
-Future idea cards may use normal descriptive titles while they are in Dragons Vault or Todo.
-When a future idea is promoted into Design Stage or Implementation scope, rename it to the next ticket number before implementation work begins.
+Future idea issues may use normal descriptive titles while they are in Dragons Vault or Todo. Promotion into Design Stage or implementation scope does not require a title prefix or a second identifier.
 
-## Ticket Number Validation Rule
+## GitHub Issue Identification Rule
 
-Before any implementation work begins, verify that the active GitHub Issue title starts with the standard ticket format:
-
-- [Ticket 0001]: Short descriptive title
-
-If the active issue does not already have a ticket number:
-
-1. Search all GitHub Issues in this repository for titles matching `[Ticket 000N]:`.
-2. Extract all existing ticket numbers.
-3. Find the highest existing ticket number.
-4. Assign the active issue the next available number:
-   - highest existing number + 1
-5. Rename the active issue to:
-   - `[Ticket 000N]: Short descriptive title`
-6. Before renaming, search again and confirm no other issue already uses that ticket number.
-7. If a duplicate ticket number is found, do not proceed until the duplicate is resolved.
-
-Ticket numbers must be unique across all GitHub Issues, regardless of whether the issue is open or closed.
-
-Do not guess the next ticket number from GitHub issue numbers. GitHub issue numbers and ticket numbers are separate.
+- The GitHub Issue number assigned by GitHub is the only canonical work identifier.
+- Refer to work as `Issue #<number>` in plans, summaries, branches, commits, pull requests, and related documentation.
+- Do not create, assign, validate, or maintain a separate work-number sequence.
+- Before implementation, verify the target GitHub Issue number and URL.
+- Existing historical titles, branches, commits, and references do not need retroactive renaming.
 
 ## Issue Hierarchy / Epic Workflow Rules
 
-Large systems should be organized as an issue hierarchy instead of one giant implementation ticket.
+Large systems should be organized as an issue hierarchy instead of one giant implementation issue.
 
 Issue hierarchy terms:
 
 - Parent epic: a tracking/planning issue for a whole feature set.
 - Child epic: a tracking/planning issue for one major area of the parent feature.
-- Leaf implementation ticket: an executable ticket with a narrow implementation scope.
-- Future placeholder ticket: a staged future idea that should not be implemented until dependencies are complete and the user approves execution.
+- Leaf implementation issue: an executable issue with a narrow implementation scope.
+- Future placeholder issue: a staged future idea that should not be implemented until dependencies are complete and the user approves execution.
 
 Parent epics and child epics:
 
 - Must not be executed directly unless the user explicitly asks to update planning/status only.
 - Must include `Parent` and/or `Children` sections where applicable.
-- Should summarize scope, goals, child tickets, dependencies, and out-of-scope items.
+- Should summarize scope, goals, child issues, dependencies, and out-of-scope items.
 - Should stay on the project board while child work is active.
-- Should not receive a documentation companion ticket unless they directly require documentation work.
+- Should not receive a documentation companion issue unless they directly require documentation work.
 
-Leaf implementation tickets:
+Leaf implementation issues:
 
 - Must include `Parent` when part of an epic hierarchy.
-- Must include `Depends On` when another ticket must be completed first.
+- Must include `Depends On` when another issue must be completed first.
 - Must include specific implementation scope, out-of-scope items, and verification plan.
 - Must be independently reviewable and reversible.
 - Are the only issue type Codex should execute by default.
 
-Before executing a ticket in an issue hierarchy:
+Before executing an issue in an issue hierarchy:
 
-- Verify the target issue is a leaf implementation ticket.
+- Verify the target issue is a leaf implementation issue.
 - Check all `Depends On` issues.
-- Stop and report blocked dependencies if required prerequisite tickets are not complete or explicitly approved to proceed.
-- Keep changes scoped to the leaf ticket even if the parent epic describes broader behavior.
+- Stop and report blocked dependencies if required prerequisite issues are not complete or explicitly approved to proceed.
+- Keep changes scoped to the leaf issue even if the parent epic describes broader behavior.
 
 For large feature requests:
 
-- If the request touches multiple systems, Codex must propose a parent/child issue tree before creating implementation tickets.
+- If the request touches multiple systems, Codex must propose a parent/child issue tree before creating implementation issues.
 - Shared foundation work should be split from feature-specific work.
-- MVP tickets should be separated from upgrade, cleanup, expansion, and future-depth tickets.
-- Future placeholder tickets should remain in Todo or Dragons Vault until promoted.
+- MVP issues should be separated from upgrade, cleanup, expansion, and future-depth issues.
+- Future placeholder issues should remain in Todo or Dragons Vault until promoted.
 
 ## Plan Review Gate
 
-After an initial implementation plan is created, Codex must automatically act as a reviewer before creating the implementation ticket.
+After an initial implementation plan is created, Codex must automatically act as a reviewer before creating the implementation issue.
 
 The review must inspect the plan for:
 
@@ -414,51 +397,48 @@ The Plan Review Gate output must include:
 - Required Plan Changes
 - Final Reviewed Plan
 
-If the review finds conflicts with GDD.md or GTD.md, Codex must stop and ask for confirmation before creating the ticket.
+If the review finds conflicts with GDD.md or GTD.md, Codex must stop and ask for confirmation before creating the issue.
 
-Only after the Final Reviewed Plan exists may Codex create the implementation ticket.
+Only after the Final Reviewed Plan exists may Codex create the implementation issue.
 
 ## Execution Plan Workflow
 
 When the user asks for an execution plan:
 
 - Create a clear initial implementation plan first.
-- Before creating any GitHub Issue ticket, run the Plan Review Gate.
+- Before creating any implementation issue, run the Plan Review Gate.
 - Revise the implementation plan based on the Plan Review Gate findings.
-- For small scoped work, create one leaf implementation ticket from the reviewed implementation plan.
-- For large multi-system work, create a parent epic, child epics when useful, and focused leaf implementation tickets from the reviewed implementation plan.
-- Use the next available ticket number in this title format:
-  - [Ticket 0001]: Short descriptive title
+- For small scoped work, create one leaf implementation issue from the reviewed implementation plan.
+- For large multi-system work, create a parent epic, child epics when useful, and focused leaf implementation issues from the reviewed implementation plan.
 - Add the implementation issue to the GitHub Project board.
 - Move the implementation issue to Design Stage unless the user says otherwise.
-- Apply an appropriate non-documentation label to the implementation ticket based on scope, such as feature, bug, enhancement, or New System.
+- Apply an appropriate non-documentation label to the implementation issue based on scope, such as feature, bug, enhancement, or New System.
 
-When the user later asks to execute an approved ticket or plan:
+When the user later asks to execute an approved issue or plan:
 
 - Move the GitHub Project item to In Progress before implementation begins.
-- Keep implementation scoped to the ticket.
-- Reference the ticket number in the work summary.
-- Run the verification plan from the ticket.
+- Keep implementation scoped to the issue.
+- Reference the GitHub Issue number in the work summary.
+- Run the verification plan from the issue.
 - After implementation and verification are complete, move the GitHub Project item to Manual Review.
 - After implementation and verification are complete, apply the `Completed` label to the GitHub Issue.
 - Completion notes should list the main files changed, verification performed, and confirm the `Completed` label was applied to the GitHub Issue.
-- Do not move the ticket to Done unless the user explicitly approves completion after review.
-- Before implementation, verify the active issue title already starts with [Ticket 000N]:.
-- If it does not, automatically promote/rename the issue using the Ticket Number Validation Rule before editing code.
-- If the active issue is a parent epic or child epic, do not implement code from it directly. Ask which leaf implementation ticket should be executed, or summarize the next unblocked leaf tickets.
-- If the active issue has a `Depends On` section, verify those dependencies before moving the ticket to In Progress.
+- Do not move the issue to Done unless the user explicitly approves completion after review.
+- Before implementation, verify the active GitHub Issue number and URL.
+- If the active issue is a parent epic or child epic, do not implement code from it directly. Ask which leaf implementation issue should be executed, or summarize the next unblocked leaf issues.
+- If the active issue has a `Depends On` section, verify those dependencies before moving the issue to In Progress.
 
 
 ## Rollback / Traceability Rules
 
-For each implementation ticket:
+For each implementation issue:
 
-- Keep changes scoped so the ticket can be reviewed or reverted independently.
-- Mention the ticket number in the commit message only when the user has explicitly authorized a commit.
-- Avoid mixing unrelated tickets in the same commit.
-- If multiple tickets are implemented together, explain why in the ticket and commit message.
+- Keep changes scoped so the issue can be reviewed or reverted independently.
+- Mention the GitHub Issue number in the commit message only when the user has explicitly authorized a commit.
+- Avoid mixing unrelated issues in the same commit.
+- If multiple issues are implemented together, explain why in the issues and commit message.
 - Completion notes should list the main files changed and any verification performed.
-- If rollback is needed, prefer reverting the commit associated with the ticket instead of manually undoing unrelated code.
+- If rollback is needed, prefer reverting the commit associated with the issue instead of manually undoing unrelated code.
 
 ## Explicit Git Authorization Required
 
@@ -499,11 +479,11 @@ If the user has not explicitly authorized the specific git action:
 When Codex handles git workflow:
 
 - Review `git status` before staging.
-- Stage only files that belong to the active ticket.
+- Stage only files that belong to the active issue.
 - Do not stage, commit, revert, or discard unrelated user changes.
-- Use commit messages that reference the active ticket number.
+- Use commit messages that reference the active GitHub Issue number.
 - Push the branch and create a pull request when the user has asked Codex to handle the full git workflow for that task.
-- Keep GitHub Issue and Project status updates aligned with the ticket workflow rules.
+- Keep GitHub Issue and Project status updates aligned with the issue workflow rules.
 - Always tell the user when commits, merges, or pull requests are created or performed.
 - For every commit, merge, or pull request, report the exact summary/title used and the description/body used. If there was no description/body, say that explicitly.
 
@@ -511,19 +491,19 @@ Explicit git authorization does not bypass issue creation, protected documentati
 
 ## Explicit Quick Fix Exception
 
-Codex may skip GitHub Issue ticket creation only when the user explicitly labels the request as a quick fix and explicitly says to ignore or skip issue creation.
+Codex may skip GitHub Issue creation only when the user explicitly labels the request as a quick fix and explicitly says to ignore or skip issue creation.
 
 Acceptable user wording includes phrases like:
 
 - "Quick fix: rename typo from X to Y, ignore issue creation"
-- "Small fix, skip ticket"
+- "Small fix, skip issue"
 - "No issue needed, just fix this typo"
-- "Quick fix only, do not create a ticket"
+- "Quick fix only, do not create an issue"
 
-If the user says something broad such as "let's do this", "go ahead", "implement this", or "fix this" without explicitly saying to skip issue/ticket creation, Codex must follow the normal ticket workflow before making changes.
+If the user says something broad such as "let's do this", "go ahead", "implement this", or "fix this" without explicitly saying to skip issue creation, Codex must follow the normal issue workflow before making changes.
 
 Quick fixes must remain narrowly scoped and low-risk. They may include typos, obvious naming mistakes, formatting, comments, lint-only fixes, or minor UI text corrections.
 
 Quick fixes must not include gameplay behavior changes, design decisions, balance changes, architecture changes, map/content changes, protected documentation edits, persistence/backend changes, or anything requiring GDD/GTD alignment.
 
-If a requested quick fix appears to involve design or behavior, Codex must stop and ask whether to create a normal implementation ticket instead.
+If a requested quick fix appears to involve design or behavior, Codex must stop and ask whether to create a normal implementation issue instead.
