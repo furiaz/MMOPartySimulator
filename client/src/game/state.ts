@@ -180,6 +180,7 @@ export type GameState = {
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;
   highestCharacterLevelEver?: number;
+  partySizeGrowthGuideViewed?: boolean;
   guildRecruit?: GuildRecruitState;
   guildUpgrades?: GuildUpgradesState;
   guildNoticeBoard?: GuildNoticeBoardState;

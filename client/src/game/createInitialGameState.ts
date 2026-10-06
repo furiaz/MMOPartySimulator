@@ -75,6 +75,7 @@ export function createInitialGameState(): GameState {
       leader.characterLevel,
       secondCompanion.characterLevel,
     ),
+    partySizeGrowthGuideViewed: false,
     guildRecruit: createInitialGuildRecruitState(),
     guildUpgrades: createInitialGuildUpgradesState(),
     guildNoticeBoard: createInitialGuildNoticeBoardState(),

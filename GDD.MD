@@ -1065,7 +1065,7 @@ Initial prototype party:
 - the party currently starts in Harbor Union Bastion
 - the shared inventory currently starts with one Training Sword as prototype/debug setup
 
-Party size may increase through total party level progression.
+Party size may increase through progression of the highest companion level ever reached.
 
 The player can issue:
 
@@ -1765,14 +1765,14 @@ Do not implement final balance curves, respec systems, advanced formulas, second
 
 ## Party Size Progression
 
-Party size is tied to total party character level.
+Party size is tied to the highest companion level ever reached.
 
 Current party size progression:
 
-- Total party level below 10: 2 party members
-- Total party level 10 or higher: 3 party members
-- Total party level 30 or higher: 4 party members
-- Total party level 60 or higher: 5 party members
+- Highest companion level below 10: 2 party members
+- Highest companion level 10 or higher: 3 party members
+- Highest companion level 30 or higher: 4 party members
+- Highest companion level 60 or higher: 5 party members
 
 Party size progression should support the feeling of building an expedition over time.
 

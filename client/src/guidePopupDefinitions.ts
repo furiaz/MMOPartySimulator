@@ -16,6 +16,7 @@ export type GuidePopupId =
   | "first_route_unlocked"
   | "first_class_path"
   | "first_class_selected"
+  | "first_party_size_growth"
   | "first_wipe_rescue";
 
 export type GuidePopupMenuTarget = {
@@ -210,6 +211,16 @@ export const guidePopupDefinitions: Record<GuidePopupId, GuidePopupDefinition> =
       {
         title: "First Class Chosen",
         body: "Classes unlock new skills, stats, and equipment direction. Roles still decide how companions behave.",
+      },
+    ],
+  },
+  first_party_size_growth: {
+    id: "first_party_size_growth",
+    ariaLabel: "Party size growth guide",
+    panels: [
+      {
+        title: "Active Party Expanded",
+        body: "Your active party can now hold 3 companions. Visit the Guild & Inn to recruit someone for the new slot.",
       },
     ],
   },
