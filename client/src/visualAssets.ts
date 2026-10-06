@@ -77,6 +77,7 @@ const slimewardEnemyPath = `${PUBLIC_ASSET_ROOT}/world/dungeons/slimeward/enemie
 const azureMassAssetPath = `${PUBLIC_ASSET_ROOT}/entities/enemies/bosses/azure-mass`;
 const classPlaceholderNpcPath = `${PUBLIC_ASSET_ROOT}/entities/npcs/class-placeholders`;
 const classPortraitBasePath = `${PUBLIC_ASSET_ROOT}/ui/portraits/classes`;
+const classSpritePortraitBasePath = `${PUBLIC_ASSET_ROOT}/ui/portraits/class-sprites`;
 const defaultFrameDurationMs = 100;
 const companionCharacterNaturalSize = {
   width: 172,
@@ -400,6 +401,22 @@ export const CLASS_PORTRAIT_SRC: Record<ClassId, string> = {
   lightbearer: `${classPortraitBasePath}/lightbearer.png`,
   penitent: `${classPortraitBasePath}/penitent.png`,
 };
+
+const CLASS_UI_PORTRAIT_SRC: Record<ClassId, string> = {
+  beginner: `${classSpritePortraitBasePath}/beginner.png`,
+  blade: `${classSpritePortraitBasePath}/blade.png`,
+  aegis: `${classSpritePortraitBasePath}/aegis.png`,
+  hunter: `${classSpritePortraitBasePath}/hunter.png`,
+  beast: `${classSpritePortraitBasePath}/beast.png`,
+  elementalist: `${classSpritePortraitBasePath}/elementalist.png`,
+  runecaster: `${classSpritePortraitBasePath}/runecaster.png`,
+  lightbearer: `${classSpritePortraitBasePath}/lightbearer.png`,
+  penitent: `${classSpritePortraitBasePath}/penitent.png`,
+};
+
+export function getClassUiPortraitSrc(classId: ClassId): string {
+  return CLASS_UI_PORTRAIT_SRC[classId];
+}
 
 const testCharacterVisualAsset = {
   kind: "sprite",
