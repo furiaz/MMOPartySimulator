@@ -248,9 +248,19 @@ describe("enemy attack leash movement", () => {
     });
   });
 
-  it("lets Hunter basic attacks launch projectiles from ranged distance", () => {
+  it("keeps Hunter ranged projectiles while holding a Training Sword", () => {
+    const attackingHunter = createAttackingCompanion(
+      "leader",
+      { x: 4, y: 0 },
+      0,
+      "hunter",
+    );
     const companion = {
-      ...createAttackingCompanion("leader", { x: 4, y: 0 }, 0, "hunter"),
+      ...attackingHunter,
+      equipment: {
+        ...attackingHunter.equipment,
+        mainHand: "training_sword" as const,
+      },
       lastAttackAt: -2000,
     };
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, undefined, {
@@ -266,6 +276,7 @@ describe("enemy attack leash movement", () => {
     const nextEnemy = nextState.entities[enemy.id] as Enemy;
 
     expect(nextEnemy.health).toBe(enemy.health);
+    expect(getCompanionAttackRange(companion)).toBe(HUNTER_BASIC_ATTACK_RANGE);
     expect(nextState.combatProjectiles).toHaveLength(1);
     expect(nextState.combatProjectiles?.[0]).toMatchObject({
       sourceId: companion.id,

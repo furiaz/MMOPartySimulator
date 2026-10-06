@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { FIRST_CLASS_IDS } from "./classes";
 import { createCompanion } from "./entities";
 import { createEmptyPartyInventory, addItemToInventoryState } from "./inventory";
 import {
   equipItemToCompanion,
   unequipItemFromCompanion,
 } from "./equipmentSystem";
+import { getAllowedEquipmentTypeLabels } from "./equipmentRules";
 import { createTestGameState } from "./testState";
 import type { GameState } from "./state";
 import type { ClassId, Companion, ItemId } from "./types";
@@ -55,6 +57,56 @@ describe("prototype equipment system", () => {
     expect(result.status).toBe("success");
     expect(nextCompanion.equipment.mainHand).toBe("iron_sword");
     expect(nextState.inventory.slots).toEqual([]);
+  });
+
+  it("equips both Training Sword variants on every current class", () => {
+    const classIds: ClassId[] = ["beginner", ...FIRST_CLASS_IDS];
+    const itemIds = ["training_sword", "copper_training_sword"] as const;
+
+    for (const classId of classIds) {
+      for (const itemId of itemIds) {
+        const { state, companion } = createStateWithCompanion(classId, [itemId]);
+        const result = equipItemToCompanion(
+          state,
+          companion.id,
+          itemId,
+          "mainHand",
+        );
+
+        expect(result.result.status).toBe("success");
+        expect(
+          (result.state.entities[companion.id] as Companion).equipment.mainHand,
+        ).toBe(itemId);
+      }
+    }
+  });
+
+  it("reports the universal Training Sword type once for every class", () => {
+    const classIds: ClassId[] = ["beginner", ...FIRST_CLASS_IDS];
+
+    for (const classId of classIds) {
+      const labels = getAllowedEquipmentTypeLabels(classId);
+
+      expect(labels.mainHand.filter((type) => type === "training_sword")).toHaveLength(
+        1,
+      );
+    }
+  });
+
+  it("keeps specialized main-hand weapons restricted", () => {
+    const { state, companion } = createStateWithCompanion("hunter", ["iron_sword"]);
+
+    const { result } = equipItemToCompanion(
+      state,
+      companion.id,
+      "iron_sword",
+      "mainHand",
+    );
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "invalid_class",
+    });
   });
 
   it("rejects equipment for invalid classes with a clear reason", () => {

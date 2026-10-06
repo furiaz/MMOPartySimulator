@@ -790,6 +790,8 @@ type FirstClassSelectionFailureReason =
 
 First-class selection checks every currently equipped item against the selected first-class equipment profile.
 
+Universal Training Sword-type main-hand weapons are compatible with every current and future class, so `classSelection.ts` retains them through successful first-class selection. Other incompatible equipment continues to block selection.
+
 A companion cannot enter first-class selection if any first-class option would be blocked by currently equipped incompatible gear.
 
 Class selection validation must stay in `classSelection.ts` and must not be duplicated in React UI.
@@ -3082,15 +3084,23 @@ Equipment rules validate:
 Equipment validation helpers are shared game logic and may be used by equipment UI, merchant compatibility filtering, and first-class selection compatibility checks.
 - telemetry results
 
+`equipmentRules.ts` owns the shared universal main-hand compatibility rule. `getAllowedEquipmentTypeLabels` combines universal main-hand types with the selected class profile and removes duplicates. `classSelection.ts` consumes the same compatibility rule instead of duplicating equipment permissions.
+
 Armor and accessories currently ignore class restrictions when level requirements are met.
 
 Equipment remains gameplay-facing data only.
 
 Equipment must not require sprite swaps, weapon anchoring, paper-doll rendering, or visible attachment systems.
 
+Current universal starter/fallback weapon items include:
+
+- Training Sword
+- Copper Training Sword
+
+Both use the `training_sword` equipment type, may be equipped by every current and future class, and remain equipped through first-class selection. They contribute only their existing item stats; class identity continues to determine attacks, attack range, projectiles, and skills.
+
 Current prototype class-restricted weapon and offhand items include:
 
-- Beginner: Training Sword
 - Blade: Iron Sword
 - Aegis: Guard Mace, Wooden Shield
 - Hunter: Short Bow
