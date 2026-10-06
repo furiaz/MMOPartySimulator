@@ -4424,6 +4424,28 @@
   accent-color: #7aa6ad;
 }
 
+.options-equipment-drop-popup-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #3a5a60;
+  background: rgba(26, 42, 47, 0.4);
+  color: #e6f0f2;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.options-equipment-drop-popup-control select {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--main-menu-panel-border);
+  border-radius: 6px;
+  background: rgba(26, 42, 47, 0.58);
+  color: var(--main-menu-panel-text);
+}
+
 .options-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6453,6 +6475,10 @@ button {
 
   .options-mute-control {
     justify-self: start;
+  }
+
+  .options-equipment-drop-popup-control {
+    grid-template-columns: 1fr;
   }
 
   .merchant-interaction {

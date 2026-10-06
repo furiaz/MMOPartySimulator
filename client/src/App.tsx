@@ -123,6 +123,7 @@ import {
   getCompanionDerivedStatsWithPartyBuffs,
   getEnemyArchetype,
   getEnemyType,
+  getEquipmentDropPopupThreshold,
   getDebugEnemySummonGroups,
   getDefaultDebugSummonEnemyTypeId,
   getFilteredMerchantBuyStock,
@@ -221,6 +222,7 @@ import {
   setAutoModeEnabled,
   setAutoCombatOnArrivalEnabled,
   setBankAutoRoutingMode,
+  setEquipmentDropPopupThreshold,
   setPartyLeader,
   setCompanionLegacySkillEnabled,
   setPartyMemberRole,
@@ -268,6 +270,7 @@ import {
   type EnemyAoeChannelState,
   type EnemyTypeId,
   type EquipmentSlot,
+  type EquipmentDropPopupThreshold,
   type EquipmentStatModifiers,
   type FirstClassId,
   type FirstClassSelectionResult,
@@ -4107,6 +4110,14 @@ function App() {
     });
   }
 
+  function changeEquipmentDropPopupThreshold(
+    threshold: EquipmentDropPopupThreshold,
+  ) {
+    setGameState((state) =>
+      setEquipmentDropPopupThreshold(state, threshold),
+    );
+  }
+
   function exportSave() {
     const now = Date.now();
     const save = createSavedGame(latestGameStateRef.current, now);
@@ -7279,6 +7290,9 @@ function App() {
               backgroundMusicVolumePercent={
                 backgroundMusicPreferences.volumePercent
               }
+              equipmentDropPopupThreshold={getEquipmentDropPopupThreshold(
+                gameState,
+              )}
               skillBookReadMessage={inventoryResultMessage}
               worldTravelTargetMapId={gameState.worldTravelTargetMapId}
               selectedCompanionId={selectedMenuCompanionId}
@@ -7364,6 +7378,9 @@ function App() {
               onMovePartyOrder={movePartyMemberOrder}
               onChangeBackgroundMusicMuted={changeBackgroundMusicMuted}
               onChangeBackgroundMusicVolume={changeBackgroundMusicVolume}
+              onChangeEquipmentDropPopupThreshold={
+                changeEquipmentDropPopupThreshold
+              }
               saveStatusMessage={saveStatusMessage}
               onExportSave={exportSave}
               onImportSaveFile={importSaveFile}

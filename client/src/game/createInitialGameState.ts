@@ -155,6 +155,7 @@ export function createInitialGameState(): GameState {
     dropVisualEvents: [],
     pendingOfflineFarmingLoot: null,
     newsBroadcasts: [],
+    equipmentDropPopupThreshold: "common",
     lastCompanionDamageTakenAtByCompanionId: {},
   });
 

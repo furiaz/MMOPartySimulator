@@ -27,6 +27,7 @@ import type {
   PartyWallet,
   PartyMemberRole,
   EquipmentSlot,
+  EquipmentDropPopupThreshold,
   ItemId,
   QuestId,
   DebugMapId,
@@ -67,6 +68,7 @@ export function GameMenu({
   currentMapId,
   backgroundMusicMuted,
   backgroundMusicVolumePercent,
+  equipmentDropPopupThreshold,
   skillBookReadMessage,
   worldTravelTargetMapId,
   selectedCompanionId,
@@ -138,6 +140,7 @@ export function GameMenu({
   onMovePartyOrder,
   onChangeBackgroundMusicMuted,
   onChangeBackgroundMusicVolume,
+  onChangeEquipmentDropPopupThreshold,
   saveStatusMessage,
   onExportSave,
   onImportSaveFile,
@@ -157,6 +160,7 @@ export function GameMenu({
   currentMapId?: DebugMapId;
   backgroundMusicMuted: boolean;
   backgroundMusicVolumePercent: number;
+  equipmentDropPopupThreshold: EquipmentDropPopupThreshold;
   skillBookReadMessage?: string | null;
   worldTravelTargetMapId: DebugMapId | null;
   selectedCompanionId: string | null;
@@ -275,6 +279,9 @@ export function GameMenu({
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
   onChangeBackgroundMusicMuted: (muted: boolean) => void;
   onChangeBackgroundMusicVolume: (volumePercent: number) => void;
+  onChangeEquipmentDropPopupThreshold: (
+    threshold: EquipmentDropPopupThreshold,
+  ) => void;
   saveStatusMessage: string | null;
   onExportSave: () => void;
   onImportSaveFile: (file: File) => void | Promise<void>;
@@ -454,9 +461,13 @@ export function GameMenu({
                 <OptionsPanel
                   backgroundMusicMuted={backgroundMusicMuted}
                   backgroundMusicVolumePercent={backgroundMusicVolumePercent}
+                  equipmentDropPopupThreshold={equipmentDropPopupThreshold}
                   saveStatusMessage={saveStatusMessage}
                   onChangeBackgroundMusicMuted={onChangeBackgroundMusicMuted}
                   onChangeBackgroundMusicVolume={onChangeBackgroundMusicVolume}
+                  onChangeEquipmentDropPopupThreshold={
+                    onChangeEquipmentDropPopupThreshold
+                  }
                   onExportSave={onExportSave}
                   onImportSaveFile={onImportSaveFile}
                   onManualSave={onManualSave}
@@ -979,18 +990,24 @@ function formatDecimal(value: number): string {
 function OptionsPanel({
   backgroundMusicMuted,
   backgroundMusicVolumePercent,
+  equipmentDropPopupThreshold,
   saveStatusMessage,
   onChangeBackgroundMusicMuted,
   onChangeBackgroundMusicVolume,
+  onChangeEquipmentDropPopupThreshold,
   onExportSave,
   onImportSaveFile,
   onManualSave,
 }: {
   backgroundMusicMuted: boolean;
   backgroundMusicVolumePercent: number;
+  equipmentDropPopupThreshold: EquipmentDropPopupThreshold;
   saveStatusMessage: string | null;
   onChangeBackgroundMusicMuted: (muted: boolean) => void;
   onChangeBackgroundMusicVolume: (volumePercent: number) => void;
+  onChangeEquipmentDropPopupThreshold: (
+    threshold: EquipmentDropPopupThreshold,
+  ) => void;
   onExportSave: () => void;
   onImportSaveFile: (file: File) => void | Promise<void>;
   onManualSave: () => void;
@@ -1023,6 +1040,24 @@ function OptionsPanel({
           Mute
         </label>
       </div>
+      <label className="options-equipment-drop-popup-control">
+        <span>Equipment Drop Popups</span>
+        <select
+          onChange={(event) =>
+            onChangeEquipmentDropPopupThreshold(
+              event.currentTarget.value as EquipmentDropPopupThreshold,
+            )
+          }
+          value={equipmentDropPopupThreshold}
+        >
+          <option value="common">Common+</option>
+          <option value="uncommon">Uncommon+</option>
+          <option value="rare">Rare+</option>
+          <option value="epic">Epic+</option>
+          <option value="legendary">Legendary</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
       <div className="options-actions">
         <button onClick={onManualSave} type="button">
           Manual Save

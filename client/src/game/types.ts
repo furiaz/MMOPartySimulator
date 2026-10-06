@@ -649,6 +649,8 @@ export type ItemRarity =
   | "epic"
   | "legendary";
 
+export type EquipmentDropPopupThreshold = ItemRarity | "off";
+
 export type ItemDefinition = {
   id: ItemId;
   displayName: string;
