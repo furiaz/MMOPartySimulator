@@ -512,6 +512,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     entities,
     restingCompanionsById,
     highestCharacterLevelEver,
+    partySizeGrowthGuideViewed: state.partySizeGrowthGuideViewed === true,
     guildRecruit,
     guildUpgrades,
     guildNoticeBoard,

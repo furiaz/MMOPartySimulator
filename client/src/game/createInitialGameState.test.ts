@@ -18,6 +18,7 @@ describe("createInitialGameState", () => {
 
     expect(state.currentMapId).toBe(HUB_MAP_ID);
     expect(state.map?.id).toBe(HUB_MAP_ID);
+    expect(state.partySizeGrowthGuideViewed).toBe(false);
     expect(state.partyLeaderId).toBe(leader.id);
     expect(leader).toMatchObject({
       kind: "companion",

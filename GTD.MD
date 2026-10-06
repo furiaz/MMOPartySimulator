@@ -848,12 +848,12 @@ Current level-gap XP modifier:
 - companion level 21-30 above enemy level: 25 percent XP
 - companion level more than 30 above enemy level: 0 percent XP
 
-Current party size limit is based on total party character level:
+Current party size limit is based on the highest companion level ever reached:
 
-- total party level below 10: 2 party members
-- total party level 10 or higher: 3 party members
-- total party level 30 or higher: 4 party members
-- total party level 60 or higher: 5 party members
+- highest companion level below 10: 2 party members
+- highest companion level 10 or higher: 3 party members
+- highest companion level 30 or higher: 4 party members
+- highest companion level 60 or higher: 5 party members
 
 Beginner first-class eligibility is currently:
 

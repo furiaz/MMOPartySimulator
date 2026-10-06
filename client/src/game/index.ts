@@ -724,6 +724,10 @@ export {
   recordHighestCharacterLevelEver,
 } from "./partySystem";
 export {
+  markPartySizeGrowthGuideViewed,
+  shouldQueuePartySizeGrowthGuide,
+} from "./partySizeGuide";
+export {
   COMBAT_APPROACH_DISTANCE,
   FORMATION_COHESION_PATH_DISTANCE,
   ROLE_PRIORITY,

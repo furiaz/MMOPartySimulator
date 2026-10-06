@@ -230,4 +230,23 @@ describe("gameplay shortcuts", () => {
       shouldResumeSimulation: false,
     });
   });
+
+  it("includes the party-size guide when dismissing a queued guide sequence", () => {
+    expect(
+      getGuideSequenceDismissal(
+        "first_class_path",
+        ["first_party_size_growth"],
+        true,
+        true,
+      ),
+    ).toEqual({
+      dismissedGuidePopupIds: [
+        "first_class_path",
+        "first_party_size_growth",
+      ],
+      remainingQueuedGuidePopupIds: [],
+      shouldFinishSequence: true,
+      shouldResumeSimulation: true,
+    });
+  });
 });
