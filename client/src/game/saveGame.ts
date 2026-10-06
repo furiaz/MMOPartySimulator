@@ -20,6 +20,7 @@ import {
 } from "./dropTables";
 import { getEnemyType } from "./enemyArchetypes";
 import { SUPERIOR_ENEMY_CHANCE } from "./enemyVariants";
+import { normalizeEquipmentDropPopupThreshold } from "./equipmentDropPopups";
 import { sanitizeGuildNoticeBoardState } from "./guildNoticeBoard";
 import { addItemToInventoryState } from "./inventory";
 import { sanitizeGuildRecruitState } from "./guildRecruit";
@@ -511,6 +512,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     entities,
     restingCompanionsById,
     highestCharacterLevelEver,
+    partySizeGrowthGuideViewed: state.partySizeGrowthGuideViewed === true,
     guildRecruit,
     guildUpgrades,
     guildNoticeBoard,
@@ -608,6 +610,9 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
       currentMapId,
     ),
     newsBroadcasts: [],
+    equipmentDropPopupThreshold: normalizeEquipmentDropPopupThreshold(
+      state.equipmentDropPopupThreshold,
+    ),
     slimewardDungeon: sanitizeSlimewardDungeon(state.slimewardDungeon),
     resurrectionProgressByCompanionId: {},
     resurrectionChannelsByHelperId: {},

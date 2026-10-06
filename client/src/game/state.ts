@@ -42,6 +42,7 @@ import type {
   Position,
   DropVisualEvent,
   DuelistsMomentumState,
+  EquipmentDropPopupThreshold,
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
   HeadhunterState,
@@ -179,6 +180,7 @@ export type GameState = {
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;
   highestCharacterLevelEver?: number;
+  partySizeGrowthGuideViewed?: boolean;
   guildRecruit?: GuildRecruitState;
   guildUpgrades?: GuildUpgradesState;
   guildNoticeBoard?: GuildNoticeBoardState;
@@ -287,6 +289,7 @@ export type GameState = {
   dropVisualEvents?: DropVisualEvent[];
   pendingOfflineFarmingLoot?: OfflineFarmingPendingLootState | null;
   newsBroadcasts?: NewsBroadcastEvent[];
+  equipmentDropPopupThreshold?: EquipmentDropPopupThreshold;
   autonomousTargetSuppressionsByEnemyId?: Record<string, AutonomousTargetSuppressionState>;
   slimewardDungeon?: SlimewardDungeonRuntimeState;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;

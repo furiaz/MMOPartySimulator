@@ -40,4 +40,17 @@ describe("guide popup definitions", () => {
       },
     ]);
   });
+
+  it("defines the first party-size growth guide", () => {
+    expect(guidePopupDefinitions.first_party_size_growth).toEqual({
+      id: "first_party_size_growth",
+      ariaLabel: "Party size growth guide",
+      panels: [
+        {
+          title: "Active Party Expanded",
+          body: "Your active party can now hold 3 companions. Visit the Guild & Inn to recruit someone for the new slot.",
+        },
+      ],
+    });
+  });
 });

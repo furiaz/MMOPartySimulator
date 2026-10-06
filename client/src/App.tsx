@@ -123,6 +123,7 @@ import {
   getCompanionDerivedStatsWithPartyBuffs,
   getEnemyArchetype,
   getEnemyType,
+  getEquipmentDropPopupThreshold,
   getDebugEnemySummonGroups,
   getDefaultDebugSummonEnemyTypeId,
   getFilteredMerchantBuyStock,
@@ -179,6 +180,7 @@ import {
   isTownServicesUnlocked,
   isFarmCropUnlocked,
   isCompanionHubEligibleForInnKitchen,
+  markPartySizeGrowthGuideViewed,
   collectAllLivestockOutputs,
   feedHungryLivestockNow,
   harvestAllFarmCrops,
@@ -210,6 +212,7 @@ import {
   refreshGuildNoticeBoardState,
   refreshGuildRecruitState,
   shouldShowGuildNoticeBoardSign,
+  shouldQueuePartySizeGrowthGuide,
   takeGuildNoticeBoardQuest,
   cancelGuildNoticeBoardQuest,
   getNavigationClickCellKey,
@@ -221,6 +224,7 @@ import {
   setAutoModeEnabled,
   setAutoCombatOnArrivalEnabled,
   setBankAutoRoutingMode,
+  setEquipmentDropPopupThreshold,
   setPartyLeader,
   setCompanionLegacySkillEnabled,
   setPartyMemberRole,
@@ -268,6 +272,7 @@ import {
   type EnemyAoeChannelState,
   type EnemyTypeId,
   type EquipmentSlot,
+  type EquipmentDropPopupThreshold,
   type EquipmentStatModifiers,
   type FirstClassId,
   type FirstClassSelectionResult,
@@ -4012,6 +4017,7 @@ function App() {
     }
 
     stopSimulationLoop();
+    resetGuidePopupState();
     setOfflineSummary(offlineResult.summary);
     setHasLocalSaveFile(true);
     setSaveStatusMessage("Save loaded.");
@@ -4107,6 +4113,14 @@ function App() {
     });
   }
 
+  function changeEquipmentDropPopupThreshold(
+    threshold: EquipmentDropPopupThreshold,
+  ) {
+    setGameState((state) =>
+      setEquipmentDropPopupThreshold(state, threshold),
+    );
+  }
+
   function exportSave() {
     const now = Date.now();
     const save = createSavedGame(latestGameStateRef.current, now);
@@ -4157,6 +4171,7 @@ function App() {
       }
 
       stopSimulationLoop();
+      resetGuidePopupState();
       setOfflineSummary(null);
       setHasLocalSaveFile(true);
       setSaveStatusMessage("Save imported.");
@@ -4291,6 +4306,15 @@ function App() {
       writeCurrentSave("Quest progress saved", gameState);
     }
   }, [appMode, gameState, queueGuidePopup, writeCurrentSave]);
+
+  useEffect(() => {
+    if (
+      appMode === "playing" &&
+      shouldQueuePartySizeGrowthGuide(gameState)
+    ) {
+      queueGuidePopup("first_party_size_growth");
+    }
+  }, [appMode, gameState, queueGuidePopup]);
 
   useEffect(() => {
     if (!activeMerchantNpcId && !activeQuestGiverNpcId && !activeBankChestNpcId) {
@@ -4662,13 +4686,29 @@ function App() {
       setActiveGameMenuTab(null);
     }
 
+    const didDismissPartySizeGrowthGuide =
+      guideDismissal.dismissedGuidePopupIds.includes(
+        "first_party_size_growth",
+      );
+
+    if (didDismissPartySizeGrowthGuide) {
+      queueSaveAfterStateChange("Party size guide saved");
+    }
+
     if (!guideDismissal.shouldFinishSequence) {
+      if (didDismissPartySizeGrowthGuide) {
+        setGameState(markPartySizeGrowthGuideViewed);
+      }
       return;
     }
 
-    setGameState((state) =>
-      restartNewsBroadcastDisplayDuration(state, Date.now()),
-    );
+    setGameState((state) => {
+      const nextState = didDismissPartySizeGrowthGuide
+        ? markPartySizeGrowthGuideViewed(state)
+        : state;
+
+      return restartNewsBroadcastDisplayDuration(nextState, Date.now());
+    });
 
     isGuideSequenceActiveRef.current = false;
     shouldResumeAfterGuideSequenceRef.current = false;
@@ -7279,6 +7319,9 @@ function App() {
               backgroundMusicVolumePercent={
                 backgroundMusicPreferences.volumePercent
               }
+              equipmentDropPopupThreshold={getEquipmentDropPopupThreshold(
+                gameState,
+              )}
               skillBookReadMessage={inventoryResultMessage}
               worldTravelTargetMapId={gameState.worldTravelTargetMapId}
               selectedCompanionId={selectedMenuCompanionId}
@@ -7364,6 +7407,9 @@ function App() {
               onMovePartyOrder={movePartyMemberOrder}
               onChangeBackgroundMusicMuted={changeBackgroundMusicMuted}
               onChangeBackgroundMusicVolume={changeBackgroundMusicVolume}
+              onChangeEquipmentDropPopupThreshold={
+                changeEquipmentDropPopupThreshold
+              }
               saveStatusMessage={saveStatusMessage}
               onExportSave={exportSave}
               onImportSaveFile={importSaveFile}

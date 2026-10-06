@@ -18,6 +18,7 @@ describe("createInitialGameState", () => {
 
     expect(state.currentMapId).toBe(HUB_MAP_ID);
     expect(state.map?.id).toBe(HUB_MAP_ID);
+    expect(state.partySizeGrowthGuideViewed).toBe(false);
     expect(state.partyLeaderId).toBe(leader.id);
     expect(leader).toMatchObject({
       kind: "companion",
@@ -87,6 +88,7 @@ describe("createInitialGameState", () => {
       (trail) => trail.length === 0,
     )).toBe(true);
     expect(state.combatFeedbackEvents).toEqual([]);
+    expect(state.equipmentDropPopupThreshold).toBe("common");
     expect(state.skillMarksByEnemyId).toEqual({});
     expect(state.skillSelfBuffsByCompanionId).toEqual({});
     expect(state.skillBindsByEnemyId).toEqual({});

@@ -67,7 +67,7 @@ import {
   getInnKitchenPantryDisplay,
   getInnKitchenRecipeDisplay,
 } from "./innKitchenPresentation";
-import { getClassIdleFrameSrc, getEnemyWalkingAnimation } from "./visualAssets";
+import { getClassUiPortraitSrc, getEnemyWalkingAnimation } from "./visualAssets";
 import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 
 type GuildTavernSection = "guild" | "inn";
@@ -718,7 +718,7 @@ function InnRoomCardButton({
   }
 
   const classDefinition = CLASS_DEFINITIONS[card.companion.classId];
-  const idleFrameSrc = getClassIdleFrameSrc(card.companion.classId);
+  const portraitSrc = getClassUiPortraitSrc(card.companion.classId);
 
   return (
     <button
@@ -736,7 +736,7 @@ function InnRoomCardButton({
     >
       <span className="guild-inn-room-number">Room {card.slotNumber}</span>
       <span className="guild-roster-companion-sprite" aria-hidden="true">
-        {idleFrameSrc ? <img alt="" src={idleFrameSrc} /> : null}
+        <img alt="" src={portraitSrc} />
       </span>
       <strong>
         Lv {card.companion.characterLevel}{" "}
@@ -950,7 +950,7 @@ function InnKitchenView({
             rows.map((row) => {
               const rowRecipe = getInnKitchenRecipeDisplay(row.selectedRecipeId, state);
               const classDefinition = CLASS_DEFINITIONS[row.companion.classId];
-              const idleFrameSrc = getClassIdleFrameSrc(row.companion.classId);
+              const portraitSrc = getClassUiPortraitSrc(row.companion.classId);
               const activeMealText = row.activeMeal
                 ? formatInnKitchenDuration(row.activeMeal.expiresAtMs - currentTime)
                 : "No meal";
@@ -975,7 +975,7 @@ function InnKitchenView({
                     type="button"
                   >
                     <span className="guild-roster-companion-sprite" aria-hidden="true">
-                      {idleFrameSrc ? <img alt="" src={idleFrameSrc} /> : null}
+                      <img alt="" src={portraitSrc} />
                     </span>
                     <span>
                       Lv {row.companion.characterLevel}{" "}
@@ -1399,9 +1399,7 @@ function GuildRecruitView({
   const classDefinition = candidate
     ? CLASS_DEFINITIONS[candidate.classId]
     : null;
-  const idleFrameSrc = candidate
-    ? getClassIdleFrameSrc(candidate.classId)
-    : null;
+  const portraitSrc = candidate ? getClassUiPortraitSrc(candidate.classId) : null;
   const recruitDisabled = !canUse || !candidate || destination === "blocked_full";
   const blockedText = !canUse
     ? GUILD_INN_PROXIMITY_MESSAGE
@@ -1516,11 +1514,11 @@ function GuildRecruitView({
           </button>
         </div>
 
-        <div className="guild-recruit-sprite-frame" aria-hidden={!idleFrameSrc}>
-          {idleFrameSrc ? (
+        <div className="guild-recruit-sprite-frame" aria-hidden={!portraitSrc}>
+          {portraitSrc ? (
             <img
-              alt={`${classDefinition?.displayName ?? "Recruit"} idle sprite`}
-              src={idleFrameSrc}
+              alt={`${classDefinition?.displayName ?? "Recruit"} class portrait`}
+              src={portraitSrc}
             />
           ) : (
             <span>Waiting</span>
@@ -2708,7 +2706,7 @@ function CompanionRosterCard({
   onSelectCompanion: (companionId: string | null) => void;
 }) {
   const classDefinition = CLASS_DEFINITIONS[companion.classId];
-  const idleFrameSrc = getClassIdleFrameSrc(companion.classId);
+  const portraitSrc = getClassUiPortraitSrc(companion.classId);
 
   return (
     <button
@@ -2727,7 +2725,7 @@ function CompanionRosterCard({
       type="button"
     >
       <span className="guild-roster-companion-sprite" aria-hidden="true">
-        {idleFrameSrc ? <img alt="" src={idleFrameSrc} /> : null}
+        <img alt="" src={portraitSrc} />
       </span>
       <strong>
         Lv {companion.characterLevel} {classDefinition?.displayName ?? companion.classId}

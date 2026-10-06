@@ -11,6 +11,7 @@ import {
   firstClassCharacterVisualAssets,
   getEntityVisualAsset,
   getClassIdleFrameSrc,
+  getClassUiPortraitSrc,
   getEnemyWalkingAnimation,
   getSpriteAnimation,
   REGIONAL_ENEMY_SPRITE_SRC,
@@ -362,6 +363,14 @@ describe("entity visual assets", () => {
     }
 
     expect(getClassIdleFrameSrc("beginner")).toContain("BeginnerWalkingSouth");
+  });
+
+  it("resolves a tightly cropped UI sprite portrait for every current class", () => {
+    for (const classId of Object.keys(CLASS_DEFINITIONS)) {
+      expect(getClassUiPortraitSrc(classId as keyof typeof CLASS_DEFINITIONS)).toBe(
+        `/assets/ui/portraits/class-sprites/${classId}.png`,
+      );
+    }
   });
 
   it("maps the Guild Notice Board sign to the generated asset", () => {

@@ -20,6 +20,7 @@ export function createTestGameState(
     entities: {},
     restingCompanionsById: {},
     highestCharacterLevelEver: 1,
+    partySizeGrowthGuideViewed: false,
     guildRecruit: createInitialGuildRecruitState(0),
     guildUpgrades: createInitialGuildUpgradesState(),
     guildNoticeBoard: createInitialGuildNoticeBoardState(0),

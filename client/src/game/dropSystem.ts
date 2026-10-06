@@ -1,5 +1,9 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getLootTierForLevel, rollEnemyDropTable } from "./dropTables";
+import {
+  getEquipmentDropPopupThreshold,
+  shouldShowEquipmentDropPopup,
+} from "./equipmentDropPopups";
 import { getEnemyDropArchetypeId } from "./enemyArchetypes";
 import { tryUnlockFarmCropFromEnemyDefeat } from "./farm";
 import { addItemToInventoryState } from "./inventory";
@@ -10,7 +14,10 @@ import {
   getKeyItemDefinition,
   TELEPORT_ECHO_SLIMEWARD_CAMP_KEY_ITEM_ID,
 } from "./keyItems";
-import { queueUnlockNewsBroadcast } from "./newsBroadcast";
+import {
+  queueImportantItemAcquisitionBroadcast,
+  queueUnlockNewsBroadcast,
+} from "./newsBroadcast";
 import {
   addCombatFeedback,
   type GameState,
@@ -244,6 +251,29 @@ function completeDropVisualEvent(
         : "Inventory Full",
     now,
   });
+
+  if (
+    itemAdd.result.addedQuantity > 0 &&
+    shouldShowEquipmentDropPopup(
+      itemDefinition,
+      getEquipmentDropPopupThreshold(nextState),
+    )
+  ) {
+    nextState = queueImportantItemAcquisitionBroadcast(
+      nextState,
+      {
+        title: "Equipment Acquired",
+        entries: [
+          {
+            verb: "Obtained",
+            itemId: event.itemId,
+            quantity: itemAdd.result.addedQuantity,
+          },
+        ],
+      },
+      now,
+    );
+  }
 
   return nextState;
 }

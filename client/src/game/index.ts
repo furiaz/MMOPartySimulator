@@ -143,6 +143,7 @@ export type {
   ArmorType,
   EquipmentItemId,
   EquipmentKind,
+  EquipmentDropPopupThreshold,
   EquipmentSlot,
   EquipmentStatModifiers,
   EquipmentType,
@@ -723,6 +724,10 @@ export {
   recordHighestCharacterLevelEver,
 } from "./partySystem";
 export {
+  markPartySizeGrowthGuideViewed,
+  shouldQueuePartySizeGrowthGuide,
+} from "./partySizeGuide";
+export {
   COMBAT_APPROACH_DISTANCE,
   FORMATION_COHESION_PATH_DISTANCE,
   ROLE_PRIORITY,
@@ -881,6 +886,13 @@ export {
   type ImportantItemAcquisitionVerb,
   updateNewsBroadcasts,
 } from "./newsBroadcast";
+export {
+  DEFAULT_EQUIPMENT_DROP_POPUP_THRESHOLD,
+  getEquipmentDropPopupThreshold,
+  normalizeEquipmentDropPopupThreshold,
+  setEquipmentDropPopupThreshold,
+  shouldShowEquipmentDropPopup,
+} from "./equipmentDropPopups";
 export { updatePoiSystem } from "./poiSystem";
 export {
   AUTO_COMBAT_ON_ARRIVAL_DELAY_MS,

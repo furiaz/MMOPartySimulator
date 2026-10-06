@@ -75,6 +75,7 @@ export function createInitialGameState(): GameState {
       leader.characterLevel,
       secondCompanion.characterLevel,
     ),
+    partySizeGrowthGuideViewed: false,
     guildRecruit: createInitialGuildRecruitState(),
     guildUpgrades: createInitialGuildUpgradesState(),
     guildNoticeBoard: createInitialGuildNoticeBoardState(),
@@ -155,6 +156,7 @@ export function createInitialGameState(): GameState {
     dropVisualEvents: [],
     pendingOfflineFarmingLoot: null,
     newsBroadcasts: [],
+    equipmentDropPopupThreshold: "common",
     lastCompanionDamageTakenAtByCompanionId: {},
   });
 

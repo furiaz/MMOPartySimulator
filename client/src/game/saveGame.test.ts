@@ -168,6 +168,85 @@ describe("save game serialization", () => {
     ).toBe(true);
   });
 
+  it("persists the equipment drop popup threshold and defaults legacy or invalid values", () => {
+    const state = {
+      ...createWildState("fighter"),
+      equipmentDropPopupThreshold: "epic" as const,
+    };
+    const save = createSavedGame(state, NOW_MS);
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+
+    expect(restored.state.equipmentDropPopupThreshold).toBe("epic");
+
+    const legacyRestore = restoreGameStateFromSave({
+      ...save,
+      state: {
+        ...save.state,
+        equipmentDropPopupThreshold: undefined,
+      },
+    });
+    const invalidRestore = restoreGameStateFromSave({
+      ...save,
+      state: {
+        ...save.state,
+        equipmentDropPopupThreshold:
+          "mythic" as GameState["equipmentDropPopupThreshold"],
+      },
+    });
+
+    expect(legacyRestore.ok).toBe(true);
+    expect(invalidRestore.ok).toBe(true);
+    if (legacyRestore.ok && invalidRestore.ok) {
+      expect(legacyRestore.state.equipmentDropPopupThreshold).toBe("common");
+      expect(invalidRestore.state.equipmentDropPopupThreshold).toBe("common");
+    }
+  });
+
+  it("persists the party-size guide state and defaults legacy or invalid values", () => {
+    const save = createSavedGame(
+      {
+        ...createWildState("fighter"),
+        partySizeGrowthGuideViewed: true,
+      },
+      NOW_MS,
+    );
+    const restored = restoreGameStateFromSave(save);
+
+    expect(save.state.partySizeGrowthGuideViewed).toBe(true);
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.partySizeGrowthGuideViewed).toBe(true);
+
+    const legacyRestore = restoreGameStateFromSave({
+      ...save,
+      state: {
+        ...save.state,
+        partySizeGrowthGuideViewed: undefined,
+      },
+    });
+    const invalidRestore = restoreGameStateFromSave({
+      ...save,
+      state: {
+        ...save.state,
+        partySizeGrowthGuideViewed: "yes" as unknown as boolean,
+      },
+    });
+
+    expect(legacyRestore.ok).toBe(true);
+    expect(invalidRestore.ok).toBe(true);
+    if (legacyRestore.ok && invalidRestore.ok) {
+      expect(legacyRestore.state.partySizeGrowthGuideViewed).toBe(false);
+      expect(invalidRestore.state.partySizeGrowthGuideViewed).toBe(false);
+    }
+  });
+
   it("preserves resting companions and highest-ever level through save restore", () => {
     const leader: Companion = {
       ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1", "defender", 0),
