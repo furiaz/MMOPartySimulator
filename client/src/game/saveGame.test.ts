@@ -168,6 +168,45 @@ describe("save game serialization", () => {
     ).toBe(true);
   });
 
+  it("persists the equipment drop popup threshold and defaults legacy or invalid values", () => {
+    const state = {
+      ...createWildState("fighter"),
+      equipmentDropPopupThreshold: "epic" as const,
+    };
+    const save = createSavedGame(state, NOW_MS);
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+
+    expect(restored.state.equipmentDropPopupThreshold).toBe("epic");
+
+    const legacyRestore = restoreGameStateFromSave({
+      ...save,
+      state: {
+        ...save.state,
+        equipmentDropPopupThreshold: undefined,
+      },
+    });
+    const invalidRestore = restoreGameStateFromSave({
+      ...save,
+      state: {
+        ...save.state,
+        equipmentDropPopupThreshold:
+          "mythic" as GameState["equipmentDropPopupThreshold"],
+      },
+    });
+
+    expect(legacyRestore.ok).toBe(true);
+    expect(invalidRestore.ok).toBe(true);
+    if (legacyRestore.ok && invalidRestore.ok) {
+      expect(legacyRestore.state.equipmentDropPopupThreshold).toBe("common");
+      expect(invalidRestore.state.equipmentDropPopupThreshold).toBe("common");
+    }
+  });
+
   it("preserves resting companions and highest-ever level through save restore", () => {
     const leader: Companion = {
       ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1", "defender", 0),

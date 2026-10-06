@@ -94,7 +94,7 @@ describe("enemy drop system", () => {
       dropVisualEvents: [
         createDropVisualEvent({
           enemyId: "wolf",
-          itemId: "wolf_fang",
+          itemId: "holy_lantern",
           now,
           currentMapId: MAP_ONE_ID,
         }),
@@ -106,7 +106,65 @@ describe("enemy drop system", () => {
     expect(nextState.dropVisualEvents).toEqual([]);
     expect(nextState.inventory.slots).toEqual([]);
     expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Inventory Full");
+    expect(nextState.newsBroadcasts).toEqual([]);
   });
+
+  it("broadcasts successfully collected enemy equipment at the selected threshold", () => {
+    const now = 1000;
+    const state = createTestGameState({
+      currentMapId: MAP_ONE_ID,
+      map: createDebugMap(MAP_ONE_ID),
+      equipmentDropPopupThreshold: "common",
+      dropVisualEvents: [
+        createDropVisualEvent({
+          enemyId: "goblin-shaman",
+          itemId: "holy_lantern",
+          now,
+          currentMapId: MAP_ONE_ID,
+        }),
+      ],
+    });
+
+    const nextState = updateDropSystem(state, now + DROP_VISUAL_DURATION_MS);
+
+    expect(nextState.inventory.slots).toEqual([
+      { itemId: "holy_lantern", quantity: 1 },
+    ]);
+    expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Holy Lantern");
+    expect(nextState.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Equipment Acquired",
+      text: "Obtained: Holy Lantern",
+      details: ["Obtained: Holy Lantern"],
+    });
+  });
+
+  it.each(["rare", "off"] as const)(
+    "suppresses a Common equipment broadcast when the threshold is %s",
+    (equipmentDropPopupThreshold) => {
+      const now = 1000;
+      const state = createTestGameState({
+        currentMapId: MAP_ONE_ID,
+        map: createDebugMap(MAP_ONE_ID),
+        equipmentDropPopupThreshold,
+        dropVisualEvents: [
+          createDropVisualEvent({
+            enemyId: "goblin-shaman",
+            itemId: "holy_lantern",
+            now,
+            currentMapId: MAP_ONE_ID,
+          }),
+        ],
+      });
+
+      const nextState = updateDropSystem(state, now + DROP_VISUAL_DURATION_MS);
+
+      expect(nextState.inventory.slots).toEqual([
+        { itemId: "holy_lantern", quantity: 1 },
+      ]);
+      expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Holy Lantern");
+      expect(nextState.newsBroadcasts).toEqual([]);
+    },
+  );
 
   it("does not add stale pending drops after a map change", () => {
     const now = 1000;

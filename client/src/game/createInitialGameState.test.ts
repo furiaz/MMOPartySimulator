@@ -87,6 +87,7 @@ describe("createInitialGameState", () => {
       (trail) => trail.length === 0,
     )).toBe(true);
     expect(state.combatFeedbackEvents).toEqual([]);
+    expect(state.equipmentDropPopupThreshold).toBe("common");
     expect(state.skillMarksByEnemyId).toEqual({});
     expect(state.skillSelfBuffsByCompanionId).toEqual({});
     expect(state.skillBindsByEnemyId).toEqual({});

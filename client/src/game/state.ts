@@ -42,6 +42,7 @@ import type {
   Position,
   DropVisualEvent,
   DuelistsMomentumState,
+  EquipmentDropPopupThreshold,
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
   HeadhunterState,
@@ -287,6 +288,7 @@ export type GameState = {
   dropVisualEvents?: DropVisualEvent[];
   pendingOfflineFarmingLoot?: OfflineFarmingPendingLootState | null;
   newsBroadcasts?: NewsBroadcastEvent[];
+  equipmentDropPopupThreshold?: EquipmentDropPopupThreshold;
   autonomousTargetSuppressionsByEnemyId?: Record<string, AutonomousTargetSuppressionState>;
   slimewardDungeon?: SlimewardDungeonRuntimeState;
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;

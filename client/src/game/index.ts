@@ -143,6 +143,7 @@ export type {
   ArmorType,
   EquipmentItemId,
   EquipmentKind,
+  EquipmentDropPopupThreshold,
   EquipmentSlot,
   EquipmentStatModifiers,
   EquipmentType,
@@ -881,6 +882,13 @@ export {
   type ImportantItemAcquisitionVerb,
   updateNewsBroadcasts,
 } from "./newsBroadcast";
+export {
+  DEFAULT_EQUIPMENT_DROP_POPUP_THRESHOLD,
+  getEquipmentDropPopupThreshold,
+  normalizeEquipmentDropPopupThreshold,
+  setEquipmentDropPopupThreshold,
+  shouldShowEquipmentDropPopup,
+} from "./equipmentDropPopups";
 export { updatePoiSystem } from "./poiSystem";
 export {
   AUTO_COMBAT_ON_ARRIVAL_DELAY_MS,
