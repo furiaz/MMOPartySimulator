@@ -316,7 +316,20 @@ describe("prototype item definitions", () => {
     }
   });
 
-  it("defines the level 5 Copper Training Sword for Beginners", () => {
+  it("keeps both Training Sword variants class-unrestricted", () => {
+    expect(ITEM_DEFINITIONS.training_sword).toMatchObject({
+      id: "training_sword",
+      displayName: "Training Sword",
+      category: "equipment",
+      equipmentSlot: "mainHand",
+      equipmentKind: "weapon",
+      equipmentType: "training_sword",
+      tier: 1,
+      levelRequirement: 1,
+      statModifiers: { attack: 1 },
+    });
+    expect(ITEM_DEFINITIONS.training_sword.allowedClassIds).toBeUndefined();
+
     expect(ITEM_DEFINITIONS.copper_training_sword).toMatchObject({
       id: "copper_training_sword",
       displayName: "Copper Training Sword",
@@ -324,11 +337,13 @@ describe("prototype item definitions", () => {
       equipmentSlot: "mainHand",
       equipmentKind: "weapon",
       equipmentType: "training_sword",
-      allowedClassIds: ["beginner"],
       tier: 1,
       levelRequirement: 5,
       statModifiers: { attack: 2 },
     });
+    expect(
+      ITEM_DEFINITIONS.copper_training_sword.allowedClassIds,
+    ).toBeUndefined();
   });
 
   it("classifies enemy drops as enemy-part materials instead of junk", () => {

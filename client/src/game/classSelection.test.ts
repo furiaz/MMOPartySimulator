@@ -5,8 +5,10 @@ import {
   canCompanionEnterFirstClassSelection,
   selectFirstClass,
 } from "./classSelection";
+import { getCompanionEquipmentStatModifiers } from "./equipmentRules";
 import { createCompanionPrimaryStats } from "./stats";
 import { createTestGameState } from "./testState";
+import type { Companion } from "./types";
 
 describe("first class selection", () => {
   it("allows an eligible Beginner to choose each first class", () => {
@@ -163,27 +165,73 @@ describe("first class selection", () => {
     expect(result.state).toBe(state);
   });
 
-  it("rejects incompatible equipped gear", () => {
+  it("retains Training Sword when choosing every first class", () => {
+    for (const classId of FIRST_CLASS_IDS) {
+      const companion = {
+        ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+        characterLevel: 10,
+        equipment: {
+          ...createCompanion("unused", { x: 0, y: 0 }, "unused").equipment,
+          mainHand: "training_sword" as const,
+        },
+      };
+      const state = createTestGameState({
+        entities: {
+          [companion.id]: companion,
+        },
+      });
+
+      expect(canCompanionEnterFirstClassSelection(companion)).toBe(true);
+
+      const result = selectFirstClass(state, companion.id, classId);
+      const selectedCompanion = result.state.entities[companion.id] as Companion;
+
+      expect(result.result).toMatchObject({ status: "success", classId });
+      expect(selectedCompanion.equipment.mainHand).toBe("training_sword");
+      expect(getCompanionEquipmentStatModifiers(selectedCompanion)).toMatchObject({
+        attack: 1,
+      });
+    }
+  });
+
+  it("retains Copper Training Sword through first-class selection", () => {
     const companion = {
       ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
       characterLevel: 10,
       equipment: {
         ...createCompanion("unused", { x: 0, y: 0 }, "unused").equipment,
-        mainHand: "training_sword" as const,
+        mainHand: "copper_training_sword" as const,
       },
     };
-    const state = createTestGameState({
-      entities: {
-        [companion.id]: companion,
-      },
-    });
+    const state = createTestGameState({ entities: { [companion.id]: companion } });
 
-    const result = selectFirstClass(state, companion.id, "blade");
+    const result = selectFirstClass(state, companion.id, "hunter");
+    const selectedCompanion = result.state.entities[companion.id] as Companion;
+
+    expect(result.result).toMatchObject({ status: "success", classId: "hunter" });
+    expect(selectedCompanion.equipment.mainHand).toBe("copper_training_sword");
+    expect(getCompanionEquipmentStatModifiers(selectedCompanion)).toMatchObject({
+      attack: 2,
+    });
+  });
+
+  it("rejects genuinely incompatible equipped gear", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 10,
+      equipment: {
+        ...createCompanion("unused", { x: 0, y: 0 }, "unused").equipment,
+        mainHand: "iron_sword" as const,
+      },
+    };
+    const state = createTestGameState({ entities: { [companion.id]: companion } });
+
+    const result = selectFirstClass(state, companion.id, "aegis");
 
     expect(result.result).toMatchObject({
       status: "failed",
       reason: "incompatible_equipment",
-      incompatibleItemIds: ["training_sword"],
+      incompatibleItemIds: ["iron_sword"],
     });
     expect(canCompanionEnterFirstClassSelection(companion)).toBe(false);
     expect(result.state).toBe(state);

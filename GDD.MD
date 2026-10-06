@@ -928,7 +928,8 @@ Current companion equipment slots:
 
 Current prototype class equipment permissions:
 
-- Beginner: Training Sword, no offhand
+- Universal starter/fallback: Training Sword-type main-hand weapons may be equipped by every current and future class
+- Beginner: no specialized weapon type, no offhand; uses the universal Training Sword type
 - Blade: One-Handed Sword, no offhand
 - Aegis: One-Handed Mace, Shield
 - Hunter: Bow, no offhand
@@ -938,9 +939,14 @@ Current prototype class equipment permissions:
 - Lightbearer: Holy Mace, Holy Lantern
 - Penitent: Thorn Whip, Sacrificial Dagger
 
+Training Sword-type weapons, including Training Sword and Copper Training Sword, remain equipped through first-class selection and may be re-equipped by every class. They contribute only their existing item stats; class identity continues to determine attacks, attack range, projectiles, and skills.
+
+All specialized class weapons and offhands remain restricted to their listed class permissions.
+
 Current prototype weapon and offhand item examples include:
 
 - Training Sword
+- Copper Training Sword
 - Iron Sword
 - Guard Mace
 - Claw Gauntlets
@@ -1828,6 +1834,7 @@ Current prototype first-class selection:
 - rejects invalid class targets
 - rejects companions who already chose a first class
 - rejects choices when currently equipped items are incompatible with the selected class
+- retains equipped universal Training Sword-type weapons through a successful selection
 
 ---
 

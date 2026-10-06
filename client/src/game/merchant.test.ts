@@ -22,6 +22,7 @@ import {
   getMerchantSellEntries,
   getMerchantSecondaryFilterOptions,
   isMerchantFirstAidPurchaseRequired,
+  isMerchantStockEntryCompatibleWithParty,
   sellMerchantItem,
 } from "./merchant";
 import { getItemDefinition } from "./items";
@@ -503,6 +504,33 @@ describe("merchant buy", () => {
         partyCompatibleOnly: true,
       }).map((entry) => entry.itemId),
     ).toEqual(["veteran_sword"]);
+  });
+
+  it("treats both Training Sword variants as compatible with a first-class party", () => {
+    const hunter = createCompanion(
+      "hunter",
+      { x: 0, y: 0 },
+      "hunter",
+      "fighter",
+      0,
+      "hunter",
+    );
+    const state = addEntity(createMerchantState(), hunter);
+
+    expect(
+      isMerchantStockEntryCompatibleWithParty(state, {
+        itemId: "training_sword",
+        priceCrowns: 12,
+        group: "weapons",
+      }),
+    ).toBe(true);
+    expect(
+      isMerchantStockEntryCompatibleWithParty(state, {
+        itemId: "copper_training_sword",
+        priceCrowns: 28,
+        group: "weapons",
+      }),
+    ).toBe(true);
   });
 
   it("filters merchant books by class", () => {

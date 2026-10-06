@@ -10,12 +10,17 @@ import type {
   EquipmentType,
   ItemDefinition,
   ItemId,
+  WeaponType,
 } from "./types";
 import {
   addEquipmentStatModifiers,
   addPrimaryStatModifiers,
   CLASS_EQUIPMENT_PROFILES,
 } from "./equipmentTypes";
+
+const UNIVERSAL_MAIN_HAND_EQUIPMENT_TYPES: readonly WeaponType[] = [
+  "training_sword",
+];
 
 export type EquipmentFailureReason =
   | "companion_not_found"
@@ -243,6 +248,16 @@ export function isClassAllowedForEquipment(
     return true;
   }
 
+  if (
+    itemDefinition.equipmentSlot === "mainHand" &&
+    itemDefinition.equipmentType &&
+    UNIVERSAL_MAIN_HAND_EQUIPMENT_TYPES.includes(
+      itemDefinition.equipmentType as WeaponType,
+    )
+  ) {
+    return true;
+  }
+
   if (itemDefinition.allowedClassIds) {
     return itemDefinition.allowedClassIds.includes(classId);
   }
@@ -338,7 +353,12 @@ export function getAllowedEquipmentTypeLabels(classId: ClassId): {
   const profile = CLASS_EQUIPMENT_PROFILES[classId];
 
   return {
-    mainHand: [...profile.mainHand],
+    mainHand: [
+      ...new Set<EquipmentType>([
+        ...UNIVERSAL_MAIN_HAND_EQUIPMENT_TYPES,
+        ...profile.mainHand,
+      ]),
+    ],
     offhand: [...profile.offhand],
   };
 }
