@@ -161,6 +161,7 @@ import {
   getQuestGiverReadyQuests,
   getTeleportWorkingStateById,
   getHighestCharacterLevelEver,
+  getEquipmentCompatibleSlots,
   hasQuestGiverWork,
   issueCompanionDirectCommand,
   issuePartyOrder,
@@ -387,7 +388,7 @@ function PixiWorldRendererFallback({ mode }: { mode: "full" | "preview" }) {
 }
 
 const debugMap = createDebugMap();
-const gameVersion = "0.01";
+const gameVersion = "0.1";
 const currencyGainFeedbackDurationMs = 1200;
 const directCommandFeedbackDurationMs = 1400;
 const movementClickFeedbackDurationMs = 900;
@@ -2693,8 +2694,10 @@ function getMerchantSlotText(itemDefinition: ItemDefinition): string {
     return "Accessory";
   }
 
-  return itemDefinition.equipmentSlot
-    ? EQUIPMENT_SLOT_LABELS[itemDefinition.equipmentSlot]
+  const compatibleSlots = getEquipmentCompatibleSlots(itemDefinition);
+
+  return compatibleSlots.length > 0
+    ? compatibleSlots.map((slot) => EQUIPMENT_SLOT_LABELS[slot]).join(" / ")
     : "Equipment";
 }
 

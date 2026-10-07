@@ -6,7 +6,10 @@ import {
   equipItemToCompanion,
   unequipItemFromCompanion,
 } from "./equipmentSystem";
-import { getAllowedEquipmentTypeLabels } from "./equipmentRules";
+import {
+  getAllowedEquipmentTypeLabels,
+  getCompanionEquipmentStatModifiers,
+} from "./equipmentRules";
 import { createTestGameState } from "./testState";
 import type { GameState } from "./state";
 import type { ClassId, Companion, ItemId } from "./types";
@@ -148,10 +151,10 @@ describe("prototype equipment system", () => {
     });
   });
 
-  it("blocks offhand equipment while a both-hands weapon is equipped", () => {
+  it("allows a Hunter to equip a Quiver with a Bow", () => {
     const { state, companion } = createStateWithCompanion("hunter", [
       "short_bow",
-      "wooden_shield",
+      "leather_quiver",
     ]);
     const bowState = equipItemToCompanion(
       state,
@@ -163,14 +166,11 @@ describe("prototype equipment system", () => {
     const { result } = equipItemToCompanion(
       bowState,
       companion.id,
-      "wooden_shield",
+      "leather_quiver",
       "offhand",
     );
 
-    expect(result).toMatchObject({
-      status: "failed",
-      reason: "offhand_blocked_by_both_hands",
-    });
+    expect(result.status).toBe("success");
   });
 
   it("returns replaced equipment to inventory without deleting items", () => {
@@ -205,52 +205,135 @@ describe("prototype equipment system", () => {
     expect(nextCompanion.equipment.head).toBe("acolyte_hood");
   });
 
-  it("clears and returns offhand when equipping a both-hands weapon", () => {
-    const { state, companion } = createStateWithCompanion("aegis", [
+  it("keeps shared Lantern permissions specific to the requested slot", () => {
+    const { state, companion } = createStateWithCompanion("lightbearer", [
+      "rune_lantern",
       "guard_mace",
-      "wooden_shield",
-      "short_bow",
     ]);
-    const equippedState = equipItemToCompanion(
-      equipItemToCompanion(
-        state,
-        companion.id,
-        "guard_mace",
-        "mainHand",
-      ).state,
+    const maceState = equipItemToCompanion(
+      state,
       companion.id,
-      "wooden_shield",
-      "offhand",
+      "guard_mace",
+      "mainHand",
     ).state;
-    const hunter = {
-      ...(equippedState.entities[companion.id] as Companion),
-      classId: "hunter" as const,
-    };
-    const hunterState = {
-      ...equippedState,
-      entities: {
-        ...equippedState.entities,
-        [companion.id]: hunter,
-      },
-    };
 
     const { state: nextState, result } = equipItemToCompanion(
-      hunterState,
+      maceState,
       companion.id,
-      "short_bow",
-      "mainHand",
+      "rune_lantern",
+      "offhand",
     );
     const nextCompanion = nextState.entities[companion.id] as Companion;
 
     expect(result.status).toBe("success");
-    expect(nextCompanion.equipment.mainHand).toBe("short_bow");
-    expect(nextCompanion.equipment.offhand).toBeNull();
-    expect(nextState.inventory.slots).toEqual(
-      expect.arrayContaining([
-        { itemId: "guard_mace", quantity: 1 },
-        { itemId: "wooden_shield", quantity: 1 },
-      ]),
-    );
+    expect(nextCompanion.equipment.mainHand).toBe("guard_mace");
+    expect(nextCompanion.equipment.offhand).toBe("rune_lantern");
+
+    const invalidMainHand = createStateWithCompanion("lightbearer", [
+      "rune_lantern",
+    ]);
+    expect(
+      equipItemToCompanion(
+        invalidMainHand.state,
+        invalidMainHand.companion.id,
+        "rune_lantern",
+        "mainHand",
+      ).result,
+    ).toMatchObject({ status: "failed", reason: "invalid_class" });
+
+    const invalidOffhand = createStateWithCompanion("runecaster", [
+      "rune_lantern",
+    ]);
+    expect(
+      equipItemToCompanion(
+        invalidOffhand.state,
+        invalidOffhand.companion.id,
+        "rune_lantern",
+        "offhand",
+      ).result,
+    ).toMatchObject({ status: "failed", reason: "invalid_class" });
+  });
+
+  it.each([
+    ["blade", "iron_sword", "sacrificial_dagger"],
+    ["aegis", "guard_mace", "wooden_shield"],
+    ["hunter", "short_bow", "leather_quiver"],
+    ["beast", "claw_gauntlets", "claw_gauntlets"],
+    ["elementalist", "apprentice_orb", "apprentice_orb"],
+    ["runecaster", "rune_lantern", "simple_talisman"],
+    ["lightbearer", "guard_mace", "rune_lantern"],
+    ["penitent", "thorn_whip", "sacrificial_dagger"],
+  ] as const)(
+    "equips the %s first-class hand loadout",
+    (classId, mainHandItemId, offhandItemId) => {
+      const { state, companion } = createStateWithCompanion(classId, [
+        mainHandItemId,
+        offhandItemId,
+      ]);
+      const mainHandState = equipItemToCompanion(
+        state,
+        companion.id,
+        mainHandItemId,
+        "mainHand",
+      ).state;
+      const offhandResult = equipItemToCompanion(
+        mainHandState,
+        companion.id,
+        offhandItemId,
+        "offhand",
+      );
+      const equippedCompanion = offhandResult.state.entities[
+        companion.id
+      ] as Companion;
+
+      expect(offhandResult.result.status).toBe("success");
+      expect(equippedCompanion.equipment.mainHand).toBe(mainHandItemId);
+      expect(equippedCompanion.equipment.offhand).toBe(offhandItemId);
+    },
+  );
+
+  it("keeps Beginner without an allowed offhand", () => {
+    const { state, companion } = createStateWithCompanion("beginner", [
+      "sacrificial_dagger",
+    ]);
+
+    expect(
+      equipItemToCompanion(
+        state,
+        companion.id,
+        "sacrificial_dagger",
+        "offhand",
+      ).result,
+    ).toMatchObject({ status: "failed", reason: "invalid_class" });
+  });
+
+  it("requires and applies two separate Claw items for both Beast hands", () => {
+    const { state, companion } = createStateWithCompanion("beast", [
+      "claw_gauntlets",
+      "claw_gauntlets",
+    ]);
+    const mainHandState = equipItemToCompanion(
+      state,
+      companion.id,
+      "claw_gauntlets",
+      "mainHand",
+    ).state;
+    const equippedState = equipItemToCompanion(
+      mainHandState,
+      companion.id,
+      "claw_gauntlets",
+      "offhand",
+    ).state;
+    const equippedCompanion = equippedState.entities[companion.id] as Companion;
+
+    expect(equippedCompanion.equipment).toMatchObject({
+      mainHand: "claw_gauntlets",
+      offhand: "claw_gauntlets",
+    });
+    expect(getCompanionEquipmentStatModifiers(equippedCompanion)).toMatchObject({
+      attack: 6,
+      evasion: 2,
+    });
   });
 
   it("lets armor ignore class restrictions when level requirements are met", () => {
@@ -339,25 +422,31 @@ describe("prototype equipment system", () => {
     expect(nextCompanion.equipment.offhand).toBe("reinforced_shield");
   });
 
-  it("equips representative level 20 both-hands weapons", () => {
+  it("equips a level 20 Bow and Quiver loadout", () => {
     const { state, companion } = createStateWithCompanion(
       "hunter",
-      ["veteran_warbow"],
+      ["veteran_warbow", "veteran_quiver"],
       10,
       20,
     );
 
-    const { state: nextState, result } = equipItemToCompanion(
+    const bowState = equipItemToCompanion(
       state,
       companion.id,
       "veteran_warbow",
       "mainHand",
+    ).state;
+    const { state: nextState, result } = equipItemToCompanion(
+      bowState,
+      companion.id,
+      "veteran_quiver",
+      "offhand",
     );
     const nextCompanion = nextState.entities[companion.id] as Companion;
 
     expect(result.status).toBe("success");
     expect(nextCompanion.equipment.mainHand).toBe("veteran_warbow");
-    expect(nextCompanion.equipment.offhand).toBeNull();
+    expect(nextCompanion.equipment.offhand).toBe("veteran_quiver");
   });
 
   it("rejects level 15 and 20 scaled equipment below their requirements", () => {

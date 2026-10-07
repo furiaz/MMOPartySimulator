@@ -38,16 +38,15 @@ export const EQUIPMENT_TYPE_LABELS: Record<EquipmentType, string> = {
   training_sword: "Training Sword",
   one_handed_sword: "One-Handed Sword",
   one_handed_mace: "One-Handed Mace",
-  claw_gauntlets: "Claw Gauntlets",
-  thorn_whip: "Thorn Whip",
+  claw: "Claw",
+  whip: "Whip",
   bow: "Bow",
   orb: "Orb",
-  rune_lantern: "Rune Lantern",
-  holy_mace: "Holy Mace",
+  lantern: "Lantern",
   shield: "Shield",
+  quiver: "Quiver",
   talisman: "Talisman",
-  holy_lantern: "Holy Lantern",
-  sacrificial_dagger: "Sacrificial Dagger",
+  dagger: "Dagger",
   head_armor: "Head Armor",
   chest_armor: "Chest Armor",
   legs_armor: "Legs Armor",
@@ -75,7 +74,7 @@ export const CLASS_EQUIPMENT_PROFILES: Record<ClassId, ClassEquipmentProfile> = 
   },
   blade: {
     mainHand: ["one_handed_sword"],
-    offhand: [],
+    offhand: ["dagger"],
   },
   aegis: {
     mainHand: ["one_handed_mace"],
@@ -83,27 +82,27 @@ export const CLASS_EQUIPMENT_PROFILES: Record<ClassId, ClassEquipmentProfile> = 
   },
   hunter: {
     mainHand: ["bow"],
-    offhand: [],
+    offhand: ["quiver"],
   },
   beast: {
-    mainHand: ["claw_gauntlets"],
-    offhand: [],
+    mainHand: ["claw"],
+    offhand: ["claw"],
   },
   elementalist: {
     mainHand: ["orb"],
-    offhand: [],
+    offhand: ["orb"],
   },
   runecaster: {
-    mainHand: ["rune_lantern"],
+    mainHand: ["lantern"],
     offhand: ["talisman"],
   },
   lightbearer: {
-    mainHand: ["holy_mace"],
-    offhand: ["holy_lantern"],
+    mainHand: ["one_handed_mace"],
+    offhand: ["lantern"],
   },
   penitent: {
-    mainHand: ["thorn_whip"],
-    offhand: ["sacrificial_dagger"],
+    mainHand: ["whip"],
+    offhand: ["dagger"],
   },
 };
 

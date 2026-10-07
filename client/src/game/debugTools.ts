@@ -186,10 +186,9 @@ const DEBUG_PROTOTYPE_EQUIPMENT_ITEM_IDS = [
   "short_bow",
   "apprentice_orb",
   "rune_lantern",
-  "holy_mace",
   "wooden_shield",
+  "leather_quiver",
   "simple_talisman",
-  "holy_lantern",
   "sacrificial_dagger",
   "acolyte_hood",
   "scholar_robe",
@@ -367,7 +366,8 @@ export function debugCycleCompanionClass(
     const itemDefinition = itemId ? ITEM_DEFINITIONS[itemId] : undefined;
 
     return Boolean(
-      itemDefinition && !isClassAllowedForEquipment(nextClassId, itemDefinition),
+      itemDefinition &&
+        !isClassAllowedForEquipment(nextClassId, itemDefinition, slot),
     );
   });
   const unequippedItemIds: ItemId[] = [];

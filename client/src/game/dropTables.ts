@@ -256,7 +256,7 @@ export const ENEMY_TYPE_DROP_TABLES: Partial<
       archetypeId: "goblin",
       tier: 2,
       groups: [
-        createDropGroup("goblin_shaman_equipment", 0.02, "holy_lantern"),
+        createDropGroup("goblin_shaman_equipment", 0.02, "rune_lantern"),
       ],
     },
   },
@@ -284,7 +284,7 @@ export const SUPERIOR_ENEMY_TYPE_DROP_TABLES: Partial<
       tier: 2,
       variant: "superior",
       groups: [
-        createDropGroup("goblin_shaman_superior_equipment", 0.2, "holy_lantern"),
+        createDropGroup("goblin_shaman_superior_equipment", 0.2, "rune_lantern"),
       ],
     },
   },

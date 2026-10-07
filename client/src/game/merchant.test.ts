@@ -244,6 +244,10 @@ describe("merchant buy", () => {
 
     expect(pricesByItemId).toMatchObject({
       veteran_sword: 180,
+      ironhold_mace: 180,
+      deep_rune_lantern: 180,
+      veteran_quiver: 135,
+      oath_dagger: 135,
       tower_shield: 135,
       sanctuary_robe: 210,
       wayfarer_jacket: 210,
@@ -401,7 +405,7 @@ describe("merchant buy", () => {
       "missing-merchant",
       "training_sword",
     );
-    const nonStockResult = buyMerchantItem(state, MERCHANT_ID, "holy_lantern");
+    const nonStockResult = buyMerchantItem(state, MERCHANT_ID, "slime_core_t1");
 
     expect(invalidMerchantResult.result).toMatchObject({
       status: "failed",
