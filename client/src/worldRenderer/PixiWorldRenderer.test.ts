@@ -30,6 +30,7 @@ import {
   getLevelUpBurstPresentation,
   getNearestHoverEntity,
   getNearestInteractableEntity,
+  getNpcSpeechBubbleLayout,
   getOverheadStatusPresentation,
   getPreviewMapPosition,
   getPreviewRenderSignature,
@@ -1128,6 +1129,67 @@ describe("overhead UI overlap", () => {
         { height: 18, width: 64, x: 90, y: 10 },
       ),
     ).toBe(false);
+  });
+});
+
+describe("NPC speech bubble layout", () => {
+  it("places the bubble above the speaker when there is room", () => {
+    const layout = getNpcSpeechBubbleLayout({
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 600,
+      renderWidth: 800,
+      speakerBottomY: 330,
+      speakerTopY: 270,
+      speakerX: 400,
+    });
+
+    expect(layout.placement).toBe("above");
+    expect(layout.bubbleY).toBeLessThan(270);
+    expect(layout.tailPointY).toBeLessThan(270);
+  });
+
+  it("flips below a speaker near the top edge", () => {
+    const layout = getNpcSpeechBubbleLayout({
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 600,
+      renderWidth: 800,
+      speakerBottomY: 70,
+      speakerTopY: 10,
+      speakerX: 400,
+    });
+
+    expect(layout.placement).toBe("below");
+    expect(layout.bubbleY).toBeGreaterThan(70);
+    expect(layout.tailPointY).toBeGreaterThan(70);
+    expect(layout.tailPointY).toBeLessThan(layout.bubbleY);
+  });
+
+  it("clamps the bubble and tail inside horizontal viewport margins", () => {
+    const left = getNpcSpeechBubbleLayout({
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 600,
+      renderWidth: 240,
+      speakerBottomY: 330,
+      speakerTopY: 270,
+      speakerX: 2,
+    });
+    const right = getNpcSpeechBubbleLayout({
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 600,
+      renderWidth: 240,
+      speakerBottomY: 330,
+      speakerTopY: 270,
+      speakerX: 238,
+    });
+
+    expect(left.bubbleX).toBe(8);
+    expect(left.tailBaseLeftX).toBeGreaterThanOrEqual(left.bubbleX);
+    expect(right.bubbleX + 180).toBe(232);
+    expect(right.tailBaseRightX).toBeLessThanOrEqual(right.bubbleX + 180);
   });
 });
 

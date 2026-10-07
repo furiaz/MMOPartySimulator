@@ -226,7 +226,7 @@ The player is the manager/controller issuing intent and commands to party member
 
 NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, dungeon chest presentation, bank chest presentation, Guild & Inn service presentation, Farm and Livestock service presentation where present, and non-interactive service placeholders.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock and limited Merchant Sell interaction, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors where present, Farm and Livestock service opening/proximity anchors where present, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock and limited Merchant Sell interaction, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors where present, Farm and Livestock service opening/proximity anchors where present, lightweight non-branching speech presentation for supported character NPCs, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
 
 Current NPC role values include:
 
@@ -249,7 +249,9 @@ type NpcRole =
   | "dungeon_chest_open";
 ```
 
-NPCs do not implement dialogue, full shops beyond fixed prototype Merchant Buy stock, production crafting or smithing beyond current prototype Smith crafting, recruitment beyond current Guild Recruit helpers, relationship behavior, or general follower behavior.
+Supported character NPCs may display one transient, non-branching speech bubble after the party reaches interaction range. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. Speech is not persisted and does not define simulation behavior.
+
+NPCs do not implement branching dialogue, dialogue choices, conversation history, full shops beyond fixed prototype Merchant Buy stock, production crafting or smithing beyond current prototype Smith crafting, recruitment beyond current Guild Recruit helpers, relationship behavior, or general follower behavior.
 
 Current execution states:
 
@@ -3806,6 +3808,7 @@ React may:
 - track guide popup queue, active popup, and viewed popup UI state
 - track save status and offline summary UI state
 - render UI-facing enemy and NPC name labels
+- track one transient NPC speech bubble and pass it to the PixiJS world renderer
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
 - call existing stat allocation helpers for supported stat allocation actions

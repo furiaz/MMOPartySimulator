@@ -40,6 +40,11 @@ import type {
   PartyMenuSection,
 } from "./gameMenuTypes";
 import { getNpcInteractionRange } from "./npcInteractionRange";
+import {
+  canNpcShowSpeech,
+  createNpcSpeech,
+  type ActiveNpcSpeech,
+} from "./npcSpeechPresentation";
 import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
 import { getResourceTooltipDetails } from "./resourceTooltip";
 import {
@@ -3176,6 +3181,8 @@ function App() {
   const [pendingNpcInteractionId, setPendingNpcInteractionId] = useState<
     string | null
   >(null);
+  const [activeNpcSpeech, setActiveNpcSpeech] =
+    useState<ActiveNpcSpeech | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [statusPresentationTime, setStatusPresentationTime] = useState(() =>
     Date.now(),
@@ -3654,6 +3661,13 @@ function App() {
   const activeMovementClickFeedbackEvents = movementClickFeedbackEvents.filter(
     (event) => event.expiresAt > currentTime,
   );
+  const visibleNpcSpeech =
+    activeNpcSpeech &&
+    activeNpcSpeech.expiresAt > currentTime &&
+    (!activeNpcSpeech.mapId || activeNpcSpeech.mapId === currentMap.id) &&
+    gameState.entities[activeNpcSpeech.npcId]?.kind === "npc"
+      ? activeNpcSpeech
+      : null;
   const activeDirectCommandCount = Object.keys(
     directCompanionCommandsById,
   ).length;
@@ -3798,6 +3812,8 @@ function App() {
   }, []);
 
   const openNpcInteraction = useCallback((npc: NpcEntity) => {
+    setPendingNpcInteractionId(null);
+    setActiveNpcSpeech(createNpcSpeech(gameState, npc));
     const interactionKind = getNpcInteractionKind(npc);
 
     if (interactionKind === "merchant") {
@@ -3829,6 +3845,7 @@ function App() {
       openFarmLivestockInteraction(npc);
     }
   }, [
+    gameState,
     openBankChestInteraction,
     openFarmLivestockInteraction,
     openGuildTavernInteraction,
@@ -4249,11 +4266,14 @@ function App() {
     const previousMapId = previousInteractionMapIdRef.current;
     previousInteractionMapIdRef.current = currentMap.id;
 
-    if (
-      previousMapId !== currentMap.id &&
-      (activeMerchantNpcId || activeQuestGiverNpcId || pendingNpcInteractionId)
-    ) {
-      closeNpcInteractions();
+    if (previousMapId !== currentMap.id) {
+      if (
+        activeMerchantNpcId ||
+        activeQuestGiverNpcId ||
+        pendingNpcInteractionId
+      ) {
+        closeNpcInteractions();
+      }
     }
   }, [
     activeMerchantNpcId,
@@ -6584,9 +6604,10 @@ function App() {
     }
 
     const interactionKind = getNpcInteractionKind(npc);
+    const supportsSpeech = canNpcShowSpeech(npc);
     const interactionRange = getNpcInteractionRange(npc);
 
-    if (!interactionKind) {
+    if (!interactionKind && !supportsSpeech) {
       closeNpcInteractions();
       const approachTarget = resolveNpcInteractionApproachTarget(
         gameState,
@@ -6605,6 +6626,9 @@ function App() {
       leader &&
       getPositionDistance(leader.position, npc.position) <= interactionRange
     ) {
+      if (!interactionKind) {
+        closeNpcInteractions();
+      }
       openNpcInteraction(npc);
       return;
     }
@@ -6844,6 +6868,7 @@ function App() {
               mode="full"
               movementClickFeedbackEvents={activeMovementClickFeedbackEvents}
               navigationClickAccessibility={navigationClickAccessibility}
+              npcSpeech={visibleNpcSpeech}
               onCompanionDragCommand={commandCompanionByDrag}
               onEnemyClick={commandPartyToTargetEnemy}
               onEntityHover={updateEntityHoverTooltip}
