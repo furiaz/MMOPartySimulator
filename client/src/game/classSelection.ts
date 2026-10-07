@@ -3,7 +3,7 @@ import { isClassAllowedForEquipment } from "./equipmentRules";
 import { getItemDefinition } from "./items";
 import { BEGINNER_CLASS_UNLOCK_LEVEL } from "./leveling";
 import { setPartyMemberClass, type GameState } from "./state";
-import type { ClassId, Companion, ItemId } from "./types";
+import type { ClassId, Companion, EquipmentSlot, ItemId } from "./types";
 
 export type FirstClassSelectionFailureReason =
   | "companion_not_found"
@@ -150,11 +150,17 @@ function getIncompatibleEquipmentItemIds(
   companion: Companion,
   classId: FirstClassId,
 ): ItemId[] {
-  return Object.values(companion.equipment).filter((itemId): itemId is ItemId => {
+  return Object.entries(companion.equipment).flatMap(([slot, itemId]) => {
     if (!itemId) {
-      return false;
+      return [];
     }
 
-    return !isClassAllowedForEquipment(classId, getItemDefinition(itemId));
+    return isClassAllowedForEquipment(
+      classId,
+      getItemDefinition(itemId),
+      slot as EquipmentSlot,
+    )
+      ? []
+      : [itemId as ItemId];
   });
 }

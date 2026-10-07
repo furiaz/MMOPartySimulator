@@ -99,9 +99,9 @@ describe("enemy drop tables", () => {
     expect(rolls.map((roll) => roll.entry?.itemId)).toEqual([
       "goblin_ear_t2",
       "goblin_tooth_t2",
-      "holy_lantern",
+      "rune_lantern",
     ]);
-    expect(getItemDefinition("holy_lantern").category).toBe("equipment");
+    expect(getItemDefinition("rune_lantern").category).toBe("equipment");
   });
 
   it("uses explicit Superior drop tables for Superior enemies", () => {
@@ -186,7 +186,7 @@ describe("enemy drop tables", () => {
     expect(rolls.map((roll) => roll.entry?.itemId)).toEqual([
       "goblin_ear_t2",
       "goblin_tooth_t2",
-      "holy_lantern",
+      "rune_lantern",
     ]);
     expect(rolls[2]?.chance).toBe(0.2);
   });

@@ -149,7 +149,7 @@ export function validateEquipmentItemForCompanion(
     };
   }
 
-  if (!isClassAllowedForEquipment(companion.classId, itemDefinition)) {
+  if (!isClassAllowedForEquipment(companion.classId, itemDefinition, targetSlot)) {
     return {
       ok: false,
       reason: "invalid_class",
@@ -227,19 +227,30 @@ export function isEquipmentSlotCompatible(
   itemDefinition: ItemDefinition,
   targetSlot: EquipmentSlot,
 ): boolean {
-  if (
-    itemDefinition.equipmentKind === "accessory" &&
-    (targetSlot === "accessory1" || targetSlot === "accessory2")
-  ) {
-    return true;
+  return getEquipmentCompatibleSlots(itemDefinition).includes(targetSlot);
+}
+
+export function getEquipmentCompatibleSlots(
+  itemDefinition: ItemDefinition,
+): EquipmentSlot[] {
+  if (itemDefinition.equipmentKind === "accessory") {
+    return ["accessory1", "accessory2"];
   }
 
-  return itemDefinition.equipmentSlot === targetSlot;
+  if (!itemDefinition.equipmentSlot) {
+    return [];
+  }
+
+  return [
+    itemDefinition.equipmentSlot,
+    ...(itemDefinition.alternateEquipmentSlots ?? []),
+  ];
 }
 
 export function isClassAllowedForEquipment(
   classId: ClassId,
   itemDefinition: ItemDefinition,
+  targetSlot: EquipmentSlot,
 ): boolean {
   if (
     itemDefinition.equipmentKind === "armor" ||
@@ -249,7 +260,7 @@ export function isClassAllowedForEquipment(
   }
 
   if (
-    itemDefinition.equipmentSlot === "mainHand" &&
+    targetSlot === "mainHand" &&
     itemDefinition.equipmentType &&
     UNIVERSAL_MAIN_HAND_EQUIPMENT_TYPES.includes(
       itemDefinition.equipmentType as WeaponType,
@@ -258,21 +269,24 @@ export function isClassAllowedForEquipment(
     return true;
   }
 
-  if (itemDefinition.allowedClassIds) {
-    return itemDefinition.allowedClassIds.includes(classId);
+  if (
+    itemDefinition.allowedClassIds &&
+    !itemDefinition.allowedClassIds.includes(classId)
+  ) {
+    return false;
   }
 
   const profile = CLASS_EQUIPMENT_PROFILES[classId];
 
   if (
-    itemDefinition.equipmentSlot === "mainHand" &&
+    targetSlot === "mainHand" &&
     itemDefinition.equipmentType
   ) {
     return profile.mainHand.includes(itemDefinition.equipmentType as never);
   }
 
   if (
-    itemDefinition.equipmentSlot === "offhand" &&
+    targetSlot === "offhand" &&
     itemDefinition.equipmentType
   ) {
     return profile.offhand.includes(itemDefinition.equipmentType as never);

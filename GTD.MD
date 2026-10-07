@@ -669,7 +669,10 @@ React-facing browser storage helpers live in `client/src/saveStorage.ts`.
 
 Current save game behavior:
 
-- `SAVE_VERSION` is currently `1`
+- `SAVE_VERSION` is currently `2`
+- version-1 saves pass through the centralized `migrateSavedGameToCurrentVersion` migration before validation or sanitization
+- the version-1 migration remaps retired Holy Mace and Holy Lantern ids across the complete saved object, preserving inventory/bank quantities and fixed slot positions, then directly fills empty Blade, Hunter, Beast, and Elementalist offhands with a matching-tier item or the level-10 fallback
+- migration grants are limited to version 1; version-2 saves do not run them, and populated offhands are never overwritten
 - saved data includes `saveVersion`, `savedAtMs`, optional `offlineFarmingBlockedReason`, and sanitized `GameState`
 - validation rejects malformed saves, unsupported save versions, missing entities, invalid inventory, invalid bank, invalid key item state, invalid wallet, invalid quest state, invalid leader id, and invalid current map id
 - restore rebuilds the current debug map from saved quest state
@@ -3034,12 +3037,11 @@ type WeaponType =
   | "training_sword"
   | "one_handed_sword"
   | "one_handed_mace"
-  | "claw_gauntlets"
-  | "thorn_whip"
+  | "claw"
+  | "whip"
   | "bow"
   | "orb"
-  | "rune_lantern"
-  | "holy_mace";
+  | "lantern";
 ```
 
 Current offhand types are:
@@ -3047,10 +3049,21 @@ Current offhand types are:
 ```ts
 type OffhandType =
   | "shield"
+  | "quiver"
   | "talisman"
-  | "holy_lantern"
-  | "sacrificial_dagger";
+  | "dagger"
+  | "claw"
+  | "orb"
+  | "lantern";
 ```
+
+Equipment definitions keep one primary `equipmentSlot` and may add:
+
+```ts
+alternateEquipmentSlots?: EquipmentSlot[];
+```
+
+Only Claws, Orbs, and Lanterns currently use `alternateEquipmentSlots`, with `mainHand` primary and `offhand` alternate. `getEquipmentCompatibleSlots(itemDefinition)` is the shared source for slot compatibility in game rules and equipment presentation.
 
 Current armor types are:
 
@@ -3083,7 +3096,7 @@ Equipment rules validate:
 - inventory removal
 - inventory return on unequip
 
-Equipment validation helpers are shared game logic and may be used by equipment UI, merchant compatibility filtering, and first-class selection compatibility checks.
+Equipment validation helpers are shared game logic and may be used by equipment UI, merchant compatibility filtering, and first-class selection compatibility checks. Hand-equipment class validation is slot-aware through `isClassAllowedForEquipment(classId, itemDefinition, targetSlot)`: the requested slot must accept the item type in the class profile, and any item-level `allowedClassIds` restriction must also permit the class. Merchant compatibility succeeds when at least one compatible hand slot is allowed for the selected companion.
 - telemetry results
 
 `equipmentRules.ts` owns the shared universal main-hand compatibility rule. `getAllowedEquipmentTypeLabels` combines universal main-hand types with the selected class profile and removes duplicates. `classSelection.ts` consumes the same compatibility rule instead of duplicating equipment permissions.
@@ -3101,16 +3114,26 @@ Current universal starter/fallback weapon items include:
 
 Both use the `training_sword` equipment type, may be equipped by every current and future class, and remain equipped through first-class selection. They contribute only their existing item stats; class identity continues to determine attacks, attack range, projectiles, and skills.
 
-Current prototype class-restricted weapon and offhand items include:
+Current prototype class hand-equipment permissions are:
 
-- Blade: Iron Sword
-- Aegis: Guard Mace, Wooden Shield
-- Hunter: Short Bow
-- Beast: Claw Gauntlets
-- Elementalist: Apprentice Orb
-- Runecaster: Rune Lantern, Simple Talisman
-- Lightbearer: Holy Mace, Holy Lantern
-- Penitent: Thorn Whip, Sacrificial Dagger
+- Beginner: Training Sword, no offhand
+- Blade: One-Handed Sword, Dagger
+- Aegis: One-Handed Mace, Shield
+- Hunter: Bow, Quiver
+- Beast: Claw, Claw
+- Elementalist: Orb, Orb
+- Runecaster: Lantern, Talisman
+- Lightbearer: One-Handed Mace, Lantern
+- Penitent: Whip, Dagger
+
+The canonical consolidated level 10/15/20 lines are:
+
+- Mace: `guard_mace` / Iron Mace (Attack 2, Defense 2), `bastion_mace` / Steel Mace (Attack 4, Defense 3), `ironhold_mace` / Veteran Mace (Attack 5, Defense 4)
+- Dagger: `sacrificial_dagger` / Iron Dagger (Attack 2), `ritual_dagger` / Steel Dagger (Attack 3, Accuracy 1), `oath_dagger` / Veteran Dagger (Attack 4, Accuracy 2)
+- Lantern: `rune_lantern` / Simple Lantern (Magic Power 2, Healing Power 1, Magic Defense 1), `etched_rune_lantern` / Etched Lantern (Magic Power 3, Healing Power 2, Magic Defense 2), `deep_rune_lantern` / Greater Lantern (Magic Power 4, Healing Power 3, Magic Defense 2)
+- Quiver: `leather_quiver` (Accuracy 1, Evasion 1), `reinforced_quiver` (Attack 1, Accuracy 2, Evasion 1), `veteran_quiver` (Attack 2, Accuracy 2, Evasion 2)
+
+Fresh class selection changes only class state and does not grant hand equipment. Missing first-class offhands are granted only by the version-1 save migration.
 
 Current shared prototype armor families include:
 
@@ -3155,7 +3178,7 @@ Current quest equipment rewards may include:
 
 Current archetype-specific prototype equipment drops may include:
 
-- Holy Lantern from Goblin Shaman
+- Simple Lantern from Goblin Shaman
 
 Current prototype equipment primary stat modifiers may include:
 
@@ -3180,7 +3203,7 @@ Current prototype equipment derived stat modifiers may include:
 - criticalDamage
 - healthRegen
 
-Short Bow and Claw Gauntlets currently occupy both hands as prototype exceptions.
+Bows are one-slot Main Hand items and accept Quivers in the Offhand. Claws and Orbs are individual items compatible with either hand, and two equipped copies apply both copies' full stats. Lanterns are compatible with either hand at the item level, while class profiles restrict Runecaster Lanterns to Main Hand and Lightbearer Lanterns to Offhand. The `occupiesBothHands` framework remains available for future equipment, but current Bows and Claws do not use it.
 
 Equipment is a prototype foundation, not a full equipment economy.
 

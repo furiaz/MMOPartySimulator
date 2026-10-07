@@ -156,10 +156,12 @@ type ArmorPieceKey = "head" | "chest" | "legs" | "gloves" | "boots";
 type ArmorSetRecipeIds = Record<ArmorPieceKey, EquipmentItemId>;
 
 const CLASS_UPGRADE_EQUIPMENT_TYPE_ORDER: EquipmentType[] = [
-  ...CLASS_EQUIPMENT_PROFILES.beginner.mainHand,
-  ...FIRST_CLASS_IDS.flatMap((classId) => [
-    ...CLASS_EQUIPMENT_PROFILES[classId].mainHand,
-    ...CLASS_EQUIPMENT_PROFILES[classId].offhand,
+  ...new Set<EquipmentType>([
+    ...CLASS_EQUIPMENT_PROFILES.beginner.mainHand,
+    ...FIRST_CLASS_IDS.flatMap((classId) => [
+      ...CLASS_EQUIPMENT_PROFILES[classId].mainHand,
+      ...CLASS_EQUIPMENT_PROFILES[classId].offhand,
+    ]),
   ]),
 ];
 
@@ -609,15 +611,6 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     24,
   ),
   equipmentRecipe(
-    "holy_mace",
-    [
-      itemCost("iron_ore", 10),
-      itemCost("redleaf_herb", 8),
-      itemCost("goblin_tooth_t2", 1),
-    ],
-    22,
-  ),
-  equipmentRecipe(
     "wooden_shield",
     [
       itemCost("hardwood", 12),
@@ -636,13 +629,13 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     20,
   ),
   equipmentRecipe(
-    "holy_lantern",
+    "leather_quiver",
     [
-      itemCost("redleaf_herb", 12),
-      itemCost("wisp_ash_t2", 4),
-      itemCost("wisp_ember_t2", 1),
+      itemCost("hardwood", 10),
+      itemCost("orc_hide", 3),
+      itemCost("goblin_ear_t2", 3),
     ],
-    22,
+    20,
   ),
   equipmentRecipe(
     "sacrificial_dagger",
@@ -792,7 +785,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
   equipmentRecipe(
     "steel_claws",
     [
-      previousEquipmentCost("claw_gauntlets", undefined, 10),
+      previousEquipmentCost("claw", undefined, 10),
       itemCost("hardwood", 24),
       itemCost("wolf_pelt_t2", 8),
       itemCost("wolf_fang_t2", 2),
@@ -802,7 +795,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
   equipmentRecipe(
     "barbed_whip",
     [
-      previousEquipmentCost("thorn_whip", undefined, 10),
+      previousEquipmentCost("whip", undefined, 10),
       itemCost("redleaf_herb", 18),
       itemCost("imp_tail_t2", 3),
       itemCost("wolf_fang_t2", 2),
@@ -832,22 +825,12 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
   equipmentRecipe(
     "etched_rune_lantern",
     [
-      previousEquipmentCost("rune_lantern", undefined, 10),
+      previousEquipmentCost("lantern", undefined, 10),
       itemCost("redleaf_herb", 18),
       itemCost("iron_ore", 8),
       itemCost("crawler_plate_t2", 2),
     ],
     38,
-  ),
-  equipmentRecipe(
-    "sanctified_mace",
-    [
-      previousEquipmentCost("holy_mace", undefined, 10),
-      itemCost("iron_ore", 14),
-      itemCost("redleaf_herb", 12),
-      itemCost("imp_tail_t2", 2),
-    ],
-    36,
   ),
   equipmentRecipe(
     "reinforced_shield",
@@ -870,19 +853,19 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     34,
   ),
   equipmentRecipe(
-    "bright_lantern",
+    "reinforced_quiver",
     [
-      previousEquipmentCost("holy_lantern", undefined, 10),
-      itemCost("redleaf_herb", 20),
-      itemCost("imp_horn_chip_t2", 8),
-      itemCost("wolf_fang_t2", 1),
+      previousEquipmentCost("quiver", undefined, 10),
+      itemCost("hardwood", 16),
+      itemCost("wolf_pelt_t2", 6),
+      itemCost("crawler_plate_t2", 1),
     ],
-    36,
+    34,
   ),
   equipmentRecipe(
     "ritual_dagger",
     [
-      previousEquipmentCost("sacrificial_dagger", undefined, 10),
+      previousEquipmentCost("dagger", undefined, 10),
       itemCost("iron_ore", 12),
       itemCost("redleaf_herb", 10),
       itemCost("imp_tail_t2", 2),

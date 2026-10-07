@@ -447,10 +447,10 @@ describe("Smith crafting", () => {
       "adept_orb",
       "rune_lantern",
       "etched_rune_lantern",
-      "holy_mace",
-      "sanctified_mace",
       "thorn_whip",
       "barbed_whip",
+      "sacrificial_dagger",
+      "ritual_dagger",
     ]);
     expectRecipeGroupOrder(sortedRecipeIds, [
       "acolyte_hood",
@@ -676,6 +676,36 @@ describe("Smith crafting", () => {
       currentCount: 1,
       completed: true,
     });
+  });
+
+  it("defines one-item Quiver recipes at levels 10 and 15", () => {
+    expect(getCraftingRecipe("leather_quiver")).toMatchObject({
+      outputItemId: "leather_quiver",
+      outputQuantity: 1,
+      crownCost: 20,
+      costs: [
+        { kind: "item", itemId: "hardwood", quantity: 10 },
+        { kind: "item", itemId: "orc_hide", quantity: 3 },
+        { kind: "item", itemId: "goblin_ear_t2", quantity: 3 },
+      ],
+    });
+    expect(getCraftingRecipe("reinforced_quiver")).toMatchObject({
+      outputItemId: "reinforced_quiver",
+      outputQuantity: 1,
+      crownCost: 34,
+      costs: [
+        {
+          kind: "equipment",
+          equipmentType: "quiver",
+          levelRequirement: 10,
+          quantity: 1,
+        },
+        { kind: "item", itemId: "hardwood", quantity: 16 },
+        { kind: "item", itemId: "wolf_pelt_t2", quantity: 6 },
+        { kind: "item", itemId: "crawler_plate_t2", quantity: 1 },
+      ],
+    });
+    expect(getCraftingRecipe("veteran_quiver")).toBeUndefined();
   });
 
   it("defines bronze accessory recipes from Tin Ore and Copper Ore", () => {

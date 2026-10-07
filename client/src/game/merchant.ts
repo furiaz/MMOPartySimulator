@@ -31,7 +31,10 @@ import {
 } from "./questSystem";
 import type { GameState } from "./state";
 import { EQUIPMENT_SLOT_LABELS, EQUIPMENT_TYPE_LABELS } from "./equipmentTypes";
-import { isClassAllowedForEquipment } from "./equipmentRules";
+import {
+  getEquipmentCompatibleSlots,
+  isClassAllowedForEquipment,
+} from "./equipmentRules";
 import { SKILL_DEFINITIONS } from "./skills";
 import {
   addCurrencyToWalletState,
@@ -357,7 +360,6 @@ const BASE_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "short_bow", priceCrowns: 65, group: "weapons" },
   { itemId: "apprentice_orb", priceCrowns: 60, group: "weapons" },
   { itemId: "rune_lantern", priceCrowns: 60, group: "weapons" },
-  { itemId: "holy_mace", priceCrowns: 60, group: "weapons" },
   { itemId: "steel_sword", priceCrowns: 120, group: "weapons" },
   { itemId: "veteran_sword", priceCrowns: 180, group: "weapons" },
   { itemId: "bastion_mace", priceCrowns: 120, group: "weapons" },
@@ -372,17 +374,16 @@ const BASE_MERCHANT_BUY_STOCK: MerchantStockEntry[] = [
   { itemId: "storm_orb", priceCrowns: 180, group: "weapons" },
   { itemId: "etched_rune_lantern", priceCrowns: 120, group: "weapons" },
   { itemId: "deep_rune_lantern", priceCrowns: 180, group: "weapons" },
-  { itemId: "sanctified_mace", priceCrowns: 120, group: "weapons" },
-  { itemId: "dawn_mace", priceCrowns: 180, group: "weapons" },
   { itemId: "wooden_shield", priceCrowns: 45, group: "offhands" },
+  { itemId: "leather_quiver", priceCrowns: 40, group: "offhands" },
   { itemId: "simple_talisman", priceCrowns: 40, group: "offhands" },
   { itemId: "sacrificial_dagger", priceCrowns: 40, group: "offhands" },
   { itemId: "reinforced_shield", priceCrowns: 90, group: "offhands" },
   { itemId: "tower_shield", priceCrowns: 135, group: "offhands" },
+  { itemId: "reinforced_quiver", priceCrowns: 90, group: "offhands" },
+  { itemId: "veteran_quiver", priceCrowns: 135, group: "offhands" },
   { itemId: "warded_talisman", priceCrowns: 90, group: "offhands" },
   { itemId: "greater_talisman", priceCrowns: 135, group: "offhands" },
-  { itemId: "bright_lantern", priceCrowns: 90, group: "offhands" },
-  { itemId: "radiant_lantern", priceCrowns: 135, group: "offhands" },
   { itemId: "ritual_dagger", priceCrowns: 90, group: "offhands" },
   { itemId: "oath_dagger", priceCrowns: 135, group: "offhands" },
   { itemId: "acolyte_robe", priceCrowns: 82, group: "cloth" },
@@ -1676,18 +1677,15 @@ function isMerchantEquipmentCompatibleWithCompanion(
     return true;
   }
 
-  if (!itemDefinition.equipmentSlot || !itemDefinition.equipmentType) {
+  if (!itemDefinition.equipmentType) {
     return false;
   }
 
-  if (
-    itemDefinition.equipmentSlot !== "mainHand" &&
-    itemDefinition.equipmentSlot !== "offhand"
-  ) {
-    return false;
-  }
-
-  return isClassAllowedForEquipment(companion.classId, itemDefinition);
+  return getEquipmentCompatibleSlots(itemDefinition).some(
+    (slot) =>
+      (slot === "mainHand" || slot === "offhand") &&
+      isClassAllowedForEquipment(companion.classId, itemDefinition, slot),
+  );
 }
 
 export function recordMerchantInteractionOpened(

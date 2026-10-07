@@ -401,7 +401,12 @@ function getEquipmentDetailText(itemDefinition: ItemDefinition): string {
 
   return [
     itemDefinition.equipmentSlot
-      ? `Slot ${EQUIPMENT_SLOT_LABELS[itemDefinition.equipmentSlot]}`
+      ? `Slot ${[
+          itemDefinition.equipmentSlot,
+          ...(itemDefinition.alternateEquipmentSlots ?? []),
+        ]
+          .map((slot) => EQUIPMENT_SLOT_LABELS[slot])
+          .join(" / ")}`
       : null,
     itemDefinition.equipmentType
       ? `Type ${EQUIPMENT_TYPE_LABELS[itemDefinition.equipmentType]}`

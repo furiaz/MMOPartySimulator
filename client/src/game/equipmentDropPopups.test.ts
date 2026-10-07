@@ -32,7 +32,7 @@ describe("equipment drop popup preferences", () => {
   });
 
   it("compares equipment rarity inclusively and treats missing rarity as Common", () => {
-    const equipment = getItemDefinition("holy_lantern");
+    const equipment = getItemDefinition("rune_lantern");
     const rarityOrder: ItemRarity[] = [
       "common",
       "uncommon",
@@ -61,7 +61,7 @@ describe("equipment drop popup preferences", () => {
       shouldShowEquipmentDropPopup(getItemDefinition("softwood"), "common"),
     ).toBe(false);
     expect(
-      shouldShowEquipmentDropPopup(getItemDefinition("holy_lantern"), "off"),
+      shouldShowEquipmentDropPopup(getItemDefinition("rune_lantern"), "off"),
     ).toBe(false);
   });
 
