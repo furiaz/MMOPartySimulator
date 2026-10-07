@@ -467,7 +467,11 @@ function applyRecruitStartingEquipment(
     if (
       itemDefinition.category === "equipment" &&
       itemDefinition.equipmentSlot &&
-      isClassAllowedForEquipment(companion.classId, itemDefinition)
+      isClassAllowedForEquipment(
+        companion.classId,
+        itemDefinition,
+        itemDefinition.equipmentSlot,
+      )
     ) {
       equipment[itemDefinition.equipmentSlot] = itemId;
     }
@@ -515,7 +519,11 @@ function getRecruitEquipmentPool(level: number): ItemDefinition[] {
         Boolean(itemDefinition.equipmentSlot) &&
         (!itemDefinition.levelRequirement ||
           itemDefinition.levelRequirement <= level) &&
-        isClassAllowedForEquipment("beginner", itemDefinition),
+        isClassAllowedForEquipment(
+          "beginner",
+          itemDefinition,
+          itemDefinition.equipmentSlot!,
+        ),
     )
     .sort((a, b) => a.id.localeCompare(b.id));
 }

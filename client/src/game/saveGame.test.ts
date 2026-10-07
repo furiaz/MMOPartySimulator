@@ -49,7 +49,9 @@ import {
   claimPendingOfflineFarmingLoot,
   createSavedGame,
   MAX_OFFLINE_FARMING_MS,
+  migrateSavedGameToCurrentVersion,
   restoreGameStateFromSave,
+  SAVE_VERSION,
   sanitizeGameStateForSave,
   validateSavedGame,
 } from "./saveGame";
@@ -65,13 +67,227 @@ describe("save game serialization", () => {
     vi.useRealTimers();
   });
 
-  it("validates v1 saves and rejects malformed saves", () => {
+  it("validates current saves and rejects malformed or future saves", () => {
     const state = createWildState("fighter");
     const save = createSavedGame(state, NOW_MS);
 
     expect(validateSavedGame(save).ok).toBe(true);
     expect(validateSavedGame({ ...save, saveVersion: 999 }).ok).toBe(false);
     expect(validateSavedGame({ ...save, state: { ...save.state, entities: null } }).ok).toBe(false);
+  });
+
+  it("migrates every persisted legacy item container before validation", () => {
+    const migrated = migrateSavedGameToCurrentVersion({
+      saveVersion: 1,
+      savedAtMs: NOW_MS,
+      state: {
+        inventory: {
+          capacity: 3,
+          slots: [{ itemId: "holy_mace", quantity: 2 }],
+        },
+        bank: {
+          slots: [{ itemId: "sanctified_mace", quantity: 3, slotIndex: 4 }],
+        },
+        pendingOfflineFarmingLoot: {
+          rolledLoot: [{ itemId: "dawn_mace", quantity: 1 }],
+          collectedLoot: [{ itemId: "holy_lantern", quantity: 1 }],
+          pendingLoot: [{ itemId: "bright_lantern", quantity: 1 }],
+        },
+        slimewardDungeon: {
+          chest: {
+            rolledLoot: [{ itemId: "radiant_lantern", quantity: 1 }],
+            collectedLoot: [{ itemId: "holy_mace", quantity: 1 }],
+            pendingLoot: [{ itemId: "sanctified_mace", quantity: 1 }],
+          },
+        },
+        guildRecruit: {
+          candidates: [{ equipmentItemIds: ["holy_lantern", "dawn_mace"] }],
+        },
+        guildSecondaryParties: {
+          preview: { expectedDrop: { itemId: "bright_lantern" } },
+          pendingResult: {
+            loot: [{ itemId: "radiant_lantern", quantity: 1 }],
+            resources: [{ itemId: "holy_mace", quantity: 1 }],
+          },
+        },
+      },
+    });
+
+    expect(migrated).toMatchObject({
+      saveVersion: SAVE_VERSION,
+      state: {
+        inventory: {
+          slots: [{ itemId: "guard_mace", quantity: 2 }],
+        },
+        bank: {
+          slots: [{ itemId: "bastion_mace", quantity: 3, slotIndex: 4 }],
+        },
+        pendingOfflineFarmingLoot: {
+          rolledLoot: [{ itemId: "ironhold_mace", quantity: 1 }],
+          collectedLoot: [{ itemId: "rune_lantern", quantity: 1 }],
+          pendingLoot: [{ itemId: "etched_rune_lantern", quantity: 1 }],
+        },
+        slimewardDungeon: {
+          chest: {
+            rolledLoot: [{ itemId: "deep_rune_lantern", quantity: 1 }],
+            collectedLoot: [{ itemId: "guard_mace", quantity: 1 }],
+            pendingLoot: [{ itemId: "bastion_mace", quantity: 1 }],
+          },
+        },
+        guildRecruit: {
+          candidates: [
+            { equipmentItemIds: ["rune_lantern", "ironhold_mace"] },
+          ],
+        },
+        guildSecondaryParties: {
+          preview: { expectedDrop: { itemId: "etched_rune_lantern" } },
+          pendingResult: {
+            loot: [{ itemId: "deep_rune_lantern", quantity: 1 }],
+            resources: [{ itemId: "guard_mace", quantity: 1 }],
+          },
+        },
+      },
+    });
+  });
+
+  it("grants matching missing offhands to active and resting v1 companions once", () => {
+    const blade = {
+      ...createCompanion(
+        "blade",
+        { x: 14, y: 29 },
+        "blade",
+        "fighter",
+        0,
+        "blade",
+      ),
+      characterLevel: 15,
+      equipment: {
+        ...createCompanion("template", { x: 0, y: 0 }, "template").equipment,
+        mainHand: "steel_sword" as const,
+        offhand: null,
+      },
+    };
+    const hunter = {
+      ...createCompanion(
+        "hunter",
+        { x: 15, y: 29 },
+        "blade",
+        "fighter",
+        1,
+        "hunter",
+      ),
+      equipment: {
+        ...createCompanion("template", { x: 0, y: 0 }, "template").equipment,
+        mainHand: "training_sword" as const,
+        offhand: null,
+      },
+    };
+    const occupiedBlade = {
+      ...createCompanion(
+        "occupied-blade",
+        { x: 16, y: 29 },
+        "blade",
+        "fighter",
+        2,
+        "blade",
+      ),
+      equipment: {
+        ...createCompanion("template", { x: 0, y: 0 }, "template").equipment,
+        mainHand: "iron_sword" as const,
+        offhand: "wooden_shield" as const,
+      },
+    };
+    const beast = {
+      ...createCompanion(
+        "beast",
+        { x: 0, y: 0 },
+        "beast",
+        "fighter",
+        0,
+        "beast",
+      ),
+      equipment: {
+        ...createCompanion("template", { x: 0, y: 0 }, "template").equipment,
+        mainHand: "rending_claws" as const,
+        offhand: null,
+      },
+    };
+    const elementalist = {
+      ...createCompanion(
+        "elementalist",
+        { x: 0, y: 0 },
+        "elementalist",
+        "fighter",
+        0,
+        "elementalist",
+      ),
+      equipment: {
+        ...createCompanion("template", { x: 0, y: 0 }, "template").equipment,
+        mainHand: "adept_orb" as const,
+        offhand: null,
+      },
+    };
+    const currentSave = createSavedGame(
+      createTestGameState({
+        entities: {
+          [blade.id]: blade,
+          [hunter.id]: hunter,
+          [occupiedBlade.id]: occupiedBlade,
+        },
+        restingCompanionsById: {
+          [beast.id]: beast,
+          [elementalist.id]: elementalist,
+        },
+        partyLeaderId: blade.id,
+      }),
+      NOW_MS,
+    );
+    const validation = validateSavedGame({ ...currentSave, saveVersion: 1 });
+
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) {
+      return;
+    }
+
+    expect(validation.save.saveVersion).toBe(SAVE_VERSION);
+    expect((validation.save.state.entities[blade.id] as Companion).equipment.offhand)
+      .toBe("ritual_dagger");
+    expect((validation.save.state.entities[hunter.id] as Companion).equipment.offhand)
+      .toBe("leather_quiver");
+    expect(
+      (validation.save.state.entities[occupiedBlade.id] as Companion).equipment.offhand,
+    ).toBe("wooden_shield");
+    expect(validation.save.state.restingCompanionsById?.[beast.id]?.equipment.offhand)
+      .toBe("rending_claws");
+    expect(
+      validation.save.state.restingCompanionsById?.[elementalist.id]?.equipment.offhand,
+    ).toBe("adept_orb");
+
+    const currentVersionBlade = {
+      ...(validation.save.state.entities[blade.id] as Companion),
+      equipment: {
+        ...(validation.save.state.entities[blade.id] as Companion).equipment,
+        offhand: null,
+      },
+    };
+    const currentVersionValidation = validateSavedGame({
+      ...validation.save,
+      state: {
+        ...validation.save.state,
+        entities: {
+          ...validation.save.state.entities,
+          [blade.id]: currentVersionBlade,
+        },
+      },
+    });
+
+    expect(currentVersionValidation.ok).toBe(true);
+    if (currentVersionValidation.ok) {
+      expect(
+        (currentVersionValidation.save.state.entities[blade.id] as Companion)
+          .equipment.offhand,
+      ).toBeNull();
+    }
   });
 
   it("restores deterministic map data and clears transient runtime state", () => {

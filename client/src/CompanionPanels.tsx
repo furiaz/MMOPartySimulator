@@ -57,6 +57,7 @@ import {
   getCompanionDerivedStatsWithPartyBuffs,
   getCompanionEffectiveGatherSpeed,
   getDefenseReductionPercent,
+  getEquipmentCompatibleSlots,
   getItemDefinition,
   getActiveSkillsForCompanion,
   getCompanionSkillRank,
@@ -1576,11 +1577,7 @@ function getGroupedConsumableInventorySlots(
 }
 
 function getTargetSlotsForItem(itemDefinition: ItemDefinition): EquipmentSlot[] {
-  if (itemDefinition.equipmentKind === "accessory") {
-    return ["accessory1", "accessory2"];
-  }
-
-  return itemDefinition.equipmentSlot ? [itemDefinition.equipmentSlot] : [];
+  return getEquipmentCompatibleSlots(itemDefinition);
 }
 
 function canShowInventoryItemForSlot(

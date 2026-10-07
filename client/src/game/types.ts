@@ -223,18 +223,20 @@ export type WeaponType =
   | "training_sword"
   | "one_handed_sword"
   | "one_handed_mace"
-  | "claw_gauntlets"
-  | "thorn_whip"
+  | "claw"
+  | "whip"
   | "bow"
   | "orb"
-  | "rune_lantern"
-  | "holy_mace";
+  | "lantern";
 
 export type OffhandType =
   | "shield"
+  | "quiver"
   | "talisman"
-  | "holy_lantern"
-  | "sacrificial_dagger";
+  | "dagger"
+  | "claw"
+  | "orb"
+  | "lantern";
 
 export type ArmorType =
   | "head_armor"
@@ -358,18 +360,15 @@ export type EquipmentItemId =
   | "rune_lantern"
   | "etched_rune_lantern"
   | "deep_rune_lantern"
-  | "holy_mace"
-  | "sanctified_mace"
-  | "dawn_mace"
   | "wooden_shield"
   | "reinforced_shield"
   | "tower_shield"
+  | "leather_quiver"
+  | "reinforced_quiver"
+  | "veteran_quiver"
   | "simple_talisman"
   | "warded_talisman"
   | "greater_talisman"
-  | "holy_lantern"
-  | "bright_lantern"
-  | "radiant_lantern"
   | "sacrificial_dagger"
   | "ritual_dagger"
   | "oath_dagger"
@@ -672,6 +671,7 @@ export type ItemDefinition = {
   buffDurationMs?: number;
   skillBookSkillId?: SkillId;
   equipmentSlot?: EquipmentSlot;
+  alternateEquipmentSlots?: EquipmentSlot[];
   equipmentKind?: EquipmentKind;
   equipmentType?: EquipmentType;
   armorFamily?: ArmorFamily;

@@ -749,8 +749,8 @@ Current enemy drop behavior:
 - archetype/tier drops route enemy-part material items into shared inventory
 - Superior enemies use higher-yield prototype drop tables where supported
 - Azure Mass currently has a type-specific Slime loot table
-- Goblin Shaman may also roll a low-chance type-specific Holy Lantern equipment drop at Tier 2
-- Superior Goblin Shaman has a higher prototype Holy Lantern drop chance
+- Goblin Shaman may also roll a low-chance type-specific Simple Lantern equipment drop at Tier 2
+- Superior Goblin Shaman has a higher prototype Simple Lantern drop chance
 - drop results use short-lived visual feedback before being routed into shared inventory
 - drops do not create persistent ground loot
 - inventory overflow may partially or fully reject dropped items
@@ -768,7 +768,7 @@ Current prototype drop chances:
 - Mossling Tier 1: Moss Tuft 55%, Mossling Cap 7%
 - Wisp Tier 2: Wisp Ash 55%, Wisp Ember 7%
 - Orc Tier 2: Orc Hide 55%, Orc Tusk 7%
-- Goblin Shaman Tier 2 archetype drop: Holy Lantern 2%
+- Goblin Shaman Tier 2 archetype drop: Simple Lantern 2%
 
 Current prototype gathered materials:
 
@@ -808,7 +808,7 @@ Current prototype enemy-part material drops may include:
 
 Current prototype enemy equipment drops may include:
 
-- Holy Lantern from Goblin Shaman
+- Simple Lantern from Goblin Shaman
 
 Current merchant behavior:
 
@@ -930,37 +930,38 @@ Current prototype class equipment permissions:
 
 - Universal starter/fallback: Training Sword-type main-hand weapons may be equipped by every current and future class
 - Beginner: no specialized weapon type, no offhand; uses the universal Training Sword type
-- Blade: One-Handed Sword, no offhand
+- Blade: One-Handed Sword, Dagger
 - Aegis: One-Handed Mace, Shield
-- Hunter: Bow, no offhand
-- Beast: Claw Gauntlets, no offhand
-- Elementalist: Orb, no offhand
-- Runecaster: Rune Lantern, Talisman
-- Lightbearer: Holy Mace, Holy Lantern
-- Penitent: Thorn Whip, Sacrificial Dagger
+- Hunter: Bow, Quiver
+- Beast: Claw, Claw
+- Elementalist: Orb, Orb
+- Runecaster: Lantern, Talisman
+- Lightbearer: One-Handed Mace, Lantern
+- Penitent: Whip, Dagger
 
 Training Sword-type weapons, including Training Sword and Copper Training Sword, remain equipped through first-class selection and may be re-equipped by every class. They contribute only their existing item stats; class identity continues to determine attacks, attack range, projectiles, and skills.
 
-All specialized class weapons and offhands remain restricted to their listed class permissions.
+All specialized class weapons and offhands remain restricted to their listed class permissions and requested equipment slot. Claws, Orbs, and Lanterns may define both Main Hand and Offhand as compatible item slots, but the class profile still decides which of those slots each class may use. This supports Beast and Elementalist using two separately owned copies while preventing unrestricted dual wielding or invalid Lantern placement.
+
+Fresh first-class selection does not grant equipment. The free Dagger, Quiver, second Claw, or second Orb is limited to automatic migration of existing version-1 saves.
 
 Current prototype weapon and offhand item examples include:
 
 - Training Sword
 - Copper Training Sword
 - Iron Sword
-- Guard Mace
-- Claw Gauntlets
+- Iron Mace
+- Claw Gauntlet
 - Thorn Whip
 - Short Bow
 - Apprentice Orb
-- Rune Lantern
-- Holy Mace
+- Simple Lantern
 - Wooden Shield
+- Leather Quiver
 - Simple Talisman
-- Holy Lantern
-- Sacrificial Dagger
+- Iron Dagger
 
-Bow and Claw Gauntlets may occupy both hands as lightweight prototype exceptions.
+Bows use the Main Hand while Quivers use the Offhand. Claws and Orbs are separate one-item-per-hand equipment lines; each equipped copy contributes its full item stats. The existing both-hands equipment framework remains available for future explicitly two-handed equipment, but current Bows and Claws do not use it.
 
 Armor and accessories are currently shared prototype equipment categories and are not class-restricted unless explicitly defined later.
 
@@ -1015,7 +1016,7 @@ Current prototype quest equipment rewards may include:
 
 Current archetype-specific prototype equipment drops may include:
 
-- Holy Lantern from Goblin Shaman
+- Simple Lantern from Goblin Shaman
 
 This is a prototype equipment foundation, not a full equipment economy.
 
@@ -2747,6 +2748,9 @@ Current prototype save behavior:
 - starting a new game over an existing save asks for confirmation
 - deleting a save asks for confirmation
 - save files use a prototype save version
+- current save schema version is `2`; the existing `mmo-party-simulator.save.v1` browser-storage key remains unchanged so older local saves stay discoverable
+- version-1 saves automatically migrate removed Holy Mace and Holy Lantern item ids to the surviving Mace and Lantern lines before normal validation and sanitization
+- version-1 migration directly fills an empty Blade, Hunter, Beast, or Elementalist offhand with the matching-tier Dagger, Quiver, Claw, or Orb, using the level-10 item as fallback; occupied offhands are never replaced and version-2 saves do not repeat the grant
 - invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
 - restored saves rebuild the current prototype map from saved quest state
 - restored saves preserve valid shared inventory, wallet, bank, key item, quest, companion, Guild & Inn, world discovery, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers

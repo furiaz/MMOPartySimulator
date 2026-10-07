@@ -94,7 +94,7 @@ describe("enemy drop system", () => {
       dropVisualEvents: [
         createDropVisualEvent({
           enemyId: "wolf",
-          itemId: "holy_lantern",
+          itemId: "rune_lantern",
           now,
           currentMapId: MAP_ONE_ID,
         }),
@@ -118,7 +118,7 @@ describe("enemy drop system", () => {
       dropVisualEvents: [
         createDropVisualEvent({
           enemyId: "goblin-shaman",
-          itemId: "holy_lantern",
+          itemId: "rune_lantern",
           now,
           currentMapId: MAP_ONE_ID,
         }),
@@ -128,13 +128,13 @@ describe("enemy drop system", () => {
     const nextState = updateDropSystem(state, now + DROP_VISUAL_DURATION_MS);
 
     expect(nextState.inventory.slots).toEqual([
-      { itemId: "holy_lantern", quantity: 1 },
+      { itemId: "rune_lantern", quantity: 1 },
     ]);
-    expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Holy Lantern");
+    expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Simple Lantern");
     expect(nextState.newsBroadcasts?.at(-1)).toMatchObject({
       title: "Equipment Acquired",
-      text: "Obtained: Holy Lantern",
-      details: ["Obtained: Holy Lantern"],
+      text: "Obtained: Simple Lantern",
+      details: ["Obtained: Simple Lantern"],
     });
   });
 
@@ -149,7 +149,7 @@ describe("enemy drop system", () => {
         dropVisualEvents: [
           createDropVisualEvent({
             enemyId: "goblin-shaman",
-            itemId: "holy_lantern",
+            itemId: "rune_lantern",
             now,
             currentMapId: MAP_ONE_ID,
           }),
@@ -159,9 +159,9 @@ describe("enemy drop system", () => {
       const nextState = updateDropSystem(state, now + DROP_VISUAL_DURATION_MS);
 
       expect(nextState.inventory.slots).toEqual([
-        { itemId: "holy_lantern", quantity: 1 },
+        { itemId: "rune_lantern", quantity: 1 },
       ]);
-      expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Holy Lantern");
+      expect(nextState.combatFeedbackEvents.at(-1)?.text).toBe("Simple Lantern");
       expect(nextState.newsBroadcasts).toEqual([]);
     },
   );

@@ -21,14 +21,12 @@ const SCALED_EQUIPMENT_LEVEL_REQUIREMENTS: Partial<Record<ItemId, number>> = {
   storm_orb: 20,
   etched_rune_lantern: 15,
   deep_rune_lantern: 20,
-  sanctified_mace: 15,
-  dawn_mace: 20,
   reinforced_shield: 15,
   tower_shield: 20,
   warded_talisman: 15,
   greater_talisman: 20,
-  bright_lantern: 15,
-  radiant_lantern: 20,
+  reinforced_quiver: 15,
+  veteran_quiver: 20,
   ritual_dagger: 15,
   oath_dagger: 20,
   bastion_helm: 15,
@@ -299,7 +297,7 @@ describe("prototype item definitions", () => {
       SCALED_EQUIPMENT_LEVEL_REQUIREMENTS,
     );
 
-    expect(scaledEquipmentEntries).toHaveLength(106);
+    expect(scaledEquipmentEntries).toHaveLength(104);
 
     for (const [itemId, levelRequirement] of scaledEquipmentEntries) {
       const itemDefinition = ITEM_DEFINITIONS[itemId as ItemId];
@@ -344,6 +342,71 @@ describe("prototype item definitions", () => {
     expect(
       ITEM_DEFINITIONS.copper_training_sword.allowedClassIds,
     ).toBeUndefined();
+  });
+
+  it("defines the consolidated hand-equipment lines with their exact stats", () => {
+    expect(ITEM_DEFINITIONS.guard_mace).toMatchObject({
+      displayName: "Iron Mace",
+      equipmentType: "one_handed_mace",
+      allowedClassIds: ["aegis", "lightbearer"],
+      statModifiers: { attack: 2, defense: 2 },
+    });
+    expect(ITEM_DEFINITIONS.bastion_mace).toMatchObject({
+      displayName: "Steel Mace",
+      statModifiers: { attack: 4, defense: 3 },
+    });
+    expect(ITEM_DEFINITIONS.ironhold_mace).toMatchObject({
+      displayName: "Veteran Mace",
+      statModifiers: { attack: 5, defense: 4 },
+    });
+
+    expect(ITEM_DEFINITIONS.sacrificial_dagger).toMatchObject({
+      displayName: "Iron Dagger",
+      equipmentType: "dagger",
+      allowedClassIds: ["blade", "penitent"],
+      statModifiers: { attack: 2 },
+    });
+    expect(ITEM_DEFINITIONS.ritual_dagger).toMatchObject({
+      displayName: "Steel Dagger",
+      statModifiers: { attack: 3, accuracy: 1 },
+    });
+    expect(ITEM_DEFINITIONS.oath_dagger).toMatchObject({
+      displayName: "Veteran Dagger",
+      statModifiers: { attack: 4, accuracy: 2 },
+    });
+
+    expect(ITEM_DEFINITIONS.rune_lantern).toMatchObject({
+      displayName: "Simple Lantern",
+      equipmentType: "lantern",
+      alternateEquipmentSlots: ["offhand"],
+      allowedClassIds: ["runecaster", "lightbearer"],
+      statModifiers: { magicPower: 2, healingPower: 1, magicDefense: 1 },
+    });
+    expect(ITEM_DEFINITIONS.etched_rune_lantern.statModifiers).toEqual({
+      magicPower: 3,
+      healingPower: 2,
+      magicDefense: 2,
+    });
+    expect(ITEM_DEFINITIONS.deep_rune_lantern.statModifiers).toEqual({
+      magicPower: 4,
+      healingPower: 3,
+      magicDefense: 2,
+    });
+
+    expect(ITEM_DEFINITIONS.leather_quiver.statModifiers).toEqual({
+      accuracy: 1,
+      evasion: 1,
+    });
+    expect(ITEM_DEFINITIONS.reinforced_quiver.statModifiers).toEqual({
+      attack: 1,
+      accuracy: 2,
+      evasion: 1,
+    });
+    expect(ITEM_DEFINITIONS.veteran_quiver.statModifiers).toEqual({
+      attack: 2,
+      accuracy: 2,
+      evasion: 2,
+    });
   });
 
   it("classifies enemy drops as enemy-part materials instead of junk", () => {
@@ -483,7 +546,7 @@ describe("prototype item definitions", () => {
     }
   });
 
-  it("keeps early equipment to two stat lines without removed crit lines", () => {
+  it("keeps early equipment compact while allowing three-stat Lanterns and Quivers", () => {
     const earlyEquipmentItems = Object.values(ITEM_DEFINITIONS).filter(
       (itemDefinition) =>
         itemDefinition.category === "equipment" &&
@@ -496,7 +559,15 @@ describe("prototype item definitions", () => {
         itemDefinition.primaryStatModifiers ?? {},
       ).length;
 
-      expect(statModifierCount + primaryStatModifierCount).toBeLessThanOrEqual(2);
+      const maximumStatLineCount =
+        itemDefinition.equipmentType === "lantern" ||
+        itemDefinition.equipmentType === "quiver"
+          ? 3
+          : 2;
+
+      expect(statModifierCount + primaryStatModifierCount).toBeLessThanOrEqual(
+        maximumStatLineCount,
+      );
       expect(itemDefinition.statModifiers?.criticalChance).toBeUndefined();
       expect(itemDefinition.statModifiers?.criticalDamage).toBeUndefined();
     }

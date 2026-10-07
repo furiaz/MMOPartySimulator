@@ -74,7 +74,40 @@ const OBSOLETE_FOOD_ITEM_IDS = new Set<string>([
   "skirmisher_rations",
 ]);
 
-export const SAVE_VERSION = 1;
+const LEGACY_ITEM_ID_MAPPINGS: Readonly<Record<string, ItemId>> = {
+  holy_mace: "guard_mace",
+  sanctified_mace: "bastion_mace",
+  dawn_mace: "ironhold_mace",
+  holy_lantern: "rune_lantern",
+  bright_lantern: "etched_rune_lantern",
+  radiant_lantern: "deep_rune_lantern",
+};
+
+const BLADE_DAGGER_BY_SWORD: Readonly<Record<string, ItemId>> = {
+  iron_sword: "sacrificial_dagger",
+  steel_sword: "ritual_dagger",
+  veteran_sword: "oath_dagger",
+};
+
+const HUNTER_QUIVER_BY_BOW: Readonly<Record<string, ItemId>> = {
+  short_bow: "leather_quiver",
+  reinforced_bow: "reinforced_quiver",
+  veteran_warbow: "veteran_quiver",
+};
+
+const BEAST_CLAW_ITEM_IDS = new Set<string>([
+  "claw_gauntlets",
+  "steel_claws",
+  "rending_claws",
+]);
+
+const ELEMENTALIST_ORB_ITEM_IDS = new Set<string>([
+  "apprentice_orb",
+  "adept_orb",
+  "storm_orb",
+]);
+
+export const SAVE_VERSION = 2;
 export const MAX_OFFLINE_FARMING_MS = 30 * 60 * 1000;
 
 export type SavedGame = {
@@ -135,23 +168,25 @@ export function createSavedGame(
 }
 
 export function validateSavedGame(value: unknown): SaveValidationResult {
-  if (!isRecord(value)) {
+  const migratedValue = migrateSavedGameToCurrentVersion(value);
+
+  if (!isRecord(migratedValue)) {
     return { ok: false, reason: "Save data is not an object." };
   }
 
-  if (value.saveVersion !== SAVE_VERSION) {
+  if (migratedValue.saveVersion !== SAVE_VERSION) {
     return { ok: false, reason: "Save version is not supported." };
   }
 
-  if (!Number.isFinite(value.savedAtMs)) {
+  if (!Number.isFinite(migratedValue.savedAtMs)) {
     return { ok: false, reason: "Save timestamp is invalid." };
   }
 
-  if (!isRecord(value.state)) {
+  if (!isRecord(migratedValue.state)) {
     return { ok: false, reason: "Save state is missing." };
   }
 
-  const state = value.state as Partial<GameState>;
+  const state = migratedValue.state as Partial<GameState>;
 
   if (!isRecord(state.entities)) {
     return { ok: false, reason: "Save entities are missing." };
@@ -186,8 +221,113 @@ export function validateSavedGame(value: unknown): SaveValidationResult {
 
   return {
     ok: true,
-    save: value as SavedGame,
+    save: migratedValue as SavedGame,
   };
+}
+
+export function migrateSavedGameToCurrentVersion(value: unknown): unknown {
+  if (!isRecord(value) || value.saveVersion !== 1) {
+    return value;
+  }
+
+  const migratedValue = remapLegacyItemIds(value);
+
+  if (!isRecord(migratedValue)) {
+    return value;
+  }
+
+  if (isRecord(migratedValue.state)) {
+    grantMissingFirstClassOffhands(migratedValue.state);
+  }
+
+  return {
+    ...migratedValue,
+    saveVersion: SAVE_VERSION,
+  };
+}
+
+function remapLegacyItemIds(value: unknown): unknown {
+  if (typeof value === "string") {
+    return LEGACY_ITEM_ID_MAPPINGS[value] ?? value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(remapLegacyItemIds);
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      remapLegacyItemIds(nestedValue),
+    ]),
+  );
+}
+
+function grantMissingFirstClassOffhands(state: Record<string, unknown>): void {
+  grantMissingFirstClassOffhandsInCollection(state.entities);
+  grantMissingFirstClassOffhandsInCollection(state.restingCompanionsById);
+}
+
+function grantMissingFirstClassOffhandsInCollection(value: unknown): void {
+  if (!isRecord(value)) {
+    return;
+  }
+
+  for (const entity of Object.values(value)) {
+    if (
+      !isRecord(entity) ||
+      entity.kind !== "companion" ||
+      !isRecord(entity.equipment) ||
+      entity.equipment.offhand
+    ) {
+      continue;
+    }
+
+    const mainHand =
+      typeof entity.equipment.mainHand === "string"
+        ? entity.equipment.mainHand
+        : undefined;
+    const offhand = getMigratedOffhandItemId(entity.classId, mainHand);
+
+    if (offhand) {
+      entity.equipment.offhand = offhand;
+    }
+  }
+}
+
+function getMigratedOffhandItemId(
+  classId: unknown,
+  mainHand: string | undefined,
+): ItemId | undefined {
+  if (classId === "blade") {
+    return mainHand
+      ? BLADE_DAGGER_BY_SWORD[mainHand] ?? "sacrificial_dagger"
+      : "sacrificial_dagger";
+  }
+
+  if (classId === "hunter") {
+    return mainHand
+      ? HUNTER_QUIVER_BY_BOW[mainHand] ?? "leather_quiver"
+      : "leather_quiver";
+  }
+
+  if (classId === "beast") {
+    return mainHand && BEAST_CLAW_ITEM_IDS.has(mainHand)
+      ? (mainHand as ItemId)
+      : "claw_gauntlets";
+  }
+
+  if (classId === "elementalist") {
+    return mainHand && ELEMENTALIST_ORB_ITEM_IDS.has(mainHand)
+      ? (mainHand as ItemId)
+      : "apprentice_orb";
+  }
+
+  return undefined;
 }
 
 export function restoreGameStateFromSave(value: unknown): RestoreSaveResult {
