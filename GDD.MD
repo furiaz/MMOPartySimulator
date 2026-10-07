@@ -1564,6 +1564,16 @@ The Quest Giver in Harbor Union Bastion can accept available Quest Giver quests 
 
 The Class Mentor may act as the current prototype quest source for The Azure Trial.
 
+Current lightweight NPC speech bubble behavior:
+
+- interacting with a supported character NPC may show one short-lived, non-branching speech bubble near that NPC after the party reaches interaction range
+- service NPC speech may provide a short role tip while the existing service UI opens normally
+- Quest Giver and Class Mentor speech may reflect ready, available, or active quest state through authored hints
+- supported dog NPCs may show a short bark without opening a service panel
+- speech is presentation-only, does not pause simulation, does not persist in saves, and does not change quest or NPC behavior
+- Bank Chests, dungeon chests, and temporary quest-objective NPCs do not use this speech presentation
+- this does not implement branching dialogue, choices, conversation history, relationships, cutscenes, or a full dialogue system
+
 Current prototype quest guide behavior:
 
 - temporary quest guide NPCs may be spawned for active guide or rescue objectives

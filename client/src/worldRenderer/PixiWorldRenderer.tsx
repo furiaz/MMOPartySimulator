@@ -37,6 +37,7 @@ import type {
   LeaderIntent,
   MapVisualObject,
   NavigationClickAccessibility,
+  NpcEntity,
   PartyIntent,
   Position,
   ResurrectionProgressState,
@@ -75,10 +76,15 @@ import {
 } from "../visualAssets";
 import { PUBLIC_ASSET_ROOT } from "../publicAssetUrl";
 import {
+  getNpcSpeechOpacity,
+  type ActiveNpcSpeech,
+} from "../npcSpeechPresentation";
+import {
   createRendererFrameScheduler,
   doOverheadUiBoxesOverlap,
   getDotDamageIconSrc,
   getFullRenderSignature,
+  getNpcSpeechBubbleLayout,
   getOverheadStatusPresentation,
   getPreviewRenderSignature,
   isStaticMapSpriteKey,
@@ -168,6 +174,15 @@ const overheadHealthHeight = 4;
 const overheadStatusTextColor = 0xffffff;
 const overheadStatusTextStrokeColor = 0x020617;
 const overheadStatusTextStrokeWidth = 4;
+const npcSpeechBackgroundColor = 0xfff2cf;
+const npcSpeechBorderColor = 0x3a2d24;
+const npcSpeechShadowColor = 0x1f1712;
+const npcSpeechTextColor = 0x2b211b;
+const npcSpeechHorizontalPadding = 12;
+const npcSpeechVerticalPadding = 9;
+const npcSpeechMinimumWidth = 96;
+const npcSpeechMaximumWidth = 260;
+const npcSpeechFontSize = 13;
 
 type EntityOverheadUiLayout = OverheadUiBox & {
   healthY: number;
@@ -270,6 +285,7 @@ type PixiWorldRendererProps = {
   mode?: PixiRendererMode;
   movementClickFeedbackEvents?: MovementClickFeedbackEvent[];
   navigationClickAccessibility?: NavigationClickAccessibility | null;
+  npcSpeech?: ActiveNpcSpeech | null;
   onEnemyClick?: (enemyId: string) => void;
   onCompanionDragCommand?: (command: CompanionDirectCommandInput) => void;
   onEntityHover?: (
@@ -352,7 +368,13 @@ type PixiRenderLayers = {
   floorLayer: Container;
   objectLayer: Container;
   overlayGraphics: Graphics;
+  speechLayer: Container;
   wallLayer: Container;
+};
+
+type NpcSpeechLayerState = {
+  alpha: number;
+  signature: string | null;
 };
 
 type TextureCache = {
@@ -5927,6 +5949,182 @@ function drawFullMap({
   onPerformanceSample?.(metrics);
 }
 
+function drawNpcSpeechLayer({
+  cameraOffset,
+  cellPixelSize,
+  currentTime,
+  entities,
+  layer,
+  layerState,
+  map,
+  mode,
+  renderSize,
+  speech,
+}: {
+  cameraOffset: Position;
+  cellPixelSize: number;
+  currentTime: number;
+  entities: GameEntity[];
+  layer: Container;
+  layerState: NpcSpeechLayerState;
+  map: GameMap;
+  mode: PixiRendererMode;
+  renderSize: RenderSize;
+  speech: ActiveNpcSpeech | null;
+}): boolean {
+  const speaker = speech
+    ? entities.find(
+        (entity): entity is NpcEntity =>
+          entity.id === speech.npcId && entity.kind === "npc",
+      )
+    : null;
+
+  if (
+    mode !== "full" ||
+    !speech ||
+    !speaker ||
+    getNpcSpeechOpacity(speech, currentTime) <= 0
+  ) {
+    if (layerState.signature === null && !layer.visible) {
+      return false;
+    }
+
+    clearLayer(layer);
+    layer.visible = false;
+    layer.alpha = 0;
+    layerState.alpha = 0;
+    layerState.signature = null;
+    return true;
+  }
+
+  const transform: FullTransform = { cameraOffset, cellPixelSize };
+  const entityPosition = toFullPosition(speaker.position, transform);
+  const visualAsset = getEntityVisualAsset(speaker, map.id);
+  const spriteLayout = getEntitySpriteLayout(
+    speaker,
+    cellPixelSize,
+    visualAsset,
+  );
+  const spritePositionY = entityPosition.y + cellPixelSize / 2;
+  const speakerTopY = spritePositionY - spriteLayout.height * spriteLayout.anchorY;
+  const speakerBottomY =
+    spritePositionY + spriteLayout.height * (1 - spriteLayout.anchorY);
+  const signature = [
+    speech.npcId,
+    speech.text,
+    speech.createdAt,
+    speech.expiresAt,
+    speaker.position.x,
+    speaker.position.y,
+    cameraOffset.x,
+    cameraOffset.y,
+    cellPixelSize,
+    renderSize.width,
+    renderSize.height,
+    map.id ?? map.debugName,
+  ].join("|");
+  let didChange = false;
+
+  if (layerState.signature !== signature) {
+    clearLayer(layer);
+
+    const availableWidth = Math.max(1, renderSize.width - 16);
+    const maximumBubbleWidth = Math.min(
+      npcSpeechMaximumWidth,
+      availableWidth,
+    );
+    const wrapWidth = Math.max(
+      40,
+      maximumBubbleWidth - npcSpeechHorizontalPadding * 2,
+    );
+    const label = new Text({
+      text: speech.text,
+      style: {
+        breakWords: true,
+        fill: npcSpeechTextColor,
+        fontFamily: '"Courier New", monospace',
+        fontSize: npcSpeechFontSize,
+        fontWeight: "700",
+        lineHeight: 16,
+        wordWrap: true,
+        wordWrapWidth: wrapWidth,
+      },
+    });
+    const minimumBubbleWidth = Math.min(
+      npcSpeechMinimumWidth,
+      maximumBubbleWidth,
+    );
+    const bubbleWidth = Math.min(
+      maximumBubbleWidth,
+      Math.max(
+        minimumBubbleWidth,
+        Math.ceil(label.width) + npcSpeechHorizontalPadding * 2,
+      ),
+    );
+    const bubbleHeight = Math.ceil(label.height) + npcSpeechVerticalPadding * 2;
+    const layout = getNpcSpeechBubbleLayout({
+      bubbleHeight,
+      bubbleWidth,
+      renderHeight: renderSize.height,
+      renderWidth: renderSize.width,
+      speakerBottomY,
+      speakerTopY,
+      speakerX: entityPosition.x,
+    });
+    const graphics = new Graphics();
+    const shadowOffset = 4;
+    const tailPoints = [
+      layout.tailBaseLeftX,
+      layout.tailBaseY,
+      layout.tailBaseRightX,
+      layout.tailBaseY,
+      layout.tailPointX,
+      layout.tailPointY,
+    ];
+    const shadowTailPoints = tailPoints.map((coordinate) => coordinate + shadowOffset);
+
+    graphics
+      .poly(shadowTailPoints)
+      .fill({ color: npcSpeechShadowColor, alpha: 0.72 });
+    graphics
+      .rect(
+        layout.bubbleX + shadowOffset,
+        layout.bubbleY + shadowOffset,
+        bubbleWidth,
+        bubbleHeight,
+      )
+      .fill({ color: npcSpeechShadowColor, alpha: 0.72 });
+    graphics
+      .poly(tailPoints)
+      .fill(npcSpeechBackgroundColor)
+      .stroke({ color: npcSpeechBorderColor, width: 3 });
+    graphics
+      .rect(layout.bubbleX, layout.bubbleY, bubbleWidth, bubbleHeight)
+      .fill(npcSpeechBackgroundColor)
+      .stroke({ color: npcSpeechBorderColor, width: 3 });
+
+    label.position.set(
+      layout.bubbleX + npcSpeechHorizontalPadding,
+      layout.bubbleY + npcSpeechVerticalPadding,
+    );
+    layer.addChild(graphics);
+    layer.addChild(label);
+    layer.visible = true;
+    layerState.signature = signature;
+    didChange = true;
+  }
+
+  const alpha = getNpcSpeechOpacity(speech, currentTime);
+
+  if (layerState.alpha !== alpha || layer.alpha !== alpha) {
+    layer.alpha = alpha;
+    layerState.alpha = alpha;
+    didChange = true;
+  }
+
+  return didChange;
+}
+
 function drawWorld({
   activeTeleport,
   cameraOffset,
@@ -6238,6 +6436,7 @@ export function PixiWorldRenderer({
   mode = "preview",
   movementClickFeedbackEvents = [],
   navigationClickAccessibility = null,
+  npcSpeech = null,
   onCompanionDragCommand,
   onEnemyClick,
   onEntityHover,
@@ -6274,6 +6473,10 @@ export function PixiWorldRenderer({
   const fullSignatureRef = useRef<string | null>(null);
   const lastDrawnTextureRevisionRef = useRef<number | null>(null);
   const previewSignatureRef = useRef<string | null>(null);
+  const npcSpeechLayerStateRef = useRef<NpcSpeechLayerState>({
+    alpha: 0,
+    signature: null,
+  });
   const preloadedVisualTextureSignatureRef = useRef<string | null>(null);
   const latestCameraOffsetRef = useRef(cameraOffset);
   const latestCellPixelSizeRef = useRef(cellPixelSize);
@@ -6299,6 +6502,7 @@ export function PixiWorldRenderer({
   const latestNavigationClickAccessibilityRef = useRef(
     navigationClickAccessibility,
   );
+  const latestNpcSpeechRef = useRef<ActiveNpcSpeech | null>(npcSpeech);
   const latestModeRef = useRef(mode);
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
@@ -6361,6 +6565,7 @@ export function PixiWorldRenderer({
     latestLeaderIntentRef.current = leaderIntent;
     latestMovementClickFeedbackEventsRef.current = movementClickFeedbackEvents;
     latestNavigationClickAccessibilityRef.current = navigationClickAccessibility;
+    latestNpcSpeechRef.current = npcSpeech;
     latestModeRef.current = mode;
     latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestPartyIntentRef.current = partyIntent;
@@ -6396,6 +6601,7 @@ export function PixiWorldRenderer({
     mode,
     movementClickFeedbackEvents,
     navigationClickAccessibility,
+    npcSpeech,
     onPerformanceSample,
     partyIntent,
     questEntityIndicators,
@@ -6450,6 +6656,7 @@ export function PixiWorldRenderer({
       floorLayer: new Container(),
       objectLayer: new Container(),
       overlayGraphics: new Graphics(),
+      speechLayer: new Container(),
       wallLayer: new Container(),
     };
     const managedState = managedStateRef.current;
@@ -6457,7 +6664,7 @@ export function PixiWorldRenderer({
     function shouldContinueRedrawing() {
       const now = Date.now();
 
-      return hasActiveTimedRendererWork({
+      const hasTimedWorldWork = hasActiveTimedRendererWork({
         activeTeleport: latestActiveTeleportRef.current,
         combatFeedbackEvents: latestCombatFeedbackEventsRef.current,
         combatProjectiles: latestCombatProjectilesRef.current,
@@ -6479,6 +6686,12 @@ export function PixiWorldRenderer({
         statusEffectsById: latestStatusEffectsByIdRef.current,
         visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
       });
+      const speech = latestNpcSpeechRef.current;
+
+      return (
+        hasTimedWorldWork ||
+        Boolean(speech && getNpcSpeechOpacity(speech, now) > 0)
+      );
     }
 
     function redrawLatestWorld(): boolean {
@@ -6487,7 +6700,7 @@ export function PixiWorldRenderer({
       }
 
       latestCurrentTimeRef.current = Date.now();
-      const didDraw = drawWorld({
+      const didDrawWorld = drawWorld({
         activeTeleport: latestActiveTeleportRef.current,
         cameraOffset: latestCameraOffsetRef.current,
         cellPixelSize: latestCellPixelSizeRef.current,
@@ -6538,11 +6751,23 @@ export function PixiWorldRenderer({
         viewportSize: latestViewportSizeRef.current,
         visualMovementByEntityId: latestVisualMovementByEntityIdRef.current,
       });
-      if (didDraw) {
+      const didDrawSpeech = drawNpcSpeechLayer({
+        cameraOffset: latestCameraOffsetRef.current,
+        cellPixelSize: latestCellPixelSizeRef.current,
+        currentTime: latestCurrentTimeRef.current,
+        entities: latestEntitiesRef.current,
+        layer: layersRef.current.speechLayer,
+        layerState: npcSpeechLayerStateRef.current,
+        map: latestMapRef.current,
+        mode: latestModeRef.current,
+        renderSize: latestRenderSizeRef.current,
+        speech: latestNpcSpeechRef.current,
+      });
+      if (didDrawWorld || didDrawSpeech) {
         appRef.current?.render();
       }
 
-      return didDraw;
+      return didDrawWorld || didDrawSpeech;
     }
 
     const redrawScheduler = createRendererFrameScheduler({
@@ -6604,6 +6829,7 @@ export function PixiWorldRenderer({
       stage.addChild(layers.effectsGraphics);
       stage.addChild(layers.effectsLayer);
       stage.addChild(layers.overlayGraphics);
+      stage.addChild(layers.speechLayer);
       hostRef.current.appendChild(app.canvas);
       appRef.current = app;
       layersRef.current = layers;
@@ -6623,6 +6849,7 @@ export function PixiWorldRenderer({
       fullHadTimedWorkRef.current = false;
       fullSignatureRef.current = null;
       lastDrawnTextureRevisionRef.current = null;
+      npcSpeechLayerStateRef.current = { alpha: 0, signature: null };
       destroyManagedRendererState(managedState);
       if (isInitialized) {
         destroyPixiApplication(app);
@@ -6667,6 +6894,7 @@ export function PixiWorldRenderer({
     mode,
     movementClickFeedbackEvents,
     navigationClickAccessibility,
+    npcSpeech,
     onPerformanceSample,
     partyIntent,
     questEntityIndicators,

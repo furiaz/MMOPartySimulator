@@ -143,6 +143,76 @@ export type TileBounds = {
   maxY: number;
 };
 
+export type NpcSpeechBubbleLayout = {
+  bubbleX: number;
+  bubbleY: number;
+  placement: "above" | "below";
+  tailBaseLeftX: number;
+  tailBaseRightX: number;
+  tailBaseY: number;
+  tailPointX: number;
+  tailPointY: number;
+};
+
+export type NpcSpeechBubbleLayoutInput = {
+  bubbleHeight: number;
+  bubbleWidth: number;
+  renderHeight: number;
+  renderWidth: number;
+  speakerBottomY: number;
+  speakerTopY: number;
+  speakerX: number;
+};
+
+export function getNpcSpeechBubbleLayout({
+  bubbleHeight,
+  bubbleWidth,
+  renderHeight,
+  renderWidth,
+  speakerBottomY,
+  speakerTopY,
+  speakerX,
+}: NpcSpeechBubbleLayoutInput): NpcSpeechBubbleLayout {
+  const margin = 8;
+  const speakerGap = 4;
+  const tailHeight = 8;
+  const tailHalfWidth = 7;
+  const tailInset = tailHalfWidth + 4;
+  const maxBubbleX = Math.max(margin, renderWidth - margin - bubbleWidth);
+  const bubbleX = clamp(
+    speakerX - bubbleWidth / 2,
+    margin,
+    maxBubbleX,
+  );
+  const preferredAboveY =
+    speakerTopY - speakerGap - tailHeight - bubbleHeight;
+  const placement = preferredAboveY >= margin ? "above" : "below";
+  const preferredBubbleY =
+    placement === "above"
+      ? preferredAboveY
+      : speakerBottomY + speakerGap + tailHeight;
+  const maxBubbleY = Math.max(margin, renderHeight - margin - bubbleHeight);
+  const bubbleY = clamp(preferredBubbleY, margin, maxBubbleY);
+  const tailPointX = clamp(
+    speakerX,
+    bubbleX + tailInset,
+    bubbleX + bubbleWidth - tailInset,
+  );
+  const tailBaseY = placement === "above" ? bubbleY + bubbleHeight : bubbleY;
+
+  return {
+    bubbleX,
+    bubbleY,
+    placement,
+    tailBaseLeftX: tailPointX - tailHalfWidth,
+    tailBaseRightX: tailPointX + tailHalfWidth,
+    tailBaseY,
+    tailPointX,
+    tailPointY:
+      placement === "above" ? tailBaseY + tailHeight : tailBaseY - tailHeight,
+  };
+}
+
 export type RendererFrameSchedulerOptions = {
   cancelAnimationFrame: (frameId: number) => void;
   draw: () => boolean;
