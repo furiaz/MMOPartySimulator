@@ -194,6 +194,7 @@ Current top-level React/UI implementation files include:
 - `livestockPresentation.ts`
 - `main.tsx`
 - `npcInteractionRange.ts`
+- `poiPresentation.ts`
 - `QuestPanels.tsx`
 - `QuestTrackerPanel.tsx`
 - `questUiHelpers.ts`
@@ -669,10 +670,12 @@ React-facing browser storage helpers live in `client/src/saveStorage.ts`.
 
 Current save game behavior:
 
-- `SAVE_VERSION` is currently `2`
-- version-1 saves pass through the centralized `migrateSavedGameToCurrentVersion` migration before validation or sanitization
+- `SAVE_VERSION` is currently `3`
+- version-1 and version-2 saves pass through the centralized `migrateSavedGameToCurrentVersion` migration before validation or sanitization
 - the version-1 migration remaps retired Holy Mace and Holy Lantern ids across the complete saved object, preserving inventory/bank quantities and fixed slot positions, then directly fills empty Blade, Hunter, Beast, and Elementalist offhands with a matching-tier item or the level-10 fallback
-- migration grants are limited to version 1; version-2 saves do not run them, and populated offhands are never overwritten
+- the version-2 migration remaps legacy `test-enemy` wild-enemy ids in current-map entity keys and enemy records, flask recharge counted-defeat records, and defend-objective suppressed-enemy ids or snapshots
+- migrations run sequentially, so version-1 saves receive both the item/offhand migration and the wild-enemy id migration before becoming version 3
+- offhand migration grants are limited to version 1; later saves do not run them, and populated offhands are never overwritten
 - saved data includes `saveVersion`, `savedAtMs`, optional `offlineFarmingBlockedReason`, and sanitized `GameState`
 - validation rejects malformed saves, unsupported save versions, missing entities, invalid inventory, invalid bank, invalid key item state, invalid wallet, invalid quest state, invalid leader id, and invalid current map id
 - restore rebuilds the current debug map from saved quest state
@@ -1795,6 +1798,8 @@ Active quest resource POIs may use a longer short commitment window than generic
 When an active quest objective targets another subzone on the current map, POI target selection may create a route-to-subzone exploration target using current subzone passage data.
 
 POI selection should record debug telemetry for selected POIs and skipped POIs where useful.
+
+`poiPresentation.ts` owns the UI-facing Leader POI target label. Combat rows resolve `targetEntityId` with `poiId` fallback, prefer the target enemy's broad archetype display name, fall back to its enemy-type display name, and finally use `Enemy`. Non-combat rows retain their POI id presentation. This helper derives labels only and does not change POI selection or simulation state.
 
 The POI system may set leader intent toward quest givers, combat targets, resources, exploration points, inspect points, escort targets, idle hub points, or prototype teleports.
 
@@ -3309,6 +3314,8 @@ Current post-Hub-2 map enemy groups:
 - `map-5`: Tin Crawler level 13, Briar Wolf level 15, Mire Spider level 15
 - `map-6`: Night Bat level 16, Elder Mossling level 17, Cinder Wisp level 18
 - `map-7`: Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, Orc Warmaster level 20
+
+Authored wild-enemy ids are assigned centrally after encounter-area filtering. Their format is `zone-<zone-number>-<enemy-type-token>-<two-digit-sequence>`, with underscores in the enemy type converted to hyphens. Sequences are one-based, restart independently for each enemy type, and span the whole wilderness zone rather than each subzone. Dungeon, quest-spawned, hub target-dummy, and explicit debug-summon ids retain their existing ownership and formats.
 
 ---
 

@@ -1,6 +1,7 @@
 import {
   createDebugMapForQuestState,
   debugMapDefinitions,
+  getEnemyStartDataForMap,
   getHubNpcStartDataForQuestState,
   getHubTwoNpcStartDataForQuestState,
   HUB_MAP_ID,
@@ -107,7 +108,7 @@ const ELEMENTALIST_ORB_ITEM_IDS = new Set<string>([
   "storm_orb",
 ]);
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const MAX_OFFLINE_FARMING_MS = 30 * 60 * 1000;
 
 export type SavedGame = {
@@ -226,24 +227,240 @@ export function validateSavedGame(value: unknown): SaveValidationResult {
 }
 
 export function migrateSavedGameToCurrentVersion(value: unknown): unknown {
-  if (!isRecord(value) || value.saveVersion !== 1) {
+  if (!isRecord(value)) {
     return value;
   }
 
-  const migratedValue = remapLegacyItemIds(value);
+  let migratedValue: Record<string, unknown> = value;
 
-  if (!isRecord(migratedValue)) {
-    return value;
+  if (migratedValue.saveVersion === 1) {
+    const remappedValue = remapLegacyItemIds(migratedValue);
+
+    if (!isRecord(remappedValue)) {
+      return value;
+    }
+
+    if (isRecord(remappedValue.state)) {
+      grantMissingFirstClassOffhands(remappedValue.state);
+    }
+
+    migratedValue = {
+      ...remappedValue,
+      saveVersion: 2,
+    };
   }
 
-  if (isRecord(migratedValue.state)) {
-    grantMissingFirstClassOffhands(migratedValue.state);
+  if (migratedValue.saveVersion === 2) {
+    return {
+      ...migratedValue,
+      saveVersion: SAVE_VERSION,
+      state: isRecord(migratedValue.state)
+        ? migrateLegacyWildEnemyIds(migratedValue.state)
+        : migratedValue.state,
+    };
   }
+
+  return migratedValue;
+}
+
+function migrateLegacyWildEnemyIds(
+  state: Record<string, unknown>,
+): Record<string, unknown> {
+  const currentMapId = getWildMapId(state.currentMapId);
+  const currentMapIdMapping = currentMapId
+    ? getLegacyWildEnemyIdMapping(currentMapId)
+    : undefined;
 
   return {
-    ...migratedValue,
-    saveVersion: SAVE_VERSION,
+    ...state,
+    entities: currentMapIdMapping
+      ? remapLegacyEnemyEntities(state.entities, currentMapIdMapping)
+      : state.entities,
+    flaskRechargeCountedEnemyDefeats: currentMapIdMapping
+      ? remapRecordKeys(
+          state.flaskRechargeCountedEnemyDefeats,
+          currentMapIdMapping,
+        )
+      : state.flaskRechargeCountedEnemyDefeats,
+    quests: migrateLegacyQuestEnemyIds(state.quests),
   };
+}
+
+function getWildMapId(value: unknown): DebugMapId | undefined {
+  return typeof value === "string" &&
+    WILD_MAP_IDS.includes(value as DebugMapId)
+    ? (value as DebugMapId)
+    : undefined;
+}
+
+function getLegacyWildEnemyIdMapping(
+  mapId: DebugMapId,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    getEnemyStartDataForMap(mapId).map((enemyStart, index) => [
+      index === 0 ? "test-enemy" : `test-enemy-${index + 1}`,
+      enemyStart.id,
+    ]),
+  );
+}
+
+function remapLegacyEnemyEntities(
+  value: unknown,
+  idMapping: Readonly<Record<string, string>>,
+): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([entityId, entity]) => {
+      if (!isRecord(entity) || entity.kind !== "enemy") {
+        return [entityId, entity];
+      }
+
+      const remappedEntityId = idMapping[entityId] ?? entityId;
+      const savedEntityId =
+        typeof entity.id === "string" ? entity.id : entityId;
+
+      return [
+        remappedEntityId,
+        {
+          ...entity,
+          id: idMapping[savedEntityId] ?? remappedEntityId,
+        },
+      ];
+    }),
+  );
+}
+
+function remapRecordKeys(
+  value: unknown,
+  idMapping: Readonly<Record<string, string>>,
+): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      idMapping[key] ?? key,
+      nestedValue,
+    ]),
+  );
+}
+
+function migrateLegacyQuestEnemyIds(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([questId, quest]) => {
+      if (!isRecord(quest) || !isRecord(quest.runtime)) {
+        return [questId, quest];
+      }
+
+      const definition = QUEST_DEFINITIONS[questId as QuestId];
+      if (!definition) {
+        return [questId, quest];
+      }
+
+      const idMappingByObjectiveId = Object.fromEntries(
+        definition.objectives.flatMap((objective) => {
+          const mapId = getWildMapId(
+            objective.targetMapId ?? objective.enemyMapId,
+          );
+
+          return mapId
+            ? [[objective.id, getLegacyWildEnemyIdMapping(mapId)]]
+            : [];
+        }),
+      ) as Record<string, Readonly<Record<string, string>>>;
+
+      return [
+        questId,
+        {
+          ...quest,
+          runtime: {
+            ...quest.runtime,
+            despawnedSubzoneEnemyIdsByObjectiveId:
+              remapObjectiveEnemyIdLists(
+                quest.runtime.despawnedSubzoneEnemyIdsByObjectiveId,
+                idMappingByObjectiveId,
+              ),
+            suppressedSubzoneEnemiesByObjectiveId:
+              remapObjectiveEnemySnapshots(
+                quest.runtime.suppressedSubzoneEnemiesByObjectiveId,
+                idMappingByObjectiveId,
+              ),
+          },
+        },
+      ];
+    }),
+  );
+}
+
+function remapObjectiveEnemyIdLists(
+  value: unknown,
+  idMappingByObjectiveId: Record<
+    string,
+    Readonly<Record<string, string>>
+  >,
+): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([objectiveId, enemyIds]) => {
+      const idMapping = idMappingByObjectiveId[objectiveId];
+
+      return [
+        objectiveId,
+        idMapping && Array.isArray(enemyIds)
+          ? enemyIds.map((enemyId) =>
+              typeof enemyId === "string"
+                ? idMapping[enemyId] ?? enemyId
+                : enemyId,
+            )
+          : enemyIds,
+      ];
+    }),
+  );
+}
+
+function remapObjectiveEnemySnapshots(
+  value: unknown,
+  idMappingByObjectiveId: Record<
+    string,
+    Readonly<Record<string, string>>
+  >,
+): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([objectiveId, enemies]) => {
+      const idMapping = idMappingByObjectiveId[objectiveId];
+
+      return [
+        objectiveId,
+        idMapping && Array.isArray(enemies)
+          ? enemies.map((enemy) => {
+              if (!isRecord(enemy) || typeof enemy.id !== "string") {
+                return enemy;
+              }
+
+              return {
+                ...enemy,
+                id: idMapping[enemy.id] ?? enemy.id,
+              };
+            })
+          : enemies,
+      ];
+    }),
+  );
 }
 
 function remapLegacyItemIds(value: unknown): unknown {

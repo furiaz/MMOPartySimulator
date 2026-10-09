@@ -80,10 +80,6 @@ export const companionIds = [
   "test-companion-5",
 ];
 
-export const enemyIds = Array.from({ length: 72 }, (_, index) =>
-  index === 0 ? "test-enemy" : `test-enemy-${index + 1}`,
-);
-
 export const resourceIds = [
   "test-resource-wood",
   "test-resource-ore",
@@ -883,274 +879,281 @@ export const mapFiveSubzoneNameLabels: ZoneSubzoneNameLabel[] =
 export const mapSixSubzoneNameLabels: ZoneSubzoneNameLabel[] =
   mapSixSourceSubzoneNameLabels;
 
-const mapOneStressEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 18, y: 13 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[1], position: { x: 29, y: 9 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[2], position: { x: 41, y: 16 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[3], position: { x: 24, y: 24 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[4], position: { x: 14, y: 14 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[5], position: { x: 34, y: 21 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[6], position: { x: 46, y: 10 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[7], position: { x: 12, y: 28 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
-  { id: enemyIds[8], position: { x: 19, y: 39 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[9], position: { x: 31, y: 47 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[10], position: { x: 44, y: 40 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[11], position: { x: 23, y: 51 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[12], position: { x: 13, y: 45 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[13], position: { x: 36, y: 38 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[14], position: { x: 46, y: 50 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[15], position: { x: 28, y: 33 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
-  { id: enemyIds[16], position: { x: 64, y: 14 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[17], position: { x: 76, y: 9 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[18], position: { x: 90, y: 16 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[19], position: { x: 98, y: 23 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[20], position: { x: 70, y: 18 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[21], position: { x: 82, y: 20 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[22], position: { x: 96, y: 9 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[23], position: { x: 58, y: 18 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
-  { id: enemyIds[24], position: { x: 63, y: 38 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[25], position: { x: 76, y: 48 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[26], position: { x: 91, y: 40 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[27], position: { x: 99, y: 49 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[28], position: { x: 62, y: 50 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[29], position: { x: 72, y: 35 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[30], position: { x: 88, y: 52 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[31], position: { x: 100, y: 37 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
-  { id: enemyIds[32], position: { x: 117, y: 14 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[33], position: { x: 128, y: 8 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[34], position: { x: 140, y: 15 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[35], position: { x: 145, y: 23 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[36], position: { x: 112, y: 24 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[37], position: { x: 125, y: 16 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[38], position: { x: 134, y: 24 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[39], position: { x: 153, y: 16 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
-  { id: enemyIds[40], position: { x: 116, y: 39 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[41], position: { x: 129, y: 48 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[42], position: { x: 141, y: 40 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[43], position: { x: 149, y: 49 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[44], position: { x: 114, y: 51 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[45], position: { x: 124, y: 35 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[46], position: { x: 137, y: 52 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
-  { id: enemyIds[47], position: { x: 153, y: 39 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+const mapOneStressEnemyStartData: WildZoneEnemyStartData[] = [
+  { position: { x: 18, y: 13 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 29, y: 9 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 41, y: 16 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 24, y: 24 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 14, y: 14 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 34, y: 21 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 46, y: 10 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 12, y: 28 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-north-den" },
+  { position: { x: 19, y: 39 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 31, y: 47 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 44, y: 40 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 23, y: 51 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 13, y: 45 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 36, y: 38 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 46, y: 50 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 28, y: 33 }, enemyTypeId: "green_slime", subzoneId: "shore-fringe", encounterAreaId: "shore-fringe-south-den" },
+  { position: { x: 64, y: 14 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 76, y: 9 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 90, y: 16 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 98, y: 23 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 70, y: 18 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 82, y: 20 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 96, y: 9 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 58, y: 18 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-north-roost" },
+  { position: { x: 63, y: 38 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 76, y: 48 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 91, y: 40 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 99, y: 49 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 62, y: 50 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 72, y: 35 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 88, y: 52 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 100, y: 37 }, enemyTypeId: "cave_bat", subzoneId: "mossy-glade", encounterAreaId: "mossy-glade-south-roost" },
+  { position: { x: 117, y: 14 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 128, y: 8 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 140, y: 15 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 145, y: 23 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 112, y: 24 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 125, y: 16 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 134, y: 24 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 153, y: 16 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-north-nest" },
+  { position: { x: 116, y: 39 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 129, y: 48 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 141, y: 40 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 149, y: 49 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 114, y: 51 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 124, y: 35 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 137, y: 52 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
+  { position: { x: 153, y: 39 }, enemyTypeId: "forest_spider", subzoneId: "lower-shore", encounterAreaId: "lower-shore-south-nest" },
 ];
 
 export const mapOneEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  1,
   mapOneSubzones,
   mapOneStressEnemyStartData,
 );
 
 export const mapTwoEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  2,
   mapTwoSubzones,
   [
-    { id: enemyIds[0], position: { x: 12, y: 10 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[1], position: { x: 23, y: 8 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[2], position: { x: 36, y: 11 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[3], position: { x: 44, y: 18 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[4], position: { x: 16, y: 20 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[5], position: { x: 28, y: 23 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[6], position: { x: 39, y: 24 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[7], position: { x: 23, y: 15 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
-    { id: enemyIds[8], position: { x: 11, y: 37 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[9], position: { x: 22, y: 47 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[10], position: { x: 35, y: 36 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[11], position: { x: 45, y: 46 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[12], position: { x: 15, y: 51 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[13], position: { x: 29, y: 34 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[14], position: { x: 39, y: 51 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[15], position: { x: 28, y: 43 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
-    { id: enemyIds[16], position: { x: 62, y: 10 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[17], position: { x: 74, y: 8 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[18], position: { x: 88, y: 11 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[19], position: { x: 98, y: 18 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[20], position: { x: 70, y: 21 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[21], position: { x: 78, y: 23 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[22], position: { x: 92, y: 24 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[23], position: { x: 80, y: 15 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
-    { id: enemyIds[24], position: { x: 62, y: 37 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[25], position: { x: 75, y: 48 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[26], position: { x: 89, y: 37 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[27], position: { x: 99, y: 47 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[28], position: { x: 64, y: 51 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[29], position: { x: 78, y: 35 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[30], position: { x: 92, y: 52 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[31], position: { x: 83, y: 43 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
-    { id: enemyIds[32], position: { x: 113, y: 10 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[33], position: { x: 125, y: 8 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[34], position: { x: 139, y: 11 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[35], position: { x: 151, y: 18 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[36], position: { x: 115, y: 22 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[37], position: { x: 128, y: 23 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[38], position: { x: 142, y: 24 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[39], position: { x: 132, y: 16 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
-    { id: enemyIds[40], position: { x: 113, y: 37 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[41], position: { x: 126, y: 48 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[42], position: { x: 140, y: 36 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[43], position: { x: 152, y: 47 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[44], position: { x: 116, y: 51 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[45], position: { x: 132, y: 35 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[46], position: { x: 144, y: 52 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
-    { id: enemyIds[47], position: { x: 133, y: 43 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 12, y: 10 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 23, y: 8 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 36, y: 11 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 44, y: 18 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 16, y: 20 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 28, y: 23 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 39, y: 24 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 23, y: 15 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-north-camp" },
+    { position: { x: 11, y: 37 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 22, y: 47 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 35, y: 36 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 45, y: 46 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 15, y: 51 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 29, y: 34 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 39, y: 51 }, enemyTypeId: "forest_spider", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 28, y: 43 }, enemyTypeId: "goblin_scout", subzoneId: "south-center", encounterAreaId: "scout-rise-south-camp" },
+    { position: { x: 62, y: 10 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 74, y: 8 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 88, y: 11 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 98, y: 18 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 70, y: 21 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 78, y: 23 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 92, y: 24 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 80, y: 15 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-north-ring" },
+    { position: { x: 62, y: 37 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 75, y: 48 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 89, y: 37 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 99, y: 47 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 64, y: 51 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 78, y: 35 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 92, y: 52 }, enemyTypeId: "goblin_scout", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 83, y: 43 }, enemyTypeId: "bog_imp", subzoneId: "south-east", encounterAreaId: "old-grove-south-ring" },
+    { position: { x: 113, y: 10 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 125, y: 8 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 139, y: 11 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 151, y: 18 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 115, y: 22 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 128, y: 23 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 142, y: 24 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 132, y: 16 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-north-pack" },
+    { position: { x: 113, y: 37 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 126, y: 48 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 140, y: 36 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 152, y: 47 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 116, y: 51 }, enemyTypeId: "bog_imp", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 132, y: 35 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 144, y: 52 }, enemyTypeId: "wolf", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
+    { position: { x: 133, y: 43 }, enemyTypeId: "goblin_thrower", subzoneId: "north-east", encounterAreaId: "wolf-causeway-south-pack" },
   ],
 );
 
-const mapThreeProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 12, y: 10 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[1], position: { x: 23, y: 8 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[2], position: { x: 36, y: 11 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[3], position: { x: 44, y: 18 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[4], position: { x: 16, y: 20 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[5], position: { x: 28, y: 23 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[6], position: { x: 39, y: 24 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[7], position: { x: 23, y: 15 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
-  { id: enemyIds[8], position: { x: 11, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[9], position: { x: 22, y: 47 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[10], position: { x: 35, y: 36 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[11], position: { x: 45, y: 46 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[12], position: { x: 15, y: 51 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[13], position: { x: 29, y: 34 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[14], position: { x: 39, y: 51 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[15], position: { x: 28, y: 43 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
-  { id: enemyIds[16], position: { x: 62, y: 10 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[17], position: { x: 74, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[18], position: { x: 88, y: 11 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[19], position: { x: 98, y: 18 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[20], position: { x: 70, y: 21 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[21], position: { x: 78, y: 23 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[22], position: { x: 92, y: 24 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[23], position: { x: 80, y: 15 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
-  { id: enemyIds[24], position: { x: 62, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[25], position: { x: 75, y: 48 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[26], position: { x: 89, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[27], position: { x: 99, y: 47 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[28], position: { x: 64, y: 51 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[29], position: { x: 78, y: 35 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[30], position: { x: 92, y: 52 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[31], position: { x: 83, y: 43 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
-  { id: enemyIds[32], position: { x: 113, y: 10 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[33], position: { x: 125, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[34], position: { x: 139, y: 11 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[35], position: { x: 151, y: 18 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[36], position: { x: 115, y: 22 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[37], position: { x: 128, y: 23 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[38], position: { x: 142, y: 24 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[39], position: { x: 132, y: 16 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
-  { id: enemyIds[40], position: { x: 113, y: 37 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[41], position: { x: 126, y: 48 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[42], position: { x: 140, y: 36 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[43], position: { x: 152, y: 47 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[44], position: { x: 116, y: 51 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[45], position: { x: 132, y: 35 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[46], position: { x: 144, y: 52 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
-  { id: enemyIds[47], position: { x: 133, y: 43 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+const mapThreeProgressionEnemyStartData: WildZoneEnemyStartData[] = [
+  { position: { x: 12, y: 10 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 23, y: 8 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 36, y: 11 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 44, y: 18 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 16, y: 20 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 28, y: 23 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 39, y: 24 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 23, y: 15 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-north-nest" },
+  { position: { x: 11, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 22, y: 47 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 35, y: 36 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 45, y: 46 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 15, y: 51 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 29, y: 34 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 39, y: 51 }, enemyTypeId: "stone_crawler", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 28, y: 43 }, enemyTypeId: "mossling", subzoneId: "south-west", encounterAreaId: "broken-thicket-south-nest" },
+  { position: { x: 62, y: 10 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 74, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 88, y: 11 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 98, y: 18 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 70, y: 21 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 78, y: 23 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 92, y: 24 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 80, y: 15 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-north" },
+  { position: { x: 62, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 75, y: 48 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 89, y: 37 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 99, y: 47 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 64, y: 51 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 78, y: 35 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 92, y: 52 }, enemyTypeId: "stone_crawler", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 83, y: 43 }, enemyTypeId: "goblin_shaman", subzoneId: "north-west", encounterAreaId: "crawler-shelf-south" },
+  { position: { x: 113, y: 10 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 125, y: 8 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 139, y: 11 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 151, y: 18 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 115, y: 22 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 128, y: 23 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 142, y: 24 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 132, y: 16 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-north-circle" },
+  { position: { x: 113, y: 37 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 126, y: 48 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 140, y: 36 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 152, y: 47 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 116, y: 51 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 132, y: 35 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 144, y: 52 }, enemyTypeId: "goblin_shaman", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
+  { position: { x: 133, y: 43 }, enemyTypeId: "mossling", subzoneId: "south-center", encounterAreaId: "imp-fen-south-circle" },
 ];
 
-const mapFourProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 18, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
-  { id: enemyIds[1], position: { x: 26, y: 11 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
-  { id: enemyIds[2], position: { x: 34, y: 19 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
-  { id: enemyIds[3], position: { x: 20, y: 24 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
-  { id: enemyIds[4], position: { x: 31, y: 27 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
-  { id: enemyIds[5], position: { x: 42, y: 17 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
-  { id: enemyIds[6], position: { x: 48, y: 36 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
-  { id: enemyIds[7], position: { x: 57, y: 32 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
-  { id: enemyIds[8], position: { x: 66, y: 39 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
-  { id: enemyIds[9], position: { x: 51, y: 47 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
-  { id: enemyIds[10], position: { x: 61, y: 50 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
-  { id: enemyIds[11], position: { x: 71, y: 32 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
-  { id: enemyIds[12], position: { x: 80, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
-  { id: enemyIds[13], position: { x: 90, y: 12 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
-  { id: enemyIds[14], position: { x: 99, y: 20 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
-  { id: enemyIds[15], position: { x: 82, y: 27 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
-  { id: enemyIds[16], position: { x: 92, y: 29 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
-  { id: enemyIds[17], position: { x: 101, y: 28 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+const mapFourProgressionEnemyStartData: WildZoneEnemyStartData[] = [
+  { position: { x: 18, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { position: { x: 26, y: 11 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { position: { x: 34, y: 19 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { position: { x: 20, y: 24 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { position: { x: 31, y: 27 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { position: { x: 42, y: 17 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-west-watch" },
+  { position: { x: 48, y: 36 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { position: { x: 57, y: 32 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { position: { x: 66, y: 39 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { position: { x: 51, y: 47 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { position: { x: 61, y: 50 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { position: { x: 71, y: 32 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-ember-pits" },
+  { position: { x: 80, y: 14 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { position: { x: 90, y: 12 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { position: { x: 99, y: 20 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { position: { x: 82, y: 27 }, enemyTypeId: "ash_wisp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { position: { x: 92, y: 29 }, enemyTypeId: "goblin_shaman", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
+  { position: { x: 101, y: 28 }, enemyTypeId: "ember_imp", subzoneId: "ash-goblin-encampment", encounterAreaId: "ash-goblin-east-palings" },
 ];
 
-const mapFiveProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 16, y: 35 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
-  { id: enemyIds[1], position: { x: 25, y: 40 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
-  { id: enemyIds[2], position: { x: 34, y: 35 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
-  { id: enemyIds[3], position: { x: 18, y: 47 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
-  { id: enemyIds[4], position: { x: 31, y: 50 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
-  { id: enemyIds[5], position: { x: 32, y: 43 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
-  { id: enemyIds[6], position: { x: 48, y: 15 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
-  { id: enemyIds[7], position: { x: 56, y: 11 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
-  { id: enemyIds[8], position: { x: 66, y: 18 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
-  { id: enemyIds[9], position: { x: 49, y: 25 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
-  { id: enemyIds[10], position: { x: 61, y: 29 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
-  { id: enemyIds[11], position: { x: 72, y: 22 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
-  { id: enemyIds[12], position: { x: 80, y: 34 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
-  { id: enemyIds[13], position: { x: 90, y: 39 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
-  { id: enemyIds[14], position: { x: 100, y: 35 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
-  { id: enemyIds[15], position: { x: 82, y: 46 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
-  { id: enemyIds[16], position: { x: 92, y: 49 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
-  { id: enemyIds[17], position: { x: 101, y: 47 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+const mapFiveProgressionEnemyStartData: WildZoneEnemyStartData[] = [
+  { position: { x: 16, y: 35 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { position: { x: 25, y: 40 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { position: { x: 34, y: 35 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { position: { x: 18, y: 47 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { position: { x: 31, y: 50 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { position: { x: 32, y: 43 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-shell-ridge" },
+  { position: { x: 48, y: 15 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { position: { x: 56, y: 11 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { position: { x: 66, y: 18 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { position: { x: 49, y: 25 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { position: { x: 61, y: 29 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { position: { x: 72, y: 22 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-wolf-run" },
+  { position: { x: 80, y: 34 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { position: { x: 90, y: 39 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { position: { x: 100, y: 35 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { position: { x: 82, y: 46 }, enemyTypeId: "tin_crawler", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { position: { x: 92, y: 49 }, enemyTypeId: "mire_spider", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
+  { position: { x: 101, y: 47 }, enemyTypeId: "briar_wolf", subzoneId: "briar-burrows", encounterAreaId: "briar-burrows-webbed-den" },
 ];
 
-const mapSixProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 15, y: 14 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
-  { id: enemyIds[1], position: { x: 24, y: 10 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
-  { id: enemyIds[2], position: { x: 34, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
-  { id: enemyIds[3], position: { x: 17, y: 25 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
-  { id: enemyIds[4], position: { x: 29, y: 27 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
-  { id: enemyIds[5], position: { x: 41, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
-  { id: enemyIds[6], position: { x: 48, y: 36 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
-  { id: enemyIds[7], position: { x: 57, y: 32 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
-  { id: enemyIds[8], position: { x: 66, y: 38 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
-  { id: enemyIds[9], position: { x: 51, y: 47 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
-  { id: enemyIds[10], position: { x: 61, y: 50 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
-  { id: enemyIds[11], position: { x: 72, y: 43 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
-  { id: enemyIds[12], position: { x: 80, y: 14 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { id: enemyIds[13], position: { x: 89, y: 11 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { id: enemyIds[14], position: { x: 99, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { id: enemyIds[15], position: { x: 81, y: 27 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { id: enemyIds[16], position: { x: 92, y: 29 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { id: enemyIds[17], position: { x: 101, y: 25 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+const mapSixProgressionEnemyStartData: WildZoneEnemyStartData[] = [
+  { position: { x: 15, y: 14 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { position: { x: 24, y: 10 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { position: { x: 34, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { position: { x: 17, y: 25 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { position: { x: 29, y: 27 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { position: { x: 41, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-bat-roost" },
+  { position: { x: 48, y: 36 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { position: { x: 57, y: 32 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { position: { x: 66, y: 38 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { position: { x: 51, y: 47 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { position: { x: 61, y: 50 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { position: { x: 72, y: 43 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-oldroot-ring" },
+  { position: { x: 80, y: 14 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 89, y: 11 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 99, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 81, y: 27 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 92, y: 29 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 101, y: 25 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
 ];
 
-const mapSevenProgressionEnemyStartData: EnemyStartData[] = [
-  { id: enemyIds[0], position: { x: 17, y: 15 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { id: enemyIds[1], position: { x: 26, y: 12 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { id: enemyIds[2], position: { x: 36, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { id: enemyIds[3], position: { x: 19, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { id: enemyIds[4], position: { x: 31, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1.15 },
-  { id: enemyIds[5], position: { x: 43, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { id: enemyIds[6], position: { x: 48, y: 37 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
-  { id: enemyIds[7], position: { x: 57, y: 33 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { id: enemyIds[8], position: { x: 66, y: 39 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { id: enemyIds[9], position: { x: 50, y: 48 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
-  { id: enemyIds[10], position: { x: 61, y: 50 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { id: enemyIds[11], position: { x: 72, y: 44 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { id: enemyIds[12], position: { x: 80, y: 15 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
-  { id: enemyIds[13], position: { x: 89, y: 11 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { id: enemyIds[14], position: { x: 99, y: 19 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { id: enemyIds[15], position: { x: 82, y: 29 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
-  { id: enemyIds[16], position: { x: 93, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
-  { id: enemyIds[17], position: { x: 101, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { id: enemyIds[18], position: { x: 88, y: 22 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
-  { id: enemyIds[19], position: { x: 96, y: 24 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+const mapSevenProgressionEnemyStartData: WildZoneEnemyStartData[] = [
+  { position: { x: 17, y: 15 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 26, y: 12 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 36, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 19, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 31, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1.15 },
+  { position: { x: 43, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 48, y: 37 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
+  { position: { x: 57, y: 33 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 66, y: 39 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 50, y: 48 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
+  { position: { x: 61, y: 50 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 72, y: 44 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 80, y: 15 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
+  { position: { x: 89, y: 11 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { position: { x: 99, y: 19 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { position: { x: 82, y: 29 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
+  { position: { x: 93, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
+  { position: { x: 101, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { position: { x: 88, y: 22 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
+  { position: { x: 96, y: 24 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
 ];
 
 export const mapThreeEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  3,
   mapThreeSubzones,
   mapThreeProgressionEnemyStartData,
 );
 
 export const mapFourEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  4,
   mapFourSubzones,
   mapFourProgressionEnemyStartData,
 );
 
 export const mapFiveEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  5,
   mapFiveSubzones,
   mapFiveProgressionEnemyStartData,
 );
 
 export const mapSixEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  6,
   mapSixSubzones,
   mapSixProgressionEnemyStartData,
 );
 
 export const mapSevenEnemyStartData: EnemyStartData[] = createEnemyStartData(
+  7,
   mapSevenSubzones,
   mapSevenProgressionEnemyStartData,
 );
@@ -1277,6 +1280,33 @@ export const slimewardFloorTwoEnemyStartData: EnemyStartData[] = [
   { id: SLIMEWARD_BOSS_ID, position: { x: 132, y: 22 }, enemyTypeId: "azure_mass", subzoneId: "f2-boss-room", encounterAreaId: "f2-boss-pack" },
 ];
 
+export function getEnemyStartDataForMap(
+  mapId: DebugMapId,
+): EnemyStartData[] {
+  switch (mapId) {
+    case MAP_ONE_ID:
+      return mapOneEnemyStartData;
+    case MAP_TWO_ID:
+      return mapTwoEnemyStartData;
+    case MAP_THREE_ID:
+      return mapThreeEnemyStartData;
+    case MAP_FOUR_ID:
+      return mapFourEnemyStartData;
+    case MAP_FIVE_ID:
+      return mapFiveEnemyStartData;
+    case MAP_SIX_ID:
+      return mapSixEnemyStartData;
+    case MAP_SEVEN_ID:
+      return mapSevenEnemyStartData;
+    case SLIMEWARD_FLOOR_ONE_ID:
+      return slimewardFloorOneEnemyStartData;
+    case SLIMEWARD_FLOOR_TWO_ID:
+      return slimewardFloorTwoEnemyStartData;
+    default:
+      return [];
+  }
+}
+
 export const slimewardFloorOneEnemyStartPositions: Position[] =
   slimewardFloorOneEnemyStartData.map((enemy) => enemy.position);
 export const slimewardFloorTwoEnemyStartPositions: Position[] =
@@ -1333,6 +1363,8 @@ export type EnemyStartData = {
   variant?: EnemyVariant;
   combatBodyRadius?: number;
 };
+
+type WildZoneEnemyStartData = Omit<EnemyStartData, "id">;
 
 type DebugMapCreationOptions = {
   secureLandingGateOpen?: boolean;
@@ -2517,8 +2549,9 @@ function createResourceStartData(subzones: ZoneSubzone[]): ResourceStartData[] {
 }
 
 function createEnemyStartData(
+  zoneNumber: number,
   subzones: ZoneSubzone[],
-  enemies: EnemyStartData[],
+  enemies: WildZoneEnemyStartData[],
 ): EnemyStartData[] {
   const encounterAreaIds = new Set(
     subzones.flatMap((subzone) =>
@@ -2526,5 +2559,17 @@ function createEnemyStartData(
     ),
   );
 
-  return enemies.filter((enemy) => encounterAreaIds.has(enemy.encounterAreaId));
+  const sequenceByEnemyType = new Map<EnemyTypeId, number>();
+
+  return enemies
+    .filter((enemy) => encounterAreaIds.has(enemy.encounterAreaId))
+    .map((enemy) => {
+      const sequence = (sequenceByEnemyType.get(enemy.enemyTypeId) ?? 0) + 1;
+      sequenceByEnemyType.set(enemy.enemyTypeId, sequence);
+
+      return {
+        ...enemy,
+        id: `zone-${zoneNumber}-${enemy.enemyTypeId.replaceAll("_", "-")}-${String(sequence).padStart(2, "0")}`,
+      };
+    });
 }

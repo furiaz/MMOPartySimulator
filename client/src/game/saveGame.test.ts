@@ -9,7 +9,7 @@ import {
   mapTwoEnemyStartData,
 } from "./debugMap";
 import { createDebugTelemetryState } from "./debugTelemetry";
-import { createCompanion, createResource } from "./entities";
+import { createCompanion, createEnemy, createResource } from "./entities";
 import {
   createInitialGuildNoticeBoardState,
   GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
@@ -288,6 +288,113 @@ describe("save game serialization", () => {
           .equipment.offhand,
       ).toBeNull();
     }
+  });
+
+  it("migrates version-2 wild enemy ids and every durable reference", () => {
+    const firstEnemyId = mapTwoEnemyStartData[0].id;
+    const secondEnemyId = mapTwoEnemyStartData[1].id;
+    const firstEnemy = createEnemy(
+      "test-enemy",
+      mapTwoEnemyStartData[0].position,
+      undefined,
+      { enemyTypeId: mapTwoEnemyStartData[0].enemyTypeId },
+    );
+    const secondEnemy = createEnemy(
+      "test-enemy-2",
+      mapTwoEnemyStartData[1].position,
+      undefined,
+      { enemyTypeId: mapTwoEnemyStartData[1].enemyTypeId },
+    );
+    const migrated = migrateSavedGameToCurrentVersion({
+      saveVersion: 2,
+      savedAtMs: NOW_MS,
+      state: {
+        currentMapId: MAP_TWO_ID,
+        entities: {
+          "test-enemy": firstEnemy,
+          "test-enemy-2": secondEnemy,
+        },
+        flaskRechargeCountedEnemyDefeats: {
+          "test-enemy": NOW_MS,
+          "test-enemy-2": NOW_MS + 1,
+        },
+        quests: {
+          hold_the_field_cache: {
+            questId: "hold_the_field_cache",
+            runtime: {
+              despawnedSubzoneEnemyIdsByObjectiveId: {
+                defend_old_grove_cache: ["test-enemy"],
+              },
+              suppressedSubzoneEnemiesByObjectiveId: {
+                defend_old_grove_cache: [secondEnemy],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(migrated).toMatchObject({
+      saveVersion: SAVE_VERSION,
+      state: {
+        entities: {
+          [firstEnemyId]: { id: firstEnemyId },
+          [secondEnemyId]: { id: secondEnemyId },
+        },
+        flaskRechargeCountedEnemyDefeats: {
+          [firstEnemyId]: NOW_MS,
+          [secondEnemyId]: NOW_MS + 1,
+        },
+        quests: {
+          hold_the_field_cache: {
+            runtime: {
+              despawnedSubzoneEnemyIdsByObjectiveId: {
+                defend_old_grove_cache: [firstEnemyId],
+              },
+              suppressedSubzoneEnemiesByObjectiveId: {
+                defend_old_grove_cache: [{ id: secondEnemyId }],
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("chains version-1 item and wild-enemy migrations into version 3", () => {
+    const migrated = migrateSavedGameToCurrentVersion({
+      saveVersion: 1,
+      savedAtMs: NOW_MS,
+      state: {
+        currentMapId: MAP_TWO_ID,
+        entities: {
+          "test-enemy": createEnemy(
+            "test-enemy",
+            mapTwoEnemyStartData[0].position,
+            undefined,
+            { enemyTypeId: mapTwoEnemyStartData[0].enemyTypeId },
+          ),
+        },
+        inventory: {
+          capacity: 1,
+          slots: [{ itemId: "holy_mace", quantity: 1 }],
+        },
+      },
+    });
+
+    expect(migrated).toMatchObject({
+      saveVersion: SAVE_VERSION,
+      state: {
+        entities: {
+          [mapTwoEnemyStartData[0].id]: {
+            id: mapTwoEnemyStartData[0].id,
+          },
+        },
+        inventory: {
+          slots: [{ itemId: "guard_mace", quantity: 1 }],
+        },
+      },
+    });
   });
 
   it("restores deterministic map data and clears transient runtime state", () => {

@@ -44,6 +44,7 @@ import {
   hubNpcStartData,
   getHubNpcStartDataForQuestState,
   getHubTwoNpcStartDataForQuestState,
+  getEnemyStartDataForMap,
   mapFourEnemyStartPositions,
   mapFourEnemyStartData,
   mapFourSubzoneNameLabels,
@@ -613,6 +614,29 @@ describe("debug maps", () => {
         wildernessMap.subzones,
         wildernessMap.enemies,
       );
+    }
+  });
+
+  it("assigns readable stable ids with independent sequences per enemy type", () => {
+    for (const [mapIndex, wildernessMap] of wildernessMaps.entries()) {
+      const sequenceByEnemyType = new Map<string, number>();
+
+      expect(getEnemyStartDataForMap(wildernessMap.mapId)).toBe(
+        wildernessMap.enemies,
+      );
+      expect(new Set(wildernessMap.enemies.map((enemy) => enemy.id)).size).toBe(
+        wildernessMap.enemies.length,
+      );
+
+      for (const enemy of wildernessMap.enemies) {
+        const sequence = (sequenceByEnemyType.get(enemy.enemyTypeId) ?? 0) + 1;
+        sequenceByEnemyType.set(enemy.enemyTypeId, sequence);
+
+        expect(enemy.id).toBe(
+          `zone-${mapIndex + 1}-${enemy.enemyTypeId.replaceAll("_", "-")}-${String(sequence).padStart(2, "0")}`,
+        );
+        expect(enemy.id).not.toContain("test-enemy");
+      }
     }
   });
 
