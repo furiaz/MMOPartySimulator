@@ -70,6 +70,12 @@ import {
   useHubBackgroundMusic,
   writeBackgroundMusicPreferences,
 } from "./backgroundMusic";
+import {
+  normalizeSoundEffectsPreferences,
+  readSoundEffectsPreferences,
+  useGameSoundEffects,
+  writeSoundEffectsPreferences,
+} from "./soundEffects";
 
 import {
   allocateCompanionStatPoint,
@@ -3076,6 +3082,9 @@ function App() {
   const [backgroundMusicPreferences, setBackgroundMusicPreferences] = useState(
     readBackgroundMusicPreferences,
   );
+  const [soundEffectsPreferences, setSoundEffectsPreferences] = useState(
+    readSoundEffectsPreferences,
+  );
   const [hasLocalSaveFile, setHasLocalSaveFile] = useState(hasStoredSaveFile);
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(
     null,
@@ -3116,6 +3125,16 @@ function App() {
     enabled: appMode === "playing",
     mapId: gameState.currentMapId,
     preferences: backgroundMusicPreferences,
+  });
+  const {
+    playMerchantTransaction,
+    queueQuestCompletions,
+    resetGameTracking: resetSoundEffectGameTracking,
+  } = useGameSoundEffects({
+    enabled: appMode === "playing",
+    gameState,
+    isGameMenuOpen,
+    preferences: soundEffectsPreferences,
   });
   const [selectedCompanionId, setSelectedCompanionId] = useState<string | null>(
     null,
@@ -3992,6 +4011,7 @@ function App() {
     latestGameStateRef.current = state;
     previousSavedMapIdRef.current = state.currentMapId ?? HUB_MAP_ID;
     previousQuestStatusesRef.current = getQuestStatuses(state);
+    resetSoundEffectGameTracking(state);
     setGameState(state);
     setAppMode("playing");
     resetUiForLoadedGame();
@@ -4129,6 +4149,30 @@ function App() {
       });
 
       writeBackgroundMusicPreferences(nextPreferences);
+      return nextPreferences;
+    });
+  }
+
+  function changeSoundEffectsVolume(volumePercent: number) {
+    setSoundEffectsPreferences((currentPreferences) => {
+      const nextPreferences = normalizeSoundEffectsPreferences({
+        ...currentPreferences,
+        volumePercent,
+      });
+
+      writeSoundEffectsPreferences(nextPreferences);
+      return nextPreferences;
+    });
+  }
+
+  function changeSoundEffectsMuted(muted: boolean) {
+    setSoundEffectsPreferences((currentPreferences) => {
+      const nextPreferences = normalizeSoundEffectsPreferences({
+        ...currentPreferences,
+        muted,
+      });
+
+      writeSoundEffectsPreferences(nextPreferences);
       return nextPreferences;
     });
   }
@@ -5362,6 +5406,7 @@ function App() {
     const opened = openGuildNoticeBoard(gameState, currentTime);
 
     if (opened.claimedRewards.length > 0) {
+      queueQuestCompletions(opened.claimedRewards.length);
       queueSaveAfterStateChange("Guild notice board rewards saved");
       setGuildNoticeBoardResultMessage(
         opened.claimedRewards
@@ -5432,6 +5477,10 @@ function App() {
         return `${reward.questTitle}: +${reward.crowns} Crowns, ${bookNames}`;
       })
       .join(" | ");
+
+    if (rerolled.claimedRewards.length > 0) {
+      queueQuestCompletions(rerolled.claimedRewards.length);
+    }
 
     if (rerolled.ok) {
       queueSaveAfterStateChange("Guild notice board reroll saved");
@@ -6051,6 +6100,7 @@ function App() {
     const purchase = buyMerchantItem(gameState, activeMerchantNpcId, itemId);
 
     if (purchase.result.status === "success") {
+      playMerchantTransaction();
       queueSaveAfterStateChange("Merchant purchase saved");
       setMerchantResultMessage(
         `Bought ${purchase.result.displayName} for ${purchase.result.priceCrowns} Crowns`,
@@ -6075,6 +6125,7 @@ function App() {
     );
 
     if (purchase.result.status === "success") {
+      playMerchantTransaction();
       queueSaveAfterStateChange("Farm seed purchase saved");
       setMerchantResultMessage(
         `Bought ${purchase.result.displayName} for ${purchase.result.priceCrowns} Crowns`,
@@ -6101,6 +6152,7 @@ function App() {
     );
 
     if (purchase.result.status === "success") {
+      playMerchantTransaction();
       queueSaveAfterStateChange("Livestock purchase saved");
       setMerchantResultMessage(
         `Bought ${purchase.result.displayName} for ${purchase.result.priceCrowns} Crowns`,
@@ -6127,6 +6179,7 @@ function App() {
     );
 
     if (sale.result.status === "success") {
+      playMerchantTransaction();
       queueSaveAfterStateChange("Merchant sale saved");
       setMerchantResultMessage(
         `Sold ${sale.result.displayName} ×${sale.result.soldQuantity} for ${sale.result.totalPriceCrowns} Crowns`,
@@ -7347,6 +7400,8 @@ function App() {
               backgroundMusicVolumePercent={
                 backgroundMusicPreferences.volumePercent
               }
+              soundEffectsMuted={soundEffectsPreferences.muted}
+              soundEffectsVolumePercent={soundEffectsPreferences.volumePercent}
               equipmentDropPopupThreshold={getEquipmentDropPopupThreshold(
                 gameState,
               )}
@@ -7435,6 +7490,8 @@ function App() {
               onMovePartyOrder={movePartyMemberOrder}
               onChangeBackgroundMusicMuted={changeBackgroundMusicMuted}
               onChangeBackgroundMusicVolume={changeBackgroundMusicVolume}
+              onChangeSoundEffectsMuted={changeSoundEffectsMuted}
+              onChangeSoundEffectsVolume={changeSoundEffectsVolume}
               onChangeEquipmentDropPopupThreshold={
                 changeEquipmentDropPopupThreshold
               }
