@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createNpc } from "./entities";
-import { isPartyLeaderNearGuildTavern } from "./guildTavern";
+import { isGuildTavernServiceAvailable } from "./guildTavern";
 import { createTestGameState } from "./testState";
 
-describe("guild tavern proximity", () => {
-  it("detects the leader in range of the Guild Coordinator", () => {
+describe("guild tavern availability", () => {
+  it("detects the Guild Coordinator service in Forward Bastion", () => {
     const leader = createCompanion("leader", { x: 10, y: 10 }, "leader");
     const coordinator = createNpc(
       "guild-coordinator",
@@ -13,6 +13,7 @@ describe("guild tavern proximity", () => {
       "guild_coordinator",
     );
     const state = createTestGameState({
+      currentMapId: "hub-2",
       partyLeaderId: leader.id,
       entities: {
         [leader.id]: leader,
@@ -20,7 +21,7 @@ describe("guild tavern proximity", () => {
       },
     });
 
-    expect(isPartyLeaderNearGuildTavern(state)).toBe(true);
+    expect(isGuildTavernServiceAvailable(state)).toBe(true);
   });
 
   it("detects the leader in range of the Inn Keeper", () => {
@@ -32,6 +33,7 @@ describe("guild tavern proximity", () => {
       "tavern_keeper",
     );
     const state = createTestGameState({
+      currentMapId: "hub-2",
       partyLeaderId: leader.id,
       entities: {
         [leader.id]: leader,
@@ -39,10 +41,10 @@ describe("guild tavern proximity", () => {
       },
     });
 
-    expect(isPartyLeaderNearGuildTavern(state)).toBe(true);
+    expect(isGuildTavernServiceAvailable(state)).toBe(true);
   });
 
-  it("keeps the shell reference-only when the leader is outside range", () => {
+  it("stays available when the leader is far across Forward Bastion", () => {
     const leader = createCompanion("leader", { x: 10, y: 10 }, "leader");
     const coordinator = createNpc(
       "guild-coordinator",
@@ -51,6 +53,7 @@ describe("guild tavern proximity", () => {
       "guild_coordinator",
     );
     const state = createTestGameState({
+      currentMapId: "hub-2",
       partyLeaderId: leader.id,
       entities: {
         [leader.id]: leader,
@@ -58,6 +61,32 @@ describe("guild tavern proximity", () => {
       },
     });
 
-    expect(isPartyLeaderNearGuildTavern(state)).toBe(false);
+    expect(isGuildTavernServiceAvailable(state)).toBe(true);
+  });
+
+  it("is unavailable outside town hubs or when its NPC is missing", () => {
+    const leader = createCompanion("leader", { x: 10, y: 10 }, "leader");
+    const coordinator = createNpc(
+      "guild-coordinator",
+      { x: 12, y: 10 },
+      "Guild Coordinator",
+      "guild_coordinator",
+    );
+    const outsideHub = createTestGameState({
+      currentMapId: "slimeward-camp",
+      partyLeaderId: leader.id,
+      entities: {
+        [leader.id]: leader,
+        [coordinator.id]: coordinator,
+      },
+    });
+    const missingNpc = createTestGameState({
+      currentMapId: "hub-2",
+      partyLeaderId: leader.id,
+      entities: { [leader.id]: leader },
+    });
+
+    expect(isGuildTavernServiceAvailable(outsideHub)).toBe(false);
+    expect(isGuildTavernServiceAvailable(missingNpc)).toBe(false);
   });
 });

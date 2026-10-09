@@ -14,7 +14,7 @@ import {
   getLivestockState,
   getLivestockUpgradeCostCrowns,
   getLivestockHelperBonusSummary,
-  isPartyLeaderNearLivestockKeeper,
+  isLivestockServiceAvailable,
   isTownServicesUnlocked,
   LIVESTOCK_ANIMAL_UPGRADE_DEFINITIONS,
   LIVESTOCK_ANIMAL_UPGRADE_IDS,
@@ -87,7 +87,7 @@ export type LivestockOutputDisplay = {
 
 export type LivestockDisplay = {
   isUnlocked: boolean;
-  isNearLivestockKeeper: boolean;
+  isLivestockServiceAvailable: boolean;
   canUseActions: boolean;
   width: number;
   height: number;
@@ -118,8 +118,8 @@ export function getLivestockDisplay(
 ): LivestockDisplay {
   const livestock = getLivestockState(state, nowMs);
   const isUnlocked = isTownServicesUnlocked(state);
-  const isNearLivestockKeeper = isPartyLeaderNearLivestockKeeper(state);
-  const canUseActions = isUnlocked && isNearLivestockKeeper;
+  const livestockServiceAvailable = isLivestockServiceAvailable(state);
+  const canUseActions = isUnlocked && livestockServiceAvailable;
   const placements = Object.values(livestock.placementsById).sort((a, b) =>
     a.id.localeCompare(b.id),
   );
@@ -210,7 +210,7 @@ export function getLivestockDisplay(
 
   return {
     isUnlocked,
-    isNearLivestockKeeper,
+    isLivestockServiceAvailable: livestockServiceAvailable,
     canUseActions,
     width: livestock.grid.width,
     height: livestock.grid.height,
@@ -229,14 +229,14 @@ export function getLivestockDisplay(
       ? totalHeld > 0
         ? outputs.map((output) => output.holdText).join(", ")
         : "Nothing held"
-      : "Requires proximity",
+      : "Service unavailable",
     canCollect: canUseActions && totalHeld > 0,
     feedNowActionText:
       hungryCount <= 0
         ? "No hungry animals"
         : canUseActions
           ? `${hungryCount} hungry`
-          : "Requires proximity",
+          : "Service unavailable",
     canFeedNow: canUseActions && hungryCount > 0,
     hasHungryAnimals: hungryCount > 0,
     gridSizeText: `${livestock.grid.width}x${livestock.grid.height}`,

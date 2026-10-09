@@ -273,6 +273,7 @@ describe("prototype quest system", () => {
 
   it("grants smithy starter materials on accept so Plain Charm can be crafted", () => {
     let state = createStateWithParty({
+      currentMapId: "hub",
       quests: createQuestStates({
         smiths_first_work: "available",
       }),

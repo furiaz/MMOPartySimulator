@@ -1,5 +1,5 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
-import { isPartyLeaderNearLivestockKeeper } from "./farm";
+import { isLivestockServiceAvailable } from "./farm";
 import { sanitizeInnKitchenState } from "./innKitchen";
 import { addItemToInventoryState } from "./inventory";
 import {
@@ -86,7 +86,7 @@ export const LIVESTOCK_BUILDING_UPGRADE_IDS: LivestockBuildingUpgradeId[] = [
 
 export type LivestockCommandFailureReason =
   | "locked_service"
-  | "not_near_livestock"
+  | "livestock_service_unavailable"
   | "invalid_creature"
   | "invalid_placement"
   | "invalid_upgrade"
@@ -1966,8 +1966,8 @@ function getLivestockActionFailure(
     return "locked_service";
   }
 
-  if (!isPartyLeaderNearLivestockKeeper(state)) {
-    return "not_near_livestock";
+  if (!isLivestockServiceAvailable(state)) {
+    return "livestock_service_unavailable";
   }
 
   return null;

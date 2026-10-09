@@ -237,21 +237,21 @@ describe("livestock presentation", () => {
     expect(display.expectedDailyOutputText).toBe("Eggs 9.60/day");
   });
 
-  it("allows browsing while locked or far but disables execution actions", () => {
+  it("allows browsing while locked or outside a qualifying hub but disables actions", () => {
     const locked = getLivestockDisplay(
       createLivestockPresentationState({ azureTrialCompleted: false }),
       0,
     );
-    const far = getLivestockDisplay(
-      createLivestockPresentationState({ leaderPosition: { x: 0, y: 0 } }),
+    const unavailable = getLivestockDisplay(
+      createLivestockPresentationState({ currentMapId: "map-1" }),
       0,
     );
 
     expect(locked.isUnlocked).toBe(false);
     expect(locked.creatures[0].canHoldForPlacement).toBe(false);
-    expect(locked.collectActionText).toBe("Requires proximity");
-    expect(far.isNearLivestockKeeper).toBe(false);
-    expect(far.creatures[0].canHoldForPlacement).toBe(false);
+    expect(locked.collectActionText).toBe("Service unavailable");
+    expect(unavailable.isLivestockServiceAvailable).toBe(false);
+    expect(unavailable.creatures[0].canHoldForPlacement).toBe(false);
   });
 
   it("filters locked creatures and shows source hints in All mode", () => {
@@ -322,10 +322,12 @@ function createLivestockPresentationState({
   azureTrialCompleted = true,
   leaderPosition = { x: 10, y: 10 },
   livestock = createInitialLivestockState(),
+  currentMapId = "hub-2",
 }: {
   azureTrialCompleted?: boolean;
   leaderPosition?: Position;
   livestock?: GameState["livestock"];
+  currentMapId?: GameState["currentMapId"];
 } = {}) {
   const leader = createCompanion("leader", leaderPosition, "leader");
   const keeper = createNpc(
@@ -337,6 +339,7 @@ function createLivestockPresentationState({
   const baseQuests = createTestGameState().quests;
 
   return createTestGameState({
+    currentMapId,
     partyLeaderId: leader.id,
     entities: {
       [leader.id]: leader,

@@ -39,7 +39,10 @@ import type {
   PartyManagementSection,
   PartyMenuSection,
 } from "./gameMenuTypes";
-import { getNpcInteractionRange } from "./npcInteractionRange";
+import {
+  getNpcInteractionRange,
+  isNpcInteractionAvailable,
+} from "./npcInteractionRange";
 import { getPoiDisplayName } from "./poiPresentation";
 import {
   canNpcShowSpeech,
@@ -188,8 +191,9 @@ import {
   depositAllToBank,
   depositInventorySlotToBank,
   isBankChestNpc,
-  isPartyLeaderNearBankChest,
-  isPartyLeaderNearGuildTavern,
+  isBankServiceAvailable,
+  isFunctionalHubNpcRole,
+  isGuildTavernServiceAvailable,
   isTownServicesUnlocked,
   isFarmCropUnlocked,
   isCompanionHubEligibleForInnKitchen,
@@ -666,7 +670,7 @@ const skillBookFailureMessages: Record<ReadSkillBookFailureReason, string> = {
 const craftingFailureMessages: Record<CraftingFailureReason, string> = {
   invalid_recipe: "Recipe unavailable",
   invalid_output: "Recipe output unavailable",
-  leader_not_near_smith: "Requires Smithy",
+  smith_service_unavailable: "Visit a hub with a Smithy",
   already_owned: "Already owned",
   missing_materials: "Missing materials",
   insufficient_crowns: "Not enough Crowns",
@@ -678,8 +682,8 @@ const craftingFailureMessages: Record<CraftingFailureReason, string> = {
 
 function getBankTransferFailureMessage(reason: string): string {
   switch (reason) {
-    case "not_near_bank":
-      return "Requires Bank Chest";
+    case "bank_service_unavailable":
+      return "Visit a hub with a Bank Chest";
     case "remote_view_only":
       return "Remote Bank is view only";
     case "source_empty":
@@ -780,8 +784,8 @@ function getFarmFailureMessage(reason: string): string {
   switch (reason) {
     case "locked_service":
       return "Complete The Azure Trial to unlock town services.";
-    case "not_near_farmer":
-      return "Stand near the Farmer.";
+    case "farm_service_unavailable":
+      return "Visit a hub with the Farmer.";
     case "insufficient_crowns":
       return "Not enough Crowns.";
     case "max_level":
@@ -800,8 +804,8 @@ function getLivestockFailureMessage(reason: string): string {
   switch (reason) {
     case "locked_service":
       return "Complete The Azure Trial to unlock town services.";
-    case "not_near_livestock":
-      return "Stand near Livestock.";
+    case "livestock_service_unavailable":
+      return "Visit a hub with Livestock.";
     case "no_available_creature":
       return "No available Livestock creature.";
     case "occupied_cell":
@@ -1050,10 +1054,6 @@ function getNpcInteractionKind(npc: NpcEntity): NpcInteractionKind | null {
   }
 
   return null;
-}
-
-function getPositionDistance(first: Position, second: Position): number {
-  return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
 function formatIdentifierName(identifier: string): string {
@@ -3620,10 +3620,10 @@ function App() {
       ? gameState.entities[activeBankChestNpcId]
       : null;
   const activeBankCanManage =
-    Boolean(activeBankChest) && isPartyLeaderNearBankChest(gameState);
+    Boolean(activeBankChest) && isBankServiceAvailable(gameState);
   const canUseGuildTavern =
     isTownServicesUnlocked(gameState) &&
-    isPartyLeaderNearGuildTavern(gameState);
+    isGuildTavernServiceAvailable(gameState);
   const activeMerchantLocked =
     Boolean(activeMerchant) && !isMerchantUnlockedForQuests(gameState);
   const activeMerchantFirstAidPurchaseRequired =
@@ -4435,9 +4435,9 @@ function App() {
         : null;
 
     if (
-      activeNpc &&
-      getPositionDistance(leader.position, activeNpc.position) >
-        getNpcInteractionRange(activeNpc)
+      activeNpcId &&
+      (!activeNpc ||
+        !isNpcInteractionAvailable(gameState, leader.position, activeNpc))
     ) {
       const timeoutId = window.setTimeout(closeNpcInteractions, 0);
 
@@ -4461,10 +4461,7 @@ function App() {
       return;
     }
 
-    if (
-      getPositionDistance(leader.position, pendingNpc.position) <=
-      getNpcInteractionRange(pendingNpc)
-    ) {
+    if (isNpcInteractionAvailable(gameState, leader.position, pendingNpc)) {
       const timeoutId = window.setTimeout(() => {
         openNpcInteraction(pendingNpc);
       }, 0);
@@ -4475,6 +4472,7 @@ function App() {
     activeMerchantNpcId,
     activeBankChestNpcId,
     activeQuestGiverNpcId,
+    gameState.currentMapId,
     gameState.entities,
     closeNpcInteractions,
     leader?.position.x,
@@ -6689,14 +6687,16 @@ function App() {
       return;
     }
 
-    if (
-      leader &&
-      getPositionDistance(leader.position, npc.position) <= interactionRange
-    ) {
+    if (leader && isNpcInteractionAvailable(gameState, leader.position, npc)) {
       if (!interactionKind) {
         closeNpcInteractions();
       }
       openNpcInteraction(npc);
+      return;
+    }
+
+    if (isFunctionalHubNpcRole(npc.npcRole)) {
+      closeNpcInteractions();
       return;
     }
 
@@ -7099,7 +7099,9 @@ function App() {
             <div className="merchant-menu bank-menu">
               <div className="merchant-menu-header">
                 <h2>{activeBankChest.displayName}</h2>
-                <span>{activeBankCanManage ? "Nearby" : "Too far"}</span>
+                <span>
+                  {activeBankCanManage ? "Available" : "Unavailable"}
+                </span>
               </div>
               <button onClick={closeNpcInteractions} type="button">
                 Leave

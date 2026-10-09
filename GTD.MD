@@ -99,6 +99,7 @@ Current game-logic implementation files include:
 - `guildTavern.ts`
 - `healingFountainSystem.ts`
 - `healthSystem.ts`
+- `hubNpcAccess.ts`
 - `innKitchen.ts`
 - `innKitchenUpgrades.ts`
 - `innRoomUpgrades.ts`
@@ -227,7 +228,7 @@ The player is the manager/controller issuing intent and commands to party member
 
 NPC entities are prototype placeholders for hub visuals, simple interactions, quest guide behavior, dungeon chest presentation, bank chest presentation, Guild & Inn service presentation, Farm and Livestock service presentation where present, and non-interactive service placeholders.
 
-Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock and limited Merchant Sell interaction, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening/proximity anchors where present, Farm and Livestock service opening/proximity anchors where present, lightweight non-branching speech presentation for supported character NPCs, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
+Current prototype NPC behavior is limited to Quest Giver quest interaction, Class Mentor first-class selection interaction, fixed Merchant Buy stock and limited Merchant Sell interaction, Smith crafting interaction, Bank Chest storage interaction, Guild & Inn service opening where present, Farm and Livestock service opening where present, lightweight non-branching speech presentation for supported character NPCs, placeholder hub NPC display, prototype quest NPC behavior for guide, rescue, repair, defend, route unlock, and elite-spawn objectives, and Slimeward dungeon chest closed/open presentation.
 
 Current NPC role values include:
 
@@ -250,7 +251,9 @@ type NpcRole =
   | "dungeon_chest_open";
 ```
 
-Supported character NPCs may display one transient, non-branching speech bubble after the party reaches interaction range. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. Speech is not persisted and does not define simulation behavior.
+`hubNpcAccess.ts` owns town-hub recognition, the functional hub NPC role allowlist, and current-map NPC-presence checks. Only `hub` and `hub-2` are current town hubs. Functional roles are `quest_giver`, `class_mentor`, `merchant`, `smith`, `bank_chest`, `guild_coordinator`, `tavern_keeper`, `farmer`, and `livestock_keeper`. Their interactions are available across the current town hub while the matching entity exists. `npcInteractionRange.ts` keeps numeric range fallback for excluded interactions such as dogs, quest guides, and dungeon chests.
+
+Supported character NPCs may display one transient, non-branching speech bubble after their interaction becomes available. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. Speech is not persisted and does not define simulation behavior.
 
 NPCs do not implement branching dialogue, dialogue choices, conversation history, full shops beyond fixed prototype Merchant Buy stock, production crafting or smithing beyond current prototype Smith crafting, recruitment beyond current Guild Recruit helpers, relationship behavior, or general follower behavior.
 
@@ -2705,8 +2708,8 @@ Current bank behavior:
 - stores items separately from shared inventory
 - accepts inventory items except quest items
 - supports manual deposit, manual withdraw, and deposit-all helpers
-- requires the leader to be near a `bank_chest` NPC for manual transfer by default
-- may be viewed remotely through UI while transfer actions remain proximity-gated
+- requires a living leader and a `bank_chest` NPC in the current town hub for manual transfer by default
+- may be viewed remotely through UI while transfer actions remain gated by current-hub Bank service availability
 - supports bank slot locks and inventory slot locks for bank movement
 - supports auto-routing modes for keeping inventory, depositing eligible enemy-part materials, or depositing all eligible non-quest items
 - sanitizes missing or old-save bank state into valid default bank state
@@ -2717,7 +2720,7 @@ Current crafting behavior:
 
 - recipes may output inventory items or slotless key items
 - recipe costs may require inventory item quantities, matching previous equipment, and Crowns
-- crafting requires the leader to be near a `smith` NPC
+- crafting requires a leader and a `smith` NPC in the current town hub
 - crafting ignores locked inventory slots when counting or consuming requirements
 - crafting does not count equipped or banked equipment toward previous-equipment requirements
 - item outputs require inventory capacity after consumed inputs are accounted for
@@ -2916,7 +2919,7 @@ Guild & Inn service logic lives in:
 Current Guild & Inn behavior:
 
 - identifies Guild & Inn service anchors by `npcRole: "guild_coordinator"` or `npcRole: "tavern_keeper"`
-- uses the Guild & Inn proximity helper to gate service actions
+- uses the shared current-hub NPC availability rule to gate service actions
 - allows Guild & Inn pages to be viewed remotely where UI supports reference-only access
 - keeps service action validation in game logic, not React
 - stores active party, resting reserve, Field Team, recruit, board, upgrade, room, Kitchen, Hearth's Fire, and world discovery state on `GameState`
@@ -2959,6 +2962,7 @@ Farm and Livestock service logic lives in:
 Current Farm behavior:
 
 - identifies Farm service anchors by `npcRole: "farmer"`
+- uses the shared current-hub NPC availability rule to gate Farm actions
 - keeps Farm action validation, crop unlocks, production timing, upgrade costs, holding caps, fertilizer rolls, harvest, pantry transfer, and telemetry in game logic
 - uses data-driven crop definitions for Carrot, Potato, Moonleaf, Bittercap Mushroom, and Ashpepper
 - stores crop plots on `GameState.farm` as permanent field discoveries with per-crop Speed, Harvest Cap, and Fertilizer upgrade levels
@@ -2969,6 +2973,7 @@ Current Farm behavior:
 Current Livestock behavior:
 
 - identifies Livestock service anchors by `npcRole: "livestock_keeper"`
+- uses the shared current-hub NPC availability rule to gate Livestock actions
 - keeps grid placement, footprint validation, ownership, production timing, feeding, hungry pause/resume, upgrades, unlocks, collection routing, helper bonuses, and telemetry in game logic
 - stores owned creatures, placed creatures, building upgrades, animal upgrades, feed day tracking, and holding quantities on `GameState.livestock`
 - uses data-driven creature definitions for Duskhen, Wolf, Tin Crawler, and Elder Mossling
@@ -3923,9 +3928,9 @@ Selecting a destination may set `worldTravelTargetMapId`; the POI system then gu
 
 Selecting an unlocked direct Teleportation Echo destination may call existing teleport helpers to complete the supported prototype direct transition.
 
-Bank UI may call existing bank helper functions, but must not define bank capacity, slot-locking, transfer, proximity, quest-item exclusion, or auto-routing rules inside React.
+Bank UI may call existing bank helper functions, but must not define bank capacity, slot-locking, transfer, service availability, quest-item exclusion, or auto-routing rules inside React.
 
-Crafting UI may call existing crafting helper functions, but must not define recipes, recipe sorting, material matching, previous-equipment requirements, key item ownership checks, Smith proximity, wallet mutation, inventory mutation, or quest progress rules inside React.
+Crafting UI may call existing crafting helper functions, but must not define recipes, recipe sorting, material matching, previous-equipment requirements, key item ownership checks, Smith service availability, wallet mutation, inventory mutation, or quest progress rules inside React.
 
 Merchant UI may call existing merchant helper functions, but must not define exchange, buy, pricing, stock, inventory, or wallet rules inside React.
 
