@@ -278,10 +278,11 @@ export function FarmLivestockPanel({
                 </button>
               </div>
             </div>
-            {!lockedMessage && !display.isNearFarmer ? (
+            {!lockedMessage && !display.isFarmServiceAvailable ? (
               <p className="guild-requires-service">
-                Stand near the Farmer to upgrade fields or harvest crops. You
-                can browse from afar, but actions require proximity.
+                Visit a hub with the Farmer to upgrade fields or harvest crops.
+                You can browse remotely, but actions require that service in
+                your current hub.
               </p>
             ) : null}
             <div className="farm-crop-list">
@@ -297,10 +298,11 @@ export function FarmLivestockPanel({
         </>
       ) : (
         <section className="guild-tavern-section livestock-section">
-          {!lockedMessage && !display.isNearLivestockKeeper ? (
+          {!lockedMessage && !display.isLivestockServiceAvailable ? (
             <p className="guild-requires-service">
-              Stand near Livestock to place, move, remove, or collect. You can
-              browse from afar, but actions require proximity.
+              Visit a hub with Livestock to place, move, remove, or collect. You
+              can browse remotely, but actions require that service in your
+              current hub.
             </p>
           ) : null}
           {livestockResultMessage ? (
@@ -596,7 +598,7 @@ export function FarmLivestockPanel({
         >
           <FarmUpgradeOverlayContent
             field={selectedUpgradeField}
-            isNearFarmer={display.isNearFarmer}
+            isFarmServiceAvailable={display.isFarmServiceAvailable}
             isUnlocked={display.isUnlocked}
             lockedMessage={lockedMessage}
             onClose={() => setSelectedUpgradeFieldId(null)}
@@ -612,7 +614,9 @@ export function FarmLivestockPanel({
         >
           <LivestockAnimalUpgradeOverlayContent
             creature={selectedLivestockUpgradeCreature}
-            isNearLivestockKeeper={livestockDisplay.isNearLivestockKeeper}
+            isLivestockServiceAvailable={
+              livestockDisplay.isLivestockServiceAvailable
+            }
             isUnlocked={livestockDisplay.isUnlocked}
             lockedMessage={lockedMessage}
             onClose={() => setSelectedLivestockUpgradeCreatureId(null)}
@@ -628,7 +632,9 @@ export function FarmLivestockPanel({
         >
           <LivestockBuildingUpgradeOverlayContent
             upgrades={livestockDisplay.buildingUpgrades}
-            isNearLivestockKeeper={livestockDisplay.isNearLivestockKeeper}
+            isLivestockServiceAvailable={
+              livestockDisplay.isLivestockServiceAvailable
+            }
             isUnlocked={livestockDisplay.isUnlocked}
             lockedMessage={lockedMessage}
             onClose={() => setLivestockBuildingUpgradeOpen(false)}
@@ -711,14 +717,14 @@ function FarmCropRow({
 
 function FarmUpgradeOverlayContent({
   field,
-  isNearFarmer,
+  isFarmServiceAvailable,
   isUnlocked,
   lockedMessage,
   onClose,
   onPurchase,
 }: {
   field: FarmFieldDisplay;
-  isNearFarmer: boolean;
+  isFarmServiceAvailable: boolean;
   isUnlocked: boolean;
   lockedMessage: string | null;
   onClose: () => void;
@@ -737,9 +743,9 @@ function FarmUpgradeOverlayContent({
 
       {lockedMessage ? (
         <p className="guild-requires-service">{lockedMessage}</p>
-      ) : !isNearFarmer && isUnlocked ? (
+      ) : !isFarmServiceAvailable && isUnlocked ? (
         <p className="guild-requires-service">
-          Stand near the Farmer to purchase upgrades.
+          Visit a hub with the Farmer to purchase upgrades.
         </p>
       ) : null}
 
@@ -778,14 +784,14 @@ function FarmUpgradeOverlayContent({
 
 function LivestockAnimalUpgradeOverlayContent({
   creature,
-  isNearLivestockKeeper,
+  isLivestockServiceAvailable,
   isUnlocked,
   lockedMessage,
   onClose,
   onPurchase,
 }: {
   creature: LivestockCreatureDisplay;
-  isNearLivestockKeeper: boolean;
+  isLivestockServiceAvailable: boolean;
   isUnlocked: boolean;
   lockedMessage: string | null;
   onClose: () => void;
@@ -807,7 +813,7 @@ function LivestockAnimalUpgradeOverlayContent({
       </div>
 
       <LivestockUpgradeRequirementMessage
-        isNearLivestockKeeper={isNearLivestockKeeper}
+        isLivestockServiceAvailable={isLivestockServiceAvailable}
         isUnlocked={isUnlocked}
         lockedMessage={lockedMessage}
       />
@@ -828,14 +834,14 @@ function LivestockAnimalUpgradeOverlayContent({
 
 function LivestockBuildingUpgradeOverlayContent({
   upgrades,
-  isNearLivestockKeeper,
+  isLivestockServiceAvailable,
   isUnlocked,
   lockedMessage,
   onClose,
   onPurchase,
 }: {
   upgrades: Array<LivestockUpgradeDisplay<LivestockBuildingUpgradeId>>;
-  isNearLivestockKeeper: boolean;
+  isLivestockServiceAvailable: boolean;
   isUnlocked: boolean;
   lockedMessage: string | null;
   onClose: () => void;
@@ -854,7 +860,7 @@ function LivestockBuildingUpgradeOverlayContent({
       </div>
 
       <LivestockUpgradeRequirementMessage
-        isNearLivestockKeeper={isNearLivestockKeeper}
+        isLivestockServiceAvailable={isLivestockServiceAvailable}
         isUnlocked={isUnlocked}
         lockedMessage={lockedMessage}
       />
@@ -871,19 +877,19 @@ function LivestockBuildingUpgradeOverlayContent({
 }
 
 function LivestockUpgradeRequirementMessage({
-  isNearLivestockKeeper,
+  isLivestockServiceAvailable,
   isUnlocked,
   lockedMessage,
 }: {
-  isNearLivestockKeeper: boolean;
+  isLivestockServiceAvailable: boolean;
   isUnlocked: boolean;
   lockedMessage: string | null;
 }) {
   return lockedMessage ? (
     <p className="guild-requires-service">{lockedMessage}</p>
-  ) : !isNearLivestockKeeper && isUnlocked ? (
+  ) : !isLivestockServiceAvailable && isUnlocked ? (
     <p className="guild-requires-service">
-      Stand near Livestock to purchase upgrades.
+      Visit a hub with Livestock to purchase upgrades.
     </p>
   ) : null;
 }
@@ -925,7 +931,7 @@ function LivestockUpgradeRowList<
 }
 
 function getFarmHarvestButtonStatusText(field: FarmFieldDisplay): string {
-  return field.harvestActionText === "Requires proximity"
+  return field.harvestActionText === "Service unavailable"
     ? field.heldQuantity > 0
       ? field.holdText
       : "Nothing held"

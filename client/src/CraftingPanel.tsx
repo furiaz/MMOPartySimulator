@@ -69,8 +69,8 @@ function getCraftingBlockReason(status: CraftingRecipeStatus): string | null {
     return "Owned";
   }
 
-  if (!status.isLeaderNearSmith) {
-    return "Requires Smithy";
+  if (!status.isSmithServiceAvailable) {
+    return "Visit a hub with a Smithy";
   }
 
   if (!status.hasRequiredMaterials) {
@@ -623,7 +623,9 @@ export function CraftingPanel({
                 <div>
                   <dt>Smithy</dt>
                   <dd>
-                    {selectedStatus.isLeaderNearSmith ? "Nearby" : "Required"}
+                    {selectedStatus.isSmithServiceAvailable
+                      ? "Available"
+                      : "Unavailable"}
                   </dd>
                 </div>
               </dl>

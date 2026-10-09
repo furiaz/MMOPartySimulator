@@ -843,17 +843,17 @@ Current prototype key item behavior:
 
 Current prototype bank behavior:
 
-- Bank Chest NPCs can provide shared party storage when the leader is nearby
+- Bank Chest NPCs provide shared party storage anywhere in the current town hub when that hub contains a Bank Chest
 - bank storage is slot-based and separate from shared inventory
 - bank and inventory slots may be locked to prevent selected movement
 - manual deposit, manual withdraw, and deposit-all actions may move eligible items between inventory and bank
 - quest items cannot be deposited
 - bank auto-routing may keep items in inventory, deposit eligible enemy-part materials only, or deposit all eligible non-quest items
-- remote bank viewing may exist through UI, but item movement requires proximity to a Bank Chest
+- remote bank viewing may exist through UI, but item movement requires Bank service availability in the current town hub
 
 Current prototype crafting behavior:
 
-- Smith NPCs can provide lightweight prototype crafting when the leader is nearby
+- Smith NPCs provide lightweight prototype crafting anywhere in the current town hub when that hub contains a Smith
 - crafting may create equipment or slotless key items
 - crafting consumes required unlocked inventory items, matching previous equipment where required, and Crowns
 - crafting does not count equipped or banked equipment toward previous-equipment requirements
@@ -1326,19 +1326,21 @@ Current Atlas pages may include:
 
 Atlas pages may be viewed remotely when supported.
 
-Service actions remain gated by their owning system and by local service presence:
+Functional hub NPC interactions and service actions are available anywhere within the current town hub when the matching NPC role exists in that hub. Current town hubs are Harbor Union Bastion (`hub`) and Forward Bastion (`hub-2`) only; Slimeward Camp and wilderness maps do not count as town hubs. Functional hub roles are Quest Giver, Class Mentor, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Farmer, and Livestock keeper. Dogs, quest guides, dungeon chests, and other excluded interactions retain their local interaction ranges.
 
-- Smith crafting requires Smith proximity
-- Bank transfers require Bank Chest proximity
-- Guild & Inn service actions require Guild & Inn proximity
-- Farm service actions require Farmer proximity in hubs where Farm is present
-- Livestock service actions require Livestock proximity in hubs where Livestock is present
+Service actions remain gated by their owning system and by current-hub service availability:
+
+- Smith crafting requires a Smith in the current town hub
+- Bank transfers require a Bank Chest in the current town hub
+- Guild & Inn service actions require a Guild Coordinator or Inn Keeper in the current town hub
+- Farm service actions require a Farmer in the current town hub
+- Livestock service actions require a Livestock keeper in the current town hub
 
 Guild & Inn remote viewing may show current state, upgrades, rooms, recipes, quests, recruits, Field Teams, and timers without allowing gated service actions.
 
 Farm & Livestock remote viewing may show current plots, crop holding, crop rates, livestock grid state, creature ownership, feed requirements, production estimates, upgrades, helper bonuses, and timers without allowing gated service actions.
 
-Guild & Inn, Farm, and Livestock are current town services. Their service actions unlock after The Azure Trial is completed and still respect service location and proximity rules.
+Guild & Inn, Farm, and Livestock are current town services. Their service actions unlock after The Azure Trial is completed and still require the matching service NPC in the current town hub.
 
 Current prototype hub service split:
 
@@ -1561,13 +1563,13 @@ Current prototype quests:
   - Objectives: enter Slimeward Floor 1, defeat The Azure Mass on Slimeward Floor 2, and collect the Slimeward boss chest
   - Rewards: 100 Crowns, 1500 character XP
 
-The Quest Giver in Harbor Union Bastion can accept available Quest Giver quests and turn in ready Quest Giver quests when the leader reaches interaction range.
+The Quest Giver in Harbor Union Bastion can accept available Quest Giver quests and turn in ready Quest Giver quests from anywhere in that hub while the Quest Giver is present.
 
 The Class Mentor may act as the current prototype quest source for The Azure Trial.
 
 Current lightweight NPC speech bubble behavior:
 
-- interacting with a supported character NPC may show one short-lived, non-branching speech bubble near that NPC after the party reaches interaction range
+- interacting with a supported character NPC may show one short-lived, non-branching speech bubble near that NPC; functional hub NPCs use current-hub availability, while excluded NPCs still require the party to reach their local interaction range
 - service NPC speech may provide a short role tip while the existing service UI opens normally
 - Quest Giver and Class Mentor speech may reflect ready, available, or active quest state through authored hints
 - supported dog NPCs may show a short bark without opening a service panel
@@ -2493,9 +2495,9 @@ Current Forward Bastion prototype hub:
 - The Class Mentor may appear in Forward Bastion through current quest-aware hub NPC data.
 - The standalone Bounty Board NPC is removed; board work is accessed through the Guild & Inn Notice Board UI.
 - The Guild Coordinator and Inn Keeper open the current Guild & Inn Atlas service page.
-- Guild & Inn service actions require the party leader to be near either Guild & Inn service NPC.
+- Guild & Inn service actions are available throughout Forward Bastion while either Guild & Inn service NPC is present.
 - The Guild & Inn Notice Board sign may appear near the building when board work is unseen or claimable.
-- Farm and Livestock service actions require the party leader to be near the matching Forward Bastion service NPC.
+- Farm and Livestock service actions are available throughout Forward Bastion while the matching service NPC is present.
 - The Smith supports current lightweight prototype crafting only.
 - The Bank Chest supports current lightweight prototype shared bank storage only.
 - Forward Bastion should not spawn hostile enemies for now.

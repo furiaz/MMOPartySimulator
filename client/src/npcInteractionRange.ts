@@ -1,4 +1,10 @@
-import type { NpcEntity } from "./game/types";
+import {
+  isFunctionalHubNpcAvailable,
+  isFunctionalHubNpcRole,
+} from "./game/hubNpcAccess";
+import { getEuclideanDistance } from "./game/positionUtils";
+import type { GameState } from "./game/state";
+import type { NpcEntity, Position } from "./game/types";
 import { BANK_INTERACTION_RANGE } from "./game/bank";
 import { SMITH_CRAFTING_INTERACTION_RANGE } from "./game/crafting";
 import { FARM_INTERACTION_RANGE } from "./game/farm";
@@ -38,4 +44,19 @@ export function getNpcInteractionRange(
   }
 
   return defaultNpcInteractionRange;
+}
+
+export function isNpcInteractionAvailable(
+  state: Pick<GameState, "currentMapId" | "entities">,
+  leaderPosition: Position,
+  npc: NpcEntity,
+): boolean {
+  if (isFunctionalHubNpcRole(npc.npcRole)) {
+    return isFunctionalHubNpcAvailable(state, npc);
+  }
+
+  return (
+    getEuclideanDistance(leaderPosition, npc.position) <=
+    getNpcInteractionRange(npc)
+  );
 }

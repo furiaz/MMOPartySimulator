@@ -30,6 +30,7 @@ import {
 } from "./keyItems";
 import { sanitizeGameStateForSave } from "./saveGame";
 import { createTestGameState } from "./testState";
+import type { GameState } from "./state";
 import type {
   LivestockPlacedCreatureState,
   LivestockState,
@@ -99,7 +100,10 @@ describe("Livestock MVP", () => {
 
   it("purchases animal upgrades, spends Crowns, and applies speed, feed, and cap effects", () => {
     const speed = purchaseLivestockAnimalUpgrade(
-      createLivestockTestState({ crowns: 1_000 }),
+      createLivestockTestState({
+        crowns: 1_000,
+        leaderPosition: { x: 0, y: 0 },
+      }),
       LIVESTOCK_DUSKHEN_CREATURE_ID,
       "speed",
       NOW_MS,
@@ -226,16 +230,16 @@ describe("Livestock MVP", () => {
     expect(placedInNewRow.ok).toBe(true);
   });
 
-  it("rejects invalid, locked, far, unaffordable, maxed, and disabled Livestock upgrades", () => {
+  it("rejects invalid, locked, unavailable, unaffordable, maxed, and disabled Livestock upgrades", () => {
     const locked = purchaseLivestockAnimalUpgrade(
       createLivestockTestState({ azureTrialCompleted: false, crowns: 1_000 }),
       LIVESTOCK_DUSKHEN_CREATURE_ID,
       "speed",
       NOW_MS,
     );
-    const far = purchaseLivestockAnimalUpgrade(
+    const unavailable = purchaseLivestockAnimalUpgrade(
       createLivestockTestState({
-        leaderPosition: { x: 0, y: 0 },
+        currentMapId: "map-1",
         crowns: 1_000,
       }),
       LIVESTOCK_DUSKHEN_CREATURE_ID,
@@ -275,7 +279,10 @@ describe("Livestock MVP", () => {
     );
 
     expect(locked).toMatchObject({ ok: false, reason: "locked_service" });
-    expect(far).toMatchObject({ ok: false, reason: "not_near_livestock" });
+    expect(unavailable).toMatchObject({
+      ok: false,
+      reason: "livestock_service_unavailable",
+    });
     expect(insufficient).toMatchObject({
       ok: false,
       reason: "insufficient_crowns",
@@ -285,7 +292,7 @@ describe("Livestock MVP", () => {
     expect(invalid).toMatchObject({ ok: false, reason: "invalid_upgrade" });
   });
 
-  it("places Duskhens and rejects locked, far, occupied, out-of-bounds, and unavailable placement", () => {
+  it("places Duskhens and rejects locked, unavailable-service, occupied, out-of-bounds, and unavailable placement", () => {
     const locked = placeLivestockCreature(
       createLivestockTestState({ azureTrialCompleted: false }),
       LIVESTOCK_DUSKHEN_CREATURE_ID,
@@ -294,8 +301,8 @@ describe("Livestock MVP", () => {
       "horizontal",
       NOW_MS,
     );
-    const far = placeLivestockCreature(
-      createLivestockTestState({ leaderPosition: { x: 0, y: 0 } }),
+    const unavailableService = placeLivestockCreature(
+      createLivestockTestState({ currentMapId: "slimeward-camp" }),
       LIVESTOCK_DUSKHEN_CREATURE_ID,
       0,
       0,
@@ -359,7 +366,10 @@ describe("Livestock MVP", () => {
     );
 
     expect(locked).toMatchObject({ ok: false, reason: "locked_service" });
-    expect(far).toMatchObject({ ok: false, reason: "not_near_livestock" });
+    expect(unavailableService).toMatchObject({
+      ok: false,
+      reason: "livestock_service_unavailable",
+    });
     expect(occupied).toMatchObject({ ok: false, reason: "occupied_cell" });
     expect(unavailable).toMatchObject({
       ok: false,
@@ -890,6 +900,7 @@ function createLivestockTestState({
   inventory,
   pantryCarrots = 100,
   crowns = 0,
+  currentMapId = "hub-2",
 }: {
   azureTrialCompleted?: boolean;
   leaderPosition?: Position;
@@ -899,6 +910,7 @@ function createLivestockTestState({
   inventory?: ReturnType<typeof createEmptyPartyInventory>;
   pantryCarrots?: number;
   crowns?: number;
+  currentMapId?: GameState["currentMapId"];
 } = {}) {
   const leader = createCompanion("leader", leaderPosition, "leader");
   const keeper = createNpc(
@@ -912,6 +924,7 @@ function createLivestockTestState({
   const baseKitchen = baseState.innKitchen!;
 
   return createTestGameState({
+    currentMapId,
     partyLeaderId: leader.id,
     entities: {
       [leader.id]: leader,

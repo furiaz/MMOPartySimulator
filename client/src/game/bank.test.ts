@@ -7,7 +7,7 @@ import {
   depositAllToBank,
   depositInventorySlotToBank,
   isAutoDepositEnemyPartMaterialDefinition,
-  isPartyLeaderNearBankChest,
+  isBankServiceAvailable,
   sanitizePartyBank,
   setBankAutoRoutingMode,
   toggleInventoryBankLock,
@@ -55,10 +55,18 @@ describe("bank storage", () => {
     });
   });
 
-  it("validates leader proximity to a bank chest", () => {
-    expect(isPartyLeaderNearBankChest(createBankState())).toBe(true);
+  it("makes the bank available anywhere in its current hub", () => {
+    expect(isBankServiceAvailable(createBankState())).toBe(true);
     expect(
-      isPartyLeaderNearBankChest(createBankState({ leaderPosition: { x: 8, y: 8 } })),
+      isBankServiceAvailable(
+        createBankState({ leaderPosition: { x: 80, y: 50 } }),
+      ),
+    ).toBe(true);
+    expect(
+      isBankServiceAvailable({
+        ...createBankState(),
+        currentMapId: "slimeward-camp",
+      }),
     ).toBe(false);
   });
 
@@ -107,18 +115,18 @@ describe("bank storage", () => {
     expect(clampBankTransferQuantity(99, 5, 3)).toBe(3);
   });
 
-  it("blocks manual movement when the leader is not near a bank chest", () => {
+  it("allows manual movement when the leader is far across the same hub", () => {
     let state = createBankState({ leaderPosition: { x: 8, y: 8 } });
     state = addItemToInventoryState(state, "wood", 1, "debug").state;
 
     const transfer = depositInventorySlotToBank(state, 0, 1);
 
     expect(transfer.result).toMatchObject({
-      status: "failed",
-      reason: "not_near_bank",
+      status: "success",
+      movedQuantity: 1,
     });
-    expect(transfer.state.inventory).toEqual(state.inventory);
-    expect(transfer.state.bank).toEqual(state.bank);
+    expect(transfer.state.inventory.slots).toEqual([]);
+    expect(transfer.state.bank.slots).toHaveLength(1);
   });
 
   it("respects inventory and bank slot locks", () => {
@@ -166,7 +174,7 @@ describe("bank storage", () => {
 
     const deposit = depositAllToBank(state, {
       onlyEnemyParts: true,
-      requireProximity: false,
+      requireServiceAvailability: false,
     });
 
     expect(deposit.movedQuantity).toBe(2);
@@ -190,7 +198,9 @@ describe("bank storage", () => {
     state = addItemToInventoryState(state, "training_sword", 1, "debug").state;
     state = addItemToInventoryState(state, "plain_charm", 1, "debug").state;
 
-    const deposit = depositAllToBank(state, { requireProximity: false });
+    const deposit = depositAllToBank(state, {
+      requireServiceAvailability: false,
+    });
 
     expect(deposit.movedQuantity).toBe(1);
     expect(deposit.stoppedBecauseFull).toBe(true);
@@ -226,15 +236,18 @@ describe("bank storage", () => {
       .toBe(false);
   });
 
-  it("remote-style bank actions fail without proximity and mutate nothing", () => {
-    let state = createBankState({ leaderPosition: { x: 12, y: 12 } });
+  it("remote-style bank actions fail outside a town hub and mutate nothing", () => {
+    let state: GameState = {
+      ...createBankState({ leaderPosition: { x: 12, y: 12 } }),
+      currentMapId: "map-1" as const,
+    };
     state = addItemToInventoryState(state, "wood", 1, "debug").state;
 
     const transfer = depositInventorySlotToBank(state, 0, 1);
 
     expect(transfer.result).toMatchObject({
       status: "failed",
-      reason: "not_near_bank",
+      reason: "bank_service_unavailable",
     });
     expect(transfer.state.inventory).toEqual(state.inventory);
     expect(transfer.state.bank).toEqual(state.bank);

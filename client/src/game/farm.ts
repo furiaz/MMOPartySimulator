@@ -10,7 +10,7 @@ import {
 } from "./keyItems";
 import { queueUnlockNewsBroadcast } from "./newsBroadcast";
 import { getPartyLeader } from "./partySystem";
-import { getEuclideanDistance } from "./positionUtils";
+import { isHubNpcRoleAvailable } from "./hubNpcAccess";
 import { getLivestockHelperBonusSummary } from "./livestockHelperBonuses";
 import type { GameState } from "./state";
 import type {
@@ -146,7 +146,7 @@ export const FARM_CROP_DEFINITIONS: FarmCropDefinition[] = [
 
 export type FarmCommandFailureReason =
   | "locked_service"
-  | "not_near_farmer"
+  | "farm_service_unavailable"
   | "insufficient_crowns"
   | "max_level"
   | "invalid_field"
@@ -890,34 +890,24 @@ export function isLivestockKeeperNpc(
   );
 }
 
-export function isPartyLeaderNearFarmer(state: GameState): boolean {
+export function isFarmServiceAvailable(state: GameState): boolean {
   const leader = getPartyLeader(state);
 
   if (!leader) {
     return false;
   }
 
-  return Object.values(state.entities).some(
-    (entity) =>
-      isFarmerNpc(entity) &&
-      getEuclideanDistance(leader.position, entity.position) <=
-        FARM_INTERACTION_RANGE,
-  );
+  return isHubNpcRoleAvailable(state, ["farmer"]);
 }
 
-export function isPartyLeaderNearLivestockKeeper(state: GameState): boolean {
+export function isLivestockServiceAvailable(state: GameState): boolean {
   const leader = getPartyLeader(state);
 
   if (!leader) {
     return false;
   }
 
-  return Object.values(state.entities).some(
-    (entity) =>
-      isLivestockKeeperNpc(entity) &&
-      getEuclideanDistance(leader.position, entity.position) <=
-        FARM_INTERACTION_RANGE,
-  );
+  return isHubNpcRoleAvailable(state, ["livestock_keeper"]);
 }
 
 function createInitialFarmField(
@@ -1046,8 +1036,8 @@ function getFarmCommandFailure(
     return "locked_service";
   }
 
-  if (!isPartyLeaderNearFarmer(state)) {
-    return "not_near_farmer";
+  if (!isFarmServiceAvailable(state)) {
+    return "farm_service_unavailable";
   }
 
   return null;
