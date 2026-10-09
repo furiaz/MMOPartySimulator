@@ -1642,6 +1642,8 @@ Current POI categories:
 - Idle
 - Event
 
+The current Leader POIs panel shows a combat target's broad enemy archetype name, such as `Slime` or `Bat`, instead of exposing its internal entity id or sequence number. Non-combat POI labels keep their existing presentation.
+
 POI selection should prefer progression-relevant targets before generic local activity.
 
 Current intended POI priority order:
@@ -2748,9 +2750,10 @@ Current prototype save behavior:
 - starting a new game over an existing save asks for confirmation
 - deleting a save asks for confirmation
 - save files use a prototype save version
-- current save schema version is `2`; the existing `mmo-party-simulator.save.v1` browser-storage key remains unchanged so older local saves stay discoverable
+- current save schema version is `3`; the existing `mmo-party-simulator.save.v1` browser-storage key remains unchanged so older local saves stay discoverable
 - version-1 saves automatically migrate removed Holy Mace and Holy Lantern item ids to the surviving Mace and Lantern lines before normal validation and sanitization
-- version-1 migration directly fills an empty Blade, Hunter, Beast, or Elementalist offhand with the matching-tier Dagger, Quiver, Claw, or Orb, using the level-10 item as fallback; occupied offhands are never replaced and version-2 saves do not repeat the grant
+- version-1 migration directly fills an empty Blade, Hunter, Beast, or Elementalist offhand with the matching-tier Dagger, Quiver, Claw, or Orb, using the level-10 item as fallback; occupied offhands are never replaced and version-2-or-later saves do not repeat the grant
+- version-2 saves automatically migrate legacy wild-enemy ids and their durable saved references to the current readable zone/enemy-type id format; version-1 saves run both migrations in order
 - invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
 - restored saves rebuild the current prototype map from saved quest state
 - restored saves preserve valid shared inventory, wallet, bank, key item, quest, companion, Guild & Inn, world discovery, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers

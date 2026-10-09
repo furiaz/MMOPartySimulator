@@ -40,6 +40,7 @@ import type {
   PartyMenuSection,
 } from "./gameMenuTypes";
 import { getNpcInteractionRange } from "./npcInteractionRange";
+import { getPoiDisplayName } from "./poiPresentation";
 import {
   canNpcShowSpeech,
   createNpcSpeech,
@@ -124,7 +125,6 @@ import {
   debugTurnInCurrentQuest,
   debugUnlockFarmCrop,
   debugUnlockTownServices,
-  enemyIds,
   equipItemToCompanion,
   equipFlaskToCompanion,
   exportDebugTelemetryReport,
@@ -133,6 +133,7 @@ import {
   getCurrencyBalance,
   getCompanionDerivedStatsWithPartyBuffs,
   getEnemyArchetype,
+  getEnemyStartDataForMap,
   getEnemyType,
   getEquipmentDropPopupThreshold,
   getDebugEnemySummonGroups,
@@ -1066,10 +1067,12 @@ function formatIdentifierName(identifier: string): string {
 function LeaderPoiPanel({
   autoModeEnabled,
   consideredTargets,
+  entities,
   hasLeader,
 }: {
   autoModeEnabled: boolean;
   consideredTargets: PoiConsideration[] | undefined;
+  entities: Record<string, GameEntity>;
   hasLeader: boolean;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -1111,7 +1114,7 @@ function LeaderPoiPanel({
               >
                 <span className="leader-poi-main">
                   <strong>{formatIdentifierName(target.category)}</strong>
-                  <span>{target.poiId}</span>
+                  <span>{getPoiDisplayName(target, entities)}</span>
                 </span>
                 <span className="leader-poi-reason">{target.reason}</span>
                 <span className="leader-poi-distance">
@@ -4855,9 +4858,17 @@ function App() {
   }
 
   function resurrectEnemy() {
-    setGameState((state) =>
-      enemyIds.reduce(debugResurrectEnemy, state),
-    );
+    setGameState((state) => {
+      const enemyStartData = state.currentMapId
+        ? getEnemyStartDataForMap(state.currentMapId)
+        : [];
+
+      return enemyStartData.reduce(
+        (currentState, enemyStart) =>
+          debugResurrectEnemy(currentState, enemyStart.id),
+        state,
+      );
+    });
   }
 
   function refreshGatherPoints() {
@@ -6904,6 +6915,7 @@ function App() {
           <LeaderPoiPanel
             autoModeEnabled={gameState.autoModeEnabled}
             consideredTargets={gameState.lastPoiDecision?.consideredTargets}
+            entities={gameState.entities}
             hasLeader={hasPartyLeader}
           />
           <Suspense fallback={<PixiWorldRendererFallback mode="full" />}>

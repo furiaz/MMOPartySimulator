@@ -22,6 +22,7 @@ import {
   aoeTargetDummyPosition,
   createDebugMapForQuestState,
   debugMapDefinitions,
+  getEnemyStartDataForMap,
   getHubNpcStartDataForQuestState,
   getHubTwoNpcStartDataForQuestState,
   HUB_MAP_ID,
@@ -30,23 +31,14 @@ import {
   SLIMEWARD_CHEST_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   SLIMEWARD_FLOOR_TWO_ID,
-  mapOneEnemyStartData,
   mapOneResourceStartData,
-  mapThreeEnemyStartData,
   mapThreeResourceStartData,
-  mapFourEnemyStartData,
   mapFourResourceStartData,
-  mapFiveEnemyStartData,
   mapFiveResourceStartData,
-  mapSixEnemyStartData,
   mapSixResourceStartData,
-  mapSevenEnemyStartData,
   mapSevenResourceStartData,
-  mapTwoEnemyStartData,
   mapTwoResourceStartData,
   slimewardCampNpcStartData,
-  slimewardFloorOneEnemyStartData,
-  slimewardFloorTwoEnemyStartData,
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
@@ -572,20 +564,6 @@ function getMapEntities(
     return entities;
   }
 
-  const enemyStartDataByMapId: Record<DebugMapId, typeof mapOneEnemyStartData> = {
-    hub: [],
-    "hub-2": [],
-    "map-1": mapOneEnemyStartData,
-    "map-2": mapTwoEnemyStartData,
-    "map-3": mapThreeEnemyStartData,
-    "map-4": mapFourEnemyStartData,
-    "map-5": mapFiveEnemyStartData,
-    "map-6": mapSixEnemyStartData,
-    "map-7": mapSevenEnemyStartData,
-    "slimeward-camp": [],
-    "slimeward-floor-1": slimewardFloorOneEnemyStartData,
-    "slimeward-floor-2": slimewardFloorTwoEnemyStartData,
-  };
   const resourceStartDataByMapId: Record<DebugMapId, typeof mapOneResourceStartData> = {
     hub: [],
     "hub-2": [],
@@ -600,7 +578,7 @@ function getMapEntities(
     "slimeward-floor-1": [],
     "slimeward-floor-2": [],
   };
-  const enemyStartData = enemyStartDataByMapId[mapId];
+  const enemyStartData = getEnemyStartDataForMap(mapId);
   const resourceStartData = resourceStartDataByMapId[mapId];
 
   for (const enemyStart of enemyStartData) {
