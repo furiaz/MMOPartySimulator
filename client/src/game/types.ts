@@ -797,7 +797,7 @@ export type PartyBank = {
 };
 
 export type BankTransferFailureReason =
-  | "not_near_bank"
+  | "bank_service_unavailable"
   | "remote_view_only"
   | "source_empty"
   | "source_locked"

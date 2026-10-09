@@ -14,8 +14,8 @@ import {
   getLivestockHelperBonusSummary,
   getLivestockExpectedOutputsPerHour,
   getFarmUpgradeCostCrowns,
-  isPartyLeaderNearFarmer,
-  isPartyLeaderNearLivestockKeeper,
+  isFarmServiceAvailable,
+  isLivestockServiceAvailable,
   isTownServicesUnlocked,
   type FarmCropId,
   type FarmFieldId,
@@ -68,8 +68,8 @@ export type FarmFieldDisplay = {
 
 export type FarmDisplay = {
   isUnlocked: boolean;
-  isNearFarmer: boolean;
-  isNearLivestockKeeper: boolean;
+  isFarmServiceAvailable: boolean;
+  isLivestockServiceAvailable: boolean;
   crownBalance: number;
   totalCropsPerHourText: string;
   totalHeldQuantity: number;
@@ -87,8 +87,8 @@ export function getFarmDisplay(
 ): FarmDisplay {
   const farm = getFarmState(state);
   const isUnlocked = isTownServicesUnlocked(state);
-  const isNearFarmer = isPartyLeaderNearFarmer(state);
-  const isNearLivestockKeeper = isPartyLeaderNearLivestockKeeper(state);
+  const farmServiceAvailable = isFarmServiceAvailable(state);
+  const livestockServiceAvailable = isLivestockServiceAvailable(state);
   const crownBalance = getCurrencyBalance(state.wallet, "crowns");
   const allFields = getFarmCropDefinitions().map((definition) => {
     const field = farm.fieldsById[definition.fieldId];
@@ -98,7 +98,7 @@ export function getFarmDisplay(
             crownBalance,
             definition,
             field,
-            isNearFarmer,
+            farmServiceAvailable,
             isUnlocked,
             nowMs,
             state,
@@ -124,8 +124,8 @@ export function getFarmDisplay(
 
   return {
     isUnlocked,
-    isNearFarmer,
-    isNearLivestockKeeper,
+    isFarmServiceAvailable: farmServiceAvailable,
+    isLivestockServiceAvailable: livestockServiceAvailable,
     crownBalance,
     totalCropsPerHourText: formatRate(totalCropsPerHour),
     totalHeldQuantity,
@@ -151,7 +151,7 @@ function getUnlockedFieldDisplay({
   crownBalance,
   definition,
   field,
-  isNearFarmer,
+  farmServiceAvailable,
   isUnlocked,
   nowMs,
   state,
@@ -159,7 +159,7 @@ function getUnlockedFieldDisplay({
   crownBalance: number;
   definition: ReturnType<typeof getFarmCropDefinitions>[number];
   field: FarmFieldState;
-  isNearFarmer: boolean;
+  farmServiceAvailable: boolean;
   isUnlocked: boolean;
   nowMs: number;
   state: GameState;
@@ -188,7 +188,7 @@ function getUnlockedFieldDisplay({
     sourceHint: definition.sourceHint,
     heldQuantity: field.heldQuantity,
     holdCap,
-    canHarvest: isUnlocked && isNearFarmer && field.heldQuantity > 0,
+    canHarvest: isUnlocked && farmServiceAvailable && field.heldQuantity > 0,
     isProducing,
     isAtCap,
     timeRemainingMs,
@@ -203,7 +203,7 @@ function getUnlockedFieldDisplay({
       displayName: definition.displayName,
       heldQuantity: field.heldQuantity,
       holdCap,
-      isNearFarmer,
+      farmServiceAvailable,
       isUnlocked,
     }),
     speedText: formatPercent(speedMultiplier * 100),
@@ -219,7 +219,7 @@ function getUnlockedFieldDisplay({
       (upgradeId) =>
         getUpgradeDisplay({
           crownBalance,
-          isNearFarmer,
+          farmServiceAvailable,
           isUnlocked,
           upgradeId,
           upgradeLevel: field.upgradeLevels[upgradeId],
@@ -264,13 +264,13 @@ function getLockedFieldDisplay(
 
 function getUpgradeDisplay({
   crownBalance,
-  isNearFarmer,
+  farmServiceAvailable,
   isUnlocked,
   upgradeId,
   upgradeLevel,
 }: {
   crownBalance: number;
-  isNearFarmer: boolean;
+  farmServiceAvailable: boolean;
   isUnlocked: boolean;
   upgradeId: FarmFieldUpgradeId;
   upgradeLevel: number;
@@ -280,7 +280,7 @@ function getUpgradeDisplay({
   const costCrowns = isMax ? null : getFarmUpgradeCostCrowns(upgradeLevel);
   const canPurchase =
     isUnlocked &&
-    isNearFarmer &&
+    farmServiceAvailable &&
     !isMax &&
     costCrowns !== null &&
     crownBalance >= costCrowns;
@@ -296,7 +296,7 @@ function getUpgradeDisplay({
       costCrowns,
       crownBalance,
       isMax,
-      isNearFarmer,
+      farmServiceAvailable,
       isUnlocked,
     }),
     currentEffectText: getUpgradeEffectText(upgradeId, upgradeLevel),
@@ -329,17 +329,17 @@ function getFarmUpgradeActionText({
   costCrowns,
   crownBalance,
   isMax,
-  isNearFarmer,
+  farmServiceAvailable,
   isUnlocked,
 }: {
   costCrowns: number | null;
   crownBalance: number;
   isMax: boolean;
-  isNearFarmer: boolean;
+  farmServiceAvailable: boolean;
   isUnlocked: boolean;
 }): string {
-  if (!isUnlocked || !isNearFarmer) {
-    return "Requires proximity";
+  if (!isUnlocked || !farmServiceAvailable) {
+    return "Service unavailable";
   }
 
   if (isMax || costCrowns === null) {
@@ -357,17 +357,17 @@ function getFarmHarvestActionText({
   displayName,
   heldQuantity,
   holdCap,
-  isNearFarmer,
+  farmServiceAvailable,
   isUnlocked,
 }: {
   displayName: string;
   heldQuantity: number;
   holdCap: number;
-  isNearFarmer: boolean;
+  farmServiceAvailable: boolean;
   isUnlocked: boolean;
 }): string {
-  if (!isUnlocked || !isNearFarmer) {
-    return "Requires proximity";
+  if (!isUnlocked || !farmServiceAvailable) {
+    return "Service unavailable";
   }
 
   if (heldQuantity <= 0) {

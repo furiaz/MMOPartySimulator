@@ -1,5 +1,5 @@
 import { getPartySizeLimit } from "./leveling";
-import { isPartyLeaderNearGuildTavern } from "./guildTavern";
+import { isGuildTavernServiceAvailable } from "./guildTavern";
 import { getInnRoomCapacity, INN_ROOM_BASE_CAPACITY } from "./innRoomUpgrades";
 import {
   getGuildSecondaryPartyCount,
@@ -385,8 +385,8 @@ function preserveGuildTavernInteractionRange(
   interactionPosition: Position,
 ): GameState {
   if (
-    !isPartyLeaderNearGuildTavern(previousState) ||
-    isPartyLeaderNearGuildTavern(nextState)
+    !isGuildTavernServiceAvailable(previousState) ||
+    isGuildTavernServiceAvailable(nextState)
   ) {
     return nextState;
   }

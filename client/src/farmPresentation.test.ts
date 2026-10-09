@@ -16,7 +16,7 @@ describe("farm presentation", () => {
     expect(display.livestockProductionPerHourText).toBe("0");
     expect(display.field.holdText).toBe("Carrots 0/20");
     expect(display.field.productionText).toBe("Production inactive");
-    expect(display.field.harvestActionText).toBe("Requires proximity");
+    expect(display.field.harvestActionText).toBe("Service unavailable");
     expect(display.field.canHarvest).toBe(false);
     expect(display.field.speedText).toBe("0%");
     expect(display.field.multiCropText).toBe("0%");
@@ -36,7 +36,7 @@ describe("farm presentation", () => {
       maxLevel: 5,
       costCrowns: 100,
       canPurchase: false,
-      actionText: "Requires proximity",
+      actionText: "Service unavailable",
       currentEffectText: "Inactive",
       nextEffectText: "100% speed",
     });

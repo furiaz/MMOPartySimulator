@@ -21,7 +21,7 @@ import {
 } from "./keyItems";
 import { queueUnlockNewsBroadcast } from "./newsBroadcast";
 import { getPartyLeader } from "./partySystem";
-import { getEuclideanDistance } from "./positionUtils";
+import { isHubNpcRoleAvailable } from "./hubNpcAccess";
 import { recordCraftedItemForQuests } from "./questProgressionHooks";
 import type { GameState } from "./state";
 import {
@@ -81,7 +81,7 @@ export type CraftingRecipe = {
 export type CraftingFailureReason =
   | "invalid_recipe"
   | "invalid_output"
-  | "leader_not_near_smith"
+  | "smith_service_unavailable"
   | "already_owned"
   | "missing_materials"
   | "insufficient_crowns"
@@ -107,7 +107,7 @@ export type CraftingRecipeStatus = {
   hasRequiredMaterials: boolean;
   hasRequiredCrowns: boolean;
   hasInventorySpace: boolean;
-  isLeaderNearSmith: boolean;
+  isSmithServiceAvailable: boolean;
   canCraft: boolean;
 };
 
@@ -1360,7 +1360,7 @@ export function getCraftingRecipeStatus(
       : outputItemDefinition
         ? canInventoryAcceptCraftingOutput(state, recipe, outputItemDefinition)
         : false;
-  const isLeaderNearSmith = isPartyLeaderNearSmith(state);
+  const smithServiceAvailable = isSmithServiceAvailable(state);
   const hasValidOutput =
     recipe.outputKind === "key_item"
       ? Boolean(outputKeyItemDefinition)
@@ -1377,14 +1377,14 @@ export function getCraftingRecipeStatus(
     hasRequiredMaterials,
     hasRequiredCrowns,
     hasInventorySpace,
-    isLeaderNearSmith,
+    isSmithServiceAvailable: smithServiceAvailable,
     canCraft:
       hasValidOutput &&
       !isOutputOwned &&
       hasRequiredMaterials &&
       hasRequiredCrowns &&
       hasInventorySpace &&
-      isLeaderNearSmith,
+      smithServiceAvailable,
   };
 }
 
@@ -1456,11 +1456,11 @@ export function craftRecipe(
     );
   }
 
-  if (!status.isLeaderNearSmith) {
+  if (!status.isSmithServiceAvailable) {
     return createCraftingFailure(
       attemptedState,
       recipe.id,
-      "leader_not_near_smith",
+      "smith_service_unavailable",
       recipe,
       status,
     );
@@ -1638,20 +1638,14 @@ export function craftRecipe(
   };
 }
 
-export function isPartyLeaderNearSmith(state: GameState): boolean {
+export function isSmithServiceAvailable(state: GameState): boolean {
   const leader = getPartyLeader(state);
 
   if (!leader) {
     return false;
   }
 
-  return Object.values(state.entities).some(
-    (entity) =>
-      entity.kind === "npc" &&
-      entity.npcRole === "smith" &&
-      getEuclideanDistance(leader.position, entity.position) <=
-        SMITH_CRAFTING_INTERACTION_RANGE,
-  );
+  return isHubNpcRoleAvailable(state, ["smith"]);
 }
 
 function canInventoryAcceptCraftingOutput(

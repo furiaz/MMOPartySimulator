@@ -8,6 +8,7 @@ import {
   toggleInventorySlotLock,
 } from "./inventory";
 import { getPartyLeader } from "./partySystem";
+import { isHubNpcRoleAvailable } from "./hubNpcAccess";
 import type { GameState } from "./state";
 import type {
   BankAutoRoutingMode,
@@ -125,18 +126,14 @@ export function isBankChestNpc(entity: unknown): entity is NpcEntity {
   );
 }
 
-export function isPartyLeaderNearBankChest(state: GameState): boolean {
+export function isBankServiceAvailable(state: GameState): boolean {
   const leader = getPartyLeader(state);
 
   if (!leader || leader.state === "dead") {
     return false;
   }
 
-  return Object.values(state.entities).some(
-    (entity) =>
-      isBankChestNpc(entity) &&
-      getDistance(leader.position, entity.position) <= BANK_INTERACTION_RANGE,
-  );
+  return isHubNpcRoleAvailable(state, ["bank_chest"]);
 }
 
 export function getBankSlotAtIndex(
@@ -213,16 +210,16 @@ export function depositInventorySlotToBank(
   state: GameState,
   inventorySlotIndex: number,
   quantity: number,
-  options: { requireProximity?: boolean } = {},
+  options: { requireServiceAvailability?: boolean } = {},
 ): { state: GameState; result: BankTransferResult } {
-  const requireProximity = options.requireProximity ?? true;
+  const requireServiceAvailability = options.requireServiceAvailability ?? true;
   const sanitizedState = sanitizeBankState(state);
   const requestedQuantity = Math.floor(quantity);
 
-  if (requireProximity && !isPartyLeaderNearBankChest(sanitizedState)) {
+  if (requireServiceAvailability && !isBankServiceAvailable(sanitizedState)) {
     return {
       state: sanitizedState,
-      result: createFailedTransfer(requestedQuantity, "not_near_bank"),
+      result: createFailedTransfer(requestedQuantity, "bank_service_unavailable"),
     };
   }
 
@@ -360,16 +357,16 @@ export function withdrawBankSlotToInventory(
   state: GameState,
   bankSlotIndex: number,
   quantity: number,
-  options: { requireProximity?: boolean } = {},
+  options: { requireServiceAvailability?: boolean } = {},
 ): { state: GameState; result: BankTransferResult } {
-  const requireProximity = options.requireProximity ?? true;
+  const requireServiceAvailability = options.requireServiceAvailability ?? true;
   const sanitizedState = sanitizeBankState(state);
   const requestedQuantity = Math.floor(quantity);
 
-  if (requireProximity && !isPartyLeaderNearBankChest(sanitizedState)) {
+  if (requireServiceAvailability && !isBankServiceAvailable(sanitizedState)) {
     return {
       state: sanitizedState,
-      result: createFailedTransfer(requestedQuantity, "not_near_bank"),
+      result: createFailedTransfer(requestedQuantity, "bank_service_unavailable"),
     };
   }
 
@@ -468,13 +465,16 @@ export function withdrawBankSlotToInventory(
 
 export function depositAllToBank(
   state: GameState,
-  options: { onlyEnemyParts?: boolean; requireProximity?: boolean } = {},
+  options: {
+    onlyEnemyParts?: boolean;
+    requireServiceAvailability?: boolean;
+  } = {},
 ): { state: GameState; movedQuantity: number; stoppedBecauseFull: boolean } {
-  const requireProximity = options.requireProximity ?? true;
+  const requireServiceAvailability = options.requireServiceAvailability ?? true;
   let nextState = sanitizeBankState(state);
   let movedQuantity = 0;
 
-  if (requireProximity && !isPartyLeaderNearBankChest(nextState)) {
+  if (requireServiceAvailability && !isBankServiceAvailable(nextState)) {
     return { state: nextState, movedQuantity: 0, stoppedBecauseFull: false };
   }
 
@@ -498,7 +498,7 @@ export function depositAllToBank(
       nextState,
       slotIndex,
       slot.quantity,
-      { requireProximity: false },
+      { requireServiceAvailability: false },
     );
     nextState = transfer.state;
 
@@ -539,7 +539,7 @@ export function autoDepositByRoutingMode(state: GameState): BankAutoDepositResul
 
   const result = depositAllToBank(sanitizedState, {
     onlyEnemyParts: mode === "deposit_body_parts",
-    requireProximity: false,
+    requireServiceAvailability: false,
   });
   const message = result.stoppedBecauseFull
     ? "Bank is full!"
@@ -929,8 +929,4 @@ function normalizeSlotIndices(
         .filter((slotIndex) => slotIndex >= 0 && slotIndex < capacity),
     ),
   ).sort((first, second) => first - second);
-}
-
-function getDistance(first: { x: number; y: number }, second: { x: number; y: number }): number {
-  return Math.hypot(first.x - second.x, first.y - second.y);
 }

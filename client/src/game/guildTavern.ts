@@ -1,5 +1,5 @@
 import { getPartyLeader } from "./partySystem";
-import { getEuclideanDistance } from "./positionUtils";
+import { isHubNpcRoleAvailable } from "./hubNpcAccess";
 import type { GameState } from "./state";
 import type { NpcEntity } from "./types";
 
@@ -21,17 +21,12 @@ export function isGuildTavernNpc(
   );
 }
 
-export function isPartyLeaderNearGuildTavern(state: GameState): boolean {
+export function isGuildTavernServiceAvailable(state: GameState): boolean {
   const leader = getPartyLeader(state);
 
   if (!leader) {
     return false;
   }
 
-  return Object.values(state.entities).some(
-    (entity) =>
-      isGuildTavernNpc(entity) &&
-      getEuclideanDistance(leader.position, entity.position) <=
-        GUILD_TAVERN_INTERACTION_RANGE,
-  );
+  return isHubNpcRoleAvailable(state, ["guild_coordinator", "tavern_keeper"]);
 }

@@ -26,7 +26,7 @@ import {
   getInnKitchenRecipes,
   getInnReserveCompanions,
   getItemDefinition,
-  isPartyLeaderNearGuildTavern,
+  isGuildTavernServiceAvailable,
   getPartySizeLimit,
   getPartySizeUnlockRequirement,
   getRestingCompanions,
@@ -87,10 +87,10 @@ type GuildView =
   | "kitchenUpgrades";
 
 const MAX_MAIN_PARTY_SLOTS = 5;
-const GUILD_INN_PROXIMITY_MESSAGE =
-  "Stand near the Guild Coordinator or Inn Keeper to manage Guild & Inn services.";
+const GUILD_INN_UNAVAILABLE_MESSAGE =
+  "Visit a hub with a Guild Coordinator or Inn Keeper to manage Guild & Inn services.";
 const GUILD_INN_BROWSE_MESSAGE =
-  `${GUILD_INN_PROXIMITY_MESSAGE} You can browse from afar, but actions require proximity.`;
+  `${GUILD_INN_UNAVAILABLE_MESSAGE} You can browse remotely, but actions require that service in your current hub.`;
 
 export type GuildSecondaryPartyRedeemSummary = {
   partyName: string;
@@ -195,9 +195,9 @@ export function GuildTavernPanel({
   const rosterCount = getTotalRosterCompanionCount(state);
   const totalRosterLevel = getTotalRosterCompanionLevel(state);
   const lockedMessage = getTownServicesLockedMessage(state);
-  const isNearGuildInn = isPartyLeaderNearGuildTavern(state);
-  const proximityMessage =
-    !lockedMessage && !isNearGuildInn ? GUILD_INN_BROWSE_MESSAGE : null;
+  const isGuildInnAvailable = isGuildTavernServiceAvailable(state);
+  const availabilityMessage =
+    !lockedMessage && !isGuildInnAvailable ? GUILD_INN_BROWSE_MESSAGE : null;
   const guildRecruit = getGuildRecruitState(state, currentTime);
   const readyRecruitCount = guildRecruit.candidates.filter(Boolean).length;
   const recruitButtonStatus = lockedMessage
@@ -264,7 +264,7 @@ export function GuildTavernPanel({
         <div>
           <h2>Guild & Inn</h2>
           <span>
-            {lockedMessage ? "Locked" : canUse ? "Nearby" : "Browsing"}
+            {lockedMessage ? "Locked" : canUse ? "Available" : "Browsing"}
           </span>
         </div>
         <dl>
@@ -291,8 +291,8 @@ export function GuildTavernPanel({
 
       {lockedMessage ? (
         <p className="guild-requires-service">{lockedMessage}</p>
-      ) : proximityMessage ? (
-        <p className="guild-requires-service">{proximityMessage}</p>
+      ) : availabilityMessage ? (
+        <p className="guild-requires-service">{availabilityMessage}</p>
       ) : null}
 
       <div className="guild-tavern-section-nav" role="tablist" aria-label="Guild and Inn sections">
@@ -552,7 +552,7 @@ export function GuildTavernPanel({
 function GuildInnRequirementMessage() {
   return (
     <p className="guild-recruit-message guild-requires-service">
-      {GUILD_INN_PROXIMITY_MESSAGE}
+      {GUILD_INN_UNAVAILABLE_MESSAGE}
     </p>
   );
 }
@@ -566,7 +566,7 @@ function getGuildMessageClassName(message: string | null | undefined): string {
 function isGuildRequirementMessage(message: string | null | undefined): boolean {
   return Boolean(
     message &&
-      (message === GUILD_INN_PROXIMITY_MESSAGE ||
+      (message === GUILD_INN_UNAVAILABLE_MESSAGE ||
         message === GUILD_INN_BROWSE_MESSAGE ||
         message.startsWith("Complete The Azure Trial")),
   );
@@ -1402,7 +1402,7 @@ function GuildRecruitView({
   const portraitSrc = candidate ? getClassUiPortraitSrc(candidate.classId) : null;
   const recruitDisabled = !canUse || !candidate || destination === "blocked_full";
   const blockedText = !canUse
-    ? GUILD_INN_PROXIMITY_MESSAGE
+    ? GUILD_INN_UNAVAILABLE_MESSAGE
     : !candidate
       ? `Next recruit in ${formatRecruitCountdown(
           guildRecruit.nextRefreshAtMs,
@@ -1564,7 +1564,7 @@ function GuildNoticeBoardView({
       ? getNoticeBoardQuestStatusLabel(quest)
       : "Take Quest";
   const statusText = !canUse
-    ? GUILD_INN_PROXIMITY_MESSAGE
+    ? GUILD_INN_UNAVAILABLE_MESSAGE
     : quest
       ? getNoticeBoardQuestStatusLabel(quest)
       : `Next posting in ${formatRecruitCountdown(

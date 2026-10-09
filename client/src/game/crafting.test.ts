@@ -6,7 +6,7 @@ import {
   getCraftingRecipe,
   getCraftingRecipeStatus,
   getSortedCraftingRecipeStatuses,
-  isPartyLeaderNearSmith,
+  isSmithServiceAvailable,
 } from "./crafting";
 import { startDebugTelemetryRecording } from "./debugTelemetry";
 import { createCompanion, createNpc } from "./entities";
@@ -284,22 +284,40 @@ describe("Smith crafting", () => {
     expect(result.state.wallet).toEqual(state.wallet);
   });
 
-  it("requires the leader to be near a Smith", () => {
-    let state = createCraftingState({ leaderPosition: { x: 10, y: 10 } });
+  it("allows crafting far across a hub with a Smith", () => {
+    let state = createCraftingState({ leaderPosition: { x: 100, y: 50 } });
     state = addItems(state, [
       ["softwood", 5],
-      ["slime_gel_t1", 1],
+      ["slime_gel_t1", 2],
     ]);
     state = setCurrencyBalanceForDebug(state, "crowns", 10).state;
 
-    expect(isPartyLeaderNearSmith(state)).toBe(false);
+    expect(isSmithServiceAvailable(state)).toBe(true);
+
+    const result = craftRecipe(state, "training_sword");
+
+    expect(result.result.status).toBe("success");
+  });
+
+  it("requires a Smith service in the current town hub", () => {
+    let state: GameState = {
+      ...createCraftingState(),
+      currentMapId: "map-1" as const,
+    };
+    state = addItems(state, [
+      ["softwood", 5],
+      ["slime_gel_t1", 2],
+    ]);
+    state = setCurrencyBalanceForDebug(state, "crowns", 10).state;
+
+    expect(isSmithServiceAvailable(state)).toBe(false);
 
     const result = craftRecipe(state, "training_sword");
 
     expect(result.result).toEqual({
       status: "failed",
       recipeId: "training_sword",
-      reason: "leader_not_near_smith",
+      reason: "smith_service_unavailable",
     });
     expect(result.state.inventory).toEqual(state.inventory);
     expect(result.state.wallet).toEqual(state.wallet);
@@ -1055,6 +1073,7 @@ function createCraftingState(options: {
   const smith = createNpc("smith", { x: 1, y: 0 }, "Smith", "smith");
 
   return createTestGameState({
+    currentMapId: "hub",
     entities: {
       [leader.id]: leader,
       [smith.id]: smith,

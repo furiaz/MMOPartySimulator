@@ -307,7 +307,11 @@ describe("Farm upgrades", () => {
   });
 
   it("purchases each upgrade, spends Crowns, and updates only that track", () => {
-    const state = createFarmState({ azureTrialCompleted: true, crowns: 900 });
+    const state = createFarmState({
+      azureTrialCompleted: true,
+      crowns: 900,
+      leaderPosition: { x: 0, y: 0 },
+    });
     const speed = purchaseFarmFieldUpgrade(
       state,
       FARM_CARROT_FIELD_ID,
@@ -355,17 +359,17 @@ describe("Farm upgrades", () => {
     expect(getFarmUpgradeCostCrowns(1)).toBe(200);
   });
 
-  it("fails upgrade commands while locked, away, underfunded, maxed, or invalid", () => {
+  it("fails upgrade commands while locked, unavailable, underfunded, maxed, or invalid", () => {
     const locked = purchaseFarmFieldUpgrade(
       createFarmState(),
       FARM_CARROT_FIELD_ID,
       "speed",
       NOW_MS,
     );
-    const away = purchaseFarmFieldUpgrade(
+    const unavailable = purchaseFarmFieldUpgrade(
       createFarmState({
         azureTrialCompleted: true,
-        leaderPosition: { x: 0, y: 0 },
+        currentMapId: "map-1",
       }),
       FARM_CARROT_FIELD_ID,
       "speed",
@@ -395,7 +399,10 @@ describe("Farm upgrades", () => {
     );
 
     expect(locked).toMatchObject({ ok: false, reason: "locked_service" });
-    expect(away).toMatchObject({ ok: false, reason: "not_near_farmer" });
+    expect(unavailable).toMatchObject({
+      ok: false,
+      reason: "farm_service_unavailable",
+    });
     expect(underfunded).toMatchObject({
       ok: false,
       reason: "insufficient_crowns",
@@ -650,6 +657,7 @@ function createFarmState({
     },
   },
   livestock,
+  currentMapId = "hub-2",
 }: {
   azureTrialCompleted?: boolean;
   crowns?: number;
@@ -658,10 +666,12 @@ function createFarmState({
   upgradeLevels?: FarmFieldUpgradeLevels;
   farm?: GameState["farm"];
   livestock?: GameState["livestock"];
+  currentMapId?: GameState["currentMapId"];
 } = {}): GameState {
   const leader = createCompanion("leader", leaderPosition, "leader");
   const farmer = createNpc("farmer", { x: 11, y: 10 }, "Farmer", "farmer");
   const state = createTestGameState({
+    currentMapId,
     partyLeaderId: leader.id,
     entities: {
       [leader.id]: leader,

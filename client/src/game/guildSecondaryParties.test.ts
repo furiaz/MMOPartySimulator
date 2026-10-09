@@ -12,7 +12,7 @@ import {
   getTotalRosterCompanionLevel,
   moveGuildRosterCompanion,
 } from "./guildSecondaryParties";
-import { isPartyLeaderNearGuildTavern } from "./guildTavern";
+import { isGuildTavernServiceAvailable } from "./guildTavern";
 import { getGuildRecruitDestination } from "./guildRecruit";
 import {
   createInitialGuildUpgradesState,
@@ -428,7 +428,7 @@ describe("guild secondary parties", () => {
       ],
     });
 
-    expect(isPartyLeaderNearGuildTavern(state)).toBe(true);
+    expect(isGuildTavernServiceAvailable(state)).toBe(true);
 
     const result = moveGuildRosterCompanion(state, "leader", {
       area: "secondary_party",
@@ -445,7 +445,7 @@ describe("guild secondary parties", () => {
     expect(result.state.entities.ally).toMatchObject({
       position: { x: 50, y: 55.5 },
     });
-    expect(isPartyLeaderNearGuildTavern(result.state)).toBe(true);
+    expect(isGuildTavernServiceAvailable(result.state)).toBe(true);
   });
 
   it("keeps the Guild and Inn interface usable when a companion returns to Main Party", () => {
@@ -467,7 +467,7 @@ describe("guild secondary parties", () => {
       ],
     });
 
-    expect(isPartyLeaderNearGuildTavern(state)).toBe(true);
+    expect(isGuildTavernServiceAvailable(state)).toBe(true);
 
     const result = moveGuildRosterCompanion(state, "reserve", {
       area: "main_party",
@@ -480,7 +480,7 @@ describe("guild secondary parties", () => {
     }
 
     expect(result.state.partyLeaderId).toBe("leader");
-    expect(isPartyLeaderNearGuildTavern(result.state)).toBe(true);
+    expect(isGuildTavernServiceAvailable(result.state)).toBe(true);
   });
 
   it("compacts Main Party party order after moves", () => {
@@ -620,6 +620,7 @@ function createRosterState({
   innUpgrades.rooms.inn_room_count = innRoomLevel;
 
   return createTestGameState({
+    currentMapId: "hub-2",
     entities: Object.fromEntries(
       [...activeCompanions, ...npcs].map((entity) => [entity.id, entity]),
     ),

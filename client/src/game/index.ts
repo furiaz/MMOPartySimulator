@@ -523,7 +523,7 @@ export {
   getPartyBank,
   isAutoDepositEnemyPartMaterialDefinition,
   isBankChestNpc,
-  isPartyLeaderNearBankChest,
+  isBankServiceAvailable,
   sanitizeBankAutoRoutingMode,
   sanitizePartyBank,
   setBankAutoRoutingMode,
@@ -599,7 +599,7 @@ export {
   getCraftingRecipeStatus,
   getCraftingRecipes,
   getSortedCraftingRecipeStatuses,
-  isPartyLeaderNearSmith,
+  isSmithServiceAvailable,
   type CraftingCost,
   type CraftingEquipmentRequirement,
   type CraftingFailureReason,
@@ -1076,8 +1076,15 @@ export {
 export {
   GUILD_TAVERN_INTERACTION_RANGE,
   isGuildTavernNpc,
-  isPartyLeaderNearGuildTavern,
+  isGuildTavernServiceAvailable,
 } from "./guildTavern";
+export {
+  isFunctionalHubNpcAvailable,
+  isFunctionalHubNpcRole,
+  isHubNpcRoleAvailable,
+  isTownHubMapId,
+  type FunctionalHubNpcRole,
+} from "./hubNpcAccess";
 export {
   FARM_CARROT_CROP_ID,
   FARM_CARROT_BASE_HOLD_CAP,
@@ -1120,8 +1127,8 @@ export {
   isFarmCropUnlocked,
   isFarmerNpc,
   isLivestockKeeperNpc,
-  isPartyLeaderNearFarmer,
-  isPartyLeaderNearLivestockKeeper,
+  isFarmServiceAvailable,
+  isLivestockServiceAvailable,
   purchaseFarmFieldUpgrade,
   sanitizeFarmState,
   settleFarmState,
