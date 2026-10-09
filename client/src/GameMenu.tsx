@@ -68,6 +68,8 @@ export function GameMenu({
   currentMapId,
   backgroundMusicMuted,
   backgroundMusicVolumePercent,
+  soundEffectsMuted,
+  soundEffectsVolumePercent,
   equipmentDropPopupThreshold,
   skillBookReadMessage,
   worldTravelTargetMapId,
@@ -140,6 +142,8 @@ export function GameMenu({
   onMovePartyOrder,
   onChangeBackgroundMusicMuted,
   onChangeBackgroundMusicVolume,
+  onChangeSoundEffectsMuted,
+  onChangeSoundEffectsVolume,
   onChangeEquipmentDropPopupThreshold,
   saveStatusMessage,
   onExportSave,
@@ -160,6 +164,8 @@ export function GameMenu({
   currentMapId?: DebugMapId;
   backgroundMusicMuted: boolean;
   backgroundMusicVolumePercent: number;
+  soundEffectsMuted: boolean;
+  soundEffectsVolumePercent: number;
   equipmentDropPopupThreshold: EquipmentDropPopupThreshold;
   skillBookReadMessage?: string | null;
   worldTravelTargetMapId: DebugMapId | null;
@@ -279,6 +285,8 @@ export function GameMenu({
   onMovePartyOrder: (companionId: string, direction: "up" | "down") => void;
   onChangeBackgroundMusicMuted: (muted: boolean) => void;
   onChangeBackgroundMusicVolume: (volumePercent: number) => void;
+  onChangeSoundEffectsMuted: (muted: boolean) => void;
+  onChangeSoundEffectsVolume: (volumePercent: number) => void;
   onChangeEquipmentDropPopupThreshold: (
     threshold: EquipmentDropPopupThreshold,
   ) => void;
@@ -461,10 +469,14 @@ export function GameMenu({
                 <OptionsPanel
                   backgroundMusicMuted={backgroundMusicMuted}
                   backgroundMusicVolumePercent={backgroundMusicVolumePercent}
+                  soundEffectsMuted={soundEffectsMuted}
+                  soundEffectsVolumePercent={soundEffectsVolumePercent}
                   equipmentDropPopupThreshold={equipmentDropPopupThreshold}
                   saveStatusMessage={saveStatusMessage}
                   onChangeBackgroundMusicMuted={onChangeBackgroundMusicMuted}
                   onChangeBackgroundMusicVolume={onChangeBackgroundMusicVolume}
+                  onChangeSoundEffectsMuted={onChangeSoundEffectsMuted}
+                  onChangeSoundEffectsVolume={onChangeSoundEffectsVolume}
                   onChangeEquipmentDropPopupThreshold={
                     onChangeEquipmentDropPopupThreshold
                   }
@@ -990,10 +1002,14 @@ function formatDecimal(value: number): string {
 function OptionsPanel({
   backgroundMusicMuted,
   backgroundMusicVolumePercent,
+  soundEffectsMuted,
+  soundEffectsVolumePercent,
   equipmentDropPopupThreshold,
   saveStatusMessage,
   onChangeBackgroundMusicMuted,
   onChangeBackgroundMusicVolume,
+  onChangeSoundEffectsMuted,
+  onChangeSoundEffectsVolume,
   onChangeEquipmentDropPopupThreshold,
   onExportSave,
   onImportSaveFile,
@@ -1001,10 +1017,14 @@ function OptionsPanel({
 }: {
   backgroundMusicMuted: boolean;
   backgroundMusicVolumePercent: number;
+  soundEffectsMuted: boolean;
+  soundEffectsVolumePercent: number;
   equipmentDropPopupThreshold: EquipmentDropPopupThreshold;
   saveStatusMessage: string | null;
   onChangeBackgroundMusicMuted: (muted: boolean) => void;
   onChangeBackgroundMusicVolume: (volumePercent: number) => void;
+  onChangeSoundEffectsMuted: (muted: boolean) => void;
+  onChangeSoundEffectsVolume: (volumePercent: number) => void;
   onChangeEquipmentDropPopupThreshold: (
     threshold: EquipmentDropPopupThreshold,
   ) => void;
@@ -1040,6 +1060,51 @@ function OptionsPanel({
           Mute
         </label>
       </div>
+      <div className="options-audio-settings">
+        <label className="options-volume-control">
+          <span>Sound Effects</span>
+          <input
+            max="100"
+            min="0"
+            onChange={(event) =>
+              onChangeSoundEffectsVolume(Number(event.currentTarget.value))
+            }
+            step="1"
+            type="range"
+            value={soundEffectsVolumePercent}
+          />
+          <output>{soundEffectsVolumePercent}%</output>
+        </label>
+        <label className="options-mute-control">
+          <input
+            checked={soundEffectsMuted}
+            onChange={(event) =>
+              onChangeSoundEffectsMuted(event.currentTarget.checked)
+            }
+            type="checkbox"
+          />
+          Mute
+        </label>
+      </div>
+      <p className="options-audio-credits">
+        Sound effects by{" "}
+        <a
+          href="https://opengameart.org/content/fantasy-sound-effects-library"
+          rel="noreferrer"
+          target="_blank"
+        >
+          Little Robot Sound Factory
+        </a>{" "}
+        (CC BY 3.0) and{" "}
+        <a
+          href="https://opengameart.org/content/rpg-sound-pack"
+          rel="noreferrer"
+          target="_blank"
+        >
+          artisticdude
+        </a>{" "}
+        (CC0).
+      </p>
       <label className="options-equipment-drop-popup-control">
         <span>Equipment Drop Popups</span>
         <select
