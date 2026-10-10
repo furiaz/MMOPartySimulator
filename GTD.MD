@@ -190,12 +190,15 @@ Current top-level React/UI implementation files include:
 - `GuidePopup.tsx`
 - `guidePopupDefinitions.ts`
 - `InventoryPanel.tsx`
+- `ImportSaveButton.tsx`
 - `innKitchenPresentation.ts`
 - `innRoomsPresentation.ts`
 - `livestockPresentation.ts`
 - `main.tsx`
 - `npcInteractionRange.ts`
 - `poiPresentation.ts`
+- `PatchNotesDialog.tsx`
+- `PATCH_NOTES.md`
 - `QuestPanels.tsx`
 - `QuestTrackerPanel.tsx`
 - `questUiHelpers.ts`
@@ -693,9 +696,21 @@ Current browser storage behavior:
 
 - local saves use `window.localStorage`
 - current storage key is `mmo-party-simulator.save.v1`
-- the UI can read, write, delete, export, import, and download save files
+- the UI can read, write, export, import, and download save files
 - exported save files are JSON
-- imported save text is parsed, validated, restored, and then written to local storage
+- imported save text is parsed, validated, and restored before any overwrite confirmation or local-storage replacement
+- the start-screen caller confirms only when a stored save exists, writes the valid import, reports success, enables Continue, and remains on the menu
+- the in-game Options caller preserves replacement confirmation and immediately enters the restored imported state after a successful write
+- canceled replacement, parsing failure, validation failure, restoration failure, file-read failure, or storage-write failure leaves the previously stored save untouched
+- the UI does not expose a browser-save deletion helper or Delete Save control
+
+Current Patch Notes behavior:
+
+- player-facing history lives in `client/src/PATCH_NOTES.md` as React-owned UI content rather than game state, public runtime data, or simulation logic
+- Vite imports the Markdown as bundled raw text and `PatchNotesDialog.tsx` renders it with `react-markdown` using `skipHtml` and no raw-HTML or GFM plugin
+- the document begins with the June 19, 2026 mechanically complete nine-class baseline and continues with newest-first monthly history
+- the dialog owns its scroll region, sticky Close control, Escape and backdrop closing, keyboard focus containment, focus restoration, and reopen-at-top behavior
+- future player-facing entries are added when changes reach `live`
 
 Current offline farming behavior:
 
@@ -3814,7 +3829,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save controls, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
 
 The full renderer viewport should reserve the bottom HUD area so the map camera and interactable world view do not place important content behind the companion vitals and buff/debuff rail UI.
 
@@ -3842,6 +3857,7 @@ React may:
 - track selected World Travel destination UI state
 - track guide popup queue, active popup, and viewed popup UI state
 - track save status and offline summary UI state
+- track start-screen Patch Notes dialog state and focus restoration
 - render UI-facing enemy and NPC name labels
 - track one transient NPC speech bubble and pass it to the PixiJS world renderer
 - call existing game command/helper functions for supported actions
@@ -3858,7 +3874,7 @@ React may:
 - call existing bank helpers for supported bank transfers, slot locks, and auto-routing settings
 - call existing crafting helpers for supported recipe status display and craft actions
 - call existing teleport or travel-intent helpers for supported prototype World Travel actions
-- call browser save storage helpers for supported local save, import, export, continue, delete, and new-game actions
+- call browser save storage helpers for supported local save, import, export, continue, and new-game actions
 - display placeholder sections for future systems
 
 React must not:

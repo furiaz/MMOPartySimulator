@@ -2733,13 +2733,16 @@ The game should reward observation and planning more than constant clicking.
 
 ---
 
-## Prototype Save, Offline Progress, and Guide Popups
+## Prototype Save, Offline Progress, Patch Notes, and Guide Popups
 
 Current prototype browser persistence includes local save support.
 
 Current prototype save behavior:
 
-- the start screen may offer Continue, New Game, and Delete Save File
+- the start screen offers Continue, New Game, and Import Save as primary actions, plus a smaller Patch Notes action
+- Patch Notes is available without a save and opens a scrollable player-facing history beginning with the June 19, 2026 mechanically complete nine-class baseline
+- Patch Notes closes through its persistent Close control, Escape, or backdrop selection and returns focus to its start-screen opener
+- future patch-note entries are added when changes reach the live version
 - saves are stored in browser local storage
 - the game may autosave periodically during play
 - the game may autosave before tab sleep or page unload
@@ -2747,10 +2750,13 @@ Current prototype save behavior:
 - major quest status changes may trigger a save
 - the player may manually save
 - the player may export a save file
-- the player may import a save file
-- imported saves replace current progress only after confirmation while playing
+- the player may import a save file from the start screen or in-game Options
+- imported files are parsed, validated, and restored successfully before replacement is offered
+- importing from the start screen asks for confirmation when a stored save exists, writes the valid import, and remains on the start screen with Continue enabled
+- importing from in-game Options keeps the replacement confirmation and immediately loads the valid imported state
+- canceling replacement or selecting an invalid or unreadable file leaves the current stored save unchanged
 - starting a new game over an existing save asks for confirmation
-- deleting a save asks for confirmation
+- the game does not expose a separate delete-save action; New Game is the supported way to replace existing progress with a fresh save
 - save files use a prototype save version
 - current save schema version is `3`; the existing `mmo-party-simulator.save.v1` browser-storage key remains unchanged so older local saves stay discoverable
 - version-1 saves automatically migrate removed Holy Mace and Holy Lantern item ids to the surviving Mace and Lantern lines before normal validation and sanitization
@@ -2785,7 +2791,7 @@ Current prototype guide popups:
 - are UI guidance only
 - do not define simulation behavior, quest rules, AI behavior, balance, or final tutorial structure
 
-Prototype save, offline progress, and guide popups are browser-prototype systems. They are not backend persistence, account persistence, cloud save, cross-device save, production offline economy, final tutorial design, or final onboarding flow.
+Prototype save, offline progress, Patch Notes, and guide popups are browser-prototype systems. Patch Notes is bundled player-facing UI content and does not define game state or simulation behavior. These systems are not backend persistence, account persistence, cloud save, cross-device save, production offline economy, final tutorial design, or final onboarding flow.
 
 ---
 
