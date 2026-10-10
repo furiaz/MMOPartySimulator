@@ -27,6 +27,7 @@
 .start-game-panel {
   display: grid;
   gap: 18px;
+  box-sizing: border-box;
   width: min(360px, calc(100vw - 32px));
   padding: 18px;
   border: 1px solid var(--main-menu-panel-border);
@@ -59,6 +60,28 @@
 .start-game-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.46;
+}
+
+.start-game-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.start-game-footer .patch-notes-button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-color: #3a5a60;
+  background: rgba(26, 42, 47, 0.48);
+  color: var(--main-menu-panel-muted-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.start-game-footer .patch-notes-button:hover,
+.start-game-footer .patch-notes-button:focus-visible {
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.62);
+  color: var(--main-menu-panel-text);
 }
 
 .save-status-text {
@@ -2474,6 +2497,99 @@
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
 }
 
+.overlay-panel.patch-notes-dialog {
+  width: min(900px, calc(100vw - 32px));
+  height: min(86vh, 820px);
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  color: var(--main-menu-panel-text);
+}
+
+.patch-notes-dialog-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.patch-notes-dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #3e5f66;
+  background: rgba(11, 23, 28, 0.98);
+}
+
+.patch-notes-dialog-header h2 {
+  margin: 0;
+  color: var(--main-menu-panel-accent-text);
+  font-size: 20px;
+}
+
+.patch-notes-dialog-header button {
+  min-width: 84px;
+  min-height: 44px;
+  border-color: #7aa6ad;
+  background: rgba(58, 90, 96, 0.58);
+  color: var(--main-menu-panel-text);
+  font-weight: 800;
+}
+
+.patch-notes-markdown {
+  padding: 6px 22px 24px;
+  color: var(--main-menu-panel-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.patch-notes-markdown h1 {
+  margin: 20px 0 6px;
+  color: var(--main-menu-panel-accent-text);
+  font-size: 26px;
+}
+
+.patch-notes-markdown h2 {
+  margin: 30px 0 8px;
+  color: #d9ecef;
+  font-size: 21px;
+}
+
+.patch-notes-markdown h3 {
+  margin: 20px 0 6px;
+  color: #9bcbd3;
+  font-size: 16px;
+}
+
+.patch-notes-markdown p {
+  margin: 8px 0 14px;
+  color: var(--main-menu-panel-muted-text);
+}
+
+.patch-notes-markdown ul {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 18px;
+  padding-left: 24px;
+}
+
+.patch-notes-markdown ul ul {
+  gap: 4px;
+  margin: 6px 0 2px;
+}
+
+.patch-notes-markdown li::marker {
+  color: var(--main-menu-panel-accent-text);
+}
+
+.patch-notes-markdown strong {
+  color: #f3df93;
+}
+
 .farm-upgrade-overlay-heading {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
@@ -4485,8 +4601,28 @@
   background: rgba(58, 90, 96, 0.62);
 }
 
-.import-save-button input {
+.import-save-input {
   display: none;
+}
+
+@media (max-width: 600px) {
+  .overlay-panel-layer {
+    padding: 10px;
+  }
+
+  .overlay-panel.patch-notes-dialog {
+    width: calc(100vw - 20px);
+    height: calc(100vh - 20px);
+  }
+
+  .patch-notes-dialog-header {
+    padding: 10px 12px;
+  }
+
+  .patch-notes-markdown {
+    padding: 2px 14px 18px;
+    font-size: 13px;
+  }
 }
 
 .options-save-status {

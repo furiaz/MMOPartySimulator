@@ -50,6 +50,7 @@ import type {
   LivestockPlacementId,
   LivestockPlacementRotation,
 } from "./game";
+import { ImportSaveButton } from "./ImportSaveButton";
 
 export type GuildSecondaryPartyRedeemSummaryState = GuildSecondaryPartyRedeemSummary;
 
@@ -1130,22 +1131,10 @@ function OptionsPanel({
         <button onClick={onExportSave} type="button">
           Export Save
         </button>
-        <label className="import-save-button">
-          Import Save
-          <input
-            accept="application/json,.json"
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
-
-              if (file) {
-                void onImportSaveFile(file);
-              }
-
-              event.currentTarget.value = "";
-            }}
-            type="file"
-          />
-        </label>
+        <ImportSaveButton
+          className="import-save-button"
+          onImportSaveFile={onImportSaveFile}
+        />
       </div>
       <p className="options-save-status">
         {saveStatusMessage ?? "Autosave ready."}

@@ -55,16 +55,6 @@ export function writeLocalSaveFile(save: SavedGame): LocalSaveWriteResult {
   }
 }
 
-export function deleteLocalSave(): LocalSaveWriteResult {
-  try {
-    window.localStorage.removeItem(LOCAL_SAVE_STORAGE_KEY);
-
-    return { ok: true, savedAtMs: Date.now() };
-  } catch (error) {
-    return { ok: false, reason: getStorageErrorMessage(error) };
-  }
-}
-
 export function hasValidLocalSave(): boolean {
   return readLocalSave().ok;
 }

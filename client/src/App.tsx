@@ -342,7 +342,6 @@ import {
   GAMEPLAY_HUD_CONTROL_SRC,
 } from "./assetIcons";
 import {
-  deleteLocalSave,
   downloadSavedGame,
   hasStoredSaveFile,
   parseSavedGameText,
@@ -350,6 +349,8 @@ import {
   writeLocalSave,
   writeLocalSaveFile,
 } from "./saveStorage";
+import { ImportSaveButton } from "./ImportSaveButton";
+import { PatchNotesDialog } from "./PatchNotesDialog";
 import {
   consumeGamePerformanceMetrics,
   type GamePerformanceMetrics,
@@ -2926,19 +2927,27 @@ function getDirectCommandFeedbackText(
 
 type AppMode = "start" | "playing";
 
+type ImportSaveOptions = {
+  enterGameAfterImport: boolean;
+};
+
 function StartScreen({
   hasSaveFile,
   statusMessage,
   onContinue,
+  onImportSaveFile,
   onNewGame,
-  onDeleteSave,
 }: {
   hasSaveFile: boolean;
   statusMessage: string | null;
   onContinue: () => void;
+  onImportSaveFile: (file: File) => void | Promise<void>;
   onNewGame: () => void;
-  onDeleteSave: () => void;
 }) {
+  const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
+  const patchNotesButtonRef = useRef<HTMLButtonElement>(null);
+  const closePatchNotes = useCallback(() => setIsPatchNotesOpen(false), []);
+
   return (
     <main className="game-page start-game-page">
       <section className="start-game-panel" aria-label="Start game">
@@ -2954,20 +2963,30 @@ function StartScreen({
           <button onClick={onNewGame} type="button">
             New Game
           </button>
-          <button
-            disabled={!hasSaveFile}
-            onClick={onDeleteSave}
-            type="button"
-          >
-            Delete Save File
-          </button>
+          <ImportSaveButton onImportSaveFile={onImportSaveFile} />
         </div>
         {statusMessage ? (
           <p className="save-status-text" role="status">
             {statusMessage}
           </p>
         ) : null}
+        <footer className="start-game-footer">
+          <button
+            ref={patchNotesButtonRef}
+            className="patch-notes-button"
+            onClick={() => setIsPatchNotesOpen(true)}
+            type="button"
+          >
+            Patch Notes
+          </button>
+        </footer>
       </section>
+      {isPatchNotesOpen ? (
+        <PatchNotesDialog
+          onClose={closePatchNotes}
+          returnFocusRef={patchNotesButtonRef}
+        />
+      ) : null}
     </main>
   );
 }
@@ -4111,23 +4130,6 @@ function App() {
     queueGuidePopup("welcome");
   }
 
-  function deleteSavedGame() {
-    if (!window.confirm("Delete the browser save file?")) {
-      return;
-    }
-
-    const result = deleteLocalSave();
-
-    if (!result.ok) {
-      setSaveStatusMessage(`Delete failed: ${result.reason}`);
-      return;
-    }
-
-    setHasLocalSaveFile(false);
-    setOfflineSummary(null);
-    setSaveStatusMessage("Save file deleted.");
-  }
-
   function manualSave() {
     writeCurrentSave("Manual save");
   }
@@ -4205,7 +4207,10 @@ function App() {
     );
   }
 
-  async function importSaveFile(file: File) {
+  async function importSaveFile(
+    file: File,
+    { enterGameAfterImport }: ImportSaveOptions,
+  ) {
     try {
       const importedText = await file.text();
       const parsedSave = parseSavedGameText(importedText);
@@ -4215,17 +4220,17 @@ function App() {
         return;
       }
 
-      if (
-        appMode === "playing" &&
-        !window.confirm("Import this save and replace current progress?")
-      ) {
-        return;
-      }
-
       const restored = restoreGameStateFromSave(parsedSave.save);
 
       if (!restored.ok) {
         setSaveStatusMessage(`Import failed: ${restored.reason}`);
+        return;
+      }
+
+      if (
+        (enterGameAfterImport || hasStoredSaveFile()) &&
+        !window.confirm("Import this save and replace current progress?")
+      ) {
         return;
       }
 
@@ -4237,12 +4242,15 @@ function App() {
         return;
       }
 
-      stopSimulationLoop();
-      resetGuidePopupState();
       setOfflineSummary(null);
       setHasLocalSaveFile(true);
       setSaveStatusMessage("Save imported.");
-      enterGameState(restored.state);
+
+      if (enterGameAfterImport) {
+        stopSimulationLoop();
+        resetGuidePopupState();
+        enterGameState(restored.state);
+      }
     } catch (error) {
       setSaveStatusMessage(
         `Import failed: ${error instanceof Error ? error.message : "File could not be read."}`,
@@ -6878,7 +6886,9 @@ function App() {
         hasSaveFile={hasLocalSaveFile}
         statusMessage={saveStatusMessage}
         onContinue={continueSavedGame}
-        onDeleteSave={deleteSavedGame}
+        onImportSaveFile={(file) =>
+          importSaveFile(file, { enterGameAfterImport: false })
+        }
         onNewGame={startNewGame}
       />
     );
@@ -7511,7 +7521,9 @@ function App() {
               }
               saveStatusMessage={saveStatusMessage}
               onExportSave={exportSave}
-              onImportSaveFile={importSaveFile}
+              onImportSaveFile={(file) =>
+                importSaveFile(file, { enterGameAfterImport: true })
+              }
               onManualSave={manualSave}
             />
           </Suspense>
