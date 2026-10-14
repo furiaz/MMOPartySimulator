@@ -3,6 +3,7 @@ import { createCompanion, createEnemy } from "./entities";
 import { addEntity, updateEntity } from "./state";
 import { createTestGameState } from "./testState";
 import {
+  launchCombatProjectile,
   launchBasicCombatProjectile,
   updateCombatProjectileSystem,
   type CombatProjectileLaunchProfile,
@@ -62,6 +63,38 @@ describe("combat projectile system", () => {
     expect((nextState.entities[target.id] as Enemy).health).toBe(target.health);
   });
 
+  it("supports a locked launch origin and named impact feedback", () => {
+    const attacker = createAttackingCompanion("attacker", { x: 3, y: 3 });
+    const target = createEnemy("target", { x: 1, y: 0 }, undefined, {
+      defense: 0,
+      evasion: 0,
+      maxHealth: 100,
+    });
+    const launchedState = launchCombatProjectile(
+      createState([attacker, target]),
+      attacker,
+      target,
+      magicProfile,
+      1000,
+      {
+        impactLabel: "Fire Bolt",
+        origin: { x: 0, y: 0 },
+      },
+    );
+
+    expect(launchedState.combatProjectiles?.[0]).toMatchObject({
+      position: { x: 0, y: 0 },
+      impactLabel: "Fire Bolt",
+    });
+
+    const nextState = updateCombatProjectileSystem(launchedState, 1100, 100);
+
+    expect(nextState.combatProjectiles).toEqual([]);
+    expect(
+      nextState.combatFeedbackEvents.some((event) => event.text === "Fire Bolt"),
+    ).toBe(true);
+  });
+
   it("applies damage only when the projectile reaches its stored target", () => {
     const attacker = createAttackingCompanion("attacker", { x: 0, y: 0 });
     const target = createEnemy("target", { x: 1, y: 0 }, undefined, {
@@ -115,6 +148,61 @@ describe("combat projectile system", () => {
       sourceEntityId: attacker.id,
       targetEntityId: target.id,
     });
+  });
+
+  it("does not apply passive physical block to magic projectiles", () => {
+    const attacker = createEnemy("attacker", { x: 0, y: 0 }, "aggressive", {
+      attack: 10,
+    });
+    const baseTarget = createCompanion(
+      "target",
+      { x: 0.1, y: 0 },
+      "target",
+      "defender",
+    );
+    const target = {
+      ...baseTarget,
+      health: 100,
+      maxHealth: 100,
+      naturalStats: {
+        strength: 100,
+        dexterity: 1,
+        constitution: 1,
+        intelligence: 1,
+        wisdom: 1,
+      },
+    };
+
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const magicState = updateCombatProjectileSystem(
+      launchCombatProjectile(
+        createState([attacker, target]),
+        attacker,
+        target,
+        magicProfile,
+        1000,
+      ),
+      1100,
+      100,
+    );
+    const physicalState = updateCombatProjectileSystem(
+      launchCombatProjectile(
+        createState([attacker, target]),
+        attacker,
+        target,
+        testProfile,
+        1000,
+      ),
+      1100,
+      100,
+    );
+    const magicDamage = target.health -
+      (magicState.entities[target.id] as Companion).health;
+    const physicalDamage = target.health -
+      (physicalState.entities[target.id] as Companion).health;
+
+    expect(magicDamage).toBeGreaterThan(physicalDamage);
   });
 
   it("expires without damage when the target is dead", () => {

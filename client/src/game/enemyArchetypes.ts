@@ -295,6 +295,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     id: "ember_imp",
     displayName: "Ember Imp",
     archetypeId: "imp",
+    abilityIds: ["fire_bolt"],
     temperament: "aggressive",
     targetPreference: "closest",
     level: 12,
