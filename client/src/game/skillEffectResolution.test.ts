@@ -10,6 +10,7 @@ import {
   SHIELD_SHOCKWAVE_CHANNEL_MS,
   updateCompanionAoeChannelSystem,
 } from "./companionAoeChannelSystem";
+import { createAoeCastTransform, resolveAoePattern } from "./aoePatterns";
 import {
   resolveSkillEffect,
   updateSkillShieldBlockPositions,
@@ -1388,11 +1389,10 @@ describe("skill effect resolution", () => {
       abilityId: "shield_shockwave",
       casterId: caster.id,
       visualIntent: "partyOffensive",
-      shape: {
-        type: "circle",
-        center: caster.position,
-        radius: 2,
-      },
+      area: resolveAoePattern(
+        { type: "circle", radius: 2 },
+        createAoeCastTransform(caster.position, caster.position),
+      ),
       channelEndsAt: 1000 + SHIELD_SHOCKWAVE_CHANNEL_MS,
     });
     expect((started.state.entities.near as Enemy).health).toBe(near.health);

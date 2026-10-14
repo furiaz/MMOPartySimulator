@@ -34,6 +34,7 @@ import type {
 } from "../game";
 import {
   aoeTargetDummyId,
+  getAoeAreaSignature,
   getEnemyArchetype,
   getEnemyType,
   isActiveResource,
@@ -1416,8 +1417,8 @@ function getEnemyAoeChannelSignature(
     channel.id,
     channel.abilityId,
     channel.phase,
-    getPositionSignature(channel.shape.center),
-    channel.shape.radius,
+    getAoeAreaSignature(channel.area),
+    channel.patternName ?? "",
     channel.startedAt,
     channel.channelEndsAt,
     channel.windupEndsAt,
@@ -1432,8 +1433,7 @@ function getCompanionAoeChannelSignature(
     channel.id,
     channel.abilityId,
     channel.visualIntent,
-    getPositionSignature(channel.shape.center),
-    channel.shape.radius,
+    getAoeAreaSignature(channel.area),
     channel.startedAt,
     channel.channelEndsAt,
   ].join(":");

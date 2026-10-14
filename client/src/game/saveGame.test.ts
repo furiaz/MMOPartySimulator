@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  aoeTargetDummyId,
+  aoeTargetDummyPosition,
   createDebugMap,
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
@@ -9,7 +11,12 @@ import {
   mapTwoEnemyStartData,
 } from "./debugMap";
 import { createDebugTelemetryState } from "./debugTelemetry";
-import { createCompanion, createEnemy, createResource } from "./entities";
+import {
+  createCompanion,
+  createEnemy,
+  createResource,
+  createTargetDummy,
+} from "./entities";
 import {
   createInitialGuildNoticeBoardState,
   GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
@@ -59,6 +66,7 @@ import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type { Companion, GameEntity, ItemId, PartyMemberRole } from "./types";
 import { addCurrencyToWalletState } from "./wallet";
+import { createAoeCastTransform, resolveAoePattern } from "./aoePatterns";
 
 const NOW_MS = 1_000_000;
 
@@ -431,11 +439,10 @@ describe("save game serialization", () => {
             id: "shockwave",
             abilityId: "shield_shockwave",
             casterId: "companion-1",
-            shape: {
-              type: "circle",
-              center: { x: 14, y: 29 },
-              radius: 2,
-            },
+            area: resolveAoePattern(
+              { type: "circle", radius: 2 },
+              createAoeCastTransform({ x: 14, y: 29 }, { x: 14, y: 29 }),
+            ),
             visualIntent: "partyOffensive",
             damageType: "physical",
             powerMultiplier: 0.5,
@@ -444,6 +451,7 @@ describe("save game serialization", () => {
             channelEndsAt: NOW_MS + 200,
           },
         },
+        aoeDummyPatternSequenceIndex: 5,
         debugTelemetry: {
           ...createDebugTelemetryState(),
           isRecording: true,
@@ -466,6 +474,7 @@ describe("save game serialization", () => {
     expect(restored.state.combatFeedbackEvents).toEqual([]);
     expect(restored.state.movementPathsByEntityId).toEqual({});
     expect(restored.state.companionAoeChannelsByCasterId).toEqual({});
+    expect(restored.state.aoeDummyPatternSequenceIndex).toBe(0);
     expect(restored.state.debugTelemetry).toBeUndefined();
   });
 
@@ -489,6 +498,35 @@ describe("save game serialization", () => {
         (entity) => entity.kind === "resource" && entity.resourceType === "wood",
       ),
     ).toBe(true);
+  });
+
+  it("moves a saved Hub 1 AoE dummy to its current canonical position", () => {
+    const savedPosition = { x: 55, y: 8 };
+    const dummy = createTargetDummy(aoeTargetDummyId, savedPosition);
+    const save = createSavedGame(
+      createTestGameState({
+        currentMapId: HUB_MAP_ID,
+        map: createDebugMap(HUB_MAP_ID),
+        entities: { [dummy.id]: dummy },
+      }),
+      NOW_MS,
+    );
+
+    expect(save.state.entities[aoeTargetDummyId]).toMatchObject({
+      position: savedPosition,
+      homePosition: savedPosition,
+    });
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.entities[aoeTargetDummyId]).toMatchObject({
+      position: aoeTargetDummyPosition,
+      homePosition: aoeTargetDummyPosition,
+    });
   });
 
   it("persists the equipment drop popup threshold and defaults legacy or invalid values", () => {

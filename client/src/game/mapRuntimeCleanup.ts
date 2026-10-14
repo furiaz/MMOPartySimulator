@@ -44,6 +44,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    aoeDummyPatternSequenceIndex: 0,
     flaskRechargeCountedEnemyDefeats: {},
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},

@@ -9,7 +9,7 @@ import {
   targetDummyPosition,
 } from "./debugMap";
 import { updateEnemyAISystem } from "./enemyAISystem";
-import { addEntity } from "./state";
+import { addEntity, isWallPosition } from "./state";
 import { setLeaderIntent } from "./partyIntentState";
 import { findEnemyTarget } from "./skillTargeting";
 import { createTestGameState } from "./testState";
@@ -17,6 +17,19 @@ import { updateGame } from "./updateGame";
 import type { Enemy } from "./types";
 
 describe("hub target dummy", () => {
+  it("places the AoE showcase dummy at the Hub 1 top-left test position", () => {
+    expect(aoeTargetDummyPosition).toEqual({ x: 15, y: 10 });
+    expect(
+      isWallPosition(
+        createTestGameState({
+          currentMapId: HUB_MAP_ID,
+          map: createDebugMap(HUB_MAP_ID),
+        }),
+        aoeTargetDummyPosition,
+      ),
+    ).toBe(false);
+  });
+
   it("creates a passive 100 HP target dummy with no rewards", () => {
     const dummy = createTargetDummy("dummy", targetDummyPosition);
 

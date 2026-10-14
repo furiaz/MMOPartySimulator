@@ -283,6 +283,7 @@ export type GameState = {
   companionAoeChannelsByCasterId?: Record<string, CompanionAoeChannelState>;
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   enemyAoeCooldownsByCasterId?: Record<string, EnemyAoeCooldownState>;
+  aoeDummyPatternSequenceIndex?: number;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
   flaskRechargeEnemyKillCounter?: number;
   flaskRechargeCountedEnemyDefeats?: Record<string, number>;
