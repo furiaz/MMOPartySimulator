@@ -185,6 +185,7 @@ function canCastStomp(state: GameState, caster: Enemy): boolean {
   return (
     (caster.id === aoeTargetDummyId || isStompOnlyEnemy(caster)) &&
     !isEnemyBound(state, caster) &&
+    !state.enemyAbilityCastsByEnemyId?.[caster.id] &&
     !state.enemyAoeChannelsByCasterId?.[caster.id] &&
     !state.enemyAoeCooldownsByCasterId?.[caster.id] &&
     isAoeStompCasterEngaged(state, caster) &&

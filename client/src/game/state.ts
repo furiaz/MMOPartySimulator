@@ -45,6 +45,8 @@ import type {
   EquipmentDropPopupThreshold,
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
+  EnemyAbilityCastState,
+  EnemyAbilityCooldownState,
   HeadhunterState,
   CruelMercyState,
   ManyBeaconsState,
@@ -283,6 +285,12 @@ export type GameState = {
   companionAoeChannelsByCasterId?: Record<string, CompanionAoeChannelState>;
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   enemyAoeCooldownsByCasterId?: Record<string, EnemyAoeCooldownState>;
+  enemyAbilityCastsByEnemyId?: Record<string, EnemyAbilityCastState>;
+  enemyAbilityCooldownsByEnemyId?: Record<
+    string,
+    Record<string, EnemyAbilityCooldownState>
+  >;
+  enemyAbilityBasicAttackRequiredByEnemyId?: Record<string, true>;
   aoeDummyPatternSequenceIndex?: number;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
   flaskRechargeEnemyKillCounter?: number;

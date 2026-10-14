@@ -198,6 +198,14 @@ export function isSkillUseBlockedByStatus(
   return hasActiveStatus(state, entityId, ["incapacitated", "silenced"]);
 }
 
+export function hasActiveStatusEffect(
+  state: GameState,
+  entityId: string,
+  type: StatusEffectType,
+): boolean {
+  return hasActiveStatus(state, entityId, [type]);
+}
+
 export function isGatherBlockedByStatus(
   state: GameState,
   entityId: string,

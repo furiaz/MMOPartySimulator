@@ -79,6 +79,7 @@ export type EnemyTypeDefinition = {
   id: EnemyTypeId;
   displayName: string;
   archetypeId: EnemyArchetypeId;
+  abilityIds?: EnemyAbilityId[];
   temperament: EnemyTemperament;
   combatStyle?: EnemyCombatStyle;
   targetPreference: EnemyTargetPreference;
@@ -2084,6 +2085,47 @@ export type EnemyAoeChannelState = {
 export type EnemyAoeCooldownState = {
   abilityId: EnemyAoeAbilityId;
   casterId: string;
+  expiresAt: number;
+};
+
+export type EnemyAbilityId = string;
+
+export type EnemyAbilityCastPhase = "casting" | "windup";
+
+export type EnemyAbilityInterruptReason =
+  | "caster_dead"
+  | "caster_removed"
+  | "target_dead"
+  | "target_missing"
+  | "target_fake_death"
+  | "taunted"
+  | "incapacitated"
+  | "silenced"
+  | "bound"
+  | "unknown_ability"
+  | "missing_resolver"
+  | "encounter_reset"
+  | "map_transition"
+  | "save_restoration";
+
+export type EnemyAbilityCastState = {
+  id: string;
+  abilityId: EnemyAbilityId;
+  casterId: string;
+  targetId: string;
+  phase: EnemyAbilityCastPhase;
+  startedAt: number;
+  castEndsAt: number;
+  windupEndsAt: number;
+  origin: Position;
+  targetPosition: Position;
+  direction: Position;
+};
+
+export type EnemyAbilityCooldownState = {
+  abilityId: EnemyAbilityId;
+  casterId: string;
+  startedAt: number;
   expiresAt: number;
 };
 

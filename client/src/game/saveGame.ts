@@ -22,6 +22,11 @@ import {
   getLootTierForLevel,
 } from "./dropTables";
 import { getEnemyType } from "./enemyArchetypes";
+import { sanitizeEnemyAbilityRuntimeForSave } from "./enemyAbilitySystem";
+import {
+  ENEMY_ABILITY_DEFINITIONS,
+  type EnemyAbilityRegistry,
+} from "./enemyAbilities";
 import { SUPERIOR_ENEMY_CHANCE } from "./enemyVariants";
 import { normalizeEquipmentDropPopupThreshold } from "./equipmentDropPopups";
 import { sanitizeGuildNoticeBoardState } from "./guildNoticeBoard";
@@ -166,7 +171,7 @@ export function createSavedGame(
     saveVersion: SAVE_VERSION,
     savedAtMs,
     offlineFarmingBlockedReason: getSaveOfflineFarmingBlockedReason(state),
-    state: sanitizeGameStateForSave(state),
+    state: sanitizeGameStateForSave(state, savedAtMs),
   };
 }
 
@@ -559,13 +564,13 @@ export function restoreGameStateFromSave(value: unknown): RestoreSaveResult {
   const currentMapId = validation.save.state.currentMapId ?? "hub";
   const map = createDebugMapForQuestState(currentMapId, validation.save.state.quests);
 
+  const restoredAtMs = Date.now();
   const sanitizedState = sanitizeGameStateForSave({
     ...validation.save.state,
     currentMapId,
     map,
-  });
+  }, restoredAtMs);
   const normalizedState = normalizeAoeTargetDummyPosition(sanitizedState);
-  const restoredAtMs = Date.now();
 
   return {
     ok: true,
@@ -831,7 +836,11 @@ export function claimPendingOfflineFarmingLoot(
   };
 }
 
-export function sanitizeGameStateForSave(state: GameState): GameState {
+export function sanitizeGameStateForSave(
+  state: GameState,
+  now = Date.now(),
+  enemyAbilityDefinitions: EnemyAbilityRegistry = ENEMY_ABILITY_DEFINITIONS,
+): GameState {
   const currentMapId = state.currentMapId ?? "hub";
   const quests = sanitizeQuestStates(state.quests);
   const map = createDebugMapForQuestState(currentMapId, quests);
@@ -894,6 +903,12 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
       currentMapId,
       map,
     },
+  );
+  const enemyAbilityRuntime = sanitizeEnemyAbilityRuntimeForSave(
+    state,
+    entities,
+    now,
+    enemyAbilityDefinitions,
   );
 
   return {
@@ -992,6 +1007,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    ...enemyAbilityRuntime,
     aoeDummyPatternSequenceIndex: 0,
     consumableUsesByCompanionId: {},
     dropVisualEvents: [],

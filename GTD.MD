@@ -74,6 +74,8 @@ Current game-logic implementation files include:
 - `dropTables.ts`
 - `dungeonSystem.ts`
 - `enemyAISystem.ts`
+- `enemyAbilities.ts`
+- `enemyAbilitySystem.ts`
 - `enemyAoeChannelSystem.ts`
 - `enemyArchetypes.ts`
 - `enemyRespawnSystem.ts`
@@ -472,7 +474,7 @@ Current role priority:
 
 `GameState` is the central simulation container.
 
-Current responsibilities include storing entities, shared party prototype inventory, shared party bank, shared party key item state, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline farming loot, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, autonomous target suppression state, skill runtime state, status-effect runtime state, skill visual events, companion AoE runtime state, enemy AoE runtime state, prototype consumable use state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, last companion damage timing, short-lived news broadcasts, debug options, and debug telemetry.
+Current responsibilities include storing entities, shared party prototype inventory, shared party bank, shared party key item state, shared party wallet, current debug map id, optional map data, active teleport state, teleport runtime state, auto-mode state, World Travel target state, POI preferences, simulation tick/frame/time values, party leader id, leader handoff timing, party intent, leader intent compatibility state, direct companion command state, prototype quest state, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline farming loot, global/local POI intent, interrupted POI target state, explored positions, follow trails, movement planning, movement path cache, attack slot cache, enemy target reachability cache, defender wait/blocking state, party formation state, combat feedback, basic combat projectile runtime state, autonomous target suppression state, skill runtime state, status-effect runtime state, skill visual events, companion AoE runtime state, enemy AoE runtime state, reusable enemy ability runtime state, prototype consumable use state, flask recharge state, prototype drop visual events, Slimeward dungeon runtime state, resurrection participant/progress state, world-wipe recovery state, passive health regeneration timing, target dummy regeneration timing, last companion damage timing, short-lived news broadcasts, debug options, and debug telemetry.
 
 Current movement planning fields include:
 
@@ -624,6 +626,12 @@ Current enemy AoE runtime fields include:
 - `enemyAoeChannelsByCasterId`
 - `enemyAoeCooldownsByCasterId`
 
+Current reusable enemy ability runtime fields include:
+
+- `enemyAbilityCastsByEnemyId`
+- `enemyAbilityCooldownsByEnemyId`
+- `enemyAbilityBasicAttackRequiredByEnemyId`
+
 Current resurrection and recovery fields include:
 
 - `resurrectionProgressByCompanionId`
@@ -687,7 +695,8 @@ Current save game behavior:
 - restore rebuilds the current debug map from saved quest state
 - restore applies Farm and Livestock catch-up through their capped production rules
 - save sanitization preserves valid shared inventory, bank, key item, wallet, quest, companion progression, companion equipment, companion flask assignment, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers
-- save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, autonomous target suppressions, skill runtime, status-effect runtime, companion AoE runtime, enemy AoE runtime, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, companion damage timing, short-lived news broadcasts, and debug telemetry
+- save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, autonomous target suppressions, skill runtime, status-effect runtime, companion AoE runtime, enemy AoE channels, enemy AoE cooldowns, active reusable enemy ability casts, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, companion damage timing, short-lived news broadcasts, and debug telemetry
+- reusable enemy ability cooldowns are the focused exception to normal combat-cooldown clearing: sanitization preserves only known configured abilities with finite unexpired absolute expiration timestamps and preserves a valid required-basic-attack gate, while discarding malformed, expired, unknown-ability, and missing-enemy records
 - companion save sanitization keeps dead companions dead, returns living companions to idle or follow state, clears temporary consumable buffs, and sanitizes skill progression data
 - enemy save sanitization keeps dead enemies dead and returns living enemies to idle state
 - Slimeward dungeon chest UI state is closed during save sanitization
@@ -1884,6 +1893,7 @@ Current systems and update helpers include:
 - Follow System
 - Quest Guide System
 - Enemy AI System
+- Enemy Ability System
 - Enemy AoE Channel System
 - Attack System
 - Combat Projectile System
@@ -1951,23 +1961,24 @@ Current high-level order:
 33. Update follow behavior
 34. Update quest guide escort behavior
 35. Update enemy AI
-36. Update enemy AoE channel behavior
-37. Update companion AoE channel behavior
-38. Update party intent self-defense
-39. Update combat skills
-40. Update attacks
-41. Update combat projectiles
-42. Update flask recharge from counted enemy defeats
-43. Restore interrupted POI target when valid
-44. Update passive health regeneration
-45. Update target dummy health regeneration
-46. Update drop system
-47. Update Slimeward dungeon system
-48. Update enemy respawn system
-49. Update gathering
-50. Update resource respawn
-51. Update entity separation
-52. Update skill shield block positions
+36. Update reusable enemy ability execution
+37. Update enemy AoE channel behavior
+38. Update companion AoE channel behavior
+39. Update party intent self-defense
+40. Update combat skills
+41. Update attacks
+42. Update combat projectiles
+43. Update flask recharge from counted enemy defeats
+44. Restore interrupted POI target when valid
+45. Update passive health regeneration
+46. Update target dummy health regeneration
+47. Update drop system
+48. Update Slimeward dungeon system
+49. Update enemy respawn system
+50. Update gathering
+51. Update resource respawn
+52. Update entity separation
+53. Update skill shield block positions
 53. Idle autonomous party members when no POI or leader intent is active
 54. Record current world discovery for supported wild subzones
 55. Apply debug companion infinite health again when enabled
@@ -2318,6 +2329,30 @@ Enemy AoE channel runtime is prototype combat runtime and should not become a fi
 
 ---
 
+## Enemy Ability System
+
+`enemyAbilities.ts` owns renderer-neutral reusable enemy ability definitions. `enemyAbilitySystem.ts` owns their focused enemy-only execution runtime.
+
+Current reusable enemy ability behavior:
+
+- enemy type definitions may provide ordered `abilityIds`; list order is deterministic selection priority
+- definitions provide range, cooldown, cast duration, optional windup duration, and a focused effect resolver
+- unknown definitions, missing resolvers, active cooldowns, out-of-range targets, and otherwise invalid candidates are skipped so the next configured ability or the normal basic attack can proceed
+- selection occurs only when a living attacking enemy has a valid target, its normal attack action is ready, no basic-attack windup or enemy AoE channel is active, status and bind rules permit skill use, and no basic attack is currently required
+- cast start snapshots caster origin, target id, target position, and normalized targeting direction, starts the absolute cooldown immediately, and sets the required-basic-attack gate
+- active casts prevent enemy chase and basic attacks; enemy AoE channels cannot start over them
+- effect resolvers receive the locked snapshot plus the current caster and target so a concrete ability can deliberately use fixed-position, updated-position, or entity-tracking behavior
+- successful resolution and interruption both reset the caster's normal attack timer; interruption preserves cooldown and the required-basic-attack gate
+- melee clears the gate when impact resolution is attempted, while ranged basic attacks clear it when their projectile launches; blocks, dodges, and misses still count as committed attacks
+- death, removal, invalid or fake-death targets, taunt, incapacitation, silence, and existing bind runtime cancel active casts; immobilization alone does not, and disarm remains basic-attack-only control
+- respawn and entity-removal cleanup discard per-enemy cast, cooldown, and gate records
+- map transitions discard all reusable enemy ability runtime for departing enemies
+- save restoration cancels active casts, preserves sanitized unexpired cooldown expiration timestamps and valid required-basic-attack gates, and requires no save-version bump because the fields are optional
+
+The production registry is intentionally empty until a concrete enemy ability issue adds a consumer. Handlers should delegate to existing damage, projectile, status-effect, and shared AoE helpers. This focused runtime does not replace enemy AI, the current enemy AoE channel system, companion skills, or the future full ability and casting framework.
+
+---
+
 ## Enemy Archetypes
 
 `enemyArchetypes.ts` owns lightweight prototype enemy archetype defaults and enemy type setup data.
@@ -2394,7 +2429,7 @@ Current enemy behavior:
 - passive enemies do not seek combat targets on their own
 - passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
-- enemy types define setup data such as level, attack cooldown, detection range, attack range override, temperament, combat style override, and target preference
+- enemy types define setup data such as level, attack cooldown, detection range, attack range override, temperament, combat style override, target preference, and an optional ordered reusable ability-id list
 - enemy archetypes do not define XP rewards
 - enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`
 - target preferences currently support closest, leader, and lowest-health party member
@@ -3411,12 +3446,12 @@ Current teleport behavior:
 - party members rally to the teleport point
 - teleport completes when living party members are within teleport range
 - on completion, current map changes to the teleport target map
-- map-local enemies, resources, hub placeholders, hub target dummies, explored tiles, movement planning, direct commands, formation state, combat feedback, combat projectiles, autonomous target suppressions, skill runtime, status-effect runtime, skill visuals, companion AoE runtime, enemy AoE runtime, consumable-use runtime, drop visuals, resurrection state, health timing, target dummy timing, companion damage timing, and follow trails are reset, cleared, pruned, or rebuilt for the new map
+- map-local enemies, resources, hub placeholders, hub target dummies, explored tiles, movement planning, direct commands, formation state, combat feedback, combat projectiles, autonomous target suppressions, skill runtime, status-effect runtime, skill visuals, companion AoE runtime, enemy AoE runtime, reusable enemy ability runtime, consumable-use runtime, drop visuals, resurrection state, health timing, target dummy timing, companion damage timing, and follow trails are reset, cleared, pruned, or rebuilt for the new map
 - companion progression, class, role, level, XP, health, party identity, equipment, consumables, wallet, inventory, quests, party order, and teleport working state are preserved
 
 `mapRuntimeCleanup.ts` owns clearing map-local runtime state during map transitions and pruning runtime records for entities that no longer exist.
 
-Map transition cleanup clears or resets active teleport, direct commands, direct-command grace, interrupted POI state, explored tiles, follow trails, combat feedback, combat projectiles, autonomous target suppressions, movement planning, attack slot cache, defender wait/blocking state, skill visuals, companion AoE runtime, enemy AoE runtime, consumable-use runtime, flask counted defeat records, health regeneration timing, target dummy regeneration timing, companion damage timing, drop visuals, resurrection state, party formation state, and map-local skill/status runtime.
+Map transition cleanup clears or resets active teleport, direct commands, direct-command grace, interrupted POI state, explored tiles, follow trails, combat feedback, combat projectiles, autonomous target suppressions, movement planning, attack slot cache, defender wait/blocking state, skill visuals, companion AoE runtime, enemy AoE runtime, reusable enemy ability casts, cooldowns, and required-basic-attack gates, consumable-use runtime, flask counted defeat records, health regeneration timing, target dummy regeneration timing, companion damage timing, drop visuals, resurrection state, party formation state, and map-local skill/status runtime.
 
 Map transition cleanup clears map-local skill/status runtime such as marks, binds, shield blocks, status effects, party poison coatings, party class buffs, overcharges, mana shields, frost armor, heal-over-time effects, lifesteal buffs, rewind runes, runic focus, absorb shields, self mitigation buffs, party mitigation buffs, gather buffs, damage mitigations, and other transient skill records that should not survive a prototype map change.
 
@@ -3986,9 +4021,9 @@ Do not implement unless requested:
 - full equipment economy beyond the current prototype equipment foundation
 - equipment visuals, weapon anchoring, paper-doll rendering, paper-doll equipment, or visible weapon swaps
 - subclass progression
-- full ability framework
+- full ability framework beyond the focused reusable enemy ability runtime
 - mana/resource cost system
-- casting system
+- full casting system beyond the focused reusable enemy ability runtime
 - advanced targeting system
 - advanced aggro/threat systems
 - advanced ranged combat beyond current basic projectile visuals and enemy attack windup

@@ -13,6 +13,7 @@ import {
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
 import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
+import { isEnemyAbilityCasting } from "./enemyAbilitySystem";
 import { GAME_LOOP_TICK_MS, type SimulationTiming } from "./simulationTiming";
 import { getPartyLeader } from "./partySystem";
 import {
@@ -88,7 +89,10 @@ export function updateEnemyAISystem(
       continue;
     }
 
-    if (isEnemyAoeChanneling(nextState, entity.id)) {
+    if (
+      isEnemyAbilityCasting(nextState, entity.id) ||
+      isEnemyAoeChanneling(nextState, entity.id)
+    ) {
       recordEnemyAiActive();
       continue;
     }
@@ -719,6 +723,7 @@ function isDormantBackgroundWildEnemy(
     enemy.state === "attack" ||
     enemy.attackWindupStartedAt !== undefined ||
     enemy.attackWindupTargetId ||
+    isEnemyAbilityCasting(state, enemy.id) ||
     isEnemyAoeChanneling(state, enemy.id)
   ) {
     return false;

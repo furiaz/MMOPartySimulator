@@ -1,6 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { createEnemy, createNpc } from "./entities";
 import { isSuperiorEnemy, rollEnemyVariantForSpawn } from "./enemyVariants";
+import { clearEnemyAbilityRuntimeForEnemy } from "./enemyAbilitySystem";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
   QUEST_DEFINITIONS,
@@ -706,11 +707,11 @@ function clearEnemyRuntimeState(state: GameState, enemyId: string): GameState {
   delete skillMarksByEnemyId[enemyId];
   delete skillBindsByEnemyId[enemyId];
 
-  return {
+  return clearEnemyAbilityRuntimeForEnemy({
     ...state,
     skillMarksByEnemyId,
     skillBindsByEnemyId,
-  };
+  }, enemyId);
 }
 
 function spawnDefenseWaves(
