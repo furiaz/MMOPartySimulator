@@ -17,6 +17,7 @@ import type {
   DirectCompanionCommand,
   DropVisualEvent,
   CompanionAoeChannelState,
+  EnemyAbilityCastState,
   EnemyAoeChannelState,
   GameEntity,
   GameMap,
@@ -402,6 +403,7 @@ export type FullRenderSignatureInput = {
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
   companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -1088,6 +1090,23 @@ export function shouldSkipStableRendererFrame({
   );
 }
 
+export function getEnemyAbilityCastProgress(
+  cast: EnemyAbilityCastState,
+  currentTime: number,
+): number {
+  if (cast.phase === "windup" || currentTime >= cast.castEndsAt) {
+    return 1;
+  }
+
+  const duration = cast.castEndsAt - cast.startedAt;
+
+  if (duration <= 0) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(1, (currentTime - cast.startedAt) / duration));
+}
+
 export function getFullRenderSignature({
   activeTeleport,
   cameraOffset,
@@ -1097,6 +1116,7 @@ export function getFullRenderSignature({
   directCompanionCommandsById,
   dropVisualEvents,
   companionAoeChannelsByCasterId,
+  enemyAbilityCastsByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -1163,6 +1183,7 @@ export function getFullRenderSignature({
     getEventSignature(combatProjectiles, getCombatProjectileSignature),
     getEventSignature(dropVisualEvents, getDropVisualSignature),
     getRecordSignature(companionAoeChannelsByCasterId, getCompanionAoeChannelSignature),
+    getRecordSignature(enemyAbilityCastsByEnemyId, getEnemyAbilityCastSignature),
     getRecordSignature(enemyAoeChannelsByCasterId, getEnemyAoeChannelSignature),
     getEventSignature(skillVisualEvents, getSkillVisualSignature),
     suppressMovePoiRing ? "move-ring-suppressed" : "move-ring-visible",
@@ -1391,6 +1412,26 @@ function getCombatProjectileSignature(projectile: ActiveCombatProjectile): strin
     getPositionSignature(projectile.targetFallbackPosition),
     projectile.speed,
     projectile.impactRadius,
+    projectile.impactLabel ?? "",
+  ].join(":");
+}
+
+function getEnemyAbilityCastSignature(
+  _enemyId: string,
+  cast: EnemyAbilityCastState,
+): string {
+  return [
+    cast.id,
+    cast.abilityId,
+    cast.casterId,
+    cast.targetId,
+    cast.phase,
+    cast.startedAt,
+    cast.castEndsAt,
+    cast.windupEndsAt,
+    getPositionSignature(cast.origin),
+    getPositionSignature(cast.targetPosition),
+    getPositionSignature(cast.direction),
   ].join(":");
 }
 

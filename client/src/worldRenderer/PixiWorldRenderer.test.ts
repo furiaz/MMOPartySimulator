@@ -24,6 +24,7 @@ import {
   getDotDamageIconSrc,
   getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
+  getEnemyAbilityCastProgress,
   getEnemyNameplateColor,
   getEnemyNameplateText,
   getFullRenderSignature,
@@ -470,6 +471,7 @@ function createFullRenderSignatureInput(
     companionAoeChannelsByCasterId: {},
     directCompanionCommandsById: {},
     dropVisualEvents: [],
+    enemyAbilityCastsByEnemyId: {},
     enemyAoeChannelsByCasterId: {},
     entities: [companion],
     leaderIntent: null,
@@ -546,6 +548,26 @@ describe("getFullRenderSignature", () => {
             position: { x: companion.position.x + 1, y: companion.position.y },
           },
         ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        enemyAbilityCastsByEnemyId: {
+          enemy: {
+            id: "enemy:fire_bolt:1000",
+            abilityId: "fire_bolt",
+            casterId: "enemy",
+            targetId: companion.id,
+            phase: "casting",
+            startedAt: 1000,
+            castEndsAt: 1900,
+            windupEndsAt: 2200,
+            origin: { x: 5, y: 4 },
+            targetPosition: companion.position,
+            direction: { x: -1, y: 0 },
+          },
+        },
       }),
     ).not.toBe(baseSignature);
     expect(
@@ -1251,6 +1273,31 @@ describe("prototype VFX feedback sprites", () => {
     expect(getSkillVisualOpacity(skillVisualEvent, 1_000, 0.7)).toBe(1);
     expect(getSkillVisualOpacity(skillVisualEvent, 2_500, 0.7)).toBeCloseTo(0.85);
     expect(getSkillVisualOpacity(skillVisualEvent, 4_000, 0.7)).toBeCloseTo(0.7);
+  });
+});
+
+describe("enemy ability cast presentation", () => {
+  const cast = {
+    id: "enemy:fire_bolt:1000",
+    abilityId: "fire_bolt",
+    casterId: "enemy",
+    targetId: "companion",
+    phase: "casting" as const,
+    startedAt: 1000,
+    castEndsAt: 1900,
+    windupEndsAt: 2200,
+    origin: { x: 0, y: 0 },
+    targetPosition: { x: 5, y: 0 },
+    direction: { x: 1, y: 0 },
+  };
+
+  it("fills through casting and remains full during release windup", () => {
+    expect(getEnemyAbilityCastProgress(cast, 1000)).toBe(0);
+    expect(getEnemyAbilityCastProgress(cast, 1450)).toBe(0.5);
+    expect(getEnemyAbilityCastProgress(cast, 1900)).toBe(1);
+    expect(
+      getEnemyAbilityCastProgress({ ...cast, phase: "windup" }, 2100),
+    ).toBe(1);
   });
 });
 

@@ -50,7 +50,7 @@ afterEach(() => {
 
 describe("enemy ability system", () => {
   it("leaves enemies without configured abilities unchanged", () => {
-    const { state } = createEngagedState();
+    const { state } = createEngagedState("tin_crawler");
     const nextState = updateEnemyAbilitySystem(state, 1000, {
       ready: createAbility("ready"),
     });
@@ -528,6 +528,7 @@ function createAbility(
 ): EnemyAbilityDefinition {
   return {
     id,
+    displayName: id,
     range: 3,
     cooldownMs: 3000,
     castDurationMs: 500,

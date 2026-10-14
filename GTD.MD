@@ -578,13 +578,13 @@ Current prototype drop and dungeon runtime fields include:
 - `dropVisualEvents`
 - `slimewardDungeon`
 
-Current basic combat projectile runtime fields include:
+Current combat projectile runtime fields include:
 
 - `combatProjectiles`
 
-Basic combat projectile runtime is owned by `combatProjectileSystem.ts` and projectile visual/profile selection is owned by `combatProjectileProfiles.ts`.
+Combat projectile travel and impact runtime is owned by `combatProjectileSystem.ts`; basic projectile visual/profile selection is owned by `combatProjectileProfiles.ts`, while focused abilities may provide their own semantic projectile profile.
 
-Basic projectile runtime supports current Hunter basic attack arrows and ranged enemy basic attack projectile visuals.
+The shared projectile launcher supports an optional locked world-space origin and impact label while the existing basic-attack wrapper preserves current callers. Projectile runtime supports current companion and ranged-enemy basic attacks plus the Ember Imp Fire Bolt.
 
 Projectile runtime is cleared by save sanitization and map-local runtime cleanup where appropriate.
 
@@ -2209,7 +2209,7 @@ Aegis shield-block skill behavior is handled by the skill system, not by the def
 
 `combatBasicAttackResolution.ts` owns applying basic attack impact effects such as damage, XP, quest defeat progress, drops, fight-back state, and party protection triggers.
 
-`combatProjectileSystem.ts` owns active basic combat projectile travel and delayed projectile impact resolution.
+`combatProjectileSystem.ts` owns active combat projectile travel and delayed projectile impact resolution for supported basic attacks and focused abilities.
 
 `combatProjectileProfiles.ts` owns current basic projectile profile selection for Hunter companions and ranged enemy combat styles.
 
@@ -2226,7 +2226,7 @@ Current attack behavior:
 - attackers attack when in range and cooldown is ready
 - companion basic attacks use the prototype attack range
 - Hunter basic attacks currently use a longer prototype range and launch basic arrow projectiles
-- ranged enemy combat styles currently launch basic projectile visuals
+- ranged enemy combat styles currently launch basic projectile visuals, and Ember Imp may launch its separate Fire Bolt ability projectile
 - enemies may use archetype or entity-specific attack ranges
 - enemies may use entity-specific attack cooldowns
 - enemies use a short basic attack windup before impact or projectile launch
@@ -2336,7 +2336,7 @@ Enemy AoE channel runtime is prototype combat runtime and should not become a fi
 Current reusable enemy ability behavior:
 
 - enemy type definitions may provide ordered `abilityIds`; list order is deterministic selection priority
-- definitions provide range, cooldown, cast duration, optional windup duration, and a focused effect resolver
+- definitions provide a display name, range, cooldown, cast duration, optional windup duration, and a focused effect resolver
 - unknown definitions, missing resolvers, active cooldowns, out-of-range targets, and otherwise invalid candidates are skipped so the next configured ability or the normal basic attack can proceed
 - selection occurs only when a living attacking enemy has a valid target, its normal attack action is ready, no basic-attack windup or enemy AoE channel is active, status and bind rules permit skill use, and no basic attack is currently required
 - cast start snapshots caster origin, target id, target position, and normalized targeting direction, starts the absolute cooldown immediately, and sets the required-basic-attack gate
@@ -2349,7 +2349,9 @@ Current reusable enemy ability behavior:
 - map transitions discard all reusable enemy ability runtime for departing enemies
 - save restoration cancels active casts, preserves sanitized unexpired cooldown expiration timestamps and valid required-basic-attack gates, and requires no save-version bump because the fields are optional
 
-The production registry is intentionally empty until a concrete enemy ability issue adds a consumer. Handlers should delegate to existing damage, projectile, status-effect, and shared AoE helpers. This focused runtime does not replace enemy AI, the current enemy AoE channel system, companion skills, or the future full ability and casting framework.
+The production registry currently contains `fire_bolt`, assigned only to Ember Imp. It uses a 5-unit selection range, 0.9-second cast, 0.3-second release windup, and 6-second cooldown starting at cast initiation. Its resolver launches a homing projectile from the cast's locked origin at 8 world units per second with a 0.35-unit impact radius, then resolves 1.5-times enemy attack as direct magic damage through existing combat rules. The projectile uses the semantic `enemy_fire_bolt` visual profile, reusing the existing Imp fireball asset at 32 by 32 pixels, and supplies `Fire Bolt` as its impact label. Fire Bolt does not add Burn, splash, ground fire, straight-line collision, or a new resource system.
+
+Ability handlers should delegate to existing damage, projectile, status-effect, and shared AoE helpers. This focused runtime does not replace enemy AI, the current enemy AoE channel system, companion skills, or the future full ability and casting framework.
 
 ---
 
@@ -3694,9 +3696,9 @@ Current world renderer behavior:
 - PixiJS renders the main world view.
 - React hosts the renderer and passes game state and command callbacks.
 - The renderer supports preview and full modes.
-- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, basic combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, and camera-follow presentation.
+- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, reusable enemy ability cast labels/bars/glows, combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, and camera-follow presentation.
 - The renderer may draw quest entity indicators as separate yellow `!` text prefixes beside relevant enemy, NPC, or resource labels without modifying entity display names.
-- The renderer uses redraw gating so stable preview/full renderer frames are skipped unless game state, timed visual work, texture readiness, or sizing changes require a draw.
+- The renderer uses redraw gating so stable preview/full renderer frames are skipped unless game state, timed visual work, texture readiness, or sizing changes require a draw. Active enemy ability casts participate in full-render signatures and timed redraw work so cast progress and glow animation receive a final cleanup frame.
 - The renderer tracks Pixi texture lifetime with shared, current-map, previous-map, and durable texture scopes, then best-effort evicts old map-only textures.
 - The renderer reuses managed Pixi sprites and text where safe, caches static map-derived render data, and records draw/texture/performance sample metrics for debugging.
 - Texture cache and redraw behavior are renderer-only optimizations and must not define simulation cadence, gameplay timing, or map ownership rules.
@@ -3864,7 +3866,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, companion AoE skill visuals, status-effect presentation where supported, basic combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, bank auto-routing controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, reusable enemy ability cast presentation, companion AoE skill visuals, status-effect presentation where supported, combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
 
 The full renderer viewport should reserve the bottom HUD area so the map camera and interactable world view do not place important content behind the companion vitals and buff/debuff rail UI.
 

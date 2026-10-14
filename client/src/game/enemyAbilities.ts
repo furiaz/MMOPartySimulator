@@ -1,4 +1,5 @@
 import type { GameState } from "./state";
+import { launchCombatProjectile } from "./combatProjectileSystem";
 import type {
   CombatEntity,
   Enemy,
@@ -17,6 +18,7 @@ export type EnemyAbilityResolutionContext = {
 
 export type EnemyAbilityDefinition = {
   id: EnemyAbilityId;
+  displayName: string;
   range: number;
   cooldownMs: number;
   castDurationMs: number;
@@ -28,7 +30,34 @@ export type EnemyAbilityRegistry = Readonly<
   Record<EnemyAbilityId, EnemyAbilityDefinition | undefined>
 >;
 
-export const ENEMY_ABILITY_DEFINITIONS: EnemyAbilityRegistry = {};
+export const ENEMY_ABILITY_DEFINITIONS: EnemyAbilityRegistry = {
+  fire_bolt: {
+    id: "fire_bolt",
+    displayName: "Fire Bolt",
+    range: 5,
+    cooldownMs: 6000,
+    castDurationMs: 900,
+    windupDurationMs: 300,
+    resolve: ({ state, caster, target, cast, definition, now }) =>
+      launchCombatProjectile(
+        state,
+        caster,
+        target,
+        {
+          damageType: "magic",
+          powerMultiplier: 1.5,
+          visualProfileId: "enemy_fire_bolt",
+          speed: 8,
+          impactRadius: 0.35,
+        },
+        now,
+        {
+          impactLabel: definition.displayName,
+          origin: cast.origin,
+        },
+      ),
+  },
+};
 
 export function getEnemyAbilityDefinition(
   abilityId: EnemyAbilityId,
@@ -39,6 +68,8 @@ export function getEnemyAbilityDefinition(
   if (
     !definition ||
     definition.id !== abilityId ||
+    typeof definition.displayName !== "string" ||
+    definition.displayName.trim().length === 0 ||
     !isNonNegativeFiniteNumber(definition.range) ||
     !isNonNegativeFiniteNumber(definition.cooldownMs) ||
     !isNonNegativeFiniteNumber(definition.castDurationMs) ||

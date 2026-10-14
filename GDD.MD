@@ -415,11 +415,11 @@ Combat flow:
 9. Defeated enemies grant XP to eligible living party members.
 10. The party regroups, recovers, resumes gathering, or continues exploration.
 
-Current basic attacks include melee attacks and a lightweight prototype projectile layer.
+Current combat includes melee basic attacks and a lightweight prototype projectile layer shared by supported basic attacks and focused enemy abilities.
 
 Prototype combat supports numeric skill ranges, enemy attack ranges, enemy attack windup timing, and basic projectile travel. Hunter basic attacks may use arrow projectiles. Ranged enemy combat styles may use simple projectile visuals such as thrown weapons, slime shots, wisps, or imp magic.
 
-Projectile travel and enemy attack windup are prototype readability layers for current basic attacks. They should not be treated as the final ranged combat system, ammunition system, projectile physics model, advanced targeting framework, or production combat telegraph system.
+Projectile travel, enemy attack windup, and focused enemy cast telegraphs are prototype readability layers. They should not be treated as the final ranged combat system, ammunition system, projectile physics model, advanced targeting framework, or production combat telegraph system.
 
 Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, barriers, absorbs, mitigation, and passive health regeneration.
 
@@ -565,7 +565,11 @@ Current reusable enemy ability execution behavior:
 - death, removal, invalid or fake-death targets, taunt, incapacitation, silence, and bind may interrupt an active cast without refunding its cooldown
 - immobilization alone does not interrupt an active cast, and disarm blocks basic attacks rather than reusable ability use
 - active casts are canceled during restoration; valid unexpired reusable enemy ability cooldowns and required-basic-attack gates are preserved
-- current enemy types do not yet assign these reusable abilities; concrete abilities are added by their own implementation issues
+- Ember Imp currently references the reusable `fire_bolt` ability
+- Fire Bolt has a 5-unit range, a 0.9-second cast, a 0.3-second release windup, and a 6-second cooldown that starts when casting begins
+- Fire Bolt launches from the locked cast origin, tracks its still-valid target at 8 world units per second, and resolves once at a 0.35-unit impact radius
+- Fire Bolt deals 1.5 times enemy attack as direct magic damage through normal evasion, magic-defense, and active-shield rules; it does not apply Burn, splash damage, or ground fire
+- the renderer presents Fire Bolt with an orange cast label, progress bar, pulsing caster glow, and a larger reuse of the current Imp fireball visual
 
 This is a focused enemy-only execution runtime. It reuses existing combat effect systems and does not replace enemy AI, basic attacks, the existing enemy AoE channel system, companion skills, or the future full ability and casting framework.
 
@@ -2612,7 +2616,7 @@ Current post-Hub-2 wilderness structure:
 - Post-Hub-2 maps are smaller than the pre-Hub-2 wilderness maps and currently use one internal subzone each for POI, Auto Combat, AFK estimate, encounter, resource, and compatibility systems.
 - Post-Hub-2 maps use blockers, negative space, encounter pockets, and landmarks to create denser paths without narrow party-clogging corridors.
 - After Hub 2, each new wilderness map should normally contain around three enemy types as the current standard; exceptions are allowed when the theme benefits from a close variant count.
-- Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12.
+- Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12. Ember Imps use the telegraphed reusable Fire Bolt before returning to their normal ranged basic attacks.
 - Briar Burrows contains Tin Crawler level 13, Briar Wolf level 15, and Mire Spider level 15.
 - Nightmire Canopy contains Night Bat level 16, Elder Mossling level 17, and Cinder Wisp level 18.
 - Orc Warcamp contains Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, and Orc Warmaster level 20.

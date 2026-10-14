@@ -30,6 +30,7 @@ import type {
   CompanionDirectCommandInput,
   DirectCompanionCommand,
   DropVisualEvent,
+  EnemyAbilityCastState,
   EnemyAoeChannelState,
   EntityCollisionShape,
   GameEntity,
@@ -53,6 +54,7 @@ import type {
 import {
   getEnemyAggroRange,
   getEnemyArchetype,
+  getEnemyAbilityDefinition,
   getEnemyType,
   getEntityCollisionShape,
   getItemDefinition,
@@ -87,6 +89,7 @@ import {
   createRendererFrameScheduler,
   doOverheadUiBoxesOverlap,
   getDotDamageIconSrc,
+  getEnemyAbilityCastProgress,
   getFullRenderSignature,
   getNpcSpeechBubbleLayout,
   getOverheadStatusPresentation,
@@ -204,6 +207,12 @@ const combatProjectileVisualProfiles: Record<
     src: `${combatProjectileSpritePath}/elementalist-arcane-bolt.png`,
     width: 30,
   },
+  enemy_fire_bolt: {
+    height: 32,
+    nativeAngleDegrees: 135,
+    src: `${combatProjectileSpritePath}/bog-imp.png`,
+    width: 32,
+  },
   hunter_arrow: {
     height: 12,
     nativeAngleDegrees: 0,
@@ -282,6 +291,7 @@ type PixiWorldRendererProps = {
   currentTime?: number;
   directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId?: Record<string, EnemyAbilityCastState>;
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent?: LeaderIntent | null;
@@ -478,6 +488,7 @@ type DrawWorldOptions = {
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -2220,6 +2231,8 @@ function drawDebugCollisionShape(
 }
 
 function drawEntityOverheadUiPass({
+  currentTime,
+  enemyAbilityCastsByEnemyId,
   entities,
   graphics,
   layer,
@@ -2231,6 +2244,8 @@ function drawEntityOverheadUiPass({
   transform,
   visibleTileBounds,
 }: {
+  currentTime: number;
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   entities: GameEntity[];
   graphics: Graphics;
   layer: Container;
@@ -2254,8 +2269,16 @@ function drawEntityOverheadUiPass({
         statusEffectsById,
       });
       const box = getEntityOverheadUiBox(entity, transform, status);
+      const activeCast =
+        entity.kind === "enemy"
+          ? enemyAbilityCastsByEnemyId[entity.id]
+          : undefined;
+      const layoutBox =
+        box && activeCast && activeCast.windupEndsAt > currentTime
+          ? { ...box, height: box.height + 18 }
+          : box;
 
-      return box ? { box, entity, status } : null;
+      return layoutBox ? { box: layoutBox, entity, status } : null;
     })
     .filter(
       (
@@ -2309,6 +2332,16 @@ function drawEntityOverheadUiPass({
       hasQuestIndicator: questIndicatorEntityIds.has(entry.entity.id),
       transform,
     });
+    drawEnemyAbilityCastUi({
+      box: entry.box,
+      cast: enemyAbilityCastsByEnemyId[entry.entity.id],
+      currentTime,
+      enemy: entry.entity,
+      graphics,
+      layer,
+      managedState,
+      metrics,
+    });
   }
 
   drawQuestEntityLabels({
@@ -2319,6 +2352,69 @@ function drawEntityOverheadUiPass({
     questIndicatorEntityIds,
     transform,
     visibleTileBounds,
+  });
+}
+
+function drawEnemyAbilityCastUi({
+  box,
+  cast,
+  currentTime,
+  enemy,
+  graphics,
+  layer,
+  managedState,
+  metrics,
+}: {
+  box: EntityOverheadUiLayout;
+  cast: EnemyAbilityCastState | undefined;
+  currentTime: number;
+  enemy: Extract<GameEntity, { kind: "enemy" }>;
+  graphics: Graphics;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+}) {
+  if (!cast || cast.windupEndsAt <= currentTime) {
+    return;
+  }
+
+  const definition = getEnemyAbilityDefinition(cast.abilityId);
+
+  if (!definition) {
+    return;
+  }
+
+  const labelHeight = 10;
+  const barHeight = 4;
+  const gap = 2;
+  const labelY = box.healthY + overheadHealthHeight + gap;
+  const barY = labelY + labelHeight + gap;
+  const progress = getEnemyAbilityCastProgress(cast, currentTime);
+
+  graphics
+    .roundRect(box.x, labelY, box.width, labelHeight, 3)
+    .fill({ color: 0x431407, alpha: 0.92 });
+  graphics
+    .rect(box.x, barY, box.width, barHeight)
+    .fill({ color: 0x431407, alpha: 0.92 });
+  graphics
+    .rect(box.x, barY, box.width * progress, barHeight)
+    .fill(0xf97316);
+
+  drawManagedFeedbackText({
+    color: 0xef4444,
+    fontSize: 9,
+    key: `enemy-ability-cast:${enemy.id}`,
+    layer,
+    managedState,
+    metrics,
+    position: {
+      x: box.x + box.width / 2,
+      y: labelY + labelHeight / 2,
+    },
+    strokeColor: 0x431407,
+    strokeWidth: 3,
+    text: definition.displayName,
   });
 }
 
@@ -4249,6 +4345,40 @@ function drawEnemyAoeChannelBars(
   }
 }
 
+function drawEnemyAbilityCastGlows(
+  graphics: Graphics,
+  castsByEnemyId: Record<string, EnemyAbilityCastState>,
+  entitiesById: Map<string, GameEntity>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  const pulse = (Math.sin((currentTime / 700) * Math.PI * 2) + 1) / 2;
+
+  for (const cast of Object.values(castsByEnemyId)) {
+    const caster = entitiesById.get(cast.casterId);
+
+    if (
+      !caster ||
+      caster.kind !== "enemy" ||
+      caster.state === "dead" ||
+      caster.health <= 0 ||
+      cast.windupEndsAt <= currentTime ||
+      !isPositionInTileBounds(caster.position, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const center = toFullPosition(caster.position, transform);
+    const radius = transform.cellPixelSize * (0.58 + pulse * 0.1);
+
+    graphics
+      .circle(center.x, center.y, radius)
+      .fill({ color: 0xf97316, alpha: 0.08 + pulse * 0.08 })
+      .stroke({ color: 0xfb923c, alpha: 0.52 + pulse * 0.3, width: 3 });
+  }
+}
+
 function getEnemyAoeChannelProgress(
   channel: EnemyAoeChannelState,
   currentTime: number,
@@ -5756,6 +5886,7 @@ function drawFullMap({
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
+  enemyAbilityCastsByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -5793,6 +5924,7 @@ function drawFullMap({
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -5904,6 +6036,14 @@ function drawFullMap({
     visibleTileBounds,
     visualMovementByEntityId,
   });
+  drawEnemyAbilityCastGlows(
+    effectsGraphics,
+    enemyAbilityCastsByEnemyId,
+    entitiesById,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
   drawEnemyAoeChannels(
     effectsGraphics,
     enemyAoeChannelsByCasterId,
@@ -6088,6 +6228,8 @@ function drawFullMap({
   );
 
   drawEntityOverheadUiPass({
+    currentTime,
+    enemyAbilityCastsByEnemyId,
     entities,
     graphics: layers.effectsGraphics,
     layer: layers.effectsLayer,
@@ -6314,6 +6456,7 @@ function drawWorld({
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
+  enemyAbilityCastsByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -6357,6 +6500,7 @@ function drawWorld({
       companionAoeChannelsByCasterId,
       currentTime,
       dropVisualEvents,
+      enemyAbilityCastsByEnemyId,
       enemyAoeChannelsByCasterId,
       entities,
       movementClickFeedbackEvents,
@@ -6378,6 +6522,7 @@ function drawWorld({
       companionAoeChannelsByCasterId,
       directCompanionCommandsById,
       dropVisualEvents,
+      enemyAbilityCastsByEnemyId,
       enemyAoeChannelsByCasterId,
       entities,
       leaderIntent,
@@ -6428,6 +6573,7 @@ function drawWorld({
       currentTime,
       directCompanionCommandsById,
       dropVisualEvents,
+      enemyAbilityCastsByEnemyId,
       enemyAoeChannelsByCasterId,
       entities,
       leaderIntent,
@@ -6518,6 +6664,7 @@ function hasActiveTimedRendererWork({
   companionAoeChannelsByCasterId,
   currentTime,
   dropVisualEvents,
+  enemyAbilityCastsByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   movementClickFeedbackEvents,
@@ -6536,6 +6683,7 @@ function hasActiveTimedRendererWork({
   companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
   currentTime: number;
   dropVisualEvents: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   movementClickFeedbackEvents: MovementClickFeedbackEvent[];
@@ -6563,6 +6711,9 @@ function hasActiveTimedRendererWork({
     combatFeedbackEvents.some((event) => event.expiresAt > currentTime) ||
     dropVisualEvents.some((event) => event.expiresAt > currentTime) ||
     skillVisualEvents.some((event) => event.expiresAt > currentTime) ||
+    Object.values(enemyAbilityCastsByEnemyId).some(
+      (cast) => cast.windupEndsAt > currentTime,
+    ) ||
     Object.values(visualMovementByEntityId).some(
       (movement) => movement.expiresAt > currentTime,
     ) ||
@@ -6607,6 +6758,7 @@ export function PixiWorldRenderer({
   currentTime,
   directCompanionCommandsById = {},
   dropVisualEvents = [],
+  enemyAbilityCastsByEnemyId = {},
   enemyAoeChannelsByCasterId = {},
   entities,
   leaderIntent = null,
@@ -6669,6 +6821,9 @@ export function PixiWorldRenderer({
   );
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
+  const latestEnemyAbilityCastsByEnemyIdRef = useRef(
+    enemyAbilityCastsByEnemyId,
+  );
   const latestEnemyAoeChannelsByCasterIdRef = useRef(enemyAoeChannelsByCasterId);
   const latestActiveTeleportRef = useRef<ActiveTeleport | null>(activeTeleport);
   const latestMapRef = useRef(map);
@@ -6737,6 +6892,7 @@ export function PixiWorldRenderer({
     }
     latestDirectCompanionCommandsByIdRef.current = directCompanionCommandsById;
     latestDropVisualEventsRef.current = dropVisualEvents;
+    latestEnemyAbilityCastsByEnemyIdRef.current = enemyAbilityCastsByEnemyId;
     latestEnemyAoeChannelsByCasterIdRef.current = enemyAoeChannelsByCasterId;
     latestMapRef.current = map;
     latestEntitiesRef.current = sortedEntities;
@@ -6773,6 +6929,7 @@ export function PixiWorldRenderer({
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
+    enemyAbilityCastsByEnemyId,
     enemyAoeChannelsByCasterId,
     leaderIntent,
     map,
@@ -6850,6 +7007,8 @@ export function PixiWorldRenderer({
           latestCompanionAoeChannelsByCasterIdRef.current,
         currentTime: now,
         dropVisualEvents: latestDropVisualEventsRef.current,
+        enemyAbilityCastsByEnemyId:
+          latestEnemyAbilityCastsByEnemyIdRef.current,
         enemyAoeChannelsByCasterId:
           latestEnemyAoeChannelsByCasterIdRef.current,
         entities: latestEntitiesRef.current,
@@ -6891,6 +7050,8 @@ export function PixiWorldRenderer({
         directCompanionCommandsById:
           latestDirectCompanionCommandsByIdRef.current,
         dropVisualEvents: latestDropVisualEventsRef.current,
+        enemyAbilityCastsByEnemyId:
+          latestEnemyAbilityCastsByEnemyIdRef.current,
         enemyAoeChannelsByCasterId:
           latestEnemyAoeChannelsByCasterIdRef.current,
         entities: latestEntitiesRef.current,
@@ -7066,6 +7227,7 @@ export function PixiWorldRenderer({
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
+    enemyAbilityCastsByEnemyId,
     enemyAoeChannelsByCasterId,
     leaderIntent,
     map,

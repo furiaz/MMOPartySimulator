@@ -1249,6 +1249,7 @@ export type CombatDamageType = "physical" | "magic";
 
 export type CombatProjectileVisualProfileId =
   | "elementalist_arcane_bolt"
+  | "enemy_fire_bolt"
   | "hunter_arrow"
   | "runecaster_rune_bolt"
   | "lightbearer_holy_bolt"
@@ -1269,6 +1270,7 @@ export type ActiveCombatProjectile = {
   launchedAt: number;
   damageType: CombatDamageType;
   powerMultiplier: number;
+  impactLabel?: string;
 };
 
 export type ActiveSkillDefinition = {
