@@ -2009,7 +2009,10 @@ export function shouldDrawCombatFeedbackEvent(
     return false;
   }
 
-  if (event.type === "attack" && event.text === "Attack") {
+  if (
+    event.type === "attack" &&
+    (event.text === "Attack" || entity.kind === "enemy")
+  ) {
     return false;
   }
 

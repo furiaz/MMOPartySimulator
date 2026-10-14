@@ -1251,6 +1251,24 @@ describe("prototype VFX feedback sprites", () => {
     ).toBe(false);
   });
 
+  it("suppresses named attack feedback from enemies but keeps companion skill names", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive");
+    const namedAttackEvent: CombatFeedbackEvent = {
+      ...baseEvent,
+      text: "Fire Bolt",
+      type: "attack",
+    };
+
+    expect(shouldDrawCombatFeedbackEvent(namedAttackEvent, companion)).toBe(true);
+    expect(
+      shouldDrawCombatFeedbackEvent(
+        { ...namedAttackEvent, entityId: enemy.id },
+        enemy,
+      ),
+    ).toBe(false);
+  });
+
   it("uses event lifetime progress for level-up burst scale and opacity", () => {
     expect(getCombatFeedbackLifetimeProgress(baseEvent, 2_000)).toBe(0.5);
     expect(getLevelUpBurstPresentation(baseEvent, 2_000).alpha).toBeCloseTo(0.65);
