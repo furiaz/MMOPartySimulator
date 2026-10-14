@@ -6,12 +6,14 @@ import type {
 } from "../game";
 import {
   createCompanion,
+  createAoeCastTransform,
   createDebugMap,
   createEnemy,
   createNpc,
   createResource,
   createTargetDummy,
   HUB_TWO_MAP_ID,
+  resolveAoePattern,
 } from "../game";
 import {
   collectCurrentMapScopedVisualTextureSrcs,
@@ -659,11 +661,10 @@ describe("getFullRenderSignature", () => {
             id: "shockwave",
             abilityId: "shield_shockwave",
             casterId: companion.id,
-            shape: {
-              type: "circle",
-              center: companion.position,
-              radius: 2,
-            },
+            area: resolveAoePattern(
+              { type: "circle", radius: 2 },
+              createAoeCastTransform(companion.position, companion.position),
+            ),
             visualIntent: "partyOffensive",
             damageType: "physical",
             powerMultiplier: 0.5,

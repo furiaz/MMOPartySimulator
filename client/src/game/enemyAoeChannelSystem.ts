@@ -1,4 +1,9 @@
 import { aoeTargetDummyId } from "./debugMap";
+import {
+  createAoeCastTransform,
+  isPositionInsideAoe,
+  resolveAoePattern,
+} from "./aoePatterns";
 import { damageEntity } from "./entities";
 import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyMembers } from "./partySystem";
@@ -22,6 +27,7 @@ import type {
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
   EnemyAoeInterruptReason,
+  AoePattern,
   Position,
 } from "./types";
 
@@ -30,7 +36,58 @@ export const AOE_DUMMY_STOMP_RADIUS = 2;
 export const AOE_DUMMY_STOMP_CHANNEL_MS = 1500;
 export const AOE_DUMMY_STOMP_WINDUP_MS = 500;
 export const AOE_DUMMY_STOMP_COOLDOWN_MS = 6000;
+export const AOE_DUMMY_PATTERN_GAP_MS = 750;
 export const AOE_DUMMY_STOMP_DAMAGE = 1;
+
+export const AOE_DUMMY_PATTERN_NAMES = [
+  "Circle",
+  "Ring",
+  "Concentric Rings",
+  "Line",
+  "Rectangle",
+  "Cross",
+  "X",
+  "Cone",
+  "Combined",
+] as const;
+
+type AoeDummyPatternName = (typeof AOE_DUMMY_PATTERN_NAMES)[number];
+
+const AOE_DUMMY_PATTERNS: ReadonlyArray<{
+  name: AoeDummyPatternName;
+  pattern: AoePattern;
+}> = [
+  { name: "Circle", pattern: { type: "circle", radius: AOE_DUMMY_STOMP_RADIUS } },
+  { name: "Ring", pattern: { type: "ring", innerRadius: 2, outerRadius: 3.5 } },
+  {
+    name: "Concentric Rings",
+    pattern: {
+      type: "concentricRings",
+      rings: [
+        { innerRadius: 0.75, outerRadius: 1.75 },
+        { innerRadius: 3.75, outerRadius: 4.75 },
+      ],
+    },
+  },
+  { name: "Line", pattern: { type: "line", squareCount: 5 } },
+  { name: "Rectangle", pattern: { type: "rectangle", columns: 4, rows: 3 } },
+  { name: "Cross", pattern: { type: "cross", armLength: 2 } },
+  { name: "X", pattern: { type: "x", armLength: 2 } },
+  {
+    name: "Cone",
+    pattern: { type: "cone", range: 5, angleRadians: Math.PI / 3 },
+  },
+  {
+    name: "Combined",
+    pattern: {
+      type: "union",
+      patterns: [
+        { type: "circle", radius: 1.5 },
+        { type: "line", squareCount: 4 },
+      ],
+    },
+  },
+];
 
 const LINE_OF_SIGHT_SAMPLE_DISTANCE = 0.1;
 const PASSIVE_BLOCK_FACTOR = 0.45;
@@ -55,7 +112,6 @@ export function updateEnemyAoeChannelSystem(
 
   return maybeStartStompChannels(nextState, now);
 }
-
 export function isEnemyAoeChanneling(state: GameState, enemyId: string): boolean {
   return Boolean(state.enemyAoeChannelsByCasterId?.[enemyId]);
 }
@@ -76,6 +132,7 @@ export function clearEnemyAoeRuntime(state: GameState): GameState {
     ...state,
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    aoeDummyPatternSequenceIndex: 0,
   };
 }
 
@@ -95,7 +152,7 @@ function updateActiveChannel(
     return interruptChannel(state, channel, "caster_bound", now);
   }
 
-  if (!hasLineOfSightToAoe(state, caster, channel.shape.center)) {
+  if (!hasLineOfSightToAoe(state, caster, channel.area.castTransform.origin)) {
     return interruptChannel(state, channel, "line_of_sight", now);
   }
 
@@ -140,30 +197,117 @@ function startStompChannel(
   caster: Enemy,
   now: number,
 ): GameState {
+  const isDummy = caster.id === aoeTargetDummyId;
+  const sequenceIndex = getDummySequenceIndex(state);
+  const patternEntry = isDummy
+    ? AOE_DUMMY_PATTERNS[sequenceIndex]
+    : AOE_DUMMY_PATTERNS[0];
+  const targetPosition = getCastTargetPosition(state, caster);
+  const channel = createStompChannel(caster, patternEntry, targetPosition, now);
+  const nextState = isDummy
+    ? addCombatFeedback(state, {
+        type: "attack",
+        entityId: caster.id,
+        feedbackKind: "attack",
+        text: patternEntry.name,
+        now,
+      })
+    : state;
+
   return {
-    ...state,
+    ...nextState,
     enemyAoeChannelsByCasterId: {
-      ...(state.enemyAoeChannelsByCasterId ?? {}),
-      [caster.id]: createStompChannel(caster, now),
+      ...(nextState.enemyAoeChannelsByCasterId ?? {}),
+      [caster.id]: channel,
     },
+    aoeDummyPatternSequenceIndex: isDummy
+      ? (sequenceIndex + 1) % AOE_DUMMY_PATTERNS.length
+      : nextState.aoeDummyPatternSequenceIndex,
   };
 }
 
-function createStompChannel(caster: Enemy, now: number): EnemyAoeChannelState {
+function createStompChannel(
+  caster: Enemy,
+  patternEntry: (typeof AOE_DUMMY_PATTERNS)[number],
+  targetPosition: Position,
+  now: number,
+): EnemyAoeChannelState {
+  const isDummy = caster.id === aoeTargetDummyId;
+
   return {
     id: `${AOE_DUMMY_STOMP_ABILITY_ID}:${caster.id}:${now}`,
     abilityId: AOE_DUMMY_STOMP_ABILITY_ID,
     casterId: caster.id,
-    shape: {
-      type: "circle",
-      center: caster.position,
-      radius: AOE_DUMMY_STOMP_RADIUS,
-    },
+    area: resolveAoePattern(
+      patternEntry.pattern,
+      createAoeCastTransform(caster.position, targetPosition),
+    ),
+    patternName: patternEntry.name,
     phase: "channeling",
     startedAt: now,
     channelEndsAt: now + AOE_DUMMY_STOMP_CHANNEL_MS,
     windupEndsAt: now + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS,
-    cooldownMs: AOE_DUMMY_STOMP_COOLDOWN_MS,
+    cooldownMs: isDummy
+      ? AOE_DUMMY_PATTERN_GAP_MS
+      : AOE_DUMMY_STOMP_COOLDOWN_MS,
+  };
+}
+
+function getDummySequenceIndex(state: GameState): number {
+  const index = state.aoeDummyPatternSequenceIndex ?? 0;
+
+  return index >= 0 && index < AOE_DUMMY_PATTERNS.length ? index : 0;
+}
+
+function getCastTargetPosition(state: GameState, caster: Enemy): Position {
+  const directAttacker = Object.values(state.directCompanionCommandsById ?? {})
+    .filter(
+      (command) =>
+        command.type === "attack" &&
+        command.targetId === caster.id &&
+        isLivingCompanion(getEntityById(state, command.companionId)),
+    )
+    .sort(
+      (first, second) =>
+        second.issuedAt - first.issuedAt ||
+        first.companionId.localeCompare(second.companionId),
+    )[0];
+
+  if (directAttacker) {
+    const companion = getEntityById(state, directAttacker.companionId);
+    if (isLivingCompanion(companion)) {
+      return companion.position;
+    }
+  }
+
+  const hasPartyAttackIntent =
+    (state.leaderIntent?.type === "attack" &&
+      state.leaderIntent.targetId === caster.id) ||
+    (state.partyIntent?.executionIntent?.type === "attack" &&
+      state.partyIntent.executionIntent.targetId === caster.id);
+  const leader = getEntityById(state, state.partyLeaderId);
+
+  if (hasPartyAttackIntent && isLivingCompanion(leader)) {
+    return leader.position;
+  }
+
+  const nearestAttacker = getPartyMembers(state)
+    .filter(
+      (member) =>
+        isLivingCompanion(member) &&
+        member.state === "attack" &&
+        member.currentTargetId === caster.id,
+    )
+    .sort(
+      (first, second) =>
+        getEuclideanDistance(first.position, caster.position) -
+          getEuclideanDistance(second.position, caster.position) ||
+        first.id.localeCompare(second.id),
+    )[0];
+
+  return nearestAttacker?.position ?? {
+    x: caster.position.x + 1,
+    y: caster.position.y,
   };
 }
 
@@ -210,7 +354,7 @@ function resolveChannelImpact(
     if (
       !isLivingCompanion(currentMember) ||
       isFakeDeathActive(nextState, currentMember.id) ||
-      !isInsideCircle(currentMember.position, channel.shape.center, channel.shape.radius)
+      !isPositionInsideAoe(channel.area, currentMember.position)
     ) {
       continue;
     }
@@ -397,12 +541,4 @@ function hasLineOfSightToAoe(
   }
 
   return true;
-}
-
-function isInsideCircle(
-  position: Position,
-  center: Position,
-  radius: number,
-): boolean {
-  return getEuclideanDistance(position, center) <= radius;
 }

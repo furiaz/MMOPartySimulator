@@ -1942,10 +1942,123 @@ export type AoeVisualIntent =
   | "partyOffensive"
   | "partyHealing";
 
-export type AoeCircleShape = {
+export type AoeCastTransform = {
+  origin: Position;
+  direction: Position;
+};
+
+type AoePatternTransform = {
+  offset?: Position;
+  rotationRadians?: number;
+};
+
+export type AoeCirclePattern = AoePatternTransform & {
+  type: "circle";
+  radius: number;
+};
+
+export type AoeRingPattern = AoePatternTransform & {
+  type: "ring";
+  innerRadius: number;
+  outerRadius: number;
+};
+
+export type AoeConcentricRingsPattern = AoePatternTransform & {
+  type: "concentricRings";
+  rings: Array<{
+    innerRadius: number;
+    outerRadius: number;
+  }>;
+};
+
+export type AoeLinePattern = AoePatternTransform & {
+  type: "line";
+  squareCount: number;
+};
+
+export type AoeRectanglePattern = AoePatternTransform & {
+  type: "rectangle";
+  columns: number;
+  rows: number;
+};
+
+export type AoeCrossPattern = AoePatternTransform & {
+  type: "cross";
+  armLength: number;
+};
+
+export type AoeXPattern = AoePatternTransform & {
+  type: "x";
+  armLength: number;
+};
+
+export type AoeConePattern = AoePatternTransform & {
+  type: "cone";
+  range: number;
+  angleRadians: number;
+};
+
+export type AoeUnionPattern = {
+  type: "union";
+  patterns: AoePattern[];
+};
+
+export type AoePattern =
+  | AoeCirclePattern
+  | AoeRingPattern
+  | AoeConcentricRingsPattern
+  | AoeLinePattern
+  | AoeRectanglePattern
+  | AoeCrossPattern
+  | AoeXPattern
+  | AoeConePattern
+  | AoeUnionPattern;
+
+export type ResolvedAoeCircle = {
   type: "circle";
   center: Position;
   radius: number;
+};
+
+export type ResolvedAoeRing = {
+  type: "ring";
+  center: Position;
+  innerRadius: number;
+  outerRadius: number;
+};
+
+export type ResolvedAoeSquare = {
+  type: "square";
+  center: Position;
+  size: number;
+  rotationRadians: number;
+};
+
+export type ResolvedAoeCone = {
+  type: "cone";
+  origin: Position;
+  direction: Position;
+  range: number;
+  angleRadians: number;
+};
+
+export type ResolvedAoePrimitive =
+  | ResolvedAoeCircle
+  | ResolvedAoeRing
+  | ResolvedAoeSquare
+  | ResolvedAoeCone;
+
+export type AoeBounds = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+};
+
+export type ResolvedAoeArea = {
+  castTransform: AoeCastTransform;
+  primitives: ResolvedAoePrimitive[];
+  bounds: AoeBounds;
 };
 
 export type EnemyAoeAbilityId = "aoe_dummy_stomp";
@@ -1958,7 +2071,8 @@ export type EnemyAoeChannelState = {
   id: string;
   abilityId: EnemyAoeAbilityId;
   casterId: string;
-  shape: AoeCircleShape;
+  area: ResolvedAoeArea;
+  patternName?: string;
   phase: EnemyAoeChannelPhase;
   startedAt: number;
   channelEndsAt: number;
@@ -1979,7 +2093,7 @@ export type CompanionAoeChannelState = {
   id: string;
   abilityId: CompanionAoeAbilityId;
   casterId: string;
-  shape: AoeCircleShape;
+  area: ResolvedAoeArea;
   visualIntent: AoeVisualIntent;
   damageType: CombatDamageType;
   powerMultiplier: number;

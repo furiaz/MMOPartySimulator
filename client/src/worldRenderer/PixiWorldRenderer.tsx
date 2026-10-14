@@ -40,6 +40,9 @@ import type {
   NpcEntity,
   PartyIntent,
   Position,
+  ResolvedAoeArea,
+  ResolvedAoeCone,
+  ResolvedAoeSquare,
   ResurrectionProgressState,
   SkillBindState,
   SkillMarkState,
@@ -58,6 +61,7 @@ import {
   RESURRECTION_RANGE,
   SKILL_DEFINITIONS,
   aoeTargetDummyId,
+  doAoeBoundsIntersect,
   targetDummyId,
 } from "../game";
 import {
@@ -3890,20 +3894,16 @@ function drawEnemyAoeChannels(
   visibleTileBounds: TileBounds,
 ) {
   for (const channel of Object.values(channelsByCasterId)) {
-    if (
-      channel.shape.type !== "circle" ||
-      !isPositionInTileBounds(channel.shape.center, visibleTileBounds)
-    ) {
+    if (!doAoeBoundsIntersect(channel.area.bounds, visibleTileBounds)) {
       continue;
     }
 
-    const center = toFullPosition(channel.shape.center, transform);
     const channelProgress = getEnemyAoeChannelProgress(channel, currentTime);
     const dangerOpacity = channel.phase === "windup" ? 1 : channelProgress;
 
-    drawAoeCircle(graphics, {
-      center,
-      radiusPx: channel.shape.radius * transform.cellPixelSize,
+    drawResolvedAoeArea(graphics, {
+      area: channel.area,
+      transform,
       intent: "enemyOffensive",
       opacity: dangerOpacity,
     });
@@ -3919,27 +3919,205 @@ function drawCompanionAoeChannels(
 ) {
   for (const channel of Object.values(channelsByCasterId)) {
     if (
-      channel.shape.type !== "circle" ||
-      !isPositionInTileBounds(channel.shape.center, visibleTileBounds) ||
+      !doAoeBoundsIntersect(channel.area.bounds, visibleTileBounds) ||
       channel.channelEndsAt <= currentTime
     ) {
       continue;
     }
 
-    const center = toFullPosition(channel.shape.center, transform);
     const duration = channel.channelEndsAt - channel.startedAt;
     const progress =
       duration <= 0
         ? 1
         : Math.max(0, Math.min(1, (currentTime - channel.startedAt) / duration));
 
-    drawAoeCircle(graphics, {
-      center,
-      radiusPx: channel.shape.radius * transform.cellPixelSize,
+    drawResolvedAoeArea(graphics, {
+      area: channel.area,
+      transform,
       intent: channel.visualIntent,
       opacity: 0.35 + progress * 0.65,
     });
   }
+}
+
+function drawResolvedAoeArea(
+  graphics: Graphics,
+  options: {
+    area: ResolvedAoeArea;
+    transform: FullTransform;
+    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    opacity: number;
+  },
+) {
+  for (const primitive of options.area.primitives) {
+    if (primitive.type === "circle") {
+      drawAoeCircle(graphics, {
+        center: toFullPosition(primitive.center, options.transform),
+        radiusPx: primitive.radius * options.transform.cellPixelSize,
+        intent: options.intent,
+        opacity: options.opacity,
+      });
+      continue;
+    }
+
+    if (primitive.type === "ring") {
+      drawAoeRing(graphics, {
+        center: toFullPosition(primitive.center, options.transform),
+        innerRadiusPx: primitive.innerRadius * options.transform.cellPixelSize,
+        outerRadiusPx: primitive.outerRadius * options.transform.cellPixelSize,
+        intent: options.intent,
+        opacity: options.opacity,
+      });
+      continue;
+    }
+
+    if (primitive.type === "square") {
+      drawAoeSquare(
+        graphics,
+        primitive,
+        options.transform,
+        options.intent,
+        options.opacity,
+      );
+      continue;
+    }
+
+    drawAoeCone(
+      graphics,
+      primitive,
+      options.transform,
+      options.intent,
+      options.opacity,
+    );
+  }
+}
+
+function drawAoeRing(
+  graphics: Graphics,
+  options: {
+    center: Position;
+    innerRadiusPx: number;
+    outerRadiusPx: number;
+    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    opacity: number;
+  },
+) {
+  const style = getAoeShapeStyle(options.intent, options.opacity);
+  const ringWidth = Math.max(0, options.outerRadiusPx - options.innerRadiusPx);
+  const middleRadius = options.innerRadiusPx + ringWidth / 2;
+
+  if (ringWidth > 0) {
+    graphics.circle(options.center.x, options.center.y, middleRadius).stroke({
+      color: style.fillColor,
+      alpha: style.fillAlpha,
+      width: ringWidth,
+    });
+  }
+
+  graphics
+    .circle(options.center.x, options.center.y, options.outerRadiusPx)
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+
+  if (options.innerRadiusPx > 0) {
+    graphics
+      .circle(options.center.x, options.center.y, options.innerRadiusPx)
+      .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+  }
+}
+
+function drawAoeSquare(
+  graphics: Graphics,
+  square: ResolvedAoeSquare,
+  transform: FullTransform,
+  intent: "enemyOffensive" | "partyOffensive" | "partyHealing",
+  opacity: number,
+) {
+  const style = getAoeShapeStyle(intent, opacity);
+  const halfSize = square.size / 2;
+  const cosine = Math.cos(square.rotationRadians);
+  const sine = Math.sin(square.rotationRadians);
+  const points = [
+    { x: -halfSize, y: -halfSize },
+    { x: halfSize, y: -halfSize },
+    { x: halfSize, y: halfSize },
+    { x: -halfSize, y: halfSize },
+  ].flatMap((corner) => {
+    const worldPosition = {
+      x: square.center.x + corner.x * cosine - corner.y * sine,
+      y: square.center.y + corner.x * sine + corner.y * cosine,
+    };
+    const pixelPosition = toFullPosition(worldPosition, transform);
+    return [pixelPosition.x, pixelPosition.y];
+  });
+
+  graphics
+    .poly(points)
+    .fill({ color: style.fillColor, alpha: style.fillAlpha })
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+}
+
+function drawAoeCone(
+  graphics: Graphics,
+  cone: ResolvedAoeCone,
+  transform: FullTransform,
+  intent: "enemyOffensive" | "partyOffensive" | "partyHealing",
+  opacity: number,
+) {
+  const style = getAoeShapeStyle(intent, opacity);
+  const directionAngle = Math.atan2(cone.direction.y, cone.direction.x);
+  const halfAngle = cone.angleRadians / 2;
+  const arcSteps = Math.max(8, Math.ceil(cone.angleRadians / (Math.PI / 24)));
+  const worldPoints: Position[] = [{ ...cone.origin }];
+
+  for (let step = 0; step <= arcSteps; step += 1) {
+    const angle = directionAngle - halfAngle + (cone.angleRadians * step) / arcSteps;
+    worldPoints.push({
+      x: cone.origin.x + Math.cos(angle) * cone.range,
+      y: cone.origin.y + Math.sin(angle) * cone.range,
+    });
+  }
+
+  const points = worldPoints.flatMap((position) => {
+    const pixelPosition = toFullPosition(position, transform);
+    return [pixelPosition.x, pixelPosition.y];
+  });
+
+  graphics
+    .poly(points)
+    .fill({ color: style.fillColor, alpha: style.fillAlpha })
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+}
+
+function getAoeShapeStyle(
+  intent: "enemyOffensive" | "partyOffensive" | "partyHealing",
+  opacity: number,
+) {
+  const alpha = Math.min(1, Math.max(0, opacity));
+
+  if (intent === "enemyOffensive") {
+    return {
+      fillColor: enemyAoeFillColor,
+      fillAlpha: 0.13 + alpha * 0.5,
+      strokeColor: enemyAoeStrokeColor,
+      strokeAlpha: 0.48 + alpha * 0.52,
+    };
+  }
+
+  if (intent === "partyHealing") {
+    return {
+      fillColor: partyHealingAoeFillColor,
+      fillAlpha: 0.08 + alpha * 0.14,
+      strokeColor: partyHealingAoeStrokeColor,
+      strokeAlpha: 0.54 + alpha * 0.36,
+    };
+  }
+
+  return {
+    fillColor: partyOffensiveAoeFillColor,
+    fillAlpha: 0.1 + alpha * 0.2,
+    strokeColor: partyOffensiveAoeStrokeColor,
+    strokeAlpha: 0.5 + alpha * 0.42,
+  };
 }
 
 function drawAoeCircle(

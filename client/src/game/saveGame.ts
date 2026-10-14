@@ -1,4 +1,6 @@
 import {
+  aoeTargetDummyId,
+  aoeTargetDummyPosition,
   createDebugMapForQuestState,
   debugMapDefinitions,
   getEnemyStartDataForMap,
@@ -562,15 +564,45 @@ export function restoreGameStateFromSave(value: unknown): RestoreSaveResult {
     currentMapId,
     map,
   });
+  const normalizedState = normalizeAoeTargetDummyPosition(sanitizedState);
   const restoredAtMs = Date.now();
 
   return {
     ok: true,
     savedAtMs: validation.save.savedAtMs,
     state: settleLivestockState(
-      settleFarmState(sanitizedState, restoredAtMs),
+      settleFarmState(normalizedState, restoredAtMs),
       restoredAtMs,
     ),
+  };
+}
+
+function normalizeAoeTargetDummyPosition(state: GameState): GameState {
+  const dummy = state.entities[aoeTargetDummyId];
+
+  if (
+    dummy?.kind !== "enemy" ||
+    !dummy.isTargetDummy ||
+    (
+      dummy.position.x === aoeTargetDummyPosition.x &&
+      dummy.position.y === aoeTargetDummyPosition.y &&
+      dummy.homePosition.x === aoeTargetDummyPosition.x &&
+      dummy.homePosition.y === aoeTargetDummyPosition.y
+    )
+  ) {
+    return state;
+  }
+
+  return {
+    ...state,
+    entities: {
+      ...state.entities,
+      [aoeTargetDummyId]: {
+        ...dummy,
+        position: { ...aoeTargetDummyPosition },
+        homePosition: { ...aoeTargetDummyPosition },
+      },
+    },
   };
 }
 
@@ -960,6 +992,7 @@ export function sanitizeGameStateForSave(state: GameState): GameState {
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    aoeDummyPatternSequenceIndex: 0,
     consumableUsesByCompanionId: {},
     dropVisualEvents: [],
     pendingOfflineFarmingLoot: sanitizePendingOfflineFarmingLoot(

@@ -8,6 +8,7 @@ import { clearExpiredSkillRuntimeState } from "./state";
 import { createCompanion, createEnemy } from "./entities";
 import { addEntity, updateEntity } from "./state";
 import { createTestGameState } from "./testState";
+import { createAoeCastTransform, resolveAoePattern } from "./aoePatterns";
 import type { ActiveCombatProjectile, SkillMarkState, SkillVisualEvent } from "./types";
 
 describe("runtime cleanup", () => {
@@ -288,11 +289,10 @@ describe("runtime cleanup", () => {
           id: "shockwave",
           abilityId: "shield_shockwave",
           casterId: "leader",
-          shape: {
-            type: "circle",
-            center: { x: 1, y: 1 },
-            radius: 2,
-          },
+          area: resolveAoePattern(
+            { type: "circle", radius: 2 },
+            createAoeCastTransform({ x: 1, y: 1 }, { x: 1, y: 1 }),
+          ),
           visualIntent: "partyOffensive",
           damageType: "physical",
           powerMultiplier: 0.5,
@@ -301,6 +301,7 @@ describe("runtime cleanup", () => {
           channelEndsAt: 1200,
         },
       },
+      aoeDummyPatternSequenceIndex: 5,
     });
 
     const nextState = clearMapTransitionRuntimeState(state);
@@ -315,6 +316,7 @@ describe("runtime cleanup", () => {
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.combatProjectiles).toEqual([]);
     expect(nextState.companionAoeChannelsByCasterId).toEqual({});
+    expect(nextState.aoeDummyPatternSequenceIndex).toBe(0);
   });
 
   it("preserves the state reference when updating the same entity reference", () => {
@@ -462,11 +464,10 @@ describe("runtime cleanup", () => {
           id: "active-shockwave",
           abilityId: "shield_shockwave",
           casterId: companion.id,
-          shape: {
-            type: "circle",
-            center: companion.position,
-            radius: 2,
-          },
+          area: resolveAoePattern(
+            { type: "circle", radius: 2 },
+            createAoeCastTransform(companion.position, companion.position),
+          ),
           visualIntent: "partyOffensive",
           damageType: "physical",
           powerMultiplier: 0.5,
@@ -478,11 +479,10 @@ describe("runtime cleanup", () => {
           id: "stale-shockwave",
           abilityId: "shield_shockwave",
           casterId: enemy.id,
-          shape: {
-            type: "circle",
-            center: enemy.position,
-            radius: 2,
-          },
+          area: resolveAoePattern(
+            { type: "circle", radius: 2 },
+            createAoeCastTransform(enemy.position, enemy.position),
+          ),
           visualIntent: "partyOffensive",
           damageType: "physical",
           powerMultiplier: 0.5,
@@ -559,11 +559,10 @@ describe("runtime cleanup", () => {
         id: "active-shockwave",
         abilityId: "shield_shockwave",
         casterId: companion.id,
-        shape: {
-          type: "circle",
-          center: companion.position,
-          radius: 2,
-        },
+        area: resolveAoePattern(
+          { type: "circle", radius: 2 },
+          createAoeCastTransform(companion.position, companion.position),
+        ),
         visualIntent: "partyOffensive",
         damageType: "physical",
         powerMultiplier: 0.5,

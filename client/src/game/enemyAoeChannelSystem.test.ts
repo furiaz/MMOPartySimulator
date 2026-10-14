@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import {
+  AOE_DUMMY_PATTERN_NAMES,
   AOE_DUMMY_STOMP_CHANNEL_MS,
   AOE_DUMMY_STOMP_COOLDOWN_MS,
+  AOE_DUMMY_PATTERN_GAP_MS,
   AOE_DUMMY_STOMP_RADIUS,
   AOE_DUMMY_STOMP_WINDUP_MS,
   updateEnemyAoeChannelSystem,
 } from "./enemyAoeChannelSystem";
+import {
+  createAoeCastTransform,
+  isPositionInsideAoe,
+  resolveAoePattern,
+} from "./aoePatterns";
 import {
   HUB_MAP_ID,
   aoeTargetDummyId,
@@ -20,7 +27,7 @@ import type { EnemyAoeChannelState, GameEntity } from "./types";
 
 describe("enemy AoE channel system", () => {
   it("starts the AoE dummy channel only when player or party engaged", () => {
-    const leader = createCompanion("leader", { x: 54, y: 8 }, "leader", "fighter");
+    const leader = createCompanion("leader", atDummy(-1, 0), "leader", "fighter");
     const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
     const idleState = createState([leader, dummy]);
 
@@ -40,11 +47,18 @@ describe("enemy AoE channel system", () => {
     expect(channel).toMatchObject({
       casterId: dummy.id,
       phase: "channeling",
-      shape: {
-        type: "circle",
-        center: dummy.position,
-        radius: AOE_DUMMY_STOMP_RADIUS,
+      area: {
+        castTransform: {
+          origin: dummy.position,
+          direction: { x: -1, y: 0 },
+        },
+        primitives: [{
+          type: "circle",
+          center: dummy.position,
+          radius: AOE_DUMMY_STOMP_RADIUS,
+        }],
       },
+      patternName: "Circle",
     });
   });
 
@@ -66,20 +80,22 @@ describe("enemy AoE channel system", () => {
     expect(channel).toMatchObject({
       abilityId: "aoe_dummy_stomp",
       casterId: heavySlime.id,
-      shape: {
-        type: "circle",
-        center: heavySlime.position,
-        radius: AOE_DUMMY_STOMP_RADIUS,
+      area: {
+        primitives: [{
+          type: "circle",
+          center: heavySlime.position,
+          radius: AOE_DUMMY_STOMP_RADIUS,
+        }],
       },
     });
   });
 
   it("damages only living companions inside the locked AoE at impact time", () => {
-    const leader = createCompanion("leader", { x: 54, y: 8 }, "leader", "fighter");
-    const entering = createCompanion("entering", { x: 60, y: 8 }, "leader");
-    const leaving = createCompanion("leaving", { x: 55.5, y: 8 }, "leader");
+    const leader = createCompanion("leader", atDummy(-1, 0), "leader", "fighter");
+    const entering = createCompanion("entering", atDummy(5, 0), "leader");
+    const leaving = createCompanion("leaving", atDummy(0.5, 0), "leader");
     const dead = {
-      ...createCompanion("dead", { x: 55, y: 8.5 }, "leader"),
+      ...createCompanion("dead", atDummy(0, 0.5), "leader"),
       state: "dead" as const,
       health: 0,
     };
@@ -96,15 +112,15 @@ describe("enemy AoE channel system", () => {
 
     state = updateEnemyAoeChannelSystem(state, 1000);
     const channel = state.enemyAoeChannelsByCasterId?.[dummy.id];
-    expect(channel?.shape.center).toEqual(dummy.position);
+    expect(channel?.area.castTransform.origin).toEqual(dummy.position);
 
     state = updateEntity(state, {
       ...entering,
-      position: { x: 55, y: 9 },
+      position: atDummy(0, 1),
     });
     state = updateEntity(state, {
       ...leaving,
-      position: { x: 60, y: 8 },
+      position: atDummy(5, 0),
     });
 
     const beforeImpact = updateEnemyAoeChannelSystem(
@@ -127,13 +143,13 @@ describe("enemy AoE channel system", () => {
       1000 +
         AOE_DUMMY_STOMP_CHANNEL_MS +
         AOE_DUMMY_STOMP_WINDUP_MS +
-        AOE_DUMMY_STOMP_COOLDOWN_MS,
+        AOE_DUMMY_PATTERN_GAP_MS,
     );
   });
 
   it("skips companions with active fake death when enemy AoE resolves", () => {
-    const hunter = createCompanion("hunter", { x: 55, y: 8 }, "leader", "fighter");
-    const ally = createCompanion("ally", { x: 55, y: 9 }, "leader", "fighter");
+    const hunter = createCompanion("hunter", atDummy(0, 0), "leader", "fighter");
+    const ally = createCompanion("ally", atDummy(0, 1), "leader", "fighter");
     const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
     let state = setLeaderIntent(
       createState([hunter, ally, dummy], {
@@ -168,7 +184,7 @@ describe("enemy AoE channel system", () => {
   });
 
   it("cancels and starts cooldown when the caster is bound", () => {
-    const leader = createCompanion("leader", { x: 54, y: 8 }, "leader", "fighter");
+    const leader = createCompanion("leader", atDummy(-1, 0), "leader", "fighter");
     const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
     let state = setLeaderIntent(createState([leader, dummy]), {
       type: "attack",
@@ -193,7 +209,7 @@ describe("enemy AoE channel system", () => {
 
     expect(nextState.enemyAoeChannelsByCasterId?.[dummy.id]).toBeUndefined();
     expect(nextState.enemyAoeCooldownsByCasterId?.[dummy.id]?.expiresAt).toBe(
-      1100 + AOE_DUMMY_STOMP_COOLDOWN_MS,
+      1100 + AOE_DUMMY_PATTERN_GAP_MS,
     );
   });
 
@@ -214,6 +230,190 @@ describe("enemy AoE channel system", () => {
     expect(nextState.enemyAoeCooldownsByCasterId?.[caster.id]?.expiresAt).toBe(
       1100 + AOE_DUMMY_STOMP_COOLDOWN_MS,
     );
+  });
+
+  it("cycles all nine dummy patterns in order with a locked aim", () => {
+    const leader = createCompanion("leader", atDummy(3, 0), "leader", "fighter");
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
+    let state = setLeaderIntent(createState([leader, dummy]), {
+      type: "attack",
+      targetId: dummy.id,
+      targetPosition: dummy.position,
+      source: "player",
+    });
+    let castStartedAt = 1000;
+
+    for (const patternName of AOE_DUMMY_PATTERN_NAMES) {
+      state = updateEnemyAoeChannelSystem(state, castStartedAt, () => 1);
+      const channel = state.enemyAoeChannelsByCasterId?.[dummy.id];
+
+      expect(channel?.patternName).toBe(patternName);
+      expect(channel?.area.castTransform).toEqual({
+        origin: aoeTargetDummyPosition,
+        direction: { x: 1, y: 0 },
+      });
+      expect(
+        state.combatFeedbackEvents.some((event) => event.text === patternName),
+      ).toBe(true);
+
+      state = updateEnemyAoeChannelSystem(
+        state,
+        castStartedAt + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS,
+        () => 1,
+      );
+      castStartedAt +=
+        AOE_DUMMY_STOMP_CHANNEL_MS +
+        AOE_DUMMY_STOMP_WINDUP_MS +
+        AOE_DUMMY_PATTERN_GAP_MS;
+    }
+
+    expect(state.aoeDummyPatternSequenceIndex).toBe(0);
+  });
+
+  it("aims at the most recently commanded living attacker", () => {
+    const leader = createCompanion("leader", atDummy(-2, 0), "leader", "fighter");
+    const older = createCompanion("older", atDummy(0, 2), "older", "fighter");
+    const newer = createCompanion("newer", atDummy(0, -2), "newer", "fighter");
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
+    const state = createState([leader, older, newer, dummy], {
+      aoeDummyPatternSequenceIndex: 3,
+      directCompanionCommandsById: {
+        [older.id]: {
+          type: "attack",
+          companionId: older.id,
+          targetId: dummy.id,
+          targetPosition: dummy.position,
+          issuedAt: 100,
+        },
+        [newer.id]: {
+          type: "attack",
+          companionId: newer.id,
+          targetId: dummy.id,
+          targetPosition: dummy.position,
+          issuedAt: 200,
+        },
+      },
+    });
+
+    const nextState = updateEnemyAoeChannelSystem(state, 1000);
+
+    expect(nextState.enemyAoeChannelsByCasterId?.[dummy.id]?.area.castTransform)
+      .toEqual({
+        origin: dummy.position,
+        direction: { x: 0, y: -1 },
+      });
+  });
+
+  it("keeps the 0.75-second gap between dummy casts", () => {
+    const leader = createCompanion("leader", atDummy(-1, 0), "leader", "fighter");
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
+    let state = setLeaderIntent(createState([leader, dummy]), {
+      type: "attack",
+      targetId: dummy.id,
+      targetPosition: dummy.position,
+      source: "player",
+    });
+
+    state = updateEnemyAoeChannelSystem(state, 1000, () => 1);
+    const impactAt = 1000 + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS;
+    state = updateEnemyAoeChannelSystem(state, impactAt, () => 1);
+
+    const beforeGapEnds = updateEnemyAoeChannelSystem(
+      state,
+      impactAt + AOE_DUMMY_PATTERN_GAP_MS - 1,
+      () => 1,
+    );
+    expect(beforeGapEnds.enemyAoeChannelsByCasterId?.[dummy.id]).toBeUndefined();
+
+    const afterGapEnds = updateEnemyAoeChannelSystem(
+      beforeGapEnds,
+      impactAt + AOE_DUMMY_PATTERN_GAP_MS,
+      () => 1,
+    );
+    expect(afterGapEnds.enemyAoeChannelsByCasterId?.[dummy.id]?.patternName)
+      .toBe("Ring");
+  });
+
+  it("uses the approved larger ring bands and two-unit concentric safe lane", () => {
+    const leader = createCompanion("leader", atDummy(5, 0), "leader", "fighter");
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
+    const attackIntent = {
+      type: "attack" as const,
+      targetId: dummy.id,
+      targetPosition: dummy.position,
+      source: "player" as const,
+    };
+    const ringState = updateEnemyAoeChannelSystem(
+      setLeaderIntent(
+        createState([leader, dummy], { aoeDummyPatternSequenceIndex: 1 }),
+        attackIntent,
+      ),
+      1000,
+      () => 1,
+    );
+    const ringArea = ringState.enemyAoeChannelsByCasterId?.[dummy.id]?.area;
+
+    expect(ringArea?.primitives).toEqual([{
+      type: "ring",
+      center: aoeTargetDummyPosition,
+      innerRadius: 2,
+      outerRadius: 3.5,
+    }]);
+
+    const concentricState = updateEnemyAoeChannelSystem(
+      setLeaderIntent(
+        createState([leader, dummy], { aoeDummyPatternSequenceIndex: 2 }),
+        attackIntent,
+      ),
+      1000,
+      () => 1,
+    );
+    const concentricArea =
+      concentricState.enemyAoeChannelsByCasterId?.[dummy.id]?.area;
+
+    expect(concentricArea?.primitives).toEqual([
+      {
+        type: "ring",
+        center: aoeTargetDummyPosition,
+        innerRadius: 0.75,
+        outerRadius: 1.75,
+      },
+      {
+        type: "ring",
+        center: aoeTargetDummyPosition,
+        innerRadius: 3.75,
+        outerRadius: 4.75,
+      },
+    ]);
+    expect(concentricArea && isPositionInsideAoe(concentricArea, atDummy(2.75, 0)))
+      .toBe(false);
+  });
+
+  it("applies one damage when combined pattern primitives overlap", () => {
+    const leader = createCompanion("leader", atDummy(1, 0), "leader", "fighter");
+    const dummy = createTargetDummy(aoeTargetDummyId, aoeTargetDummyPosition);
+    let state = setLeaderIntent(
+      createState([leader, dummy], { aoeDummyPatternSequenceIndex: 8 }),
+      {
+        type: "attack",
+        targetId: dummy.id,
+        targetPosition: dummy.position,
+        source: "player",
+      },
+    );
+
+    state = updateEnemyAoeChannelSystem(state, 1000, () => 1);
+    expect(state.enemyAoeChannelsByCasterId?.[dummy.id]?.patternName).toBe(
+      "Combined",
+    );
+
+    state = updateEnemyAoeChannelSystem(
+      state,
+      1000 + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS,
+      () => 1,
+    );
+
+    expect(getHealth(state, leader.id)).toBe(leader.health - 1);
   });
 });
 
@@ -241,16 +441,22 @@ function createChannel(
     id: `test:${caster.id}:${now}`,
     abilityId: "aoe_dummy_stomp",
     casterId: caster.id,
-    shape: {
-      type: "circle",
-      center,
-      radius: AOE_DUMMY_STOMP_RADIUS,
-    },
+    area: resolveAoePattern(
+      { type: "circle", radius: AOE_DUMMY_STOMP_RADIUS },
+      createAoeCastTransform(center, center),
+    ),
     phase: "channeling",
     startedAt: now,
     channelEndsAt: now + AOE_DUMMY_STOMP_CHANNEL_MS,
     windupEndsAt: now + AOE_DUMMY_STOMP_CHANNEL_MS + AOE_DUMMY_STOMP_WINDUP_MS,
     cooldownMs: AOE_DUMMY_STOMP_COOLDOWN_MS,
+  };
+}
+
+function atDummy(xOffset: number, yOffset: number) {
+  return {
+    x: aoeTargetDummyPosition.x + xOffset,
+    y: aoeTargetDummyPosition.y + yOffset,
   };
 }
 

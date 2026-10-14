@@ -179,7 +179,7 @@ export const hubTwoHealingFountains: HealingFountain[] = [
 export const targetDummyId = "hub-target-dummy";
 export const targetDummyPosition: Position = { x: 77, y: 42 };
 export const aoeTargetDummyId = "hub-aoe-target-dummy";
-export const aoeTargetDummyPosition: Position = { x: 55, y: 8 };
+export const aoeTargetDummyPosition: Position = { x: 15, y: 10 };
 
 const hubArrivalPositions: Position[] = [
   { x: 99, y: 30 },

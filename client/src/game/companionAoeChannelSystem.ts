@@ -1,10 +1,14 @@
 import { handleEnemyDefeatedDrops } from "./dropSystem";
 import { isLivingCompanion, isLivingEnemy, isTargetDummyEnemy } from "./entityGuards";
 import { grantCharacterXpToParty } from "./leveling";
-import { getEuclideanDistance } from "./positionUtils";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { applyStatusEffect } from "./statusEffects";
+import {
+  createAoeCastTransform,
+  isPositionInsideAoe,
+  resolveAoePattern,
+} from "./aoePatterns";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   Companion,
@@ -27,7 +31,6 @@ export function updateCompanionAoeChannelSystem(
 
   return nextState;
 }
-
 export function startShieldShockwaveChannel(
   state: GameState,
   caster: Companion,
@@ -56,11 +59,10 @@ export function startShieldShockwaveChannel(
         id: `shield_shockwave:${caster.id}:${now}`,
         abilityId: "shield_shockwave",
         casterId: caster.id,
-        shape: {
-          type: "circle",
-          center: caster.position,
-          radius: skill.effect.radius,
-        },
+        area: resolveAoePattern(
+          { type: "circle", radius: skill.effect.radius },
+          createAoeCastTransform(caster.position, caster.position),
+        ),
         visualIntent: "partyOffensive",
         damageType: skill.effect.damageType,
         powerMultiplier: skill.effect.powerMultiplier,
@@ -101,11 +103,10 @@ export function startMaulSweepChannel(
         id: `maul_sweep:${caster.id}:${now}`,
         abilityId: "maul_sweep",
         casterId: caster.id,
-        shape: {
-          type: "circle",
-          center: caster.position,
-          radius: skill.effect.radius,
-        },
+        area: resolveAoePattern(
+          { type: "circle", radius: skill.effect.radius },
+          createAoeCastTransform(caster.position, caster.position),
+        ),
         visualIntent: "partyOffensive",
         damageType: skill.effect.damageType,
         powerMultiplier: skill.effect.powerMultiplier,
@@ -156,7 +157,7 @@ function resolveMaulSweepImpact(
 
     if (
       !isLivingEnemy(currentEnemy) ||
-      !isInsideCircle(currentEnemy.position, channel.shape.center, channel.shape.radius)
+      !isPositionInsideAoe(channel.area, currentEnemy.position)
     ) {
       continue;
     }
@@ -208,7 +209,7 @@ function resolveShieldShockwaveImpact(
 
     if (
       !isLivingEnemy(currentEnemy) ||
-      !isInsideCircle(currentEnemy.position, channel.shape.center, channel.shape.radius)
+      !isPositionInsideAoe(channel.area, currentEnemy.position)
     ) {
       continue;
     }
@@ -321,12 +322,4 @@ function finishChannel(
     ...state,
     companionAoeChannelsByCasterId,
   };
-}
-
-function isInsideCircle(
-  position: { x: number; y: number },
-  center: { x: number; y: number },
-  radius: number,
-): boolean {
-  return getEuclideanDistance(position, center) <= radius;
 }

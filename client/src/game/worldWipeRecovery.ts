@@ -309,6 +309,9 @@ function resetStateToRescueHub(
     globalCooldownsByCompanionId: {},
     lastCompanionDamageTakenAtByCompanionId: {},
     companionAoeChannelsByCasterId: {},
+    enemyAoeChannelsByCasterId: {},
+    enemyAoeCooldownsByCasterId: {},
+    aoeDummyPatternSequenceIndex: 0,
   };
 
   const companions = getCompanions(nextState).sort(
