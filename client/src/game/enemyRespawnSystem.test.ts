@@ -83,6 +83,9 @@ describe("enemy respawn system", () => {
       entities: { [enemy.id]: enemy },
       skillMarksByEnemyId: { [enemy.id]: { sourceId: "source", targetId: enemy.id, bonusDamage: 1, expiresAt: 20000 } },
       skillBindsByEnemyId: { [enemy.id]: { sourceId: "source", targetId: enemy.id, expiresAt: 20000 } },
+      enemyAbilityCastsByEnemyId: { [enemy.id]: {} as never },
+      enemyAbilityCooldownsByEnemyId: { [enemy.id]: { ready: {} as never } },
+      enemyAbilityBasicAttackRequiredByEnemyId: { [enemy.id]: true },
     });
 
     const nextState = updateEnemyRespawnSystem(
@@ -106,6 +109,11 @@ describe("enemy respawn system", () => {
     expect(respawnedEnemy?.kind === "enemy" ? respawnedEnemy.defeatedAtMs : null).toBeUndefined();
     expect(nextState.skillMarksByEnemyId?.[enemy.id]).toBeUndefined();
     expect(nextState.skillBindsByEnemyId?.[enemy.id]).toBeUndefined();
+    expect(nextState.enemyAbilityCastsByEnemyId?.[enemy.id]).toBeUndefined();
+    expect(nextState.enemyAbilityCooldownsByEnemyId?.[enemy.id]).toBeUndefined();
+    expect(
+      nextState.enemyAbilityBasicAttackRequiredByEnemyId?.[enemy.id],
+    ).toBeUndefined();
   });
 
   it("does not respawn enemies while on the hub map", () => {

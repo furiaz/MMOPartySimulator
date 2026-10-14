@@ -56,6 +56,11 @@ export type {
   EnemyAoeChannelState,
   EnemyAoeCooldownState,
   EnemyAoeInterruptReason,
+  EnemyAbilityCastPhase,
+  EnemyAbilityCastState,
+  EnemyAbilityCooldownState,
+  EnemyAbilityId,
+  EnemyAbilityInterruptReason,
   ResolvedAoeArea,
   ResolvedAoeCircle,
   ResolvedAoeCone,
@@ -857,6 +862,7 @@ export {
   consumeNextAttackDamageBonus,
   dropAggroFromTarget,
   getStatusDefenseBonusPercent,
+  hasActiveStatusEffect,
   isAttackBlockedByStatus,
   isGatherBlockedByStatus,
   isMovementBlockedByStatus,
@@ -1047,6 +1053,22 @@ export {
   isEnemyAoeChanneling,
   updateEnemyAoeChannelSystem,
 } from "./enemyAoeChannelSystem";
+export {
+  ENEMY_ABILITY_DEFINITIONS,
+  getEnemyAbilityDefinition,
+  type EnemyAbilityDefinition,
+  type EnemyAbilityRegistry,
+  type EnemyAbilityResolutionContext,
+} from "./enemyAbilities";
+export {
+  cancelEnemyAbilityCast,
+  clearEnemyAbilityRuntimeForEnemy,
+  isEnemyAbilityCasting,
+  isEnemyBasicAttackRequired,
+  recordEnemyBasicAttackCommitted,
+  sanitizeEnemyAbilityRuntimeForSave,
+  updateEnemyAbilitySystem,
+} from "./enemyAbilitySystem";
 export {
   debugAddCompanion,
   debugAddCompanionToParty,

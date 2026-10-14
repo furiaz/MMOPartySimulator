@@ -11,6 +11,7 @@ import {
 } from "./consumables";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { updateEnemyAbilitySystem } from "./enemyAbilitySystem";
 import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { updateEntitySeparationSystem } from "./entitySeparationSystem";
@@ -211,6 +212,7 @@ export function updateGame(
     timing.nowMs,
     movedEntityIds,
   );
+  nextState = updateEnemyAbilitySystem(nextState, timing.nowMs);
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);

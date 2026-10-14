@@ -44,6 +44,9 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    enemyAbilityCastsByEnemyId: {},
+    enemyAbilityCooldownsByEnemyId: {},
+    enemyAbilityBasicAttackRequiredByEnemyId: {},
     aoeDummyPatternSequenceIndex: 0,
     flaskRechargeCountedEnemyDefeats: {},
     lastHealthRegenAtByCompanionId: {},
@@ -226,6 +229,18 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     state.enemyAoeCooldownsByCasterId,
     currentEntityIds,
   );
+  const enemyAbilityCastsByEnemyId = pruneRecordById(
+    state.enemyAbilityCastsByEnemyId,
+    currentEntityIds,
+  );
+  const enemyAbilityCooldownsByEnemyId = pruneRecordById(
+    state.enemyAbilityCooldownsByEnemyId,
+    currentEntityIds,
+  );
+  const enemyAbilityBasicAttackRequiredByEnemyId = pruneRecordById(
+    state.enemyAbilityBasicAttackRequiredByEnemyId,
+    currentEntityIds,
+  );
   const companionAoeChannelsByCasterId = pruneRecordById(
     state.companionAoeChannelsByCasterId,
     currentEntityIds,
@@ -298,6 +313,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
     companionAoeChannelsByCasterId === state.companionAoeChannelsByCasterId &&
     enemyAoeCooldownsByCasterId === state.enemyAoeCooldownsByCasterId &&
+    enemyAbilityCastsByEnemyId === state.enemyAbilityCastsByEnemyId &&
+    enemyAbilityCooldownsByEnemyId === state.enemyAbilityCooldownsByEnemyId &&
+    enemyAbilityBasicAttackRequiredByEnemyId ===
+      state.enemyAbilityBasicAttackRequiredByEnemyId &&
     flaskRechargeCountedEnemyDefeats === state.flaskRechargeCountedEnemyDefeats &&
     lastHealthRegenAtByCompanionId === state.lastHealthRegenAtByCompanionId &&
     lastTargetDummyRegenAtByEnemyId === state.lastTargetDummyRegenAtByEnemyId &&
@@ -350,6 +369,9 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     globalCooldownsByCompanionId,
     companionAoeChannelsByCasterId,
     enemyAoeCooldownsByCasterId,
+    enemyAbilityCastsByEnemyId,
+    enemyAbilityCooldownsByEnemyId,
+    enemyAbilityBasicAttackRequiredByEnemyId,
     flaskRechargeCountedEnemyDefeats,
     lastHealthRegenAtByCompanionId,
     lastTargetDummyRegenAtByEnemyId,
