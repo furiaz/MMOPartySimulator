@@ -611,6 +611,8 @@ describe("save game serialization", () => {
   it("preserves resting companions and highest-ever level through save restore", () => {
     const leader: Companion = {
       ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1", "defender", 0),
+      characterLevel: 19,
+      characterXp: 5302,
       state: "idle",
       currentTargetId: null,
     };
@@ -653,6 +655,11 @@ describe("save game serialization", () => {
     }
 
     expect(restored.state.entities[veteran.id]).toBeUndefined();
+    expect(restored.state.entities[leader.id]).toMatchObject({
+      id: leader.id,
+      characterLevel: 19,
+      characterXp: 5302,
+    });
     expect(restored.state.restingCompanionsById?.[veteran.id]).toMatchObject({
       id: veteran.id,
       characterLevel: 50,
