@@ -3,7 +3,9 @@ import {
   CLASS_MENTOR_NPC_ID,
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
+  HUB_TWO_QUEST_GIVER_NPC_ID,
   MAP_ONE_ID,
+  MAP_FOUR_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   SLIMEWARD_CHEST_ID,
@@ -19,6 +21,7 @@ import {
   getHubTwoNpcStartDataForQuestState,
   npcIds,
 } from "./debugMap";
+import { isFirstClassId } from "./classes";
 import { createNpc } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
@@ -32,6 +35,7 @@ import {
   grantCharacterXpToCompanion,
 } from "./leveling";
 import {
+  getAllRosterCompanions,
   getPartyMembers,
   recordHighestCharacterLevelEver,
 } from "./partySystem";
@@ -41,7 +45,10 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { recordEquippedItemObjectivesForQuests } from "./questProgressionHooks";
+import {
+  completeQuestObjective as completeQuestObjectiveProgress,
+  recordEquippedItemObjectivesForQuests,
+} from "./questProgressionHooks";
 import { addCurrencyToWalletState } from "./wallet";
 import type {
   DebugMapId,
@@ -75,6 +82,9 @@ export {
 
 export const QUEST_GIVER_POI_ID = npcIds[0];
 export const EQUIPMENT_TUTORIAL_QUEST_ID: QuestId = "outfit_the_expedition";
+export const GUILD_BOARD_ONBOARDING_QUEST_ID: QuestId =
+  "orders_from_the_guild";
+export const ASH_GOBLIN_MAIN_QUEST_ID: QuestId = "break_the_ash_camp";
 const SMITHS_FIRST_WORK_ACCEPTANCE_GRANTS: QuestRewardItem[] = [
   { itemId: "copper_ore", quantity: 2 },
   { itemId: "field_herb", quantity: 2 },
@@ -99,6 +109,8 @@ export const QUEST_ORDER: QuestId[] = [
   "crawler_shelf_report",
   "find_slimeward_camp",
   "azure_trial",
+  GUILD_BOARD_ONBOARDING_QUEST_ID,
+  ASH_GOBLIN_MAIN_QUEST_ID,
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -107,6 +119,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "Secure the Landing",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "defeat_shore_fringe_slimes",
@@ -150,6 +163,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "Outfit the Expedition",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "equip_training_sword",
@@ -189,6 +203,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "First Work at the Smithy",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "craft_plain_charm",
@@ -216,6 +231,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "Stolen Field Supplies",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "collect_mossy_glade_supplies",
@@ -241,6 +257,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "inspect_lower_shore_wreckage",
@@ -306,6 +323,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "Outskirts Samples",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "collect_scout_rise_samples",
@@ -331,6 +349,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "reach_grove_runner",
@@ -375,6 +394,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     displayName: "Hold the Field Cache",
     sourceType: "npc",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "defend_old_grove_cache",
@@ -406,6 +426,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "escort_causeway_worker",
@@ -474,6 +495,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "inspect_broken_thicket_trail_marker",
@@ -516,6 +538,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "inspect_crawler_shelf_overlook",
@@ -561,6 +584,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: QUEST_GIVER_POI_ID,
+    questGiverMapId: HUB_MAP_ID,
     objectives: [
       {
         id: "inspect_slimeward_camp_teleporter",
@@ -623,6 +647,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     sourceType: "npc",
     objectiveFlow: "sequential",
     questGiverPoiId: CLASS_MENTOR_NPC_ID,
+    questGiverMapId: HUB_TWO_MAP_ID,
     objectives: [
       {
         id: "enter_slimeward_floor_one",
@@ -650,6 +675,61 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     rewards: {
       crowns: 100,
       characterXp: 1500,
+    },
+  },
+  orders_from_the_guild: {
+    id: GUILD_BOARD_ONBOARDING_QUEST_ID,
+    displayName: "Orders from the Guild",
+    sourceType: "npc",
+    questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
+    questGiverMapId: HUB_TWO_MAP_ID,
+    requiresCompletedQuestIds: ["azure_trial"],
+    requiresFirstClassCompanion: true,
+    objectives: [
+      {
+        id: "take_ash_goblin_assault_contract",
+        type: "take_guild_notice_board_quest",
+        targetMapId: HUB_TWO_MAP_ID,
+        noticeBoardQuestId:
+          "guild-notice-board-starter-ash-goblin-encampment",
+        requiredCount: 1,
+      },
+    ],
+    unlocksQuestIds: [ASH_GOBLIN_MAIN_QUEST_ID],
+  },
+  break_the_ash_camp: {
+    id: ASH_GOBLIN_MAIN_QUEST_ID,
+    displayName: "Break the Ash Camp",
+    sourceType: "npc",
+    objectiveFlow: "parallel",
+    questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
+    questGiverMapId: HUB_TWO_MAP_ID,
+    requiresCompletedQuestIds: [GUILD_BOARD_ONBOARDING_QUEST_ID],
+    objectives: [
+      {
+        id: "defeat_ash_goblin_encampment_enemies",
+        type: "defeat_enemy_count",
+        enemyMapId: MAP_FOUR_ID,
+        targetSubzoneId: "ash-goblin-encampment",
+        requiredCount: 200,
+      },
+      {
+        id: "gather_ash_goblin_encampment_resources",
+        type: "gather_item_count",
+        targetMapId: MAP_FOUR_ID,
+        targetSubzoneId: "ash-goblin-encampment",
+        requiredCount: 20,
+      },
+      {
+        id: "equip_first_class_weapon",
+        type: "equip_item",
+        equipmentRequirement: "first_class_weapon",
+        requiredCount: 1,
+      },
+    ],
+    rewards: {
+      crowns: 500,
+      characterXp: 1800,
     },
   },
 };
@@ -1069,6 +1149,17 @@ function acceptQuest(
     );
   }
 
+  if (
+    questId === GUILD_BOARD_ONBOARDING_QUEST_ID &&
+    nextState.guildNoticeBoard?.starterContractAccepted
+  ) {
+    nextState = completeQuestObjectiveProgress(
+      nextState,
+      questId,
+      "take_ash_goblin_assault_contract",
+    );
+  }
+
   nextState = grantQuestAcceptanceItems(nextState, questId);
 
   return nextState;
@@ -1414,7 +1505,9 @@ function claimQuestReward(
     options.now ?? Date.now(),
   );
 
-  return unlockAvailableQuests(refreshCurrentMapForQuestState(nextState), questId);
+  return reconcileQuestAvailability(
+    unlockAvailableQuests(refreshCurrentMapForQuestState(nextState), questId),
+  );
 }
 
 function refreshCurrentMapForQuestState(state: GameState): GameState {
@@ -1818,12 +1911,9 @@ function unlockAvailableQuests(state: GameState, completedQuestId: QuestId): Gam
     const isExplicitUnlock =
       completedDefinition.unlocksQuestIds?.includes(questId) ?? false;
     const requirements = QUEST_DEFINITIONS[questId].requiresCompletedQuestIds;
-    const requirementsMet = requirements
-      ? requirements.every(
-          (requiredQuestId) =>
-            nextState.quests[requiredQuestId]?.status === "completed",
-        )
-      : false;
+    const requirementsMet =
+      Boolean(requirements) &&
+      areQuestAvailabilityRequirementsMet(nextState, questId);
 
     if (!isExplicitUnlock && !requirementsMet) {
       continue;
@@ -1842,7 +1932,7 @@ function unlockAvailableQuests(state: GameState, completedQuestId: QuestId): Gam
       },
       {
         type: "quest_unlocked",
-        entityId: QUEST_GIVER_POI_ID,
+        entityId: QUEST_DEFINITIONS[questId].questGiverPoiId,
         questId,
         currentMapId: nextState.currentMapId,
         currentMapDisplayName: nextState.map?.displayName,
@@ -1851,7 +1941,7 @@ function unlockAvailableQuests(state: GameState, completedQuestId: QuestId): Gam
     );
     nextState = appendDebugTelemetryEvent(nextState, {
       type: "quest_available",
-      entityId: QUEST_GIVER_POI_ID,
+      entityId: QUEST_DEFINITIONS[questId].questGiverPoiId,
       questId,
       currentMapId: nextState.currentMapId,
       currentMapDisplayName: nextState.map?.displayName,
@@ -1860,6 +1950,72 @@ function unlockAvailableQuests(state: GameState, completedQuestId: QuestId): Gam
   }
 
   return nextState;
+}
+
+export function reconcileQuestAvailability(state: GameState): GameState {
+  let nextState = state;
+
+  for (const questId of QUEST_ORDER) {
+    const quest = nextState.quests[questId];
+    const definition = QUEST_DEFINITIONS[questId];
+    const hasRequirements =
+      Boolean(definition.requiresCompletedQuestIds?.length) ||
+      definition.requiresFirstClassCompanion === true;
+
+    if (
+      !quest ||
+      quest.status !== "locked" ||
+      !hasRequirements ||
+      !areQuestAvailabilityRequirementsMet(nextState, questId)
+    ) {
+      continue;
+    }
+
+    nextState = appendDebugTelemetryEvent(
+      {
+        ...nextState,
+        quests: {
+          ...nextState.quests,
+          [questId]: {
+            ...quest,
+            status: "available",
+          },
+        },
+      },
+      {
+        type: "quest_available",
+        entityId: definition.questGiverPoiId,
+        questId,
+        currentMapId: nextState.currentMapId,
+        currentMapDisplayName: nextState.map?.displayName,
+        currentMapDebugName: nextState.map?.debugName,
+      },
+    );
+  }
+
+  return nextState;
+}
+
+export function hasFirstClassRosterCompanion(state: GameState): boolean {
+  return getAllRosterCompanions(state).some((companion) =>
+    isFirstClassId(companion.classId),
+  );
+}
+
+function areQuestAvailabilityRequirementsMet(
+  state: GameState,
+  questId: QuestId,
+): boolean {
+  const definition = QUEST_DEFINITIONS[questId];
+  const completedRequirementsMet =
+    definition.requiresCompletedQuestIds?.every(
+      (requiredQuestId) =>
+        state.quests[requiredQuestId]?.status === "completed",
+    ) ?? true;
+  const firstClassRequirementMet =
+    !definition.requiresFirstClassCompanion || hasFirstClassRosterCompanion(state);
+
+  return completedRequirementsMet && firstClassRequirementMet;
 }
 
 function getQuestByStatuses(
@@ -1900,11 +2056,7 @@ export function getQuestTargetMapId(
   const quest = state.quests[questId];
 
   if (quest.status === "ready_to_turn_in") {
-    if (questId === "azure_trial") {
-      return HUB_TWO_MAP_ID;
-    }
-
-    return HUB_MAP_ID;
+    return QUEST_DEFINITIONS[questId].questGiverMapId;
   }
 
   const objective = getFirstIncompleteObjective(state, questId);
@@ -1912,6 +2064,6 @@ export function getQuestTargetMapId(
   return (
     objective?.targetMapId ??
     objective?.enemyMapId ??
-    HUB_MAP_ID
+    QUEST_DEFINITIONS[questId].questGiverMapId
   );
 }

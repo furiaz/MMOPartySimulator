@@ -54,6 +54,15 @@ describe("guide popup flow", () => {
     ).toEqual(["first_class_path"]);
   });
 
+  it("queues the Guild Notice Board guide when onboarding becomes active", () => {
+    expect(
+      getGuidePopupsForQuestStatusChanges(
+        { orders_from_the_guild: "available" },
+        { orders_from_the_guild: "active" },
+      ),
+    ).toEqual(["guild_notice_board_onboarding"]);
+  });
+
   it("does not queue milestone guides for unrelated status changes", () => {
     expect(
       getGuidePopupsForQuestStatusChanges(

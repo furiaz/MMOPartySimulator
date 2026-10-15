@@ -3,7 +3,6 @@ import {
   getFirstIncompleteObjective,
   getItemDefinition,
   HUB_MAP_ID,
-  HUB_TWO_MAP_ID,
   MAP_THREE_ID,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
@@ -354,7 +353,7 @@ function getStrictQuestRouteTargetMapId(
   quest: QuestState,
 ): DebugMapId | null {
   if (quest.status === "ready_to_turn_in") {
-    return quest.questId === "azure_trial" ? HUB_TWO_MAP_ID : HUB_MAP_ID;
+    return QUEST_DEFINITIONS[quest.questId].questGiverMapId;
   }
 
   if (quest.status !== "active") {
@@ -401,9 +400,7 @@ function getObjectiveQuestLocation(
 }
 
 function getQuestTurnInLocation(quest: QuestState): QuestLocationDisplay {
-  return createQuestLocation(
-    quest.questId === "azure_trial" ? HUB_TWO_MAP_ID : HUB_MAP_ID,
-  );
+  return createQuestLocation(QUEST_DEFINITIONS[quest.questId].questGiverMapId);
 }
 
 function createQuestLocation(
@@ -501,7 +498,15 @@ export function getObjectiveLabel(
     )}`;
   }
 
+  if (objective.type === "take_guild_notice_board_quest") {
+    return "Take Guild Board Contract";
+  }
+
   if (objective.type === "equip_item" || objective.type === "equip_flask") {
+    if (objective.equipmentRequirement === "first_class_weapon") {
+      return "Equip First-Class Weapon";
+    }
+
     const itemDefinition = objective.itemId
       ? getItemDefinition(objective.itemId)
       : null;

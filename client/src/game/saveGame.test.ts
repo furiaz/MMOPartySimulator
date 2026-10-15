@@ -824,11 +824,17 @@ describe("save game serialization", () => {
       ...createInitialGuildNoticeBoardState(NOW_MS),
       questSequence: 5,
       hasSeenCurrentRefresh: true,
+      starterContractAccepted: true,
       nextRefreshAtMs: NOW_MS + GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
       slots: [
         {
           ...createInitialGuildNoticeBoardState(NOW_MS).slots[0]!,
           id: "guild-notice-board-quest-5",
+          title: "Ashwatch Field Orders",
+          category: "extermination" as const,
+          zoneDisplayName: "Ashwatch",
+          description: undefined,
+          isStarterContract: undefined,
           sequence: 5,
           status: "taken" as const,
           takenAtMs: NOW_MS,
@@ -866,6 +872,83 @@ describe("save game serialization", () => {
     }
 
     expect(restored.state.guildNoticeBoard).toEqual(guildNoticeBoard);
+  });
+
+  it("skips onboarding for an already-eligible legacy save without replacing Board progress", () => {
+    const leader = {
+      ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1"),
+      classId: "blade" as const,
+      characterLevel: 10,
+    };
+    const quests = createInitialQuestStates();
+    quests.azure_trial = {
+      ...quests.azure_trial,
+      status: "completed",
+      completedCycle: 1,
+      rewardClaimedCycle: 1,
+    };
+    const legacyBoard = createLegacyGuildNoticeBoardState();
+    const save = createSavedGame(
+      createTestGameState({
+        entities: { [leader.id]: leader },
+        partyLeaderId: leader.id,
+        quests,
+        guildNoticeBoard: legacyBoard,
+      }),
+      NOW_MS,
+    );
+    const legacyQuests = save.state.quests as Partial<typeof save.state.quests>;
+    delete legacyQuests.orders_from_the_guild;
+    delete legacyQuests.break_the_ash_camp;
+    save.state.guildNoticeBoard = legacyBoard;
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.quests.orders_from_the_guild.status).toBe("completed");
+    expect(restored.state.quests.break_the_ash_camp.status).toBe("available");
+    expect(restored.state.guildNoticeBoard?.slots).toHaveLength(1);
+    expect(restored.state.guildNoticeBoard?.slots[0]?.id).toBe(
+      "guild-notice-board-quest-5",
+    );
+    expect(restored.state.guildNoticeBoard?.starterContractAccepted).toBe(false);
+  });
+
+  it("keeps onboarding for a pre-eligibility legacy save and preserves its Board slot", () => {
+    const quests = createInitialQuestStates();
+    quests.azure_trial = {
+      ...quests.azure_trial,
+      status: "completed",
+      completedCycle: 1,
+      rewardClaimedCycle: 1,
+    };
+    const legacyBoard = createLegacyGuildNoticeBoardState();
+    const save = createSavedGame(
+      createTestGameState({
+        quests,
+        guildNoticeBoard: legacyBoard,
+      }),
+      NOW_MS,
+    );
+    const legacyQuests = save.state.quests as Partial<typeof save.state.quests>;
+    delete legacyQuests.orders_from_the_guild;
+    delete legacyQuests.break_the_ash_camp;
+    save.state.guildNoticeBoard = legacyBoard;
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.quests.orders_from_the_guild.status).toBe("locked");
+    expect(restored.state.guildNoticeBoard?.slots.map((slot) => slot?.id)).toEqual([
+      "guild-notice-board-starter-ash-goblin-encampment",
+      "guild-notice-board-quest-5",
+    ]);
   });
 
   it("preserves Guild Field Team assignment through save restore", () => {
@@ -1187,9 +1270,9 @@ describe("save game serialization", () => {
     expect(restored.state.guildRecruit?.recruitSequence).toBe(1);
     expect(restored.state.guildUpgrades?.recruit.recruit_slots).toBe(1);
     expect(restored.state.guildNoticeBoard?.slots[0]).toMatchObject({
-      id: "guild-notice-board-quest-1",
+      id: "guild-notice-board-starter-ash-goblin-encampment",
       status: "available",
-      sequence: 1,
+      sequence: 0,
     });
     expect(restored.state.guildNoticeBoard?.hasSeenCurrentRefresh).toBe(false);
     expect(restored.state.guildSecondaryParties).toEqual(
@@ -1322,6 +1405,42 @@ describe("save game serialization", () => {
     });
   });
 });
+
+function createLegacyGuildNoticeBoardState() {
+  const initial = createInitialGuildNoticeBoardState(NOW_MS);
+
+  return {
+    ...initial,
+    questSequence: 5,
+    starterContractAccepted: undefined,
+    slots: [
+      {
+        ...initial.slots[0]!,
+        id: "guild-notice-board-quest-5",
+        title: "Ashwatch Field Orders",
+        category: "extermination" as const,
+        zoneDisplayName: "Ashwatch",
+        description: undefined,
+        isStarterContract: undefined,
+        sequence: 5,
+        objectives: [
+          {
+            id: "defeat-goblin_shaman",
+            enemyTypeId: "goblin_shaman" as const,
+            requiredCount: 50,
+            currentCount: 12,
+          },
+          {
+            id: "defeat-ash_wisp",
+            enemyTypeId: "ash_wisp" as const,
+            requiredCount: 50,
+            currentCount: 7,
+          },
+        ],
+      },
+    ],
+  };
+}
 
 describe("offline farming", () => {
   it("caps offline progress at thirty minutes", () => {

@@ -3261,6 +3261,8 @@ export type WorldDiscoveryState = {
 
 export type GuildNoticeBoardQuestStatus = "available" | "taken" | "done";
 
+export type GuildNoticeBoardQuestCategory = "assault" | "extermination";
+
 export type GuildNoticeBoardQuestObjective = {
   id: string;
   enemyTypeId: EnemyTypeId;
@@ -3276,6 +3278,10 @@ export type GuildNoticeBoardQuestReward = {
 export type GuildNoticeBoardQuest = {
   id: string;
   title: string;
+  category?: GuildNoticeBoardQuestCategory;
+  zoneDisplayName?: string;
+  description?: string;
+  isStarterContract?: true;
   sequence: number;
   status: GuildNoticeBoardQuestStatus;
   generatedAtMs: number;
@@ -3437,6 +3443,7 @@ export type GuildNoticeBoardState = {
   hasSeenCurrentRefresh: boolean;
   rerollsUsedToday: number;
   rerollDayStartMs: number;
+  starterContractAccepted?: boolean;
 };
 
 export type ResourceEntity = BaseEntity & {

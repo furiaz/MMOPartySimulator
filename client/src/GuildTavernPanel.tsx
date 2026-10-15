@@ -1657,7 +1657,7 @@ function GuildNoticeBoardView({
                   </div>
                   <div>
                     <dt>Type</dt>
-                    <dd>Exterminate</dd>
+                    <dd>{getNoticeBoardQuestCategoryLabel(quest)}</dd>
                   </div>
                 </dl>
               </div>
@@ -1684,6 +1684,12 @@ function GuildNoticeBoardView({
                 })}
               </div>
             </div>
+
+            {quest.description ? (
+              <p className="guild-notice-board-description">
+                {quest.description}
+              </p>
+            ) : null}
 
             <div className="guild-notice-board-objectives">
               <strong>Objectives</strong>
@@ -2961,6 +2967,12 @@ function getNoticeBoardQuestStatusLabel(
   }
 
   return "Available";
+}
+
+function getNoticeBoardQuestCategoryLabel(
+  quest: GuildNoticeBoardQuest,
+): string {
+  return quest.category === "assault" ? "Assault" : "Extermination";
 }
 
 function getRoleLabel(role: PartyMemberRole): string {

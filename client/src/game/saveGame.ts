@@ -29,7 +29,10 @@ import {
 } from "./enemyAbilities";
 import { SUPERIOR_ENEMY_CHANCE } from "./enemyVariants";
 import { normalizeEquipmentDropPopupThreshold } from "./equipmentDropPopups";
-import { sanitizeGuildNoticeBoardState } from "./guildNoticeBoard";
+import {
+  ensureStarterGuildNoticeBoardContract,
+  sanitizeGuildNoticeBoardState,
+} from "./guildNoticeBoard";
 import { addItemToInventoryState } from "./inventory";
 import { sanitizeGuildRecruitState } from "./guildRecruit";
 import { sanitizeGuildUpgradesState } from "./guildRecruitUpgrades";
@@ -58,10 +61,15 @@ import {
   recordHighestCharacterLevelEver,
 } from "./partySystem";
 import {
+  ASH_GOBLIN_MAIN_QUEST_ID,
+  GUILD_BOARD_ONBOARDING_QUEST_ID,
   createInitialQuestStates,
+  hasFirstClassRosterCompanion,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
+  reconcileQuestAvailability,
 } from "./questSystem";
+import { recordEquippedItemObjectivesForQuests } from "./questProgressionHooks";
 import { sanitizeProgressionForCompanion } from "./skillProgression";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import type { GameState } from "./state";
@@ -842,16 +850,80 @@ export function sanitizeGameStateForSave(
   enemyAbilityDefinitions: EnemyAbilityRegistry = ENEMY_ABILITY_DEFINITIONS,
 ): GameState {
   const currentMapId = state.currentMapId ?? "hub";
-  const quests = sanitizeQuestStates(state.quests);
-  const map = createDebugMapForQuestState(currentMapId, quests);
+  const didSaveHaveNewQuestStates = Boolean(
+    state.quests[GUILD_BOARD_ONBOARDING_QUEST_ID] ||
+      state.quests[ASH_GOBLIN_MAIN_QUEST_ID],
+  );
   const savedEntities = Object.fromEntries(
     Object.entries(state.entities).map(([id, entity]) => [id, sanitizeEntityForSave(entity, state.partyLeaderId)]),
   );
-  const entities = restoreCurrentMapNpcs(savedEntities, currentMapId, quests);
   const restingCompanionsById = sanitizeRestingCompanionsForSave(
     state.restingCompanionsById,
-    entities,
+    savedEntities,
   );
+  const guildUpgrades = sanitizeGuildUpgradesState(state.guildUpgrades);
+  let guildNoticeBoard = sanitizeGuildNoticeBoardState(
+    state.guildNoticeBoard,
+    undefined,
+    {
+      ...state,
+      guildUpgrades,
+    },
+  );
+  let questReconciliationState: GameState = {
+    ...state,
+    currentMapId,
+    entities: savedEntities,
+    restingCompanionsById,
+    guildUpgrades,
+    guildNoticeBoard,
+    quests: sanitizeQuestStates(state.quests),
+  };
+
+  const isEligibleLegacyQuestSave =
+    !didSaveHaveNewQuestStates &&
+    questReconciliationState.quests.azure_trial.status === "completed" &&
+    hasFirstClassRosterCompanion(questReconciliationState);
+
+  if (isEligibleLegacyQuestSave) {
+    questReconciliationState = {
+      ...questReconciliationState,
+      quests: {
+        ...questReconciliationState.quests,
+        [GUILD_BOARD_ONBOARDING_QUEST_ID]: completeSanitizedQuest(
+          questReconciliationState.quests[GUILD_BOARD_ONBOARDING_QUEST_ID],
+        ),
+        [ASH_GOBLIN_MAIN_QUEST_ID]: {
+          ...questReconciliationState.quests[ASH_GOBLIN_MAIN_QUEST_ID],
+          status: "available",
+        },
+      },
+    };
+  } else {
+    questReconciliationState = reconcileQuestAvailability(
+      questReconciliationState,
+    );
+
+    if (
+      questReconciliationState.quests[GUILD_BOARD_ONBOARDING_QUEST_ID]
+        .status !== "completed" &&
+      !questReconciliationState.guildNoticeBoard?.starterContractAccepted
+    ) {
+      questReconciliationState = ensureStarterGuildNoticeBoardContract(
+        questReconciliationState,
+      );
+    }
+  }
+
+  questReconciliationState = recordEquippedItemObjectivesForQuests(
+    questReconciliationState,
+    "save_restoration",
+  );
+
+  const quests = questReconciliationState.quests;
+  guildNoticeBoard = questReconciliationState.guildNoticeBoard ?? guildNoticeBoard;
+  const map = createDebugMapForQuestState(currentMapId, quests);
+  const entities = restoreCurrentMapNpcs(savedEntities, currentMapId, quests);
   const followTrailsByEntityId = Object.fromEntries(
     Object.keys(entities).map((entityId) => [entityId, []]),
   );
@@ -860,21 +932,12 @@ export function sanitizeGameStateForSave(
     entities,
     restingCompanionsById,
   });
-  const guildUpgrades = sanitizeGuildUpgradesState(state.guildUpgrades);
   const innUpgrades = sanitizeInnUpgradesState(state.innUpgrades);
   const guildRecruit = sanitizeGuildRecruitState(state.guildRecruit, undefined, {
     ...state,
     guildUpgrades,
     innUpgrades,
   });
-  const guildNoticeBoard = sanitizeGuildNoticeBoardState(
-    state.guildNoticeBoard,
-    undefined,
-    {
-      ...state,
-      guildUpgrades,
-    },
-  );
   const guildSecondaryParties = sanitizeGuildSecondaryPartiesState(
     state.guildSecondaryParties,
     restingCompanionsById,

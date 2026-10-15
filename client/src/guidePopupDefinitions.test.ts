@@ -53,4 +53,17 @@ describe("guide popup definitions", () => {
       ],
     });
   });
+
+  it("explains concurrent Guild Board progress and reward claiming", () => {
+    const guide = guidePopupDefinitions.guild_notice_board_onboarding;
+
+    expect(guide.panels).toHaveLength(2);
+    expect(guide.panels[0]?.body).toContain("alongside main quests");
+    expect(guide.panels[0]?.body).toContain("Only taken contracts");
+    expect(guide.panels[1]?.body).toContain("claim its Crowns and skill book");
+    expect(guide.panels.every((panel) =>
+      panel.menuTarget?.tab === "atlas" &&
+      panel.menuTarget.atlasSubpage === "guildTavern"
+    )).toBe(true);
+  });
 });

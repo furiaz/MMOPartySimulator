@@ -496,7 +496,7 @@ function getQuestTargetOptions(
   const quest = state.quests[questId];
   const targetMapId =
     globalPoiIntent.type === "get_new_quest"
-      ? HUB_MAP_ID
+      ? QUEST_DEFINITIONS[questId].questGiverMapId
       : getQuestTargetMapId(state, questId);
 
   if (targetMapId !== state.currentMapId) {

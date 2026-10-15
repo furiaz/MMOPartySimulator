@@ -457,7 +457,7 @@ describe("guild field team assignments", () => {
     const withKills = withPendingAssignmentResult(assigned.state, {
       enemyKills: 2,
       enemyKillsByType: [
-        { enemyTypeId: "goblin_shaman", enemyLevel: 10, quantity: 2 },
+        { enemyTypeId: "ash_wisp", enemyLevel: 10, quantity: 2 },
       ],
       xpGranted: 0,
       loot: [],

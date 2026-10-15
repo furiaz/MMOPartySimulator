@@ -695,6 +695,8 @@ Current save game behavior:
 - restore rebuilds the current debug map from saved quest state
 - restore applies Farm and Livestock catch-up through their capped production rules
 - save sanitization preserves valid shared inventory, bank, key item, wallet, quest, companion progression, companion equipment, companion flask assignment, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers
+- save sanitization reconciles state-derived quest availability, rechecks active equipment objectives, and persists starter-contract acceptance with existing Notice Board progress
+- legacy saves missing both new quest ids skip onboarding when The Azure Trial is already completed and any active or resting roster companion has a first class; otherwise they retain the onboarding flow and receive the dedicated starter contract without replacing saved Board slots
 - save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, autonomous target suppressions, skill runtime, status-effect runtime, companion AoE runtime, enemy AoE channels, enemy AoE cooldowns, active reusable enemy ability casts, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, companion damage timing, short-lived news broadcasts, and debug telemetry
 - reusable enemy ability cooldowns are the focused exception to normal combat-cooldown clearing: sanitization preserves only known configured abilities with finite unexpired absolute expiration timestamps and preserves a valid required-basic-attack gate, while discarding malformed, expired, unknown-ability, and missing-enemy records
 - companion save sanitization keeps dead companions dead, returns living companions to idle or follow state, clears temporary consumable buffs, and sanitizes skill progression data
@@ -1681,6 +1683,8 @@ Current quest ids are:
 - `crawler_shelf_report`
 - `find_slimeward_camp`
 - `azure_trial`
+- `orders_from_the_guild`
+- `break_the_ash_camp`
 
 Current quest display names are:
 
@@ -1697,6 +1701,8 @@ Current quest display names are:
 - `crawler_shelf_report`: Crawler Shelf Report
 - `find_slimeward_camp`: Slimeward Trail
 - `azure_trial`: The Azure Trial
+- `orders_from_the_guild`: Orders from the Guild
+- `break_the_ash_camp`: Break the Ash Camp
 
 Current quest objective types are:
 
@@ -1719,12 +1725,19 @@ type QuestObjectiveType =
   | "unlock_route"
   | "defeat_elite"
   | "collect_dungeon_chest"
-  | "return_to_poi";
+  | "return_to_poi"
+  | "take_guild_notice_board_quest";
 ```
 
-Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, and crafted item checks.
+Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, and taking a matching Guild Notice Board quest.
 
-Current NPC quest location display and World Travel quest hints are derived UI data from `QUEST_DEFINITIONS` and `QuestState`. Active NPC quests use incomplete objectives in definition order, resolving objective location from `targetMapId` first and then `enemyMapId`. Unmapped active NPC quest objectives point to Harbor Union Bastion. Ready-to-turn-in NPC quests point to the quest giver hub and render as completed without objective lines. Slimeward special-region objectives resolve to Azurefen Hollow / Imp Fen, the nearest routeable parent zone/subzone, instead of dungeon floor route rows. Guild Notice Board quests do not participate in these NPC quest route hints. This UI hint layer must not add persisted quest-location state, new route commands, or Notice Board routing behavior.
+Each `QuestDefinition` owns `questGiverPoiId` and `questGiverMapId`. Availability may also require completed quests and a first-class active or resting roster companion. `reconcileQuestAvailability` evaluates those state-derived requirements after relevant quest completion, first-class selection, and save restoration.
+
+`gather_item_count` may omit `resourceType` to match any successfully inventoried resource while retaining map and subzone filters. The `first_class_weapon` equipment requirement inspects current active-companion hand slots for equipment whose kind is `weapon`, whose type is not a Training Sword, and whose allowed-class list includes a first class. Quest acceptance, equipment changes, and restoration call the shared equipment-objective check; completed equipment objectives are monotonic.
+
+`guildNoticeBoardQuestIntegration.ts` owns the Board-take-to-quest-progress seam. React invokes that game-logic action rather than coordinating onboarding progress itself. A previously accepted starter contract is state-derived on onboarding acceptance.
+
+Current NPC quest location display and World Travel quest hints are derived UI data from `QUEST_DEFINITIONS` and `QuestState`. Active NPC quests use incomplete objectives in definition order, resolving objective location from `targetMapId` first and then `enemyMapId`; unmapped objectives use the definition's `questGiverMapId`. Ready-to-turn-in and available NPC quests use the same data-driven quest-giver map and render turn-ins as completed without objective lines. Slimeward special-region objectives resolve to Azurefen Hollow / Imp Fen, the nearest routeable parent zone/subzone, instead of dungeon floor route rows. Guild Notice Board quests do not participate in these NPC quest route hints. This UI hint layer must not add persisted quest-location state, new route commands, or Notice Board routing behavior.
 
 `questEntityIndicators.ts` derives UI-only quest entity indicators from current quest state, Guild Notice Board state, and current entities. It returns at most one indicator per entity id. Active incomplete main quest objectives may mark matching living enemies, active resources, guide NPCs, rescue NPCs, or explicit objective NPC/POI entities on the current map. Available and ready-to-turn-in main quests may mark their quest giver NPC. Taken incomplete Guild Notice Board kill objectives may mark matching living enemies by `enemyTypeId`; available and done Notice Board quests do not mark enemies. This helper must not persist indicator state or own quest simulation behavior.
 
@@ -1742,6 +1755,12 @@ Current prototype quest chain:
 - `broken_thicket_survey` unlocks `crawler_shelf_report`
 - `crawler_shelf_report` unlocks `find_slimeward_camp`
 - `find_slimeward_camp` unlocks `azure_trial`
+- completed `azure_trial` plus any first-class active or resting roster companion makes `orders_from_the_guild` available
+- `orders_from_the_guild` unlocks `break_the_ash_camp`
+
+`orders_from_the_guild` completes its objective when the dedicated starter Notice Board contract is taken and grants no rewards. `break_the_ash_camp` uses parallel map-4 objectives for 200 direct kill credits, 20 successfully inventoried resources of any supported type, and one first-class weapon, then grants 1800 character XP through the existing quest reward path and 500 Crowns once.
+
+`directKillCredit.ts` is the shared direct-defeat credit helper. It returns 2 for Superior enemies and 1 otherwise. Direct NPC `defeat_enemy_count` objectives and direct Notice Board kill objectives use it. Quest-item drop rolls remain once per enemy, `defeat_elite` remains one completion, and aggregate Field Team kill redemption keeps the quantities reported by the estimator without applying Superior credit.
 
 Current quest rewards may include:
 
@@ -2984,12 +3003,16 @@ Current Guild Recruit behavior:
 
 Current Guild Notice Board behavior:
 
-- stores board slots, refresh timing, seen state, quest sequence, rerolls, and taken/done quest progress
+- stores board slots, refresh timing, seen state, regular quest sequence, rerolls, starter acceptance, category, description, and taken/done quest progress
 - records enemy-defeat progress only after board quests are taken
 - supports available, taken, and done board quest states
 - claims completed board rewards through board interaction
 - uses board upgrades for slot count, reward quality, refresh speed, and Scout rerolls
 - derives daily reroll limit from Guild Scouts plus active Livestock helper bonuses from placed, fed Wolves
+- provides reusable Assault and Extermination title/template helpers while leaving Rummage and Forage generation unimplemented
+- creates the fixed `guild-notice-board-starter-ash-goblin-encampment` contract outside normal sequence ids, with 50 Ash Wisp and 50 Ember Imp objectives and the existing 100-Crown-plus-skill-book reward path
+- protects the available starter contract from scheduled refresh and reroll, continues rerolling other eligible slots, and consumes no reroll when no slot can change
+- preserves existing saved slots and progress; after the starter is accepted, cancellation, completion, claiming, and replacement use the ordinary Board lifecycle
 
 Current Field Team behavior:
 
