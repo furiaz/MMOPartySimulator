@@ -1055,10 +1055,14 @@ export {
 } from "./enemyAoeChannelSystem";
 export {
   ENEMY_ABILITY_DEFINITIONS,
+  FORTIFYING_AURA_STATUS_SOURCE_KEY,
+  ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
+  TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
   getEnemyAbilityDefinition,
   type EnemyAbilityDefinition,
   type EnemyAbilityRegistry,
   type EnemyAbilityResolutionContext,
+  type EnemyAbilityStartContext,
 } from "./enemyAbilities";
 export {
   cancelEnemyAbilityCast,

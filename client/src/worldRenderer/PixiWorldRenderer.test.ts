@@ -712,6 +712,40 @@ describe("getFullRenderSignature", () => {
       }),
     ).not.toBe(baseSignature);
   });
+
+  it("includes locked enemy ability area geometry and supportive intent", () => {
+    const input = createFullRenderSignatureInput();
+    const companion = input.entities[0];
+    const createCast = (radius: number) => ({
+      id: "crawler:tin_crawler_defense_aura:1000",
+      abilityId: "tin_crawler_defense_aura",
+      casterId: "crawler",
+      targetId: companion.id,
+      phase: "casting" as const,
+      startedAt: 1000,
+      castEndsAt: 1800,
+      windupEndsAt: 2000,
+      origin: { x: 5, y: 4 },
+      targetPosition: companion.position,
+      direction: { x: -1, y: 0 },
+      area: resolveAoePattern(
+        { type: "circle" as const, radius },
+        createAoeCastTransform({ x: 5, y: 4 }, companion.position),
+      ),
+      visualIntent: "enemySupportive" as const,
+    });
+    const firstSignature = getFullRenderSignature({
+      ...input,
+      enemyAbilityCastsByEnemyId: { crawler: createCast(5) },
+    });
+
+    expect(
+      getFullRenderSignature({
+        ...input,
+        enemyAbilityCastsByEnemyId: { crawler: createCast(6) },
+      }),
+    ).not.toBe(firstSignature);
+  });
 });
 
 describe("texture lifetime classification", () => {

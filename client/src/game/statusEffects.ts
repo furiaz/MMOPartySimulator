@@ -61,6 +61,7 @@ export type ApplyStatusEffectInput =
       defenseBonusPercent: number;
       sourceId?: string;
       sourceKey?: string;
+      endsWhenSourceDies?: boolean;
     };
 
 export type StatusEffectRemovalFilter = {
@@ -110,6 +111,7 @@ export function applyStatusEffect(
     targetId: input.targetId,
     sourceId: input.sourceId,
     sourceKey: input.sourceKey,
+    ...(input.endsWhenSourceDies ? { endsWhenSourceDies: true as const } : {}),
     appliedAt: now,
     expiresAt: now + durationMs,
   };
@@ -174,7 +176,28 @@ export function clearStatusEffectsForEntity(
   state: GameState,
   entityId: string,
 ): GameState {
-  return removeStatusEffects(state, { targetId: entityId });
+  const statusEffectsById = state.statusEffectsById;
+
+  if (!statusEffectsById) {
+    return state;
+  }
+
+  let didRemove = false;
+  const entries = Object.entries(statusEffectsById).filter(([, status]) => {
+    const shouldRemove =
+      status.targetId === entityId ||
+      (status.sourceId === entityId && status.endsWhenSourceDies === true);
+
+    didRemove ||= shouldRemove;
+    return !shouldRemove;
+  });
+
+  return didRemove
+    ? {
+        ...state,
+        statusEffectsById: Object.fromEntries(entries),
+      }
+    : state;
 }
 
 export function isMovementBlockedByStatus(

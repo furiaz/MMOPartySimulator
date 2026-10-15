@@ -5,6 +5,7 @@ import {
   type EnemyAbilityDefinition,
   type EnemyAbilityRegistry,
 } from "./enemyAbilities";
+import { resolveAoePattern } from "./aoePatterns";
 import { getEnemyCombatBodyRadius, getEnemyType } from "./enemyArchetypes";
 import { isEnemyEntity } from "./entityGuards";
 import { getEuclideanDistance } from "./positionUtils";
@@ -285,7 +286,15 @@ function maybeStartEnemyAbility(
       !definition ||
       !definition.resolve ||
       isEnemyAbilityOnCooldown(state, enemy.id, abilityId, now) ||
-      !isInAbilityRange(enemy, target, definition.range)
+      !isInAbilityRange(enemy, target, definition.range) ||
+      (definition.canStart &&
+        !definition.canStart({
+          state,
+          caster: enemy,
+          target,
+          definition,
+          now,
+        }))
     ) {
       continue;
     }
@@ -325,6 +334,12 @@ function startEnemyAbility(
   const direction = getNormalizedDirection(caster.position, target.position);
   const castDurationMs = Math.max(0, definition.castDurationMs);
   const windupDurationMs = Math.max(0, definition.windupDurationMs ?? 0);
+  const area = definition.aoePattern
+    ? resolveAoePattern(definition.aoePattern, {
+        origin: caster.position,
+        direction,
+      })
+    : undefined;
   const cast: EnemyAbilityCastState = {
     id: `${caster.id}:${definition.id}:${now}`,
     abilityId: definition.id,
@@ -337,6 +352,8 @@ function startEnemyAbility(
     origin: { ...caster.position },
     targetPosition: { ...target.position },
     direction,
+    area,
+    visualIntent: area ? definition.aoeVisualIntent : undefined,
   };
   const cooldown: EnemyAbilityCooldownState = {
     abilityId: definition.id,

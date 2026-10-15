@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveAoePattern } from "./aoePatterns";
 import { updateCombatProjectileSystem } from "./combatProjectileSystem";
-import { createCompanion, createEnemy } from "./entities";
+import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import {
   ENEMY_ABILITY_DEFINITIONS,
+  FORTIFYING_AURA_STATUS_SOURCE_KEY,
+  ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
+  TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
   getEnemyAbilityDefinition,
   type EnemyAbilityDefinition,
 } from "./enemyAbilities";
@@ -48,6 +52,171 @@ describe("enemy ability definitions", () => {
     expect(
       getEnemyAbilityDefinition("fire_bolt", { fire_bolt: invalidDefinition }),
     ).toBeUndefined();
+  });
+
+  it("registers the tuned Fortifying Aura variants on the intended enemies", () => {
+    expect(
+      getEnemyAbilityDefinition(TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID),
+    ).toMatchObject({
+      id: TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
+      displayName: "Fortifying Aura",
+      range: 6,
+      cooldownMs: 14000,
+      castDurationMs: 800,
+      windupDurationMs: 200,
+      aoePattern: { type: "circle", radius: 5 },
+      aoeVisualIntent: "enemySupportive",
+    });
+    expect(
+      getEnemyAbilityDefinition(ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID),
+    ).toMatchObject({
+      id: ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
+      displayName: "Fortifying Aura",
+      range: 10,
+      cooldownMs: 16000,
+      castDurationMs: 1000,
+      windupDurationMs: 250,
+      aoePattern: { type: "circle", radius: 6 },
+      aoeVisualIntent: "enemySupportive",
+    });
+    expect(ENEMY_TYPES.tin_crawler.abilityIds).toEqual([
+      TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
+    ]);
+    expect(ENEMY_TYPES.orc_shieldbearer.abilityIds).toEqual([
+      ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
+    ]);
+  });
+
+  it("buffs living non-dummy enemies by center position and leaves others alone", () => {
+    const caster = createEnemy("crawler", { x: 0, y: 0 }, "aggressive", {
+      enemyTypeId: "tin_crawler",
+    });
+    const boundaryAlly = createEnemy("boundary", { x: 5, y: 0 }, "aggressive", {
+      enemyTypeId: "briar_wolf",
+      variant: "superior",
+    });
+    const warmaster = createEnemy("warmaster", { x: 0, y: 4 }, "aggressive", {
+      enemyTypeId: "orc_warmaster",
+    });
+    const outsideAlly = createEnemy("outside", { x: 5.01, y: 0 }, "aggressive", {
+      enemyTypeId: "briar_wolf",
+    });
+    const deadAlly = {
+      ...createEnemy("dead", { x: 1, y: 0 }, "aggressive", {
+        enemyTypeId: "briar_wolf",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const dummy = createTargetDummy("dummy", { x: 1, y: 1 });
+    const companion = createCompanion("companion", { x: 2, y: 0 }, "Companion");
+    const state = [
+      caster,
+      boundaryAlly,
+      warmaster,
+      outsideAlly,
+      deadAlly,
+      dummy,
+      companion,
+    ].reduce(addEntity, createTestGameState({ partyLeaderId: companion.id }));
+    const definition = getEnemyAbilityDefinition(
+      TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
+    );
+
+    if (!definition?.resolve || !definition.aoePattern) {
+      throw new Error("Expected Tin Crawler Fortifying Aura definition");
+    }
+
+    const cast = createAuraCast(caster, companion, definition, 1000);
+    const nextState = definition.resolve({
+      state,
+      caster,
+      target: companion,
+      cast,
+      definition,
+      now: 2000,
+    });
+    const statuses = Object.values(nextState.statusEffectsById ?? {});
+
+    expect(statuses.map((status) => status.targetId).sort()).toEqual(
+      [boundaryAlly.id, caster.id, warmaster.id].sort(),
+    );
+    expect(statuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetId: boundaryAlly.id,
+          sourceId: caster.id,
+          sourceKey: FORTIFYING_AURA_STATUS_SOURCE_KEY,
+          defenseBonusPercent: 50,
+          expiresAt: 10000,
+          endsWhenSourceDies: true,
+        }),
+      ]),
+    );
+  });
+
+  it("replaces Fortifying Aura strength, owner, and duration instead of stacking", () => {
+    const crawler = createEnemy("crawler", { x: 0, y: 0 }, "aggressive", {
+      enemyTypeId: "tin_crawler",
+    });
+    const shieldbearer = createEnemy(
+      "shieldbearer",
+      { x: 1, y: 0 },
+      "aggressive",
+      { enemyTypeId: "orc_shieldbearer" },
+    );
+    const target = createEnemy("target", { x: 2, y: 0 }, "aggressive", {
+      enemyTypeId: "orc_warmaster",
+    });
+    const companion = createCompanion("companion", { x: 3, y: 0 }, "Companion");
+    let state = [crawler, shieldbearer, target, companion].reduce(
+      addEntity,
+      createTestGameState({ partyLeaderId: companion.id }),
+    );
+    const stronger = getEnemyAbilityDefinition(
+      ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
+    );
+    const weaker = getEnemyAbilityDefinition(
+      TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
+    );
+
+    if (
+      !stronger?.resolve ||
+      !stronger.aoePattern ||
+      !weaker?.resolve ||
+      !weaker.aoePattern
+    ) {
+      throw new Error("Expected both Fortifying Aura definitions");
+    }
+
+    state = stronger.resolve({
+      state,
+      caster: shieldbearer,
+      target: companion,
+      cast: createAuraCast(shieldbearer, companion, stronger, 1000),
+      definition: stronger,
+      now: 2250,
+    });
+    state = weaker.resolve({
+      state,
+      caster: crawler,
+      target: companion,
+      cast: createAuraCast(crawler, companion, weaker, 3000),
+      definition: weaker,
+      now: 4000,
+    });
+
+    const targetStatuses = Object.values(state.statusEffectsById ?? {}).filter(
+      (status) => status.targetId === target.id,
+    );
+    expect(targetStatuses).toEqual([
+      expect.objectContaining({
+        sourceId: crawler.id,
+        defenseBonusPercent: 50,
+        appliedAt: 4000,
+        expiresAt: 12000,
+      }),
+    ]);
   });
 
   it("launches Fire Bolt from the locked cast origin with the agreed profile", () => {
@@ -250,4 +419,40 @@ function createEngagedFireBoltState(targetPosition: { x: number; y: number }) {
   );
 
   return { caster, state, target };
+}
+
+function createAuraCast(
+  caster: Enemy,
+  target: Companion,
+  definition: EnemyAbilityDefinition,
+  startedAt: number,
+): EnemyAbilityCastState {
+  if (!definition.aoePattern) {
+    throw new Error("Expected an AoE pattern");
+  }
+
+  const direction = {
+    x: target.position.x - caster.position.x,
+    y: target.position.y - caster.position.y,
+  };
+
+  return {
+    id: `${caster.id}:${definition.id}:${startedAt}`,
+    abilityId: definition.id,
+    casterId: caster.id,
+    targetId: target.id,
+    phase: "windup",
+    startedAt,
+    castEndsAt: startedAt + definition.castDurationMs,
+    windupEndsAt:
+      startedAt + definition.castDurationMs + (definition.windupDurationMs ?? 0),
+    origin: { ...caster.position },
+    targetPosition: { ...target.position },
+    direction,
+    area: resolveAoePattern(definition.aoePattern, {
+      origin: caster.position,
+      direction,
+    }),
+    visualIntent: definition.aoeVisualIntent,
+  };
 }

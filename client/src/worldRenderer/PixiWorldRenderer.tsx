@@ -25,6 +25,7 @@ import {
 import type {
   ActiveCombatProjectile,
   ActiveTeleport,
+  AoeVisualIntent,
   CombatFeedbackEvent,
   CompanionAoeChannelState,
   CompanionDirectCommandInput,
@@ -52,6 +53,7 @@ import type {
   StatusEffectState,
 } from "../game";
 import {
+  FORTIFYING_AURA_STATUS_SOURCE_KEY,
   getEnemyAggroRange,
   getEnemyArchetype,
   getEnemyAbilityDefinition,
@@ -148,6 +150,8 @@ const passiveEnemyNameplateColor = 0x1f2937;
 const superiorEnemyAuraColor = 0xef4444;
 const enemyAoeFillColor = 0xdc2626;
 const enemyAoeStrokeColor = 0x7f1d1d;
+const enemySupportiveAoeFillColor = 0xf59e0b;
+const enemySupportiveAoeStrokeColor = 0xd97706;
 const partyOffensiveAoeFillColor = 0x2563eb;
 const partyOffensiveAoeStrokeColor = 0x1d4ed8;
 const partyHealingAoeFillColor = 0x16a34a;
@@ -3985,6 +3989,32 @@ function drawSkillLink(
     .stroke({ color, alpha: 0.72, width });
 }
 
+function drawEnemyAbilityAreas(
+  graphics: Graphics,
+  castsByEnemyId: Record<string, EnemyAbilityCastState>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const cast of Object.values(castsByEnemyId)) {
+    if (
+      !cast.area ||
+      !cast.visualIntent ||
+      cast.windupEndsAt <= currentTime ||
+      !doAoeBoundsIntersect(cast.area.bounds, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    drawResolvedAoeArea(graphics, {
+      area: cast.area,
+      transform,
+      intent: cast.visualIntent,
+      opacity: 0.55,
+    });
+  }
+}
+
 function drawEnemyAoeChannels(
   graphics: Graphics,
   channelsByCasterId: Record<string, EnemyAoeChannelState>,
@@ -4044,7 +4074,7 @@ function drawResolvedAoeArea(
   options: {
     area: ResolvedAoeArea;
     transform: FullTransform;
-    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    intent: AoeVisualIntent;
     opacity: number;
   },
 ) {
@@ -4097,7 +4127,7 @@ function drawAoeRing(
     center: Position;
     innerRadiusPx: number;
     outerRadiusPx: number;
-    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    intent: AoeVisualIntent;
     opacity: number;
   },
 ) {
@@ -4128,7 +4158,7 @@ function drawAoeSquare(
   graphics: Graphics,
   square: ResolvedAoeSquare,
   transform: FullTransform,
-  intent: "enemyOffensive" | "partyOffensive" | "partyHealing",
+  intent: AoeVisualIntent,
   opacity: number,
 ) {
   const style = getAoeShapeStyle(intent, opacity);
@@ -4159,7 +4189,7 @@ function drawAoeCone(
   graphics: Graphics,
   cone: ResolvedAoeCone,
   transform: FullTransform,
-  intent: "enemyOffensive" | "partyOffensive" | "partyHealing",
+  intent: AoeVisualIntent,
   opacity: number,
 ) {
   const style = getAoeShapeStyle(intent, opacity);
@@ -4188,7 +4218,7 @@ function drawAoeCone(
 }
 
 function getAoeShapeStyle(
-  intent: "enemyOffensive" | "partyOffensive" | "partyHealing",
+  intent: AoeVisualIntent,
   opacity: number,
 ) {
   const alpha = Math.min(1, Math.max(0, opacity));
@@ -4199,6 +4229,15 @@ function getAoeShapeStyle(
       fillAlpha: 0.13 + alpha * 0.5,
       strokeColor: enemyAoeStrokeColor,
       strokeAlpha: 0.48 + alpha * 0.52,
+    };
+  }
+
+  if (intent === "enemySupportive") {
+    return {
+      fillColor: enemySupportiveAoeFillColor,
+      fillAlpha: 0.05 + alpha * 0.1,
+      strokeColor: enemySupportiveAoeStrokeColor,
+      strokeAlpha: 0.42 + alpha * 0.4,
     };
   }
 
@@ -4223,7 +4262,7 @@ function drawAoeCircle(
   graphics: Graphics,
   options: {
     center: { x: number; y: number };
-    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    intent: AoeVisualIntent;
     opacity: number;
     radiusPx: number;
   },
@@ -4237,6 +4276,20 @@ function drawAoeCircle(
       enemyAoeStrokeColor,
       options.opacity,
     );
+    return;
+  }
+
+  if (options.intent === "enemySupportive") {
+    const alpha = Math.min(1, Math.max(0, options.opacity));
+
+    graphics
+      .circle(options.center.x, options.center.y, options.radiusPx)
+      .fill({ color: enemySupportiveAoeFillColor, alpha: 0.05 + alpha * 0.1 })
+      .stroke({
+        color: enemySupportiveAoeStrokeColor,
+        alpha: 0.42 + alpha * 0.4,
+        width: 3,
+      });
     return;
   }
 
@@ -4379,6 +4432,63 @@ function drawEnemyAbilityCastGlows(
       .circle(center.x, center.y, radius)
       .fill({ color: 0xf97316, alpha: 0.08 + pulse * 0.08 })
       .stroke({ color: 0xfb923c, alpha: 0.52 + pulse * 0.3, width: 3 });
+  }
+}
+
+function drawFortifyingAuraOutlines(
+  graphics: Graphics,
+  entities: GameEntity[],
+  statusEffectsById: Record<string, StatusEffectState>,
+  currentTime: number,
+  map: GameMap,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  const fortifiedEnemyIds = new Set(
+    Object.values(statusEffectsById)
+      .filter(
+        (status) =>
+          status.type === "defenseBuff" &&
+          status.sourceKey === FORTIFYING_AURA_STATUS_SOURCE_KEY &&
+          status.expiresAt > currentTime,
+      )
+      .map((status) => status.targetId),
+  );
+
+  for (const entity of entities) {
+    if (
+      entity.kind !== "enemy" ||
+      entity.state === "dead" ||
+      entity.health <= 0 ||
+      !fortifiedEnemyIds.has(entity.id) ||
+      !isPositionInTileBounds(entity.position, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const visualAsset = getEntityVisualAsset(entity, map.id);
+    const layout = getEntitySpriteLayout(
+      entity,
+      transform.cellPixelSize,
+      visualAsset,
+    );
+    const entityPosition = toFullPosition(entity.position, transform);
+    const spritePosition = {
+      x: entityPosition.x,
+      y: entityPosition.y + transform.cellPixelSize / 2,
+    };
+    const radiusMultiplier = isSuperiorEnemy(entity) ? 0.48 : 0.42;
+    const radius = Math.max(layout.width, layout.height) * radiusMultiplier;
+    const centerY = spritePosition.y - layout.height * 0.18;
+
+    graphics
+      .circle(spritePosition.x, centerY, radius)
+      .fill({ color: enemySupportiveAoeFillColor, alpha: 0.04 })
+      .stroke({
+        color: enemySupportiveAoeStrokeColor,
+        alpha: 0.92,
+        width: 3,
+      });
   }
 }
 
@@ -6023,6 +6133,13 @@ function drawFullMap({
     transform,
     visibleTileBounds,
   });
+  drawEnemyAbilityAreas(
+    effectsGraphics,
+    enemyAbilityCastsByEnemyId,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
   drawFullEntities({
     cache: textureCache,
     combatFeedbackEvents,
@@ -6039,6 +6156,15 @@ function drawFullMap({
     visibleTileBounds,
     visualMovementByEntityId,
   });
+  drawFortifyingAuraOutlines(
+    effectsGraphics,
+    entities,
+    statusEffectsById,
+    statusPresentationTime,
+    map,
+    transform,
+    visibleTileBounds,
+  );
   drawEnemyAbilityCastGlows(
     effectsGraphics,
     enemyAbilityCastsByEnemyId,

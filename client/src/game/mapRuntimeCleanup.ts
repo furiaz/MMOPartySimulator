@@ -406,7 +406,13 @@ function pruneRecordById<T>(
   return nextRecord ?? record;
 }
 
-function pruneStatusEffectsByEntityId<T extends { targetId: string; sourceId?: string }>(
+function pruneStatusEffectsByEntityId<
+  T extends {
+    targetId: string;
+    sourceId?: string;
+    endsWhenSourceDies?: true;
+  },
+>(
   record: Record<string, T> | undefined,
   currentEntityIds: Set<string>,
 ): Record<string, T> | undefined {
@@ -418,7 +424,9 @@ function pruneStatusEffectsByEntityId<T extends { targetId: string; sourceId?: s
   const entries = Object.entries(record).filter(([, value]) => {
     const shouldKeep =
       currentEntityIds.has(value.targetId) &&
-      (!value.sourceId || currentEntityIds.has(value.sourceId));
+      (value.endsWhenSourceDies !== true ||
+        !value.sourceId ||
+        currentEntityIds.has(value.sourceId));
 
     didPrune ||= !shouldKeep;
     return shouldKeep;

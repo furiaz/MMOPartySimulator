@@ -1847,6 +1847,7 @@ export type StatusEffectBase = {
   targetId: string;
   sourceId?: string;
   sourceKey?: string;
+  endsWhenSourceDies?: true;
   appliedAt: number;
   expiresAt: number;
 };
@@ -1942,6 +1943,7 @@ export type SkillVisualEvent = {
 
 export type AoeVisualIntent =
   | "enemyOffensive"
+  | "enemySupportive"
   | "partyOffensive"
   | "partyHealing";
 
@@ -2122,6 +2124,8 @@ export type EnemyAbilityCastState = {
   origin: Position;
   targetPosition: Position;
   direction: Position;
+  area?: ResolvedAoeArea;
+  visualIntent?: AoeVisualIntent;
 };
 
 export type EnemyAbilityCooldownState = {

@@ -1432,6 +1432,8 @@ function getEnemyAbilityCastSignature(
     getPositionSignature(cast.origin),
     getPositionSignature(cast.targetPosition),
     getPositionSignature(cast.direction),
+    cast.area ? getAoeAreaSignature(cast.area) : "",
+    cast.visualIntent ?? "",
   ].join(":");
 }
 
@@ -1520,6 +1522,8 @@ function getStatusEffectSignature(_statusId: string, status: StatusEffectState):
     status.targetId,
     status.sourceId ?? "",
     status.sourceKey ?? "",
+    status.endsWhenSourceDies ? "source-owned" : "",
+    status.type === "defenseBuff" ? status.defenseBonusPercent : "",
     status.appliedAt,
     status.expiresAt,
   ].join(":");
