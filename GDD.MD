@@ -535,6 +535,7 @@ Current prototype enemy variants:
 - A subzone can have at most one living Superior enemy at a time.
 - Superior enemies have increased health, attack, defense, magic defense, XP, drop tables, render scale, and a visible renderer aura.
 - Superior enemy spawning may happen during map spawn, enemy respawn, or explicit debug forcing.
+- A directly defeated Superior enemy grants 2 kill credits to matching NPC defeat-count objectives and taken Guild Notice Board kill objectives. Quest-item drops still roll once per defeated enemy, and aggregate Guild Field Team kill reports remain 1 credit per reported kill.
 
 Superior enemies are prototype rare-variant behavior, not final elite design, named boss design, affix design, or production rare-monster tuning.
 
@@ -1373,7 +1374,10 @@ Current Guild & Inn behavior:
 
 - the shared service is opened through the Atlas where supported or by interacting with the Guild Coordinator or Inn Keeper in hubs where they are present
 - Guild Recruit shows generated recruit candidates, refresh timing, recruitment upgrades, and destination preview
-- Guild Notice Board shows available, taken, and done board quests, quest refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, rewards, and unseen update sign state
+- Guild Notice Board shows available, taken, and done board quests, stored Assault or Extermination categories, descriptions, quest refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, rewards, and unseen update sign state
+- New parties receive a fixed `Assault on Ash Goblin Encampment` starter contract requiring 50 Ash Wisps and 50 Ember Imps. It uses the normal 100-Crown-plus-skill-book reward path and reward-quality scaling.
+- The available starter contract is protected from scheduled refreshes and rerolls until taken. Other eligible slots may still reroll, and a reroll is not consumed when no slot can change.
+- Notice Board kill progress begins only after a posting is taken. After the starter is taken, its completion, claiming, refresh, and cancellation follow normal Board behavior.
 - Guild Field Teams manage inactive companion assignment, roster movement, upgrades, AFK assignments, redeeming rewards, and return-to-hub behavior
 - Inn Rooms show every recruited companion as occupying a room slot, including active party, Inn reserve, and Field Team companions
 - Inn Kitchen cooks per-companion meals, manages selected recipes and auto-cook preferences, spends Hearth's Fire, and exposes Recipe Book, Pantry, and Kitchen upgrades
@@ -1481,6 +1485,7 @@ Supported prototype quest objective type definitions:
 - unlock route
 - collect dungeon chest
 - return to POI
+- take Guild Notice Board quest
 
 Current prototype quest content currently uses:
 
@@ -1500,6 +1505,7 @@ Current prototype quest content currently uses:
 - craft item
 - unlock route
 - collect dungeon chest
+- take Guild Notice Board quest
 
 Talk-to-POI and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
 
@@ -1582,9 +1588,27 @@ Current prototype quests:
   - Objectives: enter Slimeward Floor 1, defeat The Azure Mass on Slimeward Floor 2, and collect the Slimeward boss chest
   - Rewards: 100 Crowns, 1500 character XP
 
-The Quest Giver in Harbor Union Bastion can accept available Quest Giver quests and turn in ready Quest Giver quests from anywhere in that hub while the Quest Giver is present.
+- Orders from the Guild
+  - Quest id: orders_from_the_guild
+  - Availability: The Azure Trial is completed and at least one active or resting roster companion has selected a first class
+  - Objective: take the fixed `Assault on Ash Goblin Encampment` Guild Notice Board contract
+  - Rewards: none
+  - Unlocks: Break the Ash Camp after normal turn-in
+
+- Break the Ash Camp
+  - Quest id: break_the_ash_camp
+  - Objectives progress in parallel: earn 200 direct enemy kill credits in Ash Goblin Encampment, successfully collect 20 Wood, Ore, or Herb units from that map, and equip one class-restricted first-class weapon on an active party companion
+  - Training Sword variants and offhand-only shields, quivers, talismans, and daggers do not satisfy the weapon objective
+  - The equipment objective remains complete after it is first satisfied
+  - Rewards: 500 Crowns and 1800 character XP
+
+Quest definitions own their quest-giver map. Quest Givers in Harbor Union Bastion and Forward Bastion can accept their available quests and turn in their ready quests from anywhere in the matching hub while that Quest Giver is present.
 
 The Class Mentor may act as the current prototype quest source for The Azure Trial.
+
+`Orders from the Guild` is reconciled after Azure Trial turn-in, successful first-class selection, and save restoration so either requirement may be completed first. Taking its starter Board contract before accepting the onboarding quest satisfies the objective immediately when the quest is later accepted. The Board take action owns this progress in game logic rather than React UI.
+
+`Break the Ash Camp` counts only resource quantities successfully added to inventory from `map-4` / `ash-goblin-encampment`; failed full-inventory collection does not progress the quest. A generic gather objective may omit a resource type to match any supported resource while retaining its map and subzone restrictions.
 
 Current lightweight NPC speech bubble behavior:
 
@@ -1649,6 +1673,7 @@ Current prototype quest reward behavior:
 - non-repeatable quests grant rewards once total
 - completed quests may unlock later quests
 - later quests may require specific earlier quests to be completed
+- direct Superior kills grant 2 credits to matching defeat-count objectives without multiplying elite objectives, quest-item drops, resources, equipment requirements, or other objective quantities
 
 Prototype POI direction may choose local targets for auto-mode behavior.
 
@@ -2511,6 +2536,7 @@ Current Forward Bastion prototype hub:
 - It is a safe forward settlement connected between Azurefen Hollow and Ash Goblin Encampment.
 - It currently includes basic hub services, a Guild & Inn building, Farm and Livestock service anchors, decorative structure visuals, a healing fountain, and physical route teleports.
 - Current placeholders may include Quest Giver, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Farmer, Livestock keeper, and dog NPCs.
+- The Quest Giver owns the current Guild Notice Board onboarding quest and the Ash Goblin Encampment main quest.
 - The Class Mentor may appear in Forward Bastion through current quest-aware hub NPC data.
 - The standalone Bounty Board NPC is removed; board work is accessed through the Guild & Inn Notice Board UI.
 - The Guild Coordinator and Inn Keeper open the current Guild & Inn Atlas service page.
@@ -2788,6 +2814,9 @@ Current prototype save behavior:
 - reusable enemy ability cooldowns are the narrow cooldown exception: valid unexpired absolute expiration timestamps and the required-basic-attack gate survive restoration, while expired, malformed, unknown-ability, or missing-enemy records are discarded
 - restored saves clear short-lived news broadcast feedback
 - restored saves sanitize companion skill progression and preserve valid learned skill rank data
+- eligible legacy saves that predate the Guild Board onboarding quest treat that onboarding as completed and expose `Break the Ash Camp` without replacing existing Board slots or progress
+- pre-eligibility legacy saves retain the onboarding path and receive the protected starter contract when its Azure Trial and first-class requirements are later met
+- restored active `Break the Ash Camp` quests recheck the currently equipped first-class weapon requirement while preserving already-completed objective progress
 
 Current prototype offline progress:
 
@@ -2806,6 +2835,7 @@ Current prototype guide popups:
 
 - may appear when starting a new game
 - may appear when the equipment tutorial quest becomes active
+- may appear when `Orders from the Guild` becomes active to explain concurrent main/Board progress, taken-only Board kill counting, and Board reward claiming through the Atlas Guild & Inn page
 - may appear after the first world-wipe rescue
 - pause the simulation while active
 - are UI guidance only

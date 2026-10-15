@@ -71,6 +71,7 @@ export const SLIMEWARD_CHEST_ID = "slimeward-boss-chest";
 export const SLIMEWARD_CHEST_POSITION: Position = { x: 138, y: 22 };
 export const SLIMEWARD_EXIT_POSITION: Position = { x: 144, y: 22 };
 export const CLASS_MENTOR_NPC_ID = "hub-class-mentor";
+export const HUB_TWO_QUEST_GIVER_NPC_ID = "hub-2-quest-giver";
 
 export const companionIds = [
   "test-companion-1",
@@ -391,7 +392,7 @@ export const classMentorNpcStartData = {
 
 export const hubTwoNpcStartData = [
   {
-    id: "hub-2-quest-giver",
+    id: HUB_TWO_QUEST_GIVER_NPC_ID,
     position: { x: 56, y: 31 },
     displayName: "Quest Giver",
     npcRole: "quest_giver",

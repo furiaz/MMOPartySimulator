@@ -24,7 +24,9 @@ export type QuestId =
   | "broken_thicket_survey"
   | "crawler_shelf_report"
   | "find_slimeward_camp"
-  | "azure_trial";
+  | "azure_trial"
+  | "orders_from_the_guild"
+  | "break_the_ash_camp";
 
 export type QuestStatus =
   | "locked"
@@ -51,7 +53,10 @@ export type QuestObjectiveType =
   | "unlock_route"
   | "defeat_elite"
   | "collect_dungeon_chest"
-  | "return_to_poi";
+  | "return_to_poi"
+  | "take_guild_notice_board_quest";
+
+export type QuestEquipmentRequirement = "first_class_weapon";
 
 export type QuestSpawnEnemyDefinition = {
   enemyTypeId?: EnemyTypeId;
@@ -78,6 +83,8 @@ export type QuestObjectiveDefinition = {
   resourceType?: ResourceType;
   itemId?: ItemId;
   targetSlot?: EquipmentSlot;
+  equipmentRequirement?: QuestEquipmentRequirement;
+  noticeBoardQuestId?: string;
   requiredCount?: number;
   questItemDisplayName?: string;
   dropChance?: number;
@@ -113,11 +120,13 @@ export type QuestDefinition = {
   sourceType?: QuestSourceType;
   objectiveFlow?: QuestObjectiveFlow;
   questGiverPoiId: string;
+  questGiverMapId: DebugMapId;
   objectives: QuestObjectiveDefinition[];
   rewards?: QuestReward;
   repeatable?: boolean;
   unlocksQuestIds?: QuestId[];
   requiresCompletedQuestIds?: QuestId[];
+  requiresFirstClassCompanion?: boolean;
 };
 
 export type QuestObjectiveProgress = {

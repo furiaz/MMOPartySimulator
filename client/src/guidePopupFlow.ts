@@ -72,6 +72,17 @@ export function getGuidePopupsForQuestStatusChanges(
     guidePopupIds.push("first_class_path");
   }
 
+  if (
+    didBecomeStatus(
+      previousStatuses,
+      nextStatuses,
+      "orders_from_the_guild",
+      "active",
+    )
+  ) {
+    guidePopupIds.push("guild_notice_board_onboarding");
+  }
+
   return guidePopupIds;
 }
 

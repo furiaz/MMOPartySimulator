@@ -1294,6 +1294,7 @@ export {
   type GuildNoticeBoardRerollResult,
   type GuildNoticeBoardTakeResult,
 } from "./guildNoticeBoard";
+export { takeGuildNoticeBoardQuestForQuests } from "./guildNoticeBoardQuestIntegration";
 export {
   GUILD_RECRUIT_REFRESH_INTERVAL_MS,
   GUILD_RECRUIT_RESERVE_CAPACITY,

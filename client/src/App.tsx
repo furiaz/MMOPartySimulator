@@ -230,7 +230,7 @@ import {
   refreshGuildRecruitState,
   shouldShowGuildNoticeBoardSign,
   shouldQueuePartySizeGrowthGuide,
-  takeGuildNoticeBoardQuest,
+  takeGuildNoticeBoardQuestForQuests,
   cancelGuildNoticeBoardQuest,
   getNavigationClickCellKey,
   resolveNavigationClickTarget,
@@ -5457,7 +5457,11 @@ function App() {
       return;
     }
 
-    const taken = takeGuildNoticeBoardQuest(gameState, currentTime, slotIndex);
+    const taken = takeGuildNoticeBoardQuestForQuests(
+      gameState,
+      currentTime,
+      slotIndex,
+    );
 
     if (taken.ok) {
       queueSaveAfterStateChange("Guild notice board quest taken");
@@ -5518,7 +5522,9 @@ function App() {
       setGuildNoticeBoardResultMessage(
         rerolled.reason === "locked"
           ? "Unlock Scouts or place a fed Wolf to reroll postings."
-          : "No rerolls remaining today.",
+          : rerolled.reason === "no_change"
+            ? "No eligible postings can be rerolled."
+            : "No rerolls remaining today.",
       );
     }
 

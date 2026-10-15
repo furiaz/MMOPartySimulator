@@ -8,6 +8,7 @@ import {
 import { getCompanionEquipmentStatModifiers } from "./equipmentRules";
 import { createCompanionPrimaryStats } from "./stats";
 import { createTestGameState } from "./testState";
+import { createInitialQuestStates } from "./questSystem";
 import type { Companion } from "./types";
 
 describe("first class selection", () => {
@@ -55,6 +56,28 @@ describe("first class selection", () => {
       naturalStats: createCompanionPrimaryStats(10),
       unspentStatPoints: 0,
     });
+  });
+
+  it("makes Guild Board onboarding available when Azure was completed first", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 10,
+    };
+    const quests = createInitialQuestStates();
+    quests.azure_trial = {
+      ...quests.azure_trial,
+      status: "completed",
+    };
+    const state = createTestGameState({
+      entities: { [companion.id]: companion },
+      partyLeaderId: companion.id,
+      quests,
+    });
+
+    const result = selectFirstClass(state, companion.id, "blade");
+
+    expect(result.result.status).toBe("success");
+    expect(result.state.quests.orders_from_the_guild.status).toBe("available");
   });
 
   it("grants first-class catch-up growth and stat points when selecting late", () => {

@@ -89,6 +89,14 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
   defeat_azure_mass: "The Azure Mass waits below. Defeat it.",
   collect_slimeward_boss_chest:
     "Claim the chest beyond the Azure Mass to finish the trial.",
+  take_ash_goblin_assault_contract:
+    "Take the Ash Goblin Encampment posting from the Guild Notice Board.",
+  defeat_ash_goblin_encampment_enemies:
+    "Break the Ash Camp by defeating its defenders.",
+  gather_ash_goblin_encampment_resources:
+    "Collect useful wood, ore, or herbs from the Ash Goblin Encampment.",
+  equip_first_class_weapon:
+    "Equip a weapon made for one of your companions’ first classes.",
 };
 
 const genericGreetings = ["Welcome.", "Hello.", "What’s up, dood?"] as const;

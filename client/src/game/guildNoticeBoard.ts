@@ -1,4 +1,5 @@
 import { addItemToInventoryState } from "./inventory";
+import { getDirectEnemyKillCredit } from "./directKillCredit";
 import { getItemDefinition } from "./items";
 import type { GameState } from "./state";
 import {
@@ -17,6 +18,7 @@ import type {
   EnemyTypeId,
   GuildNoticeBoardClaimedReward,
   GuildNoticeBoardQuest,
+  GuildNoticeBoardQuestCategory,
   GuildNoticeBoardQuestObjective,
   GuildNoticeBoardQuestReward,
   GuildNoticeBoardQuestStatus,
@@ -28,10 +30,26 @@ import { addCurrencyToWalletState } from "./wallet";
 export const GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS = 3 * 60 * 60 * 1000;
 export const GUILD_NOTICE_BOARD_SLOT_COUNT = 1;
 export const GUILD_NOTICE_BOARD_REWARD_CROWNS = 100;
+export const GUILD_NOTICE_BOARD_STARTER_QUEST_ID =
+  "guild-notice-board-starter-ash-goblin-encampment";
+const GUILD_NOTICE_BOARD_STARTER_SEQUENCE = 0;
+const ASH_GOBLIN_ENCAMPMENT_NAME = "Ash Goblin Encampment";
 
-type GuildNoticeBoardTemplate = {
+export type GuildNoticeBoardTemplate = {
   title: string;
+  category: GuildNoticeBoardQuestCategory;
+  zoneDisplayName?: string;
+  description?: string;
   targetEnemyTypeIds: EnemyTypeId[];
+};
+
+export type GuildNoticeBoardKillTemplateOptions = {
+  category: GuildNoticeBoardQuestCategory;
+  targetEnemyTypeIds: EnemyTypeId[];
+  zoneDisplayName: string;
+  enemyDisplayName?: string;
+  description?: string;
+  titleOverride?: string;
 };
 
 export type GuildNoticeBoardTakeResult =
@@ -58,7 +76,7 @@ export type GuildNoticeBoardRerollResult =
       ok: false;
       state: GameState;
       claimedRewards: GuildNoticeBoardClaimedReward[];
-      reason: "locked" | "no_rerolls";
+      reason: "locked" | "no_rerolls" | "no_change";
     };
 
 export type GuildNoticeBoardRerollDisplayState = {
@@ -77,24 +95,77 @@ export type GuildNoticeBoardRerollLimitBreakdown = {
   sourceTooltipText: string;
 };
 
+export function formatGuildNoticeBoardQuestTitle(
+  category: GuildNoticeBoardQuestCategory,
+  zoneDisplayName: string,
+  enemyDisplayName?: string,
+): string {
+  return category === "assault"
+    ? `Assault on ${zoneDisplayName}`
+    : `${enemyDisplayName ?? "Enemy"} Extermination in ${zoneDisplayName}`;
+}
+
+export function createGuildNoticeBoardKillTemplate({
+  category,
+  targetEnemyTypeIds,
+  zoneDisplayName,
+  enemyDisplayName,
+  description,
+  titleOverride,
+}: GuildNoticeBoardKillTemplateOptions): GuildNoticeBoardTemplate {
+  return {
+    title:
+      titleOverride ??
+      formatGuildNoticeBoardQuestTitle(
+        category,
+        zoneDisplayName,
+        enemyDisplayName,
+      ),
+    category,
+    zoneDisplayName,
+    description,
+    targetEnemyTypeIds,
+  };
+}
+
 const questTemplates: GuildNoticeBoardTemplate[] = [
-  {
-    title: "Ashwatch Field Orders",
+  createGuildNoticeBoardKillTemplate({
+    category: "extermination",
+    zoneDisplayName: "Ashwatch",
+    enemyDisplayName: "Field Threat",
+    titleOverride: "Ashwatch Field Orders",
     targetEnemyTypeIds: ["goblin_shaman", "ash_wisp"],
-  },
-  {
-    title: "Shaman Watch Culling",
+  }),
+  createGuildNoticeBoardKillTemplate({
+    category: "extermination",
+    zoneDisplayName: "Ashwatch",
+    enemyDisplayName: "Shaman Watch",
+    titleOverride: "Shaman Watch Culling",
     targetEnemyTypeIds: ["ash_wisp", "goblin_shaman"],
-  },
-  {
-    title: "Orc Approach Patrol",
+  }),
+  createGuildNoticeBoardKillTemplate({
+    category: "extermination",
+    zoneDisplayName: "Orc Approach",
+    enemyDisplayName: "Orc",
+    titleOverride: "Orc Approach Patrol",
     targetEnemyTypeIds: ["orc", "ash_wisp"],
-  },
-  {
-    title: "Hollow Threat Sweep",
+  }),
+  createGuildNoticeBoardKillTemplate({
+    category: "extermination",
+    zoneDisplayName: "Hollow",
+    enemyDisplayName: "Hollow Threat",
+    titleOverride: "Hollow Threat Sweep",
     targetEnemyTypeIds: ["goblin_shaman", "orc"],
-  },
+  }),
 ];
+
+const starterQuestTemplate = createGuildNoticeBoardKillTemplate({
+  category: "assault",
+  zoneDisplayName: ASH_GOBLIN_ENCAMPMENT_NAME,
+  targetEnemyTypeIds: ["ash_wisp", "ember_imp"],
+  description:
+    "Defeat 50 Ash Wisps and 50 Ember Imps. Progress begins after taking this posting.",
+});
 
 const allSkillBookItemIds = Object.values(
   SKILL_BOOK_ITEM_IDS_BY_SKILL_ID,
@@ -107,15 +178,20 @@ export function createInitialGuildNoticeBoardState(
   state?: GameState,
 ): GuildNoticeBoardState {
   const slotCount = getGuildNoticeBoardSlotCount(state);
+  const regularSlotCount = Math.max(0, slotCount - 1);
   return {
-    slots: Array.from({ length: slotCount }, (_, index) =>
-      createGuildNoticeBoardQuest(index + 1, nowMs),
-    ),
+    slots: [
+      createStarterGuildNoticeBoardQuest(nowMs),
+      ...Array.from({ length: regularSlotCount }, (_, index) =>
+        createGuildNoticeBoardQuest(index + 1, nowMs),
+      ),
+    ],
     nextRefreshAtMs: nowMs + getNoticeBoardRefreshIntervalMs(state),
-    questSequence: slotCount,
+    questSequence: regularSlotCount,
     hasSeenCurrentRefresh: false,
     rerollsUsedToday: 0,
     rerollDayStartMs: getLocalDayStartMs(nowMs),
+    starterContractAccepted: false,
   };
 }
 
@@ -143,15 +219,30 @@ export function refreshGuildNoticeBoardState(
 
   let sequence = board.questSequence;
   let changedSlot = false;
-  const slots = board.slots.map((slot) => {
+  const configuredSlotCount = getGuildNoticeBoardSlotCount(state);
+  const slots = board.slots.flatMap((slot) => {
     if (!canRefreshSlot(slot)) {
-      return slot;
+      return [slot];
+    }
+
+    if (
+      slot?.isStarterContract &&
+      board.slots.length > configuredSlotCount
+    ) {
+      changedSlot = true;
+      return [];
     }
 
     sequence += 1;
     changedSlot = true;
-    return createGuildNoticeBoardQuest(sequence, nowMs);
+    return [createGuildNoticeBoardQuest(sequence, nowMs)];
   });
+
+  while (slots.length < configuredSlotCount) {
+    sequence += 1;
+    changedSlot = true;
+    slots.push(createGuildNoticeBoardQuest(sequence, nowMs));
+  }
 
   const nextBoard: GuildNoticeBoardState = {
     slots,
@@ -160,6 +251,7 @@ export function refreshGuildNoticeBoardState(
     hasSeenCurrentRefresh: changedSlot ? false : board.hasSeenCurrentRefresh,
     rerollsUsedToday: board.rerollsUsedToday,
     rerollDayStartMs: board.rerollDayStartMs,
+    starterContractAccepted: board.starterContractAccepted,
   };
 
   return {
@@ -240,6 +332,8 @@ export function takeGuildNoticeBoardQuest(
   };
   const slots = [...board.slots];
   slots[targetSlotIndex] = quest;
+  const starterContractAccepted =
+    board.starterContractAccepted || quest.isStarterContract === true;
 
   return {
     ok: true,
@@ -249,6 +343,7 @@ export function takeGuildNoticeBoardQuest(
         ...board,
         slots,
         hasSeenCurrentRefresh: true,
+        starterContractAccepted,
       },
     },
     quest,
@@ -270,7 +365,14 @@ export function cancelGuildNoticeBoardQuest(
   }
 
   const slots = [...board.slots];
-  slots[targetSlotIndex] = null;
+  if (
+    slots[targetSlotIndex]?.isStarterContract &&
+    slots.length > getGuildNoticeBoardSlotCount(refreshedState)
+  ) {
+    slots.splice(targetSlotIndex, 1);
+  } else {
+    slots[targetSlotIndex] = null;
+  }
 
   return {
     ok: true,
@@ -322,14 +424,44 @@ export function rerollGuildNoticeBoard(
   }
 
   let sequence = board.questSequence;
-  const slots = board.slots.map((slot) => {
-    if (slot?.status === "taken") {
-      return slot;
+  let changedSlot = false;
+  const configuredSlotCount = getGuildNoticeBoardSlotCount(nextState);
+  const slots = board.slots.flatMap((slot) => {
+    if (
+      slot?.status === "taken" ||
+      (slot?.isStarterContract && slot.status === "available")
+    ) {
+      return [slot];
+    }
+
+    if (slot?.isStarterContract && board.slots.length > configuredSlotCount) {
+      changedSlot = true;
+      return [];
     }
 
     sequence += 1;
-    return createGuildNoticeBoardQuest(sequence, nowMs);
+    changedSlot = true;
+    return [createGuildNoticeBoardQuest(sequence, nowMs)];
   });
+
+  while (slots.length < configuredSlotCount) {
+    sequence += 1;
+    changedSlot = true;
+    slots.push(createGuildNoticeBoardQuest(sequence, nowMs));
+  }
+
+  if (!changedSlot) {
+    return {
+      ok: false,
+      state: {
+        ...nextState,
+        guildNoticeBoard: board,
+      },
+      claimedRewards: opened.claimedRewards,
+      reason: "no_change",
+    };
+  }
+
   const rerollsUsedToday = board.rerollsUsedToday + 1;
 
   nextState = {
@@ -401,6 +533,7 @@ export function recordEnemyDefeatedForGuildNoticeBoard(
   }
 
   const defeatedEnemyTypeId = defeatedEnemy.enemyTypeId;
+  const killCredit = getDirectEnemyKillCredit(defeatedEnemy);
   const board = sanitizeGuildNoticeBoardState(state.guildNoticeBoard, undefined, state);
   let changed = false;
   const slots = board.slots.map((slot) => {
@@ -413,6 +546,7 @@ export function recordEnemyDefeatedForGuildNoticeBoard(
       const nextObjective = updateObjectiveForEnemy(
         objective,
         defeatedEnemyTypeId,
+        killCredit,
       );
       progressed = progressed || nextObjective !== objective;
       return nextObjective;
@@ -546,8 +680,12 @@ export function sanitizeGuildNoticeBoardState(
 
   const questSequence = sanitizeSequence(guildNoticeBoard.questSequence);
   let maxSequence = questSequence;
+  const configuredSlotCount = getGuildNoticeBoardSlotCount(state);
+  const savedSlotCount = Array.isArray(guildNoticeBoard.slots)
+    ? guildNoticeBoard.slots.length
+    : 0;
   const slots = Array.from(
-    { length: getGuildNoticeBoardSlotCount(state) },
+    { length: Math.max(configuredSlotCount, savedSlotCount) },
     (_, index) => {
       if (
         Array.isArray(guildNoticeBoard.slots) &&
@@ -565,7 +703,9 @@ export function sanitizeGuildNoticeBoardState(
       );
 
       if (quest) {
-        maxSequence = Math.max(maxSequence, quest.sequence);
+        if (!quest.isStarterContract) {
+          maxSequence = Math.max(maxSequence, quest.sequence);
+        }
         return quest;
       }
 
@@ -590,6 +730,39 @@ export function sanitizeGuildNoticeBoardState(
       guildNoticeBoard.rerollDayStartMs,
       getLocalDayStartMs(nowMs),
     ),
+    starterContractAccepted:
+      guildNoticeBoard.starterContractAccepted === true ||
+      slots.some(
+        (slot) =>
+          slot?.isStarterContract === true && slot.status !== "available",
+      ),
+  };
+}
+
+export function ensureStarterGuildNoticeBoardContract(
+  state: GameState,
+  nowMs = Date.now(),
+): GameState {
+  const board = sanitizeGuildNoticeBoardState(
+    state.guildNoticeBoard,
+    nowMs,
+    state,
+  );
+
+  if (
+    board.starterContractAccepted ||
+    board.slots.some((slot) => slot?.isStarterContract)
+  ) {
+    return { ...state, guildNoticeBoard: board };
+  }
+
+  return {
+    ...state,
+    guildNoticeBoard: {
+      ...board,
+      slots: [createStarterGuildNoticeBoardQuest(nowMs), ...board.slots],
+      hasSeenCurrentRefresh: false,
+    },
   };
 }
 
@@ -602,6 +775,9 @@ function createGuildNoticeBoardQuest(
   return {
     id: `guild-notice-board-quest-${sequence}`,
     title: template.title,
+    category: template.category,
+    zoneDisplayName: template.zoneDisplayName,
+    description: template.description,
     sequence,
     status: "available",
     generatedAtMs: nowMs,
@@ -615,6 +791,33 @@ function createGuildNoticeBoardQuest(
       currentCount: 0,
     })),
     rewards: createGuildNoticeBoardReward(sequence),
+    rewardClaimedAtMs: null,
+  };
+}
+
+function createStarterGuildNoticeBoardQuest(
+  nowMs: number,
+): GuildNoticeBoardQuest {
+  return {
+    id: GUILD_NOTICE_BOARD_STARTER_QUEST_ID,
+    title: starterQuestTemplate.title,
+    category: starterQuestTemplate.category,
+    zoneDisplayName: starterQuestTemplate.zoneDisplayName,
+    description: starterQuestTemplate.description,
+    isStarterContract: true,
+    sequence: GUILD_NOTICE_BOARD_STARTER_SEQUENCE,
+    status: "available",
+    generatedAtMs: nowMs,
+    takenAtMs: null,
+    levelAnchor: null,
+    levelRange: null,
+    objectives: starterQuestTemplate.targetEnemyTypeIds.map((enemyTypeId) => ({
+      id: `defeat-${enemyTypeId}`,
+      enemyTypeId,
+      requiredCount: 50,
+      currentCount: 0,
+    })),
+    rewards: createGuildNoticeBoardReward(1),
     rewardClaimedAtMs: null,
   };
 }
@@ -639,7 +842,12 @@ function sanitizeGuildNoticeBoardQuest(
     return null;
   }
 
-  const fallbackQuest = createGuildNoticeBoardQuest(fallbackSequence, nowMs);
+  const isStarterContract =
+    quest.isStarterContract === true ||
+    quest.id === GUILD_NOTICE_BOARD_STARTER_QUEST_ID;
+  const fallbackQuest = isStarterContract
+    ? createStarterGuildNoticeBoardQuest(nowMs)
+    : createGuildNoticeBoardQuest(fallbackSequence, nowMs);
   const status = sanitizeQuestStatus(quest.status);
   const objectives = sanitizeObjectives(quest.objectives, fallbackQuest.objectives);
   const reward = sanitizeReward(quest.rewards, fallbackQuest.rewards);
@@ -650,7 +858,13 @@ function sanitizeGuildNoticeBoardQuest(
       typeof quest.title === "string" && quest.title
         ? quest.title
         : fallbackQuest.title,
-    sequence: sanitizeSequence(quest.sequence),
+    category: quest.category ?? fallbackQuest.category,
+    zoneDisplayName: quest.zoneDisplayName ?? fallbackQuest.zoneDisplayName,
+    description: quest.description ?? fallbackQuest.description,
+    isStarterContract: isStarterContract ? true : undefined,
+    sequence: isStarterContract
+      ? GUILD_NOTICE_BOARD_STARTER_SEQUENCE
+      : sanitizeSequence(quest.sequence),
     status,
     generatedAtMs: sanitizeTimestamp(quest.generatedAtMs, nowMs),
     takenAtMs:
@@ -706,6 +920,7 @@ function sanitizeReward(
 function updateObjectiveForEnemy(
   objective: GuildNoticeBoardQuestObjective,
   enemyTypeId: EnemyTypeId,
+  amount: number,
 ): GuildNoticeBoardQuestObjective {
   if (
     objective.enemyTypeId !== enemyTypeId ||
@@ -716,7 +931,10 @@ function updateObjectiveForEnemy(
 
   return {
     ...objective,
-    currentCount: Math.min(objective.requiredCount, objective.currentCount + 1),
+    currentCount: Math.min(
+      objective.requiredCount,
+      objective.currentCount + amount,
+    ),
   };
 }
 
@@ -782,6 +1000,10 @@ function grantGuildNoticeBoardReward(
 }
 
 function canRefreshSlot(slot: GuildNoticeBoardQuest | null): boolean {
+  if (slot?.isStarterContract && slot.status === "available") {
+    return false;
+  }
+
   return (
     slot === null ||
     slot.status === "available" ||

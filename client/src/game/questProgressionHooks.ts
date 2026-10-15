@@ -3,6 +3,8 @@ import {
   MAP_TWO_ID,
   createDebugMapForQuestState,
 } from "./debugMap";
+import { isFirstClassId } from "./classes";
+import { getDirectEnemyKillCredit } from "./directKillCredit";
 import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
 import { getItemDefinition } from "./items";
 import { recordEnemyDefeatedForGuildNoticeBoard } from "./guildNoticeBoard";
@@ -45,7 +47,7 @@ export function recordEnemyDefeatedForQuests(
       matchesOptionalEnemyType(objective, defeatedEnemy.enemyTypeId) &&
       matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId) &&
       matchesOptionalEnemyVariant(objective, defeatedEnemy),
-    1,
+    getDirectEnemyKillCredit(defeatedEnemy),
   );
 
   nextState = recordEnemyQuestDropObjectives(
@@ -94,7 +96,7 @@ export function recordResourceGatheredForQuests(
     (objective) =>
       objective.type === "gather_item_count" &&
       objective.targetMapId === mapId &&
-      objective.resourceType === resourceType &&
+      (!objective.resourceType || objective.resourceType === resourceType) &&
       matchesOptionalSubzone(objective, resourceSubzoneId),
     quantity,
   );
@@ -226,20 +228,27 @@ export function recordEquippedItemObjectivesForQuests(
     for (const objective of QUEST_DEFINITIONS[questId].objectives) {
       if (
         (objective.type !== "equip_item" && objective.type !== "equip_flask") ||
-        quest.objectiveProgress[objective.id]?.completed ||
-        !objective.itemId
+        quest.objectiveProgress[objective.id]?.completed
       ) {
         continue;
       }
 
       const isEquipped =
         objective.type === "equip_flask"
-          ? isFlaskEquippedByAnyCompanion(nextState, objective.itemId)
-          : isItemEquippedByAnyCompanion(
-              nextState,
-              objective.itemId,
-              objective.targetSlot,
-            );
+          ? Boolean(
+              objective.itemId &&
+                isFlaskEquippedByAnyCompanion(nextState, objective.itemId),
+            )
+          : objective.equipmentRequirement === "first_class_weapon"
+            ? isFirstClassWeaponEquippedByActiveCompanion(nextState)
+            : Boolean(
+                objective.itemId &&
+                  isItemEquippedByAnyCompanion(
+                    nextState,
+                    objective.itemId,
+                    objective.targetSlot,
+                  ),
+              );
 
       nextState = appendDebugTelemetryEvent(nextState, {
         type: "quest_equipment_state_checked",
@@ -262,6 +271,20 @@ export function recordEquippedItemObjectivesForQuests(
   }
 
   return nextState;
+}
+
+export function recordGuildNoticeBoardQuestTakenForQuests(
+  state: GameState,
+  noticeBoardQuestId: string,
+): GameState {
+  return updateMatchingQuestObjectives(
+    state,
+    (objective) =>
+      objective.type === "take_guild_notice_board_quest" &&
+      (!objective.noticeBoardQuestId ||
+        objective.noticeBoardQuestId === noticeBoardQuestId),
+    1,
+  );
 }
 
 export function recordMerchantItemPurchasedForQuests(
@@ -359,6 +382,33 @@ function isItemEquippedByAnyCompanion(
     return targetSlot
       ? entity.equipment[targetSlot] === itemId
       : Object.values(entity.equipment).includes(itemId);
+  });
+}
+
+function isFirstClassWeaponEquippedByActiveCompanion(
+  state: GameState,
+): boolean {
+  return Object.values(state.entities).some((entity) => {
+    if (entity.kind !== "companion") {
+      return false;
+    }
+
+    return (["mainHand", "offhand"] as const).some((slot) => {
+      const itemId = entity.equipment[slot];
+
+      if (!itemId) {
+        return false;
+      }
+
+      const itemDefinition = getItemDefinition(itemId);
+
+      return (
+        itemDefinition?.category === "equipment" &&
+        itemDefinition.equipmentKind === "weapon" &&
+        itemDefinition.equipmentType !== "training_sword" &&
+        itemDefinition.allowedClassIds?.some(isFirstClassId) === true
+      );
+    });
   });
 }
 
