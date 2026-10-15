@@ -482,6 +482,10 @@ export function getObjectiveLabel(
   objective: QuestObjectiveDefinition,
   requiredCount = objective.requiredCount ?? 1,
 ): string {
+  if (objective.id === "defeat_briar_burrows_enemies") {
+    return `Defeat ${requiredCount} Briar Burrows Enemies`;
+  }
+
   if (objective.type === "defeat_enemy_count") {
     return `Kill ${requiredCount} ${formatQuestEnemyName(
       objective.enemyArchetypeId,
@@ -500,6 +504,16 @@ export function getObjectiveLabel(
 
   if (objective.type === "take_guild_notice_board_quest") {
     return "Take Guild Board Contract";
+  }
+
+  if (objective.type === "own_livestock_creature") {
+    return objective.livestockCreatureId === "tin_crawler"
+      ? "Find Tin Crawler Hatchling"
+      : "Find Livestock Creature";
+  }
+
+  if (objective.type === "active_party_member_count") {
+    return `Have ${requiredCount} Active Companions`;
   }
 
   if (objective.type === "equip_item" || objective.type === "equip_flask") {

@@ -3,6 +3,7 @@ import {
   createInitialQuestStates,
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
+  MAP_FIVE_ID,
   MAP_ONE_ID,
   MAP_THREE_ID,
   MAP_TWO_ID,
@@ -63,6 +64,38 @@ describe("quest UI helpers", () => {
         type: "collect_dungeon_chest",
       }),
     ).toBe("Collect Dungeon Chest");
+  });
+
+  it("shows the Briar Burrows objective labels and route locations", () => {
+    const quests = createInitialQuestStates();
+    const quest = activateQuest(quests.into_the_briar_burrows);
+
+    expect(
+      getObjectiveLabel({
+        id: "defeat_briar_burrows_enemies",
+        type: "defeat_enemy_count",
+        requiredCount: 300,
+      }),
+    ).toBe("Defeat 300 Briar Burrows Enemies");
+    expect(
+      getObjectiveLabel({
+        id: "find_tin_crawler_hatchling",
+        type: "own_livestock_creature",
+        livestockCreatureId: "tin_crawler",
+      }),
+    ).toBe("Find Tin Crawler Hatchling");
+    expect(
+      getObjectiveLabel({
+        id: "assemble_three_companions",
+        type: "active_party_member_count",
+        requiredCount: 3,
+      }),
+    ).toBe("Have 3 Active Companions");
+
+    expect(getQuestDetailLocations(quest).map((location) => location.mapId)).toEqual([
+      MAP_FIVE_ID,
+      HUB_TWO_MAP_ID,
+    ]);
   });
 
   it("shows Hold the Field Cache at Briarwood Rise Thicket", () => {

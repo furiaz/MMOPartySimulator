@@ -6,6 +6,7 @@ import {
   HUB_TWO_QUEST_GIVER_NPC_ID,
   MAP_ONE_ID,
   MAP_FOUR_ID,
+  MAP_FIVE_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   SLIMEWARD_CHEST_ID,
@@ -47,6 +48,7 @@ import {
 } from "./state";
 import {
   completeQuestObjective as completeQuestObjectiveProgress,
+  reconcileStateDerivedQuestObjectivesForQuests,
   recordEquippedItemObjectivesForQuests,
 } from "./questProgressionHooks";
 import { addCurrencyToWalletState } from "./wallet";
@@ -72,6 +74,7 @@ export {
   recordDungeonChestCollectedForQuests,
   recordEnemyDefeatedForQuests,
   recordEquippedItemObjectivesForQuests,
+  reconcileStateDerivedQuestObjectivesForQuests,
   recordMapReachedForQuests,
   recordCraftedItemForQuests,
   recordMerchantItemPurchasedForQuests,
@@ -85,6 +88,8 @@ export const EQUIPMENT_TUTORIAL_QUEST_ID: QuestId = "outfit_the_expedition";
 export const GUILD_BOARD_ONBOARDING_QUEST_ID: QuestId =
   "orders_from_the_guild";
 export const ASH_GOBLIN_MAIN_QUEST_ID: QuestId = "break_the_ash_camp";
+export const BRIAR_BURROWS_MAIN_QUEST_ID: QuestId =
+  "into_the_briar_burrows";
 const SMITHS_FIRST_WORK_ACCEPTANCE_GRANTS: QuestRewardItem[] = [
   { itemId: "copper_ore", quantity: 2 },
   { itemId: "field_herb", quantity: 2 },
@@ -111,6 +116,7 @@ export const QUEST_ORDER: QuestId[] = [
   "azure_trial",
   GUILD_BOARD_ONBOARDING_QUEST_ID,
   ASH_GOBLIN_MAIN_QUEST_ID,
+  BRIAR_BURROWS_MAIN_QUEST_ID,
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -705,6 +711,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
     questGiverMapId: HUB_TWO_MAP_ID,
     requiresCompletedQuestIds: [GUILD_BOARD_ONBOARDING_QUEST_ID],
+    unlocksQuestIds: [BRIAR_BURROWS_MAIN_QUEST_ID],
     objectives: [
       {
         id: "defeat_ash_goblin_encampment_enemies",
@@ -730,6 +737,42 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     rewards: {
       crowns: 500,
       characterXp: 1800,
+    },
+  },
+  into_the_briar_burrows: {
+    id: BRIAR_BURROWS_MAIN_QUEST_ID,
+    displayName: "Into the Briar Burrows",
+    sourceType: "npc",
+    objectiveFlow: "parallel",
+    questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
+    questGiverMapId: HUB_TWO_MAP_ID,
+    requiresCompletedQuestIds: [ASH_GOBLIN_MAIN_QUEST_ID],
+    objectives: [
+      {
+        id: "defeat_briar_burrows_enemies",
+        type: "defeat_enemy_count",
+        enemyMapId: MAP_FIVE_ID,
+        targetSubzoneId: "briar-burrows",
+        requiredCount: 300,
+      },
+      {
+        id: "find_tin_crawler_hatchling",
+        type: "own_livestock_creature",
+        targetMapId: MAP_FIVE_ID,
+        targetSubzoneId: "briar-burrows",
+        livestockCreatureId: "tin_crawler",
+        requiredCount: 1,
+      },
+      {
+        id: "assemble_three_companions",
+        type: "active_party_member_count",
+        targetMapId: HUB_TWO_MAP_ID,
+        requiredCount: 3,
+      },
+    ],
+    rewards: {
+      crowns: 750,
+      characterXp: 2800,
     },
   },
 };
@@ -1148,6 +1191,11 @@ function acceptQuest(
       "quest_acceptance",
     );
   }
+
+  nextState = reconcileStateDerivedQuestObjectivesForQuests(
+    nextState,
+    "quest_acceptance",
+  );
 
   if (
     questId === GUILD_BOARD_ONBOARDING_QUEST_ID &&

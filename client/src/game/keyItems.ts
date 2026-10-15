@@ -65,7 +65,7 @@ export const KEY_ITEM_DEFINITIONS: Record<KeyItemId, KeyItemDefinition> = {
   },
   livestock_creature_tin_crawler: {
     id: "livestock_creature_tin_crawler",
-    displayName: "Tin Crawler Discovery",
+    displayName: "Tin Crawler Hatchling Discovery",
     description: "Registers Tin Crawlers as a Livestock creature.",
   },
   livestock_creature_elder_mossling: {

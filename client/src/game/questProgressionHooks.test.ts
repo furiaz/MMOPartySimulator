@@ -19,6 +19,7 @@ import {
   recordQuestPoiReachedForQuests,
   recordQuestRepairProgress,
   recordResourceGatheredForQuests,
+  reconcileStateDerivedQuestObjectivesForQuests,
 } from "./questProgressionHooks";
 import {
   createInitialQuestStates,
@@ -326,6 +327,109 @@ describe("quest progression hooks", () => {
       completed: true,
     });
     expect(state.quests.outfit_the_expedition.status).toBe("ready_to_turn_in");
+  });
+
+  it("reconciles current livestock ownership and active party size until completion", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 0, y: 0 },
+      "companion-1",
+    );
+    const follower = createCompanion(
+      "companion-2",
+      { x: 1, y: 0 },
+      leader.id,
+    );
+    const thirdCompanion = {
+      ...createCompanion("companion-3", { x: 2, y: 0 }, leader.id),
+      state: "dead" as const,
+      health: 0,
+    };
+    let state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [follower.id]: follower,
+      },
+      restingCompanionsById: {
+        [thirdCompanion.id]: thirdCompanion,
+      },
+      partyLeaderId: leader.id,
+      quests: createQuestStates({ into_the_briar_burrows: "active" }),
+    });
+
+    state = reconcileStateDerivedQuestObjectivesForQuests(state, "test");
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 2, completed: false });
+
+    const leaderOnlyEntities = { ...state.entities };
+    delete leaderOnlyEntities[follower.id];
+    state = reconcileStateDerivedQuestObjectivesForQuests(
+      {
+        ...state,
+        entities: leaderOnlyEntities,
+      },
+      "test",
+    );
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 1, completed: false });
+
+    state = reconcileStateDerivedQuestObjectivesForQuests(
+      {
+        ...state,
+        entities: {
+          ...state.entities,
+          [follower.id]: follower,
+          [thirdCompanion.id]: thirdCompanion,
+        },
+        restingCompanionsById: {},
+        livestock: {
+          ...state.livestock!,
+          ownedCreaturesById: {
+            ...state.livestock!.ownedCreaturesById,
+            tin_crawler: 1,
+          },
+        },
+      },
+      "test",
+    );
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+
+    const withoutThirdCompanion = { ...state.entities };
+    delete withoutThirdCompanion[thirdCompanion.id];
+    state = reconcileStateDerivedQuestObjectivesForQuests(
+      {
+        ...state,
+        entities: withoutThirdCompanion,
+        livestock: {
+          ...state.livestock!,
+          ownedCreaturesById: {
+            ...state.livestock!.ownedCreaturesById,
+            tin_crawler: 0,
+          },
+        },
+      },
+      "test",
+    );
+
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
   });
 });
 

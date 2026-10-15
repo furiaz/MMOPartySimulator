@@ -961,7 +961,10 @@ export {
   getPartyMovementTargetPosition,
 } from "./partyTargetSystem";
 export {
+  ASH_GOBLIN_MAIN_QUEST_ID,
+  BRIAR_BURROWS_MAIN_QUEST_ID,
   EQUIPMENT_TUTORIAL_QUEST_ID,
+  GUILD_BOARD_ONBOARDING_QUEST_ID,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
   QUEST_ORDER,
@@ -986,6 +989,7 @@ export {
   recordDungeonChestCollectedForQuests,
   recordEnemyDefeatedForQuests,
   recordEquippedItemObjectivesForQuests,
+  reconcileStateDerivedQuestObjectivesForQuests,
   recordMerchantItemPurchasedForQuests,
   recordMerchantLockedForQuest,
   recordMapReachedForQuests,
