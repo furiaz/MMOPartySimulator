@@ -47,6 +47,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     enemyAbilityCastsByEnemyId: {},
     enemyAbilityCooldownsByEnemyId: {},
     enemyAbilityBasicAttackRequiredByEnemyId: {},
+    enemyDashesByEnemyId: {},
     aoeDummyPatternSequenceIndex: 0,
     flaskRechargeCountedEnemyDefeats: {},
     lastHealthRegenAtByCompanionId: {},
@@ -241,6 +242,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     state.enemyAbilityBasicAttackRequiredByEnemyId,
     currentEntityIds,
   );
+  const enemyDashesByEnemyId = pruneRecordById(
+    state.enemyDashesByEnemyId,
+    currentEntityIds,
+  );
   const companionAoeChannelsByCasterId = pruneRecordById(
     state.companionAoeChannelsByCasterId,
     currentEntityIds,
@@ -317,6 +322,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     enemyAbilityCooldownsByEnemyId === state.enemyAbilityCooldownsByEnemyId &&
     enemyAbilityBasicAttackRequiredByEnemyId ===
       state.enemyAbilityBasicAttackRequiredByEnemyId &&
+    enemyDashesByEnemyId === state.enemyDashesByEnemyId &&
     flaskRechargeCountedEnemyDefeats === state.flaskRechargeCountedEnemyDefeats &&
     lastHealthRegenAtByCompanionId === state.lastHealthRegenAtByCompanionId &&
     lastTargetDummyRegenAtByEnemyId === state.lastTargetDummyRegenAtByEnemyId &&
@@ -372,6 +378,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     enemyAbilityCastsByEnemyId,
     enemyAbilityCooldownsByEnemyId,
     enemyAbilityBasicAttackRequiredByEnemyId,
+    enemyDashesByEnemyId,
     flaskRechargeCountedEnemyDefeats,
     lastHealthRegenAtByCompanionId,
     lastTargetDummyRegenAtByEnemyId,

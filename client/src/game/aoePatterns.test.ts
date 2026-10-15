@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AOE_PATTERN_SQUARE_SIZE,
   DEFAULT_AOE_CIRCLE_DIAMETER,
+  clipSquareAoeAreaToForwardDistance,
   createAoeCastTransform,
   doAoeBoundsIntersect,
   isPositionInsideAoe,
@@ -167,5 +168,46 @@ describe("AoE patterns", () => {
       minY: 20,
       maxY: 21,
     })).toBe(false);
+  });
+
+  it("clips square paths with an exact partial final row", () => {
+    const fullArea = resolveAoePattern(
+      { type: "rectangle", rows: 5, columns: 2 },
+      createAoeCastTransform({ x: 1, y: 2 }, { x: 2, y: 2 }),
+    );
+    const clippedArea = clipSquareAoeAreaToForwardDistance(fullArea, 6.2);
+
+    expect(clippedArea.primitives).toHaveLength(10);
+    const partialRows = clippedArea.primitives.filter(
+      (primitive) => primitive.type === "rectangle",
+    );
+    expect(partialRows).toHaveLength(2);
+    expect(partialRows[0]?.width).toBeCloseTo(0.2);
+    expect(partialRows[1]?.width).toBeCloseTo(0.2);
+    expect(partialRows.map((primitive) => primitive.height)).toEqual([1.5, 1.5]);
+    expect(clippedArea.bounds.minX).toBeCloseTo(1);
+    expect(clippedArea.bounds.maxX).toBeCloseTo(7.2);
+    expect(clippedArea.bounds.minY).toBeCloseTo(0.5);
+    expect(clippedArea.bounds.maxY).toBeCloseTo(3.5);
+    expect(isPositionInsideAoe(clippedArea, { x: 7.19, y: 2 })).toBe(true);
+    expect(isPositionInsideAoe(clippedArea, { x: 7.21, y: 2 })).toBe(false);
+  });
+
+  it("preserves clipped containment and bounds after rotation", () => {
+    const fullArea = resolveAoePattern(
+      { type: "line", squareCount: 4 },
+      createAoeCastTransform({ x: 3, y: 4 }, { x: 3, y: 5 }),
+    );
+    const clippedArea = clipSquareAoeAreaToForwardDistance(fullArea, 4);
+
+    expect(clippedArea.primitives.at(-1)).toMatchObject({
+      type: "rectangle",
+      width: 1,
+      height: 1.5,
+    });
+    expect(clippedArea.bounds.minY).toBeCloseTo(4);
+    expect(clippedArea.bounds.maxY).toBeCloseTo(8);
+    expect(isPositionInsideAoe(clippedArea, { x: 3, y: 7.99 })).toBe(true);
+    expect(isPositionInsideAoe(clippedArea, { x: 3, y: 8.01 })).toBe(false);
   });
 });

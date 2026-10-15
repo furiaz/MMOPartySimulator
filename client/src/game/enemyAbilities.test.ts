@@ -5,6 +5,8 @@ import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import {
   ENEMY_ABILITY_DEFINITIONS,
   FORTIFYING_AURA_STATUS_SOURCE_KEY,
+  NIGHT_BAT_RENDING_DASH_ABILITY_ID,
+  ORC_RAIDER_RENDING_DASH_ABILITY_ID,
   ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
   TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
   getEnemyAbilityDefinition,
@@ -84,6 +86,39 @@ describe("enemy ability definitions", () => {
     ]);
     expect(ENEMY_TYPES.orc_shieldbearer.abilityIds).toEqual([
       ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID,
+    ]);
+  });
+
+  it("registers the tuned Rending Dash variants on the intended enemies", () => {
+    expect(
+      getEnemyAbilityDefinition(NIGHT_BAT_RENDING_DASH_ABILITY_ID),
+    ).toMatchObject({
+      id: NIGHT_BAT_RENDING_DASH_ABILITY_ID,
+      displayName: "Rending Dash",
+      range: 6,
+      cooldownMs: 8000,
+      castDurationMs: 650,
+      windupDurationMs: 150,
+      aoePattern: { type: "line", squareCount: 4 },
+      aoeVisualIntent: "enemyOffensive",
+    });
+    expect(
+      getEnemyAbilityDefinition(ORC_RAIDER_RENDING_DASH_ABILITY_ID),
+    ).toMatchObject({
+      id: ORC_RAIDER_RENDING_DASH_ABILITY_ID,
+      displayName: "Rending Dash",
+      range: 7.5,
+      cooldownMs: 10000,
+      castDurationMs: 900,
+      windupDurationMs: 200,
+      aoePattern: { type: "rectangle", rows: 5, columns: 2 },
+      aoeVisualIntent: "enemyOffensive",
+    });
+    expect(ENEMY_TYPES.night_bat.abilityIds).toEqual([
+      NIGHT_BAT_RENDING_DASH_ABILITY_ID,
+    ]);
+    expect(ENEMY_TYPES.orc_raider.abilityIds).toEqual([
+      ORC_RAIDER_RENDING_DASH_ABILITY_ID,
     ]);
   });
 

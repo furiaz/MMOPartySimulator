@@ -1,0 +1,2 @@
+export const ENEMY_ROAM_LEASH_DISTANCE = 8;
+export const ENEMY_ATTACK_LEASH_DISTANCE = 16;

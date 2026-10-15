@@ -32,7 +32,7 @@ import {
   isStompOnlyEnemy,
 } from "./enemyAoeChannelSystem";
 import {
-  isEnemyAbilityCasting,
+  isEnemyAbilityBusy,
   recordEnemyBasicAttackCommitted,
 } from "./enemyAbilitySystem";
 import {
@@ -99,7 +99,7 @@ export function updateAttackSystem(
     if (
       !attacker ||
       (attacker.kind === "enemy" &&
-        (isEnemyAbilityCasting(nextState, attacker.id) ||
+        (isEnemyAbilityBusy(nextState, attacker.id) ||
           isEnemyAoeChanneling(nextState, attacker.id))) ||
       !isAttackingCombatEntity(attacker)
     ) {

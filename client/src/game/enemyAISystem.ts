@@ -13,7 +13,11 @@ import {
 import { getEuclideanDistance } from "./positionUtils";
 import { isEnemyEntity, isTargetDummyEnemy } from "./entityGuards";
 import { isEnemyAoeChanneling } from "./enemyAoeChannelSystem";
-import { isEnemyAbilityCasting } from "./enemyAbilitySystem";
+import { isEnemyAbilityBusy } from "./enemyAbilitySystem";
+import {
+  ENEMY_ATTACK_LEASH_DISTANCE,
+  ENEMY_ROAM_LEASH_DISTANCE,
+} from "./enemyLeash";
 import { GAME_LOOP_TICK_MS, type SimulationTiming } from "./simulationTiming";
 import { getPartyLeader } from "./partySystem";
 import {
@@ -44,8 +48,6 @@ import type {
 } from "./types";
 
 const ENEMY_DETECTION_RANGE = 10;
-const ENEMY_ROAM_LEASH_DISTANCE = 8;
-const ENEMY_ATTACK_LEASH_DISTANCE = 16;
 const ENEMY_ROAM_SPEED_MULTIPLIER = 2;
 const ENEMY_CHASE_SPEED_MULTIPLIER = 3;
 const ENEMY_ROAM_MOVE_MIN_MS = 1000;
@@ -90,7 +92,7 @@ export function updateEnemyAISystem(
     }
 
     if (
-      isEnemyAbilityCasting(nextState, entity.id) ||
+      isEnemyAbilityBusy(nextState, entity.id) ||
       isEnemyAoeChanneling(nextState, entity.id)
     ) {
       recordEnemyAiActive();
@@ -723,7 +725,7 @@ function isDormantBackgroundWildEnemy(
     enemy.state === "attack" ||
     enemy.attackWindupStartedAt !== undefined ||
     enemy.attackWindupTargetId ||
-    isEnemyAbilityCasting(state, enemy.id) ||
+    isEnemyAbilityBusy(state, enemy.id) ||
     isEnemyAoeChanneling(state, enemy.id)
   ) {
     return false;
