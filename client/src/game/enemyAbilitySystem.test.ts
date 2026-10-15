@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { updateAttackSystem } from "./attackSystem";
+import { resolveAoePattern } from "./aoePatterns";
 import { createCompanion, createEnemy } from "./entities";
 import {
   FORTIFYING_AURA_STATUS_SOURCE_KEY,
@@ -539,6 +540,7 @@ describe("enemy ability system", () => {
     expect(
       nextState.enemyAbilityBasicAttackRequiredByEnemyId?.[enemy.id],
     ).toBeUndefined();
+    expect(nextState.enemyDashesByEnemyId?.[enemy.id]).toBeUndefined();
   });
 
   it("clears runtime on map transition and prunes removed enemies", () => {
@@ -549,6 +551,7 @@ describe("enemy ability system", () => {
     expect(transitionedState.enemyAbilityCastsByEnemyId).toEqual({});
     expect(transitionedState.enemyAbilityCooldownsByEnemyId).toEqual({});
     expect(transitionedState.enemyAbilityBasicAttackRequiredByEnemyId).toEqual({});
+    expect(transitionedState.enemyDashesByEnemyId).toEqual({});
 
     const entities = { ...runtimeState.entities };
     delete entities[enemy.id];
@@ -561,6 +564,7 @@ describe("enemy ability system", () => {
     expect(
       prunedState.enemyAbilityBasicAttackRequiredByEnemyId?.[enemy.id],
     ).toBeUndefined();
+    expect(prunedState.enemyDashesByEnemyId?.[enemy.id]).toBeUndefined();
   });
 
   it("clears active casts while preserving only valid cooldowns and gates for saves", () => {
@@ -615,6 +619,7 @@ describe("enemy ability system", () => {
     expect(sanitized.enemyAbilityBasicAttackRequiredByEnemyId).toEqual({
       [enemy.id]: true,
     });
+    expect(sanitized.enemyDashesByEnemyId).toEqual({});
 
     const sanitizedGameState = sanitizeGameStateForSave(
       runtimeState,
@@ -628,6 +633,7 @@ describe("enemy ability system", () => {
     expect(sanitizedGameState.enemyAbilityBasicAttackRequiredByEnemyId).toEqual({
       [enemy.id]: true,
     });
+    expect(sanitizedGameState.enemyDashesByEnemyId).toEqual({});
   });
 });
 
@@ -726,6 +732,28 @@ function withEnemyAbilityRuntime(state: GameState, enemyId: string): GameState {
     },
     enemyAbilityBasicAttackRequiredByEnemyId: {
       [enemyId]: true,
+    },
+    enemyDashesByEnemyId: {
+      [enemyId]: {
+        id: `${enemyId}:ready:1000:dash`,
+        abilityId: "ready",
+        casterId: enemyId,
+        origin: { x: 0, y: 0 },
+        direction: { x: 1, y: 0 },
+        destination: { x: 3, y: 0 },
+        distance: 3,
+        area: resolveAoePattern(
+          { type: "line", squareCount: 2 },
+          { origin: { x: 0, y: 0 }, direction: { x: 1, y: 0 } },
+        ),
+        startedAt: 1000,
+        endsAt: 1250,
+        lastUpdatedAt: 1000,
+        lastProgressDistance: 0,
+        lastSafePosition: { x: 0, y: 0 },
+        powerMultiplier: 1,
+        hitTargetIds: [],
+      },
     },
   };
 }

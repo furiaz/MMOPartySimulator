@@ -6,6 +6,7 @@ import type {
   ResolvedAoeArea,
   ResolvedAoeCone,
   ResolvedAoePrimitive,
+  ResolvedAoeRectangle,
   ResolvedAoeSquare,
 } from "./types";
 
@@ -76,6 +77,66 @@ export function getAoeAreaSignature(area: ResolvedAoeArea): string {
     ...area.primitives.map(getPrimitiveSignature),
     boundsSignature(area.bounds),
   ].join("|");
+}
+
+export function clipSquareAoeAreaToForwardDistance(
+  area: ResolvedAoeArea,
+  maximumDistance: number,
+): ResolvedAoeArea {
+  const distance = Math.max(0, maximumDistance);
+  const origin = area.castTransform.origin;
+  const forward = normalizeDirection(area.castTransform.direction);
+  const right = { x: -forward.y, y: forward.x };
+  const rotationRadians = Math.atan2(forward.y, forward.x);
+  const primitives = area.primitives.flatMap<ResolvedAoePrimitive>((primitive) => {
+    if (primitive.type !== "square") {
+      return [];
+    }
+
+    const delta = {
+      x: primitive.center.x - origin.x,
+      y: primitive.center.y - origin.y,
+    };
+    const centerForward = delta.x * forward.x + delta.y * forward.y;
+    const centerLateral = delta.x * right.x + delta.y * right.y;
+    const start = centerForward - primitive.size / 2;
+    const end = centerForward + primitive.size / 2;
+
+    if (start >= distance - GEOMETRY_EPSILON) {
+      return [];
+    }
+
+    if (end <= distance + GEOMETRY_EPSILON) {
+      return [primitive];
+    }
+
+    const width = Math.max(0, distance - start);
+
+    if (width <= GEOMETRY_EPSILON) {
+      return [];
+    }
+
+    const centerDistance = start + width / 2;
+    return [{
+      type: "rectangle",
+      center: {
+        x: origin.x + forward.x * centerDistance + right.x * centerLateral,
+        y: origin.y + forward.y * centerDistance + right.y * centerLateral,
+      },
+      width,
+      height: primitive.size,
+      rotationRadians,
+    } satisfies ResolvedAoeRectangle];
+  });
+
+  return {
+    castTransform: {
+      origin: { ...area.castTransform.origin },
+      direction: { ...area.castTransform.direction },
+    },
+    primitives,
+    bounds: getPrimitiveBounds(primitives, origin),
+  };
 }
 
 function resolvePatternPrimitives(
@@ -299,6 +360,19 @@ function isPositionInsidePrimitive(
       const halfSize = primitive.size / 2 + GEOMETRY_EPSILON;
       return Math.abs(local.x) <= halfSize && Math.abs(local.y) <= halfSize;
     }
+    case "rectangle": {
+      const local = rotate(
+        {
+          x: position.x - primitive.center.x,
+          y: position.y - primitive.center.y,
+        },
+        -primitive.rotationRadians,
+      );
+      return (
+        Math.abs(local.x) <= primitive.width / 2 + GEOMETRY_EPSILON &&
+        Math.abs(local.y) <= primitive.height / 2 + GEOMETRY_EPSILON
+      );
+    }
     case "cone":
       return isPositionInsideCone(primitive, position);
   }
@@ -366,7 +440,9 @@ function getSinglePrimitiveBounds(primitive: ResolvedAoePrimitive): AoeBounds {
     return radiusBounds(primitive.origin, primitive.range);
   }
 
-  const corners = getSquareCorners(primitive);
+  const corners = primitive.type === "square"
+    ? getSquareCorners(primitive)
+    : getRectangleCorners(primitive);
 
   return {
     minX: Math.min(...corners.map((corner) => corner.x)),
@@ -374,6 +450,24 @@ function getSinglePrimitiveBounds(primitive: ResolvedAoePrimitive): AoeBounds {
     minY: Math.min(...corners.map((corner) => corner.y)),
     maxY: Math.max(...corners.map((corner) => corner.y)),
   };
+}
+
+function getRectangleCorners(rectangle: ResolvedAoeRectangle): Position[] {
+  const halfWidth = rectangle.width / 2;
+  const halfHeight = rectangle.height / 2;
+
+  return [
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight },
+  ].map((corner) => {
+    const rotated = rotate(corner, rectangle.rotationRadians);
+    return {
+      x: rectangle.center.x + rotated.x,
+      y: rectangle.center.y + rotated.y,
+    };
+  });
 }
 
 function getSquareCorners(square: ResolvedAoeSquare): Position[] {
@@ -471,6 +565,8 @@ function getPrimitiveSignature(primitive: ResolvedAoePrimitive): string {
       return `ring:${pointSignature(primitive.center)}:${numberSignature(primitive.innerRadius)}:${numberSignature(primitive.outerRadius)}`;
     case "square":
       return `square:${pointSignature(primitive.center)}:${numberSignature(primitive.size)}:${numberSignature(primitive.rotationRadians)}`;
+    case "rectangle":
+      return `rectangle:${pointSignature(primitive.center)}:${numberSignature(primitive.width)}:${numberSignature(primitive.height)}:${numberSignature(primitive.rotationRadians)}`;
     case "cone":
       return `cone:${pointSignature(primitive.origin)}:${pointSignature(primitive.direction)}:${numberSignature(primitive.range)}:${numberSignature(primitive.angleRadians)}`;
   }

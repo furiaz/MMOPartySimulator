@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   CombatFeedbackEvent,
+  EnemyDashState,
   GameMap,
   NavigationClickAccessibility,
 } from "../game";
@@ -25,6 +26,7 @@ import {
   getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
   getEnemyAbilityCastProgress,
+  getEnemyDashAfterimagePresentations,
   getEnemyNameplateColor,
   getEnemyNameplateText,
   getFullRenderSignature,
@@ -472,6 +474,7 @@ function createFullRenderSignatureInput(
     directCompanionCommandsById: {},
     dropVisualEvents: [],
     enemyAbilityCastsByEnemyId: {},
+    enemyDashesByEnemyId: {},
     enemyAoeChannelsByCasterId: {},
     entities: [companion],
     leaderIntent: null,
@@ -495,6 +498,50 @@ function createFullRenderSignatureInput(
     ...overrides,
   };
 }
+
+describe("Rending Dash afterimages", () => {
+  it("spaces static images and fades older samples first", () => {
+    const dash: EnemyDashState = {
+      id: "dash",
+      abilityId: "night_bat_rending_dash",
+      casterId: "bat",
+      origin: { x: 1, y: 2 },
+      direction: { x: 1, y: 0 },
+      destination: { x: 7, y: 2 },
+      distance: 6,
+      area: resolveAoePattern(
+        { type: "line", squareCount: 4 },
+        createAoeCastTransform({ x: 1, y: 2 }, { x: 2, y: 2 }),
+      ),
+      startedAt: 1000,
+      endsAt: 1250,
+      lastUpdatedAt: 1200,
+      lastProgressDistance: 4.8,
+      lastSafePosition: { x: 1, y: 2 },
+      powerMultiplier: 1.25,
+      hitTargetIds: [],
+    };
+    const presentations = getEnemyDashAfterimagePresentations(
+      dash,
+      1150,
+      2,
+      220,
+    );
+
+    expect(presentations.map((presentation) => presentation.position)).toEqual([
+      { x: 1, y: 2 },
+      { x: 3, y: 2 },
+    ]);
+    expect(presentations[0]?.opacity).toBeLessThan(
+      presentations[1]?.opacity ?? 0,
+    );
+    expect(
+      getEnemyDashAfterimagePresentations(dash, 1230, 2, 220).map(
+        (presentation) => presentation.index,
+      ),
+    ).toEqual([1]);
+  });
+});
 
 describe("getFullRenderSignature", () => {
   it("stays stable across non-visual simulation ticks", () => {
@@ -566,6 +613,33 @@ describe("getFullRenderSignature", () => {
             origin: { x: 5, y: 4 },
             targetPosition: companion.position,
             direction: { x: -1, y: 0 },
+          },
+        },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        enemyDashesByEnemyId: {
+          enemy: {
+            id: "enemy:night_bat_rending_dash:1000:dash",
+            abilityId: "night_bat_rending_dash",
+            casterId: "enemy",
+            origin: { x: 1, y: 1 },
+            direction: { x: 1, y: 0 },
+            destination: { x: 7, y: 1 },
+            distance: 6,
+            area: resolveAoePattern(
+              { type: "line", squareCount: 4 },
+              createAoeCastTransform({ x: 1, y: 1 }, { x: 2, y: 1 }),
+            ),
+            startedAt: 1000,
+            endsAt: 1250,
+            lastUpdatedAt: 1100,
+            lastProgressDistance: 2.4,
+            lastSafePosition: { x: 1, y: 1 },
+            powerMultiplier: 1.25,
+            hitTargetIds: [],
           },
         },
       }),

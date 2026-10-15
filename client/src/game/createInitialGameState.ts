@@ -158,6 +158,7 @@ export function createInitialGameState(): GameState {
     enemyAbilityCastsByEnemyId: {},
     enemyAbilityCooldownsByEnemyId: {},
     enemyAbilityBasicAttackRequiredByEnemyId: {},
+    enemyDashesByEnemyId: {},
     aoeDummyPatternSequenceIndex: 0,
     dropVisualEvents: [],
     pendingOfflineFarmingLoot: null,

@@ -60,6 +60,7 @@ export function createTestGameState(
     enemyAbilityCastsByEnemyId: {},
     enemyAbilityCooldownsByEnemyId: {},
     enemyAbilityBasicAttackRequiredByEnemyId: {},
+    enemyDashesByEnemyId: {},
     newsBroadcasts: [],
     ...overrides,
   };

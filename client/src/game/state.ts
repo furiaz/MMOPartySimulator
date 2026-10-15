@@ -47,6 +47,7 @@ import type {
   EnemyAoeCooldownState,
   EnemyAbilityCastState,
   EnemyAbilityCooldownState,
+  EnemyDashState,
   HeadhunterState,
   CruelMercyState,
   ManyBeaconsState,
@@ -291,6 +292,7 @@ export type GameState = {
     Record<string, EnemyAbilityCooldownState>
   >;
   enemyAbilityBasicAttackRequiredByEnemyId?: Record<string, true>;
+  enemyDashesByEnemyId?: Record<string, EnemyDashState>;
   aoeDummyPatternSequenceIndex?: number;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
   flaskRechargeEnemyKillCounter?: number;

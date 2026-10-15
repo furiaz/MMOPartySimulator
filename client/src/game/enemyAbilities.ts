@@ -3,6 +3,7 @@ import type { GameState } from "./state";
 import { launchCombatProjectile } from "./combatProjectileSystem";
 import { isLivingEnemy, isTargetDummyEnemy } from "./entityGuards";
 import { applyStatusEffect } from "./statusEffects";
+import { prepareEnemyDash, startEnemyDash } from "./enemyDashSystem";
 import type {
   AoePattern,
   AoeVisualIntent,
@@ -10,6 +11,8 @@ import type {
   Enemy,
   EnemyAbilityCastState,
   EnemyAbilityId,
+  EnemyDashPlan,
+  ResolvedAoeArea,
 } from "./types";
 
 export const TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID =
@@ -17,6 +20,8 @@ export const TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID =
 export const ORC_SHIELDBEARER_DEFENSE_AURA_ABILITY_ID =
   "orc_shieldbearer_defense_aura";
 export const FORTIFYING_AURA_STATUS_SOURCE_KEY = "fortifying_aura";
+export const NIGHT_BAT_RENDING_DASH_ABILITY_ID = "night_bat_rending_dash";
+export const ORC_RAIDER_RENDING_DASH_ABILITY_ID = "orc_raider_rending_dash";
 
 const FORTIFYING_AURA_ABILITY_IDS = new Set<EnemyAbilityId>([
   TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
@@ -37,6 +42,22 @@ export type EnemyAbilityStartContext = Omit<
   "cast"
 >;
 
+export type EnemyAbilityCastPreparationContext = EnemyAbilityStartContext & {
+  origin: CombatEntity["position"];
+  targetPosition: CombatEntity["position"];
+  direction: CombatEntity["position"];
+  area?: ResolvedAoeArea;
+};
+
+export type EnemyAbilityCastPreparation = {
+  area?: ResolvedAoeArea;
+  dashPlan?: EnemyDashPlan;
+};
+
+export type EnemyAbilityResolution = GameState & {
+  enemyAbilityActionCompletion?: "deferred";
+};
+
 export type EnemyAbilityDefinition = {
   id: EnemyAbilityId;
   displayName: string;
@@ -47,7 +68,10 @@ export type EnemyAbilityDefinition = {
   aoePattern?: AoePattern;
   aoeVisualIntent?: AoeVisualIntent;
   canStart?: (context: EnemyAbilityStartContext) => boolean;
-  resolve?: (context: EnemyAbilityResolutionContext) => GameState;
+  prepareCast?: (
+    context: EnemyAbilityCastPreparationContext,
+  ) => EnemyAbilityCastPreparation | null;
+  resolve?: (context: EnemyAbilityResolutionContext) => EnemyAbilityResolution;
 };
 
 export type EnemyAbilityRegistry = Readonly<
@@ -101,6 +125,28 @@ export const ENEMY_ABILITY_DEFINITIONS: EnemyAbilityRegistry = {
     buffDurationMs: 10000,
     cooldownMs: 16000,
   }),
+  [NIGHT_BAT_RENDING_DASH_ABILITY_ID]: createRendingDashDefinition({
+    id: NIGHT_BAT_RENDING_DASH_ABILITY_ID,
+    range: 6,
+    pattern: { type: "line", squareCount: 4 },
+    fullDistance: 6,
+    castDurationMs: 650,
+    windupDurationMs: 150,
+    movementDurationMs: 250,
+    powerMultiplier: 1.25,
+    cooldownMs: 8000,
+  }),
+  [ORC_RAIDER_RENDING_DASH_ABILITY_ID]: createRendingDashDefinition({
+    id: ORC_RAIDER_RENDING_DASH_ABILITY_ID,
+    range: 7.5,
+    pattern: { type: "rectangle", rows: 5, columns: 2 },
+    fullDistance: 7.5,
+    castDurationMs: 900,
+    windupDurationMs: 200,
+    movementDurationMs: 350,
+    powerMultiplier: 1.5,
+    cooldownMs: 10000,
+  }),
 };
 
 export function getEnemyAbilityDefinition(
@@ -121,6 +167,8 @@ export function getEnemyAbilityDefinition(
       !isNonNegativeFiniteNumber(definition.windupDurationMs)) ||
     (definition.canStart !== undefined &&
       typeof definition.canStart !== "function") ||
+    (definition.prepareCast !== undefined &&
+      typeof definition.prepareCast !== "function") ||
     (definition.aoeVisualIntent !== undefined &&
       !isAoeVisualIntent(definition.aoeVisualIntent)) ||
     (definition.aoeVisualIntent !== undefined && !definition.aoePattern)
@@ -129,6 +177,55 @@ export function getEnemyAbilityDefinition(
   }
 
   return definition;
+}
+
+type RendingDashConfig = {
+  id: EnemyAbilityId;
+  range: number;
+  pattern: AoePattern;
+  fullDistance: number;
+  castDurationMs: number;
+  windupDurationMs: number;
+  movementDurationMs: number;
+  powerMultiplier: number;
+  cooldownMs: number;
+};
+
+function createRendingDashDefinition(
+  config: RendingDashConfig,
+): EnemyAbilityDefinition {
+  return {
+    id: config.id,
+    displayName: "Rending Dash",
+    range: config.range,
+    cooldownMs: config.cooldownMs,
+    castDurationMs: config.castDurationMs,
+    windupDurationMs: config.windupDurationMs,
+    aoePattern: config.pattern,
+    aoeVisualIntent: "enemyOffensive",
+    prepareCast: ({ state, caster, target, area }) => {
+      if (!area) {
+        return null;
+      }
+
+      const preparation = prepareEnemyDash(
+        state,
+        caster,
+        target,
+        area,
+        config.fullDistance,
+        config.movementDurationMs,
+      );
+
+      return preparation
+        ? { area: preparation.area, dashPlan: preparation.dashPlan }
+        : null;
+    },
+    resolve: ({ state, caster, cast, now }) => ({
+      ...startEnemyDash(state, caster, cast, config.powerMultiplier, now),
+      enemyAbilityActionCompletion: "deferred",
+    }),
+  };
 }
 
 type FortifyingAuraConfig = {

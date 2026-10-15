@@ -316,6 +316,7 @@ describe("runtime cleanup", () => {
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.combatProjectiles).toEqual([]);
     expect(nextState.companionAoeChannelsByCasterId).toEqual({});
+    expect(nextState.enemyDashesByEnemyId).toEqual({});
     expect(nextState.aoeDummyPatternSequenceIndex).toBe(0);
   });
 

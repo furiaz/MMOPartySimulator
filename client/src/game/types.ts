@@ -2039,6 +2039,14 @@ export type ResolvedAoeSquare = {
   rotationRadians: number;
 };
 
+export type ResolvedAoeRectangle = {
+  type: "rectangle";
+  center: Position;
+  width: number;
+  height: number;
+  rotationRadians: number;
+};
+
 export type ResolvedAoeCone = {
   type: "cone";
   origin: Position;
@@ -2051,6 +2059,7 @@ export type ResolvedAoePrimitive =
   | ResolvedAoeCircle
   | ResolvedAoeRing
   | ResolvedAoeSquare
+  | ResolvedAoeRectangle
   | ResolvedAoeCone;
 
 export type AoeBounds = {
@@ -2126,7 +2135,41 @@ export type EnemyAbilityCastState = {
   direction: Position;
   area?: ResolvedAoeArea;
   visualIntent?: AoeVisualIntent;
+  dashPlan?: EnemyDashPlan;
 };
+
+export type EnemyDashPlan = {
+  destination: Position;
+  distance: number;
+  durationMs: number;
+};
+
+export type EnemyDashState = {
+  id: string;
+  abilityId: EnemyAbilityId;
+  casterId: string;
+  origin: Position;
+  direction: Position;
+  destination: Position;
+  distance: number;
+  area: ResolvedAoeArea;
+  startedAt: number;
+  endsAt: number;
+  lastUpdatedAt: number;
+  lastProgressDistance: number;
+  lastSafePosition: Position;
+  powerMultiplier: number;
+  hitTargetIds: string[];
+};
+
+export type EnemyDashInterruptReason =
+  | "caster_dead"
+  | "caster_removed"
+  | "incapacitated"
+  | "bound"
+  | "encounter_reset"
+  | "map_transition"
+  | "save_restoration";
 
 export type EnemyAbilityCooldownState = {
   abilityId: EnemyAbilityId;

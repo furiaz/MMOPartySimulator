@@ -3,7 +3,9 @@ import {
   ENEMY_ABILITY_DEFINITIONS,
   getEnemyAbilityDefinition,
   type EnemyAbilityDefinition,
+  type EnemyAbilityCastPreparation,
   type EnemyAbilityRegistry,
+  type EnemyAbilityResolution,
 } from "./enemyAbilities";
 import { resolveAoePattern } from "./aoePatterns";
 import { getEnemyCombatBodyRadius, getEnemyType } from "./enemyArchetypes";
@@ -53,6 +55,13 @@ export function updateEnemyAbilitySystem(
 
 export function isEnemyAbilityCasting(state: GameState, enemyId: string): boolean {
   return Boolean(state.enemyAbilityCastsByEnemyId?.[enemyId]);
+}
+
+export function isEnemyAbilityBusy(state: GameState, enemyId: string): boolean {
+  return Boolean(
+    state.enemyAbilityCastsByEnemyId?.[enemyId] ||
+      state.enemyDashesByEnemyId?.[enemyId],
+  );
 }
 
 export function isEnemyBasicAttackRequired(
@@ -118,15 +127,18 @@ export function clearEnemyAbilityRuntimeForEnemy(
   const enemyAbilityBasicAttackRequiredByEnemyId = {
     ...(state.enemyAbilityBasicAttackRequiredByEnemyId ?? {}),
   };
+  const enemyDashesByEnemyId = { ...(state.enemyDashesByEnemyId ?? {}) };
   delete enemyAbilityCastsByEnemyId[enemyId];
   delete enemyAbilityCooldownsByEnemyId[enemyId];
   delete enemyAbilityBasicAttackRequiredByEnemyId[enemyId];
+  delete enemyDashesByEnemyId[enemyId];
 
   return {
     ...state,
     enemyAbilityCastsByEnemyId,
     enemyAbilityCooldownsByEnemyId,
     enemyAbilityBasicAttackRequiredByEnemyId,
+    enemyDashesByEnemyId,
   };
 }
 
@@ -140,6 +152,7 @@ export function sanitizeEnemyAbilityRuntimeForSave(
   | "enemyAbilityCastsByEnemyId"
   | "enemyAbilityCooldownsByEnemyId"
   | "enemyAbilityBasicAttackRequiredByEnemyId"
+  | "enemyDashesByEnemyId"
 > {
   const enemyAbilityCooldownsByEnemyId: NonNullable<
     GameState["enemyAbilityCooldownsByEnemyId"]
@@ -196,6 +209,7 @@ export function sanitizeEnemyAbilityRuntimeForSave(
     enemyAbilityCastsByEnemyId: {},
     enemyAbilityCooldownsByEnemyId,
     enemyAbilityBasicAttackRequiredByEnemyId,
+    enemyDashesByEnemyId: {},
   };
 }
 
@@ -299,7 +313,39 @@ function maybeStartEnemyAbility(
       continue;
     }
 
-    return startEnemyAbility(state, enemy, target, definition, now);
+    const origin = { ...enemy.position };
+    const targetPosition = { ...target.position };
+    const direction = getNormalizedDirection(origin, targetPosition);
+    const area = definition.aoePattern
+      ? resolveAoePattern(definition.aoePattern, { origin, direction })
+      : undefined;
+    const preparation = definition.prepareCast?.({
+      state,
+      caster: enemy,
+      target,
+      definition,
+      now,
+      origin,
+      targetPosition,
+      direction,
+      area,
+    });
+
+    if (definition.prepareCast && !preparation) {
+      continue;
+    }
+
+    return startEnemyAbility(
+      state,
+      enemy,
+      target,
+      definition,
+      now,
+      origin,
+      targetPosition,
+      direction,
+      preparation ?? { area },
+    );
   }
 
   return state;
@@ -315,7 +361,7 @@ function canEnemyStartAbility(state: GameState, enemy: Enemy, now: number): bool
     enemy.attackWindupStartedAt === undefined &&
     enemy.attackWindupDurationMs === undefined &&
     !enemy.attackWindupTargetId &&
-    !isEnemyAbilityCasting(state, enemy.id) &&
+    !isEnemyAbilityBusy(state, enemy.id) &&
     !state.enemyAoeChannelsByCasterId?.[enemy.id] &&
     !isEnemyBasicAttackRequired(state, enemy.id) &&
     !isEnemyBound(state, enemy) &&
@@ -330,16 +376,14 @@ function startEnemyAbility(
   target: CombatEntity,
   definition: EnemyAbilityDefinition,
   now: number,
+  origin: Position,
+  targetPosition: Position,
+  direction: Position,
+  preparation: EnemyAbilityCastPreparation,
 ): GameState {
-  const direction = getNormalizedDirection(caster.position, target.position);
   const castDurationMs = Math.max(0, definition.castDurationMs);
   const windupDurationMs = Math.max(0, definition.windupDurationMs ?? 0);
-  const area = definition.aoePattern
-    ? resolveAoePattern(definition.aoePattern, {
-        origin: caster.position,
-        direction,
-      })
-    : undefined;
+  const area = preparation.area;
   const cast: EnemyAbilityCastState = {
     id: `${caster.id}:${definition.id}:${now}`,
     abilityId: definition.id,
@@ -349,11 +393,12 @@ function startEnemyAbility(
     startedAt: now,
     castEndsAt: now + castDurationMs,
     windupEndsAt: now + castDurationMs + windupDurationMs,
-    origin: { ...caster.position },
-    targetPosition: { ...target.position },
+    origin,
+    targetPosition,
     direction,
     area,
     visualIntent: area ? definition.aoeVisualIntent : undefined,
+    dashPlan: preparation.dashPlan,
   };
   const cooldown: EnemyAbilityCooldownState = {
     abilityId: definition.id,
@@ -398,7 +443,7 @@ function resolveEnemyAbility(
     ...state,
     enemyAbilityCastsByEnemyId,
   };
-  const resolvedState = definition.resolve?.({
+  const resolution: EnemyAbilityResolution = definition.resolve?.({
     state: stateWithoutCast,
     caster,
     target,
@@ -406,6 +451,13 @@ function resolveEnemyAbility(
     definition,
     now,
   }) ?? stateWithoutCast;
+  const isDeferred = resolution.enemyAbilityActionCompletion === "deferred";
+  const resolvedState = { ...resolution };
+  delete resolvedState.enemyAbilityActionCompletion;
+
+  if (isDeferred) {
+    return resolvedState;
+  }
   const currentCaster = getEntityById(resolvedState, caster.id);
 
   return isEnemyEntity(currentCaster)

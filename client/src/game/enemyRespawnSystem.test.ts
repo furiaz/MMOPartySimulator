@@ -86,6 +86,7 @@ describe("enemy respawn system", () => {
       enemyAbilityCastsByEnemyId: { [enemy.id]: {} as never },
       enemyAbilityCooldownsByEnemyId: { [enemy.id]: { ready: {} as never } },
       enemyAbilityBasicAttackRequiredByEnemyId: { [enemy.id]: true },
+      enemyDashesByEnemyId: { [enemy.id]: {} as never },
     });
 
     const nextState = updateEnemyRespawnSystem(
@@ -114,6 +115,7 @@ describe("enemy respawn system", () => {
     expect(
       nextState.enemyAbilityBasicAttackRequiredByEnemyId?.[enemy.id],
     ).toBeUndefined();
+    expect(nextState.enemyDashesByEnemyId?.[enemy.id]).toBeUndefined();
   });
 
   it("does not respawn enemies while on the hub map", () => {

@@ -111,7 +111,9 @@ export function applyStatusEffect(
     targetId: input.targetId,
     sourceId: input.sourceId,
     sourceKey: input.sourceKey,
-    ...(input.endsWhenSourceDies ? { endsWhenSourceDies: true as const } : {}),
+    ...("endsWhenSourceDies" in input && input.endsWhenSourceDies
+      ? { endsWhenSourceDies: true as const }
+      : {}),
     appliedAt: now,
     expiresAt: now + durationMs,
   };
