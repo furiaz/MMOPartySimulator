@@ -97,6 +97,12 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
     "Collect useful wood, ore, or herbs from the Ash Goblin Encampment.",
   equip_first_class_weapon:
     "Equip a weapon made for one of your companions’ first classes.",
+  defeat_briar_burrows_enemies:
+    "Push through Briar Burrows and defeat the creatures inside.",
+  find_tin_crawler_hatchling:
+    "Tin Crawlers sometimes leave a hatchling behind. Find one for the Livestock keeper.",
+  assemble_three_companions:
+    "The Guild & Inn can help you assemble three active companions.",
 };
 
 const genericGreetings = ["Welcome.", "Hello.", "What’s up, dood?"] as const;

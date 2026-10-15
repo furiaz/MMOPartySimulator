@@ -951,6 +951,99 @@ describe("save game serialization", () => {
     ]);
   });
 
+  it("unlocks Into the Briar Burrows when an older save completed Break the Ash Camp", () => {
+    const quests = createInitialQuestStates();
+    quests.break_the_ash_camp = {
+      ...quests.break_the_ash_camp,
+      status: "completed",
+      completedCycle: 1,
+      rewardClaimedCycle: 1,
+    };
+    const save = createSavedGame(createTestGameState({ quests }), NOW_MS);
+    delete (save.state.quests as Partial<typeof save.state.quests>)
+      .into_the_briar_burrows;
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.quests.into_the_briar_burrows.status).toBe(
+      "available",
+    );
+  });
+
+  it("restores Briar Burrows kill progress and reconciles current ownership and party size", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 14, y: 29 },
+      "companion-1",
+    );
+    const follower = createCompanion(
+      "companion-2",
+      { x: 15, y: 29 },
+      leader.id,
+    );
+    const thirdCompanion = {
+      ...createCompanion("companion-3", { x: 16, y: 29 }, leader.id),
+      state: "dead" as const,
+      health: 0,
+    };
+    const quests = createInitialQuestStates();
+    quests.into_the_briar_burrows = {
+      ...quests.into_the_briar_burrows,
+      status: "active",
+      objectiveProgress: {
+        ...quests.into_the_briar_burrows.objectiveProgress,
+        defeat_briar_burrows_enemies: {
+          objectiveId: "defeat_briar_burrows_enemies",
+          currentCount: 123,
+          completed: false,
+        },
+      },
+    };
+    const baseState = createTestGameState();
+    const save = createSavedGame(
+      createTestGameState({
+        entities: {
+          [leader.id]: leader,
+          [follower.id]: follower,
+          [thirdCompanion.id]: thirdCompanion,
+        },
+        partyLeaderId: leader.id,
+        quests,
+        livestock: {
+          ...baseState.livestock!,
+          ownedCreaturesById: {
+            ...baseState.livestock!.ownedCreaturesById,
+            tin_crawler: 1,
+          },
+        },
+      }),
+      NOW_MS,
+    );
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(
+      restored.state.quests.into_the_briar_burrows.objectiveProgress
+        .defeat_briar_burrows_enemies.currentCount,
+    ).toBe(123);
+    expect(
+      restored.state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+    expect(
+      restored.state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+  });
+
   it("preserves Guild Field Team assignment through save restore", () => {
     const leader: Companion = {
       ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1", "defender", 0),

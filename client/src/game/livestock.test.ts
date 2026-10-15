@@ -26,7 +26,9 @@ import { getLivestockHelperBonusSummary } from "./livestockHelperBonuses";
 import { createEmptyPartyInventory, countInventoryItem } from "./inventory";
 import {
   LIVESTOCK_DUSKHEN_DISCOVERY_KEY_ITEM_ID,
+  LIVESTOCK_TIN_CRAWLER_DISCOVERY_KEY_ITEM_ID,
   LIVESTOCK_WOLF_DISCOVERY_KEY_ITEM_ID,
+  getKeyItemDefinition,
 } from "./keyItems";
 import { sanitizeGameStateForSave } from "./saveGame";
 import { createTestGameState } from "./testState";
@@ -728,6 +730,46 @@ describe("Livestock MVP", () => {
       text: "Obtained: Wolf Pup",
       details: ["Obtained: Wolf Pup"],
     });
+  });
+
+  it("presents Tin Crawler discoveries as Hatchlings while keeping the adult name", () => {
+    const baseState = createLivestockTestState();
+    const result = addOwnedLivestockCreature(
+      {
+        ...baseState,
+        quests: {
+          ...baseState.quests,
+          into_the_briar_burrows: {
+            ...baseState.quests.into_the_briar_burrows,
+            status: "active",
+          },
+        },
+      },
+      LIVESTOCK_TIN_CRAWLER_CREATURE_ID,
+      "tin_crawler_defeat",
+      NOW_MS,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.creature.displayName).toBe("Tin Crawler");
+    expect(
+      result.state.keyItemsById?.[
+        LIVESTOCK_TIN_CRAWLER_DISCOVERY_KEY_ITEM_ID
+      ],
+    ).toBe(1);
+    expect(
+      getKeyItemDefinition(LIVESTOCK_TIN_CRAWLER_DISCOVERY_KEY_ITEM_ID)
+        .displayName,
+    ).toBe("Tin Crawler Hatchling Discovery");
+    expect(result.state.newsBroadcasts?.at(-1)).toMatchObject({
+      title: "Unlock Acquired",
+      text: "Unlocked: Tin Crawler Hatchling",
+      details: ["Unlocked: Tin Crawler Hatchling"],
+    });
+    expect(
+      result.state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
   });
 
   it("counts only placed fed helper creatures for helper bonuses", () => {

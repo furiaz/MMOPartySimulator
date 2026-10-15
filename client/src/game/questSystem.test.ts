@@ -8,6 +8,7 @@ import {
   CLASS_MENTOR_NPC_ID,
   HUB_TWO_QUEST_GIVER_NPC_ID,
   HUB_TWO_MAP_ID,
+  MAP_FIVE_ID,
   MAP_FOUR_ID,
   MAP_TWO_ID,
   MAP_THREE_ID,
@@ -390,6 +391,7 @@ describe("prototype quest system", () => {
       "azure_trial",
       "orders_from_the_guild",
       "break_the_ash_camp",
+      "into_the_briar_burrows",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");
@@ -401,6 +403,7 @@ describe("prototype quest system", () => {
     expect(quests.azure_trial.status).toBe("locked");
     expect(quests.orders_from_the_guild.status).toBe("locked");
     expect(quests.break_the_ash_camp.status).toBe("locked");
+    expect(quests.into_the_briar_burrows.status).toBe("locked");
   });
 
   it("grants smithy starter materials on accept so Plain Charm can be crafted", () => {
@@ -1057,10 +1060,125 @@ describe("prototype quest system", () => {
     );
 
     expect(rewarded.quests.break_the_ash_camp.status).toBe("completed");
+    expect(rewarded.quests.into_the_briar_burrows.status).toBe("available");
     expect(rewarded.wallet.balancesByCurrencyId.crowns).toBe(500);
     expect(getCompanion(rewarded, "companion-1").lastCharacterXpGained).toBe(1800);
     expect(getCompanion(rewarded, "companion-2").lastCharacterXpGained).toBe(1800);
     expect(repeated.wallet.balancesByCurrencyId.crowns).toBe(500);
+  });
+
+  it("defines and accepts Into the Briar Burrows through the Hub 2 quest giver", () => {
+    const thirdCompanion = createCompanion(
+      "companion-3",
+      { x: 2, y: 0 },
+      "companion-1",
+    );
+    const initialState = createStateWithParty({
+      quests: createQuestStates({
+        break_the_ash_camp: "completed",
+        into_the_briar_burrows: "available",
+      }),
+    });
+    const state = acceptQuestFromQuestGiver(
+      {
+        ...initialState,
+        entities: {
+          ...initialState.entities,
+          [thirdCompanion.id]: thirdCompanion,
+        },
+        livestock: {
+          ...initialState.livestock!,
+          ownedCreaturesById: {
+            ...initialState.livestock!.ownedCreaturesById,
+            tin_crawler: 1,
+          },
+        },
+      },
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "into_the_briar_burrows",
+    );
+
+    expect(QUEST_DEFINITIONS.into_the_briar_burrows).toMatchObject({
+      displayName: "Into the Briar Burrows",
+      questGiverMapId: HUB_TWO_MAP_ID,
+      requiresCompletedQuestIds: ["break_the_ash_camp"],
+      rewards: { crowns: 750, characterXp: 2800 },
+    });
+    expect(state.quests.into_the_briar_burrows.status).toBe("active");
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+  });
+
+  it("counts only Briar Burrows kills and gives Superior enemies two credits", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_FIVE_ID,
+      map: createDebugMap(MAP_FIVE_ID),
+      quests: createQuestStates({ into_the_briar_burrows: "active" }),
+    });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("tin-crawler", "crawler", "briar-burrows"),
+      MAP_FIVE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      {
+        ...createDefeatedEnemy("superior-wolf", "wolf", "briar-burrows"),
+        variant: "superior",
+      },
+      MAP_FIVE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-zone", "crawler", "other-subzone"),
+      MAP_FIVE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-map", "crawler", "briar-burrows"),
+      MAP_FOUR_ID,
+    );
+
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .defeat_briar_burrows_enemies.currentCount,
+    ).toBe(3);
+  });
+
+  it("grants Into the Briar Burrows rewards once", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({
+        into_the_briar_burrows: "ready_to_turn_in",
+      }),
+    });
+
+    const rewarded = finishReadyQuestForQuestGiver(
+      state,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "into_the_briar_burrows",
+    );
+    const repeated = finishReadyQuestForQuestGiver(
+      rewarded,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "into_the_briar_burrows",
+    );
+
+    expect(rewarded.quests.into_the_briar_burrows.status).toBe("completed");
+    expect(rewarded.wallet.balancesByCurrencyId.crowns).toBe(750);
+    expect(getCompanion(rewarded, "companion-1").lastCharacterXpGained).toBe(
+      2800,
+    );
+    expect(getCompanion(rewarded, "companion-2").lastCharacterXpGained).toBe(
+      2800,
+    );
+    expect(repeated.wallet.balancesByCurrencyId.crowns).toBe(750);
   });
 
   it("uses chance and pity for special enemy quest drops without overflowing", () => {

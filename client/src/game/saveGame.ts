@@ -69,7 +69,10 @@ import {
   QUEST_ORDER,
   reconcileQuestAvailability,
 } from "./questSystem";
-import { recordEquippedItemObjectivesForQuests } from "./questProgressionHooks";
+import {
+  reconcileStateDerivedQuestObjectivesForQuests,
+  recordEquippedItemObjectivesForQuests,
+} from "./questProgressionHooks";
 import { sanitizeProgressionForCompanion } from "./skillProgression";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import type { GameState } from "./state";
@@ -916,6 +919,10 @@ export function sanitizeGameStateForSave(
   }
 
   questReconciliationState = recordEquippedItemObjectivesForQuests(
+    questReconciliationState,
+    "save_restoration",
+  );
+  questReconciliationState = reconcileStateDerivedQuestObjectivesForQuests(
     questReconciliationState,
     "save_restoration",
   );

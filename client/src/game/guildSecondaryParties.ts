@@ -13,6 +13,7 @@ import {
   getRestingCompanions,
   recordHighestCharacterLevelEver,
 } from "./partySystem";
+import { reconcileStateDerivedQuestObjectivesForQuests } from "./questProgressionHooks";
 import type { GameState } from "./state";
 import type {
   Companion,
@@ -374,7 +375,10 @@ export function moveGuildRosterCompanion(
 
   return {
     ok: true,
-    state: nextState,
+    state: reconcileStateDerivedQuestObjectivesForQuests(
+      nextState,
+      "guild_roster_movement",
+    ),
     movedCompanionId: companionId,
   };
 }

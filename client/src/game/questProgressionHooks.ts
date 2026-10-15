@@ -273,6 +273,110 @@ export function recordEquippedItemObjectivesForQuests(
   return nextState;
 }
 
+export function reconcileStateDerivedQuestObjectivesForQuests(
+  state: GameState,
+  reason = "state_derived_objective_check",
+): GameState {
+  let nextState = state;
+
+  for (const questId of QUEST_ORDER) {
+    if (nextState.quests[questId]?.status !== "active") {
+      continue;
+    }
+
+    for (const objective of QUEST_DEFINITIONS[questId].objectives) {
+      if (
+        objective.type !== "own_livestock_creature" &&
+        objective.type !== "active_party_member_count"
+      ) {
+        continue;
+      }
+
+      const quest = nextState.quests[questId];
+      const progress = quest.objectiveProgress[objective.id];
+
+      if (!progress || progress.completed) {
+        continue;
+      }
+
+      const requiredCount = Math.max(1, objective.requiredCount ?? 1);
+      const currentValue =
+        objective.type === "own_livestock_creature"
+          ? objective.livestockCreatureId
+            ? nextState.livestock?.ownedCreaturesById[
+                objective.livestockCreatureId
+              ] ?? 0
+            : 0
+          : Object.values(nextState.entities).filter(
+              (entity) => entity.kind === "companion",
+            ).length;
+      const currentCount = Math.min(
+        requiredCount,
+        Math.max(0, Math.floor(currentValue)),
+      );
+      const completed = currentCount >= requiredCount;
+
+      if (
+        progress.currentCount === currentCount &&
+        progress.completed === completed
+      ) {
+        continue;
+      }
+
+      nextState = appendDebugTelemetryEvent(
+        {
+          ...nextState,
+          quests: {
+            ...nextState.quests,
+            [questId]: {
+              ...quest,
+              objectiveProgress: {
+                ...quest.objectiveProgress,
+                [objective.id]: {
+                  ...progress,
+                  currentCount,
+                  completed,
+                },
+              },
+            },
+          },
+        },
+        {
+          type: "quest_objective_progress",
+          entityId: "party",
+          questId,
+          objectiveId: objective.id,
+          objectiveProgress: currentCount,
+          objectiveRequiredCount: requiredCount,
+          result: reason,
+          currentMapId: nextState.currentMapId,
+          currentMapDisplayName: nextState.map?.displayName,
+          currentMapDebugName: nextState.map?.debugName,
+        },
+      );
+
+      if (completed) {
+        nextState = appendDebugTelemetryEvent(nextState, {
+          type: "quest_objective_completed",
+          entityId: "party",
+          questId,
+          objectiveId: objective.id,
+          objectiveProgress: currentCount,
+          objectiveRequiredCount: requiredCount,
+          result: reason,
+          currentMapId: nextState.currentMapId,
+          currentMapDisplayName: nextState.map?.displayName,
+          currentMapDebugName: nextState.map?.debugName,
+        });
+      }
+    }
+
+    nextState = maybeMarkQuestReadyToTurnIn(nextState, questId);
+  }
+
+  return nextState;
+}
+
 export function recordGuildNoticeBoardQuestTakenForQuests(
   state: GameState,
   noticeBoardQuestId: string,

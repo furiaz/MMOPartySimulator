@@ -6,6 +6,7 @@ import type {
   EnemyVariant,
   EquipmentSlot,
   ItemId,
+  LivestockCreatureId,
   Position,
   ResourceType,
 } from "./types";
@@ -26,7 +27,8 @@ export type QuestId =
   | "find_slimeward_camp"
   | "azure_trial"
   | "orders_from_the_guild"
-  | "break_the_ash_camp";
+  | "break_the_ash_camp"
+  | "into_the_briar_burrows";
 
 export type QuestStatus =
   | "locked"
@@ -54,7 +56,9 @@ export type QuestObjectiveType =
   | "defeat_elite"
   | "collect_dungeon_chest"
   | "return_to_poi"
-  | "take_guild_notice_board_quest";
+  | "take_guild_notice_board_quest"
+  | "own_livestock_creature"
+  | "active_party_member_count";
 
 export type QuestEquipmentRequirement = "first_class_weapon";
 
@@ -84,6 +88,7 @@ export type QuestObjectiveDefinition = {
   itemId?: ItemId;
   targetSlot?: EquipmentSlot;
   equipmentRequirement?: QuestEquipmentRequirement;
+  livestockCreatureId?: LivestockCreatureId;
   noticeBoardQuestId?: string;
   requiredCount?: number;
   questItemDisplayName?: string;

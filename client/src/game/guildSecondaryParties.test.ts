@@ -20,6 +20,7 @@ import {
 } from "./guildRecruitUpgrades";
 import { createInitialInnUpgradesState } from "./innRoomUpgrades";
 import { isPositionAvailable } from "./movementPlanning";
+import { createInitialQuestStates } from "./questSystem";
 import { createTestGameState } from "./testState";
 import type { GameState } from "./state";
 import type { Companion } from "./types";
@@ -142,6 +143,39 @@ describe("guild secondary parties", () => {
       }),
     ).toBe(true);
     expect(result.state.restingCompanionsById?.reserve).toBeUndefined();
+  });
+
+  it("updates the active-party quest objective after roster movement", () => {
+    const baseState = createRosterState({
+      activeIds: ["leader", "ally"],
+      restingIds: ["reserve"],
+      highestCharacterLevelEver: 10,
+    });
+    const quests = createInitialQuestStates();
+    const state = {
+      ...baseState,
+      quests: {
+        ...quests,
+        into_the_briar_burrows: {
+          ...quests.into_the_briar_burrows,
+          status: "active" as const,
+        },
+      },
+    };
+
+    const result = moveGuildRosterCompanion(state, "reserve", {
+      area: "main_party",
+      slotIndex: 2,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(
+      result.state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
   });
 
   it("spawns a returning companion around the leader without using occupied spaces", () => {
