@@ -16,6 +16,7 @@ export type BasicAttackImpactResult = {
 type BasicAttackImpactOptions = {
   damageType?: CombatDamageType;
   powerMultiplier?: number;
+  label?: string;
 };
 
 export function resolveBasicAttackImpact(
@@ -32,7 +33,7 @@ export function resolveBasicAttackImpact(
     allowEvasion: true,
     allowPassiveBlock: damageType === "physical",
     now,
-    label: "Attack",
+    label: options.label ?? "Attack",
   });
   let nextState = combatResult.state;
   const updatedTarget = updateTargetAfterDamage(combatResult.target, attacker);

@@ -17,19 +17,25 @@ export type CombatProjectileLaunchProfile = {
   impactRadius: number;
 };
 
-export function launchBasicCombatProjectile(
+export type CombatProjectileLaunchOptions = {
+  impactLabel?: string;
+  origin?: Position;
+};
+
+export function launchCombatProjectile(
   state: GameState,
   attacker: CombatEntity,
   target: CombatEntity,
   profile: CombatProjectileLaunchProfile,
   now: number,
+  options: CombatProjectileLaunchOptions = {},
 ): GameState {
   const projectiles = state.combatProjectiles ?? [];
   const projectile: ActiveCombatProjectile = {
     id: `${now}-${attacker.id}-${target.id}-${projectiles.length}`,
     sourceId: attacker.id,
     targetId: target.id,
-    position: { ...attacker.position },
+    position: { ...(options.origin ?? attacker.position) },
     targetFallbackPosition: { ...target.position },
     speed: profile.speed,
     impactRadius: profile.impactRadius,
@@ -37,12 +43,23 @@ export function launchBasicCombatProjectile(
     launchedAt: now,
     damageType: profile.damageType,
     powerMultiplier: profile.powerMultiplier,
+    impactLabel: options.impactLabel,
   };
 
   return {
     ...state,
     combatProjectiles: [...projectiles, projectile],
   };
+}
+
+export function launchBasicCombatProjectile(
+  state: GameState,
+  attacker: CombatEntity,
+  target: CombatEntity,
+  profile: CombatProjectileLaunchProfile,
+  now: number,
+): GameState {
+  return launchCombatProjectile(state, attacker, target, profile, now);
 }
 
 export function updateCombatProjectileSystem(
@@ -78,6 +95,7 @@ export function updateCombatProjectileSystem(
       const impactResult = resolveBasicAttackImpact(nextState, source, target, now, {
         damageType: projectile.damageType,
         powerMultiplier: projectile.powerMultiplier,
+        label: projectile.impactLabel,
       });
       nextState = impactResult.state;
       continue;

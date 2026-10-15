@@ -415,11 +415,11 @@ Combat flow:
 9. Defeated enemies grant XP to eligible living party members.
 10. The party regroups, recovers, resumes gathering, or continues exploration.
 
-Current basic attacks include melee attacks and a lightweight prototype projectile layer.
+Current combat includes melee basic attacks and a lightweight prototype projectile layer shared by supported basic attacks and focused enemy abilities.
 
 Prototype combat supports numeric skill ranges, enemy attack ranges, enemy attack windup timing, and basic projectile travel. Hunter basic attacks may use arrow projectiles. Ranged enemy combat styles may use simple projectile visuals such as thrown weapons, slime shots, wisps, or imp magic.
 
-Projectile travel and enemy attack windup are prototype readability layers for current basic attacks. They should not be treated as the final ranged combat system, ammunition system, projectile physics model, advanced targeting framework, or production combat telegraph system.
+Projectile travel, enemy attack windup, and focused enemy cast telegraphs are prototype readability layers. They should not be treated as the final ranged combat system, ammunition system, projectile physics model, advanced targeting framework, or production combat telegraph system.
 
 Companion combat may use derived combat stats for prototype attack power, defense, max health, evasion, block, magic power, healing power, magic defense, accuracy, critical hits, healing, shields, barriers, absorbs, mitigation, and passive health regeneration.
 
@@ -478,7 +478,7 @@ Current prototype world-wipe recovery behavior:
 - restores companions to the selected rescue hub arrival positions
 - restores companion health
 - clears active combat, movement, teleport, POI, drop, resurrection, formation, and map-local runtime state
-- clears temporary skill runtime state, skill cooldowns, global cooldowns, status effects, skill visual events, companion AoE channels, enemy AoE channels, and enemy AoE cooldowns
+- clears temporary skill runtime state, skill cooldowns, global cooldowns, status effects, skill visual events, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, and reusable enemy ability runtime
 - clears Slimeward dungeon runtime when rescue returns the party to Slimeward Camp
 - may charge Crowns based on route distance, limited by the current wallet balance
 - records map reach for quest state after rescue
@@ -488,7 +488,7 @@ This is a prototype safety system, not the final death penalty, revive economy, 
 
 Map transitions and rescue transitions should clear or prune map-local temporary runtime state.
 
-Current map-local cleanup may include movement caches, attack slot caches, follow trails, combat feedback, projectiles, skill runtime state, status effects, skill cooldowns, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, resurrection runtime, health timing, and target dummy timing.
+Current map-local cleanup may include movement caches, attack slot caches, follow trails, combat feedback, projectiles, skill runtime state, status effects, skill cooldowns, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, reusable enemy ability casts, reusable enemy ability cooldowns, required-basic-attack gates, resurrection runtime, health timing, and target dummy timing.
 
 This cleanup is prototype runtime hygiene, not a final persistence, checkpoint, combat-instance, or encounter-reset system.
 
@@ -549,10 +549,29 @@ Current prototype enemy respawn behavior:
 
 - defeated enemies may respawn on wild maps after a short delay
 - enemies respawn at their home position
-- respawn restores health and clears temporary target, roam, mark, and bind state
+- respawn restores health and clears temporary target, roam, mark, bind, and reusable enemy ability runtime state
 - respawn may reroll eligible Superior enemy variant state
 - normal enemy respawn pauses while a matching subzone is suppressed by an active defend-area quest objective or its short post-completion restore delay
 - enemy respawn does not run in the hub
+
+Current reusable enemy ability execution behavior:
+
+- enemy types may reference reusable enemy ability definitions through an ordered ability-id list
+- the ordered list is deterministic priority: an enemy tries the first valid ready ability when its next normal attack action is available
+- starting an ability locks the caster position, target id, target position, and targeting direction for that cast
+- ability cooldown starts when casting begins and continues to elapse during crowd control
+- enemies cannot chase or perform basic attacks while casting
+- a started ability requires the enemy to commit at least one basic attack before another ability can begin, including when the cast is interrupted
+- death, removal, invalid or fake-death targets, taunt, incapacitation, silence, and bind may interrupt an active cast without refunding its cooldown
+- immobilization alone does not interrupt an active cast, and disarm blocks basic attacks rather than reusable ability use
+- active casts are canceled during restoration; valid unexpired reusable enemy ability cooldowns and required-basic-attack gates are preserved
+- Ember Imp currently references the reusable `fire_bolt` ability
+- Fire Bolt has a 5-unit range, a 0.9-second cast, a 0.3-second release windup, and a 6-second cooldown that starts when casting begins
+- Fire Bolt launches from the locked cast origin, tracks its still-valid target at 8 world units per second, and resolves once at a 0.35-unit impact radius
+- Fire Bolt deals 1.5 times enemy attack as direct magic damage through normal evasion, magic-defense, and active-shield rules; it does not apply Burn, splash damage, or ground fire
+- the renderer presents Fire Bolt with an orange cast label, progress bar, pulsing caster glow, and a larger reuse of the current Imp fireball visual
+
+This is a focused enemy-only execution runtime. It reuses existing combat effect systems and does not replace enemy AI, basic attacks, the existing enemy AoE channel system, companion skills, or the future full ability and casting framework.
 
 Current prototype enemy AoE behavior:
 
@@ -612,7 +631,7 @@ Slimeward-specific enemy types currently use the Slime archetype/family and exis
 
 Prototype enemy archetypes/families provide lightweight defaults such as display name, default combat style, default attack range, and default temperament.
 
-Prototype enemy types provide current setup values such as level, attack cooldown, detection range, attack range override, combat body radius, temperament, combat style override, and target preference.
+Prototype enemy types provide current setup values such as level, attack cooldown, detection range, attack range override, combat body radius, temperament, combat style override, target preference, and an optional ordered reusable enemy ability-id list.
 
 Prototype enemy archetypes and enemy types are not final bestiary content, final encounter design, faction design, AI behavior trees, production combat roles, or XP reward tables.
 ---
@@ -2597,7 +2616,7 @@ Current post-Hub-2 wilderness structure:
 - Post-Hub-2 maps are smaller than the pre-Hub-2 wilderness maps and currently use one internal subzone each for POI, Auto Combat, AFK estimate, encounter, resource, and compatibility systems.
 - Post-Hub-2 maps use blockers, negative space, encounter pockets, and landmarks to create denser paths without narrow party-clogging corridors.
 - After Hub 2, each new wilderness map should normally contain around three enemy types as the current standard; exceptions are allowed when the theme benefits from a close variant count.
-- Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12.
+- Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12. Ember Imps use the telegraphed reusable Fire Bolt before returning to their normal ranged basic attacks.
 - Briar Burrows contains Tin Crawler level 13, Briar Wolf level 15, and Mire Spider level 15.
 - Nightmire Canopy contains Night Bat level 16, Elder Mossling level 17, and Cinder Wisp level 18.
 - Orc Warcamp contains Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, and Orc Warmaster level 20.
@@ -2765,7 +2784,8 @@ Current prototype save behavior:
 - invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
 - restored saves rebuild the current prototype map from saved quest state
 - restored saves preserve valid shared inventory, wallet, bank, key item, quest, companion, Guild & Inn, world discovery, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers
-- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, consumable buffs, skill runtime state, status effects, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, and debug telemetry
+- restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, companion skill and global cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, consumable buffs, skill runtime state, status effects, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, active reusable enemy ability casts, and debug telemetry
+- reusable enemy ability cooldowns are the narrow cooldown exception: valid unexpired absolute expiration timestamps and the required-basic-attack gate survive restoration, while expired, malformed, unknown-ability, or missing-enemy records are discarded
 - restored saves clear short-lived news broadcast feedback
 - restored saves sanitize companion skill progression and preserve valid learned skill rank data
 
@@ -2852,9 +2872,9 @@ Do not implement these unless explicitly requested:
 - full equipment economy beyond the current prototype equipment foundation
 - equipment visuals, weapon anchoring, paper-doll rendering, paper-doll equipment, or visible weapon swaps
 - full inventory/equipment economy beyond the current prototype shared party inventory
-- advanced ability framework beyond current prototype class skills, skill ranks, skill books, skill behavior settings, temporary skill runtime state, status effects, companion AoE channels, and legacy-enabled Beginner skill carry-over
+- advanced ability framework beyond current prototype class skills, skill ranks, skill books, skill behavior settings, temporary skill runtime state, status effects, companion AoE channels, focused reusable enemy ability execution, and legacy-enabled Beginner skill carry-over
 - mana or complex resource costs
-- casting system
+- full casting system beyond the focused reusable enemy ability runtime
 - advanced targeting system
 - advanced support mechanics
 - advanced aggro/threat mechanics

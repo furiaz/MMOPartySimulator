@@ -44,6 +44,11 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    enemyAbilityCastsByEnemyId: {},
+    enemyAbilityCooldownsByEnemyId: {},
+    enemyAbilityBasicAttackRequiredByEnemyId: {},
+    enemyDashesByEnemyId: {},
+    aoeDummyPatternSequenceIndex: 0,
     flaskRechargeCountedEnemyDefeats: {},
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
@@ -225,6 +230,22 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     state.enemyAoeCooldownsByCasterId,
     currentEntityIds,
   );
+  const enemyAbilityCastsByEnemyId = pruneRecordById(
+    state.enemyAbilityCastsByEnemyId,
+    currentEntityIds,
+  );
+  const enemyAbilityCooldownsByEnemyId = pruneRecordById(
+    state.enemyAbilityCooldownsByEnemyId,
+    currentEntityIds,
+  );
+  const enemyAbilityBasicAttackRequiredByEnemyId = pruneRecordById(
+    state.enemyAbilityBasicAttackRequiredByEnemyId,
+    currentEntityIds,
+  );
+  const enemyDashesByEnemyId = pruneRecordById(
+    state.enemyDashesByEnemyId,
+    currentEntityIds,
+  );
   const companionAoeChannelsByCasterId = pruneRecordById(
     state.companionAoeChannelsByCasterId,
     currentEntityIds,
@@ -297,6 +318,11 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     globalCooldownsByCompanionId === state.globalCooldownsByCompanionId &&
     companionAoeChannelsByCasterId === state.companionAoeChannelsByCasterId &&
     enemyAoeCooldownsByCasterId === state.enemyAoeCooldownsByCasterId &&
+    enemyAbilityCastsByEnemyId === state.enemyAbilityCastsByEnemyId &&
+    enemyAbilityCooldownsByEnemyId === state.enemyAbilityCooldownsByEnemyId &&
+    enemyAbilityBasicAttackRequiredByEnemyId ===
+      state.enemyAbilityBasicAttackRequiredByEnemyId &&
+    enemyDashesByEnemyId === state.enemyDashesByEnemyId &&
     flaskRechargeCountedEnemyDefeats === state.flaskRechargeCountedEnemyDefeats &&
     lastHealthRegenAtByCompanionId === state.lastHealthRegenAtByCompanionId &&
     lastTargetDummyRegenAtByEnemyId === state.lastTargetDummyRegenAtByEnemyId &&
@@ -349,6 +375,10 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     globalCooldownsByCompanionId,
     companionAoeChannelsByCasterId,
     enemyAoeCooldownsByCasterId,
+    enemyAbilityCastsByEnemyId,
+    enemyAbilityCooldownsByEnemyId,
+    enemyAbilityBasicAttackRequiredByEnemyId,
+    enemyDashesByEnemyId,
     flaskRechargeCountedEnemyDefeats,
     lastHealthRegenAtByCompanionId,
     lastTargetDummyRegenAtByEnemyId,
@@ -383,7 +413,13 @@ function pruneRecordById<T>(
   return nextRecord ?? record;
 }
 
-function pruneStatusEffectsByEntityId<T extends { targetId: string; sourceId?: string }>(
+function pruneStatusEffectsByEntityId<
+  T extends {
+    targetId: string;
+    sourceId?: string;
+    endsWhenSourceDies?: true;
+  },
+>(
   record: Record<string, T> | undefined,
   currentEntityIds: Set<string>,
 ): Record<string, T> | undefined {
@@ -395,7 +431,9 @@ function pruneStatusEffectsByEntityId<T extends { targetId: string; sourceId?: s
   const entries = Object.entries(record).filter(([, value]) => {
     const shouldKeep =
       currentEntityIds.has(value.targetId) &&
-      (!value.sourceId || currentEntityIds.has(value.sourceId));
+      (value.endsWhenSourceDies !== true ||
+        !value.sourceId ||
+        currentEntityIds.has(value.sourceId));
 
     didPrune ||= !shouldKeep;
     return shouldKeep;

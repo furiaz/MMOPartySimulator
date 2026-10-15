@@ -11,6 +11,11 @@ import {
 } from "./consumables";
 import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
+import { updateEnemyAbilitySystem } from "./enemyAbilitySystem";
+import {
+  cleanupEnemyDashRuntime,
+  updateEnemyDashSystem,
+} from "./enemyDashSystem";
 import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { updateEntitySeparationSystem } from "./entitySeparationSystem";
@@ -211,6 +216,12 @@ export function updateGame(
     timing.nowMs,
     movedEntityIds,
   );
+  nextState = updateEnemyAbilitySystem(nextState, timing.nowMs);
+  nextState = updateEnemyDashSystem(
+    nextState,
+    movedEntityIds,
+    timing.nowMs,
+  );
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
@@ -231,6 +242,7 @@ export function updateGame(
     timing.nowMs,
     timing.deltaMs,
   );
+  nextState = cleanupEnemyDashRuntime(nextState, timing.nowMs);
   nextState = updateFlaskRechargeFromEnemyKills(nextState, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);

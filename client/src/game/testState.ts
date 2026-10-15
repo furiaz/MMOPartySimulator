@@ -57,6 +57,10 @@ export function createTestGameState(
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    enemyAbilityCastsByEnemyId: {},
+    enemyAbilityCooldownsByEnemyId: {},
+    enemyAbilityBasicAttackRequiredByEnemyId: {},
+    enemyDashesByEnemyId: {},
     newsBroadcasts: [],
     ...overrides,
   };

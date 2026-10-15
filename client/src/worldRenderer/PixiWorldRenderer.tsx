@@ -25,11 +25,14 @@ import {
 import type {
   ActiveCombatProjectile,
   ActiveTeleport,
+  AoeVisualIntent,
   CombatFeedbackEvent,
   CompanionAoeChannelState,
   CompanionDirectCommandInput,
   DirectCompanionCommand,
   DropVisualEvent,
+  EnemyAbilityCastState,
+  EnemyDashState,
   EnemyAoeChannelState,
   EntityCollisionShape,
   GameEntity,
@@ -40,6 +43,10 @@ import type {
   NpcEntity,
   PartyIntent,
   Position,
+  ResolvedAoeArea,
+  ResolvedAoeCone,
+  ResolvedAoeRectangle,
+  ResolvedAoeSquare,
   ResurrectionProgressState,
   SkillBindState,
   SkillMarkState,
@@ -48,8 +55,10 @@ import type {
   StatusEffectState,
 } from "../game";
 import {
+  FORTIFYING_AURA_STATUS_SOURCE_KEY,
   getEnemyAggroRange,
   getEnemyArchetype,
+  getEnemyAbilityDefinition,
   getEnemyType,
   getEntityCollisionShape,
   getItemDefinition,
@@ -58,6 +67,7 @@ import {
   RESURRECTION_RANGE,
   SKILL_DEFINITIONS,
   aoeTargetDummyId,
+  doAoeBoundsIntersect,
   targetDummyId,
 } from "../game";
 import {
@@ -83,6 +93,8 @@ import {
   createRendererFrameScheduler,
   doOverheadUiBoxesOverlap,
   getDotDamageIconSrc,
+  getEnemyAbilityCastProgress,
+  getEnemyDashAfterimagePresentations,
   getFullRenderSignature,
   getNpcSpeechBubbleLayout,
   getOverheadStatusPresentation,
@@ -141,6 +153,8 @@ const passiveEnemyNameplateColor = 0x1f2937;
 const superiorEnemyAuraColor = 0xef4444;
 const enemyAoeFillColor = 0xdc2626;
 const enemyAoeStrokeColor = 0x7f1d1d;
+const enemySupportiveAoeFillColor = 0xf59e0b;
+const enemySupportiveAoeStrokeColor = 0xd97706;
 const partyOffensiveAoeFillColor = 0x2563eb;
 const partyOffensiveAoeStrokeColor = 0x1d4ed8;
 const partyHealingAoeFillColor = 0x16a34a;
@@ -199,6 +213,12 @@ const combatProjectileVisualProfiles: Record<
     nativeAngleDegrees: 0,
     src: `${combatProjectileSpritePath}/elementalist-arcane-bolt.png`,
     width: 30,
+  },
+  enemy_fire_bolt: {
+    height: 32,
+    nativeAngleDegrees: 135,
+    src: `${combatProjectileSpritePath}/bog-imp.png`,
+    width: 32,
   },
   hunter_arrow: {
     height: 12,
@@ -278,6 +298,8 @@ type PixiWorldRendererProps = {
   currentTime?: number;
   directCompanionCommandsById?: Record<string, DirectCompanionCommand>;
   dropVisualEvents?: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId?: Record<string, EnemyAbilityCastState>;
+  enemyDashesByEnemyId?: Record<string, EnemyDashState>;
   enemyAoeChannelsByCasterId?: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent?: LeaderIntent | null;
@@ -474,6 +496,8 @@ type DrawWorldOptions = {
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
+  enemyDashesByEnemyId: Record<string, EnemyDashState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -2216,6 +2240,8 @@ function drawDebugCollisionShape(
 }
 
 function drawEntityOverheadUiPass({
+  currentTime,
+  enemyAbilityCastsByEnemyId,
   entities,
   graphics,
   layer,
@@ -2227,6 +2253,8 @@ function drawEntityOverheadUiPass({
   transform,
   visibleTileBounds,
 }: {
+  currentTime: number;
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   entities: GameEntity[];
   graphics: Graphics;
   layer: Container;
@@ -2250,8 +2278,16 @@ function drawEntityOverheadUiPass({
         statusEffectsById,
       });
       const box = getEntityOverheadUiBox(entity, transform, status);
+      const activeCast =
+        entity.kind === "enemy"
+          ? enemyAbilityCastsByEnemyId[entity.id]
+          : undefined;
+      const layoutBox =
+        box && activeCast && activeCast.windupEndsAt > currentTime
+          ? { ...box, height: box.height + 18 }
+          : box;
 
-      return box ? { box, entity, status } : null;
+      return layoutBox ? { box: layoutBox, entity, status } : null;
     })
     .filter(
       (
@@ -2305,6 +2341,16 @@ function drawEntityOverheadUiPass({
       hasQuestIndicator: questIndicatorEntityIds.has(entry.entity.id),
       transform,
     });
+    drawEnemyAbilityCastUi({
+      box: entry.box,
+      cast: enemyAbilityCastsByEnemyId[entry.entity.id],
+      currentTime,
+      enemy: entry.entity,
+      graphics,
+      layer,
+      managedState,
+      metrics,
+    });
   }
 
   drawQuestEntityLabels({
@@ -2315,6 +2361,69 @@ function drawEntityOverheadUiPass({
     questIndicatorEntityIds,
     transform,
     visibleTileBounds,
+  });
+}
+
+function drawEnemyAbilityCastUi({
+  box,
+  cast,
+  currentTime,
+  enemy,
+  graphics,
+  layer,
+  managedState,
+  metrics,
+}: {
+  box: EntityOverheadUiLayout;
+  cast: EnemyAbilityCastState | undefined;
+  currentTime: number;
+  enemy: Extract<GameEntity, { kind: "enemy" }>;
+  graphics: Graphics;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+}) {
+  if (!cast || cast.windupEndsAt <= currentTime) {
+    return;
+  }
+
+  const definition = getEnemyAbilityDefinition(cast.abilityId);
+
+  if (!definition) {
+    return;
+  }
+
+  const labelHeight = 10;
+  const barHeight = 4;
+  const gap = 2;
+  const labelY = box.healthY + overheadHealthHeight + gap;
+  const barY = labelY + labelHeight + gap;
+  const progress = getEnemyAbilityCastProgress(cast, currentTime);
+
+  graphics
+    .roundRect(box.x, labelY, box.width, labelHeight, 3)
+    .fill({ color: 0x431407, alpha: 0.92 });
+  graphics
+    .rect(box.x, barY, box.width, barHeight)
+    .fill({ color: 0x431407, alpha: 0.92 });
+  graphics
+    .rect(box.x, barY, box.width * progress, barHeight)
+    .fill(0xf97316);
+
+  drawManagedFeedbackText({
+    color: 0xef4444,
+    fontSize: 9,
+    key: `enemy-ability-cast:${enemy.id}`,
+    layer,
+    managedState,
+    metrics,
+    position: {
+      x: box.x + box.width / 2,
+      y: labelY + labelHeight / 2,
+    },
+    strokeColor: 0x431407,
+    strokeWidth: 3,
+    text: definition.displayName,
   });
 }
 
@@ -3383,7 +3492,10 @@ function shouldDrawCombatFeedbackEvent(
     return false;
   }
 
-  if (event.type === "attack" && event.text === "Attack") {
+  if (
+    event.type === "attack" &&
+    (event.text === "Attack" || entity.kind === "enemy")
+  ) {
     return false;
   }
 
@@ -3882,6 +3994,32 @@ function drawSkillLink(
     .stroke({ color, alpha: 0.72, width });
 }
 
+function drawEnemyAbilityAreas(
+  graphics: Graphics,
+  castsByEnemyId: Record<string, EnemyAbilityCastState>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const cast of Object.values(castsByEnemyId)) {
+    if (
+      !cast.area ||
+      !cast.visualIntent ||
+      cast.windupEndsAt <= currentTime ||
+      !doAoeBoundsIntersect(cast.area.bounds, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    drawResolvedAoeArea(graphics, {
+      area: cast.area,
+      transform,
+      intent: cast.visualIntent,
+      opacity: 0.55,
+    });
+  }
+}
+
 function drawEnemyAoeChannels(
   graphics: Graphics,
   channelsByCasterId: Record<string, EnemyAoeChannelState>,
@@ -3890,20 +4028,16 @@ function drawEnemyAoeChannels(
   visibleTileBounds: TileBounds,
 ) {
   for (const channel of Object.values(channelsByCasterId)) {
-    if (
-      channel.shape.type !== "circle" ||
-      !isPositionInTileBounds(channel.shape.center, visibleTileBounds)
-    ) {
+    if (!doAoeBoundsIntersect(channel.area.bounds, visibleTileBounds)) {
       continue;
     }
 
-    const center = toFullPosition(channel.shape.center, transform);
     const channelProgress = getEnemyAoeChannelProgress(channel, currentTime);
     const dangerOpacity = channel.phase === "windup" ? 1 : channelProgress;
 
-    drawAoeCircle(graphics, {
-      center,
-      radiusPx: channel.shape.radius * transform.cellPixelSize,
+    drawResolvedAoeArea(graphics, {
+      area: channel.area,
+      transform,
       intent: "enemyOffensive",
       opacity: dangerOpacity,
     });
@@ -3919,34 +4053,264 @@ function drawCompanionAoeChannels(
 ) {
   for (const channel of Object.values(channelsByCasterId)) {
     if (
-      channel.shape.type !== "circle" ||
-      !isPositionInTileBounds(channel.shape.center, visibleTileBounds) ||
+      !doAoeBoundsIntersect(channel.area.bounds, visibleTileBounds) ||
       channel.channelEndsAt <= currentTime
     ) {
       continue;
     }
 
-    const center = toFullPosition(channel.shape.center, transform);
     const duration = channel.channelEndsAt - channel.startedAt;
     const progress =
       duration <= 0
         ? 1
         : Math.max(0, Math.min(1, (currentTime - channel.startedAt) / duration));
 
-    drawAoeCircle(graphics, {
-      center,
-      radiusPx: channel.shape.radius * transform.cellPixelSize,
+    drawResolvedAoeArea(graphics, {
+      area: channel.area,
+      transform,
       intent: channel.visualIntent,
       opacity: 0.35 + progress * 0.65,
     });
   }
 }
 
+function drawResolvedAoeArea(
+  graphics: Graphics,
+  options: {
+    area: ResolvedAoeArea;
+    transform: FullTransform;
+    intent: AoeVisualIntent;
+    opacity: number;
+  },
+) {
+  for (const primitive of options.area.primitives) {
+    if (primitive.type === "circle") {
+      drawAoeCircle(graphics, {
+        center: toFullPosition(primitive.center, options.transform),
+        radiusPx: primitive.radius * options.transform.cellPixelSize,
+        intent: options.intent,
+        opacity: options.opacity,
+      });
+      continue;
+    }
+
+    if (primitive.type === "ring") {
+      drawAoeRing(graphics, {
+        center: toFullPosition(primitive.center, options.transform),
+        innerRadiusPx: primitive.innerRadius * options.transform.cellPixelSize,
+        outerRadiusPx: primitive.outerRadius * options.transform.cellPixelSize,
+        intent: options.intent,
+        opacity: options.opacity,
+      });
+      continue;
+    }
+
+    if (primitive.type === "square") {
+      drawAoeSquare(
+        graphics,
+        primitive,
+        options.transform,
+        options.intent,
+        options.opacity,
+      );
+      continue;
+    }
+
+    if (primitive.type === "rectangle") {
+      drawAoeRectangle(
+        graphics,
+        primitive,
+        options.transform,
+        options.intent,
+        options.opacity,
+      );
+      continue;
+    }
+
+    drawAoeCone(
+      graphics,
+      primitive,
+      options.transform,
+      options.intent,
+      options.opacity,
+    );
+  }
+}
+
+function drawAoeRectangle(
+  graphics: Graphics,
+  rectangle: ResolvedAoeRectangle,
+  transform: FullTransform,
+  intent: AoeVisualIntent,
+  opacity: number,
+) {
+  const style = getAoeShapeStyle(intent, opacity);
+  const halfWidth = rectangle.width / 2;
+  const halfHeight = rectangle.height / 2;
+  const cosine = Math.cos(rectangle.rotationRadians);
+  const sine = Math.sin(rectangle.rotationRadians);
+  const points = [
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight },
+  ].flatMap((corner) => {
+    const worldPosition = {
+      x: rectangle.center.x + corner.x * cosine - corner.y * sine,
+      y: rectangle.center.y + corner.x * sine + corner.y * cosine,
+    };
+    const pixelPosition = toFullPosition(worldPosition, transform);
+    return [pixelPosition.x, pixelPosition.y];
+  });
+
+  graphics
+    .poly(points)
+    .fill({ color: style.fillColor, alpha: style.fillAlpha })
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+}
+
+function drawAoeRing(
+  graphics: Graphics,
+  options: {
+    center: Position;
+    innerRadiusPx: number;
+    outerRadiusPx: number;
+    intent: AoeVisualIntent;
+    opacity: number;
+  },
+) {
+  const style = getAoeShapeStyle(options.intent, options.opacity);
+  const ringWidth = Math.max(0, options.outerRadiusPx - options.innerRadiusPx);
+  const middleRadius = options.innerRadiusPx + ringWidth / 2;
+
+  if (ringWidth > 0) {
+    graphics.circle(options.center.x, options.center.y, middleRadius).stroke({
+      color: style.fillColor,
+      alpha: style.fillAlpha,
+      width: ringWidth,
+    });
+  }
+
+  graphics
+    .circle(options.center.x, options.center.y, options.outerRadiusPx)
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+
+  if (options.innerRadiusPx > 0) {
+    graphics
+      .circle(options.center.x, options.center.y, options.innerRadiusPx)
+      .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+  }
+}
+
+function drawAoeSquare(
+  graphics: Graphics,
+  square: ResolvedAoeSquare,
+  transform: FullTransform,
+  intent: AoeVisualIntent,
+  opacity: number,
+) {
+  const style = getAoeShapeStyle(intent, opacity);
+  const halfSize = square.size / 2;
+  const cosine = Math.cos(square.rotationRadians);
+  const sine = Math.sin(square.rotationRadians);
+  const points = [
+    { x: -halfSize, y: -halfSize },
+    { x: halfSize, y: -halfSize },
+    { x: halfSize, y: halfSize },
+    { x: -halfSize, y: halfSize },
+  ].flatMap((corner) => {
+    const worldPosition = {
+      x: square.center.x + corner.x * cosine - corner.y * sine,
+      y: square.center.y + corner.x * sine + corner.y * cosine,
+    };
+    const pixelPosition = toFullPosition(worldPosition, transform);
+    return [pixelPosition.x, pixelPosition.y];
+  });
+
+  graphics
+    .poly(points)
+    .fill({ color: style.fillColor, alpha: style.fillAlpha })
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+}
+
+function drawAoeCone(
+  graphics: Graphics,
+  cone: ResolvedAoeCone,
+  transform: FullTransform,
+  intent: AoeVisualIntent,
+  opacity: number,
+) {
+  const style = getAoeShapeStyle(intent, opacity);
+  const directionAngle = Math.atan2(cone.direction.y, cone.direction.x);
+  const halfAngle = cone.angleRadians / 2;
+  const arcSteps = Math.max(8, Math.ceil(cone.angleRadians / (Math.PI / 24)));
+  const worldPoints: Position[] = [{ ...cone.origin }];
+
+  for (let step = 0; step <= arcSteps; step += 1) {
+    const angle = directionAngle - halfAngle + (cone.angleRadians * step) / arcSteps;
+    worldPoints.push({
+      x: cone.origin.x + Math.cos(angle) * cone.range,
+      y: cone.origin.y + Math.sin(angle) * cone.range,
+    });
+  }
+
+  const points = worldPoints.flatMap((position) => {
+    const pixelPosition = toFullPosition(position, transform);
+    return [pixelPosition.x, pixelPosition.y];
+  });
+
+  graphics
+    .poly(points)
+    .fill({ color: style.fillColor, alpha: style.fillAlpha })
+    .stroke({ color: style.strokeColor, alpha: style.strokeAlpha, width: 3 });
+}
+
+function getAoeShapeStyle(
+  intent: AoeVisualIntent,
+  opacity: number,
+) {
+  const alpha = Math.min(1, Math.max(0, opacity));
+
+  if (intent === "enemyOffensive") {
+    return {
+      fillColor: enemyAoeFillColor,
+      fillAlpha: 0.13 + alpha * 0.5,
+      strokeColor: enemyAoeStrokeColor,
+      strokeAlpha: 0.48 + alpha * 0.52,
+    };
+  }
+
+  if (intent === "enemySupportive") {
+    return {
+      fillColor: enemySupportiveAoeFillColor,
+      fillAlpha: 0.05 + alpha * 0.1,
+      strokeColor: enemySupportiveAoeStrokeColor,
+      strokeAlpha: 0.42 + alpha * 0.4,
+    };
+  }
+
+  if (intent === "partyHealing") {
+    return {
+      fillColor: partyHealingAoeFillColor,
+      fillAlpha: 0.08 + alpha * 0.14,
+      strokeColor: partyHealingAoeStrokeColor,
+      strokeAlpha: 0.54 + alpha * 0.36,
+    };
+  }
+
+  return {
+    fillColor: partyOffensiveAoeFillColor,
+    fillAlpha: 0.1 + alpha * 0.2,
+    strokeColor: partyOffensiveAoeStrokeColor,
+    strokeAlpha: 0.5 + alpha * 0.42,
+  };
+}
+
 function drawAoeCircle(
   graphics: Graphics,
   options: {
     center: { x: number; y: number };
-    intent: "enemyOffensive" | "partyOffensive" | "partyHealing";
+    intent: AoeVisualIntent;
     opacity: number;
     radiusPx: number;
   },
@@ -3960,6 +4324,20 @@ function drawAoeCircle(
       enemyAoeStrokeColor,
       options.opacity,
     );
+    return;
+  }
+
+  if (options.intent === "enemySupportive") {
+    const alpha = Math.min(1, Math.max(0, options.opacity));
+
+    graphics
+      .circle(options.center.x, options.center.y, options.radiusPx)
+      .fill({ color: enemySupportiveAoeFillColor, alpha: 0.05 + alpha * 0.1 })
+      .stroke({
+        color: enemySupportiveAoeStrokeColor,
+        alpha: 0.42 + alpha * 0.4,
+        width: 3,
+      });
     return;
   }
 
@@ -4068,6 +4446,97 @@ function drawEnemyAoeChannelBars(
 
     graphics.rect(x, y, width, height).fill({ color: 0x450a0a, alpha: 0.9 });
     graphics.rect(x, y, width * progress, height).fill(0xef4444);
+  }
+}
+
+function drawEnemyAbilityCastGlows(
+  graphics: Graphics,
+  castsByEnemyId: Record<string, EnemyAbilityCastState>,
+  entitiesById: Map<string, GameEntity>,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  const pulse = (Math.sin((currentTime / 700) * Math.PI * 2) + 1) / 2;
+
+  for (const cast of Object.values(castsByEnemyId)) {
+    const caster = entitiesById.get(cast.casterId);
+
+    if (
+      !caster ||
+      caster.kind !== "enemy" ||
+      caster.state === "dead" ||
+      caster.health <= 0 ||
+      cast.windupEndsAt <= currentTime ||
+      !isPositionInTileBounds(caster.position, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const center = toFullPosition(caster.position, transform);
+    const radius = transform.cellPixelSize * (0.58 + pulse * 0.1);
+
+    graphics
+      .circle(center.x, center.y, radius)
+      .fill({ color: 0xf97316, alpha: 0.08 + pulse * 0.08 })
+      .stroke({ color: 0xfb923c, alpha: 0.52 + pulse * 0.3, width: 3 });
+  }
+}
+
+function drawFortifyingAuraOutlines(
+  graphics: Graphics,
+  entities: GameEntity[],
+  statusEffectsById: Record<string, StatusEffectState>,
+  currentTime: number,
+  map: GameMap,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  const fortifiedEnemyIds = new Set(
+    Object.values(statusEffectsById)
+      .filter(
+        (status) =>
+          status.type === "defenseBuff" &&
+          status.sourceKey === FORTIFYING_AURA_STATUS_SOURCE_KEY &&
+          status.expiresAt > currentTime,
+      )
+      .map((status) => status.targetId),
+  );
+
+  for (const entity of entities) {
+    if (
+      entity.kind !== "enemy" ||
+      entity.state === "dead" ||
+      entity.health <= 0 ||
+      !fortifiedEnemyIds.has(entity.id) ||
+      !isPositionInTileBounds(entity.position, visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const visualAsset = getEntityVisualAsset(entity, map.id);
+    const layout = getEntitySpriteLayout(
+      entity,
+      transform.cellPixelSize,
+      visualAsset,
+    );
+    const entityPosition = toFullPosition(entity.position, transform);
+    const spritePosition = {
+      x: entityPosition.x,
+      y: entityPosition.y + transform.cellPixelSize / 2,
+    };
+    const radiusMultiplier = isSuperiorEnemy(entity) ? 0.48 : 0.42;
+    const radius = Math.max(layout.width, layout.height) * radiusMultiplier;
+    const centerY = spritePosition.y - layout.height * 0.18;
+
+    graphics
+      .circle(spritePosition.x, centerY, radius)
+      .fill({ color: enemySupportiveAoeFillColor, alpha: 0.04 })
+      .stroke({
+        color: enemySupportiveAoeStrokeColor,
+        alpha: 0.92,
+        width: 3,
+      });
   }
 }
 
@@ -5224,6 +5693,100 @@ function drawFullEntities({
   }
 }
 
+function drawEnemyDashAfterimages({
+  cache,
+  currentTime,
+  enemyDashesByEnemyId,
+  entitiesById,
+  layer,
+  managedState,
+  map,
+  metrics,
+  requestRedraw,
+  transform,
+  visibleTileBounds,
+  visualMovementByEntityId,
+}: {
+  cache: TextureCache;
+  currentTime: number;
+  enemyDashesByEnemyId: Record<string, EnemyDashState>;
+  entitiesById: Map<string, GameEntity>;
+  layer: Container;
+  managedState: ManagedRendererState;
+  map: GameMap;
+  metrics: PixiDrawMetrics;
+  requestRedraw?: () => void;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+  visualMovementByEntityId: Record<string, EntityVisualMovement>;
+}) {
+  for (const dash of Object.values(enemyDashesByEnemyId)) {
+    const caster = entitiesById.get(dash.casterId);
+
+    if (!caster || caster.kind !== "enemy" || dash.distance <= 0) {
+      continue;
+    }
+
+    const visualAsset = getEntityVisualAsset(caster, map.id);
+    const layout = getEntitySpriteLayout(
+      caster,
+      transform.cellPixelSize,
+      visualAsset,
+    );
+    const spacing = layout.width / transform.cellPixelSize + 0.1;
+    const presentations = getEnemyDashAfterimagePresentations(
+      dash,
+      currentTime,
+      spacing,
+      getEnemyDashAfterimageFadeDurationMs(dash.abilityId),
+    );
+
+    for (const presentation of presentations) {
+      const { createdAt: creationTime, index, opacity: alpha, position } = presentation;
+
+      if (!isPositionInTileBounds(position, visibleTileBounds)) {
+        continue;
+      }
+
+      const spriteSrc = getEntitySpriteSrc({
+        currentTime: creationTime,
+        entity: caster,
+        map,
+        visualMovementByEntityId,
+      }) ?? getEntityIdleSpriteSrc(caster, map);
+
+      if (!spriteSrc) {
+        continue;
+      }
+
+      const pixelPosition = toFullPosition(position, transform);
+      drawManagedImageSprite({
+        alpha,
+        anchorX: layout.anchorX,
+        anchorY: layout.anchorY,
+        cache,
+        height: layout.height,
+        key: `enemy-dash-afterimage:${dash.id}:${index}`,
+        layer,
+        managedState,
+        metrics,
+        position: {
+          x: pixelPosition.x,
+          y: pixelPosition.y + transform.cellPixelSize / 2,
+        },
+        requestRedraw,
+        src: spriteSrc,
+        tint: 0x7dd3fc,
+        width: layout.width,
+      });
+    }
+  }
+}
+
+function getEnemyDashAfterimageFadeDurationMs(abilityId: string): number {
+  return abilityId === "night_bat_rending_dash" ? 220 : 300;
+}
+
 function drawSuperiorEnemyAura(
   graphics: Graphics,
   position: Position,
@@ -5578,6 +6141,8 @@ function drawFullMap({
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
+  enemyAbilityCastsByEnemyId,
+  enemyDashesByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -5615,6 +6180,8 @@ function drawFullMap({
   currentTime: number;
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
+  enemyDashesByEnemyId: Record<string, EnemyDashState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -5710,6 +6277,27 @@ function drawFullMap({
     transform,
     visibleTileBounds,
   });
+  drawEnemyAbilityAreas(
+    effectsGraphics,
+    enemyAbilityCastsByEnemyId,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
+  drawEnemyDashAfterimages({
+    cache: textureCache,
+    currentTime,
+    enemyDashesByEnemyId,
+    entitiesById,
+    layer: layers.objectLayer,
+    managedState,
+    map,
+    metrics,
+    requestRedraw,
+    transform,
+    visibleTileBounds,
+    visualMovementByEntityId,
+  });
   drawFullEntities({
     cache: textureCache,
     combatFeedbackEvents,
@@ -5726,6 +6314,23 @@ function drawFullMap({
     visibleTileBounds,
     visualMovementByEntityId,
   });
+  drawFortifyingAuraOutlines(
+    effectsGraphics,
+    entities,
+    statusEffectsById,
+    statusPresentationTime,
+    map,
+    transform,
+    visibleTileBounds,
+  );
+  drawEnemyAbilityCastGlows(
+    effectsGraphics,
+    enemyAbilityCastsByEnemyId,
+    entitiesById,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
   drawEnemyAoeChannels(
     effectsGraphics,
     enemyAoeChannelsByCasterId,
@@ -5910,6 +6515,8 @@ function drawFullMap({
   );
 
   drawEntityOverheadUiPass({
+    currentTime,
+    enemyAbilityCastsByEnemyId,
     entities,
     graphics: layers.effectsGraphics,
     layer: layers.effectsLayer,
@@ -6136,6 +6743,8 @@ function drawWorld({
   currentTime,
   directCompanionCommandsById,
   dropVisualEvents,
+  enemyAbilityCastsByEnemyId,
+  enemyDashesByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -6179,6 +6788,8 @@ function drawWorld({
       companionAoeChannelsByCasterId,
       currentTime,
       dropVisualEvents,
+      enemyAbilityCastsByEnemyId,
+      enemyDashesByEnemyId,
       enemyAoeChannelsByCasterId,
       entities,
       movementClickFeedbackEvents,
@@ -6200,6 +6811,8 @@ function drawWorld({
       companionAoeChannelsByCasterId,
       directCompanionCommandsById,
       dropVisualEvents,
+      enemyAbilityCastsByEnemyId,
+      enemyDashesByEnemyId,
       enemyAoeChannelsByCasterId,
       entities,
       leaderIntent,
@@ -6250,6 +6863,8 @@ function drawWorld({
       currentTime,
       directCompanionCommandsById,
       dropVisualEvents,
+      enemyAbilityCastsByEnemyId,
+      enemyDashesByEnemyId,
       enemyAoeChannelsByCasterId,
       entities,
       leaderIntent,
@@ -6340,6 +6955,8 @@ function hasActiveTimedRendererWork({
   companionAoeChannelsByCasterId,
   currentTime,
   dropVisualEvents,
+  enemyAbilityCastsByEnemyId,
+  enemyDashesByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   movementClickFeedbackEvents,
@@ -6358,6 +6975,8 @@ function hasActiveTimedRendererWork({
   companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
   currentTime: number;
   dropVisualEvents: DropVisualEvent[];
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
+  enemyDashesByEnemyId: Record<string, EnemyDashState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   movementClickFeedbackEvents: MovementClickFeedbackEvent[];
@@ -6385,6 +7004,12 @@ function hasActiveTimedRendererWork({
     combatFeedbackEvents.some((event) => event.expiresAt > currentTime) ||
     dropVisualEvents.some((event) => event.expiresAt > currentTime) ||
     skillVisualEvents.some((event) => event.expiresAt > currentTime) ||
+    Object.values(enemyAbilityCastsByEnemyId).some(
+      (cast) => cast.windupEndsAt > currentTime,
+    ) ||
+    Object.values(enemyDashesByEnemyId).some(
+      (dash) => dash.endsAt > currentTime,
+    ) ||
     Object.values(visualMovementByEntityId).some(
       (movement) => movement.expiresAt > currentTime,
     ) ||
@@ -6429,6 +7054,8 @@ export function PixiWorldRenderer({
   currentTime,
   directCompanionCommandsById = {},
   dropVisualEvents = [],
+  enemyAbilityCastsByEnemyId = {},
+  enemyDashesByEnemyId = {},
   enemyAoeChannelsByCasterId = {},
   entities,
   leaderIntent = null,
@@ -6491,6 +7118,10 @@ export function PixiWorldRenderer({
   );
   const latestDirectCompanionCommandsByIdRef = useRef(directCompanionCommandsById);
   const latestDropVisualEventsRef = useRef(dropVisualEvents);
+  const latestEnemyAbilityCastsByEnemyIdRef = useRef(
+    enemyAbilityCastsByEnemyId,
+  );
+  const latestEnemyDashesByEnemyIdRef = useRef(enemyDashesByEnemyId);
   const latestEnemyAoeChannelsByCasterIdRef = useRef(enemyAoeChannelsByCasterId);
   const latestActiveTeleportRef = useRef<ActiveTeleport | null>(activeTeleport);
   const latestMapRef = useRef(map);
@@ -6559,6 +7190,8 @@ export function PixiWorldRenderer({
     }
     latestDirectCompanionCommandsByIdRef.current = directCompanionCommandsById;
     latestDropVisualEventsRef.current = dropVisualEvents;
+    latestEnemyAbilityCastsByEnemyIdRef.current = enemyAbilityCastsByEnemyId;
+    latestEnemyDashesByEnemyIdRef.current = enemyDashesByEnemyId;
     latestEnemyAoeChannelsByCasterIdRef.current = enemyAoeChannelsByCasterId;
     latestMapRef.current = map;
     latestEntitiesRef.current = sortedEntities;
@@ -6595,6 +7228,8 @@ export function PixiWorldRenderer({
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
+    enemyAbilityCastsByEnemyId,
+    enemyDashesByEnemyId,
     enemyAoeChannelsByCasterId,
     leaderIntent,
     map,
@@ -6672,6 +7307,9 @@ export function PixiWorldRenderer({
           latestCompanionAoeChannelsByCasterIdRef.current,
         currentTime: now,
         dropVisualEvents: latestDropVisualEventsRef.current,
+        enemyAbilityCastsByEnemyId:
+          latestEnemyAbilityCastsByEnemyIdRef.current,
+        enemyDashesByEnemyId: latestEnemyDashesByEnemyIdRef.current,
         enemyAoeChannelsByCasterId:
           latestEnemyAoeChannelsByCasterIdRef.current,
         entities: latestEntitiesRef.current,
@@ -6713,6 +7351,9 @@ export function PixiWorldRenderer({
         directCompanionCommandsById:
           latestDirectCompanionCommandsByIdRef.current,
         dropVisualEvents: latestDropVisualEventsRef.current,
+        enemyAbilityCastsByEnemyId:
+          latestEnemyAbilityCastsByEnemyIdRef.current,
+        enemyDashesByEnemyId: latestEnemyDashesByEnemyIdRef.current,
         enemyAoeChannelsByCasterId:
           latestEnemyAoeChannelsByCasterIdRef.current,
         entities: latestEntitiesRef.current,
@@ -6888,6 +7529,8 @@ export function PixiWorldRenderer({
     currentTime,
     directCompanionCommandsById,
     dropVisualEvents,
+    enemyAbilityCastsByEnemyId,
+    enemyDashesByEnemyId,
     enemyAoeChannelsByCasterId,
     leaderIntent,
     map,

@@ -286,6 +286,8 @@ import {
   type DirectCompanionCommandResultCode,
   type DropVisualEvent,
   type Enemy,
+  type EnemyAbilityCastState,
+  type EnemyDashState,
   type EnemyAoeChannelState,
   type EnemyTypeId,
   type EquipmentSlot,
@@ -431,6 +433,8 @@ const emptyDirectCompanionCommands: Record<string, DirectCompanionCommand> = {};
 const emptyDropVisualEvents: DropVisualEvent[] = [];
 const emptyCombatProjectiles: ActiveCombatProjectile[] = [];
 const emptyCompanionAoeChannels: Record<string, CompanionAoeChannelState> = {};
+const emptyEnemyAbilityCasts: Record<string, EnemyAbilityCastState> = {};
+const emptyEnemyDashes: Record<string, EnemyDashState> = {};
 const emptyEnemyAoeChannels: Record<string, EnemyAoeChannelState> = {};
 const emptyResurrectionProgress: Record<string, ResurrectionProgressState> = {};
 const emptySkillBinds: Record<string, SkillBindState> = {};
@@ -3621,6 +3625,10 @@ function App() {
   const companionAoeChannelsByCasterId =
     gameState.companionAoeChannelsByCasterId ?? emptyCompanionAoeChannels;
   const dropVisualEvents = gameState.dropVisualEvents ?? emptyDropVisualEvents;
+  const enemyAbilityCastsByEnemyId =
+    gameState.enemyAbilityCastsByEnemyId ?? emptyEnemyAbilityCasts;
+  const enemyDashesByEnemyId =
+    gameState.enemyDashesByEnemyId ?? emptyEnemyDashes;
   const enemyAoeChannelsByCasterId =
     gameState.enemyAoeChannelsByCasterId ?? emptyEnemyAoeChannels;
   const resurrectionProgressByCompanionId =
@@ -6939,6 +6947,8 @@ function App() {
               companionAoeChannelsByCasterId={companionAoeChannelsByCasterId}
               directCompanionCommandsById={directCompanionCommandsById}
               dropVisualEvents={dropVisualEvents}
+              enemyAbilityCastsByEnemyId={enemyAbilityCastsByEnemyId}
+              enemyDashesByEnemyId={enemyDashesByEnemyId}
               enemyAoeChannelsByCasterId={enemyAoeChannelsByCasterId}
               entities={allEntities}
               leaderIntent={gameState.leaderIntent}

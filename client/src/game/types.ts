@@ -79,6 +79,7 @@ export type EnemyTypeDefinition = {
   id: EnemyTypeId;
   displayName: string;
   archetypeId: EnemyArchetypeId;
+  abilityIds?: EnemyAbilityId[];
   temperament: EnemyTemperament;
   combatStyle?: EnemyCombatStyle;
   targetPreference: EnemyTargetPreference;
@@ -1248,6 +1249,7 @@ export type CombatDamageType = "physical" | "magic";
 
 export type CombatProjectileVisualProfileId =
   | "elementalist_arcane_bolt"
+  | "enemy_fire_bolt"
   | "hunter_arrow"
   | "runecaster_rune_bolt"
   | "lightbearer_holy_bolt"
@@ -1268,6 +1270,7 @@ export type ActiveCombatProjectile = {
   launchedAt: number;
   damageType: CombatDamageType;
   powerMultiplier: number;
+  impactLabel?: string;
 };
 
 export type ActiveSkillDefinition = {
@@ -1844,6 +1847,7 @@ export type StatusEffectBase = {
   targetId: string;
   sourceId?: string;
   sourceKey?: string;
+  endsWhenSourceDies?: true;
   appliedAt: number;
   expiresAt: number;
 };
@@ -1939,13 +1943,136 @@ export type SkillVisualEvent = {
 
 export type AoeVisualIntent =
   | "enemyOffensive"
+  | "enemySupportive"
   | "partyOffensive"
   | "partyHealing";
 
-export type AoeCircleShape = {
+export type AoeCastTransform = {
+  origin: Position;
+  direction: Position;
+};
+
+type AoePatternTransform = {
+  offset?: Position;
+  rotationRadians?: number;
+};
+
+export type AoeCirclePattern = AoePatternTransform & {
+  type: "circle";
+  radius: number;
+};
+
+export type AoeRingPattern = AoePatternTransform & {
+  type: "ring";
+  innerRadius: number;
+  outerRadius: number;
+};
+
+export type AoeConcentricRingsPattern = AoePatternTransform & {
+  type: "concentricRings";
+  rings: Array<{
+    innerRadius: number;
+    outerRadius: number;
+  }>;
+};
+
+export type AoeLinePattern = AoePatternTransform & {
+  type: "line";
+  squareCount: number;
+};
+
+export type AoeRectanglePattern = AoePatternTransform & {
+  type: "rectangle";
+  columns: number;
+  rows: number;
+};
+
+export type AoeCrossPattern = AoePatternTransform & {
+  type: "cross";
+  armLength: number;
+};
+
+export type AoeXPattern = AoePatternTransform & {
+  type: "x";
+  armLength: number;
+};
+
+export type AoeConePattern = AoePatternTransform & {
+  type: "cone";
+  range: number;
+  angleRadians: number;
+};
+
+export type AoeUnionPattern = {
+  type: "union";
+  patterns: AoePattern[];
+};
+
+export type AoePattern =
+  | AoeCirclePattern
+  | AoeRingPattern
+  | AoeConcentricRingsPattern
+  | AoeLinePattern
+  | AoeRectanglePattern
+  | AoeCrossPattern
+  | AoeXPattern
+  | AoeConePattern
+  | AoeUnionPattern;
+
+export type ResolvedAoeCircle = {
   type: "circle";
   center: Position;
   radius: number;
+};
+
+export type ResolvedAoeRing = {
+  type: "ring";
+  center: Position;
+  innerRadius: number;
+  outerRadius: number;
+};
+
+export type ResolvedAoeSquare = {
+  type: "square";
+  center: Position;
+  size: number;
+  rotationRadians: number;
+};
+
+export type ResolvedAoeRectangle = {
+  type: "rectangle";
+  center: Position;
+  width: number;
+  height: number;
+  rotationRadians: number;
+};
+
+export type ResolvedAoeCone = {
+  type: "cone";
+  origin: Position;
+  direction: Position;
+  range: number;
+  angleRadians: number;
+};
+
+export type ResolvedAoePrimitive =
+  | ResolvedAoeCircle
+  | ResolvedAoeRing
+  | ResolvedAoeSquare
+  | ResolvedAoeRectangle
+  | ResolvedAoeCone;
+
+export type AoeBounds = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+};
+
+export type ResolvedAoeArea = {
+  castTransform: AoeCastTransform;
+  primitives: ResolvedAoePrimitive[];
+  bounds: AoeBounds;
 };
 
 export type EnemyAoeAbilityId = "aoe_dummy_stomp";
@@ -1958,7 +2085,8 @@ export type EnemyAoeChannelState = {
   id: string;
   abilityId: EnemyAoeAbilityId;
   casterId: string;
-  shape: AoeCircleShape;
+  area: ResolvedAoeArea;
+  patternName?: string;
   phase: EnemyAoeChannelPhase;
   startedAt: number;
   channelEndsAt: number;
@@ -1973,13 +2101,90 @@ export type EnemyAoeCooldownState = {
   expiresAt: number;
 };
 
+export type EnemyAbilityId = string;
+
+export type EnemyAbilityCastPhase = "casting" | "windup";
+
+export type EnemyAbilityInterruptReason =
+  | "caster_dead"
+  | "caster_removed"
+  | "target_dead"
+  | "target_missing"
+  | "target_fake_death"
+  | "taunted"
+  | "incapacitated"
+  | "silenced"
+  | "bound"
+  | "unknown_ability"
+  | "missing_resolver"
+  | "encounter_reset"
+  | "map_transition"
+  | "save_restoration";
+
+export type EnemyAbilityCastState = {
+  id: string;
+  abilityId: EnemyAbilityId;
+  casterId: string;
+  targetId: string;
+  phase: EnemyAbilityCastPhase;
+  startedAt: number;
+  castEndsAt: number;
+  windupEndsAt: number;
+  origin: Position;
+  targetPosition: Position;
+  direction: Position;
+  area?: ResolvedAoeArea;
+  visualIntent?: AoeVisualIntent;
+  dashPlan?: EnemyDashPlan;
+};
+
+export type EnemyDashPlan = {
+  destination: Position;
+  distance: number;
+  durationMs: number;
+};
+
+export type EnemyDashState = {
+  id: string;
+  abilityId: EnemyAbilityId;
+  casterId: string;
+  origin: Position;
+  direction: Position;
+  destination: Position;
+  distance: number;
+  area: ResolvedAoeArea;
+  startedAt: number;
+  endsAt: number;
+  lastUpdatedAt: number;
+  lastProgressDistance: number;
+  lastSafePosition: Position;
+  powerMultiplier: number;
+  hitTargetIds: string[];
+};
+
+export type EnemyDashInterruptReason =
+  | "caster_dead"
+  | "caster_removed"
+  | "incapacitated"
+  | "bound"
+  | "encounter_reset"
+  | "map_transition"
+  | "save_restoration";
+
+export type EnemyAbilityCooldownState = {
+  abilityId: EnemyAbilityId;
+  casterId: string;
+  startedAt: number;
+  expiresAt: number;
+};
+
 export type CompanionAoeAbilityId = "shield_shockwave" | "maul_sweep";
 
 export type CompanionAoeChannelState = {
   id: string;
   abilityId: CompanionAoeAbilityId;
   casterId: string;
-  shape: AoeCircleShape;
+  area: ResolvedAoeArea;
   visualIntent: AoeVisualIntent;
   damageType: CombatDamageType;
   powerMultiplier: number;

@@ -1,17 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   CombatFeedbackEvent,
+  EnemyDashState,
   GameMap,
   NavigationClickAccessibility,
 } from "../game";
 import {
   createCompanion,
+  createAoeCastTransform,
   createDebugMap,
   createEnemy,
   createNpc,
   createResource,
   createTargetDummy,
   HUB_TWO_MAP_ID,
+  resolveAoePattern,
 } from "../game";
 import {
   collectCurrentMapScopedVisualTextureSrcs,
@@ -22,6 +25,8 @@ import {
   getDotDamageIconSrc,
   getCombatFeedbackLifetimeProgress,
   getCombatFeedbackLaneKey,
+  getEnemyAbilityCastProgress,
+  getEnemyDashAfterimagePresentations,
   getEnemyNameplateColor,
   getEnemyNameplateText,
   getFullRenderSignature,
@@ -468,6 +473,8 @@ function createFullRenderSignatureInput(
     companionAoeChannelsByCasterId: {},
     directCompanionCommandsById: {},
     dropVisualEvents: [],
+    enemyAbilityCastsByEnemyId: {},
+    enemyDashesByEnemyId: {},
     enemyAoeChannelsByCasterId: {},
     entities: [companion],
     leaderIntent: null,
@@ -491,6 +498,50 @@ function createFullRenderSignatureInput(
     ...overrides,
   };
 }
+
+describe("Rending Dash afterimages", () => {
+  it("spaces static images and fades older samples first", () => {
+    const dash: EnemyDashState = {
+      id: "dash",
+      abilityId: "night_bat_rending_dash",
+      casterId: "bat",
+      origin: { x: 1, y: 2 },
+      direction: { x: 1, y: 0 },
+      destination: { x: 7, y: 2 },
+      distance: 6,
+      area: resolveAoePattern(
+        { type: "line", squareCount: 4 },
+        createAoeCastTransform({ x: 1, y: 2 }, { x: 2, y: 2 }),
+      ),
+      startedAt: 1000,
+      endsAt: 1250,
+      lastUpdatedAt: 1200,
+      lastProgressDistance: 4.8,
+      lastSafePosition: { x: 1, y: 2 },
+      powerMultiplier: 1.25,
+      hitTargetIds: [],
+    };
+    const presentations = getEnemyDashAfterimagePresentations(
+      dash,
+      1150,
+      2,
+      220,
+    );
+
+    expect(presentations.map((presentation) => presentation.position)).toEqual([
+      { x: 1, y: 2 },
+      { x: 3, y: 2 },
+    ]);
+    expect(presentations[0]?.opacity).toBeLessThan(
+      presentations[1]?.opacity ?? 0,
+    );
+    expect(
+      getEnemyDashAfterimagePresentations(dash, 1230, 2, 220).map(
+        (presentation) => presentation.index,
+      ),
+    ).toEqual([1]);
+  });
+});
 
 describe("getFullRenderSignature", () => {
   it("stays stable across non-visual simulation ticks", () => {
@@ -544,6 +595,53 @@ describe("getFullRenderSignature", () => {
             position: { x: companion.position.x + 1, y: companion.position.y },
           },
         ],
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        enemyAbilityCastsByEnemyId: {
+          enemy: {
+            id: "enemy:fire_bolt:1000",
+            abilityId: "fire_bolt",
+            casterId: "enemy",
+            targetId: companion.id,
+            phase: "casting",
+            startedAt: 1000,
+            castEndsAt: 1900,
+            windupEndsAt: 2200,
+            origin: { x: 5, y: 4 },
+            targetPosition: companion.position,
+            direction: { x: -1, y: 0 },
+          },
+        },
+      }),
+    ).not.toBe(baseSignature);
+    expect(
+      getFullRenderSignature({
+        ...input,
+        enemyDashesByEnemyId: {
+          enemy: {
+            id: "enemy:night_bat_rending_dash:1000:dash",
+            abilityId: "night_bat_rending_dash",
+            casterId: "enemy",
+            origin: { x: 1, y: 1 },
+            direction: { x: 1, y: 0 },
+            destination: { x: 7, y: 1 },
+            distance: 6,
+            area: resolveAoePattern(
+              { type: "line", squareCount: 4 },
+              createAoeCastTransform({ x: 1, y: 1 }, { x: 2, y: 1 }),
+            ),
+            startedAt: 1000,
+            endsAt: 1250,
+            lastUpdatedAt: 1100,
+            lastProgressDistance: 2.4,
+            lastSafePosition: { x: 1, y: 1 },
+            powerMultiplier: 1.25,
+            hitTargetIds: [],
+          },
+        },
       }),
     ).not.toBe(baseSignature);
     expect(
@@ -659,11 +757,10 @@ describe("getFullRenderSignature", () => {
             id: "shockwave",
             abilityId: "shield_shockwave",
             casterId: companion.id,
-            shape: {
-              type: "circle",
-              center: companion.position,
-              radius: 2,
-            },
+            area: resolveAoePattern(
+              { type: "circle", radius: 2 },
+              createAoeCastTransform(companion.position, companion.position),
+            ),
             visualIntent: "partyOffensive",
             damageType: "physical",
             powerMultiplier: 0.5,
@@ -688,6 +785,40 @@ describe("getFullRenderSignature", () => {
         },
       }),
     ).not.toBe(baseSignature);
+  });
+
+  it("includes locked enemy ability area geometry and supportive intent", () => {
+    const input = createFullRenderSignatureInput();
+    const companion = input.entities[0];
+    const createCast = (radius: number) => ({
+      id: "crawler:tin_crawler_defense_aura:1000",
+      abilityId: "tin_crawler_defense_aura",
+      casterId: "crawler",
+      targetId: companion.id,
+      phase: "casting" as const,
+      startedAt: 1000,
+      castEndsAt: 1800,
+      windupEndsAt: 2000,
+      origin: { x: 5, y: 4 },
+      targetPosition: companion.position,
+      direction: { x: -1, y: 0 },
+      area: resolveAoePattern(
+        { type: "circle" as const, radius },
+        createAoeCastTransform({ x: 5, y: 4 }, companion.position),
+      ),
+      visualIntent: "enemySupportive" as const,
+    });
+    const firstSignature = getFullRenderSignature({
+      ...input,
+      enemyAbilityCastsByEnemyId: { crawler: createCast(5) },
+    });
+
+    expect(
+      getFullRenderSignature({
+        ...input,
+        enemyAbilityCastsByEnemyId: { crawler: createCast(6) },
+      }),
+    ).not.toBe(firstSignature);
   });
 });
 
@@ -1228,6 +1359,24 @@ describe("prototype VFX feedback sprites", () => {
     ).toBe(false);
   });
 
+  it("suppresses named attack feedback from enemies but keeps companion skill names", () => {
+    const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
+    const enemy = createEnemy("enemy-1", { x: 1, y: 0 }, "aggressive");
+    const namedAttackEvent: CombatFeedbackEvent = {
+      ...baseEvent,
+      text: "Fire Bolt",
+      type: "attack",
+    };
+
+    expect(shouldDrawCombatFeedbackEvent(namedAttackEvent, companion)).toBe(true);
+    expect(
+      shouldDrawCombatFeedbackEvent(
+        { ...namedAttackEvent, entityId: enemy.id },
+        enemy,
+      ),
+    ).toBe(false);
+  });
+
   it("uses event lifetime progress for level-up burst scale and opacity", () => {
     expect(getCombatFeedbackLifetimeProgress(baseEvent, 2_000)).toBe(0.5);
     expect(getLevelUpBurstPresentation(baseEvent, 2_000).alpha).toBeCloseTo(0.65);
@@ -1250,6 +1399,31 @@ describe("prototype VFX feedback sprites", () => {
     expect(getSkillVisualOpacity(skillVisualEvent, 1_000, 0.7)).toBe(1);
     expect(getSkillVisualOpacity(skillVisualEvent, 2_500, 0.7)).toBeCloseTo(0.85);
     expect(getSkillVisualOpacity(skillVisualEvent, 4_000, 0.7)).toBeCloseTo(0.7);
+  });
+});
+
+describe("enemy ability cast presentation", () => {
+  const cast = {
+    id: "enemy:fire_bolt:1000",
+    abilityId: "fire_bolt",
+    casterId: "enemy",
+    targetId: "companion",
+    phase: "casting" as const,
+    startedAt: 1000,
+    castEndsAt: 1900,
+    windupEndsAt: 2200,
+    origin: { x: 0, y: 0 },
+    targetPosition: { x: 5, y: 0 },
+    direction: { x: 1, y: 0 },
+  };
+
+  it("fills through casting and remains full during release windup", () => {
+    expect(getEnemyAbilityCastProgress(cast, 1000)).toBe(0);
+    expect(getEnemyAbilityCastProgress(cast, 1450)).toBe(0.5);
+    expect(getEnemyAbilityCastProgress(cast, 1900)).toBe(1);
+    expect(
+      getEnemyAbilityCastProgress({ ...cast, phase: "windup" }, 2100),
+    ).toBe(1);
   });
 });
 

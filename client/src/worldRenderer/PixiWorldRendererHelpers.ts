@@ -17,6 +17,8 @@ import type {
   DirectCompanionCommand,
   DropVisualEvent,
   CompanionAoeChannelState,
+  EnemyAbilityCastState,
+  EnemyDashState,
   EnemyAoeChannelState,
   GameEntity,
   GameMap,
@@ -34,6 +36,7 @@ import type {
 } from "../game";
 import {
   aoeTargetDummyId,
+  getAoeAreaSignature,
   getEnemyArchetype,
   getEnemyType,
   isActiveResource,
@@ -401,6 +404,8 @@ export type FullRenderSignatureInput = {
   directCompanionCommandsById: Record<string, DirectCompanionCommand>;
   dropVisualEvents: DropVisualEvent[];
   companionAoeChannelsByCasterId: Record<string, CompanionAoeChannelState>;
+  enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
+  enemyDashesByEnemyId: Record<string, EnemyDashState>;
   enemyAoeChannelsByCasterId: Record<string, EnemyAoeChannelState>;
   entities: GameEntity[];
   leaderIntent: LeaderIntent | null;
@@ -1087,6 +1092,71 @@ export function shouldSkipStableRendererFrame({
   );
 }
 
+export function getEnemyAbilityCastProgress(
+  cast: EnemyAbilityCastState,
+  currentTime: number,
+): number {
+  if (cast.phase === "windup" || currentTime >= cast.castEndsAt) {
+    return 1;
+  }
+
+  const duration = cast.castEndsAt - cast.startedAt;
+
+  if (duration <= 0) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(1, (currentTime - cast.startedAt) / duration));
+}
+
+export type EnemyDashAfterimagePresentation = {
+  createdAt: number;
+  index: number;
+  opacity: number;
+  position: Position;
+};
+
+export function getEnemyDashAfterimagePresentations(
+  dash: EnemyDashState,
+  currentTime: number,
+  spacing: number,
+  fadeDurationMs: number,
+): EnemyDashAfterimagePresentation[] {
+  if (dash.distance <= 0 || spacing <= 0 || fadeDurationMs <= 0) {
+    return [];
+  }
+
+  const movementDurationMs = Math.max(0, dash.endsAt - dash.startedAt);
+  const furthestDistance = dash.lastProgressDistance - spacing;
+  const presentations: EnemyDashAfterimagePresentation[] = [];
+
+  for (
+    let distance = 0, index = 0;
+    distance <= furthestDistance + 0.0001;
+    distance += spacing, index += 1
+  ) {
+    const createdAt =
+      dash.startedAt + movementDurationMs * (distance / dash.distance);
+    const opacity = Math.max(0, 1 - Math.max(0, currentTime - createdAt) / fadeDurationMs);
+
+    if (opacity <= 0) {
+      continue;
+    }
+
+    presentations.push({
+      createdAt,
+      index,
+      opacity,
+      position: {
+        x: dash.origin.x + dash.direction.x * distance,
+        y: dash.origin.y + dash.direction.y * distance,
+      },
+    });
+  }
+
+  return presentations;
+}
+
 export function getFullRenderSignature({
   activeTeleport,
   cameraOffset,
@@ -1096,6 +1166,8 @@ export function getFullRenderSignature({
   directCompanionCommandsById,
   dropVisualEvents,
   companionAoeChannelsByCasterId,
+  enemyAbilityCastsByEnemyId,
+  enemyDashesByEnemyId,
   enemyAoeChannelsByCasterId,
   entities,
   leaderIntent,
@@ -1162,6 +1234,8 @@ export function getFullRenderSignature({
     getEventSignature(combatProjectiles, getCombatProjectileSignature),
     getEventSignature(dropVisualEvents, getDropVisualSignature),
     getRecordSignature(companionAoeChannelsByCasterId, getCompanionAoeChannelSignature),
+    getRecordSignature(enemyAbilityCastsByEnemyId, getEnemyAbilityCastSignature),
+    getRecordSignature(enemyDashesByEnemyId, getEnemyDashSignature),
     getRecordSignature(enemyAoeChannelsByCasterId, getEnemyAoeChannelSignature),
     getEventSignature(skillVisualEvents, getSkillVisualSignature),
     suppressMovePoiRing ? "move-ring-suppressed" : "move-ring-visible",
@@ -1390,6 +1464,51 @@ function getCombatProjectileSignature(projectile: ActiveCombatProjectile): strin
     getPositionSignature(projectile.targetFallbackPosition),
     projectile.speed,
     projectile.impactRadius,
+    projectile.impactLabel ?? "",
+  ].join(":");
+}
+
+function getEnemyAbilityCastSignature(
+  _enemyId: string,
+  cast: EnemyAbilityCastState,
+): string {
+  return [
+    cast.id,
+    cast.abilityId,
+    cast.casterId,
+    cast.targetId,
+    cast.phase,
+    cast.startedAt,
+    cast.castEndsAt,
+    cast.windupEndsAt,
+    getPositionSignature(cast.origin),
+    getPositionSignature(cast.targetPosition),
+    getPositionSignature(cast.direction),
+    cast.area ? getAoeAreaSignature(cast.area) : "",
+    cast.visualIntent ?? "",
+    cast.dashPlan
+      ? `${getPositionSignature(cast.dashPlan.destination)}:${cast.dashPlan.distance}:${cast.dashPlan.durationMs}`
+      : "",
+  ].join(":");
+}
+
+function getEnemyDashSignature(
+  _enemyId: string,
+  dash: EnemyDashState,
+): string {
+  return [
+    dash.id,
+    dash.abilityId,
+    dash.casterId,
+    getPositionSignature(dash.origin),
+    getPositionSignature(dash.destination),
+    dash.distance,
+    getAoeAreaSignature(dash.area),
+    dash.startedAt,
+    dash.endsAt,
+    dash.lastProgressDistance,
+    getPositionSignature(dash.lastSafePosition),
+    dash.hitTargetIds.join(","),
   ].join(":");
 }
 
@@ -1416,8 +1535,8 @@ function getEnemyAoeChannelSignature(
     channel.id,
     channel.abilityId,
     channel.phase,
-    getPositionSignature(channel.shape.center),
-    channel.shape.radius,
+    getAoeAreaSignature(channel.area),
+    channel.patternName ?? "",
     channel.startedAt,
     channel.channelEndsAt,
     channel.windupEndsAt,
@@ -1432,8 +1551,7 @@ function getCompanionAoeChannelSignature(
     channel.id,
     channel.abilityId,
     channel.visualIntent,
-    getPositionSignature(channel.shape.center),
-    channel.shape.radius,
+    getAoeAreaSignature(channel.area),
     channel.startedAt,
     channel.channelEndsAt,
   ].join(":");
@@ -1479,6 +1597,8 @@ function getStatusEffectSignature(_statusId: string, status: StatusEffectState):
     status.targetId,
     status.sourceId ?? "",
     status.sourceKey ?? "",
+    status.endsWhenSourceDies ? "source-owned" : "",
+    status.type === "defenseBuff" ? status.defenseBonusPercent : "",
     status.appliedAt,
     status.expiresAt,
   ].join(":");
@@ -1968,7 +2088,10 @@ export function shouldDrawCombatFeedbackEvent(
     return false;
   }
 
-  if (event.type === "attack" && event.text === "Attack") {
+  if (
+    event.type === "attack" &&
+    (event.text === "Attack" || entity.kind === "enemy")
+  ) {
     return false;
   }
 

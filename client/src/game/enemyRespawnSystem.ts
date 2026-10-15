@@ -1,6 +1,7 @@
 import { createEnemy } from "./entities";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isSlimewardDungeonFloorMapId } from "./dungeonSystem";
+import { clearEnemyAbilityRuntimeForEnemy } from "./enemyAbilitySystem";
 import { isSuperiorEnemy, rollEnemyVariantForSpawn } from "./enemyVariants";
 import {
   QUEST_DEFINITIONS,
@@ -157,9 +158,9 @@ function clearEnemyRuntimeState(state: GameState, enemyId: string): GameState {
   delete skillMarksByEnemyId[enemyId];
   delete skillBindsByEnemyId[enemyId];
 
-  return {
+  return clearEnemyAbilityRuntimeForEnemy({
     ...state,
     skillMarksByEnemyId,
     skillBindsByEnemyId,
-  };
+  }, enemyId);
 }

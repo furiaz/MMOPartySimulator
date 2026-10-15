@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   createCompanion,
+  createAoeCastTransform,
   createDebugMap,
   createEnemy,
   createPendingRoleBonusState,
+  resolveAoePattern,
 } from "./index";
 import {
   hubCompanionStartPositions,
@@ -354,11 +356,10 @@ describe("world wipe recovery", () => {
               id: "shockwave",
               abilityId: "shield_shockwave",
               casterId: "leader",
-              shape: {
-                type: "circle",
-                center: { x: 5, y: 5 },
-                radius: 2,
-              },
+              area: resolveAoePattern(
+                { type: "circle", radius: 2 },
+                createAoeCastTransform({ x: 5, y: 5 }, { x: 5, y: 5 }),
+              ),
               visualIntent: "partyOffensive",
               damageType: "physical",
               powerMultiplier: 0.5,
@@ -367,6 +368,7 @@ describe("world wipe recovery", () => {
               channelEndsAt: 200,
             },
           },
+          aoeDummyPatternSequenceIndex: 5,
           skillCooldownsByCompanionId: {
             leader: {
               kick: {
@@ -466,6 +468,7 @@ describe("world wipe recovery", () => {
     expect(nextState.combatFeedbackEvents).toEqual([]);
     expect(nextState.skillVisualEvents).toEqual([]);
     expect(nextState.companionAoeChannelsByCasterId).toEqual({});
+    expect(nextState.aoeDummyPatternSequenceIndex).toBe(0);
     expect(nextState.skillCooldownsByCompanionId).toEqual({});
     expect(nextState.globalCooldownsByCompanionId).toEqual({});
     expect(nextState.dropVisualEvents).toEqual([]);

@@ -32,6 +32,10 @@ import {
   isStompOnlyEnemy,
 } from "./enemyAoeChannelSystem";
 import {
+  isEnemyAbilityBusy,
+  recordEnemyBasicAttackCommitted,
+} from "./enemyAbilitySystem";
+import {
   isCompanionAssignedToResurrectionRecovery,
   isPositionInActiveResurrectionArea,
 } from "./resurrectionSystem";
@@ -95,7 +99,8 @@ export function updateAttackSystem(
     if (
       !attacker ||
       (attacker.kind === "enemy" &&
-        isEnemyAoeChanneling(nextState, attacker.id)) ||
+        (isEnemyAbilityBusy(nextState, attacker.id) ||
+          isEnemyAoeChanneling(nextState, attacker.id))) ||
       !isAttackingCombatEntity(attacker)
     ) {
       continue;
@@ -238,6 +243,12 @@ export function updateAttackSystem(
           projectileProfile,
           now,
         );
+        if (isEnemy(windupReadyAttacker)) {
+          nextState = recordEnemyBasicAttackCommitted(
+            nextState,
+            windupReadyAttacker.id,
+          );
+        }
         if (isPartyCombatEntity(windupReadyAttacker)) {
           nextState = startCompanionGlobalCooldown(
             nextState,
@@ -263,6 +274,13 @@ export function updateAttackSystem(
         now,
       );
       nextState = impactResult.state;
+
+      if (isEnemy(windupReadyAttacker)) {
+        nextState = recordEnemyBasicAttackCommitted(
+          nextState,
+          windupReadyAttacker.id,
+        );
+      }
 
       if (isPartyCombatEntity(windupReadyAttacker)) {
         nextState = startCompanionGlobalCooldown(
