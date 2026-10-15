@@ -10,6 +10,11 @@ import {
   updateFlaskRechargeFromEnemyKills,
 } from "./consumables";
 import { createCompanion, createEnemy } from "./entities";
+import {
+  createDebugMap,
+  HUB_TWO_MAP_ID,
+  hubTwoHealingFountains,
+} from "./debugMap";
 import { updateHealingFountainSystem } from "./healingFountainSystem";
 import { getCompanionDerivedStats } from "./stats";
 import { addItemToInventoryState, countInventoryItem } from "./inventory";
@@ -433,7 +438,7 @@ describe("prototype consumables", () => {
     });
   });
 
-  it("refills equipped flasks to max charges at hub healing fountains", () => {
+  it("refills equipped flasks to max charges at the Forward Bastion fountain", () => {
     const { state, companion } = createConsumableState(["minor_recovery_flask"]);
     const equipped = equipFlaskToCompanion(
       state,
@@ -441,23 +446,18 @@ describe("prototype consumables", () => {
       "minor_recovery_flask",
     ).state;
     const charged = setEquippedFlaskCharges(equipped, companion.id, 12);
+    const fountain = hubTwoHealingFountains[0];
+    const chargedCompanion = charged.entities[companion.id] as Companion;
     const atFountain = {
       ...charged,
-      currentMapId: "hub" as const,
-      map: {
-        displayName: "Test Hub",
-        debugName: "test-hub",
-        columns: 10,
-        rows: 10,
-        walls: [],
-        teleports: [],
-        healingFountains: [
-          {
-            id: "test-fountain",
-            position: { x: 0, y: 0 },
-            range: 2,
-          },
-        ],
+      currentMapId: HUB_TWO_MAP_ID,
+      map: createDebugMap(HUB_TWO_MAP_ID),
+      entities: {
+        ...charged.entities,
+        [companion.id]: {
+          ...chargedCompanion,
+          position: fountain.position,
+        },
       },
     };
     const refilled = updateHealingFountainSystem(atFountain);

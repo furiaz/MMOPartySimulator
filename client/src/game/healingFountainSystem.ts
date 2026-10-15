@@ -1,11 +1,10 @@
-import { HUB_MAP_ID } from "./debugMap";
 import { refillEquippedFlasksFromHubFountain } from "./consumables";
 import { getPartyMembers } from "./partySystem";
 import { updateEntity, type GameState } from "./state";
 import type { Position } from "./types";
 
 export function updateHealingFountainSystem(state: GameState): GameState {
-  if (state.currentMapId !== HUB_MAP_ID || !state.map?.healingFountains.length) {
+  if (!state.map?.healingFountains.length) {
     return state;
   }
 

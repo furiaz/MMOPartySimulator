@@ -749,6 +749,7 @@ export {
 export {
   getOrderedFormationMembers,
   getActiveCompanions,
+  getActiveCompanionsInPartyOrder,
   getAllRosterCompanions,
   getHighestCharacterLevelEver,
   getHighestCompanionCharacterLevel,

@@ -28,6 +28,15 @@ export function getActiveCompanions(state: GameState): PartyMember[] {
   return Object.values(state.entities).filter(isPartyMember);
 }
 
+export function getActiveCompanionsInPartyOrder(
+  state: GameState,
+): PartyMember[] {
+  return getActiveCompanions(state).sort(
+    (first, second) =>
+      first.partyOrder - second.partyOrder || first.id.localeCompare(second.id),
+  );
+}
+
 export function getRestingCompanions(state: GameState): PartyMember[] {
   return Object.values(state.restingCompanionsById ?? {});
 }
