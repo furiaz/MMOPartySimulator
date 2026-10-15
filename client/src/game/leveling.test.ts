@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import {
+  getCharacterXpProgress,
   getCharacterXpToNextLevel,
   getEnemyXpReward,
-  getSameLevelEnemyXp,
   getLevelGapXpModifier,
   getPartySizeLimit,
   getPartySizeUnlockRequirement,
+  getSameLevelEnemyXp,
+  getTotalCharacterXpForLevel,
   grantCharacterXpToCompanion,
   grantCharacterXpToParty,
   MAX_CHARACTER_LEVEL,
@@ -16,7 +18,96 @@ import { PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS } from "./state";
 import { createCompanionPrimaryStats } from "./stats";
 import { createTestGameState } from "./testState";
 
+const EXPECTED_XP_TO_NEXT_LEVEL_1_TO_20 = [
+  6,
+  18,
+  50,
+  112,
+  216,
+  385,
+  624,
+  1008,
+  1440,
+  2100,
+  2422,
+  2793,
+  3547,
+  4295,
+  5204,
+  6238,
+  7474,
+  8948,
+  10605,
+  12230,
+];
+
+const EXPECTED_HIGH_LEVEL_XP_ANCHORS: Record<number, number> = {
+  30: 37044,
+  40: 81127,
+  50: 149520,
+  60: 233127,
+  70: 363483,
+  80: 531464,
+  90: 728721,
+  100: 999191,
+  110: 1248647,
+  120: 1560381,
+  130: 1949944,
+  140: 2436762,
+  150: 3045119,
+  160: 3567882,
+  170: 4180389,
+  180: 4898047,
+  190: 5738907,
+  199: 6618427,
+};
+
 describe("character leveling", () => {
+  it("uses the approved early and Tier 2 XP requirements", () => {
+    expect(
+      EXPECTED_XP_TO_NEXT_LEVEL_1_TO_20.map((_, index) =>
+        getCharacterXpToNextLevel(index + 1),
+      ),
+    ).toEqual(EXPECTED_XP_TO_NEXT_LEVEL_1_TO_20);
+  });
+
+  it("uses the approved provisional high-level anchors", () => {
+    for (const [level, xpToNextLevel] of Object.entries(
+      EXPECTED_HIGH_LEVEL_XP_ANCHORS,
+    )) {
+      expect(getCharacterXpToNextLevel(Number(level))).toBe(xpToNextLevel);
+    }
+  });
+
+  it("keeps every pre-cap requirement positive, integral, and increasing", () => {
+    let previousRequirement = 0;
+
+    for (let level = 1; level < MAX_CHARACTER_LEVEL; level += 1) {
+      const requirement = getCharacterXpToNextLevel(level);
+
+      expect(requirement).not.toBeNull();
+      expect(Number.isInteger(requirement)).toBe(true);
+      expect(requirement).toBeGreaterThan(previousRequirement);
+      previousRequirement = requirement ?? previousRequirement;
+    }
+
+    expect(getCharacterXpToNextLevel(MAX_CHARACTER_LEVEL)).toBeNull();
+  });
+
+  it("derives cumulative XP from the authoritative per-level requirements", () => {
+    let expectedTotal = 0;
+
+    for (let level = 1; level <= MAX_CHARACTER_LEVEL; level += 1) {
+      expect(getTotalCharacterXpForLevel(level)).toBe(expectedTotal);
+      expectedTotal += getCharacterXpToNextLevel(level) ?? 0;
+    }
+
+    expect(getTotalCharacterXpForLevel(10)).toBe(3859);
+    expect(getTotalCharacterXpForLevel(20)).toBe(57485);
+    expect(getTotalCharacterXpForLevel(21)).toBe(69715);
+    expect(getTotalCharacterXpForLevel(MAX_CHARACTER_LEVEL)).toBe(346687309);
+  });
+
   it("rolls XP into level-ups and preserves overflow", () => {
     const companion = createCompanion("companion-1", { x: 0, y: 0 }, "companion-1");
 
@@ -26,6 +117,52 @@ describe("character leveling", () => {
     expect(updatedCompanion.characterXp).toBe(2);
     expect(updatedCompanion.lastCharacterXpGained).toBe(8);
     expect(updatedCompanion.naturalStats).toEqual(createCompanionPrimaryStats(2));
+  });
+
+  it("handles the revised level 19 boundary and one-XP overflow", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 19,
+      characterXp: 0,
+    };
+
+    expect(grantCharacterXpToCompanion(companion, 10605)).toMatchObject({
+      characterLevel: 20,
+      characterXp: 0,
+    });
+    expect(grantCharacterXpToCompanion(companion, 10606)).toMatchObject({
+      characterLevel: 20,
+      characterXp: 1,
+    });
+  });
+
+  it("reaches level 200 at the exact final requirement", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 199,
+      characterXp: 0,
+    };
+
+    expect(grantCharacterXpToCompanion(companion, 6618427)).toMatchObject({
+      characterLevel: MAX_CHARACTER_LEVEL,
+      characterXp: 0,
+      lastCharacterXpGained: 6618427,
+    });
+  });
+
+  it("derives progress from stored XP and the revised requirement", () => {
+    const companion = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      characterLevel: 19,
+      characterXp: 5302,
+    };
+
+    expect(getCharacterXpProgress(companion)).toEqual({
+      xp: 5302,
+      xpToNextLevel: 10605,
+      percent: (5302 / 10605) * 100,
+      isMaxLevel: false,
+    });
   });
 
   it("applies base-class stat growth and allocation points when XP grants levels", () => {
@@ -88,9 +225,16 @@ describe("character leveling", () => {
     expect(getLevelGapXpModifier(32, 1)).toBe(0);
   });
 
-  it("uses tuned same-level enemy XP rewards for levels 1-5", () => {
+  it("keeps same-level enemy XP rewards unchanged", () => {
     expect([1, 2, 3, 4, 5].map(getSameLevelEnemyXp)).toEqual([1, 2, 4, 6, 8]);
     expect(getSameLevelEnemyXp(6)).toBe(11);
+    expect(getSameLevelEnemyXp(10)).toBe(21);
+    expect(getSameLevelEnemyXp(20)).toBe(52);
+    expect(getSameLevelEnemyXp(30)).toBe(90);
+    expect(getSameLevelEnemyXp(50)).toBe(178);
+    expect(getSameLevelEnemyXp(100)).toBe(452);
+    expect(getSameLevelEnemyXp(150)).toBe(781);
+    expect(getSameLevelEnemyXp(199)).toBe(1143);
   });
 
   it("derives party size limit from highest-ever companion level", () => {
