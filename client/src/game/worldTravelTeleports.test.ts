@@ -5,6 +5,7 @@ import {
   slimewardCampDungeonEntranceArrivalPositions,
 } from "./debugMap";
 import { createInitialGameState } from "./createInitialGameState";
+import { createCompanion } from "./entities";
 import {
   TELEPORT_ECHO_HARBOR_UNION_BASTION_KEY_ITEM_ID,
   TELEPORT_ECHO_SLIMEWARD_CAMP_KEY_ITEM_ID,
@@ -77,6 +78,39 @@ describe("world travel teleport echoes", () => {
     expect(teleport.state.worldTravelTargetMapId).toBeNull();
     expect(teleport.state.entities["test-companion-1"]?.position).toEqual(
       slimewardCampDungeonEntranceArrivalPositions[0],
+    );
+  });
+
+  it("preserves dynamically recruited companions during direct World Travel", () => {
+    const dynamicCompanion = createCompanion(
+      "guild-recruit-4",
+      { x: 12, y: 12 },
+      "test-companion-1",
+      "fighter",
+      2,
+    );
+    const baseState = createInitialGameState();
+    const state = awardKeyItem(
+      {
+        ...baseState,
+        entities: {
+          ...baseState.entities,
+          [dynamicCompanion.id]: dynamicCompanion,
+        },
+      },
+      TELEPORT_ECHO_SLIMEWARD_CAMP_KEY_ITEM_ID,
+    ).state;
+
+    const teleport = teleportWorldTravelDestination(state, SLIMEWARD_CAMP_ID);
+
+    expect(teleport.result.status).toBe("success");
+    expect(teleport.state.entities[dynamicCompanion.id]).toMatchObject({
+      id: dynamicCompanion.id,
+      characterLevel: dynamicCompanion.characterLevel,
+      classId: dynamicCompanion.classId,
+    });
+    expect(teleport.state.entities[dynamicCompanion.id]?.position).toEqual(
+      slimewardCampDungeonEntranceArrivalPositions[2],
     );
   });
 

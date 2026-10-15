@@ -46,7 +46,6 @@ import {
   SLIMEWARD_CAMP_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   SLIMEWARD_FLOOR_TWO_ID,
-  companionIds,
   createDebugMap,
   createDebugMapForQuestState,
   getHubNpcStartDataForQuestState,
@@ -57,6 +56,7 @@ import {
   slimewardCampNpcStartData,
 } from "./debugMap";
 import {
+  getActiveCompanionsInPartyOrder,
   getPartyLeader,
   recordHighestCharacterLevelEver,
 } from "./partySystem";
@@ -1075,16 +1075,11 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
 
   const map = createDebugMap(SLIMEWARD_CAMP_ID);
   const entities: Record<string, GameEntity> = {};
+  const activeCompanions = getActiveCompanionsInPartyOrder(clearedState);
 
-  for (const companionId of companionIds) {
-    const companion = clearedState.entities[companionId];
-
-    if (companion?.kind !== "companion") {
-      continue;
-    }
-
+  for (const [index, companion] of activeCompanions.entries()) {
     const position =
-      slimewardCampArrivalPositions[companionIds.indexOf(companionId)] ??
+      slimewardCampArrivalPositions[index] ??
       slimewardCampArrivalPositions[0];
     entities[companion.id] = {
       ...moveEntityTo(companion, position),
@@ -1169,15 +1164,10 @@ export function debugTeleportToHub(
       ? getHubTwoNpcStartDataForQuestState(state.quests)
       : getHubNpcStartDataForQuestState(state.quests);
   const entities: Record<string, GameEntity> = {};
+  const activeCompanions = getActiveCompanionsInPartyOrder(state);
 
-  for (const companionId of companionIds) {
-    const companion = state.entities[companionId];
-
-    if (companion?.kind !== "companion") {
-      continue;
-    }
-
-    const position = startPositions[companionIds.indexOf(companionId)] ??
+  for (const [index, companion] of activeCompanions.entries()) {
+    const position = startPositions[index] ??
       startPositions[0];
 
     entities[companion.id] = {
@@ -1245,15 +1235,10 @@ export function debugTeleportToHub(
 export function debugTeleportToSlimewardCamp(state: GameState): GameState {
   const map = createDebugMap(SLIMEWARD_CAMP_ID);
   const entities: Record<string, GameEntity> = {};
+  const activeCompanions = getActiveCompanionsInPartyOrder(state);
 
-  for (const companionId of companionIds) {
-    const companion = state.entities[companionId];
-
-    if (companion?.kind !== "companion") {
-      continue;
-    }
-
-    const position = slimewardCampArrivalPositions[companionIds.indexOf(companionId)] ??
+  for (const [index, companion] of activeCompanions.entries()) {
+    const position = slimewardCampArrivalPositions[index] ??
       slimewardCampArrivalPositions[0];
 
     entities[companion.id] = {

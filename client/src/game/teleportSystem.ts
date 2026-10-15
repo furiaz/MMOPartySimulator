@@ -17,7 +17,6 @@ import { recordMapReachedForQuests } from "./questSystem";
 import { createActiveQuestGuideNpc } from "./questGuideSystem";
 import { isTeleportWorking } from "./teleportState";
 import {
-  companionIds,
   aoeTargetDummyId,
   aoeTargetDummyPosition,
   createDebugMapForQuestState,
@@ -42,7 +41,10 @@ import {
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
-import { hasDeadPartyMembers } from "./partySystem";
+import {
+  getActiveCompanionsInPartyOrder,
+  hasDeadPartyMembers,
+} from "./partySystem";
 import {
   clearMapTransitionRuntimeState,
   pruneMissingEntityRuntimeState,
@@ -445,7 +447,8 @@ function completeTeleportWithDefinition(
     teleport.targetMapId,
     sourceState.quests,
   );
-  const entities = getMapEntities(sourceState, targetMap);
+  const activeCompanions = getActiveCompanionsInPartyOrder(sourceState);
+  const entities = getMapEntities(sourceState, targetMap, activeCompanions);
   let nextState: GameState = {
     ...clearMapTransitionRuntimeState(sourceState),
     entities,
@@ -457,15 +460,15 @@ function completeTeleportWithDefinition(
     lastPoiDecision: undefined,
   };
 
-  for (const companionId of companionIds) {
-    const companion = nextState.entities[companionId];
+  for (const [index, activeCompanion] of activeCompanions.entries()) {
+    const companion = nextState.entities[activeCompanion.id];
 
     if (companion?.kind !== "companion") {
       continue;
     }
 
     const position =
-      teleportDefinition.arrivalPositions[companionIds.indexOf(companionId)] ??
+      teleportDefinition.arrivalPositions[index] ??
       teleportDefinition.arrivalPositions[0];
 
     nextState = updateEntity(nextState, {
@@ -526,8 +529,9 @@ function completeTeleportWithDefinition(
 function getMapEntities(
   state: GameState,
   map: GameMap,
+  activeCompanions: readonly Companion[],
 ): Record<string, GameEntity> {
-  const entities = getPreservedCompanions(state);
+  const entities = getPreservedCompanions(activeCompanions);
   const mapId = map.id ?? HUB_MAP_ID;
 
   if (
@@ -652,15 +656,13 @@ function appendSuperiorEnemySpawnEvents(
   return nextState;
 }
 
-function getPreservedCompanions(state: GameState): Record<string, GameEntity> {
+function getPreservedCompanions(
+  activeCompanions: readonly Companion[],
+): Record<string, GameEntity> {
   const entities: Record<string, GameEntity> = {};
 
-  for (const companionId of companionIds) {
-    const companion = state.entities[companionId];
-
-    if (companion?.kind === "companion") {
-      entities[companion.id] = companion;
-    }
+  for (const companion of activeCompanions) {
+    entities[companion.id] = companion;
   }
 
   return entities;

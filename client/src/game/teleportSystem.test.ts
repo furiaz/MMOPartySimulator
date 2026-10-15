@@ -7,6 +7,10 @@ import {
 import {
   companionIds,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
+  HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
+  MAP_FOUR_ID,
+  MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
   MAP_ONE_ID,
   SLIMEWARD_CAMP_ID,
   SLIMEWARD_FLOOR_ONE_ID,
@@ -15,6 +19,10 @@ import {
   SLIMEWARD_FLOOR_TWO_ID,
   slimewardCampDungeonEntranceArrivalPositions,
 } from "./debugMap";
+import {
+  createInitialGuildRecruitState,
+  recruitGuildCandidate,
+} from "./guildRecruit";
 import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
 import { updateTeleportSystem } from "./teleportSystem";
@@ -31,7 +39,7 @@ describe("teleport system", () => {
     expect("hubDepartureFoodWarning" in nextState).toBe(false);
   });
 
-  it("preserves all five fixed companions at distinct arrival positions", () => {
+  it("preserves five mixed-id companions in deterministic party order", () => {
     const baseState = createHubTeleportReadyState();
     const teleport = baseState.activeTeleport;
 
@@ -39,13 +47,20 @@ describe("teleport system", () => {
       throw new Error("Missing active teleport in test state.");
     }
 
-    const companions = companionIds.map((companionId, index) =>
+    const companionData = [
+      { id: companionIds[3], partyOrder: 3 },
+      { id: "guild-recruit-8", partyOrder: 4 },
+      { id: companionIds[0], partyOrder: 0 },
+      { id: "guild-recruit-2", partyOrder: 2 },
+      { id: companionIds[1], partyOrder: 1 },
+    ];
+    const companions = companionData.map(({ id, partyOrder }) =>
       createCompanion(
-        companionId,
+        id,
         teleport.position,
         companionIds[0],
-        index === 0 ? "defender" : "fighter",
-        index,
+        partyOrder === 0 ? "defender" : "fighter",
+        partyOrder,
       ),
     );
     const state = {
@@ -56,18 +71,146 @@ describe("teleport system", () => {
     };
 
     const nextState = updateTeleportSystem(state, new Set(), 12345);
-    const arrivalPositions = companionIds.map(
-      (companionId) => nextState.entities[companionId]?.position,
+    const teleportDefinition = baseState.map?.teleports.find(
+      (candidate) => candidate.id === teleport.id,
+    );
+    const orderedCompanions = [...companions].sort(
+      (first, second) =>
+        first.partyOrder - second.partyOrder || first.id.localeCompare(second.id),
+    );
+    const arrivalPositions = orderedCompanions.map(
+      (companion) => nextState.entities[companion.id]?.position,
     );
 
     expect(
-      companionIds.every(
-        (companionId) => nextState.entities[companionId]?.kind === "companion",
+      companions.every(
+        (companion) => nextState.entities[companion.id]?.kind === "companion",
       ),
     ).toBe(true);
+    expect(arrivalPositions).toEqual(teleportDefinition?.arrivalPositions);
     expect(
       new Set(arrivalPositions.map((position) => JSON.stringify(position))),
-    ).toHaveLength(companionIds.length);
+    ).toHaveLength(companions.length);
+  });
+
+  it("preserves a production Guild recruit, generated leader, and dead active companion", () => {
+    const nowMs = 1_000;
+    const baseState = createTeleportReadyState(
+      HUB_TWO_MAP_ID,
+      HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID,
+      {
+        highestCharacterLevelEver: 10,
+        guildRecruit: createInitialGuildRecruitState(nowMs),
+      },
+    );
+    const recruitment = recruitGuildCandidate(baseState, nowMs);
+
+    expect(recruitment.ok).toBe(true);
+    if (!recruitment.ok || !baseState.activeTeleport) {
+      return;
+    }
+
+    const recruit = recruitment.companion;
+    const deadCompanion = {
+      ...createCompanion(
+        "guild-recruit-dead",
+        baseState.activeTeleport.position,
+        recruit.id,
+        "fighter",
+        2,
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+    const restingCompanion = createCompanion(
+      "guild-recruit-resting",
+      { x: 1, y: 1 },
+      recruit.id,
+      "fighter",
+      3,
+    );
+    const positionedEntities = Object.fromEntries(
+      Object.values(recruitment.state.entities).map((entity) => [
+        entity.id,
+        entity.kind === "companion"
+          ? { ...entity, position: baseState.activeTeleport?.position ?? entity.position }
+          : entity,
+      ]),
+    );
+    const nextState = updateTeleportSystem(
+      {
+        ...recruitment.state,
+        partyLeaderId: recruit.id,
+        entities: {
+          ...positionedEntities,
+          [deadCompanion.id]: deadCompanion,
+        },
+        restingCompanionsById: {
+          [restingCompanion.id]: restingCompanion,
+        },
+      },
+      new Set(),
+      nowMs,
+    );
+
+    expect(nextState.currentMapId).toBe(MAP_FOUR_ID);
+    expect(nextState.entities[recruit.id]).toMatchObject({
+      id: recruit.id,
+      characterLevel: recruit.characterLevel,
+      characterXp: recruit.characterXp,
+      classId: recruit.classId,
+      equipment: recruit.equipment,
+      currentTargetId: null,
+    });
+    expect(nextState.partyLeaderId).toBe(recruit.id);
+    expect(nextState.entities[deadCompanion.id]).toMatchObject({
+      health: 0,
+    });
+    expect(nextState.entities[restingCompanion.id]).toBeUndefined();
+    expect(nextState.restingCompanionsById?.[restingCompanion.id]).toEqual(
+      restingCompanion,
+    );
+
+    const returnTeleport = nextState.map?.teleports.find(
+      (candidate) => candidate.id === MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
+    );
+    if (!returnTeleport) {
+      throw new Error("Missing map-4-to-hub-2 teleport in test map.");
+    }
+    const returnReadyState = {
+      ...nextState,
+      activeTeleport: {
+        id: returnTeleport.id,
+        position: returnTeleport.position,
+        range: returnTeleport.range,
+        sourceMapId: returnTeleport.sourceMapId,
+        targetMapId: returnTeleport.targetMapId,
+        triggeredBy: "player" as const,
+      },
+      entities: Object.fromEntries(
+        Object.values(nextState.entities).map((entity) => [
+          entity.id,
+          entity.kind === "companion" && entity.health > 0
+            ? { ...entity, position: returnTeleport.position }
+            : entity,
+        ]),
+      ),
+    };
+
+    const returnedState = updateTeleportSystem(
+      returnReadyState,
+      new Set(),
+      nowMs + 1,
+    );
+
+    expect(returnedState.currentMapId).toBe(HUB_TWO_MAP_ID);
+    expect(returnedState.entities[recruit.id]).toMatchObject({
+      id: recruit.id,
+      characterLevel: recruit.characterLevel,
+      equipment: recruit.equipment,
+    });
+    expect(returnedState.entities[deadCompanion.id]).toMatchObject({ health: 0 });
+    expect(returnedState.entities[restingCompanion.id]).toBeUndefined();
   });
 
   it("clears transient movement runtime after teleport completion", () => {

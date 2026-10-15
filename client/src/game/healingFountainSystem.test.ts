@@ -3,7 +3,9 @@ import { createCompanion } from "./entities";
 import {
   createDebugMap,
   HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   hubHealingFountains,
+  hubTwoHealingFountains,
   MAP_ONE_ID,
 } from "./debugMap";
 import { addEntity, type GameState } from "./state";
@@ -68,7 +70,63 @@ describe("healing fountain system", () => {
     });
   });
 
-  it("does not heal outside the hub map", () => {
+  it("heals living party members at the Forward Bastion fountain", () => {
+    const fountain = hubTwoHealingFountains[0];
+    const leader = {
+      ...createCompanion("leader", fountain.position, "leader"),
+      health: 4,
+    };
+
+    const nextState = updateHealingFountainSystem(
+      [leader].reduce(
+        addEntity,
+        createTestGameState({
+          currentMapId: HUB_TWO_MAP_ID,
+          map: createDebugMap(HUB_TWO_MAP_ID),
+          partyLeaderId: leader.id,
+        }),
+      ),
+    );
+
+    expect(nextState.entities[leader.id]).toMatchObject({
+      health: leader.maxHealth,
+    });
+  });
+
+  it("heals during combat on an arbitrary map with a configured fountain", () => {
+    const fountain = {
+      id: "field-fountain",
+      position: { x: 7, y: 20 },
+      range: 2,
+    };
+    const leader = {
+      ...createCompanion("leader", fountain.position, "leader"),
+      state: "attack" as const,
+      health: 4,
+    };
+    const map = {
+      ...createDebugMap(MAP_ONE_ID),
+      healingFountains: [fountain],
+    };
+
+    const nextState = updateHealingFountainSystem(
+      [leader].reduce(
+        addEntity,
+        createTestGameState({
+          currentMapId: MAP_ONE_ID,
+          map,
+          partyLeaderId: leader.id,
+        }),
+      ),
+    );
+
+    expect(nextState.entities[leader.id]).toMatchObject({
+      state: "attack",
+      health: leader.maxHealth,
+    });
+  });
+
+  it("does not heal on a map without a configured fountain", () => {
     const fountain = hubHealingFountains[0];
     const leader = {
       ...createCompanion("leader", fountain.position, "leader"),
