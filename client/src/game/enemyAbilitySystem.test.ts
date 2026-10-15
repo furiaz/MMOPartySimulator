@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { updateAttackSystem } from "./attackSystem";
 import { createCompanion, createEnemy } from "./entities";
 import {
+  FORTIFYING_AURA_STATUS_SOURCE_KEY,
+  TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
   type EnemyAbilityDefinition,
   type EnemyAbilityRegistry,
   type EnemyAbilityResolutionContext,
 } from "./enemyAbilities";
 import {
+  cancelEnemyAbilityCast,
   clearEnemyAbilityRuntimeForEnemy,
   isEnemyBasicAttackRequired,
   sanitizeEnemyAbilityRuntimeForSave,
@@ -111,6 +114,112 @@ describe("enemy ability system", () => {
       expiresAt: 4000,
     });
     expect(isEnemyBasicAttackRequired(nextState, enemy.id)).toBe(true);
+  });
+
+  it("skips an unnecessary ability without cooldown or gate and tries the next one", () => {
+    setAbilityIds("ember_imp", ["unnecessary", "ready"]);
+    const { state, enemy } = createEngagedState();
+    const definitions: EnemyAbilityRegistry = {
+      unnecessary: createAbility("unnecessary", {
+        canStart: () => false,
+      }),
+      ready: createAbility("ready"),
+    };
+
+    const nextState = updateEnemyAbilitySystem(state, 1000, definitions);
+
+    expect(nextState.enemyAbilityCastsByEnemyId?.[enemy.id]?.abilityId).toBe(
+      "ready",
+    );
+    expect(
+      nextState.enemyAbilityCooldownsByEnemyId?.[enemy.id]?.unnecessary,
+    ).toBeUndefined();
+    expect(nextState.enemyAbilityCooldownsByEnemyId?.[enemy.id]?.ready).toBeDefined();
+  });
+
+  it("does not cast Fortifying Aura while the caster is already fortified", () => {
+    const { state, enemy } = createEngagedState("tin_crawler", { x: 5, y: 0 });
+    const fortifiedState = applyStatusEffect(
+      state,
+      {
+        type: "defenseBuff",
+        targetId: enemy.id,
+        durationMs: 5000,
+        defenseBonusPercent: 50,
+        sourceId: "other-crawler",
+        sourceKey: FORTIFYING_AURA_STATUS_SOURCE_KEY,
+        endsWhenSourceDies: true,
+      },
+      900,
+    );
+
+    const nextState = updateEnemyAbilitySystem(fortifiedState, 1000);
+
+    expect(nextState.enemyAbilityCastsByEnemyId?.[enemy.id]).toBeUndefined();
+    expect(
+      nextState.enemyAbilityCooldownsByEnemyId?.[enemy.id]?.[
+        TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID
+      ],
+    ).toBeUndefined();
+    expect(isEnemyBasicAttackRequired(nextState, enemy.id)).toBe(false);
+  });
+
+  it("uses a pending locked aura as a reservation and releases it on interruption", () => {
+    const leader = createCompanion("leader", { x: 4, y: 0 }, "Leader", "fighter");
+    const first = createReadyEnemy("first", "tin_crawler", { x: 0, y: 0 }, leader.id);
+    const second = createReadyEnemy("second", "tin_crawler", { x: 2, y: 0 }, leader.id);
+    let state = createState([leader, first, second]);
+
+    state = updateEnemyAbilitySystem(state, 1000);
+
+    expect(Object.keys(state.enemyAbilityCastsByEnemyId ?? {})).toEqual([first.id]);
+    expect(state.enemyAbilityCastsByEnemyId?.[first.id]).toMatchObject({
+      abilityId: TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
+      castEndsAt: 1800,
+      windupEndsAt: 2000,
+      visualIntent: "enemySupportive",
+      area: {
+        castTransform: { origin: first.position },
+        primitives: [{ type: "circle", center: first.position, radius: 5 }],
+      },
+    });
+    expect(
+      state.enemyAbilityCooldownsByEnemyId?.[first.id]?.[
+        TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID
+      ]?.expiresAt,
+    ).toBe(15000);
+    expect(state.enemyAbilityCooldownsByEnemyId?.[second.id]).toBeUndefined();
+
+    state = cancelEnemyAbilityCast(state, first.id, "silenced", 1100);
+    state = updateEnemyAbilitySystem(state, 1100);
+
+    expect(state.enemyAbilityCastsByEnemyId?.[second.id]?.abilityId).toBe(
+      TIN_CRAWLER_DEFENSE_AURA_ABILITY_ID,
+    );
+  });
+
+  it("allows Fortifying Aura casters outside each other's pending areas", () => {
+    const firstTarget = createCompanion("leader", { x: 4, y: 0 }, "Leader", "fighter");
+    const secondTarget = createCompanion("second-target", { x: 15, y: 0 }, "Second", "fighter");
+    const first = createReadyEnemy(
+      "first",
+      "tin_crawler",
+      { x: 0, y: 0 },
+      firstTarget.id,
+    );
+    const second = createReadyEnemy(
+      "second",
+      "tin_crawler",
+      { x: 11, y: 0 },
+      secondTarget.id,
+    );
+    const state = createState([firstTarget, secondTarget, first, second]);
+
+    const nextState = updateEnemyAbilitySystem(state, 1000);
+
+    expect(Object.keys(nextState.enemyAbilityCastsByEnemyId ?? {}).sort()).toEqual(
+      [first.id, second.id].sort(),
+    );
   });
 
   it("keeps the locked snapshot while exposing the current target at resolution", () => {
@@ -559,6 +668,23 @@ function createEngagedState(
   const state = createState([leader, enemy]);
 
   return { state, enemy, leader };
+}
+
+function createReadyEnemy(
+  id: string,
+  enemyTypeId: EnemyTypeId,
+  position: { x: number; y: number },
+  targetId: string,
+): Enemy {
+  return {
+    ...createEnemy(id, position, "aggressive", {
+      enemyTypeId,
+      attackCooldownMs: 1000,
+    }),
+    state: "attack",
+    currentTargetId: targetId,
+    lastAttackAt: 0,
+  };
 }
 
 function createState(entities: GameEntity[]): GameState {

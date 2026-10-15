@@ -79,6 +79,61 @@ describe("status effects", () => {
     );
   });
 
+  it("clears only explicitly source-owned effects when their source dies or leaves", () => {
+    const source = createEnemy("source", { x: 0, y: 0 });
+    const target = createEnemy("target", { x: 1, y: 0 });
+    let state = createState([source, target]);
+
+    state = applyStatusEffect(
+      state,
+      {
+        type: "defenseBuff",
+        targetId: target.id,
+        durationMs: 5000,
+        defenseBonusPercent: 50,
+        sourceId: source.id,
+        sourceKey: "fortifying_aura",
+        endsWhenSourceDies: true,
+      },
+      0,
+    );
+    state = applyStatusEffect(
+      state,
+      {
+        type: "poison",
+        targetId: target.id,
+        durationMs: 5000,
+        tickDamage: 1,
+        sourceId: source.id,
+        sourceKey: "ordinary_poison",
+      },
+      0,
+    );
+
+    const afterDeath = clearStatusEffectsForEntity(state, source.id);
+
+    expect(afterDeath.statusEffectsById).not.toHaveProperty(
+      `${target.id}-defenseBuff-fortifying_aura`,
+    );
+    expect(afterDeath.statusEffectsById).toHaveProperty(
+      `${target.id}-poison-ordinary_poison`,
+    );
+
+    const entitiesWithoutSource = { ...state.entities };
+    delete entitiesWithoutSource[source.id];
+    const afterRemoval = pruneMissingEntityRuntimeState({
+      ...state,
+      entities: entitiesWithoutSource,
+    });
+
+    expect(afterRemoval.statusEffectsById).not.toHaveProperty(
+      `${target.id}-defenseBuff-fortifying_aura`,
+    );
+    expect(afterRemoval.statusEffectsById).toHaveProperty(
+      `${target.id}-poison-ordinary_poison`,
+    );
+  });
+
   it("blocks movement without blocking basic attacks", () => {
     const attacker = {
       ...createCompanion("attacker", { x: 0, y: 0 }, "attacker"),
