@@ -61,7 +61,7 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
   defend_wolf_causeway:
     "Defend the worker while the causeway is opened.",
   defeat_causeway_elite:
-    "A stronger wolf is blocking the route. Bring it down.",
+    "A Superior Wolf is blocking the route. Bring it down.",
   unlock_map_three_route:
     "The causeway is clear. Open the route into Azurefen Hollow.",
   inspect_broken_thicket_trail_marker:

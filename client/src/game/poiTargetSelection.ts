@@ -560,6 +560,31 @@ function isQuestElitePoi(
   );
 }
 
+function isTrackedQuestSpawnPoi(
+  state: GameState,
+  poi: PointOfInterest,
+  questId: QuestId,
+  objective: QuestObjectiveDefinition,
+): boolean {
+  if (poi.category !== "combat" || !poi.targetEntityId) {
+    return false;
+  }
+
+  const entity = state.entities[poi.targetEntityId];
+  const trackedEnemyIds =
+    state.quests[questId].runtime?.questSpawnedEnemyIdsByObjectiveId?.[
+      objective.id
+    ] ?? [];
+
+  return (
+    entity?.kind === "enemy" &&
+    entity.state !== "dead" &&
+    trackedEnemyIds.includes(entity.id) &&
+    entity.questSpawn?.questId === questId &&
+    entity.questSpawn.objectiveId === objective.id
+  );
+}
+
 function getQuestTargetOptions(
   state: GameState,
   globalPoiIntent: GlobalPoiIntent,
@@ -744,6 +769,35 @@ function getQuestObjectiveTargetOptions(
         objectiveId: objective.id,
       },
     ];
+  }
+
+  if (objective.type === "defeat_quest_spawn") {
+    const questSpawnOptions = candidates
+      .filter((poi) => isTrackedQuestSpawnPoi(state, poi, questId, objective))
+      .map((poi) => ({
+        poi,
+        priority: 10,
+        reason: "active quest tracked spawn objective",
+        questId,
+        objectiveId: objective.id,
+      }));
+
+    return questSpawnOptions.length > 0
+      ? questSpawnOptions
+      : [
+          {
+            poi: createObjectivePositionPoi(
+              state,
+              questId,
+              objective,
+              objective.targetPoiId ?? `${questId}-${objective.id}-target`,
+            ),
+            priority: 10,
+            reason: "active quest tracked spawn target position",
+            questId,
+            objectiveId: objective.id,
+          },
+        ];
   }
 
   if (objective.type === "defeat_elite") {

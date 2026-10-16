@@ -3,7 +3,11 @@ import {
   getPartyExecutionIntent,
   setPartyIntent,
 } from "./partyIntentState";
-import { QUEST_DEFINITIONS, QUEST_ORDER } from "./questSystem";
+import {
+  getFirstIncompleteObjective,
+  QUEST_DEFINITIONS,
+  QUEST_ORDER,
+} from "./questSystem";
 import { updateEntity, type GameState } from "./state";
 import type { Position } from "./types";
 import type {
@@ -34,7 +38,7 @@ export function getActiveQuestDefenseFocus(
       QUEST_DEFINITIONS[questId].objectives,
       quest.objectiveProgress,
       quest.runtime,
-    );
+    ) ?? getSuppressionHandoffObjective(state, questId);
 
     if (
       !objective?.targetPosition ||
@@ -64,6 +68,54 @@ export function getActiveQuestDefenseFocus(
   }
 
   return null;
+}
+
+function getSuppressionHandoffObjective(
+  state: GameState,
+  questId: QuestId,
+): QuestObjectiveDefinition | null {
+  const definition = QUEST_DEFINITIONS[questId];
+
+  if (definition.objectiveFlow !== "sequential") {
+    return null;
+  }
+
+  const objective = getFirstIncompleteObjective(state, questId);
+  const suppression = objective?.ambientEnemySuppression;
+  const targetMapId = objective?.targetMapId;
+
+  if (
+    !objective ||
+    objective.type === "defend_area" ||
+    objective.type === "patron_ward" ||
+    !suppression ||
+    targetMapId !== state.currentMapId
+  ) {
+    return null;
+  }
+
+  const groupId = suppression.groupId ?? objective.id;
+  const runtime =
+    state.quests[questId].runtime?.ambientEnemySuppressionsByGroupId?.[
+      groupId
+    ];
+
+  if (
+    !runtime ||
+    runtime.targetMapId !== targetMapId ||
+    runtime.scope !== suppression.scope ||
+    (suppression.scope === "subzone" &&
+      runtime.targetSubzoneId !== objective.targetSubzoneId)
+  ) {
+    return null;
+  }
+
+  const ownsSuppression = runtime.activeObjectiveIds.includes(objective.id);
+  const isAwaitingHandoff =
+    runtime.activeObjectiveIds.length === 0 &&
+    Number.isFinite(runtime.restoreAtMs);
+
+  return ownsSuppression || isAwaitingHandoff ? objective : null;
 }
 
 export function shouldUseAutomaticQuestDefenseFocus(

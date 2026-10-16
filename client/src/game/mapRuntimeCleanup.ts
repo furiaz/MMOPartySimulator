@@ -20,6 +20,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     directCompanionCommandsById: {},
     directCommandGraceUntilByCompanionId: {},
     interruptedPoiTarget: null,
+    questNpcSpeechCue: undefined,
     exploredTiles: {},
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],

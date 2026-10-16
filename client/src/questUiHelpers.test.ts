@@ -98,6 +98,22 @@ describe("quest UI helpers", () => {
     ]);
   });
 
+  it("labels tracked Superior quest spawns by their configured enemy type", () => {
+    expect(
+      getObjectiveLabel({
+        id: "defeat_causeway_elite",
+        type: "defeat_quest_spawn",
+        questSpawnTarget: {
+          enemyTypeId: "wolf",
+          level: 8,
+          position: { x: 145, y: 22 },
+          variant: "superior",
+          encounterBand: "standard",
+        },
+      }),
+    ).toBe("Defeat Superior Wolf");
+  });
+
   it("shows Hold the Field Cache at Briarwood Rise Thicket", () => {
     const quests = createInitialQuestStates();
     const quest = activateQuest(quests.hold_the_field_cache);

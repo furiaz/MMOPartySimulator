@@ -57,6 +57,164 @@ describe("quest defense focus", () => {
     });
   });
 
+  it("keeps Auto Combat focused across a pending sequential suppression handoff", () => {
+    const baseState = createCausewayWolfHandoffState();
+    const wolf = createEnemy(
+      "tracked-causeway-wolf",
+      { x: 145, y: 22 },
+      "aggressive",
+      {
+        enemyTypeId: "wolf",
+        subzoneId: "north-east",
+        questSpawn: {
+          questId: "open_wolf_causeway",
+          objectiveId: "defeat_causeway_elite",
+        },
+      },
+    );
+    const resource = createResource("nearby-resource", { x: 144, y: 23 });
+    const state: GameState = {
+      ...baseState,
+      entities: {
+        ...baseState.entities,
+        [wolf.id]: wolf,
+        [resource.id]: resource,
+      },
+    };
+    const reservations = {
+      resourceIds: new Set<string>(),
+      resourceIdByGathererId: new Map<string, string>(),
+      gathererIdByResourceId: new Map<string, string>(),
+    };
+
+    expect(getActiveQuestDefenseFocus(state)).toEqual({
+      anchorPosition: { x: 145, y: 22 },
+      defenderIds: [wolf.id],
+      objectiveId: "defeat_causeway_elite",
+      questId: "open_wolf_causeway",
+    });
+    expect(
+      getActiveQuestDefenseFocus(
+        withCausewayWolfSuppressionOwner(state, "defeat_causeway_elite"),
+      ),
+    ).toMatchObject({ objectiveId: "defeat_causeway_elite" });
+    expect(
+      selectAutoCombatPoiTarget(state, reservations).localTarget,
+    ).toMatchObject({
+      poiId: wolf.id,
+      reason: "active quest defense enemy",
+    });
+
+    const resourceTarget = {
+      poiId: resource.id,
+      category: "resource" as const,
+      mapId: "map-2" as const,
+      position: resource.position,
+      targetEntityId: resource.id,
+      reason: "wild resource fallback",
+    };
+    const aiGatherState: GameState = {
+      ...state,
+      localPoiTarget: resourceTarget,
+      partyIntent: {
+        mode: "travel",
+        source: "ai",
+        executionIntent: {
+          type: "gather",
+          targetId: resource.id,
+          targetPosition: resource.position,
+          source: "ai",
+        },
+        globalPoiIntent: null,
+        localPoiTarget: resourceTarget,
+        worldTravelTargetMapId: null,
+      },
+    };
+    expect(clearAutomaticResourceWorkForQuestDefense(aiGatherState)).toMatchObject({
+      localPoiTarget: null,
+      partyIntent: null,
+    });
+
+    const noWolfState: GameState = {
+      ...state,
+      entities: {
+        ...state.entities,
+        [wolf.id]: { ...wolf, state: "dead", health: 0 },
+      },
+    };
+    expect(
+      selectAutoCombatPoiTarget(noWolfState, reservations).localTarget,
+    ).toMatchObject({
+      category: "event",
+      position: { x: 145, y: 22 },
+      reason: "active quest defense anchor",
+    });
+
+    const causewayQuest = state.quests.open_wolf_causeway;
+    const wolfCompletedState: GameState = {
+      ...state,
+      entities: {
+        ...state.entities,
+        [wolf.id]: { ...wolf, state: "dead", health: 0 },
+      },
+      quests: {
+        ...state.quests,
+        open_wolf_causeway: {
+          ...causewayQuest,
+          objectiveProgress: {
+            ...causewayQuest.objectiveProgress,
+            defeat_causeway_elite: {
+              objectiveId: "defeat_causeway_elite",
+              currentCount: 1,
+              completed: true,
+            },
+          },
+        },
+      },
+    };
+
+    expect(getActiveQuestDefenseFocus(wolfCompletedState)).toBeNull();
+    expect(
+      selectAutoCombatPoiTarget(wolfCompletedState, reservations).localTarget,
+    ).toMatchObject({
+      poiId: resource.id,
+      category: "resource",
+      reason: "wild resource fallback",
+    });
+  });
+
+  it("does not treat a reset defense's restoration delay as a handoff", () => {
+    const state = createCausewayWolfHandoffState();
+    const quest = state.quests.open_wolf_causeway;
+
+    expect(getActiveQuestDefenseFocus({
+      ...state,
+      quests: {
+        ...state.quests,
+        open_wolf_causeway: {
+          ...quest,
+          objectiveProgress: {
+            ...quest.objectiveProgress,
+            escort_causeway_worker: {
+              objectiveId: "escort_causeway_worker",
+              currentCount: 1,
+              completed: true,
+            },
+            defend_wolf_causeway: {
+              objectiveId: "defend_wolf_causeway",
+              currentCount: 0,
+              completed: false,
+            },
+          },
+          runtime: {
+            ...quest.runtime,
+            defenseStartedObjectiveIds: {},
+          },
+        },
+      },
+    })).toBeNull();
+  });
+
   it("clears only AI-owned gathering when a defense starts", () => {
     const baseState = createPatronDefenseState();
     const resource = createResource("nearby-resource", { x: 95, y: 20 });
@@ -212,8 +370,8 @@ describe("quest defense focus", () => {
     });
   });
 
-  it("keeps an autonomous Gatherer-role companion with the party", () => {
-    const state = createPatronDefenseState();
+  it("keeps an autonomous Gatherer-role companion with the party during a handoff", () => {
+    const state = createCausewayWolfHandoffState();
     const resource = createResource("nearby-resource", { x: 94, y: 20 });
     const gatherer = createCompanion(
       "gatherer",
@@ -293,4 +451,91 @@ function createPatronDefenseState(): GameState {
     partyLeaderId: leader.id,
     quests,
   });
+}
+
+function createCausewayWolfHandoffState(): GameState {
+  const quests = createInitialQuestStates();
+  const causewayQuest = quests.open_wolf_causeway;
+  quests.open_wolf_causeway = {
+    ...causewayQuest,
+    status: "active",
+    objectiveProgress: {
+      ...causewayQuest.objectiveProgress,
+      escort_causeway_worker: {
+        objectiveId: "escort_causeway_worker",
+        currentCount: 1,
+        completed: true,
+      },
+      defend_wolf_causeway: {
+        objectiveId: "defend_wolf_causeway",
+        currentCount: 1,
+        completed: true,
+      },
+    },
+    runtime: {
+      ambientEnemySuppressionsByGroupId: {
+        "wolf-causeway-encounter": {
+          targetMapId: "map-2",
+          targetSubzoneId: "north-east",
+          scope: "subzone",
+          restoreDelayMs: 3_000,
+          variantPolicy: "reroll",
+          activeObjectiveIds: [],
+          enemySnapshots: [],
+          restoreAtMs: 15_000,
+        },
+      },
+    },
+  };
+  const leader = createCompanion(
+    "leader",
+    { x: 143, y: 22 },
+    "leader",
+    "fighter",
+    0,
+  );
+
+  return createTestGameState({
+    autoModeEnabled: true,
+    currentMapId: "map-2",
+    map: { ...NIGHTMIRE_TEST_MAP, id: "map-2", columns: 180 },
+    entities: { [leader.id]: leader },
+    partyLeaderId: leader.id,
+    quests,
+  });
+}
+
+function withCausewayWolfSuppressionOwner(
+  state: GameState,
+  objectiveId: string,
+): GameState {
+  const quest = state.quests.open_wolf_causeway;
+  const runtime = quest.runtime?.ambientEnemySuppressionsByGroupId?.[
+    "wolf-causeway-encounter"
+  ];
+
+  if (!runtime) {
+    throw new Error("Expected a Causeway suppression session");
+  }
+
+  return {
+    ...state,
+    quests: {
+      ...state.quests,
+      open_wolf_causeway: {
+        ...quest,
+        runtime: {
+          ...quest.runtime,
+          ambientEnemySuppressionsByGroupId: {
+            ...quest.runtime?.ambientEnemySuppressionsByGroupId,
+            "wolf-causeway-encounter": {
+              ...runtime,
+              activeObjectiveIds: [objectiveId],
+              restoreAtMs: undefined,
+            },
+          },
+        },
+      },
+    },
+  };
 }

@@ -1098,6 +1098,7 @@ export function sanitizeGameStateForSave(
     directCompanionCommandsById: {},
     directCommandGraceUntilByCompanionId: {},
     interruptedPoiTarget: null,
+    questNpcSpeechCue: undefined,
     globalPoiIntent: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,

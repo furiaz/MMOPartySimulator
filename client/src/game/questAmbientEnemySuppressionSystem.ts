@@ -160,7 +160,7 @@ export function updateQuestAmbientEnemySuppressionSystem(
     ).sort();
 
     for (const groupId of groupIds) {
-      const runtime =
+      let runtime =
         nextState.quests[questId]?.runtime
           ?.ambientEnemySuppressionsByGroupId?.[groupId];
 
@@ -179,6 +179,25 @@ export function updateQuestAmbientEnemySuppressionSystem(
           random,
         );
         continue;
+      }
+
+      const quest = nextState.quests[questId];
+      const activeObjectiveIds = runtime.activeObjectiveIds.filter(
+        (objectiveId) =>
+          getSuppressionContext(questId, objectiveId) !== null &&
+          !quest.objectiveProgress[objectiveId]?.completed,
+      );
+
+      if (activeObjectiveIds.length !== runtime.activeObjectiveIds.length) {
+        runtime = {
+          ...runtime,
+          activeObjectiveIds,
+          restoreAtMs:
+            activeObjectiveIds.length > 0
+              ? undefined
+              : nowMs + runtime.restoreDelayMs,
+        };
+        nextState = setSuppressionRuntime(nextState, context, runtime);
       }
 
       if (runtime.activeObjectiveIds.length > 0) {
@@ -239,7 +258,7 @@ export function sanitizeQuestAmbientEnemySuppressionsAfterLoad(
         ? sanitizeSuppressionRuntime(value, context, quest)
         : null;
 
-      if (sanitized) {
+      if (sanitized && context) {
         if (
           sanitized.activeObjectiveIds.length === 0 &&
           sanitized.restoreAtMs === undefined
@@ -252,7 +271,10 @@ export function sanitizeQuestAmbientEnemySuppressionsAfterLoad(
             );
           }
         } else {
-          nextGroups[groupId] = sanitized;
+          nextGroups[context.groupId] = mergeSuppressionRuntime(
+            nextGroups[context.groupId],
+            sanitized,
+          );
         }
       } else {
         const recoverableRuntime = getRecoverableSuppressionRuntime(
@@ -520,7 +542,7 @@ function getSuppressionContextForGroup(
 ): SuppressionContext | null {
   for (const objective of QUEST_DEFINITIONS[questId].objectives) {
     const context = getSuppressionContext(questId, objective.id);
-    if (context?.groupId === groupId) {
+    if (context && (context.groupId === groupId || objective.id === groupId)) {
       return context;
     }
   }

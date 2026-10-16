@@ -1700,7 +1700,7 @@ Current quest display names are:
 - `scout_rise_samples`: Scout Rise Samples
 - `rescue_the_grove_runner`: Rescue the Grove Runner
 - `hold_the_field_cache`: Hold the Field Cache
-- `open_wolf_causeway`: Open the Wolf Causeway
+- `open_wolf_causeway`: Open the Causeway
 - `broken_thicket_survey`: Broken Thicket Survey
 - `crawler_shelf_report`: Crawler Shelf Report
 - `find_slimeward_camp`: Slimeward Trail
@@ -1730,6 +1730,7 @@ type QuestObjectiveType =
   | "guide_npc_to_poi"
   | "unlock_route"
   | "defeat_elite"
+  | "defeat_quest_spawn"
   | "collect_dungeon_chest"
   | "return_to_poi"
   | "take_guild_notice_board_quest"
@@ -1738,7 +1739,9 @@ type QuestObjectiveType =
   | "patron_ward";
 ```
 
-Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, taking a matching Guild Notice Board quest, Livestock ownership, active-party size, and Patron Ward charge/defense completion.
+Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, tracked quest-spawn defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, taking a matching Guild Notice Board quest, Livestock ownership, active-party size, and Patron Ward charge/defense completion.
+
+`QuestObjectiveDefinition.startSpeech` may provide an NPC id, display name, text, and optional speaker position for one-shot objective-start presentation. `questSpawnTarget` configures a tracked target by enemy type, level, position, optional variant, and encounter band. The `defeat_quest_spawn` objective uses the objective's saved runtime entity-id list as its authority for targeting and kill progress.
 
 Each `QuestDefinition` owns `questGiverPoiId` and `questGiverMapId`. Availability may also require completed quests and a first-class active or resting roster companion. `reconcileQuestAvailability` evaluates those state-derived requirements after relevant quest completion, first-class selection, and save restoration.
 
@@ -1762,7 +1765,7 @@ Current prototype quest chain:
 - `scout_rise_samples` unlocks `rescue_the_grove_runner`
 - `rescue_the_grove_runner` unlocks `hold_the_field_cache`
 - `hold_the_field_cache` unlocks `open_wolf_causeway`
-- `open_wolf_causeway` unlocks `broken_thicket_survey`
+- `open_wolf_causeway` (Open the Causeway) unlocks `broken_thicket_survey`
 - `broken_thicket_survey` unlocks `crawler_shelf_report`
 - `crawler_shelf_report` unlocks `find_slimeward_camp`
 - `find_slimeward_camp` unlocks `azure_trial`
@@ -1777,7 +1780,7 @@ Current prototype quest chain:
 
 `the_patrons_shadow` uses three `patron_ward` objectives plus an `elder_mossling` Livestock ownership objective, then grants 4000 character XP and 1000 Crowns. Each Ward accumulates 100 matching direct enemy credits before manual activation. `patronWardState.ts` owns Ward definitions, positions, wave counts, barrier geometry, timing constants, route-open checks, and persistent/transient runtime sanitation. `patronWardSystem.ts` owns click-and-approach activation, mutually exclusive defenses, normal-only quest-defender waves, retreat/wipe/map-exit resets, objective completion, prop fades, the barrier/route transition, legacy map-7 access, and renderer-facing Ward/Warmaster presentation. The route unlock persists before quest turn-in while encounter, fade, and finale timing remain transient.
 
-`directKillCredit.ts` is the shared direct-defeat credit helper. It returns 2 for Superior enemies and 1 otherwise. Direct NPC `defeat_enemy_count` objectives and direct Notice Board kill objectives use it. Quest-item drop rolls remain once per enemy, `defeat_elite` remains one completion, and aggregate Field Team kill redemption keeps the quantities reported by the estimator without applying Superior credit.
+`directKillCredit.ts` is the shared direct-defeat credit helper. It returns 2 for Superior enemies and 1 otherwise. Direct NPC `defeat_enemy_count` objectives and direct Notice Board kill objectives use it. Quest-item drop rolls remain once per enemy, `defeat_elite` remains one completion, and `defeat_quest_spawn` completes once for the tracked entity id without applying Superior double credit. Aggregate Field Team kill redemption keeps the quantities reported by the estimator without applying Superior credit.
 
 Current quest rewards may include:
 
@@ -1790,7 +1793,7 @@ Merchant interaction is gated by quest progress where implemented.
 
 Merchant Buy can be locked until the equipment tutorial flow allows it.
 
-`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, and elite-spawn objective helpers. Patron Ward behavior remains in the focused `patronWardSystem.ts` rather than being hardcoded into the generic guide system.
+`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, elite-spawn, and tracked quest-spawn objective helpers. Patron Ward behavior remains in the focused `patronWardSystem.ts` rather than being hardcoded into the generic guide system.
 
 Current quest objective helper behavior:
 
@@ -1802,14 +1805,19 @@ Current quest objective helper behavior:
 - rescue objectives complete when the leader reaches the NPC after nearby enemies are cleared
 - repair objectives progress while a party member or quest guide NPC is near the target and not targeted by an enemy
 - defend objectives start from a nearby repair actor, begin their configured ambient-enemy suppression, spawn quest enemy waves, and use repair progress as the defense timer
+- defend objectives may opt into waiting for every configured defender wave to be defeated in addition to reaching the repair-duration threshold; objectives without this setting retain timer-only completion
+- defend objectives may define one-shot start speech data; the first start transition emits a transient NPC speech cue that React presents through the shared HUD-aware bubble, and save restoration/map transitions clear the cue while the persisted started flag prevents replay
+- Open the Causeway configures its defense wave only at repair progress 0, preserving the 10-second repair and the two-Wolf/one-Goblin Thrower composition; the Causeway Worker says `Its an ambush! Protect me!` when the defense starts
 - `questAmbientEnemySuppressionSystem.ts` owns reusable begin, maintain, release, restore, clear, and load-sanitization behavior for data-driven `map` or `subzone` suppression
 - suppression configuration provides scope, an optional quest-scoped group id, restore delay, and `preserve` or `reroll` variant policy; missing configuration causes no suppression
 - active sessions snapshot matching living, dead, respawning, normal, or Superior non-dummy ambient enemies, continuously remove newly introduced matching ambient enemies, and leave quest-spawned enemies untouched
-- releasing the last objective owner schedules deterministic safe restoration at full health near authored homes; a new owner in the same group cancels the timer without an intermediate repopulation
+- releasing the last objective owner schedules deterministic safe restoration at full health near authored homes; a new owner in the same group cancels the timer without an intermediate repopulation. The quest-guide update processes the active objective before timed restoration so a newly active owner can claim the group first
 - Hold the Field Cache and Defend Wolf Causeway use subzone scope, a 3-second delay, and variant rerolls; all Patron Wards share map scope through `nightmire-wards`, a 2-second delay, and preserved variants
 - completed defend objectives clean up living quest-spawned enemies and release their suppression session
+- Open the Causeway requires both its 10-second repair and defeat of all three first-wave defenders; its following tracked Superior Wolf objective joins the same `wolf-causeway-encounter` subzone-suppression group, so ambient enemies return only three seconds after the Wolf objective completes
 - legacy defense saves with objective-owned despawn ids, snapshots, or restore timestamps are converted into the generalized runtime when valid; malformed or orphaned sessions restore safely instead of leaving enemies absent
 - defeat elite objectives ensure the configured elite quest enemy is spawned
+- tracked quest-spawn objectives ensure a configured, tracked enemy exists and progress only when its runtime-tracked entity id is defeated; the Causeway objective replaces an old live Elite Wolf with its configured level-8 Superior Wolf, preserving Standard encounter rank and normal Superior drops/rewards
 - unlock route objectives complete the current route objective when active
 - collect dungeon chest objectives complete when the matching dungeon chest has been collected
 - craft item objectives complete when `recordCraftedItemForQuests` observes the matching crafted item
@@ -1822,7 +1830,7 @@ Current quest guide constants include:
 
 - `QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS = 3_000`
 
-`questDefenseFocus.ts` resolves the active defense context without quest, Ward, map, or enemy-type allowlists. It recognizes started incomplete `defend_area` objectives and the active typed `patron_ward` runtime, returning the quest/objective, defense anchor, and living quest-defender ids. While Auto Combat owns party behavior, `poiSystem.ts`, `poiTargetSelection.ts`, and `roleSystem.ts` use that context to clear AI-created resource work, prioritize encounter defenders, hold at the anchor between waves, and keep autonomous Gatherer-role companions with the party. Player-authored party gathering and direct companion commands are preserved. The focus ends when the defense completes or resets and is not extended by ambient restoration timing.
+`questDefenseFocus.ts` resolves encounter focus without quest, Ward, map, or enemy-type allowlists. It recognizes started incomplete `defend_area` objectives, the active typed `patron_ward` runtime, and a current sequential objective that owns or is taking over a live shared ambient-suppression group. The handoff case includes the pending-restoration window between sequential objectives, before the next objective claims ownership. The resolver returns the current quest/objective, its target position, and living quest-spawn enemy ids. While Auto Combat owns party behavior, `poiSystem.ts`, `poiTargetSelection.ts`, and `roleSystem.ts` use that context to clear AI-created resource work, prioritize encounter enemies, hold at the objective position between waves or before a spawn, and keep autonomous Gatherer-role companions with the party. Player-authored party gathering and direct companion commands are preserved. Focus ends when the current encounter objective completes or resets, even if the suppression group still has a pending ambient-restoration delay.
 
 POI selection types live in `poiTypes.ts`.
 

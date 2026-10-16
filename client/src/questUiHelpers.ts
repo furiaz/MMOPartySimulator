@@ -1,6 +1,7 @@
 import {
   debugMapDefinitions,
   getFirstIncompleteObjective,
+  getEnemyType,
   getItemDefinition,
   HUB_MAP_ID,
   MAP_THREE_ID,
@@ -592,6 +593,16 @@ export function getObjectiveLabel(
 
   if (objective.type === "defeat_elite") {
     return "Defeat Elite";
+  }
+
+  if (objective.type === "defeat_quest_spawn") {
+    const enemyName = getEnemyType(
+      objective.questSpawnTarget?.enemyTypeId,
+    )?.displayName ?? "Quest Enemy";
+    const variantName =
+      objective.questSpawnTarget?.variant === "superior" ? "Superior " : "";
+
+    return `Defeat ${variantName}${enemyName}`;
   }
 
   if (objective.type === "collect_dungeon_chest") {

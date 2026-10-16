@@ -47,6 +47,7 @@ import { getPoiDisplayName } from "./poiPresentation";
 import {
   canNpcShowSpeech,
   createNpcSpeech,
+  NPC_SPEECH_DURATION_MS,
   type ActiveNpcSpeech,
 } from "./npcSpeechPresentation";
 import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
@@ -3810,13 +3811,26 @@ function App() {
   const activeMovementClickFeedbackEvents = movementClickFeedbackEvents.filter(
     (event) => event.expiresAt > currentTime,
   );
-  const visibleNpcSpeech =
-    activeNpcSpeech &&
-    activeNpcSpeech.expiresAt > currentTime &&
-    (!activeNpcSpeech.mapId || activeNpcSpeech.mapId === currentMap.id) &&
-    gameState.entities[activeNpcSpeech.npcId]?.kind === "npc"
-      ? activeNpcSpeech
-      : null;
+  const questSpeechCue = gameState.questNpcSpeechCue;
+  const scriptedNpcSpeech: ActiveNpcSpeech | null = questSpeechCue
+    ? {
+        createdAt: questSpeechCue.createdAt,
+        expiresAt: questSpeechCue.createdAt + NPC_SPEECH_DURATION_MS,
+        mapId: questSpeechCue.mapId,
+        npcId: questSpeechCue.npcId,
+        text: questSpeechCue.text,
+      }
+    : null;
+  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech]
+    .filter(
+      (speech): speech is ActiveNpcSpeech =>
+        speech !== null &&
+        speech.expiresAt > currentTime &&
+        (!speech.mapId || speech.mapId === currentMap.id) &&
+        gameState.entities[speech.npcId]?.kind === "npc",
+    )
+    .sort((first, second) => first.createdAt - second.createdAt)
+    .at(-1) ?? null;
   const activeDirectCommandCount = Object.keys(
     directCompanionCommandsById,
   ).length;

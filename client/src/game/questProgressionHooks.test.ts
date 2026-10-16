@@ -491,6 +491,95 @@ describe("quest progression hooks", () => {
       state.quests.the_patrons_shadow.objectiveProgress.break_cinder_wisp_ward,
     ).toMatchObject({ currentCount: 1, completed: false });
   });
+
+  it("completes a tracked quest-spawn target once without applying Superior double credit", () => {
+    const quests = createQuestStates({ open_wolf_causeway: "active" });
+    const causewayQuest = quests.open_wolf_causeway;
+    quests.open_wolf_causeway = {
+      ...causewayQuest,
+      objectiveProgress: {
+        ...causewayQuest.objectiveProgress,
+        escort_causeway_worker: {
+          objectiveId: "escort_causeway_worker",
+          currentCount: 1,
+          completed: true,
+        },
+        defend_wolf_causeway: {
+          objectiveId: "defend_wolf_causeway",
+          currentCount: 1,
+          completed: true,
+        },
+      },
+      runtime: {
+        questSpawnedEnemyIdsByObjectiveId: {
+          defeat_causeway_elite: ["tracked-superior-wolf"],
+        },
+      },
+    };
+    let state = createStateWithParty({
+      currentMapId: MAP_TWO_ID,
+      map: createDebugMap(MAP_TWO_ID),
+      quests,
+    });
+    const unrelatedSuperiorWolf = {
+      ...createEnemy("ambient-superior-wolf", { x: 0, y: 0 }, "aggressive", {
+        enemyTypeId: "wolf",
+        level: 8,
+        variant: "superior",
+        subzoneId: "north-east",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const trackedSuperiorWolf = {
+      ...createEnemy(
+        "tracked-superior-wolf",
+        { x: 145, y: 22 },
+        "aggressive",
+        {
+          enemyTypeId: "wolf",
+          level: 8,
+          variant: "superior",
+          encounterBand: "standard",
+          subzoneId: "north-east",
+          questSpawn: {
+            questId: "open_wolf_causeway",
+            objectiveId: "defeat_causeway_elite",
+            targetPosition: { x: 145, y: 22 },
+          },
+        },
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      unrelatedSuperiorWolf,
+      MAP_TWO_ID,
+    );
+    expect(
+      state.quests.open_wolf_causeway.objectiveProgress.defeat_causeway_elite,
+    ).toMatchObject({ currentCount: 0, completed: false });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      trackedSuperiorWolf,
+      MAP_TWO_ID,
+    );
+    expect(
+      state.quests.open_wolf_causeway.objectiveProgress.defeat_causeway_elite,
+    ).toMatchObject({ currentCount: 1, completed: true });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      trackedSuperiorWolf,
+      MAP_TWO_ID,
+    );
+    expect(
+      state.quests.open_wolf_causeway.objectiveProgress.defeat_causeway_elite,
+    ).toMatchObject({ currentCount: 1, completed: true });
+  });
 });
 
 function createStateWithParty(

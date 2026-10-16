@@ -550,6 +550,67 @@ describe("save game serialization", () => {
     expect(restored.state.debugTelemetry).toBeUndefined();
   });
 
+  it("clears a quest start-speech cue on restore without replaying the started defense", () => {
+    const quests = createInitialQuestStates();
+    const causeway = quests.open_wolf_causeway;
+    quests.open_wolf_causeway = {
+      ...causeway,
+      status: "active",
+      objectiveProgress: {
+        ...causeway.objectiveProgress,
+        escort_causeway_worker: {
+          objectiveId: "escort_causeway_worker",
+          currentCount: 1,
+          completed: true,
+        },
+      },
+      runtime: {
+        defenseStartedObjectiveIds: {
+          defend_wolf_causeway: true,
+        },
+      },
+    };
+    const state = createTestGameState({
+      currentMapId: MAP_TWO_ID,
+      map: createDebugMap(MAP_TWO_ID),
+      quests,
+      questNpcSpeechCue: {
+        id: "open_wolf_causeway:defend_wolf_causeway:999",
+        mapId: MAP_TWO_ID,
+        npcId: "map-2-causeway-worker",
+        text: "Its an ambush! Protect me!",
+        createdAt: NOW_MS - 1_000,
+      },
+    });
+    const save = createSavedGame(state, NOW_MS);
+
+    expect(save.state.questNpcSpeechCue).toBeUndefined();
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+
+    expect(restored.state.questNpcSpeechCue).toBeUndefined();
+    expect(
+      restored.state.quests.open_wolf_causeway.runtime
+        ?.defenseStartedObjectiveIds?.defend_wolf_causeway,
+    ).toBe(true);
+
+    const resumedState = updateQuestGuideSystem(
+      restored.state,
+      new Set(),
+      {
+        nowMs: NOW_MS + 100,
+        deltaMs: 100,
+        deltaSeconds: 0.1,
+        frameNumber: 1,
+      },
+    );
+    expect(resumedState.questNpcSpeechCue).toBeUndefined();
+  });
+
   it("keeps persistent party, inventory, wallet, quests, map, and resources", () => {
     let state = createWildState("fighter");
     state = addItemToInventoryState(state, "softwood", 2, "debug").state;

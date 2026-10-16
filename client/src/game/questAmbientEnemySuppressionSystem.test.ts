@@ -215,6 +215,62 @@ describe("quest ambient enemy suppression", () => {
     });
   });
 
+  it("migrates an active Causeway suppression session into its shared group", () => {
+    const snapshot = createEnemy("causeway-snapshot", { x: 145, y: 22 }, undefined, {
+      enemyTypeId: "wolf",
+      subzoneId: "north-east",
+    });
+    const quests = createInitialQuestStates();
+    const causewayQuest = quests.open_wolf_causeway;
+    quests.open_wolf_causeway = {
+      ...causewayQuest,
+      status: "active",
+      objectiveProgress: {
+        ...causewayQuest.objectiveProgress,
+        escort_causeway_worker: {
+          objectiveId: "escort_causeway_worker",
+          currentCount: 1,
+          completed: true,
+        },
+      },
+      runtime: {
+        defenseStartedObjectiveIds: { defend_wolf_causeway: true },
+        ambientEnemySuppressionsByGroupId: {
+          defend_wolf_causeway: {
+            targetMapId: MAP_TWO_ID,
+            targetSubzoneId: "north-east",
+            scope: "subzone",
+            restoreDelayMs: 3_000,
+            variantPolicy: "reroll",
+            activeObjectiveIds: ["defend_wolf_causeway"],
+            enemySnapshots: [snapshot],
+          },
+        },
+      },
+    };
+    const state = createTestGameState({
+      currentMapId: MAP_TWO_ID,
+      map: createDebugMapForQuestState(MAP_TWO_ID, quests),
+      quests,
+      entities: {},
+      followTrailsByEntityId: {},
+    });
+
+    const restored = sanitizeQuestAmbientEnemySuppressionsAfterLoad(state, 5_000);
+    const runtime =
+      restored.quests.open_wolf_causeway.runtime
+        ?.ambientEnemySuppressionsByGroupId?.["wolf-causeway-encounter"];
+
+    expect(runtime?.activeObjectiveIds).toEqual(["defend_wolf_causeway"]);
+    expect(runtime?.enemySnapshots.map((enemy) => enemy.id)).toEqual([
+      snapshot.id,
+    ]);
+    expect(
+      restored.quests.open_wolf_causeway.runtime
+        ?.ambientEnemySuppressionsByGroupId?.defend_wolf_causeway,
+    ).toBeUndefined();
+  });
+
   it("restores recoverable snapshots and clears malformed saved sessions", () => {
     const enemy = createEnemy("recoverable", { x: 20, y: 20 }, undefined, {
       enemyTypeId: "night_bat",
