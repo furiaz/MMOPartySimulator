@@ -62,9 +62,23 @@ export function createActiveQuestGuideNpc(
 
   if (
     !context ||
-    !isQuestNpcObjective(context.objective) ||
     context.objective.targetMapId !== mapId
   ) {
+    return null;
+  }
+
+  if (context.objective.startSpeech) {
+    const speech = context.objective.startSpeech;
+
+    return createNpc(
+      speech.npcId,
+      speech.position ?? getObjectiveTargetPosition(context.objective),
+      speech.displayName,
+      "quest_guide",
+    );
+  }
+
+  if (!isQuestNpcObjective(context.objective)) {
     return null;
   }
 
@@ -83,7 +97,8 @@ export function shouldSpawnQuestGuide(state: GameState, mapId: string): boolean 
 
   return Boolean(
     context &&
-      isQuestNpcObjective(context.objective) &&
+      (isQuestNpcObjective(context.objective) ||
+        Boolean(context.objective.startSpeech)) &&
       context.objective.targetMapId === mapId,
   );
 }
@@ -108,37 +123,49 @@ export function updateQuestGuideSystem(
   timing?: SimulationTiming,
   random = Math.random,
 ): GameState {
-  let nextState = updateQuestAmbientEnemySuppressionSystem(
-    state,
+  let nextState = state;
+  const context = getActiveObjectiveContext(nextState);
+
+  if (context && context.objective.targetMapId === nextState.currentMapId) {
+    if (
+      context.objective.ambientEnemySuppression &&
+      context.objective.type !== "defend_area" &&
+      context.objective.type !== "patron_ward"
+    ) {
+      nextState = beginQuestAmbientEnemySuppression(
+        nextState,
+        context.questId,
+        context.objective.id,
+      );
+    }
+
+    if (context.objective.type === "guide_npc_to_poi") {
+      nextState = updateEscortObjective(nextState, context, movedEntityIds);
+    } else if (context.objective.type === "rescue_npc") {
+      nextState = updateRescueObjective(nextState, context);
+    } else if (context.objective.type === "repair_poi") {
+      nextState = updateRepairObjective(nextState, context, timing?.deltaMs ?? 0);
+    } else if (context.objective.type === "defend_area") {
+      nextState = updateDefenseObjective(
+        nextState,
+        context,
+        timing?.deltaMs ?? 0,
+        timing?.nowMs ?? Date.now(),
+      );
+    } else if (context.objective.type === "defeat_elite") {
+      nextState = ensureEliteSpawned(nextState, context);
+    } else if (context.objective.type === "defeat_quest_spawn") {
+      nextState = ensureQuestSpawnTarget(nextState, context);
+    } else if (context.objective.type === "unlock_route") {
+      nextState = completeQuestObjective(nextState, context.questId, context.objective.id);
+    }
+  }
+
+  return updateQuestAmbientEnemySuppressionSystem(
+    nextState,
     timing?.nowMs ?? Date.now(),
     random,
   );
-  const context = getActiveObjectiveContext(nextState);
-
-  if (!context || context.objective.targetMapId !== nextState.currentMapId) {
-    return nextState;
-  }
-
-  if (context.objective.type === "guide_npc_to_poi") {
-    nextState = updateEscortObjective(nextState, context, movedEntityIds);
-  } else if (context.objective.type === "rescue_npc") {
-    nextState = updateRescueObjective(nextState, context);
-  } else if (context.objective.type === "repair_poi") {
-    nextState = updateRepairObjective(nextState, context, timing?.deltaMs ?? 0);
-  } else if (context.objective.type === "defend_area") {
-    nextState = updateDefenseObjective(
-      nextState,
-      context,
-      timing?.deltaMs ?? 0,
-      timing?.nowMs ?? Date.now(),
-    );
-  } else if (context.objective.type === "defeat_elite") {
-    nextState = ensureEliteSpawned(nextState, context);
-  } else if (context.objective.type === "unlock_route") {
-    nextState = completeQuestObjective(nextState, context.questId, context.objective.id);
-  }
-
-  return nextState;
 }
 
 export function isQuestGuideObjectiveRelevant(state: GameState): boolean {
@@ -301,7 +328,7 @@ function updateDefenseObjective(
     return state;
   }
 
-  let nextState = startDefenseObjective(state, context);
+  let nextState = startDefenseObjective(state, context, nowMs);
   nextState = beginQuestAmbientEnemySuppression(
     nextState,
     context.questId,
@@ -313,6 +340,10 @@ function updateDefenseObjective(
       ?.completed,
   );
   nextState = updateRepairObjective(nextState, context, deltaMs);
+  nextState = completeDefenseObjectiveAfterDefenders(
+    nextState,
+    context,
+  );
 
   if (
     nextState.quests[context.questId].objectiveProgress[context.objective.id]
@@ -332,9 +363,58 @@ function updateDefenseObjective(
   return nextState;
 }
 
+function completeDefenseObjectiveAfterDefenders(
+  state: GameState,
+  context: ActiveObjectiveContext,
+): GameState {
+  const objective = context.objective;
+
+  if (
+    objective.type !== "defend_area" ||
+    !objective.waitForSpawnedDefendersToBeDefeated
+  ) {
+    return state;
+  }
+
+  const quest = state.quests[context.questId];
+  const progressMs =
+    quest.runtime?.repairProgressMsByObjectiveId?.[objective.id] ?? 0;
+  const waveKeys = (objective.waveProgressPercents ?? [0]).map(
+    (progressPercent) => `${objective.id}:${progressPercent}`,
+  );
+  const spawnedWaveKeys = quest.runtime?.defenseSpawnedWaveKeys ?? {};
+  const allWavesSpawned = waveKeys.every((waveKey) => spawnedWaveKeys[waveKey]);
+
+  if (
+    progressMs < (objective.repairDurationMs ?? 1) ||
+    !allWavesSpawned
+  ) {
+    return state;
+  }
+
+  const trackedIds = new Set(
+    quest.runtime?.questSpawnedEnemyIdsByObjectiveId?.[objective.id] ?? [],
+  );
+  const defenders = Object.values(state.entities).filter(
+    (entity) =>
+      entity.kind === "enemy" &&
+      (trackedIds.has(entity.id) ||
+        (entity.questSpawn?.questId === context.questId &&
+          entity.questSpawn.objectiveId === objective.id)),
+  );
+  const livingDefenderRemains = defenders.some(
+    (defender) => defender.state !== "dead",
+  );
+
+  return livingDefenderRemains
+    ? state
+    : completeQuestObjective(state, context.questId, objective.id);
+}
+
 function startDefenseObjective(
   state: GameState,
   context: ActiveObjectiveContext,
+  nowMs: number,
 ): GameState {
   const quest = state.quests[context.questId];
 
@@ -342,16 +422,39 @@ function startDefenseObjective(
     return state;
   }
 
+  const speech = context.objective.startSpeech;
+  const speakerExists = speech && state.entities[speech.npcId]?.kind === "npc";
+  const nextState = speakerExists || !speech
+    ? state
+    : addEntity(
+        state,
+        createNpc(
+          speech.npcId,
+          speech.position ?? getObjectiveTargetPosition(context.objective),
+          speech.displayName,
+          "quest_guide",
+        ),
+      );
+
   return {
-    ...state,
+    ...nextState,
+    questNpcSpeechCue: speech
+      ? {
+          id: `${context.questId}:${context.objective.id}:${nowMs}`,
+          mapId: nextState.currentMapId,
+          npcId: speech.npcId,
+          text: speech.text,
+          createdAt: nowMs,
+        }
+      : nextState.questNpcSpeechCue,
     quests: {
-      ...state.quests,
+      ...nextState.quests,
       [context.questId]: {
-        ...state.quests[context.questId],
+        ...nextState.quests[context.questId],
         runtime: {
-          ...state.quests[context.questId].runtime,
+          ...nextState.quests[context.questId].runtime,
           defenseStartedObjectiveIds: {
-            ...state.quests[context.questId].runtime?.defenseStartedObjectiveIds,
+            ...nextState.quests[context.questId].runtime?.defenseStartedObjectiveIds,
             [context.objective.id]: true,
           },
         },
@@ -493,6 +596,74 @@ function ensureEliteSpawned(
   return appendQuestSpawnedEnemy(addEntity(state, elite), context, elite.id);
 }
 
+function ensureQuestSpawnTarget(
+  state: GameState,
+  context: ActiveObjectiveContext,
+): GameState {
+  const targetDefinition = context.objective.questSpawnTarget;
+
+  if (!targetDefinition) {
+    return state;
+  }
+
+  const spawnedIds =
+    state.quests[context.questId].runtime?.questSpawnedEnemyIdsByObjectiveId?.[
+      context.objective.id
+    ] ?? [];
+  const existingTargetId =
+    spawnedIds.find((id) => state.entities[id]?.kind === "enemy") ??
+    Object.values(state.entities).find(
+      (entity) =>
+        entity.kind === "enemy" &&
+        entity.questSpawn?.questId === context.questId &&
+        entity.questSpawn.objectiveId === context.objective.id,
+    )?.id;
+  const targetId =
+    existingTargetId ?? `quest-${context.questId}-${context.objective.id}-target`;
+  const existingTarget = state.entities[targetId];
+
+  if (
+    existingTarget?.kind === "enemy" &&
+    matchesQuestSpawnTarget(existingTarget, targetDefinition, context)
+  ) {
+    return appendQuestSpawnedEnemy(state, context, targetId);
+  }
+
+  const target = createEnemy(targetId, targetDefinition.position, "aggressive", {
+    enemyTypeId: targetDefinition.enemyTypeId,
+    level: targetDefinition.level,
+    variant: targetDefinition.variant,
+    encounterBand: targetDefinition.encounterBand ?? "standard",
+    subzoneId: context.objective.targetSubzoneId,
+    questSpawn: {
+      questId: context.questId,
+      objectiveId: context.objective.id,
+      targetPosition: targetDefinition.position,
+    },
+  });
+
+  return appendQuestSpawnedEnemy(addEntity(state, target), context, target.id);
+}
+
+function matchesQuestSpawnTarget(
+  enemy: Extract<GameState["entities"][string], { kind: "enemy" }>,
+  targetDefinition: NonNullable<QuestObjectiveDefinition["questSpawnTarget"]>,
+  context: ActiveObjectiveContext,
+): boolean {
+  return (
+    enemy.state !== "dead" &&
+    enemy.enemyTypeId === targetDefinition.enemyTypeId &&
+    enemy.level === targetDefinition.level &&
+    enemy.variant === targetDefinition.variant &&
+    enemy.encounterBand === (targetDefinition.encounterBand ?? "standard") &&
+    enemy.aggressionMode === "aggressive" &&
+    enemy.questSpawn?.questId === context.questId &&
+    enemy.questSpawn.objectiveId === context.objective.id &&
+    enemy.questSpawn.isElite !== true &&
+    enemy.questSpawn.suppressNormalDrops !== true
+  );
+}
+
 function cleanupQuestSpawnedEnemies(
   state: GameState,
   context: ActiveObjectiveContext,
@@ -520,6 +691,10 @@ function appendQuestSpawnedEnemy(
     state.quests[context.questId].runtime?.questSpawnedEnemyIdsByObjectiveId?.[
       context.objective.id
     ] ?? [];
+
+  if (currentIds.includes(enemyId)) {
+    return state;
+  }
 
   return {
     ...state,
@@ -590,6 +765,7 @@ function getObjectiveTargetPosition(objective: QuestObjectiveDefinition): Positi
   return (
     objective.guideTargetPosition ??
     objective.targetPosition ??
+    objective.questSpawnTarget?.position ??
     objective.eliteSpawnPosition ??
     { x: 1, y: 1 }
   );

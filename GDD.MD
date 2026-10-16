@@ -1567,11 +1567,15 @@ Current prototype quests:
   - Quest id: hold_the_field_cache
   - Objectives: defend the Old Grove field cache while quest-spawned enemies attack
   - Rewards: 75 Crowns, 28 character XP, 1 Soldier's Recovery Flask
-  - Unlocks: Open the Wolf Causeway
+  - Unlocks: Open the Causeway
 
-- Open the Wolf Causeway
+- Open the Causeway
   - Quest id: open_wolf_causeway
-  - Objectives: escort the Causeway Worker, defend the Wolf Causeway blockage, defeat the causeway elite, and unlock the map-3 route
+  - Objectives: escort the Causeway Worker, repair the Wolf Causeway blockage for 10 seconds while defeating its three ambushers (two Wolves and one Goblin Thrower), defeat the tracked level-8 Superior Wolf, and unlock the map-3 route
+  - The 10-second repair defense begins with the Causeway Worker saying, “Its an ambush! Protect me!”
+  - The repair step completes only after both the full repair timer and all three ambushers are defeated. The tracked Superior Wolf is the encounter’s second step and appears only after the repair defense ends.
+  - Ambient enemies remain suppressed across both steps and return three seconds after the tracked Wolf is defeated.
+  - The quest Wolf is a Superior variant with Standard encounter rank. It uses normal Superior combat and rewards; unrelated Superior Wolves do not count.
   - Rewards: 100 Crowns, 40 character XP, 1 Bulwark Cuirass, 1 Plain Charm
   - Unlocks: Broken Thicket Survey
 
@@ -1640,7 +1644,7 @@ The Class Mentor may act as the current prototype quest source for The Azure Tri
 
 `The Patron's Shadow` places three manually activated Wards around the Nightmire Canopy route to Orc Warcamp. Only one Ward defense can be active at a time. Starting a defense removes all ambient Nightmire enemies and leaves only the matching quest defenders. Failed, abandoned, wiped, or interrupted defenses reset to charged-and-ready without requiring another 100 credits. Ambient enemies return at full health near their authored homes 2 seconds after the defense ends unless another Ward begins during that breathing period.
 
-During an active quest defense, Auto Combat prioritizes that encounter's living defenders and holds at the defense anchor between waves. It does not select resource POIs, and autonomous Gatherer-role companions rejoin the party instead of starting or continuing autonomous gathering. Manual party gathering and direct companion gathering commands remain allowed and may still cause the existing retreat/reset behavior. Normal resource targeting resumes as soon as the defense completes or resets; the ambient-enemy restoration delay does not extend this focus.
+During an active quest defense, Auto Combat prioritizes that encounter's living defenders and holds at the defense anchor between waves. Focus continues across sequential objectives that hand off the same ambient-enemy suppression group, targeting the current objective's quest enemies or holding near its target position before they appear. It does not select resource POIs, and autonomous Gatherer-role companions rejoin the party instead of starting or continuing autonomous gathering. Manual party gathering and direct companion gathering commands remain allowed and may still cause the existing retreat/reset behavior. Focus ends when the current encounter objective completes or resets; a remaining ambient-enemy restoration delay does not extend it.
 
 Completing the third Ward unlocks the Orc Warcamp route before quest turn-in. The dark-green collision barrier around the teleporter fades, and an untargetable Orc Warmaster scene actor says `You have drawn the Patron's gaze. Come, then.`, remains visible for 3 seconds, then fades through the portal. Existing saves that had already reached Orc Warcamp preserve that access without replaying the barrier scene.
 
@@ -1670,6 +1674,7 @@ Current prototype quest guide behavior:
 - repair objectives can be progressed by a nearby party member or quest guide NPC
 - repair progress pauses if the repair actor is targeted by an enemy
 - defend objectives can spawn quest enemies during repair progress
+- a defend objective may opt into requiring all configured defender waves to be defeated as well as completing its repair timer; without this setting, existing timer-only defense behavior is unchanged
 - quest objectives may data-drive ambient-enemy suppression for a map or subzone, including living, defeated, respawning, normal, and Superior ambient enemies while leaving target dummies and quest-spawned enemies untouched
 - suppression groups allow consecutive objectives to share captured enemies and cancel a pending restoration without briefly repopulating the area
 - suppressed enemies restore together after the objective's configured delay, at full health and near safe authored home positions; each objective chooses whether original variants are preserved or rerolled

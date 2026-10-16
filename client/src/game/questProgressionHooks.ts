@@ -81,6 +81,34 @@ export function recordEnemyDefeatedForQuests(
     );
   }
 
+  const questSpawn = defeatedEnemy.questSpawn;
+  const trackedObjective = questSpawn
+    ? QUEST_DEFINITIONS[questSpawn.questId]?.objectives.find(
+        (objective) =>
+          objective.id === questSpawn.objectiveId &&
+          objective.type === "defeat_quest_spawn" &&
+          objective.targetMapId === mapId,
+      )
+    : undefined;
+  const trackedEnemyIds = questSpawn
+    ? nextState.quests[questSpawn.questId]?.runtime
+        ?.questSpawnedEnemyIdsByObjectiveId?.[questSpawn.objectiveId]
+    : undefined;
+
+  if (
+    questSpawn &&
+    trackedObjective &&
+    nextState.quests[questSpawn.questId]?.status === "active" &&
+    trackedEnemyIds?.includes(defeatedEnemy.id)
+  ) {
+    nextState = updateObjectiveProgress(
+      nextState,
+      questSpawn.questId,
+      trackedObjective,
+      1,
+    );
+  }
+
   nextState = recordEnemyDefeatedForGuildNoticeBoard(nextState, defeatedEnemy);
 
   return nextState;
@@ -207,7 +235,8 @@ export function recordQuestRepairProgress(
     },
   };
 
-  return clampedProgressMs >= durationMs
+  return clampedProgressMs >= durationMs &&
+    !objective.waitForSpawnedDefendersToBeDefeated
     ? updateObjectiveProgress(nextState, questId, objective, 1)
     : nextState;
 }

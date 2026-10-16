@@ -2,6 +2,7 @@ import type {
   DebugMapId,
   Enemy,
   EnemyArchetypeId,
+  EnemyEncounterBand,
   EnemyTypeId,
   EnemyVariant,
   EquipmentSlot,
@@ -55,6 +56,7 @@ export type QuestObjectiveType =
   | "guide_npc_to_poi"
   | "unlock_route"
   | "defeat_elite"
+  | "defeat_quest_spawn"
   | "collect_dungeon_chest"
   | "return_to_poi"
   | "take_guild_notice_board_quest"
@@ -81,6 +83,21 @@ export type QuestSpawnEnemyDefinition = {
   enemyArchetypeId?: EnemyArchetypeId;
   level?: number;
   count?: number;
+};
+
+export type QuestSpawnTargetDefinition = {
+  enemyTypeId: EnemyTypeId;
+  level: number;
+  position: Position;
+  variant?: EnemyVariant;
+  encounterBand?: EnemyEncounterBand;
+};
+
+export type QuestObjectiveStartSpeech = {
+  npcId: string;
+  displayName: string;
+  text: string;
+  position?: Position;
 };
 
 export type QuestObjectiveDefinition = {
@@ -112,10 +129,13 @@ export type QuestObjectiveDefinition = {
   dropChance?: number;
   pityKillCount?: number;
   repairDurationMs?: number;
+  waitForSpawnedDefendersToBeDefeated?: boolean;
   defenseRadius?: number;
   defenseDurationMs?: number;
   waveProgressPercents?: number[];
   questSpawnEnemies?: QuestSpawnEnemyDefinition[];
+  startSpeech?: QuestObjectiveStartSpeech;
+  questSpawnTarget?: QuestSpawnTargetDefinition;
   routeTeleportId?: string;
   eliteSpawnPosition?: Position;
   eliteEnemy?: QuestSpawnEnemyDefinition;

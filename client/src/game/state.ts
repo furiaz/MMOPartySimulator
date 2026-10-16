@@ -148,6 +148,14 @@ export type InterruptedPoiTarget = {
   lastPoiDecision?: PoiDecisionState;
 };
 
+export type QuestNpcSpeechCue = {
+  id: string;
+  mapId?: DebugMapId;
+  npcId: string;
+  text: string;
+  createdAt: number;
+};
+
 export { clearFrameMovementPlanning, clearTickMovementPlanning } from "./movementState";
 export {
   COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
@@ -219,6 +227,7 @@ export type GameState = {
   directCommandGraceUntilByCompanionId?: Record<string, number>;
   interruptedPoiTarget?: InterruptedPoiTarget | null;
   quests: Record<QuestId, QuestState>;
+  questNpcSpeechCue?: QuestNpcSpeechCue;
   globalPoiIntent: GlobalPoiIntent | null;
   localPoiTarget: LocalPoiTarget | null;
   lastPoiDecision?: PoiDecisionState;

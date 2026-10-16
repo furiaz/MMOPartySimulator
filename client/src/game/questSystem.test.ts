@@ -408,6 +408,55 @@ describe("prototype quest system", () => {
     expect(quests.the_patrons_shadow.status).toBe("locked");
   });
 
+  it("configures Open the Causeway with one repair wave and a tracked Superior Wolf", () => {
+    const defense = QUEST_DEFINITIONS.open_wolf_causeway.objectives.find(
+      (objective) => objective.id === "defend_wolf_causeway",
+    );
+    const trackedWolf = QUEST_DEFINITIONS.open_wolf_causeway.objectives.find(
+      (objective) => objective.id === "defeat_causeway_elite",
+    );
+
+    expect(defense).toMatchObject({
+      type: "defend_area",
+      repairDurationMs: 10_000,
+      waitForSpawnedDefendersToBeDefeated: true,
+      waveProgressPercents: [0],
+      ambientEnemySuppression: {
+        scope: "subzone",
+        groupId: "wolf-causeway-encounter",
+        restoreDelayMs: 3_000,
+        variantPolicy: "reroll",
+      },
+      questSpawnEnemies: [
+        { enemyTypeId: "wolf", level: 7, count: 2 },
+        { enemyTypeId: "goblin_thrower", level: 7, count: 1 },
+      ],
+      startSpeech: {
+        npcId: "map-2-causeway-worker",
+        displayName: "Causeway Worker",
+        text: "Its an ambush! Protect me!",
+      },
+    });
+    expect(trackedWolf).toMatchObject({
+      type: "defeat_quest_spawn",
+      enemyTypeId: "wolf",
+      requiredCount: 1,
+      ambientEnemySuppression: {
+        scope: "subzone",
+        groupId: "wolf-causeway-encounter",
+        restoreDelayMs: 3_000,
+        variantPolicy: "reroll",
+      },
+      questSpawnTarget: {
+        enemyTypeId: "wolf",
+        level: 8,
+        position: { x: 145, y: 22 },
+        variant: "superior",
+        encounterBand: "standard",
+      },
+    });
+  });
+
   it("grants smithy starter materials on accept so Plain Charm can be crafted", () => {
     let state = createStateWithParty({
       currentMapId: "hub",
