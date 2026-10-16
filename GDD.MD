@@ -539,6 +539,16 @@ Current prototype enemy variants:
 
 Superior enemies are prototype rare-variant behavior, not final elite design, named boss design, affix design, or production rare-monster tuning.
 
+Encounter bands describe an individual authored enemy spawn, independently of its enemy type and Superior variant:
+
+- Standard is the default band for ordinary spawns. A Standard enemy may still spawn as a Superior.
+- Elite is a deliberately designed, stronger area monster based on the area's average enemy strength, rather than an ordinary enemy made stronger by the Superior roll.
+- Champion is reserved for future handcrafted special-arena enemies and is not the final challenge of a tier.
+- Boss is the end-of-tier challenge, generally placed around a tier boundary such as levels 9–10, 19–20, or 29–30.
+- Hover inspection shows the rank for Elite, Champion, and Boss enemies; Standard rank is omitted, and rank does not appear in world nameplates.
+
+The Azure Mass and the single Orc Warmaster in Orc Warcamp are Bosses. The Orc Warmaster is authored once in the Warmaster encounter area. Encounter-band labels currently classify spawns only; they do not independently change stats, AI, drops, XP, or Superior behavior.
+
 Current prototype enemy scaling:
 
 - supports starter and early scaling bands

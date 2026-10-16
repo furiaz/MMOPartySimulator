@@ -604,6 +604,7 @@ function getMapEntities(
       enemyTypeId: enemyStart.enemyTypeId,
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
+      encounterBand: enemyStart.encounterBand,
       variant,
       combatBodyRadius: enemyStart.combatBodyRadius,
       maxHealth: enemyStart.enemyTypeId === "azure_mass" ? 900 : undefined,

@@ -27,6 +27,8 @@ export type EnemyTargetPreference = "closest" | "leader" | "lowestHealth";
 
 export type EnemyVariant = "superior";
 
+export type EnemyEncounterBand = "standard" | "elite" | "champion" | "boss";
+
 export type EnemyArchetypeId =
   | "slime"
   | "bat"
@@ -3022,6 +3024,7 @@ export type Enemy = LivingEntity & {
   kind: "enemy";
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  encounterBand: EnemyEncounterBand;
   variant?: EnemyVariant;
   debugSpawn?: true;
   isTargetDummy?: true;

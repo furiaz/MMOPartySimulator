@@ -6,6 +6,7 @@ import type {
   Enemy,
   EnemyAggressionMode,
   EnemyArchetypeId,
+  EnemyEncounterBand,
   EnemyTypeId,
   EnemyVariant,
   EntityState,
@@ -78,6 +79,7 @@ type CreateEnemyOptions = {
   magicDefense?: number;
   evasion?: number;
   variant?: EnemyVariant;
+  encounterBand?: EnemyEncounterBand;
   attackCooldownMs?: number;
   attackRange?: number;
   combatBodyRadius?: number;
@@ -114,6 +116,7 @@ export function createEnemy(
       enemyType?.temperament ??
       archetype?.defaultTemperament ??
       "passive",
+    encounterBand: options.encounterBand ?? "standard",
     variant: options.variant,
     isTargetDummy: options.isTargetDummy,
     archetypeId,

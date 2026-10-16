@@ -6,6 +6,7 @@ import {
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
   MAP_ONE_ID,
+  MAP_SEVEN_ID,
   MAP_TWO_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   mapTwoEnemyStartData,
@@ -64,7 +65,7 @@ import {
 } from "./saveGame";
 import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
-import type { Companion, GameEntity, ItemId, PartyMemberRole } from "./types";
+import type { Companion, Enemy, GameEntity, ItemId, PartyMemberRole } from "./types";
 import { addCurrencyToWalletState } from "./wallet";
 import { createAoeCastTransform, resolveAoePattern } from "./aoePatterns";
 
@@ -82,6 +83,61 @@ describe("save game serialization", () => {
     expect(validateSavedGame(save).ok).toBe(true);
     expect(validateSavedGame({ ...save, saveVersion: 999 }).ok).toBe(false);
     expect(validateSavedGame({ ...save, state: { ...save.state, entities: null } }).ok).toBe(false);
+  });
+
+  it("restores authored encounter bands and sanitizes dynamic enemy bands", () => {
+    const warmaster = createEnemy(
+      "zone-7-orc-warmaster-01",
+      { x: 82, y: 29 },
+      undefined,
+      { enemyTypeId: "orc_warmaster", encounterBand: "elite" },
+    );
+    const dynamicChampion = createEnemy(
+      "dynamic-champion",
+      { x: 40, y: 30 },
+      undefined,
+      { encounterBand: "champion" },
+    );
+    const malformedBandEnemy = {
+      ...createEnemy("malformed-band", { x: 45, y: 30 }),
+      encounterBand: "legendary" as Enemy["encounterBand"],
+    };
+    const state = {
+      ...createTestGameState(),
+      currentMapId: MAP_SEVEN_ID,
+      map: createDebugMap(MAP_SEVEN_ID),
+      entities: {
+        [warmaster.id]: warmaster,
+        [dynamicChampion.id]: dynamicChampion,
+        [malformedBandEnemy.id]: malformedBandEnemy,
+      },
+    };
+
+    const sanitized = sanitizeGameStateForSave(state, NOW_MS);
+
+    expect(sanitized.entities[warmaster.id]).toMatchObject({
+      encounterBand: "boss",
+    });
+    expect(sanitized.entities[dynamicChampion.id]).toMatchObject({
+      encounterBand: "champion",
+    });
+    expect(sanitized.entities[malformedBandEnemy.id]).toMatchObject({
+      encounterBand: "standard",
+    });
+
+    const legacySave = createSavedGame(state, NOW_MS);
+    const savedWarmaster = legacySave.state.entities[warmaster.id];
+    if (savedWarmaster?.kind === "enemy") {
+      delete (savedWarmaster as Partial<Enemy>).encounterBand;
+    }
+    const restored = restoreGameStateFromSave(legacySave);
+
+    expect(restored.ok).toBe(true);
+    if (restored.ok) {
+      expect(restored.state.entities[warmaster.id]).toMatchObject({
+        encounterBand: "boss",
+      });
+    }
   });
 
   it("migrates every persisted legacy item container before validation", () => {

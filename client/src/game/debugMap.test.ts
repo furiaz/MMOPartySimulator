@@ -90,6 +90,7 @@ import {
   mapSixResourceStartData,
   mapSixSubzones,
   SLIMEWARD_CAMP_ID,
+  slimewardFloorTwoEnemyStartData,
   targetDummyPosition,
 } from "./debugMap";
 import { ENEMY_TYPES } from "./enemyArchetypes";
@@ -173,7 +174,7 @@ const wildernessMaps = [
     resources: mapSevenResourceStartData,
     labels: mapSevenSubzoneNameLabels,
     expectedSubzoneCount: 1,
-    expectedEnemyCount: 20,
+    expectedEnemyCount: 19,
     expectedResourceCount: 3,
   },
 ] as const;
@@ -190,6 +191,24 @@ const secureLandingCompleteQuestStates = {
 };
 
 describe("debug maps", () => {
+  it("authors a single Boss Warmaster and classifies the Azure Mass as a Boss", () => {
+    const warmasters = mapSevenEnemyStartData.filter(
+      (enemy) => enemy.enemyTypeId === "orc_warmaster",
+    );
+
+    expect(warmasters).toEqual([
+      expect.objectContaining({
+        position: { x: 82, y: 29 },
+        encounterBand: "boss",
+      }),
+    ]);
+    expect(
+      slimewardFloorTwoEnemyStartData.find(
+        (enemy) => enemy.enemyTypeId === "azure_mass",
+      ),
+    ).toMatchObject({ encounterBand: "boss" });
+  });
+
   it("remakes the hub as a larger port base while preserving wilderness map sizes", () => {
     expect(createDebugMap(HUB_MAP_ID)).toMatchObject({
       columns: DEBUG_MAP_COLUMNS,

@@ -2941,6 +2941,9 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
       title: enemyType?.displayName ?? archetype?.displayName ?? "Enemy",
       rows: [
         { label: "Level", value: entity.level.toString() },
+        ...(entity.encounterBand === "standard"
+          ? []
+          : [{ label: "Rank", value: encounterBandLabels[entity.encounterBand] }]),
         { label: "HP", value: `${entity.health}/${entity.maxHealth}` },
         {
           label: "Temperament",
@@ -2963,6 +2966,12 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
     ],
   };
 }
+
+const encounterBandLabels = {
+  elite: "Elite",
+  champion: "Champion",
+  boss: "Boss",
+} as const;
 
 function getCompanionDisplayName(member: Companion): string {
   const index = companionIds.indexOf(member.id);
