@@ -1,10 +1,6 @@
-import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { createEnemy, createNpc } from "./entities";
-import { isSuperiorEnemy, rollEnemyVariantForSpawn } from "./enemyVariants";
-import { clearEnemyAbilityRuntimeForEnemy } from "./enemyAbilitySystem";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
 import {
-  QUEST_DEFINITIONS,
   completeQuestObjective,
   getActiveQuest,
   getFirstIncompleteObjective,
@@ -18,21 +14,14 @@ import {
 } from "./state";
 import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
-import { isPositionInsideSubzone } from "./subzoneSystem";
 import {
-  mapFiveEnemyStartData,
-  mapFourEnemyStartData,
-  mapOneEnemyStartData,
-  mapSevenEnemyStartData,
-  mapSixEnemyStartData,
-  mapThreeEnemyStartData,
-  mapTwoEnemyStartData,
-  slimewardFloorOneEnemyStartData,
-  slimewardFloorTwoEnemyStartData,
-} from "./debugMap";
-import type { DebugMapId, Enemy, NpcEntity, Position } from "./types";
+  beginQuestAmbientEnemySuppression,
+  releaseQuestAmbientEnemySuppression,
+  updateQuestAmbientEnemySuppressionSystem,
+} from "./questAmbientEnemySuppressionSystem";
+import { isPositionInsideSubzone } from "./subzoneSystem";
+import type { NpcEntity, Position } from "./types";
 import type { QuestId, QuestObjectiveDefinition } from "./questTypes";
-import type { EnemyStartData } from "./debugMap";
 import type { SimulationTiming } from "./simulationTiming";
 
 export const QUEST_GUIDE_NPC_ID = "map-1-route-worker";
@@ -50,21 +39,6 @@ const QUEST_RESCUE_SAFE_RANGE = 8;
 const QUEST_RESCUE_COMPLETION_RANGE = 5;
 const QUEST_DEFENSE_DEFAULT_RADIUS = 14;
 export const QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS = 3_000;
-
-const ENEMY_START_DATA_BY_MAP_ID: Record<DebugMapId, EnemyStartData[]> = {
-  hub: [],
-  "hub-2": [],
-  "map-1": mapOneEnemyStartData,
-  "map-2": mapTwoEnemyStartData,
-  "map-3": mapThreeEnemyStartData,
-  "map-4": mapFourEnemyStartData,
-  "map-5": mapFiveEnemyStartData,
-  "map-6": mapSixEnemyStartData,
-  "map-7": mapSevenEnemyStartData,
-  "slimeward-camp": [],
-  "slimeward-floor-1": slimewardFloorOneEnemyStartData,
-  "slimeward-floor-2": slimewardFloorTwoEnemyStartData,
-};
 
 type ActiveObjectiveContext = {
   questId: QuestId;
@@ -134,7 +108,7 @@ export function updateQuestGuideSystem(
   timing?: SimulationTiming,
   random = Math.random,
 ): GameState {
-  let nextState = restoreDueDefenseSubzoneEnemies(
+  let nextState = updateQuestAmbientEnemySuppressionSystem(
     state,
     timing?.nowMs ?? Date.now(),
     random,
@@ -328,7 +302,11 @@ function updateDefenseObjective(
   }
 
   let nextState = startDefenseObjective(state, context);
-  nextState = suppressDefenseSubzoneEnemies(nextState, context);
+  nextState = beginQuestAmbientEnemySuppression(
+    nextState,
+    context.questId,
+    context.objective.id,
+  );
   nextState = spawnDefenseWaves(nextState, context);
   const wasCompleted = Boolean(
     nextState.quests[context.questId].objectiveProgress[context.objective.id]
@@ -342,7 +320,12 @@ function updateDefenseObjective(
   ) {
     nextState = cleanupQuestSpawnedEnemies(nextState, context);
     if (!wasCompleted) {
-      nextState = scheduleDefenseSubzoneEnemyRestore(nextState, context, nowMs);
+      nextState = releaseQuestAmbientEnemySuppression(
+        nextState,
+        context.questId,
+        context.objective.id,
+        nowMs,
+      );
     }
   }
 
@@ -375,343 +358,6 @@ function startDefenseObjective(
       },
     },
   };
-}
-
-function suppressDefenseSubzoneEnemies(
-  state: GameState,
-  context: ActiveObjectiveContext,
-): GameState {
-  if (!context.objective.targetSubzoneId) {
-    return state;
-  }
-
-  const existingSuppressedEnemies =
-    state.quests[context.questId].runtime?.suppressedSubzoneEnemiesByObjectiveId?.[
-      context.objective.id
-    ] ?? [];
-  const existingSuppressedEnemyIds = new Set(
-    existingSuppressedEnemies.map((enemy) => enemy.id),
-  );
-  const enemiesToSuppress = Object.values(state.entities).filter(
-    (entity): entity is Enemy =>
-      entity.kind === "enemy" &&
-      !entity.questSpawn &&
-      entity.subzoneId === context.objective.targetSubzoneId,
-  );
-
-  if (enemiesToSuppress.length === 0) {
-    return state;
-  }
-
-  const newSuppressedEnemies = enemiesToSuppress.filter(
-    (enemy) => !existingSuppressedEnemyIds.has(enemy.id),
-  );
-  const suppressedEnemyIds = [
-    ...new Set([
-      ...(state.quests[context.questId].runtime
-        ?.despawnedSubzoneEnemyIdsByObjectiveId?.[context.objective.id] ?? []),
-      ...enemiesToSuppress.map((enemy) => enemy.id),
-    ]),
-  ];
-  const nextState = removeEntities(
-    state,
-    enemiesToSuppress.map((enemy) => enemy.id),
-  );
-
-  return {
-    ...nextState,
-    quests: {
-      ...nextState.quests,
-      [context.questId]: {
-        ...nextState.quests[context.questId],
-        runtime: {
-          ...nextState.quests[context.questId].runtime,
-          despawnedSubzoneEnemyIdsByObjectiveId: {
-            ...nextState.quests[context.questId].runtime
-              ?.despawnedSubzoneEnemyIdsByObjectiveId,
-            [context.objective.id]: suppressedEnemyIds,
-          },
-          suppressedSubzoneEnemiesByObjectiveId: {
-            ...nextState.quests[context.questId].runtime
-              ?.suppressedSubzoneEnemiesByObjectiveId,
-            [context.objective.id]: [
-              ...existingSuppressedEnemies,
-              ...newSuppressedEnemies,
-            ],
-          },
-        },
-      },
-    },
-  };
-}
-
-function scheduleDefenseSubzoneEnemyRestore(
-  state: GameState,
-  context: ActiveObjectiveContext,
-  nowMs: number,
-): GameState {
-  return {
-    ...state,
-    quests: {
-      ...state.quests,
-      [context.questId]: {
-        ...state.quests[context.questId],
-        runtime: {
-          ...state.quests[context.questId].runtime,
-          suppressedSubzoneEnemyRestoreAtMsByObjectiveId: {
-            ...state.quests[context.questId].runtime
-              ?.suppressedSubzoneEnemyRestoreAtMsByObjectiveId,
-            [context.objective.id]:
-              nowMs + QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS,
-          },
-        },
-      },
-    },
-  };
-}
-
-function restoreDueDefenseSubzoneEnemies(
-  state: GameState,
-  nowMs: number,
-  random: () => number,
-): GameState {
-  let nextState = state;
-
-  for (const questId of Object.keys(nextState.quests) as QuestId[]) {
-    const quest = nextState.quests[questId];
-    const restoreAtByObjectiveId =
-      quest.runtime?.suppressedSubzoneEnemyRestoreAtMsByObjectiveId ?? {};
-
-    for (const objective of QUEST_DEFINITIONS[questId].objectives) {
-      if (
-        objective.type !== "defend_area" ||
-        objective.targetMapId !== nextState.currentMapId ||
-        !quest.objectiveProgress[objective.id]?.completed
-      ) {
-        continue;
-      }
-
-      const restoreAtMs = restoreAtByObjectiveId[objective.id];
-      const hasSuppressedEnemies = Boolean(
-        quest.runtime?.suppressedSubzoneEnemiesByObjectiveId?.[objective.id]
-          ?.length ||
-          quest.runtime?.despawnedSubzoneEnemyIdsByObjectiveId?.[objective.id]
-            ?.length,
-      );
-
-      if (restoreAtMs === undefined) {
-        if (hasSuppressedEnemies) {
-          nextState = scheduleDefenseSubzoneEnemyRestore(
-            nextState,
-            { questId, objective },
-            nowMs,
-          );
-        }
-        continue;
-      }
-
-      if (nowMs < restoreAtMs) {
-        continue;
-      }
-
-      nextState = restoreDefenseSubzoneEnemies(
-        nextState,
-        { questId, objective },
-        random,
-      );
-      nextState = clearDefenseSubzoneEnemyRestoreRuntime(
-        nextState,
-        questId,
-        objective.id,
-      );
-    }
-  }
-
-  return nextState;
-}
-
-function restoreDefenseSubzoneEnemies(
-  state: GameState,
-  context: ActiveObjectiveContext,
-  random: () => number,
-): GameState {
-  const suppressedEnemies =
-    state.quests[context.questId].runtime?.suppressedSubzoneEnemiesByObjectiveId?.[
-      context.objective.id
-    ] ?? [];
-  const legacySuppressedEnemyIds =
-    state.quests[context.questId].runtime?.despawnedSubzoneEnemyIdsByObjectiveId?.[
-      context.objective.id
-    ] ?? [];
-  const enemiesToRestoreById = new Map<string, Enemy>();
-
-  for (const enemy of suppressedEnemies) {
-    enemiesToRestoreById.set(enemy.id, enemy);
-  }
-
-  for (const enemyId of legacySuppressedEnemyIds) {
-    if (enemiesToRestoreById.has(enemyId)) {
-      continue;
-    }
-
-    const enemy = createEnemyFromStartData(
-      context.objective.targetMapId,
-      enemyId,
-    );
-    if (enemy) {
-      enemiesToRestoreById.set(enemy.id, enemy);
-    }
-  }
-
-  let nextState = state;
-
-  for (const enemy of enemiesToRestoreById.values()) {
-    if (nextState.entities[enemy.id]) {
-      continue;
-    }
-
-    const restoredEnemy = restoreSuppressedEnemy(
-      nextState,
-      enemy,
-      random,
-    );
-    nextState = addEntity(nextState, restoredEnemy);
-    nextState = clearEnemyRuntimeState(nextState, restoredEnemy.id);
-
-    if (isSuperiorEnemy(restoredEnemy)) {
-      nextState = appendDebugTelemetryEvent(nextState, {
-        type: "superior_enemy_spawned",
-        entityId: restoredEnemy.id,
-        currentMapId: nextState.currentMapId,
-        currentMapDisplayName: nextState.map?.displayName,
-        currentMapDebugName: nextState.map?.debugName,
-        enemyTypeId: restoredEnemy.enemyTypeId,
-        enemyArchetypeId: restoredEnemy.archetypeId,
-        enemyVariant: restoredEnemy.variant,
-        enemyPosition: restoredEnemy.position,
-        enemyLevel: restoredEnemy.level,
-        reason: "respawn",
-      });
-    }
-  }
-
-  return nextState;
-}
-
-function restoreSuppressedEnemy(
-  state: GameState,
-  enemy: Enemy,
-  random: () => number,
-): Enemy {
-  const variant = rollEnemyVariantForSpawn({
-    currentMapId: state.currentMapId,
-    map: state.map,
-    position: enemy.homePosition,
-    subzoneId: enemy.subzoneId,
-    existingEntities: state.entities,
-    random,
-  });
-  const restoredEnemy = createEnemy(
-    enemy.id,
-    enemy.homePosition,
-    enemy.aggressionMode,
-    {
-      archetypeId: enemy.archetypeId,
-      enemyTypeId: enemy.enemyTypeId,
-      level: enemy.level,
-      xpReward: enemy.xpReward,
-      attackCooldownMs: enemy.attackCooldownMs,
-      attackRange: enemy.attackRange,
-      combatBodyRadius: enemy.combatBodyRadius,
-      subzoneId: enemy.subzoneId,
-      encounterAreaId: enemy.encounterAreaId,
-      variant,
-    },
-  );
-
-  return {
-    ...restoredEnemy,
-    debugSpawn: enemy.debugSpawn,
-    roamTargetPosition: null,
-    nextRoamAt: enemy.nextRoamAt,
-  };
-}
-
-function createEnemyFromStartData(
-  mapId: DebugMapId | undefined,
-  enemyId: string,
-): Enemy | null {
-  if (!mapId) {
-    return null;
-  }
-
-  const enemyStart = ENEMY_START_DATA_BY_MAP_ID[mapId].find(
-    (candidate) => candidate.id === enemyId,
-  );
-
-  if (!enemyStart) {
-    return null;
-  }
-
-  return createEnemy(enemyStart.id, enemyStart.position, undefined, {
-    enemyTypeId: enemyStart.enemyTypeId,
-    subzoneId: enemyStart.subzoneId,
-    encounterAreaId: enemyStart.encounterAreaId,
-    variant: enemyStart.variant,
-    combatBodyRadius: enemyStart.combatBodyRadius,
-    maxHealth: enemyStart.enemyTypeId === "azure_mass" ? 900 : undefined,
-    xpReward: enemyStart.enemyTypeId === "azure_mass" ? 160 : undefined,
-  });
-}
-
-function clearDefenseSubzoneEnemyRestoreRuntime(
-  state: GameState,
-  questId: QuestId,
-  objectiveId: string,
-): GameState {
-  const quest = state.quests[questId];
-  const despawnedSubzoneEnemyIdsByObjectiveId = {
-    ...(quest.runtime?.despawnedSubzoneEnemyIdsByObjectiveId ?? {}),
-  };
-  const suppressedSubzoneEnemiesByObjectiveId = {
-    ...(quest.runtime?.suppressedSubzoneEnemiesByObjectiveId ?? {}),
-  };
-  const suppressedSubzoneEnemyRestoreAtMsByObjectiveId = {
-    ...(quest.runtime?.suppressedSubzoneEnemyRestoreAtMsByObjectiveId ?? {}),
-  };
-
-  delete despawnedSubzoneEnemyIdsByObjectiveId[objectiveId];
-  delete suppressedSubzoneEnemiesByObjectiveId[objectiveId];
-  delete suppressedSubzoneEnemyRestoreAtMsByObjectiveId[objectiveId];
-
-  return {
-    ...state,
-    quests: {
-      ...state.quests,
-      [questId]: {
-        ...quest,
-        runtime: {
-          ...quest.runtime,
-          despawnedSubzoneEnemyIdsByObjectiveId,
-          suppressedSubzoneEnemiesByObjectiveId,
-          suppressedSubzoneEnemyRestoreAtMsByObjectiveId,
-        },
-      },
-    },
-  };
-}
-
-function clearEnemyRuntimeState(state: GameState, enemyId: string): GameState {
-  const skillMarksByEnemyId = { ...(state.skillMarksByEnemyId ?? {}) };
-  const skillBindsByEnemyId = { ...(state.skillBindsByEnemyId ?? {}) };
-  delete skillMarksByEnemyId[enemyId];
-  delete skillBindsByEnemyId[enemyId];
-
-  return clearEnemyAbilityRuntimeForEnemy({
-    ...state,
-    skillMarksByEnemyId,
-    skillBindsByEnemyId,
-  }, enemyId);
 }
 
 function spawnDefenseWaves(

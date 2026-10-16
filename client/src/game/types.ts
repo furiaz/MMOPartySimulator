@@ -3057,6 +3057,7 @@ export type Enemy = LivingEntity & {
     targetPosition?: Position;
     isElite?: true;
     suppressNormalDrops?: true;
+    patronAura?: true;
   };
 };
 

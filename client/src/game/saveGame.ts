@@ -46,6 +46,10 @@ import {
 import { sanitizeInnKitchenState } from "./innKitchen";
 import { sanitizeInnUpgradesState } from "./innRoomUpgrades";
 import { sanitizeWorldDiscoveryState } from "./worldDiscovery";
+import {
+  isLegacyNightmireRouteSave,
+  restorePatronWardStateFromSave,
+} from "./patronWardSystem";
 import { sanitizePartyInventory } from "./inventory";
 import {
   getItemDefinition,
@@ -73,6 +77,7 @@ import {
   reconcileStateDerivedQuestObjectivesForQuests,
   recordEquippedItemObjectivesForQuests,
 } from "./questProgressionHooks";
+import { sanitizeQuestAmbientEnemySuppressionsAfterLoad } from "./questAmbientEnemySuppressionSystem";
 import { sanitizeProgressionForCompanion } from "./skillProgression";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import type { GameState } from "./state";
@@ -411,6 +416,10 @@ function migrateLegacyQuestEnemyIds(value: unknown): unknown {
                 quest.runtime.suppressedSubzoneEnemiesByObjectiveId,
                 idMappingByObjectiveId,
               ),
+            ambientEnemySuppressionsByGroupId:
+              remapAmbientEnemySuppressionSnapshots(
+                quest.runtime.ambientEnemySuppressionsByGroupId,
+              ),
           },
         },
       ];
@@ -476,6 +485,44 @@ function remapObjectiveEnemySnapshots(
               };
             })
           : enemies,
+      ];
+    }),
+  );
+}
+
+function remapAmbientEnemySuppressionSnapshots(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([groupId, runtime]) => {
+      if (!isRecord(runtime) || !Array.isArray(runtime.enemySnapshots)) {
+        return [groupId, runtime];
+      }
+
+      const targetMapId = getWildMapId(runtime.targetMapId);
+      const idMapping = targetMapId
+        ? getLegacyWildEnemyIdMapping(targetMapId)
+        : undefined;
+
+      return [
+        groupId,
+        idMapping
+          ? {
+              ...runtime,
+              enemySnapshots: runtime.enemySnapshots.map((enemy) => {
+                if (!isRecord(enemy) || typeof enemy.id !== "string") {
+                  return enemy;
+                }
+
+                return {
+                  ...enemy,
+                  id: idMapping[enemy.id] ?? enemy.id,
+                };
+              }),
+            }
+          : runtime,
       ];
     }),
   );
@@ -927,10 +974,27 @@ export function sanitizeGameStateForSave(
     "save_restoration",
   );
 
-  const quests = questReconciliationState.quests;
+  let quests = questReconciliationState.quests;
   guildNoticeBoard = questReconciliationState.guildNoticeBoard ?? guildNoticeBoard;
-  const map = createDebugMapForQuestState(currentMapId, quests);
-  const entities = restoreCurrentMapNpcs(savedEntities, currentMapId, quests);
+  let map = createDebugMapForQuestState(currentMapId, quests);
+  let entities = restoreCurrentMapNpcs(savedEntities, currentMapId, quests);
+  const restoredSuppressionState =
+    sanitizeQuestAmbientEnemySuppressionsAfterLoad(
+      {
+        ...questReconciliationState,
+        quests,
+        map,
+        entities,
+      },
+      now,
+    );
+  const restoredPatronWardState = restorePatronWardStateFromSave(
+    restoredSuppressionState,
+    isLegacyNightmireRouteSave(state),
+  );
+  quests = restoredPatronWardState.quests;
+  map = restoredPatronWardState.map ?? map;
+  entities = restoredPatronWardState.entities;
   const followTrailsByEntityId = Object.fromEntries(
     Object.keys(entities).map((entityId) => [entityId, []]),
   );
@@ -1011,6 +1075,7 @@ export function sanitizeGameStateForSave(
     currentMapId,
     map,
     quests,
+    teleportStatesById: restoredPatronWardState.teleportStatesById,
     activeTeleport: null,
     autoCombatOnArrivalEnabled: Boolean(state.autoCombatOnArrivalEnabled),
     autoRoute: undefined,
@@ -1129,9 +1194,10 @@ function sanitizeQuestStates(
           : shouldCompleteMissingObjective
             ? requiredCount
             : 0;
-        const completed = Boolean(savedProgress?.completed) ||
+        const completed =
+          Boolean(savedProgress?.completed) ||
           shouldCompleteMissingObjective ||
-          currentCount >= requiredCount;
+          (objective.type !== "patron_ward" && currentCount >= requiredCount);
 
         return [
           objective.id,

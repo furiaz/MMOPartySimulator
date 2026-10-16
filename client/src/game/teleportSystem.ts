@@ -49,6 +49,7 @@ import {
   clearMapTransitionRuntimeState,
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
+import { preparePatronWardStateForMapExit } from "./patronWardSystem";
 import { assignCurrentRoleBonuses } from "./roleBonus";
 import { getWorldTravelTeleportStatus } from "./worldTravelTeleports";
 import {
@@ -236,6 +237,8 @@ export function updateTeleportSystem(
   movedEntityIds = new Set<string>(),
   _nowMs = Date.now(),
 ): GameState {
+  void _nowMs;
+
   if (isAiTeleportPausedForResurrection(state)) {
     return state;
   }
@@ -439,9 +442,10 @@ function completeTeleportWithDefinition(
 ): GameState {
   const previousMapId = state.currentMapId;
   const previousMap = state.map;
+  const preparedState = preparePatronWardStateForMapExit(state);
   const sourceState = shouldResetSlimewardDungeonOnTeleport(teleport.id)
-    ? clearSlimewardDungeonRuntime(state)
-    : state;
+    ? clearSlimewardDungeonRuntime(preparedState)
+    : preparedState;
   const positionsBeforeTransition = getEntityPositions(sourceState.entities);
   const targetMap = createDebugMapForQuestState(
     teleport.targetMapId,

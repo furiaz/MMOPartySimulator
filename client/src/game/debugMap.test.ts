@@ -17,6 +17,7 @@ import {
   MAP_SEVEN_ID,
   MAP_SEVEN_TO_MAP_SIX_TELEPORTER_ID,
   MAP_SIX_ID,
+  NIGHTMIRE_BARRIER_COLLISION_CELLS,
   MAP_SIX_TO_MAP_FIVE_TELEPORTER_ID,
   MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
   MAP_THREE_ID,
@@ -93,6 +94,7 @@ import {
 } from "./debugMap";
 import { ENEMY_TYPES } from "./enemyArchetypes";
 import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
+import { NIGHTMIRE_BARRIER_CENTER } from "./patronWardState";
 import { QUEST_DEFINITIONS } from "./questSystem";
 import type { DebugMapId, GameMap, Position, ZoneSubzone } from "./types";
 
@@ -487,12 +489,26 @@ describe("debug maps", () => {
 
   it("keeps wilderness teleports and arrivals on reachable open floor", () => {
     for (const definition of Object.values(debugMapDefinitions)) {
-      const sourceMap = createReachabilityValidationMap(definition.id);
+      const sourceMap =
+        definition.id === MAP_SIX_ID
+          ? createDebugMapForQuestState(MAP_SIX_ID, {
+              the_patrons_shadow: {
+                runtime: { patronWards: { routeUnlocked: true } },
+              },
+            })
+          : createReachabilityValidationMap(definition.id);
 
       for (const teleport of definition.teleports) {
         assertOpenReachablePosition(sourceMap, teleport.position);
 
-        const targetMap = createReachabilityValidationMap(teleport.targetMapId);
+        const targetMap =
+          teleport.targetMapId === MAP_SIX_ID
+            ? createDebugMapForQuestState(MAP_SIX_ID, {
+                the_patrons_shadow: {
+                  runtime: { patronWards: { routeUnlocked: true } },
+                },
+              })
+            : createReachabilityValidationMap(teleport.targetMapId);
         for (const arrivalPosition of teleport.arrivalPositions) {
           assertOpenReachablePosition(targetMap, arrivalPosition);
         }
@@ -599,6 +615,29 @@ describe("debug maps", () => {
     expect(isNavigationCellWalkable(openMap, OLD_GROVE_PASSAGE_BLOCKER_POSITION)).toBe(true);
     expect(getNavigationDistance(closedMap, { x: 100, y: 29 }, { x: 110, y: 29 }, 80)).toBeNull();
     expect(getNavigationDistance(openMap, { x: 100, y: 29 }, { x: 110, y: 29 }, 80)).not.toBeNull();
+  });
+
+  it("blocks the Nightmire route with one shared circular barrier until the Wards unlock it", () => {
+    const closedMap = createDebugMap(MAP_SIX_ID);
+    const openMap = createDebugMapForQuestState(MAP_SIX_ID, {
+      the_patrons_shadow: {
+        runtime: { patronWards: { routeUnlocked: true } },
+      },
+    });
+    const forwardTeleport = closedMap.teleports.find(
+      (teleport) => teleport.id === MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
+    );
+
+    expect(forwardTeleport?.startsWorking).toBe(false);
+    expect(closedMap.collisionWalls).toEqual(NIGHTMIRE_BARRIER_COLLISION_CELLS);
+    expect(closedMap.collisionWalls).toContainEqual(NIGHTMIRE_BARRIER_CENTER);
+    expect(isNavigationCellWalkable(closedMap, NIGHTMIRE_BARRIER_CENTER)).toBe(
+      false,
+    );
+    expect(openMap.collisionWalls).toBeUndefined();
+    expect(isNavigationCellWalkable(openMap, NIGHTMIRE_BARRIER_CENTER)).toBe(
+      true,
+    );
   });
 
   it("keeps authored subzones, passages, encounter areas, and resource locations valid", () => {

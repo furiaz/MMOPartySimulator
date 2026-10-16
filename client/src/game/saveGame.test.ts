@@ -336,6 +336,17 @@ describe("save game serialization", () => {
               suppressedSubzoneEnemiesByObjectiveId: {
                 defend_old_grove_cache: [secondEnemy],
               },
+              ambientEnemySuppressionsByGroupId: {
+                defend_old_grove_cache: {
+                  targetMapId: MAP_TWO_ID,
+                  scope: "subzone",
+                  targetSubzoneId: "south-east",
+                  restoreDelayMs: 3_000,
+                  variantPolicy: "reroll",
+                  activeObjectiveIds: ["defend_old_grove_cache"],
+                  enemySnapshots: [firstEnemy],
+                },
+              },
             },
           },
         },
@@ -361,6 +372,11 @@ describe("save game serialization", () => {
               },
               suppressedSubzoneEnemiesByObjectiveId: {
                 defend_old_grove_cache: [{ id: secondEnemyId }],
+              },
+              ambientEnemySuppressionsByGroupId: {
+                defend_old_grove_cache: {
+                  enemySnapshots: [{ id: firstEnemyId }],
+                },
               },
             },
           },

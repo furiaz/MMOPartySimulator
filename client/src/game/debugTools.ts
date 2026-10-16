@@ -28,6 +28,7 @@ import {
   type LivestockCreatureUnlockSource,
 } from "./livestock";
 import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
+import { preparePatronWardStateForMapExit } from "./patronWardSystem";
 import {
   clearSlimewardDungeonRuntime,
   isSlimewardMapId,
@@ -1154,17 +1155,18 @@ export function debugTeleportToHub(
   state: GameState,
   targetMapId: typeof HUB_MAP_ID | typeof HUB_TWO_MAP_ID,
 ): GameState {
-  const map = createDebugMapForQuestState(targetMapId, state.quests);
+  const preparedState = preparePatronWardStateForMapExit(state);
+  const map = createDebugMapForQuestState(targetMapId, preparedState.quests);
   const startPositions =
     targetMapId === HUB_TWO_MAP_ID
       ? hubTwoCompanionStartPositions
       : hubCompanionStartPositions;
   const npcStartData =
     targetMapId === HUB_TWO_MAP_ID
-      ? getHubTwoNpcStartDataForQuestState(state.quests)
-      : getHubNpcStartDataForQuestState(state.quests);
+      ? getHubTwoNpcStartDataForQuestState(preparedState.quests)
+      : getHubNpcStartDataForQuestState(preparedState.quests);
   const entities: Record<string, GameEntity> = {};
-  const activeCompanions = getActiveCompanionsInPartyOrder(state);
+  const activeCompanions = getActiveCompanionsInPartyOrder(preparedState);
 
   for (const [index, companion] of activeCompanions.entries()) {
     const position = startPositions[index] ??
@@ -1172,9 +1174,11 @@ export function debugTeleportToHub(
 
     entities[companion.id] = {
       ...moveEntityTo(companion, position),
-      state: companion.id === state.partyLeaderId ? "idle" : "follow",
+      state: companion.id === preparedState.partyLeaderId ? "idle" : "follow",
       currentTargetId:
-        companion.id === state.partyLeaderId ? null : state.partyLeaderId,
+        companion.id === preparedState.partyLeaderId
+          ? null
+          : preparedState.partyLeaderId,
       commandPriority: "autonomous",
       defendPosition: null,
     };
@@ -1185,7 +1189,7 @@ export function debugTeleportToHub(
   }
 
   return pruneMissingEntityRuntimeState({
-    ...clearSlimewardDungeonRuntime(state),
+    ...clearSlimewardDungeonRuntime(preparedState),
     currentMapId: targetMapId,
     map,
     entities,
@@ -1233,9 +1237,10 @@ export function debugTeleportToHub(
 }
 
 export function debugTeleportToSlimewardCamp(state: GameState): GameState {
+  const preparedState = preparePatronWardStateForMapExit(state);
   const map = createDebugMap(SLIMEWARD_CAMP_ID);
   const entities: Record<string, GameEntity> = {};
-  const activeCompanions = getActiveCompanionsInPartyOrder(state);
+  const activeCompanions = getActiveCompanionsInPartyOrder(preparedState);
 
   for (const [index, companion] of activeCompanions.entries()) {
     const position = slimewardCampArrivalPositions[index] ??
@@ -1243,9 +1248,11 @@ export function debugTeleportToSlimewardCamp(state: GameState): GameState {
 
     entities[companion.id] = {
       ...moveEntityTo(companion, position),
-      state: companion.id === state.partyLeaderId ? "idle" : "follow",
+      state: companion.id === preparedState.partyLeaderId ? "idle" : "follow",
       currentTargetId:
-        companion.id === state.partyLeaderId ? null : state.partyLeaderId,
+        companion.id === preparedState.partyLeaderId
+          ? null
+          : preparedState.partyLeaderId,
       commandPriority: "autonomous",
       defendPosition: null,
     };
@@ -1256,7 +1263,7 @@ export function debugTeleportToSlimewardCamp(state: GameState): GameState {
   }
 
   return pruneMissingEntityRuntimeState({
-    ...clearSlimewardDungeonRuntime(state),
+    ...clearSlimewardDungeonRuntime(preparedState),
     currentMapId: SLIMEWARD_CAMP_ID,
     map,
     entities,

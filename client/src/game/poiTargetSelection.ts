@@ -33,6 +33,7 @@ import {
 import { isTeleportWorking } from "./teleportState";
 import { getSubzoneAtPosition, isPositionInsideSubzone } from "./subzoneSystem";
 import { QUEST_REPAIR_RANGE } from "./questGuideSystem";
+import { getActiveQuestDefenseFocus } from "./questDefenseFocus";
 import { getNextWorldTravelTeleport } from "./worldTravelRouting";
 import {
   getCurrentPartyGatherResourceTargetId,
@@ -165,6 +166,12 @@ export function selectAutoCombatPoiTarget(
   gathererReservations: GathererResourceReservations,
 ): PoiSelectionResult {
   const candidates = buildPoiCandidates(state, gathererReservations);
+  const defenseFocus = getActiveQuestDefenseFocus(state);
+
+  if (defenseFocus) {
+    return selectActiveDefenseTarget(state, candidates, defenseFocus);
+  }
+
   const activeThreatSelection = selectAutoCombatActiveThreatTarget(
     state,
     candidates,
@@ -195,6 +202,79 @@ export function selectAutoCombatPoiTarget(
     consideredTargets: getPoiConsiderations(scoredTargets, selectedTarget),
     skippedReasons,
   };
+}
+
+function selectActiveDefenseTarget(
+  state: GameState,
+  candidates: PointOfInterest[],
+  defenseFocus: NonNullable<ReturnType<typeof getActiveQuestDefenseFocus>>,
+): PoiSelectionResult {
+  const defenderIds = new Set(defenseFocus.defenderIds);
+  const skippedReasons: Record<string, string> = {};
+  const defenderOptions: PoiTargetOption[] = candidates
+    .filter(
+      (poi) =>
+        poi.category === "combat" &&
+        Boolean(poi.targetEntityId && defenderIds.has(poi.targetEntityId)),
+    )
+    .map((poi) => ({
+      poi,
+      priority: 1,
+      scoreBase: 0,
+      reason: "active quest defense enemy",
+      questId: defenseFocus.questId,
+      objectiveId: defenseFocus.objectiveId,
+    }));
+  const scoredDefenders = selectScoredPoiTargets(
+    state,
+    defenderOptions,
+    skippedReasons,
+  );
+  const selectedDefender = selectStablePoiTarget(state, scoredDefenders);
+
+  if (selectedDefender) {
+    return {
+      localTarget: selectedDefender.localTarget,
+      consideredTargets: getPoiConsiderations(
+        scoredDefenders,
+        selectedDefender,
+      ),
+      skippedReasons,
+    };
+  }
+
+  const anchorTarget: LocalPoiTarget = {
+    poiId: `quest-defense-anchor:${defenseFocus.questId}:${defenseFocus.objectiveId}`,
+    category: "event",
+    mapId: state.currentMapId ?? MAP_ONE_ID,
+    position: { ...defenseFocus.anchorPosition },
+    interactionRange: 3,
+    questId: defenseFocus.questId,
+    objectiveId: defenseFocus.objectiveId,
+    reason: "active quest defense anchor",
+  };
+
+  return {
+    localTarget: anchorTarget,
+    consideredTargets: [
+      {
+        ...anchorTarget,
+        isSelected: true,
+        pathDistance: getDistanceToDefenseAnchor(state, anchorTarget.position),
+        priority: 2,
+      },
+    ],
+    skippedReasons,
+  };
+}
+
+function getDistanceToDefenseAnchor(
+  state: GameState,
+  anchorPosition: Position,
+): number {
+  const leader = getPartyLeader(state);
+
+  return leader ? getDistance(leader.position, anchorPosition) : 0;
 }
 
 function selectAutoCombatActiveThreatTarget(

@@ -19,6 +19,7 @@ import {
   getPartyMovementTargetPosition,
 } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
+import { shouldUseAutomaticQuestDefenseFocus } from "./questDefenseFocus";
 import type {
   Companion,
   Enemy,
@@ -96,6 +97,10 @@ function getRoleTarget(
   }
 
   if (partyMember.role === "gatherer") {
+    if (shouldUseAutomaticQuestDefenseFocus(state)) {
+      return leader ? getFollowTarget(partyMember, leader) : null;
+    }
+
     if (leader && !isWithinGathererLeaderBoundary(state, partyMember, leader)) {
       return getFollowTarget(partyMember, leader);
     }

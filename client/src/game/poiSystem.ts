@@ -39,6 +39,10 @@ import {
   setPartyIntent,
 } from "./partyIntentState";
 import {
+  clearAutomaticResourceWorkForQuestDefense,
+  getActiveQuestDefenseFocus,
+} from "./questDefenseFocus";
+import {
   QUEST_DEFINITIONS,
   QUEST_ORDER,
   completeQuestObjective,
@@ -85,10 +89,11 @@ export function updatePoiSystem(
   state: GameState,
   resourceWorkContext?: ResourceWorkContext,
 ): GameState {
+  const focusedState = clearAutomaticResourceWorkForQuestDefense(state);
   const markerInteractionState =
-    state.activeTeleport || isAutoRoutePaused(state)
-      ? state
-      : updateReachedQuestMarkerInteractions(state);
+    focusedState.activeTeleport || isAutoRoutePaused(focusedState)
+      ? focusedState
+      : updateReachedQuestMarkerInteractions(focusedState);
 
   if (
     (!markerInteractionState.autoModeEnabled &&
@@ -276,6 +281,20 @@ function canReusePoiSelection(
   gathererReservations: GathererResourceReservations,
 ): state is GameState & { localPoiTarget: LocalPoiTarget } {
   if (!state.localPoiTarget) {
+    return false;
+  }
+
+  const defenseFocus = getActiveQuestDefenseFocus(state);
+
+  if (
+    defenseFocus &&
+    (state.localPoiTarget.category === "resource" ||
+      (state.localPoiTarget.category === "combat" &&
+        (!state.localPoiTarget.targetEntityId ||
+          !defenseFocus.defenderIds.includes(
+            state.localPoiTarget.targetEntityId,
+          ))))
+  ) {
     return false;
   }
 

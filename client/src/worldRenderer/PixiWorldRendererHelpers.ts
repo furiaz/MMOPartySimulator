@@ -157,7 +157,15 @@ export type NpcSpeechBubbleLayout = {
   tailPointY: number;
 };
 
+export type ViewportRect = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
 export type NpcSpeechBubbleLayoutInput = {
+  avoidanceRects?: readonly ViewportRect[];
   bubbleHeight: number;
   bubbleWidth: number;
   renderHeight: number;
@@ -168,6 +176,7 @@ export type NpcSpeechBubbleLayoutInput = {
 };
 
 export function getNpcSpeechBubbleLayout({
+  avoidanceRects = [],
   bubbleHeight,
   bubbleWidth,
   renderHeight,
@@ -181,22 +190,110 @@ export function getNpcSpeechBubbleLayout({
   const tailHeight = 8;
   const tailHalfWidth = 7;
   const tailInset = tailHalfWidth + 4;
+  const avoidanceGap = 8;
   const maxBubbleX = Math.max(margin, renderWidth - margin - bubbleWidth);
-  const bubbleX = clamp(
+  const centeredBubbleX = clamp(
     speakerX - bubbleWidth / 2,
     margin,
     maxBubbleX,
   );
   const preferredAboveY =
     speakerTopY - speakerGap - tailHeight - bubbleHeight;
-  const placement = preferredAboveY >= margin ? "above" : "below";
-  const preferredBubbleY =
-    placement === "above"
-      ? preferredAboveY
-      : speakerBottomY + speakerGap + tailHeight;
   const maxBubbleY = Math.max(margin, renderHeight - margin - bubbleHeight);
-  const bubbleY = clamp(preferredBubbleY, margin, maxBubbleY);
-  const tailPointX = clamp(
+  const preferredBelowY = speakerBottomY + speakerGap + tailHeight;
+  const horizontalCandidates = getSpeechBubbleHorizontalCandidates({
+    avoidanceGap,
+    avoidanceRects,
+    bubbleWidth,
+    centeredBubbleX,
+    margin,
+    maxBubbleX,
+  });
+  const placements: Array<{
+    bubbleX: number;
+    bubbleY: number;
+    placement: "above" | "below";
+  }> = [];
+
+  if (preferredAboveY >= margin) {
+    for (const bubbleX of horizontalCandidates) {
+      placements.push({
+        bubbleX,
+        bubbleY: clamp(preferredAboveY, margin, maxBubbleY),
+        placement: "above",
+      });
+    }
+  }
+
+  for (const bubbleX of horizontalCandidates) {
+    placements.push({
+      bubbleX,
+      bubbleY: clamp(preferredBelowY, margin, maxBubbleY),
+      placement: "below",
+    });
+  }
+
+  if (placements.length === 0) {
+    placements.push({
+      bubbleX: centeredBubbleX,
+      bubbleY: clamp(preferredAboveY, margin, maxBubbleY),
+      placement: "above",
+    });
+  }
+
+  const paddedAvoidanceRects = avoidanceRects.map((rect) => ({
+    height: Math.max(0, rect.height) + avoidanceGap * 2,
+    width: Math.max(0, rect.width) + avoidanceGap * 2,
+    x: rect.x - avoidanceGap,
+    y: rect.y - avoidanceGap,
+  }));
+  const selectedPlacement =
+    placements.find(
+      (candidate) =>
+        !paddedAvoidanceRects.some((rect) =>
+          doViewportRectsOverlap(
+            {
+              x: candidate.bubbleX,
+              y: candidate.bubbleY,
+              width: bubbleWidth,
+              height: bubbleHeight,
+            },
+            rect,
+          ),
+        ),
+    ) ??
+    [...placements].sort((first, second) => {
+      const firstOverlap = getTotalViewportOverlapArea(
+        {
+          x: first.bubbleX,
+          y: first.bubbleY,
+          width: bubbleWidth,
+          height: bubbleHeight,
+        },
+        paddedAvoidanceRects,
+      );
+      const secondOverlap = getTotalViewportOverlapArea(
+        {
+          x: second.bubbleX,
+          y: second.bubbleY,
+          width: bubbleWidth,
+          height: bubbleHeight,
+        },
+        paddedAvoidanceRects,
+      );
+
+      return (
+        firstOverlap - secondOverlap ||
+        Number(first.placement === "below") -
+          Number(second.placement === "below") ||
+        Math.abs(first.bubbleX - centeredBubbleX) -
+          Math.abs(second.bubbleX - centeredBubbleX)
+      );
+    })[0];
+  const bubbleX = selectedPlacement.bubbleX;
+  const bubbleY = selectedPlacement.bubbleY;
+  const placement = selectedPlacement.placement;
+  const tailBaseCenterX = clamp(
     speakerX,
     bubbleX + tailInset,
     bubbleX + bubbleWidth - tailInset,
@@ -207,13 +304,87 @@ export function getNpcSpeechBubbleLayout({
     bubbleX,
     bubbleY,
     placement,
-    tailBaseLeftX: tailPointX - tailHalfWidth,
-    tailBaseRightX: tailPointX + tailHalfWidth,
+    tailBaseLeftX: tailBaseCenterX - tailHalfWidth,
+    tailBaseRightX: tailBaseCenterX + tailHalfWidth,
     tailBaseY,
-    tailPointX,
+    tailPointX: clamp(speakerX, margin, renderWidth - margin),
     tailPointY:
       placement === "above" ? tailBaseY + tailHeight : tailBaseY - tailHeight,
   };
+}
+
+function getSpeechBubbleHorizontalCandidates({
+  avoidanceGap,
+  avoidanceRects,
+  bubbleWidth,
+  centeredBubbleX,
+  margin,
+  maxBubbleX,
+}: {
+  avoidanceGap: number;
+  avoidanceRects: readonly ViewportRect[];
+  bubbleWidth: number;
+  centeredBubbleX: number;
+  margin: number;
+  maxBubbleX: number;
+}): number[] {
+  const candidates = [
+    centeredBubbleX,
+    ...avoidanceRects.flatMap((rect) => [
+      rect.x - avoidanceGap - bubbleWidth,
+      rect.x + rect.width + avoidanceGap,
+    ]),
+  ]
+    .map((candidate) => clamp(candidate, margin, maxBubbleX))
+    .filter(
+      (candidate, index, allCandidates) =>
+        allCandidates.findIndex((value) => Math.abs(value - candidate) < 0.01) ===
+        index,
+    );
+
+  return [
+    candidates[0] ?? centeredBubbleX,
+    ...candidates
+      .slice(1)
+      .sort(
+        (first, second) =>
+          Math.abs(first - centeredBubbleX) -
+            Math.abs(second - centeredBubbleX) ||
+          first - second,
+      ),
+  ];
+}
+
+function doViewportRectsOverlap(
+  first: ViewportRect,
+  second: ViewportRect,
+): boolean {
+  return (
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y
+  );
+}
+
+function getTotalViewportOverlapArea(
+  target: ViewportRect,
+  avoidanceRects: readonly ViewportRect[],
+): number {
+  return avoidanceRects.reduce((total, rect) => {
+    const width = Math.max(
+      0,
+      Math.min(target.x + target.width, rect.x + rect.width) -
+        Math.max(target.x, rect.x),
+    );
+    const height = Math.max(
+      0,
+      Math.min(target.y + target.height, rect.y + rect.height) -
+        Math.max(target.y, rect.y),
+    );
+
+    return total + width * height;
+  }, 0);
 }
 
 export type RendererFrameSchedulerOptions = {

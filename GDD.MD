@@ -1601,6 +1601,22 @@ Current prototype quests:
   - Training Sword variants and offhand-only shields, quivers, talismans, and daggers do not satisfy the weapon objective
   - The equipment objective remains complete after it is first satisfied
   - Rewards: 500 Crowns and 1800 character XP
+  - Unlocks: Into the Briar Burrows
+
+- Into the Briar Burrows
+  - Quest id: into_the_briar_burrows
+  - Objectives progress in parallel: earn 300 direct enemy kill credits in Briar Burrows, own one Tin Crawler Hatchling, and have at least 3 active party companions
+  - Existing Tin Crawler ownership and active-party size are recognized immediately; resting and Field Team companions do not count toward the party-size objective
+  - The Hatchling is not consumed and retains the existing first/second/further discovery chances of 10%/5%/1%
+  - Rewards: 750 Crowns and 2800 character XP
+  - Unlocks: The Patron's Shadow
+
+- The Patron's Shadow
+  - Quest id: the_patrons_shadow
+  - Objectives progress in parallel: charge and break the Night Bat, Elder Mossling, and Cinder Wisp Patron Wards, and own one Elder Mossling Livestock creature
+  - Each Ward requires 100 matching Nightmire Canopy enemy credits before it can be manually activated; ambient Superior enemies grant 2 credits and quest-spawned Ward defenders are always normal variants
+  - Ward defenses may be completed in any order and use waves of 3+3 Night Bats, 4+4 Elder Mosslings, and 3+3+4 Cinder Wisps respectively
+  - Rewards: 1000 Crowns and 4000 character XP
 
 Quest definitions own their quest-giver map. Quest Givers in Harbor Union Bastion and Forward Bastion can accept their available quests and turn in their ready quests from anywhere in the matching hub while that Quest Giver is present.
 
@@ -1610,12 +1626,22 @@ The Class Mentor may act as the current prototype quest source for The Azure Tri
 
 `Break the Ash Camp` counts only resource quantities successfully added to inventory from `map-4` / `ash-goblin-encampment`; failed full-inventory collection does not progress the quest. A generic gather objective may omit a resource type to match any supported resource while retaining its map and subzone restrictions.
 
+`Into the Briar Burrows` uses state-derived Livestock ownership and active-party-size objectives. Incomplete state-derived objectives reconcile on quest acceptance, the matching roster or Livestock action, and save restoration; once completed, they remain complete.
+
+`The Patron's Shadow` places three manually activated Wards around the Nightmire Canopy route to Orc Warcamp. Only one Ward defense can be active at a time. Starting a defense removes all ambient Nightmire enemies and leaves only the matching quest defenders. Failed, abandoned, wiped, or interrupted defenses reset to charged-and-ready without requiring another 100 credits. Ambient enemies return at full health near their authored homes 2 seconds after the defense ends unless another Ward begins during that breathing period.
+
+During an active quest defense, Auto Combat prioritizes that encounter's living defenders and holds at the defense anchor between waves. It does not select resource POIs, and autonomous Gatherer-role companions rejoin the party instead of starting or continuing autonomous gathering. Manual party gathering and direct companion gathering commands remain allowed and may still cause the existing retreat/reset behavior. Normal resource targeting resumes as soon as the defense completes or resets; the ambient-enemy restoration delay does not extend this focus.
+
+Completing the third Ward unlocks the Orc Warcamp route before quest turn-in. The dark-green collision barrier around the teleporter fades, and an untargetable Orc Warmaster scene actor says `You have drawn the Patron's gaze. Come, then.`, remains visible for 3 seconds, then fades through the portal. Existing saves that had already reached Orc Warcamp preserve that access without replaying the barrier scene.
+
 Current lightweight NPC speech bubble behavior:
 
 - interacting with a supported character NPC may show one short-lived, non-branching speech bubble near that NPC; functional hub NPCs use current-hub availability, while excluded NPCs still require the party to reach their local interaction range
 - service NPC speech may provide a short role tip while the existing service UI opens normally
 - Quest Giver and Class Mentor speech may reflect ready, available, or active quest state through authored hints
 - supported dog NPCs may show a short bark without opening a service panel
+- world speech bubbles prefer centered-above placement, shift horizontally around registered HUD regions, fall below the speaker when needed, and remain clamped inside the usable world viewport; their tails continue to point toward the speaker
+- the Orc Warmaster Ward finale uses the same HUD-aware speech placement so its sentence remains readable beside the minimap and coordinate panel
 - speech is presentation-only, does not pause simulation, does not persist in saves, and does not change quest or NPC behavior
 - Bank Chests, dungeon chests, and temporary quest-objective NPCs do not use this speech presentation
 - this does not implement branching dialogue, choices, conversation history, relationships, cutscenes, or a full dialogue system
@@ -1634,8 +1660,10 @@ Current prototype quest guide behavior:
 - repair objectives can be progressed by a nearby party member or quest guide NPC
 - repair progress pauses if the repair actor is targeted by an enemy
 - defend objectives can spawn quest enemies during repair progress
-- defend objectives may temporarily suppress normal enemies in the objective subzone, including living and defeated normal enemies, so the defense encounter can use quest-spawned attackers cleanly
-- normal enemies suppressed for a defend objective restore together 3 seconds after that defense objective completes
+- quest objectives may data-drive ambient-enemy suppression for a map or subzone, including living, defeated, respawning, normal, and Superior ambient enemies while leaving target dummies and quest-spawned enemies untouched
+- suppression groups allow consecutive objectives to share captured enemies and cancel a pending restoration without briefly repopulating the area
+- suppressed enemies restore together after the objective's configured delay, at full health and near safe authored home positions; each objective chooses whether original variants are preserved or rerolled
+- the existing field-cache and Wolf Causeway defenses use subzone suppression, a 3-second delay, and variant rerolls; the Patron Wards share map-wide suppression, a 2-second delay, and preserved variants
 - living quest-spawned defense enemies are cleaned up when the defense objective completes
 - defeat elite objectives can spawn an aggressive quest enemy
 - unlock route objectives complete the associated route step
@@ -2605,6 +2633,7 @@ Current non-working starter routes:
 
 - `map-1` -> `map-2`
 - `map-2` -> `map-3`
+- `map-6` -> `map-7` until all three Patron Wards have been completed, except for legacy saves that already reached map-7
 - `hub-2` north route placeholder
 - `hub-2` east route placeholder
 - `slimeward-camp` broken exit placeholder
@@ -2645,6 +2674,8 @@ Current post-Hub-2 wilderness structure:
 - Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12. Ember Imps use the telegraphed reusable Fire Bolt before returning to their normal ranged basic attacks.
 - Briar Burrows contains Tin Crawler level 13, Briar Wolf level 15, and Mire Spider level 15.
 - Nightmire Canopy contains Night Bat level 16, Elder Mossling level 17, and Cinder Wisp level 18.
+- Nightmire Canopy's three Patron Wards reuse the Bat roost tree, Elder Moss stump, and Cinder-veined stone landmarks near the Orc Warcamp teleporter. Uncompleted Wards and their quest defenders show the looping dark-green Orc aura as a narrative marker rather than a combat bonus.
+- The Orc Warcamp teleporter is covered by a radius-5 dark-green barrier until the third Ward is completed; its visual circle and collision use the same authored geometry, and the barrier is omitted for legacy-preserved access.
 - Orc Warcamp contains Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, and Orc Warmaster level 20.
 
 Current Slimeward dungeon prototype rooms/subzones are:
