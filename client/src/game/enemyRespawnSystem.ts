@@ -124,6 +124,7 @@ function respawnEnemy(
       combatBodyRadius: enemy.combatBodyRadius,
       subzoneId: enemy.subzoneId,
       encounterAreaId: enemy.encounterAreaId,
+      encounterBand: enemy.encounterBand,
       variant,
     },
   );

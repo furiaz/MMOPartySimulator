@@ -12,6 +12,9 @@ import {
   MAP_FOUR_ID,
   MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
   MAP_ONE_ID,
+  MAP_SEVEN_ID,
+  MAP_SIX_ID,
+  MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
   SLIMEWARD_CAMP_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   SLIMEWARD_FLOOR_ONE_TO_CAMP_TELEPORTER_ID,
@@ -29,6 +32,30 @@ import { updateTeleportSystem } from "./teleportSystem";
 import type { ActiveTeleport } from "./types";
 
 describe("teleport system", () => {
+  it("reconstructs the authored Orc Warmaster as a Boss", () => {
+    const state = createTeleportReadyState(
+      MAP_SIX_ID,
+      MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
+    );
+
+    const nextState = updateTeleportSystem(state);
+    const warmaster = nextState.entities["zone-7-orc-warmaster-01"];
+
+    expect(nextState.currentMapId).toBe(MAP_SEVEN_ID);
+    expect(warmaster).toMatchObject({
+      kind: "enemy",
+      enemyTypeId: "orc_warmaster",
+      encounterBand: "boss",
+      position: { x: 82, y: 29 },
+    });
+    expect(
+      Object.values(nextState.entities).filter(
+        (entity) =>
+          entity.kind === "enemy" && entity.enemyTypeId === "orc_warmaster",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("does not create obsolete hub departure food warnings", () => {
     const nowMs = 12345;
     const state = createHubTeleportReadyState();

@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { createResource, gatherResource } from "./entities";
+import { createEnemy, createResource, gatherResource } from "./entities";
+
+describe("enemy encounter bands", () => {
+  it("defaults enemies to Standard and accepts each non-standard band", () => {
+    expect(createEnemy("standard", { x: 0, y: 0 }).encounterBand).toBe(
+      "standard",
+    );
+    expect(
+      createEnemy("elite", { x: 0, y: 0 }, undefined, {
+        encounterBand: "elite",
+      }).encounterBand,
+    ).toBe("elite");
+    expect(
+      createEnemy("champion", { x: 0, y: 0 }, undefined, {
+        encounterBand: "champion",
+      }).encounterBand,
+    ).toBe("champion");
+    expect(
+      createEnemy("boss", { x: 0, y: 0 }, undefined, {
+        encounterBand: "boss",
+      }).encounterBand,
+    ).toBe("boss");
+  });
+});
 
 describe("resource depletion", () => {
   it("creates zero-quantity resources as depleted with zero durability", () => {

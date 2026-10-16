@@ -1,6 +1,7 @@
 import type {
   DebugMapId,
   DebugTeleportPoint,
+  EnemyEncounterBand,
   EnemyVariant,
   EnemyTypeId,
   GameMap,
@@ -1126,10 +1127,9 @@ const mapSevenProgressionEnemyStartData: WildZoneEnemyStartData[] = [
   { position: { x: 80, y: 15 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
   { position: { x: 89, y: 11 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
   { position: { x: 99, y: 19 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { position: { x: 82, y: 29 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
+  { position: { x: 82, y: 29 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25, encounterBand: "boss" },
   { position: { x: 93, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
   { position: { x: 101, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { position: { x: 88, y: 22 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
   { position: { x: 96, y: 24 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
 ];
 
@@ -1282,7 +1282,7 @@ export const slimewardFloorTwoEnemyStartData: EnemyStartData[] = [
   { id: "slimeward-f2-r4-3", position: { x: 102, y: 22 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
   { id: "slimeward-f2-r4-4", position: { x: 94, y: 25 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
   { id: "slimeward-f2-r4-5", position: { x: 104, y: 25 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
-  { id: SLIMEWARD_BOSS_ID, position: { x: 132, y: 22 }, enemyTypeId: "azure_mass", subzoneId: "f2-boss-room", encounterAreaId: "f2-boss-pack" },
+  { id: SLIMEWARD_BOSS_ID, position: { x: 132, y: 22 }, enemyTypeId: "azure_mass", subzoneId: "f2-boss-room", encounterAreaId: "f2-boss-pack", encounterBand: "boss" },
 ];
 
 export function getEnemyStartDataForMap(
@@ -1365,6 +1365,7 @@ export type EnemyStartData = {
   enemyTypeId: EnemyTypeId;
   subzoneId: string;
   encounterAreaId: string;
+  encounterBand?: EnemyEncounterBand;
   variant?: EnemyVariant;
   combatBodyRadius?: number;
 };

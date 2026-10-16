@@ -2402,6 +2402,16 @@ Ability handlers should delegate to existing damage, projectile, status-effect, 
 
 `enemyArchetypes.ts` owns lightweight prototype enemy archetype defaults and enemy type setup data.
 
+### Encounter Bands
+
+Encounter bands belong to individual authored enemy spawns, not enemy types or archetypes. `EnemyStartData.encounterBand` accepts `standard`, `elite`, `champion`, or `boss`; missing authored values resolve to `standard` when an enemy is created. Runtime `Enemy.encounterBand` carries the resolved value through map reconstruction and respawn. Respawn preserves the current enemy's band.
+
+Encounter bands are independent of the optional `superior` enemy variant. Superior spawning may strengthen a Standard spawn without changing its band. Bands currently provide classification and hover inspection only; they do not alter combat stats, AI, rewards, drops, or quest behavior. The React enemy hover tooltip shows Elite, Champion, or Boss and omits the row for Standard enemies. World nameplates remain unchanged.
+
+Save sanitation matches current-map enemies against authored spawn IDs and uses the authored band when available. For dynamic or otherwise unmatched enemies, it preserves a valid saved band and defaults missing or invalid values to `standard`. These optional fields require no save-version migration.
+
+The Azure Mass and the retained Orc Warmaster spawn are authored as Bosses. Orc Warcamp has one Orc Warmaster spawn. Boss design is expected to align with tier-boundary challenges; this is guidance for content authoring, not a runtime scaling rule.
+
 Current enemy archetype ids are:
 
 ```ts

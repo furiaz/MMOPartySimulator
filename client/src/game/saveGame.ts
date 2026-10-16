@@ -84,6 +84,7 @@ import type { GameState } from "./state";
 import type {
   Companion,
   DebugMapId,
+  EnemyEncounterBand,
   GameEntity,
   InventorySlot,
   ItemId,
@@ -904,8 +905,21 @@ export function sanitizeGameStateForSave(
     state.quests[GUILD_BOARD_ONBOARDING_QUEST_ID] ||
       state.quests[ASH_GOBLIN_MAIN_QUEST_ID],
   );
+  const authoredEncounterBandsByEnemyId = new Map<string, EnemyEncounterBand>(
+    getEnemyStartDataForMap(currentMapId).map((enemyStart) => [
+      enemyStart.id,
+      enemyStart.encounterBand ?? "standard",
+    ]),
+  );
   const savedEntities = Object.fromEntries(
-    Object.entries(state.entities).map(([id, entity]) => [id, sanitizeEntityForSave(entity, state.partyLeaderId)]),
+    Object.entries(state.entities).map(([id, entity]) => [
+      id,
+      sanitizeEntityForSave(
+        entity,
+        state.partyLeaderId,
+        authoredEncounterBandsByEnemyId,
+      ),
+    ]),
   );
   const restingCompanionsById = sanitizeRestingCompanionsForSave(
     state.restingCompanionsById,
@@ -1543,7 +1557,11 @@ function sanitizeNonNegativeNumber(value: unknown): number {
     : 0;
 }
 
-function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity {
+function sanitizeEntityForSave(
+  entity: GameEntity,
+  leaderId: string,
+  authoredEncounterBandsByEnemyId: ReadonlyMap<string, EnemyEncounterBand>,
+): GameEntity {
   if (entity.kind === "companion") {
     const isLeader = entity.id === leaderId;
 
@@ -1565,14 +1583,31 @@ function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity
   }
 
   if (entity.kind === "enemy") {
+    const authoredEncounterBand = authoredEncounterBandsByEnemyId.get(entity.id);
+    const encounterBand =
+      authoredEncounterBand ??
+      (isEnemyEncounterBand(entity.encounterBand)
+        ? entity.encounterBand
+        : "standard");
+
     return {
       ...entity,
+      encounterBand,
       state: entity.state === "dead" ? "dead" : "idle",
       currentTargetId: null,
     };
   }
 
   return entity;
+}
+
+function isEnemyEncounterBand(value: unknown): value is EnemyEncounterBand {
+  return (
+    value === "standard" ||
+    value === "elite" ||
+    value === "champion" ||
+    value === "boss"
+  );
 }
 
 function restoreCurrentMapNpcs(
