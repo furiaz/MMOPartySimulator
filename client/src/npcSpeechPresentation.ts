@@ -103,6 +103,14 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
     "Tin Crawlers sometimes leave a hatchling behind. Find one for the Livestock keeper.",
   assemble_three_companions:
     "The Guild & Inn can help you assemble three active companions.",
+  break_night_bat_ward:
+    "Defeat Night Bats in Nightmire Canopy, then break their Patron Ward.",
+  break_elder_mossling_ward:
+    "Defeat Elder Mosslings in Nightmire Canopy, then break their Patron Ward.",
+  break_cinder_wisp_ward:
+    "Defeat Cinder Wisps in Nightmire Canopy, then break their Patron Ward.",
+  find_elder_mossling:
+    "Find an Elder Mossling for the Livestock keeper while you search Nightmire Canopy.",
 };
 
 const genericGreetings = ["Welcome.", "Hello.", "What’s up, dood?"] as const;

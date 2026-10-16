@@ -507,13 +507,29 @@ export function getObjectiveLabel(
   }
 
   if (objective.type === "own_livestock_creature") {
-    return objective.livestockCreatureId === "tin_crawler"
-      ? "Find Tin Crawler Hatchling"
+    if (objective.livestockCreatureId === "tin_crawler") {
+      return "Find Tin Crawler Hatchling";
+    }
+
+    return objective.livestockCreatureId === "elder_mossling"
+      ? "Find Elder Mossling"
       : "Find Livestock Creature";
   }
 
   if (objective.type === "active_party_member_count") {
     return `Have ${requiredCount} Active Companions`;
+  }
+
+  if (objective.type === "patron_ward") {
+    if (objective.patronWardId === "night_bat_ward") {
+      return "Break the Night Bat Ward";
+    }
+
+    if (objective.patronWardId === "elder_mossling_ward") {
+      return "Break the Elder Mossling Ward";
+    }
+
+    return "Break the Cinder Wisp Ward";
   }
 
   if (objective.type === "equip_item" || objective.type === "equip_flask") {

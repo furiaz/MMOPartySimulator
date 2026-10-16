@@ -50,6 +50,18 @@ export function recordEnemyDefeatedForQuests(
     getDirectEnemyKillCredit(defeatedEnemy),
   );
 
+  if (!defeatedEnemy.questSpawn) {
+    nextState = updateMatchingQuestObjectives(
+      nextState,
+      (objective) =>
+        objective.type === "patron_ward" &&
+        objective.enemyMapId === mapId &&
+        matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) &&
+        matchesOptionalEnemyType(objective, defeatedEnemy.enemyTypeId),
+      getDirectEnemyKillCredit(defeatedEnemy),
+    );
+  }
+
   nextState = recordEnemyQuestDropObjectives(
     nextState,
     defeatedEnemy,
@@ -209,7 +221,9 @@ export function completeQuestObjective(
     (candidate) => candidate.id === objectiveId,
   );
 
-  return objective ? updateObjectiveProgress(state, questId, objective, 1) : state;
+  return objective
+    ? updateObjectiveProgress(state, questId, objective, 1, true)
+    : state;
 }
 
 export function recordEquippedItemObjectivesForQuests(
@@ -684,6 +698,7 @@ function updateObjectiveProgress(
   questId: QuestId,
   objective: QuestObjectiveDefinition,
   amount: number,
+  forceComplete = false,
 ): GameState {
   const quest = state.quests[questId];
   const progress = quest.objectiveProgress[objective.id];
@@ -694,7 +709,10 @@ function updateObjectiveProgress(
   }
 
   const currentCount = Math.min(requiredCount, progress.currentCount + amount);
-  const completed = currentCount >= requiredCount;
+  const completed =
+    objective.type === "patron_ward"
+      ? forceComplete && currentCount >= requiredCount
+      : currentCount >= requiredCount;
   let nextState = appendDebugTelemetryEvent(
     {
       ...state,

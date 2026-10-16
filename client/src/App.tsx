@@ -67,7 +67,10 @@ import { getQuestEntityIndicators } from "./questEntityIndicators";
 import { QuestTrackerPanel } from "./QuestTrackerPanel";
 import { BankPanel } from "./BankPanel";
 import { MerchantSellPanel } from "./MerchantSellPanel";
-import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
+import type {
+  PixiRendererPerformanceSample,
+  ViewportRect,
+} from "./worldRenderer/PixiWorldRendererHelpers";
 import {
   normalizeBackgroundMusicPreferences,
   readBackgroundMusicPreferences,
@@ -166,6 +169,7 @@ import {
   finishReadyQuestsForQuestGiver,
   createSavedGame,
   getPartyLeader,
+  getPatronWardPresentationState,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
@@ -175,6 +179,7 @@ import {
   hasQuestGiverWork,
   issueCompanionDirectCommand,
   issuePartyOrder,
+  requestPatronWardActivation,
   isActiveResource,
   isMerchantUnlockedForQuests,
   isMerchantFirstAidPurchaseRequired,
@@ -321,6 +326,8 @@ import {
   type NpcEntity,
   type OfflineFarmingSummary,
   type PartyMemberRole,
+  type PatronWardId,
+  type PatronWardPresentationState,
   type PrimaryStatId,
   type PoiConsideration,
   type Position,
@@ -1753,6 +1760,66 @@ function getWorldViewportSize(isCompanionHudCollapsed = false): ViewportSize {
     width: window.innerWidth,
     height: Math.max(1, window.innerHeight - bottomHudReservedHeight),
   };
+}
+
+function areViewportRectsEqual(
+  first: ViewportRect | null,
+  second: ViewportRect | null,
+): boolean {
+  return (
+    first === second ||
+    Boolean(
+      first &&
+        second &&
+        Math.abs(first.x - second.x) < 0.1 &&
+        Math.abs(first.y - second.y) < 0.1 &&
+        Math.abs(first.width - second.width) < 0.1 &&
+        Math.abs(first.height - second.height) < 0.1,
+    )
+  );
+}
+
+function useMeasuredViewportRect() {
+  const elementRef = useRef<HTMLDivElement | null>(null);
+  const [rect, setRect] = useState<ViewportRect | null>(null);
+
+  useEffect(() => {
+    const element = elementRef.current;
+
+    if (!element) {
+      return;
+    }
+    const measuredElement = element;
+
+    function updateRect() {
+      const bounds = measuredElement.getBoundingClientRect();
+      const nextRect = {
+        x: bounds.left,
+        y: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      };
+
+      setRect((currentRect) =>
+        areViewportRectsEqual(currentRect, nextRect) ? currentRect : nextRect,
+      );
+    }
+
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateRect);
+    resizeObserver?.observe(measuredElement);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateRect);
+    };
+  }, []);
+
+  return [elementRef, rect] as const;
 }
 
 function getMaximumCameraOffset({
@@ -3247,6 +3314,10 @@ function App() {
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() =>
     getWorldViewportSize(false),
   );
+  const [minimapViewportRect, setMinimapViewportRect] =
+    useState<ViewportRect | null>(null);
+  const [minimapCoordinateRef, minimapCoordinateRect] =
+    useMeasuredViewportRect();
   const [
     visualMovementByEntityId,
     setVisualMovementByEntityId,
@@ -3281,6 +3352,21 @@ function App() {
   const previousCameraFocusRef = useRef<Position | null>(null);
   const currentCrownBalance = getCurrencyBalance(gameState.wallet, "crowns");
   const previousCrownBalanceRef = useRef(currentCrownBalance);
+  const handleMinimapViewportRectChange = useCallback(
+    (rect: ViewportRect | null) => {
+      setMinimapViewportRect((currentRect) =>
+        areViewportRectsEqual(currentRect, rect) ? currentRect : rect,
+      );
+    },
+    [],
+  );
+  const speechBubbleAvoidanceRects = useMemo(
+    () =>
+      [minimapViewportRect, minimapCoordinateRect].filter(
+        (rect): rect is ViewportRect => Boolean(rect),
+      ),
+    [minimapCoordinateRect, minimapViewportRect],
+  );
   const currentMap = gameState.map ?? debugMap;
   const renderMap = useMemo(() => {
     const currentMapId = currentMap.id;
@@ -3597,6 +3683,8 @@ function App() {
     () => getQuestEntityIndicators(gameState),
     [gameState],
   );
+  const patronWardPresentation: PatronWardPresentationState | null =
+    getPatronWardPresentationState(gameState);
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find(isActiveResource);
   const inventory = gameState.inventory;
@@ -4836,6 +4924,10 @@ function App() {
         targetId: targetEnemyId,
       }),
     );
+  }
+
+  function commandPartyToActivatePatronWard(wardId: PatronWardId) {
+    setGameState((state) => requestPatronWardActivation(state, wardId));
   }
 
   function commandCompanionsToGatherResource(targetResourceId = targetResource?.id) {
@@ -6971,12 +7063,15 @@ function App() {
               onPerformanceSample={handleRendererPerformanceSample}
               onCursorPositionChange={updateMapCursorPosition}
               onResourceClick={commandCompanionsToGatherResource}
+              onPatronWardClick={commandPartyToActivatePatronWard}
               partyIntent={gameState.partyIntent}
+              patronWardPresentation={patronWardPresentation}
               questEntityIndicators={questEntityIndicators}
               questObjectiveMarkers={questObjectiveMarkers}
               questGiverHasWork={questGiverHasWork}
               resurrectionProgressByCompanionId={resurrectionProgressByCompanionId}
               showDebugOverlays={showEntityInfo}
+              speechBubbleAvoidanceRects={speechBubbleAvoidanceRects}
               skillBindsByEnemyId={skillBindsByEnemyId}
               skillMarksByEnemyId={skillMarksByEnemyId}
               skillShieldBlocksById={skillShieldBlocksById}
@@ -6997,7 +7092,11 @@ function App() {
               viewportSize={viewportSize}
             />
           ) : null}
-          <div className="minimap-coordinate-readout" aria-label="Minimap coordinates">
+          <div
+            ref={minimapCoordinateRef}
+            className="minimap-coordinate-readout"
+            aria-label="Minimap coordinates"
+          >
             <span>Leader: {leaderCoordinateText}</span>
             <span>Cursor: {mapCursorCoordinateText}</span>
           </div>
@@ -7016,6 +7115,7 @@ function App() {
               questObjectiveMarkers={questObjectiveMarkers}
               onFloorClick={commandPartyToMoveFromMinimapPosition}
               onPerformanceSample={handleRendererPerformanceSample}
+              onViewportRectChange={handleMinimapViewportRectChange}
               onCursorPositionChange={updateMapCursorPosition}
               suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}

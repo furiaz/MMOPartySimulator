@@ -47,6 +47,7 @@ import {
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
 import { updateQuestGuideSystem } from "./questGuideSystem";
+import { updatePatronWardSystem } from "./patronWardSystem";
 import { createResourceWorkContext } from "./gathererResourceReservation";
 import { updateResurrectionSystem } from "./resurrectionSystem";
 import {
@@ -125,6 +126,7 @@ export function updateGame(
   nextState = processInnKitchenAutoCook(nextState, timing.nowMs).state;
   nextState = syncPartyDerivedMaxHealth(nextState);
   nextState = debugApplyCompanionInfiniteHealth(nextState);
+  nextState = updatePatronWardSystem(nextState, timing.nowMs);
 
   const mapIdBeforeWipeRecovery = nextState.currentMapId;
   nextState = updateWorldWipeRecovery(nextState, timing.nowMs);

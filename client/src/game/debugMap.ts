@@ -14,6 +14,10 @@ import type {
   ZoneSubzonePassage,
 } from "./types";
 import { bakeNavigationGrid } from "./navigation";
+import {
+  createNightmireBarrierCollisionCells,
+  isNightmireRouteOpen,
+} from "./patronWardState";
 
 export const DEBUG_MAP_COLUMNS = 110;
 export const DEBUG_MAP_ROWS = 60;
@@ -1103,7 +1107,7 @@ const mapSixProgressionEnemyStartData: WildZoneEnemyStartData[] = [
   { position: { x: 99, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
   { position: { x: 81, y: 27 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
   { position: { x: 92, y: 29 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { position: { x: 101, y: 25 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 101, y: 22 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
 ];
 
 const mapSevenProgressionEnemyStartData: WildZoneEnemyStartData[] = [
@@ -1370,6 +1374,7 @@ type WildZoneEnemyStartData = Omit<EnemyStartData, "id">;
 type DebugMapCreationOptions = {
   secureLandingGateOpen?: boolean;
   oldGrovePassageOpen?: boolean;
+  nightmireRouteOpen?: boolean;
 };
 
 type DebugMapQuestStates = Partial<
@@ -1378,6 +1383,12 @@ type DebugMapQuestStates = Partial<
     {
       status?: string;
       objectiveProgress?: Record<string, { completed?: boolean }>;
+      runtime?: {
+        patronWards?: {
+          routeUnlocked?: true;
+          legacyRoutePreserved?: true;
+        };
+      };
     }
   >
 >;
@@ -1601,12 +1612,15 @@ const MAP_FIVE_VISUAL_OBJECTS: MapVisualObject[] = [
 ];
 
 const MAP_SIX_VISUAL_OBJECTS: MapVisualObject[] = [
-  { id: "map-6-bat-roost", visualId: "nightmire_bat_roost_dead_tree", position: { x: 23, y: 20 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-bat-roost", visualId: "nightmire_bat_roost_dead_tree", position: { x: 96, y: 20 }, widthCells: 4, heightCells: 4, anchorY: 1 },
   { id: "map-6-hanging-roots", visualId: "nightmire_hanging_root_curtain", position: { x: 41, y: 44 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-6-oldroot-stump", visualId: "nightmire_ancient_elder_moss_stump", position: { x: 61, y: 27 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-6-cinder-pool", visualId: "nightmire_cinder_veined_standing_stone", position: { x: 88, y: 22 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-oldroot-stump", visualId: "nightmire_ancient_elder_moss_stump", position: { x: 96, y: 29 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-cinder-pool", visualId: "nightmire_cinder_veined_standing_stone", position: { x: 96, y: 38 }, widthCells: 4, heightCells: 4, anchorY: 1 },
   { id: "map-6-glowcap-cluster", visualId: "nightmire_mushroom_ring", position: { x: 86, y: 45 }, widthCells: 4, heightCells: 4, anchorY: 1 },
 ];
+
+export const NIGHTMIRE_BARRIER_COLLISION_CELLS =
+  createNightmireBarrierCollisionCells();
 
 const MAP_SEVEN_VISUAL_OBJECTS: MapVisualObject[] = [
   { id: "map-7-war-banner", visualId: "orc_warcamp_orc_command_banner_standard", position: { x: 24, y: 18 }, widthCells: 4, heightCells: 4, anchorY: 1 },
@@ -1976,6 +1990,7 @@ export const debugMapDefinitions: Record<
         sourceMapId: MAP_SIX_ID,
         targetMapId: MAP_SEVEN_ID,
         arrivalPositions: mapSixMapSevenArrivalPositions,
+        startsWorking: false,
         autoSelectAfterEnemiesCleared: true,
       },
     ],
@@ -2153,7 +2168,7 @@ export function createDebugMap(
   options: DebugMapCreationOptions = {},
 ): GameMap {
   const definition = debugMapDefinitions[mapId];
-  const walls = getDebugMapWalls(definition, options);
+  const walls = getDebugMapWalls(definition);
   const collisionWalls = getDebugMapCollisionWalls(definition, options);
   const visualObjects = getDebugMapVisualObjects(definition, options);
   const map = {
@@ -2187,6 +2202,7 @@ export function createDebugMapForQuestState(
   return createDebugMap(mapId, {
     secureLandingGateOpen: isSecureLandingPassageGateOpen(quests),
     oldGrovePassageOpen: isOldGrovePassageOpen(quests),
+    nightmireRouteOpen: isNightmireRouteOpen(quests),
   });
 }
 
@@ -2234,7 +2250,6 @@ export function getDebugMapDefinition(mapId: DebugMapId) {
 
 function getDebugMapWalls(
   definition: (typeof debugMapDefinitions)[DebugMapId],
-  _options: DebugMapCreationOptions,
 ): Position[] {
   return definition.walls;
 }
@@ -2255,7 +2270,15 @@ function getDebugMapCollisionWalls(
     return HUB_TWO_STRUCTURE_COLLISION_WALLS;
   }
 
-  if (definition.id !== MAP_ONE_ID && definition.id !== MAP_TWO_ID) {
+  if (definition.id === MAP_SIX_ID && !options.nightmireRouteOpen) {
+    return NIGHTMIRE_BARRIER_COLLISION_CELLS;
+  }
+
+  if (
+    definition.id !== MAP_ONE_ID &&
+    definition.id !== MAP_TWO_ID &&
+    definition.id !== MAP_SIX_ID
+  ) {
     return undefined;
   }
 

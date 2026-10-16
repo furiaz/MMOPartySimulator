@@ -7,6 +7,7 @@ import {
   MAP_ONE_ID,
   MAP_FOUR_ID,
   MAP_FIVE_ID,
+  MAP_SIX_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   SLIMEWARD_CHEST_ID,
@@ -90,6 +91,8 @@ export const GUILD_BOARD_ONBOARDING_QUEST_ID: QuestId =
 export const ASH_GOBLIN_MAIN_QUEST_ID: QuestId = "break_the_ash_camp";
 export const BRIAR_BURROWS_MAIN_QUEST_ID: QuestId =
   "into_the_briar_burrows";
+export const NIGHTMIRE_PATRON_QUEST_ID: QuestId = "the_patrons_shadow";
+export const NIGHTMIRE_WARD_SUPPRESSION_GROUP_ID = "nightmire-wards";
 const SMITHS_FIRST_WORK_ACCEPTANCE_GRANTS: QuestRewardItem[] = [
   { itemId: "copper_ore", quantity: 2 },
   { itemId: "field_herb", quantity: 2 },
@@ -117,6 +120,7 @@ export const QUEST_ORDER: QuestId[] = [
   GUILD_BOARD_ONBOARDING_QUEST_ID,
   ASH_GOBLIN_MAIN_QUEST_ID,
   BRIAR_BURROWS_MAIN_QUEST_ID,
+  NIGHTMIRE_PATRON_QUEST_ID,
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -412,6 +416,11 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         repairDurationMs: 12000,
         defenseRadius: 14,
         waveProgressPercents: [0, 25, 50, 75],
+        ambientEnemySuppression: {
+          scope: "subzone",
+          restoreDelayMs: 3_000,
+          variantPolicy: "reroll",
+        },
         questSpawnEnemies: [
           { enemyTypeId: "goblin_scout", level: 5, count: 1 },
           { enemyTypeId: "bog_imp", level: 5, count: 1 },
@@ -457,6 +466,11 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
         repairDurationMs: 10000,
         defenseRadius: 14,
         waveProgressPercents: [0, 50],
+        ambientEnemySuppression: {
+          scope: "subzone",
+          restoreDelayMs: 3_000,
+          variantPolicy: "reroll",
+        },
         questSpawnEnemies: [
           { enemyTypeId: "wolf", level: 7, count: 2 },
           { enemyTypeId: "goblin_thrower", level: 7, count: 1 },
@@ -747,6 +761,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
     questGiverMapId: HUB_TWO_MAP_ID,
     requiresCompletedQuestIds: [ASH_GOBLIN_MAIN_QUEST_ID],
+    unlocksQuestIds: [NIGHTMIRE_PATRON_QUEST_ID],
     objectives: [
       {
         id: "defeat_briar_burrows_enemies",
@@ -773,6 +788,83 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     rewards: {
       crowns: 750,
       characterXp: 2800,
+    },
+  },
+  the_patrons_shadow: {
+    id: NIGHTMIRE_PATRON_QUEST_ID,
+    displayName: "The Patron's Shadow",
+    sourceType: "npc",
+    objectiveFlow: "parallel",
+    questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
+    questGiverMapId: HUB_TWO_MAP_ID,
+    requiresCompletedQuestIds: [BRIAR_BURROWS_MAIN_QUEST_ID],
+    objectives: [
+      {
+        id: "break_night_bat_ward",
+        type: "patron_ward",
+        targetMapId: MAP_SIX_ID,
+        enemyMapId: MAP_SIX_ID,
+        targetSubzoneId: "nightmire-canopy",
+        targetPosition: { x: 96, y: 20 },
+        enemyTypeId: "night_bat",
+        patronWardId: "night_bat_ward",
+        patronWardWaveCounts: [3, 3],
+        ambientEnemySuppression: {
+          scope: "map",
+          groupId: NIGHTMIRE_WARD_SUPPRESSION_GROUP_ID,
+          restoreDelayMs: 2_000,
+          variantPolicy: "preserve",
+        },
+        requiredCount: 100,
+      },
+      {
+        id: "break_elder_mossling_ward",
+        type: "patron_ward",
+        targetMapId: MAP_SIX_ID,
+        enemyMapId: MAP_SIX_ID,
+        targetSubzoneId: "nightmire-canopy",
+        targetPosition: { x: 96, y: 29 },
+        enemyTypeId: "elder_mossling",
+        patronWardId: "elder_mossling_ward",
+        patronWardWaveCounts: [4, 4],
+        ambientEnemySuppression: {
+          scope: "map",
+          groupId: NIGHTMIRE_WARD_SUPPRESSION_GROUP_ID,
+          restoreDelayMs: 2_000,
+          variantPolicy: "preserve",
+        },
+        requiredCount: 100,
+      },
+      {
+        id: "break_cinder_wisp_ward",
+        type: "patron_ward",
+        targetMapId: MAP_SIX_ID,
+        enemyMapId: MAP_SIX_ID,
+        targetSubzoneId: "nightmire-canopy",
+        targetPosition: { x: 96, y: 38 },
+        enemyTypeId: "cinder_wisp",
+        patronWardId: "cinder_wisp_ward",
+        patronWardWaveCounts: [3, 3, 4],
+        ambientEnemySuppression: {
+          scope: "map",
+          groupId: NIGHTMIRE_WARD_SUPPRESSION_GROUP_ID,
+          restoreDelayMs: 2_000,
+          variantPolicy: "preserve",
+        },
+        requiredCount: 100,
+      },
+      {
+        id: "find_elder_mossling",
+        type: "own_livestock_creature",
+        targetMapId: MAP_SIX_ID,
+        targetSubzoneId: "nightmire-canopy",
+        livestockCreatureId: "elder_mossling",
+        requiredCount: 1,
+      },
+    ],
+    rewards: {
+      crowns: 1000,
+      characterXp: 4000,
     },
   },
 };

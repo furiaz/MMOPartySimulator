@@ -28,7 +28,8 @@ export type QuestId =
   | "azure_trial"
   | "orders_from_the_guild"
   | "break_the_ash_camp"
-  | "into_the_briar_burrows";
+  | "into_the_briar_burrows"
+  | "the_patrons_shadow";
 
 export type QuestStatus =
   | "locked"
@@ -58,9 +59,22 @@ export type QuestObjectiveType =
   | "return_to_poi"
   | "take_guild_notice_board_quest"
   | "own_livestock_creature"
-  | "active_party_member_count";
+  | "active_party_member_count"
+  | "patron_ward";
+
+export type PatronWardId =
+  | "night_bat_ward"
+  | "elder_mossling_ward"
+  | "cinder_wisp_ward";
 
 export type QuestEquipmentRequirement = "first_class_weapon";
+
+export type QuestAmbientEnemySuppressionConfig = {
+  scope: "map" | "subzone";
+  groupId?: string;
+  restoreDelayMs: number;
+  variantPolicy: "preserve" | "reroll";
+};
 
 export type QuestSpawnEnemyDefinition = {
   enemyTypeId?: EnemyTypeId;
@@ -89,6 +103,9 @@ export type QuestObjectiveDefinition = {
   targetSlot?: EquipmentSlot;
   equipmentRequirement?: QuestEquipmentRequirement;
   livestockCreatureId?: LivestockCreatureId;
+  patronWardId?: PatronWardId;
+  patronWardWaveCounts?: number[];
+  ambientEnemySuppression?: QuestAmbientEnemySuppressionConfig;
   noticeBoardQuestId?: string;
   requiredCount?: number;
   questItemDisplayName?: string;
@@ -140,6 +157,17 @@ export type QuestObjectiveProgress = {
   completed: boolean;
 };
 
+export type QuestAmbientEnemySuppressionRuntime = {
+  targetMapId: DebugMapId;
+  targetSubzoneId?: string;
+  scope: "map" | "subzone";
+  restoreDelayMs: number;
+  variantPolicy: "preserve" | "reroll";
+  activeObjectiveIds: string[];
+  enemySnapshots: Enemy[];
+  restoreAtMs?: number;
+};
+
 export type QuestRuntimeState = {
   questDropMissCountsByObjectiveId?: Record<string, number>;
   repairProgressMsByObjectiveId?: Record<string, number>;
@@ -149,6 +177,24 @@ export type QuestRuntimeState = {
   despawnedSubzoneEnemyIdsByObjectiveId?: Record<string, string[]>;
   suppressedSubzoneEnemiesByObjectiveId?: Record<string, Enemy[]>;
   suppressedSubzoneEnemyRestoreAtMsByObjectiveId?: Record<string, number>;
+  ambientEnemySuppressionsByGroupId?: Record<
+    string,
+    QuestAmbientEnemySuppressionRuntime
+  >;
+  patronWards?: PatronWardRuntimeState;
+};
+
+export type PatronWardRuntimeState = {
+  pendingActivationWardId?: PatronWardId;
+  activeWardId?: PatronWardId;
+  activeWaveIndex?: number;
+  trackedDefenderIds?: string[];
+  nextWaveAtMs?: number;
+  retreatStartedAtMs?: number;
+  wardFadeStartedAtMsByWardId?: Partial<Record<PatronWardId, number>>;
+  finaleStartedAtMs?: number;
+  routeUnlocked?: true;
+  legacyRoutePreserved?: true;
 };
 
 export type QuestState = {

@@ -258,7 +258,7 @@ type NpcRole =
 
 `hubNpcAccess.ts` owns town-hub recognition, the functional hub NPC role allowlist, and current-map NPC-presence checks. Only `hub` and `hub-2` are current town hubs. Functional roles are `quest_giver`, `class_mentor`, `merchant`, `smith`, `bank_chest`, `guild_coordinator`, `tavern_keeper`, `farmer`, and `livestock_keeper`. Their interactions are available across the current town hub while the matching entity exists. `npcInteractionRange.ts` keeps numeric range fallback for excluded interactions such as dogs, quest guides, and dungeon chests.
 
-Supported character NPCs may display one transient, non-branching speech bubble after their interaction becomes available. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. Speech is not persisted and does not define simulation behavior.
+Supported character NPCs may display one transient, non-branching speech bubble after their interaction becomes available. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. React measures registered HUD regions such as the minimap and coordinate panel and passes viewport-space avoidance rectangles to the renderer. The shared pure layout helper tries centered-above, horizontally shifted, and below-speaker candidates, clamps the complete bubble inside the usable world viewport, chooses the least-overlapping candidate only as a constrained fallback, and keeps the tail directed toward the speaker. Ordinary NPC speech and the Orc Warmaster finale use this same layout; HUD layers remain above the world renderer. Speech is not persisted and does not define simulation behavior.
 
 NPCs do not implement branching dialogue, dialogue choices, conversation history, full shops beyond fixed prototype Merchant Buy stock, production crafting or smithing beyond current prototype Smith crafting, recruitment beyond current Guild Recruit helpers, relationship behavior, or general follower behavior.
 
@@ -1667,6 +1667,8 @@ Current quest runtime state may include:
 - legacy despawned subzone enemy ids by objective id
 - suppressed subzone enemy snapshots by objective id
 - suppressed subzone enemy restore timestamps by objective id
+- generalized ambient-enemy suppression sessions by quest-scoped group id
+- Patron Ward pending activation, active Ward/wave, tracked defenders, retreat/fade/finale timing, route unlock, and legacy-route preservation
 
 Current quest ids are:
 
@@ -1685,6 +1687,8 @@ Current quest ids are:
 - `azure_trial`
 - `orders_from_the_guild`
 - `break_the_ash_camp`
+- `into_the_briar_burrows`
+- `the_patrons_shadow`
 
 Current quest display names are:
 
@@ -1703,6 +1707,8 @@ Current quest display names are:
 - `azure_trial`: The Azure Trial
 - `orders_from_the_guild`: Orders from the Guild
 - `break_the_ash_camp`: Break the Ash Camp
+- `into_the_briar_burrows`: Into the Briar Burrows
+- `the_patrons_shadow`: The Patron's Shadow
 
 Current quest objective types are:
 
@@ -1726,14 +1732,19 @@ type QuestObjectiveType =
   | "defeat_elite"
   | "collect_dungeon_chest"
   | "return_to_poi"
-  | "take_guild_notice_board_quest";
+  | "take_guild_notice_board_quest"
+  | "own_livestock_creature"
+  | "active_party_member_count"
+  | "patron_ward";
 ```
 
-Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, and taking a matching Guild Notice Board quest.
+Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, taking a matching Guild Notice Board quest, Livestock ownership, active-party size, and Patron Ward charge/defense completion.
 
 Each `QuestDefinition` owns `questGiverPoiId` and `questGiverMapId`. Availability may also require completed quests and a first-class active or resting roster companion. `reconcileQuestAvailability` evaluates those state-derived requirements after relevant quest completion, first-class selection, and save restoration.
 
 `gather_item_count` may omit `resourceType` to match any successfully inventoried resource while retaining map and subzone filters. The `first_class_weapon` equipment requirement inspects current active-companion hand slots for equipment whose kind is `weapon`, whose type is not a Training Sword, and whose allowed-class list includes a first class. Quest acceptance, equipment changes, and restoration call the shared equipment-objective check; completed equipment objectives are monotonic.
+
+`own_livestock_creature` and `active_party_member_count` are state-derived objectives reconciled in game logic after quest acceptance, matching Livestock acquisition, recruitment or roster movement, and save restoration. Incomplete progress reflects current ownership or active-party size; completed progress remains monotonic. Active-party count includes living or dead active members but excludes Inn reserve and Field Team companions.
 
 `guildNoticeBoardQuestIntegration.ts` owns the Board-take-to-quest-progress seam. React invokes that game-logic action rather than coordinating onboarding progress itself. A previously accepted starter contract is state-derived on onboarding acceptance.
 
@@ -1757,8 +1768,14 @@ Current prototype quest chain:
 - `find_slimeward_camp` unlocks `azure_trial`
 - completed `azure_trial` plus any first-class active or resting roster companion makes `orders_from_the_guild` available
 - `orders_from_the_guild` unlocks `break_the_ash_camp`
+- `break_the_ash_camp` unlocks `into_the_briar_burrows`
+- `into_the_briar_burrows` unlocks `the_patrons_shadow`
 
 `orders_from_the_guild` completes its objective when the dedicated starter Notice Board contract is taken and grants no rewards. `break_the_ash_camp` uses parallel map-4 objectives for 200 direct kill credits, 20 successfully inventoried resources of any supported type, and one first-class weapon, then grants 1800 character XP through the existing quest reward path and 500 Crowns once.
+
+`into_the_briar_burrows` uses parallel map-5 and roster objectives for 300 direct kill credits, ownership of one `tin_crawler` Livestock creature, and 3 active party members, then grants 2800 character XP and 750 Crowns. Tin Crawler acquisition presentation uses `Tin Crawler Hatchling`, its permanent key item is `Tin Crawler Hatchling Discovery`, and its placed adult Livestock name remains `Tin Crawler`. Existing Tin Crawler ownership completes the objective without consuming the creature or changing its 10%/5%/1% discovery chances.
+
+`the_patrons_shadow` uses three `patron_ward` objectives plus an `elder_mossling` Livestock ownership objective, then grants 4000 character XP and 1000 Crowns. Each Ward accumulates 100 matching direct enemy credits before manual activation. `patronWardState.ts` owns Ward definitions, positions, wave counts, barrier geometry, timing constants, route-open checks, and persistent/transient runtime sanitation. `patronWardSystem.ts` owns click-and-approach activation, mutually exclusive defenses, normal-only quest-defender waves, retreat/wipe/map-exit resets, objective completion, prop fades, the barrier/route transition, legacy map-7 access, and renderer-facing Ward/Warmaster presentation. The route unlock persists before quest turn-in while encounter, fade, and finale timing remain transient.
 
 `directKillCredit.ts` is the shared direct-defeat credit helper. It returns 2 for Superior enemies and 1 otherwise. Direct NPC `defeat_enemy_count` objectives and direct Notice Board kill objectives use it. Quest-item drop rolls remain once per enemy, `defeat_elite` remains one completion, and aggregate Field Team kill redemption keeps the quantities reported by the estimator without applying Superior credit.
 
@@ -1773,7 +1790,7 @@ Merchant interaction is gated by quest progress where implemented.
 
 Merchant Buy can be locked until the equipment tutorial flow allows it.
 
-`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, and elite-spawn objective helpers.
+`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, and elite-spawn objective helpers. Patron Ward behavior remains in the focused `patronWardSystem.ts` rather than being hardcoded into the generic guide system.
 
 Current quest objective helper behavior:
 
@@ -1784,11 +1801,14 @@ Current quest objective helper behavior:
 - guide NPCs pause when no companion is within escort range or nearby living enemies are present
 - rescue objectives complete when the leader reaches the NPC after nearby enemies are cleared
 - repair objectives progress while a party member or quest guide NPC is near the target and not targeted by an enemy
-- defend objectives start from a nearby repair actor, suppress normal objective-subzone enemies, spawn quest enemy waves, and use repair progress as the defense timer
-- defend objective suppression removes and stores living or dead normal non-quest-spawn enemies in the objective subzone while leaving quest-spawned enemies available for defense waves
-- completed defend objectives clean up living quest-spawned enemies and schedule normal subzone enemy restoration
-- suppressed normal subzone enemies restore together after `QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS`
-- legacy defense saves with only despawned enemy ids may rebuild missing authored enemies from map enemy start data during restoration
+- defend objectives start from a nearby repair actor, begin their configured ambient-enemy suppression, spawn quest enemy waves, and use repair progress as the defense timer
+- `questAmbientEnemySuppressionSystem.ts` owns reusable begin, maintain, release, restore, clear, and load-sanitization behavior for data-driven `map` or `subzone` suppression
+- suppression configuration provides scope, an optional quest-scoped group id, restore delay, and `preserve` or `reroll` variant policy; missing configuration causes no suppression
+- active sessions snapshot matching living, dead, respawning, normal, or Superior non-dummy ambient enemies, continuously remove newly introduced matching ambient enemies, and leave quest-spawned enemies untouched
+- releasing the last objective owner schedules deterministic safe restoration at full health near authored homes; a new owner in the same group cancels the timer without an intermediate repopulation
+- Hold the Field Cache and Defend Wolf Causeway use subzone scope, a 3-second delay, and variant rerolls; all Patron Wards share map scope through `nightmire-wards`, a 2-second delay, and preserved variants
+- completed defend objectives clean up living quest-spawned enemies and release their suppression session
+- legacy defense saves with objective-owned despawn ids, snapshots, or restore timestamps are converted into the generalized runtime when valid; malformed or orphaned sessions restore safely instead of leaving enemies absent
 - defeat elite objectives ensure the configured elite quest enemy is spawned
 - unlock route objectives complete the current route objective when active
 - collect dungeon chest objectives complete when the matching dungeon chest has been collected
@@ -1801,6 +1821,8 @@ They must not become a general follower, recruitment, companion NPC, production 
 Current quest guide constants include:
 
 - `QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS = 3_000`
+
+`questDefenseFocus.ts` resolves the active defense context without quest, Ward, map, or enemy-type allowlists. It recognizes started incomplete `defend_area` objectives and the active typed `patron_ward` runtime, returning the quest/objective, defense anchor, and living quest-defender ids. While Auto Combat owns party behavior, `poiSystem.ts`, `poiTargetSelection.ts`, and `roleSystem.ts` use that context to clear AI-created resource work, prioritize encounter defenders, hold at the anchor between waves, and keep autonomous Gatherer-role companions with the party. Player-authored party gathering and direct companion commands are preserved. The focus ends when the defense completes or resets and is not extended by ambient restoration timing.
 
 POI selection types live in `poiTypes.ts`.
 
@@ -2004,6 +2026,8 @@ Current high-level order:
 56. Record debug telemetry
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
+
+The Patron Ward system updates before world-wipe recovery so active Ward state can reset cleanly on wipes and map exits. Generalized ambient-enemy suppression updates through the quest-guide stage before enemy AI, ensuring suppressed enemies cannot act or respawn during the defense. Defense-focused POI cleanup and selection occurs in the POI stage before role behavior, so autonomous Gatherer-role companions see the same active-defense context during that tick.
 
 ---
 
@@ -3459,6 +3483,8 @@ Current teleport behavior:
 - supports per-teleport runtime working state
 - teleports default to working unless their map definition sets `startsWorking: false`
 - quest route-unlock objectives may set a teleport to working
+- `map-6-to-map-7` starts non-working for new progression and is surrounded by collision cells generated from the same radius-5 circle used to render the Patron barrier; completing all three Patron Wards fades the barrier and persists the route unlock before quest turn-in
+- save restoration preserves valid route unlock state and marks saves that had already reached or occupied map-7 as legacy-preserved, omitting the barrier and Warmaster scene rather than removing access
 - non-working teleports cannot be triggered or selected for route movement
 - can be triggered by player/debug action, World Travel menu selection, or AI conditions
 - can set a teleport point as party movement intent
@@ -3691,9 +3717,12 @@ Current public asset path root:
 
 - `client/public/assets/`
 
+The Orc aura runtime frames live under `client/public/assets/effects/gameplay/orc-aura/`; their exact-copy mirrors and manifest records live in the external Used Assets library according to the repository asset lifecycle.
+
 Current semantic asset groups referenced by the UI include:
 
 - `assets/effects/gameplay`
+- `assets/effects/gameplay/orc-aura`
 - `assets/effects/projectiles`
 - `assets/entities/companions`
 - `assets/entities/enemies`
@@ -3719,9 +3748,11 @@ Current world renderer behavior:
 - PixiJS renders the main world view.
 - React hosts the renderer and passes game state and command callbacks.
 - The renderer supports preview and full modes.
-- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, reusable enemy ability cast labels/bars/glows, combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, and camera-follow presentation.
+- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, reusable enemy ability cast labels/bars/glows, combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, Patron Ward props/aura/labels, the Nightmire barrier, the Warmaster finale, HUD-aware speech bubbles, and camera-follow presentation.
 - The renderer may draw quest entity indicators as separate yellow `!` text prefixes beside relevant enemy, NPC, or resource labels without modifying entity display names.
 - The renderer uses redraw gating so stable preview/full renderer frames are skipped unless game state, timed visual work, texture readiness, or sizing changes require a draw. Active enemy ability casts participate in full-render signatures and timed redraw work so cast progress and glow animation receive a final cleanup frame.
+- Patron aura loops, barrier pulses, Ward/finale fades, speech timing, and HUD avoidance rectangles participate in the applicable full-render signatures and timed redraw work. The preview/minimap renderer omits Ward speech and barrier presentation.
+- The seven Orc aura frames loop at approximately 10 FPS behind uncompleted Wards and quest-spawned Ward defenders. The aura marker is presentation-only and does not apply combat stats.
 - The renderer tracks Pixi texture lifetime with shared, current-map, previous-map, and durable texture scopes, then best-effort evicts old map-only textures.
 - The renderer reuses managed Pixi sprites and text where safe, caches static map-derived render data, and records draw/texture/performance sample metrics for debugging.
 - Texture cache and redraw behavior are renderer-only optimizations and must not define simulation cadence, gameplay timing, or map ownership rules.
@@ -3889,7 +3920,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, reusable enemy ability cast presentation, companion AoE skill visuals, status-effect presentation where supported, combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, Patron Wards, Patron aura animation, the Nightmire route barrier, the untargetable Warmaster finale actor, HUD-aware world speech bubbles, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, reusable enemy ability cast presentation, companion AoE skill visuals, status-effect presentation where supported, combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
 
 The full renderer viewport should reserve the bottom HUD area so the map camera and interactable world view do not place important content behind the companion vitals and buff/debuff rail UI.
 
@@ -3920,6 +3951,7 @@ React may:
 - track start-screen Patch Notes dialog state and focus restoration
 - render UI-facing enemy and NPC name labels
 - track one transient NPC speech bubble and pass it to the PixiJS world renderer
+- measure registered HUD bounds on mount, renderer remount, window resize, and element-size changes, then pass those viewport-space avoidance rectangles to the renderer without owning speech-layout decisions
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
 - call existing stat allocation helpers for supported stat allocation actions

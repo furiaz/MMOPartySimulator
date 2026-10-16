@@ -3,6 +3,7 @@ import { createCompanion, createEnemy, createResource } from "./entities";
 import {
   createDebugMap,
   MAP_ONE_ID,
+  MAP_SIX_ID,
   SLIMEWARD_CHEST_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   SLIMEWARD_FLOOR_TWO_ID,
@@ -430,6 +431,65 @@ describe("quest progression hooks", () => {
       state.quests.into_the_briar_burrows.objectiveProgress
         .find_tin_crawler_hatchling,
     ).toMatchObject({ currentCount: 1, completed: true });
+  });
+
+  it("charges Patron Wards only from matching ambient Nightmire enemies", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_SIX_ID,
+      map: createDebugMap(MAP_SIX_ID),
+      quests: createQuestStates({ the_patrons_shadow: "active" }),
+    });
+    const nightBat = {
+      ...createEnemy("night-bat", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "night_bat",
+        subzoneId: "nightmire-canopy",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const superiorNightBat = {
+      ...createEnemy("superior-night-bat", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "night_bat",
+        subzoneId: "nightmire-canopy",
+        variant: "superior",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const questDefender = {
+      ...createEnemy("quest-night-bat", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "night_bat",
+        subzoneId: "nightmire-canopy",
+        questSpawn: {
+          questId: "the_patrons_shadow",
+          objectiveId: "break_night_bat_ward",
+          targetPosition: { x: 96, y: 20 },
+          patronAura: true,
+        },
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const wrongEnemy = {
+      ...createEnemy("cinder-wisp", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "cinder_wisp",
+        subzoneId: "nightmire-canopy",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    state = recordEnemyDefeatedForQuests(state, nightBat, MAP_SIX_ID);
+    state = recordEnemyDefeatedForQuests(state, superiorNightBat, MAP_SIX_ID);
+    state = recordEnemyDefeatedForQuests(state, questDefender, MAP_SIX_ID);
+    state = recordEnemyDefeatedForQuests(state, wrongEnemy, MAP_SIX_ID);
+
+    expect(
+      state.quests.the_patrons_shadow.objectiveProgress.break_night_bat_ward,
+    ).toMatchObject({ currentCount: 3, completed: false });
+    expect(
+      state.quests.the_patrons_shadow.objectiveProgress.break_cinder_wisp_ward,
+    ).toMatchObject({ currentCount: 1, completed: false });
   });
 });
 

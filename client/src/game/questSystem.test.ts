@@ -392,6 +392,7 @@ describe("prototype quest system", () => {
       "orders_from_the_guild",
       "break_the_ash_camp",
       "into_the_briar_burrows",
+      "the_patrons_shadow",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");
@@ -404,6 +405,7 @@ describe("prototype quest system", () => {
     expect(quests.orders_from_the_guild.status).toBe("locked");
     expect(quests.break_the_ash_camp.status).toBe("locked");
     expect(quests.into_the_briar_burrows.status).toBe("locked");
+    expect(quests.the_patrons_shadow.status).toBe("locked");
   });
 
   it("grants smithy starter materials on accept so Plain Charm can be crafted", () => {

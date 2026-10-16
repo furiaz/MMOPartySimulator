@@ -10,6 +10,7 @@ import {
   QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS,
   updateQuestGuideSystem,
 } from "./questGuideSystem";
+import { sanitizeQuestAmbientEnemySuppressionsAfterLoad } from "./questAmbientEnemySuppressionSystem";
 import { addEntity, type GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity } from "./types";
@@ -102,7 +103,7 @@ describe("quest guide defense objectives", () => {
     expect(nextState.entities[outsideEnemy.id]).toBeDefined();
     expect(
       nextState.quests.hold_the_field_cache.runtime
-        ?.suppressedSubzoneEnemiesByObjectiveId?.defend_old_grove_cache?.map(
+        ?.ambientEnemySuppressionsByGroupId?.defend_old_grove_cache?.enemySnapshots.map(
           (enemy) => enemy.id,
         )
         .sort(),
@@ -173,8 +174,7 @@ describe("quest guide defense objectives", () => {
     });
     expect(
       afterRestore.quests.hold_the_field_cache.runtime
-        ?.suppressedSubzoneEnemyRestoreAtMsByObjectiveId
-        ?.defend_old_grove_cache,
+        ?.ambientEnemySuppressionsByGroupId?.defend_old_grove_cache,
     ).toBeUndefined();
   });
 
@@ -204,7 +204,8 @@ describe("quest guide defense objectives", () => {
     expect(nextState.entities[enemy.id]).toBeUndefined();
     expect(
       nextState.quests.open_wolf_causeway.runtime
-        ?.suppressedSubzoneEnemiesByObjectiveId?.defend_wolf_causeway?.[0]?.id,
+        ?.ambientEnemySuppressionsByGroupId?.defend_wolf_causeway
+        ?.enemySnapshots[0]?.id,
     ).toBe(enemy.id);
   });
 
@@ -231,10 +232,14 @@ describe("quest guide defense objectives", () => {
       completed: true,
     };
 
-    const scheduledState = updateQuestGuideSystem(
+    const loadedState = sanitizeQuestAmbientEnemySuppressionsAfterLoad(
       createMapTwoState([], {
         quests: questState,
       }),
+      5_000,
+    );
+    const scheduledState = updateQuestGuideSystem(
+      loadedState,
       new Set(),
       createTiming(5_000, 100),
       () => 0.99,
