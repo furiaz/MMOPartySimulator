@@ -1,3 +1,4 @@
+import { restoreBarracks } from "./barracks";
 import {
   aoeTargetDummyId,
   aoeTargetDummyPosition,
@@ -1059,7 +1060,7 @@ export function sanitizeGameStateForSave(
     enemyAbilityDefinitions,
   );
 
-  return {
+  return restoreBarracks({
     ...state,
     entities,
     restingCompanionsById,
@@ -1176,7 +1177,7 @@ export function sanitizeGameStateForSave(
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
     debugTelemetry: undefined,
-  };
+  }, now);
 }
 
 function sanitizeQuestStates(

@@ -1,4 +1,5 @@
 import type { GameState } from "./state";
+import { initializeBarracks } from "./barracks";
 import type { PartyFormationState } from "./types";
 
 function createIdlePartyFormation(): PartyFormationState {
@@ -16,6 +17,8 @@ function createIdlePartyFormation(): PartyFormationState {
 export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
+    barracksById: state.barracksById ? Object.fromEntries(Object.entries(state.barracksById).map(([id, runtime]) =>
+      [id, { ...runtime, wasInRange: false, speech: undefined, hintExpiresAtMs: undefined }])) : undefined,
     activeTeleport: null,
     directCompanionCommandsById: {},
     directCommandGraceUntilByCompanionId: {},
@@ -91,6 +94,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 }
 
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
+  state = initializeBarracks(state);
   const currentEntityIds = new Set(Object.keys(state.entities));
   const followTrailsByEntityId =
     pruneRecordById(state.followTrailsByEntityId, currentEntityIds) ??

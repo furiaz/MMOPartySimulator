@@ -46,6 +46,7 @@ import {
 } from "./positionUtils";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import { isEnemyEntity } from "./entityGuards";
+import { getCombatTargetPosition, getStructureApproachPosition, hasStructureLineOfSight } from "./combatStructures";
 import {
   getEnemyAttackRange,
   getEnemyCombatBodyRadius,
@@ -205,7 +206,7 @@ export function updateAttackSystem(
       }
     }
 
-    if (isInAttackRange(attackReadyAttacker, target)) {
+    if (isInAttackRange(attackReadyAttacker, target) && hasStructureLineOfSight(nextState, attackReadyAttacker.position, target)) {
       if (isEnemy(attackReadyAttacker) && isStompOnlyEnemy(attackReadyAttacker)) {
         nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;
@@ -314,7 +315,7 @@ export function updateAttackSystem(
     const candidateAttackSlot = chooseAttackSlot(
       nextState,
       currentAttacker,
-      target.position,
+      getCombatTargetPosition(currentAttacker.position, target),
       getEffectiveAttackRange(currentAttacker, target),
       {
         allowPartyPassThrough: true,
@@ -338,7 +339,7 @@ export function updateAttackSystem(
 
     const movementTarget = isResurrectionParticipant
       ? attackSlot
-      : attackSlot ?? target.position;
+      : attackSlot ?? (target.kind === "structure" ? getStructureApproachPosition(nextState, currentAttacker, target) : target.position);
 
     if (!movementTarget) {
       continue;
@@ -350,7 +351,7 @@ export function updateAttackSystem(
       nextState = rememberAttackSlot(
         nextState,
         currentAttacker,
-        target.position,
+        getCombatTargetPosition(currentAttacker.position, target),
         getEffectiveAttackRange(currentAttacker, target),
         attackSlot,
         {
@@ -371,7 +372,7 @@ export function updateAttackSystem(
       pathTargetKey: attackSlot
         ? `combat-slot:${target.id}:${getPositionPathKey(attackSlot)}`
         : `chase:${target.id}`,
-      pathTargetPosition: attackSlot ?? target.position,
+      pathTargetPosition: movementTarget,
       speedMultiplier: isEnemy(currentAttacker) ? getEnemyChaseSpeedMultiplier() : 1,
     });
 
@@ -525,7 +526,7 @@ function getCombatOrderPriority(entity: GameEntity): number {
 }
 
 function isAttackingCombatEntity(entity: GameEntity): entity is CombatEntity {
-  return isCombatEntity(entity) && entity.state === "attack";
+  return entity.kind !== "structure" && isCombatEntity(entity) && entity.state === "attack";
 }
 
 function isLiveCombatTarget(
@@ -548,7 +549,7 @@ function isFakeDeathTarget(
 
 function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
   return (
-    getDistance(attacker.position, target.position) <=
+    getDistance(attacker.position, getCombatTargetPosition(attacker.position, target)) <=
     getEffectiveAttackRange(attacker, target)
   );
 }
@@ -634,7 +635,8 @@ function getFinalStepAttackPosition(
     return null;
   }
 
-  const euclideanDistance = getEuclideanDistance(attacker.position, target.position);
+  const targetPosition = getCombatTargetPosition(attacker.position, target);
+  const euclideanDistance = getEuclideanDistance(attacker.position, targetPosition);
   const effectiveAttackRange = getEffectiveAttackRange(attacker, target);
   const gap = euclideanDistance - effectiveAttackRange;
 
@@ -643,8 +645,8 @@ function getFinalStepAttackPosition(
   }
 
   const direction = {
-    x: attacker.position.x - target.position.x,
-    y: attacker.position.y - target.position.y,
+    x: attacker.position.x - targetPosition.x,
+    y: attacker.position.y - targetPosition.y,
   };
   const directionLength = Math.hypot(direction.x, direction.y);
 
@@ -653,8 +655,8 @@ function getFinalStepAttackPosition(
   }
 
   const finalPosition = {
-    x: target.position.x + (direction.x / directionLength) * effectiveAttackRange,
-    y: target.position.y + (direction.y / directionLength) * effectiveAttackRange,
+    x: targetPosition.x + (direction.x / directionLength) * effectiveAttackRange,
+    y: targetPosition.y + (direction.y / directionLength) * effectiveAttackRange,
   };
 
   if (
@@ -685,7 +687,7 @@ function moveTowardRequiredSpacedAttackSlot(
   const attackSlot = chooseAttackSlot(
     state,
     attacker,
-    target.position,
+    getCombatTargetPosition(attacker.position, target),
     getEffectiveAttackRange(attacker, target),
     {
       allowPartyPassThrough: true,
@@ -705,7 +707,7 @@ function moveTowardRequiredSpacedAttackSlot(
   let nextState = rememberAttackSlot(
     state,
     attacker,
-    target.position,
+    getCombatTargetPosition(attacker.position, target),
     getEffectiveAttackRange(attacker, target),
     attackSlot,
     {
@@ -748,7 +750,7 @@ function getBasicAttackProjectileProfile(
 ): CombatProjectileProfile | null {
   return isEnemy(attacker)
     ? getEnemyBasicProjectileProfile(attacker)
-    : getCompanionBasicProjectileProfile(attacker);
+    : attacker.kind === "companion" ? getCompanionBasicProjectileProfile(attacker) : null;
 }
 
 function getEffectiveAttackRange(attacker: GameEntity, target: GameEntity): number {

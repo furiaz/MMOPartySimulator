@@ -32,6 +32,7 @@ export function updateEnemyRespawnSystem(
       entity.kind !== "enemy" ||
       entity.state !== "dead" ||
       entity.questSpawn ||
+      entity.barrackSpawn ||
       isEnemySuppressedByDefenseObjective(nextState, entity, nowMs)
     ) {
       continue;

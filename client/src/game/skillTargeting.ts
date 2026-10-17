@@ -1,4 +1,6 @@
 import { getPartyLeader, getPartyMembers } from "./partySystem";
+import { getCombatTargetPosition, hasStructureLineOfSight, isLivingHostileTarget, isHostileTargetInRadius } from "./combatStructures";
+import type { CombatStructure } from "./types";
 import {
   isActiveResource,
   isLivingCompanion,
@@ -56,7 +58,19 @@ export function getSkillTarget(
   caster: Companion,
   skill: SkillDefinition,
   options: SkillTargetOptions = {},
-): Enemy | Companion | undefined {
+): Enemy | Companion | CombatStructure | undefined {
+  const orderedTargetId = options.forcedEnemyTargetId ?? caster.currentTargetId ?? getPartyCombatTarget(state)?.id;
+  const orderedTarget = orderedTargetId ? state.entities[orderedTargetId] : undefined;
+  if (orderedTarget?.kind === "structure" && orderedTarget.health > 0 &&
+      (skill.effect.type === "shockwave" || skill.effect.type === "maulSweep") &&
+      isHostileTargetInRadius(orderedTarget, caster.position, skill.effect.radius)) return caster;
+  // Buildings are not discovered autonomously: only an explicit attack target is eligible.
+  if (orderedTarget?.kind === "structure" && isLivingHostileTarget(orderedTarget) &&
+      skill.tags.some(tag => tag === "Damage" || tag === "DoT") &&
+      getGridDistance(caster.position, getCombatTargetPosition(caster.position, orderedTarget)) <= skill.range &&
+      hasStructureLineOfSight(state, caster.position, orderedTarget)) {
+    return orderedTarget;
+  }
   if (skill.effect.type === "selfPercentHeal") {
     return isSelfPercentHealPriorityActive(caster, skill) ? caster : undefined;
   }
@@ -452,7 +466,7 @@ export function findEnemyTarget(
   const partyTarget = getPartyCombatTarget(state);
 
   if (
-    partyTarget &&
+    partyTarget?.kind === "enemy" &&
     isEnemyInRange(caster, partyTarget, range) &&
     isAllowedEnemyTarget(partyTarget, options)
   ) {
@@ -525,7 +539,7 @@ function findOffensiveMobilityTarget(
   const partyTarget = getPartyCombatTarget(state);
 
   if (
-    partyTarget &&
+    partyTarget?.kind === "enemy" &&
     isEnemyInRange(caster, partyTarget, range) &&
     isAllowedEnemyTarget(partyTarget, options)
   ) {
@@ -1158,7 +1172,7 @@ function getProtectiveTauntCandidates(
 export function isProtectiveTauntSkillUse(
   state: GameState,
   skill: SkillDefinition,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
 ): target is Enemy {
   return skill.id === "throw_rock" && isLivingEnemy(target) && isProtectiveTauntTarget(state, target);
 }
@@ -1266,7 +1280,7 @@ function getKickTargetPriority(
 export function isSupportAttackerKickSkillUse(
   state: GameState,
   skill: SkillDefinition,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
 ): target is Enemy {
   return skill.id === "kick" && isLivingEnemy(target) && isEnemyAttackingRole(state, target, "support");
 }
@@ -1275,7 +1289,7 @@ export function isLeaderOpeningKickSkillUse(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
 ): target is Enemy {
   return (
     skill.id === "kick" &&

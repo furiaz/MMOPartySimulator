@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, type MouseEvent, type PointerEvent } from "react";
+import { getEntityPointerHit as getSharedEntityPointerHit } from "./PixiWorldRendererHelpers";
+import type { BarrackRuntime } from "../game/types";
+import { BARRACK_PREPARATION_MS } from "../game/barrackDefinitions";
 import * as PIXI from "pixi.js";
 import type {
   Application as PixiApplication,
@@ -40,7 +43,6 @@ import type {
   LeaderIntent,
   MapVisualObject,
   NavigationClickAccessibility,
-  NpcEntity,
   PartyIntent,
   Position,
   ResolvedAoeArea,
@@ -342,6 +344,7 @@ type PixiWorldRendererProps = {
   onPatronWardClick?: (wardId: import("../game").PatronWardId) => void;
   partyIntent?: PartyIntent | null;
   patronWardPresentation?: PatronWardPresentationState | null;
+  barracksById?: Record<string, BarrackRuntime>;
   questEntityIndicators?: QuestEntityIndicator[];
   questObjectiveMarkers?: QuestObjectiveMarker[];
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
@@ -471,14 +474,14 @@ type StaticMapRenderCache = {
   sortedVisualObjects: MapVisualObject[];
 };
 
-type InteractableEntityKind = "enemy" | "resource" | "npc";
+type InteractableEntityKind = "enemy" | "structure" | "resource" | "npc";
 
 type InteractableEntity = GameEntity & {
   kind: InteractableEntityKind;
 };
 
 type DirectCommandDropTarget = GameEntity & {
-  kind: "resource" | "enemy";
+  kind: "resource" | "enemy" | "structure";
 };
 
 type EntitySpriteLayout = {
@@ -533,6 +536,7 @@ type DrawWorldOptions = {
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
   patronWardPresentation: PatronWardPresentationState | null;
+  barracksById: Record<string, BarrackRuntime>;
   questEntityIndicators: QuestEntityIndicator[];
   questObjectiveMarkers: QuestObjectiveMarker[];
   questGiverHasWork: boolean;
@@ -1588,7 +1592,7 @@ function getEntityHealthPercent(entity: GameEntity): number | null {
 }
 
 function isInteractableEntity(entity: GameEntity): entity is InteractableEntity {
-  if (entity.kind === "enemy") {
+  if (entity.kind === "enemy" || entity.kind === "structure") {
     return entity.state !== "dead";
   }
 
@@ -1614,7 +1618,7 @@ function getNearestInteractableEntity({
   map: GameMap;
   mapPosition: Position;
 }): InteractableEntity | null {
-  const priorities: InteractableEntityKind[] = ["npc", "resource", "enemy"];
+  const priorities: InteractableEntityKind[] = ["npc", "structure", "resource", "enemy"];
   const maximumDistanceSquared =
     fullModeInteractionRadius * fullModeInteractionRadius;
 
@@ -1717,7 +1721,7 @@ function getNearestDirectCommandDropTarget({
   map: GameMap;
   mapPosition: Position;
 }): DirectCommandDropTarget | null {
-  const priorities: DirectCommandDropTarget["kind"][] = ["resource", "enemy"];
+  const priorities: DirectCommandDropTarget["kind"][] = ["structure", "resource", "enemy"];
   const maximumDistanceSquared =
     fullModeInteractionRadius * fullModeInteractionRadius;
 
@@ -1793,7 +1797,7 @@ function getCompanionDragPreview({
     };
   }
 
-  if (target?.kind === "enemy") {
+  if (target?.kind === "enemy" || target?.kind === "structure") {
     return {
       companionId,
       targetKind: "enemy",
@@ -1822,6 +1826,7 @@ function getNearestHoverEntity({
   const priorities: Array<GameEntity["kind"]> = [
     "npc",
     "companion",
+    "structure",
     "resource",
     "enemy",
   ];
@@ -1875,6 +1880,9 @@ function getEntityPointerHit({
   map: GameMap;
   mapPosition: Position;
 }): { distanceSquared: number } | null {
+  if (entity.kind === "structure") {
+    return getSharedEntityPointerHit({ cellPixelSize, entity, map, mapPosition });
+  }
   const isContentBoundsHit = isInsideImageContentBounds(
     entity,
     map,
@@ -5491,6 +5499,7 @@ function drawFullMapVisualObjects({
   requestRedraw,
   transform,
   visibleTileBounds,
+  entities,
 }: {
   cache: TextureCache;
   layer: Container;
@@ -5500,10 +5509,12 @@ function drawFullMapVisualObjects({
   requestRedraw?: () => void;
   transform: FullTransform;
   visibleTileBounds: TileBounds;
+  entities: GameEntity[];
 }) {
   const visualObjects = getStaticMapRenderCache(map).sortedVisualObjects;
 
   for (const visualObject of visualObjects) {
+    if (entities.some(entity => entity.kind === "structure" && entity.id === visualObject.id && entity.health <= 0)) continue;
     if (
       map.id === "map-6" &&
       PATRON_WARD_VISUAL_OBJECT_IDS.has(visualObject.id)
@@ -5946,6 +5957,7 @@ function drawFullEntities({
 
   for (const entity of sortedByY) {
     if (
+      entity.kind === "structure" ||
       !shouldRenderEntity(entity) ||
       !isPositionInTileBounds(entity.position, visibleTileBounds)
     ) {
@@ -6457,7 +6469,7 @@ function drawPreviewMap(
   }
 
   for (const entity of entities) {
-    if (!shouldRenderEntity(entity)) {
+    if (entity.kind === "structure" || !shouldRenderEntity(entity)) {
       continue;
     }
 
@@ -6543,6 +6555,7 @@ function drawFullMap({
   onPerformanceSample,
   partyIntent,
   patronWardPresentation,
+  barracksById,
   questEntityIndicators,
   questObjectiveMarkers,
   questGiverHasWork,
@@ -6584,6 +6597,7 @@ function drawFullMap({
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
   patronWardPresentation: PatronWardPresentationState | null;
+  barracksById: Record<string, BarrackRuntime>;
   questEntityIndicators: QuestEntityIndicator[];
   questObjectiveMarkers: QuestObjectiveMarker[];
   questGiverHasWork: boolean;
@@ -6658,6 +6672,7 @@ function drawFullMap({
     requestRedraw,
     transform,
     visibleTileBounds,
+    entities,
   });
   drawPatronWardObjects({
     cache: textureCache,
@@ -6966,6 +6981,30 @@ function drawFullMap({
     transform,
     visibleTileBounds,
   });
+  for (const entity of entities) {
+    if (entity.kind !== "structure" || entity.health <= 0) continue;
+    const visual = map.visualObjects?.find(object => object.id === entity.id);
+    if (!visual || !isMapVisualObjectInTileBounds(visual, visibleTileBounds)) continue;
+    const runtime = barracksById[entity.id];
+    const center = toFullPosition(entity.position, transform);
+    const width = visual.widthCells * cellPixelSize;
+    const height = visual.heightCells * cellPixelSize;
+    const x = center.x - width / 2;
+    const y = center.y + cellPixelSize / 2 - height;
+    const pulse = 0.35 + Math.sin(currentTime / 240) * 0.15;
+    overlayGraphics.roundRect(x, y, width, height, 6).stroke({ color: 0xef4444, alpha: pulse, width: visual.widthCells > 3 ? 3 : 2 });
+    overlayGraphics.rect(x, y - 12, width, 6).fill(0x450a0a);
+    overlayGraphics.rect(x, y - 12, width * entity.health / entity.maxHealth, 6).fill(0xef4444);
+    if (runtime?.wasInRange && runtime.preparationMs > 0) {
+      overlayGraphics.rect(x, y - 4, width, 4).fill(0x422006);
+      overlayGraphics.rect(x, y - 4, width * runtime.preparationMs / BARRACK_PREPARATION_MS, 4).fill(0xfbbf24);
+    }
+    if ((runtime?.hintExpiresAtMs ?? 0) > currentTime) {
+      drawManagedFeedbackText({ color: 0xfef08a, fontSize: 12, key: `barrack-hint:${entity.id}`,
+        layer: layers.effectsLayer, managedState, metrics,
+        position: { x: center.x, y: center.y + cellPixelSize }, text: "Click the Barrack to attack it" });
+    }
+  }
   drawPatronWardLabels({
     layer: layers.effectsLayer,
     managedState,
@@ -7029,8 +7068,7 @@ function drawNpcSpeechLayer({
 }): boolean {
   const speaker = speech
     ? entities.find(
-        (entity): entity is NpcEntity =>
-          entity.id === speech.npcId && entity.kind === "npc",
+        (entity) => entity.id === speech.npcId && (entity.kind === "npc" || (entity.kind === "structure" && entity.health > 0)),
       )
     : null;
 
@@ -7055,7 +7093,9 @@ function drawNpcSpeechLayer({
   const transform: FullTransform = { cameraOffset, cellPixelSize };
   const entityPosition = toFullPosition(speaker.position, transform);
   const visualAsset = getEntityVisualAsset(speaker, map.id);
-  const spriteLayout = getEntitySpriteLayout(
+  const spriteLayout = speaker.kind === "structure"
+    ? { height: (map.visualObjects?.find(object => object.id === speaker.id)?.heightCells ?? 3) * cellPixelSize, anchorY: 1 }
+    : getEntitySpriteLayout(
     speaker,
     cellPixelSize,
     visualAsset,
@@ -7207,6 +7247,7 @@ function drawWorld({
   onPerformanceSample,
   partyIntent,
   patronWardPresentation,
+  barracksById,
   fullHadTimedWorkRef,
   fullSignatureRef,
   lastDrawnTextureRevisionRef,
@@ -7247,6 +7288,7 @@ function drawWorld({
       movementClickFeedbackEvents,
       mode,
       patronWardPresentation,
+      barracksById,
       skillBindsByEnemyId,
       skillMarksByEnemyId,
       skillShieldBlocksById,
@@ -7256,6 +7298,7 @@ function drawWorld({
       visualMovementByEntityId,
     });
     const fullSignature = `${getFullRenderSignature({
+      barracksById,
       activeTeleport,
       cameraOffset,
       cellPixelSize,
@@ -7332,6 +7375,7 @@ function drawWorld({
       onPerformanceSample,
       partyIntent,
       patronWardPresentation,
+      barracksById,
       questEntityIndicators,
       questObjectiveMarkers,
       questGiverHasWork,
@@ -7421,6 +7465,7 @@ function hasActiveTimedRendererWork({
   movementClickFeedbackEvents,
   mode,
   patronWardPresentation,
+  barracksById,
   skillBindsByEnemyId,
   skillMarksByEnemyId,
   skillShieldBlocksById,
@@ -7442,6 +7487,7 @@ function hasActiveTimedRendererWork({
   movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   mode: PixiRendererMode;
   patronWardPresentation: PatronWardPresentationState | null;
+  barracksById: Record<string, BarrackRuntime>;
   skillBindsByEnemyId: Record<string, SkillBindState>;
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
@@ -7460,6 +7506,7 @@ function hasActiveTimedRendererWork({
 
   return (
     Boolean(activeTeleport) ||
+    entities.some(entity => entity.kind === "structure" && (barracksById[entity.id]?.health ?? entity.health) > 0) ||
     Boolean(
       patronWardPresentation?.barrier ||
         patronWardPresentation?.wards.some(
@@ -7569,6 +7616,7 @@ export function PixiWorldRenderer({
   onResourceClick,
   partyIntent = null,
   patronWardPresentation = null,
+  barracksById = {},
   questEntityIndicators = [],
   questObjectiveMarkers = [],
   resurrectionProgressByCompanionId = {},
@@ -7635,6 +7683,7 @@ export function PixiWorldRenderer({
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
   const latestPatronWardPresentationRef = useRef(patronWardPresentation);
+  const latestBarracksByIdRef = useRef(barracksById);
   const latestQuestEntityIndicatorsRef = useRef(questEntityIndicators);
   const latestQuestObjectiveMarkersRef = useRef(questObjectiveMarkers);
   const latestQuestGiverHasWorkRef = useRef(questGiverHasWork);
@@ -7743,6 +7792,7 @@ export function PixiWorldRenderer({
     latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestPartyIntentRef.current = partyIntent;
     latestPatronWardPresentationRef.current = patronWardPresentation;
+    latestBarracksByIdRef.current = barracksById;
     latestQuestEntityIndicatorsRef.current = questEntityIndicators;
     latestQuestObjectiveMarkersRef.current = questObjectiveMarkers;
     latestQuestGiverHasWorkRef.current = questGiverHasWork;
@@ -7782,6 +7832,7 @@ export function PixiWorldRenderer({
     onPerformanceSample,
     partyIntent,
     patronWardPresentation,
+    barracksById,
     questEntityIndicators,
     questObjectiveMarkers,
     questGiverHasWork,
@@ -7861,6 +7912,7 @@ export function PixiWorldRenderer({
           latestMovementClickFeedbackEventsRef.current,
         mode: latestModeRef.current,
         patronWardPresentation: latestPatronWardPresentationRef.current,
+        barracksById: latestBarracksByIdRef.current,
         skillBindsByEnemyId: latestSkillBindsByEnemyIdRef.current,
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
@@ -7914,6 +7966,7 @@ export function PixiWorldRenderer({
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
         patronWardPresentation: latestPatronWardPresentationRef.current,
+        barracksById: latestBarracksByIdRef.current,
         fullHadTimedWorkRef,
         fullSignatureRef,
         lastDrawnTextureRevisionRef,
@@ -8269,7 +8322,7 @@ export function PixiWorldRenderer({
       return;
     }
 
-    if (target?.kind === "enemy") {
+    if (target?.kind === "enemy" || target?.kind === "structure") {
       onCompanionDragCommand({
         type: "attack",
         companionId: dragState.companionId,
@@ -8367,7 +8420,7 @@ export function PixiWorldRenderer({
       return;
     }
 
-    if (entity?.kind === "enemy") {
+    if (entity?.kind === "enemy" || entity?.kind === "structure") {
       onEnemyClick?.(entity.id);
       return;
     }

@@ -1,4 +1,5 @@
 import { isActiveResource, isLivingCompanion, isLivingEnemy } from "./entityGuards";
+import { isLivingHostileTarget, getStructureApproachPosition } from "./combatStructures";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getGridDistance } from "./positionUtils";
 import { clearResurrectionRecoveryAssignmentForCompanion } from "./resurrectionSystem";
@@ -147,7 +148,7 @@ export function updateDirectCompanionCommandSystem(
     const target = getEntityById(nextState, command.targetId);
 
     if (command.type === "attack") {
-      if (!isLivingEnemy(target)) {
+      if (!isLivingHostileTarget(target)) {
         nextState = clearDirectCompanionCommand(
           nextState,
           command,
@@ -255,12 +256,13 @@ function validateDirectCommand(
   const target = getEntityById(state, input.targetId);
 
   if (input.type === "attack") {
-    if (!isLivingEnemy(target)) {
+    if (!isLivingHostileTarget(target)) {
       return { code: "invalid_target", targetPosition: null };
     }
 
-    return isWithinDirectCommandRange(state, companion, target.position)
-      ? { code: "success", targetPosition: { ...target.position } }
+    const approach = target.kind === "structure" ? getStructureApproachPosition(state, companion, target) : target.position;
+    return approach && isWithinDirectCommandRange(state, companion, approach)
+      ? { code: "success", targetPosition: { ...approach } }
       : { code: "out_of_range", targetPosition: null };
   }
 

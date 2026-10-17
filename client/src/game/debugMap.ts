@@ -15,6 +15,7 @@ import type {
   ZoneSubzonePassage,
 } from "./types";
 import { bakeNavigationGrid } from "./navigation";
+import { BARRACK_DEFINITIONS, getBarrackCollisionCells } from "./barrackDefinitions";
 import {
   createCircularBarrierCollisionCells,
   createNightmireBarrierCollisionCells,
@@ -169,12 +170,7 @@ export const mapSixForwardTeleporterPosition: Position = { x: 104, y: 29 };
 export const mapSevenReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const MAP_SEVEN_ROUTE_BARRACK_ID = "map-7-route-barrack";
 export const MAP_SEVEN_ROUTE_BARRACK_POSITION: Position = { x: 75, y: 26 };
-export const MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS = createHorizontalWall(
-  MAP_SEVEN_ROUTE_BARRACK_POSITION.y,
-  70,
-  79,
-  [],
-);
+export const MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS = getBarrackCollisionCells(BARRACK_DEFINITIONS[0]);
 export const MAP_SEVEN_ARENA_GATE_POSITION: Position = { x: 87, y: 51 };
 export const MAP_SEVEN_ARENA_GATE_RADIUS = 5;
 export const MAP_SEVEN_ARENA_GATE_COLLISION_CELLS =
@@ -1719,6 +1715,7 @@ const MAP_SEVEN_WALLS = dedupeWalls([
   ...createPerimeterWalls(POST_HUB_TWO_MAP_COLUMNS, POST_HUB_TWO_MAP_ROWS),
   // The route begins at the north edge of the field and runs down the center-right.
   ...createVerticalWall(69, 5, 55, []),
+  // Keep walkable lanes beside the route Barrack; destroying it is optional.
   // The Boss arena occupies the east side and opens only from the route's southern end.
   ...createVerticalWall(80, 1, 51, []),
   ...createHorizontalWall(1, 81, 108, []),

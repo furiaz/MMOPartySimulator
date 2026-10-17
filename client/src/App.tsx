@@ -2959,6 +2959,11 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
     return getResourceTooltipDetails(entity);
   }
 
+  if (entity.kind === "structure") return { title: entity.displayName, rows: [
+    { label: "HP", value: `${entity.health}/${entity.maxHealth}` },
+    { label: "Type", value: "Combat structure" },
+  ] };
+
   return {
     title: entity.displayName,
     rows: [
@@ -3821,13 +3826,16 @@ function App() {
         text: questSpeechCue.text,
       }
     : null;
-  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech]
+  const structureSpeech: ActiveNpcSpeech[] = Object.entries(gameState.barracksById ?? {}).flatMap(([id, runtime]) =>
+    runtime.speech && gameState.entities[id]?.kind === "structure" && runtime.health > 0
+      ? [{ ...runtime.speech, npcId: id, mapId: currentMap.id }] : []);
+  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech, ...structureSpeech]
     .filter(
       (speech): speech is ActiveNpcSpeech =>
         speech !== null &&
         speech.expiresAt > currentTime &&
         (!speech.mapId || speech.mapId === currentMap.id) &&
-        gameState.entities[speech.npcId]?.kind === "npc",
+        (gameState.entities[speech.npcId]?.kind === "npc" || gameState.entities[speech.npcId]?.kind === "structure"),
     )
     .sort((first, second) => first.createdAt - second.createdAt)
     .at(-1) ?? null;
@@ -7078,6 +7086,7 @@ function App() {
               movementClickFeedbackEvents={activeMovementClickFeedbackEvents}
               navigationClickAccessibility={navigationClickAccessibility}
               npcSpeech={visibleNpcSpeech}
+              barracksById={gameState.barracksById}
               onCompanionDragCommand={commandCompanionByDrag}
               onEnemyClick={commandPartyToTargetEnemy}
               onEntityHover={updateEntityHoverTooltip}

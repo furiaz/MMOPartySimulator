@@ -1,5 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
+import { isLivingHostileTarget, isHostileTargetInRadius } from "./combatStructures";
+import type { CombatStructure, HostileCombatTarget } from "./types";
 import {
   isLivingCompanion,
   isLivingEnemy,
@@ -82,7 +84,7 @@ const DEFAULT_SHIELD_DIRECTION: Position = { x: 0, y: -1 };
 
 export type SkillUse = {
   skill: SkillDefinition;
-  target?: Enemy | Companion;
+  target?: Enemy | Companion | CombatStructure;
   score: number;
   selectionPriority: number;
 };
@@ -170,7 +172,7 @@ function resolvePreparedSkillEffect(
 ): SkillEffectResolutionResult {
   const { target, skill } = skillUse;
 
-  if (skill.effect.type === "damage" && isLivingEnemy(target)) {
+  if (skill.effect.type === "damage" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyDamageSkill(state, caster, target, skill, now),
@@ -178,7 +180,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "followThrough" && isLivingEnemy(target)) {
+  if (skill.effect.type === "followThrough" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyFollowThrough(state, caster, target, skill, now),
@@ -186,7 +188,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "lungeDamage" && isLivingEnemy(target)) {
+  if (skill.effect.type === "lungeDamage" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyLungeDamageSkill(state, caster, target, skill, now),
@@ -194,7 +196,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "sweepingDamage" && isLivingEnemy(target)) {
+  if (skill.effect.type === "sweepingDamage" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applySweepingStrike(state, caster, target, skill, now),
@@ -202,7 +204,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "taunt" && isLivingEnemy(target)) {
+  if (skill.effect.type === "taunt" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyTaunt(state, caster, target, skill, now),
@@ -416,7 +418,7 @@ function resolvePreparedSkillEffect(
     return consumeSkillEffect(appliedState, target?.id ?? caster.id);
   }
 
-  if (skill.effect.type === "whipPrison" && isLivingEnemy(target)) {
+  if (skill.effect.type === "whipPrison" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyWhipPrison(state, caster, target, skill, now),
@@ -424,7 +426,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "flagellantLash" && isLivingEnemy(target)) {
+  if (skill.effect.type === "flagellantLash" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyFlagellantLash(state, caster, target, skill, now),
@@ -432,7 +434,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "silencingRay" && isLivingEnemy(target)) {
+  if (skill.effect.type === "silencingRay" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applySilencingRay(state, caster, target, skill, now),
@@ -440,7 +442,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "arrowBurst" && isLivingEnemy(target)) {
+  if (skill.effect.type === "arrowBurst" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyArrowBurst(state, caster, target, skill, now),
@@ -448,7 +450,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "fireBurst" && isLivingEnemy(target)) {
+  if (skill.effect.type === "fireBurst" && isLivingHostileTarget(target)) {
     return resolveAppliedSkillEffect(
       state,
       applyFireBurst(state, caster, target, skill, now),
@@ -754,7 +756,7 @@ function findRunicFocusDuplicateTarget(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
-  originalTarget: Enemy | Companion | undefined,
+  originalTarget: Enemy | Companion | CombatStructure | undefined,
 ): Enemy | Companion | undefined {
   if (
     skill.effect.type === "damage" ||
@@ -793,7 +795,7 @@ function findRunicFocusDuplicateTarget(
 function applyDamageSkill(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -827,7 +829,7 @@ function applyDamageSkill(
 function applyFollowThrough(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -835,7 +837,7 @@ function applyFollowThrough(
     return state;
   }
 
-  const conditionalBonus = isFollowThroughBonusTarget(state, caster, target)
+  const conditionalBonus = target.kind === "enemy" && isFollowThroughBonusTarget(state, caster, target)
     ? skill.effect.conditionalBonusMultiplier
     : 0;
   let nextState = damageEnemy(
@@ -864,7 +866,7 @@ function applyFollowThrough(
 function applyLungeDamageSkill(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -898,7 +900,7 @@ function applyLungeDamageSkill(
 
   const currentTarget = nextState.entities[target.id];
 
-  if (isLivingEnemy(currentTarget)) {
+  if (isLivingHostileTarget(currentTarget)) {
     nextState = damageEnemy(
       nextState,
       lungedCaster,
@@ -927,7 +929,7 @@ function applyLungeDamageSkill(
 function applySweepingStrike(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -949,12 +951,11 @@ function applySweepingStrike(
 
   for (const enemy of Object.values(nextState.entities)) {
     if (
-      enemy.kind !== "enemy" ||
+      !isLivingHostileTarget(enemy) ||
       enemy.id === target.id ||
       enemy.state === "dead" ||
       !currentTarget ||
-      getGridDistance(enemy.position, currentTarget.position) >
-        skill.effect.splashRange
+      !isHostileTargetInRadius(enemy, currentTarget.position, skill.effect.splashRange)
     ) {
       continue;
     }
@@ -986,7 +987,7 @@ function applySweepingStrike(
 function applyTaunt(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -1116,7 +1117,7 @@ function applyMultiTaunt(
 function applyPinningShot(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -2321,11 +2322,11 @@ function applyPartyMitigationBuff(
 function applyQuickStep(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "quickStep" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "quickStep" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -2378,11 +2379,11 @@ function applyQuickStep(
 function applySkirmishShot(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "skirmishShot" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "skirmishShot" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -2416,7 +2417,7 @@ function applySkirmishShot(
   let nextState = updateEntity(state, movedCaster);
   const currentTarget = nextState.entities[target.id];
 
-  if (isLivingEnemy(currentTarget)) {
+  if (isLivingHostileTarget(currentTarget)) {
     nextState = damageEnemy(
       nextState,
       movedCaster,
@@ -2451,11 +2452,11 @@ function applySkirmishShot(
 function applyPounce(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "pounce" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "pounce" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -2489,7 +2490,7 @@ function applyPounce(
   let nextState = updateEntity(state, movedCaster);
   const currentTarget = nextState.entities[target.id];
 
-  if (isLivingEnemy(currentTarget)) {
+  if (isLivingHostileTarget(currentTarget)) {
     nextState = damageEnemy(
       nextState,
       movedCaster,
@@ -2524,11 +2525,11 @@ function applyPounce(
 function applyFlameStep(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "flameStep" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "flameStep" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -2562,7 +2563,7 @@ function applyFlameStep(
   let nextState = updateEntity(state, movedCaster);
   const currentTarget = nextState.entities[target.id];
 
-  if (isLivingEnemy(currentTarget)) {
+  if (isLivingHostileTarget(currentTarget)) {
     nextState = applyBurning(
       nextState,
       movedCaster,
@@ -2594,11 +2595,11 @@ function applyFlameStep(
 function applyRuneStep(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "runeStep" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "runeStep" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -2681,11 +2682,11 @@ function applyRuneStep(
 function applyDawnStep(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "dawnStep" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "dawnStep" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -2769,7 +2770,7 @@ function applyDawnStep(
 function applyArrowBurst(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -2781,9 +2782,8 @@ function applyArrowBurst(
   const { damageType, powerMultiplier, radius } = skill.effect;
   const targets = Object.values(state.entities)
     .filter(
-      (entity): entity is Enemy =>
-        isLivingEnemy(entity) &&
-        getGridDistance(entity.position, target.position) <= radius,
+      (entity): entity is HostileCombatTarget =>
+        isLivingHostileTarget(entity) && isHostileTargetInRadius(entity, target.position, radius),
     )
     .sort(
       (a, b) =>
@@ -2799,7 +2799,7 @@ function applyArrowBurst(
   for (const burstTarget of targets) {
     const currentTarget = nextState.entities[burstTarget.id];
 
-    if (!isLivingEnemy(currentTarget)) {
+    if (!isLivingHostileTarget(currentTarget)) {
       continue;
     }
 
@@ -2830,7 +2830,7 @@ function applyArrowBurst(
 function applyFireBurst(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -2842,9 +2842,8 @@ function applyFireBurst(
   let nextState = state;
   const targets = Object.values(state.entities)
     .filter(
-      (entity): entity is Enemy =>
-        isLivingEnemy(entity) &&
-        getGridDistance(entity.position, target.position) <= effect.radius,
+      (entity): entity is HostileCombatTarget =>
+        isLivingHostileTarget(entity) && isHostileTargetInRadius(entity, target.position, effect.radius),
     )
     .sort(
       (a, b) =>
@@ -2860,7 +2859,7 @@ function applyFireBurst(
   for (const burstTarget of targets) {
     const currentTarget = nextState.entities[burstTarget.id];
 
-    if (!isLivingEnemy(currentTarget)) {
+    if (!isLivingHostileTarget(currentTarget)) {
       continue;
     }
 
@@ -2877,7 +2876,7 @@ function applyFireBurst(
 
     const targetAfterDamage = nextState.entities[burstTarget.id];
 
-    if (isLivingEnemy(targetAfterDamage)) {
+    if (isLivingHostileTarget(targetAfterDamage)) {
       nextState = applyBurning(
         nextState,
         caster,
@@ -2951,7 +2950,7 @@ function applyShieldBlock(
 function applyBind(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -2984,11 +2983,11 @@ function applyBind(
 function applyAtonementStep(
   state: GameState,
   caster: Companion,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   skill: SkillDefinition,
   now: number,
 ): GameState | null {
-  if (skill.effect.type !== "atonementStep" || !isLivingEnemy(target)) {
+  if (skill.effect.type !== "atonementStep" || !isLivingHostileTarget(target)) {
     return null;
   }
 
@@ -3128,7 +3127,7 @@ function applyAtonementStep(
 function applySilencingRay(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -3628,7 +3627,7 @@ function getLivingEnemiesInRange(
 function damageEnemy(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   label: string,
   now: number,
   damageType: "physical" | "magic",
@@ -3674,7 +3673,7 @@ function damageEnemy(
 function applyWhipPrison(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -3721,10 +3720,8 @@ function applyWhipPrison(
     sourceKey: skill.effect.sourceKey,
     now,
   });
-  nextState = updateEntity(nextState, {
-    ...target,
-    state: "attack",
-    currentTargetId: caster.id,
+  if (target.kind === "enemy") nextState = updateEntity(nextState, {
+    ...target, state: "attack", currentTargetId: caster.id,
   });
   const visualDurationMs = Math.max(
     controlDurationMs,
@@ -3759,7 +3756,7 @@ function applyWhipPrison(
 function applyFlagellantLash(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -3791,7 +3788,7 @@ function applyFlagellantLash(
   );
   const currentTarget = nextState.entities[target.id];
 
-  if (isLivingEnemy(currentTarget)) {
+  if (isLivingHostileTarget(currentTarget)) {
     nextState = applyBleed(nextState, currentCaster, currentTarget, {
       durationMs: getCrimsonAuthorityDurationMs(
         currentCaster,
@@ -3811,7 +3808,7 @@ function applyFlagellantLash(
 function applyBurning(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -3843,7 +3840,7 @@ function applyBurning(
 function applyBleed(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   {
     damageAttackPowerPercent,
     durationMs,

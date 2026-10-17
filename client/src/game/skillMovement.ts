@@ -5,7 +5,8 @@ import {
 } from "./movementPlanning";
 import type { GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
-import type { Companion, Enemy, GameEntity, Position } from "./types";
+import type { Companion, HostileCombatTarget, GameEntity, Position } from "./types";
+import { getCombatTargetPosition, hasStructureLineOfSight } from "./combatStructures";
 
 const SKILL_MOVEMENT_SAMPLE_DISTANCE = 0.1;
 const QUICK_STEP_ANGLE_OFFSETS_RADIANS = [
@@ -23,21 +24,24 @@ type SkillPositionOptions = {
 export function getClearLungePosition(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   distance: number,
 ): Position | null {
   if (
-    !isDirectSkillPathClear(state, caster.position, target.position, {
-      ignoredEntityIds: [caster.id, target.id],
-    })
+    target.kind === "structure"
+      ? !hasStructureLineOfSight(state, caster.position, target)
+      : !isDirectSkillPathClear(state, caster.position, target.position, {
+          ignoredEntityIds: [caster.id, target.id],
+        })
   ) {
     return null;
   }
 
+  const targetPosition = getCombatTargetPosition(caster.position, target);
   const direction = getUnitDirection(
     {
-      x: target.position.x - caster.position.x,
-      y: target.position.y - caster.position.y,
+      x: targetPosition.x - caster.position.x,
+      y: targetPosition.y - caster.position.y,
     },
     { x: 0, y: 0 },
   );

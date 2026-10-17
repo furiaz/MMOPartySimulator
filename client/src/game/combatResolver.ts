@@ -248,7 +248,7 @@ export function resolveAndApplyCombatDamage(
 
     if (finalDamage > 0) {
       const damagedTarget = damageEntity(target, finalDamage);
-      nextState = updateEntity(nextState, damagedTarget);
+      nextState = updateEntity(nextState, damagedTarget, options.now);
       if (damagedTarget.kind === "companion") {
         nextState = {
           ...nextState,
@@ -287,7 +287,7 @@ export function resolveAndApplyCombatDamage(
 
   const updatedTarget = nextState.entities[target.id];
   const resolvedTarget =
-    updatedTarget && (updatedTarget.kind === "companion" || updatedTarget.kind === "enemy")
+    updatedTarget && (updatedTarget.kind === "companion" || updatedTarget.kind === "enemy" || updatedTarget.kind === "structure")
       ? updatedTarget
       : target;
 
@@ -391,7 +391,7 @@ function getBasePower(
   attacker: CombatEntity,
   damageType: CombatDamageType,
 ): number {
-  if (attacker.kind === "enemy") {
+  if (attacker.kind === "enemy" || attacker.kind === "structure") {
     return attacker.attack;
   }
 
@@ -408,7 +408,7 @@ function getCombatStats(
     return getCompanionDerivedStatsWithPartyBuffs(state, entity);
   }
 
-  const enemyStats = getEnemyCombatStats(entity);
+  const enemyStats = entity.kind === "structure" ? entity : getEnemyCombatStats(entity);
 
   return {
     attack: enemyStats.attack,
