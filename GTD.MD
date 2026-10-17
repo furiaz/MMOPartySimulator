@@ -3437,6 +3437,16 @@ Current post-Hub-2 map enemy groups:
 - `map-6`: Night Bat level 16, Elder Mossling level 17, Cinder Wisp level 18
 - `map-7`: Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, Orc Warmaster level 20
 
+Planned `map-7` topology for Issue #678:
+
+- Keep the 110-by-57 footprint already used by `map-6`.
+- Treat an open Orc field of roughly 60% of the map, a vertical route of roughly 15%, and a Boss arena of roughly 25% as approximate authoring budgets rather than rigid region boundaries.
+- Keep the field open and farmable, with Orcs authored in loose squads. Auto Mode may route toward the route and arena anchors, but must not turn the field into a mandatory ordered checkpoint gauntlet.
+- Start the route near the field's upper side, run it south, and connect it to the arena from below. The route contains one squad and one barrack at a narrow choke; map geometry must leave a clear passage after the barrack is destroyed and must not create a party-trapping corridor.
+- Reserve the arena for two barracks, the Warmaster encounter anchor, the cage and repeatable chest, and central combat lanes for party movement, dashes, and AoEs.
+- Map data owns fixed geometry and placement anchors. Barrack health/behavior and Boss-gate progression are owned by their separate implementation issues; the layout must not encode them as a chain of mandatory field checkpoints.
+- The arena entrance barrier should follow the existing Nightmire Patron barrier's circular collision and visual behavior. Keep its rendered area and collision geometry aligned, and let Boss-gate progression determine when the passage is open.
+
 Authored wild-enemy ids are assigned centrally after encounter-area filtering. Their format is `zone-<zone-number>-<enemy-type-token>-<two-digit-sequence>`, with underscores in the enemy type converted to hyphens. Sequences are one-based, restart independently for each enemy type, and span the whole wilderness zone rather than each subzone. Dungeon, quest-spawned, hub target-dummy, and explicit debug-summon ids retain their existing ownership and formats.
 
 ---

@@ -15,7 +15,16 @@ import {
   MAP_ONE_ROWS,
   MAP_ONE_ID,
   MAP_SEVEN_ID,
+  MAP_SEVEN_ARENA_BARRACK_POSITIONS,
+  MAP_SEVEN_ARENA_GATE_COLLISION_CELLS,
+  MAP_SEVEN_ARENA_GATE_POSITION,
+  MAP_SEVEN_CAGE_POSITION,
+  MAP_SEVEN_REPEAT_CHEST_POSITION,
+  MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS,
+  MAP_SEVEN_ROUTE_BARRACK_ID,
+  MAP_SEVEN_ROUTE_BARRACK_POSITION,
   MAP_SEVEN_TO_MAP_SIX_TELEPORTER_ID,
+  MAP_SEVEN_WARMASTER_POSITION,
   MAP_SIX_ID,
   NIGHTMIRE_BARRIER_COLLISION_CELLS,
   MAP_SIX_TO_MAP_FIVE_TELEPORTER_ID,
@@ -94,7 +103,11 @@ import {
   targetDummyPosition,
 } from "./debugMap";
 import { ENEMY_TYPES } from "./enemyArchetypes";
-import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
+import {
+  findNavigationPath,
+  getNavigationDistance,
+  isNavigationCellWalkable,
+} from "./navigation";
 import { NIGHTMIRE_BARRIER_CENTER } from "./patronWardState";
 import { QUEST_DEFINITIONS } from "./questSystem";
 import type { DebugMapId, GameMap, Position, ZoneSubzone } from "./types";
@@ -198,7 +211,7 @@ describe("debug maps", () => {
 
     expect(warmasters).toEqual([
       expect.objectContaining({
-        position: { x: 82, y: 29 },
+        position: MAP_SEVEN_WARMASTER_POSITION,
         encounterBand: "boss",
       }),
     ]);
@@ -207,6 +220,84 @@ describe("debug maps", () => {
         (enemy) => enemy.enemyTypeId === "azure_mass",
       ),
     ).toMatchObject({ encounterBand: "boss" });
+  });
+
+  it("lays out Orc Warcamp as an open farm, a single route choke, and a bottom-entry arena", () => {
+    const map = createDebugMap(MAP_SEVEN_ID);
+    const destroyedBarrackMap = createDebugMap(MAP_SEVEN_ID, {
+      mapSevenRouteBarrackDestroyed: true,
+    });
+    const blockedGateMap = createDebugMap(MAP_SEVEN_ID, {
+      mapSevenRouteBarrackDestroyed: true,
+      mapSevenArenaGateClosed: true,
+    });
+    const routeBarrack = map.visualObjects?.find(
+      (visualObject) => visualObject.id === MAP_SEVEN_ROUTE_BARRACK_ID,
+    );
+    const warmaster = mapSevenEnemyStartData.find(
+      (enemy) => enemy.enemyTypeId === "orc_warmaster",
+    );
+
+    expect(routeBarrack?.position).toEqual(MAP_SEVEN_ROUTE_BARRACK_POSITION);
+    expect(map.collisionWalls).toEqual(MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS);
+    expect(
+      destroyedBarrackMap.visualObjects?.some(
+        (visualObject) => visualObject.id === MAP_SEVEN_ROUTE_BARRACK_ID,
+      ),
+    ).toBe(false);
+    expect(destroyedBarrackMap.collisionWalls).toBeUndefined();
+    expect(warmaster?.position).toEqual(MAP_SEVEN_WARMASTER_POSITION);
+    expect(MAP_SEVEN_ARENA_BARRACK_POSITIONS).toEqual([
+      { x: 88, y: 12 },
+      { x: 102, y: 12 },
+    ]);
+    expect(mapSevenEnemyStartData).toHaveLength(19);
+
+    for (const anchor of [
+      ...MAP_SEVEN_ARENA_BARRACK_POSITIONS,
+      MAP_SEVEN_WARMASTER_POSITION,
+      MAP_SEVEN_CAGE_POSITION,
+      MAP_SEVEN_REPEAT_CHEST_POSITION,
+    ]) {
+      expect(isNavigationCellWalkable(destroyedBarrackMap, anchor)).toBe(true);
+    }
+
+    expect(
+      findNavigationPath(
+        map,
+        { x: 75, y: 22 },
+        [{ x: 75, y: 30 }],
+      ),
+    ).toEqual([]);
+    const openArenaPath = findNavigationPath(
+      destroyedBarrackMap,
+      { x: 7, y: 29 },
+      [MAP_SEVEN_WARMASTER_POSITION],
+    );
+    expect(openArenaPath.length).toBeGreaterThan(0);
+    expect(openArenaPath.some((position) => position.y >= 53)).toBe(true);
+    expect(
+      openArenaPath.some(
+        (position) =>
+          position.y === 52 && position.x >= 82 && position.x <= 91,
+      ),
+    ).toBe(true);
+    expect(blockedGateMap.collisionWalls).toEqual(
+      expect.arrayContaining(MAP_SEVEN_ARENA_GATE_COLLISION_CELLS),
+    );
+    expect(
+      isNavigationCellWalkable(blockedGateMap, MAP_SEVEN_ARENA_GATE_POSITION),
+    ).toBe(false);
+    expect(
+      findNavigationPath(
+        blockedGateMap,
+        { x: 75, y: 53 },
+        [MAP_SEVEN_WARMASTER_POSITION],
+      ),
+    ).toEqual([]);
+    expect(
+      getNavigationDistance(blockedGateMap, { x: 7, y: 29 }, { x: 5, y: 29 }, 20),
+    ).not.toBeNull();
   });
 
   it("remakes the hub as a larger port base while preserving wilderness map sizes", () => {
@@ -1022,6 +1113,10 @@ function assertMapPlacements(mapId: DebugMapId, positions: Position[]) {
 }
 
 function createReachabilityValidationMap(mapId: DebugMapId): GameMap {
+  if (mapId === MAP_SEVEN_ID) {
+    return createDebugMap(mapId, { mapSevenRouteBarrackDestroyed: true });
+  }
+
   return createDebugMapForQuestState(mapId, secureLandingCompleteQuestStates);
 }
 

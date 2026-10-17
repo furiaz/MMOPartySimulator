@@ -2693,6 +2693,15 @@ Current post-Hub-2 wilderness structure:
 - The Orc Warcamp teleporter is covered by a radius-5 dark-green barrier until the third Ward is completed; its visual circle and collision use the same authored geometry, and the barrier is omitted for legacy-preserved access.
 - Orc Warcamp contains Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, and Orc Warmaster level 20.
 
+Planned Orc Warcamp layout (Issue #678):
+
+- Keep the overall map footprint the same as Nightmire Canopy.
+- Use roughly 60% of the map for a broad, freely accessible Orc field, about 15% for a vertical route, and the remaining 25% for the Warmaster arena. These are layout targets, not exact partition boundaries.
+- Keep the open field useful for repeatable Orc farming and backtracking; loose enemy squads may organize the field, but players do not need to clear it as a mandatory sequence of checkpoints.
+- Start the route near the top of the field, run it downward, and enter the arena from below. Place one Orc squad and a destructible, health-bearing, non-attacking barrack at its narrow choke; destroying the barrack opens the passage, which should widen again beyond it.
+- Reserve the arena for two barracks, the Warmaster encounter, a cage and repeatable chest, with clear central movement and AoE space.
+- The arena entrance may use a dark-green circular collision barrier following the visual and collision behavior of the Nightmire Patron Ward barrier. Its open/closed progression is separate from the fixed map layout, and it must not trap the party inside the arena.
+
 Current Slimeward dungeon prototype rooms/subzones are:
 
 - Slimeward Floor 1: Slimeward Entry, Gelstone Bend, Dripping Pocket, Slimecut Hall, Azure Threshold
