@@ -22,6 +22,7 @@ import { getGridDistance } from "./positionUtils";
 import { shouldUseAutomaticQuestDefenseFocus } from "./questDefenseFocus";
 import type {
   Companion,
+  CombatStructure,
   Enemy,
   GameEntity,
   Position,
@@ -197,12 +198,13 @@ export function getDefenderAnchorPosition(
 
 function getLeaderCombatTarget(
   state: GameState,
-): Enemy | undefined {
-  return getLeaderEnemyTarget(state);
+): Enemy | CombatStructure | undefined {
+  return getPartyCombatTarget(state) ?? undefined;
 }
 
 export function getLeaderEnemyTarget(state: GameState): Enemy | undefined {
-  return getPartyCombatTarget(state) ?? undefined;
+  const target = getPartyCombatTarget(state);
+  return target?.kind === "enemy" ? target : undefined;
 }
 
 export function isDefenderAttackTargetRelevant(

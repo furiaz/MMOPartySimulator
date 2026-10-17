@@ -383,7 +383,7 @@ export function isAutonomousEntity(
 export function isCombatEntity(
   entity: GameEntity | undefined,
 ): entity is CombatEntity {
-  return isAutonomousEntity(entity) || entity?.kind === "enemy";
+  return isAutonomousEntity(entity) || entity?.kind === "enemy" || entity?.kind === "structure";
 }
 
 export function isResourceEntity(

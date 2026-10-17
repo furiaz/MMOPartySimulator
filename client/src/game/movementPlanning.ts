@@ -6,6 +6,7 @@ import {
 } from "./entities";
 import {
   findNavigationPath,
+  findNearestReachableNavigationPosition,
   getNavigationDistance,
   getNavigationNeighborPositions,
   getNavigationPositionKey,
@@ -328,6 +329,27 @@ export function getBoundedPathDistance(
     {
       allowPartyPassThrough: true,
     },
+  );
+}
+
+/** Search reachable cells once, sharing the normal movement blocker rules. */
+export function findNearestReachablePosition(
+  state: GameState,
+  entity: GameEntity,
+  isCandidate: (position: Position) => boolean,
+  options: MovementOptions = {},
+): Position | null {
+  if (!state.map) return isCandidate(entity.position) ? entity.position : null;
+  if (!isNavigationCellWalkable(state.map, entity.position)) return null;
+  const blockers = createNavigationBlockerLookup(state, entity.id, options);
+  const isBlocked = (position: Position) =>
+    isNavigationPositionBlocked(state, position, entity.id, options, blockers);
+  recordPathDistanceQuery();
+  return findNearestReachableNavigationPosition(
+    state.map,
+    entity.position,
+    position => !isBlocked(position) && isCandidate(position),
+    { isBlocked },
   );
 }
 

@@ -1,4 +1,4 @@
-import { isCombatEntity } from "./entities";
+import { isLivingHostileTarget, getStructureApproachPosition } from "./combatStructures";
 import { isActiveResource } from "./entityGuards";
 import {
   getBoundedPathDistance,
@@ -8,7 +8,6 @@ import {
 import { getEntityById, type GameState } from "./state";
 import type {
   GameEntity,
-  Enemy,
   PartyExecutionIntent,
   Position,
 } from "./types";
@@ -49,7 +48,7 @@ export function getPartyExecutionIntentReachability(
       ? getEntityById(state, intent.targetId)
       : undefined;
 
-    if (!isLiveEnemy(target)) {
+    if (!isLivingHostileTarget(target)) {
       return {
         reason: "invalid_target",
         targetId: intent.targetId,
@@ -57,6 +56,13 @@ export function getPartyExecutionIntentReachability(
       };
     }
 
+    if (target.kind === "structure") {
+      const position = getStructureApproachPosition(state, leader, target);
+      // The shared approach search has already proved reachability.
+      return position
+        ? { reason: "valid", targetId: target.id, targetPosition: position }
+        : { reason: "unreachable", targetId: target.id };
+    }
     return getTargetReachability(state, leader, target.id, target.position);
   }
 
@@ -146,15 +152,6 @@ function getTargetReachability(
     targetId,
     targetPosition,
   };
-}
-
-function isLiveEnemy(entity: GameEntity | undefined): entity is Enemy {
-  return (
-    entity?.kind === "enemy" &&
-    isCombatEntity(entity) &&
-    entity.state !== "dead" &&
-    entity.health > 0
-  );
 }
 
 function isInsideMapBounds(state: GameState, position: Position): boolean {

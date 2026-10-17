@@ -15,7 +15,7 @@ export type EntityState =
   | "defend"
   | "dead";
 
-export type EntityKind = "companion" | "enemy" | "resource" | "npc";
+export type EntityKind = "companion" | "enemy" | "resource" | "npc" | "structure";
 
 export type EnemyTemperament = "passive" | "aggressive";
 
@@ -3021,6 +3021,7 @@ export type LivingEntity = BaseEntity & {
 
 export type Enemy = LivingEntity & {
   kind: "enemy";
+  barrackSpawn?: { barrackId: string; sequence: number };
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
   encounterBand: EnemyEncounterBand;
@@ -3482,8 +3483,34 @@ export type NpcEntity = BaseEntity & {
     | "dungeon_chest_open";
 };
 
-export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity;
+export type CombatStructure = LivingEntity & {
+  kind: "structure";
+  structureType: "orc_barracks";
+  displayName: string;
+  footprint: AoeBounds;
+  attackBounds: AoeBounds;
+  currentTargetId: string | null;
+  attack: number;
+  defense: number;
+  magicDefense: number;
+  evasion: number;
+};
+export type HostileCombatTarget = Enemy | CombatStructure;
+
+export type BarrackRuntime = {
+  health: number;
+  preparationMs: number;
+  respawnAtMs?: number;
+  spawnSequence: number;
+  pendingEnemyTypeId?: EnemyTypeId;
+  tutorialSeen?: boolean;
+  wasInRange?: boolean;
+  speech?: { text: string; createdAt: number; expiresAt: number };
+  hintExpiresAtMs?: number;
+};
+
+export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity | CombatStructure;
 
 export type AutonomousEntity = Companion;
 
-export type CombatEntity = Companion | Enemy;
+export type CombatEntity = Companion | Enemy | CombatStructure;

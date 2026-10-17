@@ -187,7 +187,10 @@ export type {
   MovementPathProfile,
 } from "./movementTypes";
 
+import { updateStructureRuntime } from "./combatStructures";
+
 export type GameState = {
+  barracksById?: Record<string, import("./types").BarrackRuntime>;
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;
   highestCharacterLevelEver?: number;
@@ -348,14 +351,14 @@ export function addEnemy(state: GameState, enemy: Enemy): GameState {
   });
 }
 
-export function updateEntity(state: GameState, entity: GameEntity): GameState {
+export function updateEntity(state: GameState, entity: GameEntity, now = Date.now()): GameState {
   const previousEntity = state.entities[entity.id];
 
   if (previousEntity === entity) {
     return state;
   }
 
-  return {
+  const nextState: GameState = {
     ...state,
     entities: {
       ...state.entities,
@@ -373,6 +376,7 @@ export function updateEntity(state: GameState, entity: GameEntity): GameState {
           }
         : state.followTrailsByEntityId,
   };
+  return entity.kind === "structure" ? updateStructureRuntime(nextState, entity, now) : nextState;
 }
 
 export function addCombatFeedback(

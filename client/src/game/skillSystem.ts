@@ -24,6 +24,7 @@ import {
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { getGridDistance } from "./positionUtils";
 import { getPartyCombatTarget } from "./partyTargetSystem";
+import type { CombatStructure } from "./types";
 import {
   isCompanionGlobalCooldownActive,
   isSkillCooldownActive,
@@ -481,7 +482,7 @@ function getSkillSelectionScore(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
   roleScore: number,
 ): number {
   let score = roleScore;
@@ -579,7 +580,7 @@ function isRecoveryAreaSkillUseAllowed(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
-  target: Enemy | Companion,
+  target: Enemy | Companion | CombatStructure,
 ): boolean {
   if (!isCompanionAssignedToResurrectionRecovery(state, caster.id)) {
     return true;
@@ -707,7 +708,7 @@ function isOutOfCombatFirstAidAllyUse(
   state: GameState,
   caster: Companion,
   skill: SkillDefinition,
-  target: Enemy | Companion | undefined,
+  target: Enemy | Companion | CombatStructure | undefined,
 ): target is Companion {
   return (
     skill.id === "first_aid" &&

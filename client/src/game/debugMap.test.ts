@@ -222,7 +222,7 @@ describe("debug maps", () => {
     ).toMatchObject({ encounterBand: "boss" });
   });
 
-  it("lays out Orc Warcamp as an open farm, a single route choke, and a bottom-entry arena", () => {
+  it("lays out Orc Warcamp as an open farm, a passable vertical route, and a bottom-entry arena", () => {
     const map = createDebugMap(MAP_SEVEN_ID);
     const destroyedBarrackMap = createDebugMap(MAP_SEVEN_ID, {
       mapSevenRouteBarrackDestroyed: true,
@@ -268,7 +268,7 @@ describe("debug maps", () => {
         { x: 75, y: 22 },
         [{ x: 75, y: 30 }],
       ),
-    ).toEqual([]);
+    ).not.toHaveLength(0);
     const openArenaPath = findNavigationPath(
       destroyedBarrackMap,
       { x: 7, y: 29 },

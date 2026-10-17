@@ -70,6 +70,61 @@ export function doAoeBoundsIntersect(
   );
 }
 
+/** Exact ground-rectangle intersection; unions are boolean to avoid duplicate hits. */
+export function doesAoeIntersectFootprint(area: ResolvedAoeArea, bounds: AoeBounds): boolean {
+  if (!doAoeBoundsIntersect(area.bounds, bounds)) return false;
+  const corners = [
+    { x: bounds.minX, y: bounds.minY }, { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY }, { x: bounds.minX, y: bounds.maxY },
+  ];
+  const inside = (point: Position) => point.x >= bounds.minX - GEOMETRY_EPSILON && point.x <= bounds.maxX + GEOMETRY_EPSILON &&
+    point.y >= bounds.minY - GEOMETRY_EPSILON && point.y <= bounds.maxY + GEOMETRY_EPSILON;
+  return area.primitives.some(primitive => {
+    if (primitive.type === "circle" || primitive.type === "ring") {
+      const center = primitive.center;
+      const nearest = { x: clamp(center.x, bounds.minX, bounds.maxX), y: clamp(center.y, bounds.minY, bounds.maxY) };
+      const minimum = getDistanceSquared(center, nearest);
+      const maximum = Math.max(...corners.map(corner => getDistanceSquared(center, corner)));
+      const outer = primitive.type === "circle" ? primitive.radius : primitive.outerRadius;
+      const inner = primitive.type === "circle" ? 0 : primitive.innerRadius;
+      return minimum <= outer * outer + GEOMETRY_EPSILON && maximum + GEOMETRY_EPSILON >= inner * inner;
+    }
+    if (corners.some(corner => isPositionInsidePrimitive(primitive, corner))) return true;
+    if (primitive.type === "square" || primitive.type === "rectangle") {
+      const polygon = primitive.type === "square" ? getSquareCorners(primitive) : getRectangleCorners(primitive);
+      return polygon.some(inside) || polygon.some((point, index) =>
+        corners.some((corner, cornerIndex) => segmentsIntersect(point, polygon[(index + 1) % 4], corner, corners[(cornerIndex + 1) % 4])));
+    }
+    if (inside(primitive.origin)) return true;
+    const angle = Math.atan2(primitive.direction.y, primitive.direction.x);
+    const ends = [-1, 1].map(sign => ({ x: primitive.origin.x + Math.cos(angle + sign * primitive.angleRadians / 2) * primitive.range,
+      y: primitive.origin.y + Math.sin(angle + sign * primitive.angleRadians / 2) * primitive.range }));
+    if (ends.some(inside)) return true;
+    return corners.some((start, index) => {
+      const end = corners[(index + 1) % 4];
+      if (ends.some(point => segmentsIntersect(primitive.origin, point, start, end))) return true;
+      const dx = end.x - start.x, dy = end.y - start.y;
+      const ox = start.x - primitive.origin.x, oy = start.y - primitive.origin.y;
+      const a = dx * dx + dy * dy, b = 2 * (dx * ox + dy * oy);
+      const discriminant = b * b - 4 * a * (ox * ox + oy * oy - primitive.range * primitive.range);
+      if (a <= GEOMETRY_EPSILON || discriminant < -GEOMETRY_EPSILON) return false;
+      return [-1, 1].some(sign => {
+        const t = (-b + sign * Math.sqrt(Math.max(0, discriminant))) / (2 * a);
+        return t >= -GEOMETRY_EPSILON && t <= 1 + GEOMETRY_EPSILON &&
+          isPositionInsidePrimitive(primitive, { x: start.x + t * dx, y: start.y + t * dy });
+      });
+    });
+  });
+}
+
+function segmentsIntersect(a: Position, b: Position, c: Position, d: Position): boolean {
+  const cross = (p: Position, q: Position, r: Position) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const abC = cross(a, b, c), abD = cross(a, b, d), cdA = cross(c, d, a), cdB = cross(c, d, b);
+  return abC * abD <= GEOMETRY_EPSILON && cdA * cdB <= GEOMETRY_EPSILON &&
+    Math.max(Math.min(a.x, b.x), Math.min(c.x, d.x)) <= Math.min(Math.max(a.x, b.x), Math.max(c.x, d.x)) + GEOMETRY_EPSILON &&
+    Math.max(Math.min(a.y, b.y), Math.min(c.y, d.y)) <= Math.min(Math.max(a.y, b.y), Math.max(c.y, d.y)) + GEOMETRY_EPSILON;
+}
+
 export function getAoeAreaSignature(area: ResolvedAoeArea): string {
   return [
     pointSignature(area.castTransform.origin),

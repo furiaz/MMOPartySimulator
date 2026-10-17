@@ -688,6 +688,8 @@ export function getEntityVisualAsset(
       : entityVisualAssets.npc;
   }
 
+  if (entity.kind === "structure") return entityVisualAssets.npc;
+
   if (entity.isTargetDummy) {
     return entityVisualAssets.testHunter;
   }

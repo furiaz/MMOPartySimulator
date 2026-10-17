@@ -1,5 +1,6 @@
 import { isCompanionInDirectCommandGrace } from "./directCompanionCommands";
 import { isLivingEnemy } from "./entityGuards";
+import { getCombatTargetPosition } from "./combatStructures";
 import { isWithinFollowLeash } from "./followSystem";
 import { isWithinGathererLeaderBoundary } from "./gathererResourceReservation";
 import {
@@ -25,6 +26,7 @@ import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem"
 import { getEntityById, type GameState } from "./state";
 import type {
   Enemy,
+  CombatStructure,
   GameEntity,
   Position,
 } from "./types";
@@ -39,7 +41,7 @@ export const GATHERER_REJOIN_DISTANCE = 6;
 
 export type PartyActivityPlan = {
   phase: "traveling" | "combat";
-  target: Enemy | null;
+  target: Enemy | CombatStructure | null;
   targetPosition: Position | null;
 };
 
@@ -70,22 +72,23 @@ export function resolvePartyActivityPlan(
 
   if (hasDirectPlayerPartyIntent(state)) {
     const intentTarget = getPartyCombatTarget(state);
+    const combatPosition = intentTarget ? getCombatTargetPosition(leader.position, intentTarget) : null;
 
     return {
       phase:
         intentTarget &&
-        getDistance(leader.position, intentTarget.position) <= combatBreakDistance
+        combatPosition && getDistance(leader.position, combatPosition) <= combatBreakDistance
           ? "combat"
           : "traveling",
       target: intentTarget,
-      targetPosition: intentTarget?.position ?? movementTargetPosition ?? null,
+      targetPosition: combatPosition ?? movementTargetPosition ?? null,
     };
   }
 
   const intentTarget = getPartyCombatTarget(state);
   const target =
     getCommittedPartyThreatTarget(state, {
-      currentTarget: intentTarget,
+      currentTarget: intentTarget?.kind === "enemy" ? intentTarget : null,
       includeDirectPersonalAttackers: true,
       range: combatBreakDistance,
     }) ?? intentTarget;
@@ -206,6 +209,7 @@ export function canUseAutonomousRoleBehavior(
   }
 
   if (entity.state === "attack") {
+    if (entity.currentTargetId && state.entities[entity.currentTargetId]?.kind === "structure") return false;
     return entity.role === "gatherer";
   }
 
@@ -231,7 +235,7 @@ export function canUseAutonomousRoleBehavior(
 function isWithinPartyCombatDistance(
   state: GameState,
   leader: PartyMember,
-  target: Enemy,
+  target: Enemy | CombatStructure,
   combatBreakDistance: number,
 ): boolean {
   if (getDistance(leader.position, target.position) <= combatBreakDistance) {
@@ -241,7 +245,7 @@ function isWithinPartyCombatDistance(
   return getNearestPartyDistance(state, target) <= combatBreakDistance;
 }
 
-function getNearestPartyDistance(state: GameState, target: Enemy): number {
+function getNearestPartyDistance(state: GameState, target: Enemy | CombatStructure): number {
   const distances = getPartyMembers(state)
     .filter(
       (member) =>

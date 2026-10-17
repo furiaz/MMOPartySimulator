@@ -1,4 +1,7 @@
 import { handleEnemyDefeatedDrops } from "./dropSystem";
+import { isLivingHostileTarget } from "./combatStructures";
+import { doesAoeIntersectFootprint } from "./aoePatterns";
+import type { HostileCombatTarget } from "./types";
 import { isLivingCompanion, isLivingEnemy, isTargetDummyEnemy } from "./entityGuards";
 import { grantCharacterXpToParty } from "./leveling";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
@@ -13,7 +16,6 @@ import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   Companion,
   CompanionAoeChannelState,
-  Enemy,
   SkillDefinition,
 } from "./types";
 
@@ -156,8 +158,8 @@ function resolveMaulSweepImpact(
     const currentEnemy = nextState.entities[enemy.id];
 
     if (
-      !isLivingEnemy(currentEnemy) ||
-      !isPositionInsideAoe(channel.area, currentEnemy.position)
+      !isLivingHostileTarget(currentEnemy) ||
+      !(currentEnemy.kind === "structure" ? doesAoeIntersectFootprint(channel.area, currentEnemy.attackBounds) : isPositionInsideAoe(channel.area, currentEnemy.position))
     ) {
       continue;
     }
@@ -208,8 +210,8 @@ function resolveShieldShockwaveImpact(
     const currentEnemy = nextState.entities[enemy.id];
 
     if (
-      !isLivingEnemy(currentEnemy) ||
-      !isPositionInsideAoe(channel.area, currentEnemy.position)
+      !isLivingHostileTarget(currentEnemy) ||
+      !(currentEnemy.kind === "structure" ? doesAoeIntersectFootprint(channel.area, currentEnemy.attackBounds) : isPositionInsideAoe(channel.area, currentEnemy.position))
     ) {
       continue;
     }
@@ -267,7 +269,7 @@ function resolveShieldShockwaveImpact(
 function damageEnemy(
   state: GameState,
   caster: Companion,
-  target: Enemy,
+  target: HostileCombatTarget,
   label: string,
   now: number,
   damageType: "physical" | "magic",

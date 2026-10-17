@@ -1,4 +1,5 @@
 import { updateAttackSystem } from "./attackSystem";
+import { updateBarracks, initializeBarracks } from "./barracks";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
 import { updateAutoRouteRuntime } from "./autoRouteSystem";
 import { updateCompanionAoeChannelSystem } from "./companionAoeChannelSystem";
@@ -106,6 +107,7 @@ export function updateGame(
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
+  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs);
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
@@ -159,6 +161,7 @@ export function updateGame(
   nextState = updatePartyIntentRecoverySystem(nextState);
 
   nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
+  nextState = initializeBarracks(nextState);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,

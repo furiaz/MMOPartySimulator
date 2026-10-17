@@ -567,6 +567,7 @@ export type FullRenderVisualMovement = {
 };
 
 export type FullRenderSignatureInput = {
+  barracksById?: Record<string, import("../game/types").BarrackRuntime>;
   activeTeleport: ActiveTeleport | null;
   cameraOffset: Position;
   cellPixelSize: number;
@@ -703,7 +704,7 @@ export type EntitySpriteLayout = {
   width: number;
 };
 
-type InteractableEntityKind = "enemy" | "resource" | "npc";
+type InteractableEntityKind = "enemy" | "structure" | "resource" | "npc";
 
 export type InteractableEntity = GameEntity & {
   kind: InteractableEntityKind;
@@ -1157,7 +1158,7 @@ export function getPreviewMapPosition(
 }
 
 export function isInteractableEntity(entity: GameEntity): entity is InteractableEntity {
-  if (entity.kind === "enemy") {
+  if (entity.kind === "enemy" || entity.kind === "structure") {
     return entity.state !== "dead";
   }
 
@@ -1329,6 +1330,7 @@ export function getEnemyDashAfterimagePresentations(
 }
 
 export function getFullRenderSignature({
+  barracksById = {},
   activeTeleport,
   cameraOffset,
   cellPixelSize,
@@ -1391,6 +1393,7 @@ export function getFullRenderSignature({
     renderSize.width,
     renderSize.height,
     visibleEntitySignature,
+    JSON.stringify(barracksById),
     getEventSignature(
       movementClickFeedbackEvents,
       getMovementClickFeedbackSignature,
@@ -1482,6 +1485,7 @@ function getFullRenderEntitySignature(entity: GameEntity): string {
     ].join(":");
   }
 
+  if (entity.kind === "structure") return [...baseSignature, entity.displayName, entity.health, entity.maxHealth].join(":");
   return [...baseSignature, entity.displayName, entity.npcRole].join(":");
 }
 
@@ -1823,7 +1827,7 @@ export function getNearestInteractableEntity({
   map: GameMap;
   mapPosition: Position;
 }): InteractableEntity | null {
-  const priorities: InteractableEntityKind[] = ["npc", "resource", "enemy"];
+  const priorities: InteractableEntityKind[] = ["npc", "structure", "resource", "enemy"];
   const maximumDistanceSquared =
     fullModeInteractionRadius * fullModeInteractionRadius;
 
@@ -1880,6 +1884,7 @@ export function getNearestHoverEntity({
   const priorities: Array<GameEntity["kind"]> = [
     "npc",
     "companion",
+    "structure",
     "resource",
     "enemy",
   ];
@@ -1933,6 +1938,17 @@ export function getEntityPointerHit({
   map: GameMap;
   mapPosition: Position;
 }): { distanceSquared: number } | null {
+  if (entity.kind === "structure") {
+    if (entity.health <= 0) return null;
+    const b = entity.footprint;
+    const visual = map.visualObjects?.find(object => object.id === entity.id);
+    const groundHit = mapPosition.x >= b.minX && mapPosition.x <= b.maxX && mapPosition.y >= b.minY && mapPosition.y <= b.maxY;
+    const visualHit = visual && mapPosition.x >= visual.position.x + 0.5 - visual.widthCells / 2 &&
+      mapPosition.x <= visual.position.x + 0.5 + visual.widthCells / 2 &&
+      mapPosition.y >= visual.position.y + 1 - visual.heightCells && mapPosition.y <= visual.position.y + 1;
+    return groundHit || visualHit
+      ? { distanceSquared: 0 } : null;
+  }
   const isContentBoundsHit = isInsideImageContentBounds(
     entity,
     map,
