@@ -13,6 +13,7 @@ import {
   MAP_FOUR_TO_HUB_TWO_TELEPORTER_ID,
   MAP_ONE_ID,
   MAP_SEVEN_ID,
+  MAP_SEVEN_WARMASTER_POSITION,
   MAP_SIX_ID,
   MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
   SLIMEWARD_CAMP_ID,
@@ -46,7 +47,7 @@ describe("teleport system", () => {
       kind: "enemy",
       enemyTypeId: "orc_warmaster",
       encounterBand: "boss",
-      position: { x: 82, y: 29 },
+      position: MAP_SEVEN_WARMASTER_POSITION,
     });
     expect(
       Object.values(nextState.entities).filter(

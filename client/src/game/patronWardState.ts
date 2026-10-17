@@ -140,20 +140,19 @@ export function sanitizePersistentPatronWardRuntime(
   };
 }
 
-export function createNightmireBarrierCollisionCells(): Position[] {
+export function createCircularBarrierCollisionCells(
+  center: Position,
+  radius: number,
+): Position[] {
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return [];
+  }
+
   const cells: Position[] = [];
-  const minimumX = Math.floor(
-    NIGHTMIRE_BARRIER_CENTER.x - NIGHTMIRE_BARRIER_RADIUS,
-  );
-  const maximumX = Math.ceil(
-    NIGHTMIRE_BARRIER_CENTER.x + NIGHTMIRE_BARRIER_RADIUS,
-  );
-  const minimumY = Math.floor(
-    NIGHTMIRE_BARRIER_CENTER.y - NIGHTMIRE_BARRIER_RADIUS,
-  );
-  const maximumY = Math.ceil(
-    NIGHTMIRE_BARRIER_CENTER.y + NIGHTMIRE_BARRIER_RADIUS,
-  );
+  const minimumX = Math.floor(center.x - radius);
+  const maximumX = Math.ceil(center.x + radius);
+  const minimumY = Math.floor(center.y - radius);
+  const maximumY = Math.ceil(center.y + radius);
 
   for (let y = minimumY; y <= maximumY; y += 1) {
     for (let x = minimumX; x <= maximumX; x += 1) {
@@ -161,9 +160,9 @@ export function createNightmireBarrierCollisionCells(): Position[] {
 
       if (
         Math.hypot(
-          cellCenter.x - NIGHTMIRE_BARRIER_CENTER.x,
-          cellCenter.y - NIGHTMIRE_BARRIER_CENTER.y,
-        ) <= NIGHTMIRE_BARRIER_RADIUS
+          cellCenter.x - center.x,
+          cellCenter.y - center.y,
+        ) <= radius
       ) {
         cells.push({ x, y });
       }
@@ -171,4 +170,11 @@ export function createNightmireBarrierCollisionCells(): Position[] {
   }
 
   return cells;
+}
+
+export function createNightmireBarrierCollisionCells(): Position[] {
+  return createCircularBarrierCollisionCells(
+    NIGHTMIRE_BARRIER_CENTER,
+    NIGHTMIRE_BARRIER_RADIUS,
+  );
 }
