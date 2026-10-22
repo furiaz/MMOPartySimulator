@@ -892,6 +892,15 @@ Current prototype crafting behavior:
 - current key item crafting may include the Harbor Union Bastion Teleportation Echo
 - successful crafting may advance explicit crafting quest objectives
 
+Equipment recipe material rules (Issue #683):
+
+- Prefer materials available at or below the equipment's level. Armor, accessories, shields, quivers, talismans, and other non-weapon offhands may use sources at most 2 levels above the item; weapons, including weapons used offhand, may use sources at most 3 levels above it.
+- Above-level materials are supplementary: each quantity must be smaller than the main gathered ingredient's quantity (the largest gathered-material quantity when several are used).
+- Source level means the earliest reliable source of the exact material tier: a normal authored enemy, an authored gathering location, or the acquisition source of the producing Livestock creature. Superior variants do not increase source level.
+- Every equipment recipe must comply, including recipes for consumed previous equipment. These are content-authoring rules, not new material equip requirements, player crafting gates, or restrictions on slotless key-item recipes.
+- Corrected level-10 recipes use appropriate Goblin/Imp parts or older Wolf Pelts instead of level-18 Orc parts; level-15 Sentinel Boots and Bastion Sabatons use Briar Wolf Pelts. Level-10 pendants use Iron Ore instead of Tin Ore; level-15 pendants retain Tin Ore from Tin Crawler Livestock.
+- Orc Hide and Orc Tusk retain their drops and sale values but have no current crafting use after these corrections. New uses require separate design approval.
+
 This is not the full inventory, wallet, equipment economy, shop, crafting, trading, bank, loot, backend persistence, cloud save, account save, or cross-device persistence system.
 
 Do not implement these unless explicitly requested:

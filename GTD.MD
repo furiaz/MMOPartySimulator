@@ -2918,6 +2918,12 @@ Current crafting recipes include:
 - level 1, 5, 10, and 15 prototype equipment recipes where matching item definitions exist
 - previous-equipment upgrade requirements for supported level 5 and level 15 recipes
 
+Issue #683 enforces equipment recipe material-source policy through focused content tests beside the existing crafting tests, not through simulation-time checks or React. Tests resolve normal enemy-part sources from authored enemy definitions and effective drop tables at the matching loot tier, gathered materials from authored resource locations and their subzone levels, and Livestock outputs from the producing creature's acquisition source. Shared materials use their earliest reliable source; unknown material sources fail validation rather than defaulting to an early level.
+
+Non-weapon equipment permits source levels up to item level +2; weapons (including weapon types equipped offhand) permit +3. Each above-level material must have a smaller quantity than the largest gathered-material cost. Every equipment recipe is checked, including recipes that produce previous-equipment inputs, while slotless key-item recipes are excluded. Boundary, tier, source-sharing, quantity, and representative upgrade-chain tests protect this policy. Material definitions gain no equip-level restrictions, crafting runtime gains no new gates, and existing saves require no migration.
+
+The approved substitutions affect 25 recipes without changing their fees, quantities, IDs, names, stats, or previous-equipment matching. Tin Ore remains in level-15 pendants but not level-10 pendants. Orc Hide/Tusk have no remaining recipe costs; their drop tables, sale values, and Warmaster chest rewards remain unchanged.
+
 Prototype consumable logic lives in `consumables.ts`.
 
 Current consumable kinds are:
