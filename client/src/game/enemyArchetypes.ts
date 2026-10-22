@@ -379,6 +379,7 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
     abilityIds: ["orc_warmaster_patron_burst", "orc_warmaster_patron_cleave", "orc_warmaster_kick", "orc_warmaster_rending_dash"],
     archetypeId: "orc",
     temperament: "aggressive",
+    canRoam: false,
     targetPreference: "leader",
     level: 20,
     maxHealth: 1500,

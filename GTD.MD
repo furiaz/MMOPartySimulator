@@ -2544,6 +2544,7 @@ Current enemy behavior:
 - passive enemies do not seek combat targets on their own
 - passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
+- Optional `EnemyTypeDefinition.canRoam` defaults to existing idle roaming. The Warmaster sets it to `false`; after normal target selection, the idle-roaming path clears any queued roam without changing detection, chase, attacks, dashes or home/reset handling. No saved runtime field is needed.
 - enemy types define setup data such as level, attack cooldown, detection range, attack range override, temperament, combat style override, target preference, and an optional ordered reusable ability-id list
 - enemy archetypes do not define XP rewards
 - enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`

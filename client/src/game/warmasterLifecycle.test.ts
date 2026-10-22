@@ -7,7 +7,8 @@ import { createWarmasterLifecycle, guardWarmasterWalkingDeparture, hasPendingWar
 import { claimWarmasterChest, closeWarmasterChest, getFrozenWarmasterEncounterIds, isWarmasterGateClosed, reconcileWarmasterLifecycle, requestWarmasterChest, sanitizeWarmasterLifecycle, updateWarmasterLifecycle } from "./warmasterLifecycle";
 import { BARRACK_DEFINITIONS, getBarrackMaxHealth } from "./barrackDefinitions";
 import { initializeBarracks, updateBarracks } from "./barracks";
-import { updateWarmasterSystem } from "./warmasterSystem";
+import { resetWarmasterAttempt, updateWarmasterSystem } from "./warmasterSystem";
+import { updateEnemyAISystem } from "./enemyAISystem";
 import { isInsideWarmasterArena } from "./warmasterState";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
 import { ITEM_DEFINITIONS } from "./items";
@@ -39,6 +40,26 @@ function outside(state: GameState): GameState {
   return { ...state, warmasterInteraction: undefined, entities: { ...state.entities, leader: { ...state.entities.leader, position: { x: 25, y: 20 } } } };
 }
 describe("Warmaster lifecycle", () => {
+  it.each(["first", "rearmed", "reset", "restored"])("keeps the %s ready Boss at his safe home before detection", mode => {
+    let state = mode === "rearmed" ? outside(claim(victory())) : setup({ x: 25, y: 20 });
+    if (mode === "rearmed") {
+      state = updateWarmasterLifecycle({ ...state, warmasterLifecycle: { ...state.warmasterLifecycle!, recharge: 60 } }, 4000);
+    } else if (mode === "reset") {
+      state = resetWarmasterAttempt(state, 4000);
+    } else if (mode === "restored") {
+      state = sanitizeGameStateForSave(state, 4000);
+    }
+    const boss = state.entities.boss as Enemy;
+    const home = boss.position;
+
+    for (let frame = 0; frame < 50; frame++) {
+      state = updateEnemyAISystem(state, { nowMs: 5000 + frame * 100, deltaMs: 100, deltaSeconds: 0.1, frameNumber: frame });
+    }
+
+    expect(state.entities.boss).toMatchObject({ position: home, state: "idle", currentTargetId: null });
+    expect((state.entities.boss as Enemy).roamTargetPosition ?? null).toBeNull();
+  });
+
   it("starts ready, activates without charge, and leaves failed attempts available", () => {
     const state = setup();
     expect(state.warmasterLifecycle).toMatchObject({ phase: "ready", recharge: 0, sequence: 1 });

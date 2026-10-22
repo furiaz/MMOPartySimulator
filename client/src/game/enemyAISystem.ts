@@ -37,6 +37,7 @@ import {
   getEnemyDetectionRange as getArchetypeDetectionRange,
   getEnemyTargetPreference,
   getEnemyTemperament,
+  getEnemyType,
 } from "./enemyArchetypes";
 import { isFakeDeathActive } from "./statusEffects";
 import { isInsideEnemyMovementBounds } from "./enemyMovementBounds";
@@ -468,6 +469,17 @@ function updateEnemyWander(
   timing: SimulationTiming,
   movedEntityIds: Set<string>,
 ): GameState {
+  if (getEnemyType(enemy.enemyTypeId)?.canRoam === false) {
+    return enemy.roamTargetPosition || enemy.roamMoveUntil !== undefined || enemy.nextRoamAt !== undefined
+      ? updateEntity(state, {
+          ...enemy,
+          roamTargetPosition: null,
+          roamMoveUntil: undefined,
+          nextRoamAt: undefined,
+        })
+      : state;
+  }
+
   const now = timing.nowMs;
 
   if (enemy.roamTargetPosition && enemy.roamMoveUntil && now <= enemy.roamMoveUntil) {
