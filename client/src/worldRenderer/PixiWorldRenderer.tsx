@@ -297,6 +297,10 @@ const skillFeedbackDisplayNames = new Set(
   Object.values(SKILL_DEFINITIONS).map((skill) => skill.displayName),
 );
 
+import type { WarmasterAttempt } from "../game/warmasterState";
+import { isInsideWarmasterArena } from "../game/warmasterState";
+import { getPatronTransferPosition, isAuraVisible } from "./warmasterPresentation";
+
 type PixiRendererMode = "preview" | "full";
 
 type QuestObjectiveMarker = {
@@ -344,6 +348,7 @@ type PixiWorldRendererProps = {
   onPatronWardClick?: (wardId: import("../game").PatronWardId) => void;
   partyIntent?: PartyIntent | null;
   patronWardPresentation?: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
   barracksById?: Record<string, BarrackRuntime>;
   questEntityIndicators?: QuestEntityIndicator[];
   questObjectiveMarkers?: QuestObjectiveMarker[];
@@ -408,6 +413,7 @@ type TileBounds = {
 };
 
 type PixiRenderLayers = {
+  auraLayer: Container;
   backgroundGraphics: Graphics;
   entityLayer: Container;
   effectsGraphics: Graphics;
@@ -536,6 +542,7 @@ type DrawWorldOptions = {
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
   patronWardPresentation: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
   barracksById: Record<string, BarrackRuntime>;
   questEntityIndicators: QuestEntityIndicator[];
   questObjectiveMarkers: QuestObjectiveMarker[];
@@ -637,6 +644,7 @@ function clearLayers(layers: PixiRenderLayers) {
   clearLayer(layers.floorLayer);
   clearLayer(layers.wallLayer);
   clearLayer(layers.objectLayer);
+  clearLayer(layers.auraLayer);
   clearLayer(layers.entityLayer);
   clearLayer(layers.effectsLayer);
   layers.backgroundGraphics.clear();
@@ -2273,6 +2281,7 @@ function drawDebugCollisionShape(
 }
 
 function drawEntityOverheadUiPass({
+  warmasterAttempt,
   currentTime,
   enemyAbilityCastsByEnemyId,
   entities,
@@ -2286,6 +2295,7 @@ function drawEntityOverheadUiPass({
   transform,
   visibleTileBounds,
 }: {
+  warmasterAttempt?: WarmasterAttempt;
   currentTime: number;
   enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   entities: GameEntity[];
@@ -2317,7 +2327,7 @@ function drawEntityOverheadUiPass({
           : undefined;
       const layoutBox =
         box && activeCast && activeCast.windupEndsAt > currentTime
-          ? { ...box, height: box.height + 18 }
+          ? { ...box, height: box.height + 18 + (warmasterAttempt?.bossId === entity.id ? 14 : 0) }
           : box;
 
       return layoutBox ? { box: layoutBox, entity, status } : null;
@@ -2384,6 +2394,9 @@ function drawEntityOverheadUiPass({
       managedState,
       metrics,
     });
+    if (warmasterAttempt?.bossId === entry.entity.id) {
+      drawManagedFeedbackText({ color: 0x86efac, fontSize: 9, key: `patron-power:${entry.entity.id}`, layer, managedState, metrics, position: { x: entry.box.x + entry.box.width / 2, y: entry.box.healthY + overheadHealthHeight + 7 }, text: `Patron Power: ${warmasterAttempt.power}/10` });
+    }
   }
 
   drawQuestEntityLabels({
@@ -2429,7 +2442,7 @@ function drawEnemyAbilityCastUi({
   const labelHeight = 10;
   const barHeight = 4;
   const gap = 2;
-  const labelY = box.healthY + overheadHealthHeight + gap;
+  const labelY = box.healthY + overheadHealthHeight + gap + (enemy.enemyTypeId === "orc_warmaster" ? 14 : 0);
   const barY = labelY + labelHeight + gap;
   const progress = getEnemyAbilityCastProgress(cast, currentTime);
 
@@ -2503,7 +2516,7 @@ function getEntityOverheadUiBox(
     };
   }
 
-  const y = center.y - transform.cellPixelSize * (status ? 1.05 : 0.86);
+  const y = center.y - transform.cellPixelSize * (status ? 1.05 : 0.86) * (entity.kind === "enemy" ? entity.combatSizeMultiplier ?? 1 : 1);
   const statusLabelY = y;
   const statusBarY = statusLabelY + overheadStatusLabelHeight + overheadStatusLabelGap;
   const healthY = status
@@ -2624,7 +2637,7 @@ function getEnemyNameplatePosition(
 
   return {
     x: center.x,
-    y: center.y - transform.cellPixelSize * 1.32,
+    y: center.y - transform.cellPixelSize * 1.32 * (enemy.combatSizeMultiplier ?? 1),
   };
 }
 
@@ -3056,9 +3069,7 @@ function getEntitySpriteLayout(
       visualAsset.kind === "image" || visualAsset.kind === "sprite"
         ? visualAsset.naturalSize
         : undefined;
-    const variantScale = isSuperiorEnemy(entity)
-      ? SUPERIOR_ENEMY_RENDER_SCALE
-      : 1;
+    const variantScale = (isSuperiorEnemy(entity) ? SUPERIOR_ENEMY_RENDER_SCALE : 1) * (entity.combatSizeMultiplier ?? 1);
 
     return {
       anchorX: 0.5,
@@ -5647,6 +5658,7 @@ function drawPatronWardObjects({
 }
 
 function drawPatronDefenderAuras({
+  warmasterAttempt,
   cache,
   currentTime,
   entities,
@@ -5657,6 +5669,7 @@ function drawPatronDefenderAuras({
   transform,
   visibleTileBounds,
 }: {
+  warmasterAttempt?: WarmasterAttempt;
   cache: TextureCache;
   currentTime: number;
   entities: GameEntity[];
@@ -5670,9 +5683,9 @@ function drawPatronDefenderAuras({
   for (const entity of entities) {
     if (
       entity.kind !== "enemy" ||
-      entity.questSpawn?.patronAura !== true ||
+      !(entity.questSpawn?.patronAura === true || entity.enemyTypeId === "orc_warmaster" || (warmasterAttempt && isInsideWarmasterArena(entity.position) && ["orc", "orc_raider", "orc_shieldbearer"].includes(entity.enemyTypeId ?? ""))) ||
       entity.state === "dead" ||
-      !isPositionInTileBounds(entity.position, visibleTileBounds)
+      !isAuraVisible(entity.position, 4 * (entity.combatSizeMultiplier ?? 1), visibleTileBounds)
     ) {
       continue;
     }
@@ -5683,7 +5696,7 @@ function drawPatronDefenderAuras({
       anchorX: 0.5,
       anchorY: 1,
       cache,
-      height: 128,
+      height: 128 * (entity.combatSizeMultiplier ?? 1),
       key: `patron-defender-aura:${entity.id}`,
       layer,
       managedState,
@@ -5694,8 +5707,17 @@ function drawPatronDefenderAuras({
       },
       requestRedraw,
       src: getPatronAuraFrameSrc(currentTime),
-      width: 128,
+      width: 128 * (entity.combatSizeMultiplier ?? 1),
     });
+  }
+  const boss = entities.find(entity => entity.id === warmasterAttempt?.bossId);
+  if (!boss || boss.state === "dead") return;
+  for (const transfer of warmasterAttempt?.transfers ?? []) {
+    if (currentTime >= transfer.arrivesAt) continue;
+    const position = getPatronTransferPosition(transfer, boss.position, currentTime);
+    if (!isAuraVisible(position, 4, visibleTileBounds)) continue;
+    const pixel = toFullPosition(position, transform);
+    drawManagedImageSprite({ anchorX: 0.5, anchorY: 1, cache, height: 128, width: 128, key: `patron-transfer:${transfer.id}`, layer, managedState, metrics, position: { x: pixel.x, y: pixel.y + transform.cellPixelSize / 2 }, requestRedraw, src: getPatronAuraFrameSrc(currentTime) });
   }
 }
 
@@ -6131,7 +6153,7 @@ function drawEnemyDashAfterimages({
 
     const visualAsset = getEntityVisualAsset(caster, map.id);
     const layout = getEntitySpriteLayout(
-      caster,
+      { ...caster, combatSizeMultiplier: dash.bodyScale ?? caster.combatSizeMultiplier },
       transform.cellPixelSize,
       visualAsset,
     );
@@ -6555,6 +6577,7 @@ function drawFullMap({
   onPerformanceSample,
   partyIntent,
   patronWardPresentation,
+  warmasterAttempt,
   barracksById,
   questEntityIndicators,
   questObjectiveMarkers,
@@ -6597,6 +6620,7 @@ function drawFullMap({
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
   patronWardPresentation: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
   barracksById: Record<string, BarrackRuntime>;
   questEntityIndicators: QuestEntityIndicator[];
   questObjectiveMarkers: QuestObjectiveMarker[];
@@ -6720,10 +6744,11 @@ function drawFullMap({
     visualMovementByEntityId,
   });
   drawPatronDefenderAuras({
+    warmasterAttempt,
     cache: textureCache,
     currentTime,
     entities,
-    layer: layers.entityLayer,
+    layer: layers.auraLayer,
     managedState,
     metrics,
     requestRedraw,
@@ -6968,6 +6993,7 @@ function drawFullMap({
   );
 
   drawEntityOverheadUiPass({
+    warmasterAttempt,
     currentTime,
     enemyAbilityCastsByEnemyId,
     entities,
@@ -7247,6 +7273,7 @@ function drawWorld({
   onPerformanceSample,
   partyIntent,
   patronWardPresentation,
+  warmasterAttempt,
   barracksById,
   fullHadTimedWorkRef,
   fullSignatureRef,
@@ -7288,6 +7315,7 @@ function drawWorld({
       movementClickFeedbackEvents,
       mode,
       patronWardPresentation,
+      warmasterAttempt,
       barracksById,
       skillBindsByEnemyId,
       skillMarksByEnemyId,
@@ -7331,7 +7359,7 @@ function drawWorld({
       visualMovementByEntityId,
     })}|patron:${getPatronWardPresentationSignature(
       patronWardPresentation,
-    )}|speech-avoidance:${getViewportRectsSignature(
+    )}|warmaster:${JSON.stringify(warmasterAttempt)}|speech-avoidance:${getViewportRectsSignature(
       speechBubbleAvoidanceRects,
     )}`;
 
@@ -7375,6 +7403,7 @@ function drawWorld({
       onPerformanceSample,
       partyIntent,
       patronWardPresentation,
+      warmasterAttempt,
       barracksById,
       questEntityIndicators,
       questObjectiveMarkers,
@@ -7465,6 +7494,7 @@ function hasActiveTimedRendererWork({
   movementClickFeedbackEvents,
   mode,
   patronWardPresentation,
+  warmasterAttempt,
   barracksById,
   skillBindsByEnemyId,
   skillMarksByEnemyId,
@@ -7487,6 +7517,7 @@ function hasActiveTimedRendererWork({
   movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   mode: PixiRendererMode;
   patronWardPresentation: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
   barracksById: Record<string, BarrackRuntime>;
   skillBindsByEnemyId: Record<string, SkillBindState>;
   skillMarksByEnemyId: Record<string, SkillMarkState>;
@@ -7506,6 +7537,7 @@ function hasActiveTimedRendererWork({
 
   return (
     Boolean(activeTeleport) ||
+    Boolean(warmasterAttempt) ||
     entities.some(entity => entity.kind === "structure" && (barracksById[entity.id]?.health ?? entity.health) > 0) ||
     Boolean(
       patronWardPresentation?.barrier ||
@@ -7616,6 +7648,7 @@ export function PixiWorldRenderer({
   onResourceClick,
   partyIntent = null,
   patronWardPresentation = null,
+  warmasterAttempt,
   barracksById = {},
   questEntityIndicators = [],
   questObjectiveMarkers = [],
@@ -7683,6 +7716,7 @@ export function PixiWorldRenderer({
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
   const latestPatronWardPresentationRef = useRef(patronWardPresentation);
+  const latestWarmasterAttemptRef = useRef(warmasterAttempt);
   const latestBarracksByIdRef = useRef(barracksById);
   const latestQuestEntityIndicatorsRef = useRef(questEntityIndicators);
   const latestQuestObjectiveMarkersRef = useRef(questObjectiveMarkers);
@@ -7792,6 +7826,7 @@ export function PixiWorldRenderer({
     latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestPartyIntentRef.current = partyIntent;
     latestPatronWardPresentationRef.current = patronWardPresentation;
+    latestWarmasterAttemptRef.current = warmasterAttempt;
     latestBarracksByIdRef.current = barracksById;
     latestQuestEntityIndicatorsRef.current = questEntityIndicators;
     latestQuestObjectiveMarkersRef.current = questObjectiveMarkers;
@@ -7832,6 +7867,7 @@ export function PixiWorldRenderer({
     onPerformanceSample,
     partyIntent,
     patronWardPresentation,
+    warmasterAttempt,
     barracksById,
     questEntityIndicators,
     questObjectiveMarkers,
@@ -7878,6 +7914,7 @@ export function PixiWorldRenderer({
     const app = new Application();
     const stage = new Container();
     const layers: PixiRenderLayers = {
+      auraLayer: new Container(),
       backgroundGraphics: new Graphics(),
       entityLayer: new Container(),
       effectsLayer: new Container(),
@@ -7912,6 +7949,7 @@ export function PixiWorldRenderer({
           latestMovementClickFeedbackEventsRef.current,
         mode: latestModeRef.current,
         patronWardPresentation: latestPatronWardPresentationRef.current,
+        warmasterAttempt: latestWarmasterAttemptRef.current,
         barracksById: latestBarracksByIdRef.current,
         skillBindsByEnemyId: latestSkillBindsByEnemyIdRef.current,
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
@@ -7966,6 +8004,7 @@ export function PixiWorldRenderer({
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
         patronWardPresentation: latestPatronWardPresentationRef.current,
+        warmasterAttempt: latestWarmasterAttemptRef.current,
         barracksById: latestBarracksByIdRef.current,
         fullHadTimedWorkRef,
         fullSignatureRef,
@@ -8067,6 +8106,7 @@ export function PixiWorldRenderer({
       stage.addChild(layers.floorLayer);
       stage.addChild(layers.wallLayer);
       stage.addChild(layers.objectLayer);
+      stage.addChild(layers.auraLayer);
       stage.addChild(layers.entityLayer);
       stage.addChild(layers.fallbackGraphics);
       stage.addChild(layers.effectsGraphics);
@@ -8143,6 +8183,7 @@ export function PixiWorldRenderer({
     onPerformanceSample,
     partyIntent,
     questEntityIndicators,
+    warmasterAttempt,
     questObjectiveMarkers,
     questGiverHasWork,
     renderSize,

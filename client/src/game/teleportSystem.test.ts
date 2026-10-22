@@ -47,6 +47,8 @@ describe("teleport system", () => {
       kind: "enemy",
       enemyTypeId: "orc_warmaster",
       encounterBand: "boss",
+      health: 1500,
+      maxHealth: 1500,
       position: MAP_SEVEN_WARMASTER_POSITION,
     });
     expect(
@@ -55,6 +57,13 @@ describe("teleport system", () => {
           entity.kind === "enemy" && entity.enemyTypeId === "orc_warmaster",
       ),
     ).toHaveLength(1);
+  });
+
+  it("keeps the Azure Mass's authored 900 HP on dungeon entry", () => {
+    const map = createDebugMap(SLIMEWARD_FLOOR_ONE_ID);
+    const teleport = map.teleports.find(point => point.targetMapId === SLIMEWARD_FLOOR_TWO_ID)!;
+    const nextState = updateTeleportSystem(createTeleportReadyState(SLIMEWARD_FLOOR_ONE_ID, teleport.id));
+    expect(nextState.entities["slimeward-azure-mass"]).toMatchObject({ health: 900, maxHealth: 900 });
   });
 
   it("does not create obsolete hub departure food warnings", () => {

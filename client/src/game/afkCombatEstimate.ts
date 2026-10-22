@@ -332,7 +332,7 @@ function getSubzoneEnemySummaries(
       enemyTypeId: enemyTypeId ?? subzone.enemyTypeIds[0],
       displayName: enemyType?.displayName ?? enemyTypeId ?? "Unknown Enemy",
       level,
-      maxHealth: liveEnemy?.maxHealth ?? scaledStats.maxHealth,
+      maxHealth: liveEnemy?.maxHealth ?? enemyType?.maxHealth ?? scaledStats.maxHealth,
       attack: liveEnemy?.attack ?? scaledStats.attack,
       defense: liveEnemy?.defense ?? scaledStats.defense,
       magicDefense: liveEnemy?.magicDefense ?? scaledStats.magicDefense,

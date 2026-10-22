@@ -88,6 +88,8 @@ import {
   type SimulationTiming,
 } from "./simulationTiming";
 import { recordCurrentWorldDiscovery } from "./worldDiscovery";
+import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
+import { updateForcedMovements } from "./forcedMovement";
 
 export function updateGame(
   state: GameState,
@@ -104,10 +106,11 @@ export function updateGame(
     timing.nowMs,
   );
   nextState = updateAutoRouteRuntime(nextState);
+  nextState = updateWarmasterSystem(nextState, timing.nowMs);
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
-  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs);
+  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState) });
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
@@ -180,6 +183,7 @@ export function updateGame(
     );
   }
 
+  nextState = updateForcedMovements(nextState, movedEntityIds, timing.nowMs);
   nextState = updateDirectCompanionCommandSystem(
     nextState,
     movedEntityIds,
@@ -221,6 +225,7 @@ export function updateGame(
     timing.nowMs,
     movedEntityIds,
   );
+  nextState = updateWarmasterSystem(nextState, timing.nowMs);
   nextState = updateEnemyAbilitySystem(nextState, timing.nowMs);
   nextState = updateEnemyDashSystem(
     nextState,
@@ -248,6 +253,7 @@ export function updateGame(
     timing.deltaMs,
   );
   nextState = cleanupEnemyDashRuntime(nextState, timing.nowMs);
+  nextState = updateWarmasterSystem(nextState, timing.nowMs);
   nextState = updateFlaskRechargeFromEnemyKills(nextState, timing.nowMs);
   nextState = restoreInterruptedPoiTarget(nextState);
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);

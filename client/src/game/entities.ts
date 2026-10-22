@@ -99,8 +99,12 @@ export function createEnemy(
   const archetype = getEnemyArchetype(archetypeId);
   const level = options.level ?? enemyType?.level ?? STARTING_ENEMY_LEVEL;
   const scaledStats = getScaledEnemyStats(level, archetypeId);
-  const maxHealth = options.maxHealth ?? scaledStats.maxHealth;
-  const scalingOverrides = getEnemyScalingOverrides(options);
+  const authoredMaxHealth = options.maxHealth ?? enemyType?.maxHealth;
+  const maxHealth = authoredMaxHealth ?? scaledStats.maxHealth;
+  const scalingOverrides = getEnemyScalingOverrides({
+    ...options,
+    maxHealth: authoredMaxHealth,
+  });
 
   return applyEnemyVariantStats({
     id,

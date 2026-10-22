@@ -1,4 +1,6 @@
 import { restoreBarracks } from "./barracks";
+import { restoreOrcWarcampLayout } from "./orcWarcampRestoration";
+import { resetWarmasterAttempt } from "./warmasterSystem";
 import {
   aoeTargetDummyId,
   aoeTargetDummyPosition,
@@ -902,6 +904,13 @@ export function sanitizeGameStateForSave(
   enemyAbilityDefinitions: EnemyAbilityRegistry = ENEMY_ABILITY_DEFINITIONS,
 ): GameState {
   const currentMapId = state.currentMapId ?? "hub";
+  // Displacements are transient; restore their last safe point, not a body-overlap mid-flight.
+  const restoredPositions = Object.fromEntries(Object.entries(state.entities).map(([id, entity]) => {
+    const savedPosition = state.forcedMovementsByEntityId?.[id]?.lastSafePosition;
+    return [id, savedPosition && Number.isFinite(savedPosition.x) && Number.isFinite(savedPosition.y)
+      ? { ...entity, position: { ...savedPosition } } : entity];
+  }));
+  state = { ...state, entities: restoredPositions };
   const didSaveHaveNewQuestStates = Boolean(
     state.quests[GUILD_BOARD_ONBOARDING_QUEST_ID] ||
       state.quests[ASH_GOBLIN_MAIN_QUEST_ID],
@@ -1060,7 +1069,7 @@ export function sanitizeGameStateForSave(
     enemyAbilityDefinitions,
   );
 
-  return restoreBarracks({
+  return resetWarmasterAttempt(restoreOrcWarcampLayout(restoreBarracks({
     ...state,
     entities,
     restingCompanionsById,
@@ -1158,6 +1167,8 @@ export function sanitizeGameStateForSave(
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    warmasterAttempt: undefined,
+    forcedMovementsByEntityId: {},
     ...enemyAbilityRuntime,
     aoeDummyPatternSequenceIndex: 0,
     consumableUsesByCompanionId: {},
@@ -1177,7 +1188,7 @@ export function sanitizeGameStateForSave(
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
     debugTelemetry: undefined,
-  }, now);
+  }, now)), now);
 }
 
 function sanitizeQuestStates(

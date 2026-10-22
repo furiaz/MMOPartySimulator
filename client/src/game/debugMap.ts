@@ -16,6 +16,7 @@ import type {
 } from "./types";
 import { bakeNavigationGrid } from "./navigation";
 import { BARRACK_DEFINITIONS, getBarrackCollisionCells } from "./barrackDefinitions";
+import { ORC_WARCAMP_ARENA, ORC_WARCAMP_ARENA_BARRACKS, ORC_WARCAMP_BOSS_POSITION, ORC_WARCAMP_CAGE_POSITION, ORC_WARCAMP_CHEST_POSITION, ORC_WARCAMP_ENCOUNTER_ID, ORC_WARCAMP_GATE_POSITION, ORC_WARCAMP_ROUTE_BARRACK_POSITION } from "./orcWarcampLayout";
 import {
   createCircularBarrierCollisionCells,
   createNightmireBarrierCollisionCells,
@@ -169,22 +170,19 @@ export const mapSixReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapSixForwardTeleporterPosition: Position = { x: 104, y: 29 };
 export const mapSevenReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const MAP_SEVEN_ROUTE_BARRACK_ID = "map-7-route-barrack";
-export const MAP_SEVEN_ROUTE_BARRACK_POSITION: Position = { x: 75, y: 26 };
+export const MAP_SEVEN_ROUTE_BARRACK_POSITION = ORC_WARCAMP_ROUTE_BARRACK_POSITION;
 export const MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS = getBarrackCollisionCells(BARRACK_DEFINITIONS[0]);
-export const MAP_SEVEN_ARENA_GATE_POSITION: Position = { x: 87, y: 51 };
+export const MAP_SEVEN_ARENA_GATE_POSITION = ORC_WARCAMP_GATE_POSITION;
 export const MAP_SEVEN_ARENA_GATE_RADIUS = 5;
 export const MAP_SEVEN_ARENA_GATE_COLLISION_CELLS =
   createCircularBarrierCollisionCells(
     MAP_SEVEN_ARENA_GATE_POSITION,
     MAP_SEVEN_ARENA_GATE_RADIUS,
   );
-export const MAP_SEVEN_ARENA_BARRACK_POSITIONS: Position[] = [
-  { x: 88, y: 12 },
-  { x: 102, y: 12 },
-];
-export const MAP_SEVEN_WARMASTER_POSITION: Position = { x: 101, y: 27 };
-export const MAP_SEVEN_CAGE_POSITION: Position = { x: 88, y: 45 };
-export const MAP_SEVEN_REPEAT_CHEST_POSITION: Position = { x: 102, y: 45 };
+export const MAP_SEVEN_ARENA_BARRACK_POSITIONS = ORC_WARCAMP_ARENA_BARRACKS.map(barrack => barrack.position);
+export const MAP_SEVEN_WARMASTER_POSITION = ORC_WARCAMP_BOSS_POSITION;
+export const MAP_SEVEN_CAGE_POSITION = ORC_WARCAMP_CAGE_POSITION;
+export const MAP_SEVEN_REPEAT_CHEST_POSITION = ORC_WARCAMP_CHEST_POSITION;
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const HUB_TWO_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
@@ -802,7 +800,7 @@ export const mapSevenSubzones: ZoneSubzone[] = [
       { id: "orc-warcamp-farm-east", subzoneId: "orc-warcamp", center: { x: 53, y: 45 }, radius: 17, leashRadius: 20 },
       { id: "orc-warcamp-farm-south", subzoneId: "orc-warcamp", center: { x: 25, y: 46 }, radius: 17, leashRadius: 20 },
       { id: "orc-warcamp-route-squad", subzoneId: "orc-warcamp", center: { x: 75, y: 15 }, radius: 8, leashRadius: 11 },
-      { id: "orc-warcamp-warmaster-ring", subzoneId: "orc-warcamp", center: { x: 98, y: 27 }, radius: 14, leashRadius: 17 },
+      { id: ORC_WARCAMP_ENCOUNTER_ID, subzoneId: "orc-warcamp", center: MAP_SEVEN_WARMASTER_POSITION, radius: 14, leashRadius: 17 },
     ],
     resourceLocations: [
       { id: resourceIds[0], subzoneId: "orc-warcamp", position: { x: 11, y: 50 }, resourceType: "wood", tier: 2 },
@@ -1653,8 +1651,7 @@ const MAP_SEVEN_VISUAL_OBJECTS: MapVisualObject[] = [
   { id: MAP_SEVEN_ROUTE_BARRACK_ID, visualId: "orc_warcamp_barracks", position: MAP_SEVEN_ROUTE_BARRACK_POSITION, widthCells: 5, heightCells: 5, anchorY: 1 },
   { id: "map-7-warmaster-dais", visualId: "orc_warcamp_crude_war_drum_platform", position: MAP_SEVEN_WARMASTER_POSITION, widthCells: 4, heightCells: 4, anchorY: 1 },
   { id: "map-7-weapon-pile", visualId: "orc_warcamp_skull_bone_trophy_mound", position: { x: 35, y: 50 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-7-arena-barrack-west", visualId: "orc_warcamp_barracks", position: MAP_SEVEN_ARENA_BARRACK_POSITIONS[0], widthCells: 3, heightCells: 3, anchorY: 1 },
-  { id: "map-7-arena-barrack-east", visualId: "orc_warcamp_barracks", position: MAP_SEVEN_ARENA_BARRACK_POSITIONS[1], widthCells: 3, heightCells: 3, anchorY: 1 },
+  ...ORC_WARCAMP_ARENA_BARRACKS.map((barrack): MapVisualObject => ({ id: barrack.id, visualId: "orc_warcamp_barracks", position: barrack.position, widthCells: 3, heightCells: 3, anchorY: 1 })),
 ];
 
 const MAP_ONE_WALLS = dedupeWalls([
@@ -1718,8 +1715,9 @@ const MAP_SEVEN_WALLS = dedupeWalls([
   // Keep walkable lanes beside the route Barrack; destroying it is optional.
   // The Boss arena occupies the east side and opens only from the route's southern end.
   ...createVerticalWall(80, 1, 51, []),
-  ...createHorizontalWall(1, 81, 108, []),
-  ...createHorizontalWall(52, 81, 108, [[82, 91]]),
+  // Reclaimed northern space is solid terrain, not an isolated walkable room.
+  ...createWallBlock(Math.ceil(ORC_WARCAMP_ARENA.minX), Math.floor(ORC_WARCAMP_ARENA.maxX), 1, Math.floor(ORC_WARCAMP_ARENA.minY)),
+  ...createHorizontalWall(Math.ceil(ORC_WARCAMP_ARENA.maxY), Math.ceil(ORC_WARCAMP_ARENA.minX), Math.floor(ORC_WARCAMP_ARENA.maxX), [[MAP_SEVEN_ARENA_GATE_POSITION.x - 5, MAP_SEVEN_ARENA_GATE_POSITION.x + 4]]),
   // Sparse field landmarks keep the farming space open rather than checkpoint-shaped.
   ...createWallBlock(20, 27, 37, 44),
   ...createWallBlock(42, 47, 8, 13),

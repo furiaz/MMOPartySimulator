@@ -54,7 +54,7 @@ export function updateStructureRuntime(state: GameState, structure: CombatStruct
   const previous = state.barracksById?.[structure.id];
   const health = Math.max(0, Math.min(getBarrackMaxHealth(), structure.health));
   let nextState: GameState = { ...state, barracksById: { ...state.barracksById, [structure.id]: {
-    preparationMs: 0, spawnSequence: 0, ...previous, health,
+    preparationMs: 0, spawnSequence: 0, ...previous, health, maxHealth: getBarrackMaxHealth(),
     ...(health <= 0 ? { respawnAtMs: previous?.respawnAtMs ?? now + BARRACK_RESPAWN_MS,
       preparationMs: 0, pendingEnemyTypeId: undefined, speech: undefined, hintExpiresAtMs: undefined, wasInRange: false } : {}),
   } } };

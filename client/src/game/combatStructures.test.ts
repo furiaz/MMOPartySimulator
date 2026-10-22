@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BARRACK_DEFINITIONS } from "./barrackDefinitions";
+import { BARRACK_DEFINITIONS, getBarrackMaxHealth } from "./barrackDefinitions";
 import { initializeBarracks, restoreBarracks } from "./barracks";
 import { createCompanion } from "./entities";
 import { createDebugMap } from "./debugMap";
@@ -91,7 +91,7 @@ describe("structure attackable bounds and approach cost", () => {
     const state = setup({ x: definition.attackBounds.minX, y: definition.attackBounds.minY - 1 });
     state.entities.leader = { ...state.entities.leader as Companion, state: "attack", currentTargetId: definition.id };
     const next = updateAttackSystem(state, new Set(), 10_000);
-    expect((next.entities[definition.id] as CombatStructure).health).toBeLessThan(624);
+    expect((next.entities[definition.id] as CombatStructure).health).toBeLessThan(getBarrackMaxHealth());
     expect(next.entities.leader.position).toEqual(state.entities.leader.position);
   });
 
@@ -121,7 +121,7 @@ describe("structure attackable bounds and approach cost", () => {
       expect(next.entities[`member-${index}`].position).toEqual(position);
       expect((next.entities[`member-${index}`] as Companion).lastAttackAt).toBe(10_000);
     }
-    expect((next.entities[routeId] as CombatStructure).health).toBeLessThan(624);
+    expect((next.entities[routeId] as CombatStructure).health).toBeLessThan(getBarrackMaxHealth());
   });
 
   it("uses roof-area bounds for range, projectiles and incidental AoEs", () => {
@@ -137,7 +137,7 @@ describe("structure attackable bounds and approach cost", () => {
     }, 0);
     state = updateCombatProjectileSystem(state, 100, 100);
     expect(state.combatProjectiles).toHaveLength(0);
-    expect((state.entities[routeId] as CombatStructure).health).toBeLessThan(624);
+    expect((state.entities[routeId] as CombatStructure).health).toBeLessThan(getBarrackMaxHealth());
     const beforeAoe = (state.entities[routeId] as CombatStructure).health;
     state = startMaulSweepChannel(state, state.entities.leader as Companion, SKILL_DEFINITIONS.maul_sweep, 200);
     state = updateCompanionAoeChannelSystem(state, 400);
@@ -164,12 +164,12 @@ describe("structure attackable bounds and approach cost", () => {
     state.map.navigationGrid = bakeNavigationGrid(state.map);
     state.entities.leader = { ...state.entities.leader as Companion, state: "attack", currentTargetId: routeId };
     state = updateAttackSystem(state, new Set(["leader"]), 10_000);
-    expect((state.entities[routeId] as CombatStructure).health).toBe(624);
+    expect((state.entities[routeId] as CombatStructure).health).toBe(getBarrackMaxHealth());
     state = launchCombatProjectile(state, state.entities.leader as Companion, state.entities[routeId] as CombatStructure, {
       damageType: "physical", powerMultiplier: 1, visualProfileId: "hunter_arrow", speed: 12, impactRadius: 0.3,
     }, 10_000);
     state = updateCombatProjectileSystem(state, 11_000, 1_000);
-    expect((state.entities[routeId] as CombatStructure).health).toBe(624);
+    expect((state.entities[routeId] as CombatStructure).health).toBe(getBarrackMaxHealth());
     expect(state.combatProjectiles).toHaveLength(0);
   });
 

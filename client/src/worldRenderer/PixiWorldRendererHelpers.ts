@@ -1461,6 +1461,7 @@ function getFullRenderEntitySignature(entity: GameEntity): string {
       entity.archetypeId ?? "",
       entity.enemyTypeId ?? "",
       entity.variant ?? "",
+      entity.combatSizeMultiplier ?? 1,
       entity.isTargetDummy ? "dummy" : "",
       entity.health,
       entity.maxHealth,
@@ -1684,6 +1685,7 @@ function getEnemyDashSignature(
     dash.lastProgressDistance,
     getPositionSignature(dash.lastSafePosition),
     dash.hitTargetIds.join(","),
+    dash.bodyScale ?? 1,
   ].join(":");
 }
 

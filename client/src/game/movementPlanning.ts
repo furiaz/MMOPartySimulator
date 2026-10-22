@@ -33,6 +33,8 @@ import {
 } from "./positionUtils";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { isMovementBlockedByStatus } from "./statusEffects";
+import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
+import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
 import type { GameState } from "./state";
 import type {
   DebugNavigationBlocker,
@@ -84,7 +86,7 @@ export function getEntityCollisionShape(
 
   return {
     kind: "circle",
-    radius: ENTITY_COLLISION_DISTANCE,
+    radius: entity.kind === "enemy" && entity.combatSizeMultiplier !== undefined ? getEnemyCombatBodyRadius(entity) : ENTITY_COLLISION_DISTANCE,
   };
 }
 
@@ -451,6 +453,8 @@ export function isEntitySeparationPositionAvailable(
   sourceEntityId: string,
   position: Position,
 ): boolean {
+  const actor = state.entities[movingEntityId];
+  if (actor?.kind === "enemy" && !isEnemyMovementPositionAllowed(state, actor, position)) return false;
   return (
     isNavigationPositionWalkable(state, position) &&
     !isActiveResourcePosition(state, position, movingEntityId) &&
@@ -476,6 +480,18 @@ export function isPositionAvailable(
     !isActiveResourcePosition(state, position, options.ignoredEntityId) &&
     !isPositionOccupiedByEntity(state, position, options.ignoredEntityId)
   );
+}
+
+/** Static terrain visibility: living actors do not block the ray. */
+export function hasTerrainLineOfSight(state: GameState, from: Position, to: Position): boolean {
+  const distance = getEuclideanDistance(from, to);
+  const steps = Math.max(1, Math.ceil(distance / 0.25));
+  for (let step = 1; step <= steps; step++) {
+    const progress = step / steps;
+    const position = { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress };
+    if (isWallPosition(state, position) || isActiveResourcePosition(state, position)) return false;
+  }
+  return true;
 }
 
 function getNextMoveResolution(
@@ -1214,6 +1230,8 @@ function isNavigationPositionBlocked(
   options: WalkablePositionOptions,
   lookup?: NavigationBlockerLookup,
 ): boolean {
+  const actor = state.entities[ignoredEntityId];
+  if (actor?.kind === "enemy" && !isEnemyMovementPositionAllowed(state, actor, position)) return true;
   if (lookup) {
     const key = getNavigationPositionKey(position);
 

@@ -5,6 +5,7 @@ import {
 import { resolveAndApplyCombatDamage, type CombatRng } from "./combatResolver";
 import { moveEntityTo, setLastAttackAt } from "./entities";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
+import { getEnemyMovementBodyRadius, isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
 import { ENEMY_ATTACK_LEASH_DISTANCE } from "./enemyLeash";
 import { isLivingCompanion } from "./entityGuards";
 import {
@@ -116,6 +117,7 @@ export function startEnemyDash(
     lastSafePosition: { ...cast.origin },
     powerMultiplier,
     hitTargetIds: [],
+    bodyScale: caster.combatSizeMultiplier,
   };
 
   return {
@@ -471,7 +473,8 @@ function isDashTerrainAvailable(
   caster: Enemy,
   position: Position,
 ): boolean {
-  const radius = getEnemyCombatBodyRadius(caster) + DASH_CLEARANCE;
+  const radius = getEnemyMovementBodyRadius(caster) + DASH_CLEARANCE;
+  if (!isEnemyMovementPositionAllowed(state, caster, position)) return false;
 
   if (state.map) {
     if (
@@ -515,7 +518,7 @@ function isDashTerrainAvailable(
         : undefined;
 
       if (
-        encounterArea?.leashRadius !== undefined &&
+        !caster.movementBounds && encounterArea?.leashRadius !== undefined &&
         getEuclideanDistance(position, encounterArea.center) + radius >
           encounterArea.leashRadius
       ) {
@@ -525,7 +528,7 @@ function isDashTerrainAvailable(
   }
 
   if (
-    !caster.questSpawn &&
+    !caster.questSpawn && !caster.movementBounds &&
     getEuclideanDistance(position, caster.homePosition) + radius >
       ENEMY_ATTACK_LEASH_DISTANCE
   ) {

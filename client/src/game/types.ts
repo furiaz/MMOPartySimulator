@@ -86,6 +86,7 @@ export type EnemyTypeDefinition = {
   combatStyle?: EnemyCombatStyle;
   targetPreference: EnemyTargetPreference;
   level: number;
+  maxHealth?: number;
   attackCooldownMs: number;
   detectionRange: number;
   attackRange?: number;
@@ -2162,6 +2163,7 @@ export type EnemyDashState = {
   lastSafePosition: Position;
   powerMultiplier: number;
   hitTargetIds: string[];
+  bodyScale?: number;
 };
 
 export type EnemyDashInterruptReason =
@@ -3051,6 +3053,9 @@ export type Enemy = LivingEntity & {
   attackRange?: number;
   combatBodyRadius?: number;
   attackWindupStartedAt?: number;
+  combatSizeMultiplier?: number;
+  movementBounds?: AoeBounds;
+  minimumMovementBodyRadius?: number;
   attackWindupDurationMs?: number;
   attackWindupTargetId?: string | null;
   targetDecisionReason?: EnemyTargetDecisionReason;
@@ -3499,6 +3504,7 @@ export type HostileCombatTarget = Enemy | CombatStructure;
 
 export type BarrackRuntime = {
   health: number;
+  maxHealth?: number;
   preparationMs: number;
   respawnAtMs?: number;
   spawnSequence: number;

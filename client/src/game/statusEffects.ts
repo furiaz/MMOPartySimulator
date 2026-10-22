@@ -208,21 +208,21 @@ export function isMovementBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["immobilized", "incapacitated"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["immobilized", "incapacitated"]);
 }
 
 export function isAttackBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated", "disarmed"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["incapacitated", "disarmed"]);
 }
 
 export function isSkillUseBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated", "silenced"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["incapacitated", "silenced"]);
 }
 
 export function hasActiveStatusEffect(
@@ -237,7 +237,7 @@ export function isGatherBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["incapacitated"]);
 }
 
 export function isFakeDeathActive(state: GameState, entityId: string): boolean {
