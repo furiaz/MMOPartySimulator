@@ -7,6 +7,7 @@ import { clearStatusEffectsForEntity } from "./statusEffects";
 import { WARMASTER_ARENA, WARMASTER_MAX_POWER, WARMASTER_RETREAT_MS, isInsideWarmasterArena, isWarmaster, type WarmasterAttempt } from "./warmasterState";
 import { ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
 import type { Enemy } from "./types";
+import { isWarmasterAvailable } from "./warmasterLifecycleState";
 function configureBoss(boss: Enemy): Enemy {
   return {
     ...boss,
@@ -72,6 +73,7 @@ export function resetWarmasterAttempt(state: GameState, now: number): GameState 
   }, now);
 }
 export function updateWarmasterSystem(state: GameState, now: number): GameState {
+  if (!isWarmasterAvailable(state)) return state.warmasterAttempt ? { ...state, warmasterAttempt: undefined } : state;
   if (state.currentMapId !== "map-7")
     return state.warmasterAttempt ? { ...state, warmasterAttempt: undefined } : state;
   const boss = Object.values(state.entities).find(isWarmaster);

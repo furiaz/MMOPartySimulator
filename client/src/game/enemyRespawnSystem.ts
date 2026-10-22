@@ -9,6 +9,8 @@ import {
 } from "./questSystem";
 import { updateEntity, type GameState } from "./state";
 import type { Enemy } from "./types";
+import { isWarmasterAvailable } from "./warmasterLifecycleState";
+import { isInsideWarmasterArena } from "./warmasterState";
 
 export const ENEMY_RESPAWN_DELAY_MS = 30_000;
 
@@ -33,6 +35,8 @@ export function updateEnemyRespawnSystem(
       entity.state !== "dead" ||
       entity.questSpawn ||
       entity.barrackSpawn ||
+      entity.enemyTypeId === "orc_warmaster" ||
+      (state.currentMapId === "map-7" && !isWarmasterAvailable(state) && isInsideWarmasterArena(entity.homePosition)) ||
       isEnemySuppressedByDefenseObjective(nextState, entity, nowMs)
     ) {
       continue;

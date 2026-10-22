@@ -4,6 +4,7 @@ import {
   moveEntityTo,
   moveEntityToward,
 } from "./entities";
+import { guardWarmasterWalkingDeparture } from "./warmasterLifecycleState";
 import {
   findNavigationPath,
   findNearestReachableNavigationPosition,
@@ -241,9 +242,11 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
     );
   }
 
+  const guarded = guardWarmasterWalkingDeparture(reservedState, entity, moveResolution.position);
+  if (guarded?.warmasterInteraction?.departure) return guarded;
   return markMoveSucceeded(
     updateMovementEntity(
-      reservedState,
+      guarded ?? reservedState,
       moveEntityTo(entity, moveResolution.position),
     ),
     entity.id,
@@ -1741,6 +1744,12 @@ function swapEntityPositions(
   if (!firstEntity || !secondEntity) {
     recordMovementFailure();
     return markMoveFailed(state, firstEntityId);
+  }
+
+  for (const [entity, destination] of [[firstEntity, secondEntity.position], [secondEntity, firstEntity.position]] as const) {
+    const guarded = guardWarmasterWalkingDeparture(state, entity, destination);
+    if (guarded?.warmasterInteraction?.departure) return guarded;
+    state = guarded ?? state;
   }
 
   let nextState = updateMovementEntity(

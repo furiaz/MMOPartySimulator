@@ -8,6 +8,10 @@ import {
   Suspense,
 } from "react";
 import "./App.css";
+import { WarmasterRewardOverlay } from "./WarmasterRewardOverlay";
+import { claimWarmasterChest, closeWarmasterChest, requestWarmasterChest } from "./game/warmasterLifecycle";
+import { WARMASTER_CAPTIVE_ID, WARMASTER_CHEST_ID } from "./game/warmasterLifecycleState";
+import { resolveWarmasterDeparture } from "./game/teleportSystem";
 import { CompanionVitalsPanel } from "./CompanionVitalsPanel";
 import {
   DebugToolsPanel,
@@ -861,6 +865,8 @@ function getWorldTravelTeleportFailureMessage(
       return "Teleport already in progress.";
     case "recovery_active":
       return "Teleport unavailable during recovery.";
+    case "unclaimed_chest":
+      return "Choose whether to collect your Warmaster chest before leaving.";
     case "invalid_destination":
     default:
       return "Teleport destination unavailable.";
@@ -3831,7 +3837,9 @@ function App() {
       ? [{ ...runtime.speech, npcId: id, mapId: currentMap.id }] : []);
   const patronSpeech: ActiveNpcSpeech | null = gameState.warmasterAttempt?.speechStartedAt !== undefined
     ? { createdAt: gameState.warmasterAttempt.speechStartedAt, expiresAt: gameState.warmasterAttempt.speechStartedAt + NPC_SPEECH_DURATION_MS, mapId: currentMap.id, npcId: gameState.warmasterAttempt.bossId, text: "Their borrowed power returns to me!" } : null;
-  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech, ...structureSpeech, patronSpeech]
+  const rescueSpeechAt = gameState.warmasterInteraction?.rescueSpeechStartedAt;
+  const rescueSpeech: ActiveNpcSpeech | null = rescueSpeechAt === undefined ? null : { createdAt: rescueSpeechAt, expiresAt: rescueSpeechAt + NPC_SPEECH_DURATION_MS, mapId: "map-7", npcId: WARMASTER_CAPTIVE_ID, text: "You’ve freed me. Thank you!" };
+  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech, ...structureSpeech, patronSpeech, rescueSpeech]
     .filter(
       (speech): speech is ActiveNpcSpeech =>
         speech !== null &&
@@ -6158,6 +6166,7 @@ function App() {
     setSaveStatusMessage(
       getWorldTravelTeleportFailureMessage(teleport.result.reason),
     );
+    if (teleport.result.reason === "unclaimed_chest") setGameState(teleport.state);
   }
 
   function debugTeleportToHubOne() {
@@ -6517,8 +6526,8 @@ function App() {
   }
 
   function closeDungeonChest() {
-    queueSaveAfterStateChange("Dungeon chest continued");
-    setGameState(closeSlimewardDungeonChestUi);
+    queueSaveAfterStateChange("Chest closed");
+    setGameState(state => state.warmasterInteraction?.chestOpen ? closeWarmasterChest(state) : closeSlimewardDungeonChestUi(state));
   }
 
   function recordAppliedGameplayShortcut(
@@ -6539,7 +6548,7 @@ function App() {
       ),
       guidePopupOpen: Boolean(activeGuidePopupIdRef.current),
       queuedGuidePopups: queuedGuidePopupIdsRef.current.length > 0,
-      dungeonChestOpen: Boolean(activeDungeonChest),
+      dungeonChestOpen: Boolean(activeDungeonChest || gameState.warmasterInteraction?.chestOpen || gameState.warmasterInteraction?.departure),
       offlineSummaryOpen: Boolean(offlineSummary),
       secondaryPartySummaryOpen: Boolean(guildSecondaryPartyRedeemSummary),
     });
@@ -6564,7 +6573,7 @@ function App() {
     ) {
       dismissGuidePopups(true);
     }
-    if (activeDungeonChest) {
+    if (activeDungeonChest || gameState.warmasterInteraction?.chestOpen) {
       closeDungeonChest();
     }
     if (offlineSummary) {
@@ -6805,6 +6814,11 @@ function App() {
   }
 
   function commandPartyToInteractWithNpc(npcId: string) {
+    if (npcId === WARMASTER_CHEST_ID) {
+      queueSaveAfterStateChange("Warmaster chest interaction saved");
+      setGameState(requestWarmasterChest);
+      return;
+    }
     const npc = gameState.entities[npcId];
 
     if (npc?.kind !== "npc") {
@@ -7090,6 +7104,7 @@ function App() {
               npcSpeech={visibleNpcSpeech}
               barracksById={gameState.barracksById}
               warmasterAttempt={gameState.warmasterAttempt}
+              warmasterLifecycle={gameState.warmasterLifecycle}
               onCompanionDragCommand={commandCompanionByDrag}
               onEnemyClick={commandPartyToTargetEnemy}
               onEntityHover={updateEntityHoverTooltip}
@@ -7495,6 +7510,15 @@ function App() {
             </div>
           </section>
         ) : null}
+
+        <WarmasterRewardOverlay
+          chest={gameState.warmasterLifecycle?.chest}
+          open={Boolean(gameState.warmasterInteraction?.chestOpen)}
+          departurePending={Boolean(gameState.warmasterInteraction?.departure)}
+          onCollect={() => { queueSaveAfterStateChange("Warmaster chest collected"); setGameState(claimWarmasterChest); }}
+          onClose={closeDungeonChest}
+          onDeparture={leave => setGameState(state => resolveWarmasterDeparture(state, leave))}
+        />
 
         {activeDungeonChest ? (
           <section className="dungeon-chest-overlay" aria-label="Dungeon chest loot">

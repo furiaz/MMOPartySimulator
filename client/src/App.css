@@ -6532,6 +6532,17 @@
   font-size: 18px;
 }
 
+.warmaster-reward-panel {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+.warmaster-reward-panel .dungeon-chest-grid {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+}
+
 .dungeon-chest-warning {
   margin: 0;
   color: #fca5a5;

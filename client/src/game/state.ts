@@ -1,5 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { recordPatronDeath, type WarmasterAttempt } from "./warmasterState";
+import { recordWarmasterLifecycleDeath, type WarmasterLifecycle, type WarmasterInteraction } from "./warmasterLifecycleState";
 import type { ForcedMovement } from "./forcedMovement";
 import { findClosestAvailablePosition } from "./movementPlanning";
 import type {
@@ -309,6 +310,8 @@ export type GameState = {
   enemyDashesByEnemyId?: Record<string, EnemyDashState>;
   forcedMovementsByEntityId?: Record<string, ForcedMovement>;
   warmasterAttempt?: WarmasterAttempt;
+  warmasterLifecycle?: WarmasterLifecycle;
+  warmasterInteraction?: WarmasterInteraction;
   aoeDummyPatternSequenceIndex?: number;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
   flaskRechargeEnemyKillCounter?: number;
@@ -380,7 +383,7 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
           }
         : state.followTrailsByEntityId,
   };
-  return entity.kind === "structure" ? updateStructureRuntime(nextState, entity, now) : recordPatronDeath(nextState, previousEntity, entity, now);
+  return entity.kind === "structure" ? updateStructureRuntime(nextState, entity, now) : recordWarmasterLifecycleDeath(recordPatronDeath(nextState, previousEntity, entity, now), previousEntity, entity, now);
 }
 
 export function addCombatFeedback(

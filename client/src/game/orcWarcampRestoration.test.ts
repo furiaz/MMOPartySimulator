@@ -14,6 +14,7 @@ import { ORC_WARCAMP_ARENA, ORC_WARCAMP_BOSS_POSITION } from "./orcWarcampLayout
 import { restoreOrcWarcampLayout } from "./orcWarcampRestoration";
 import { sanitizeGameStateForSave } from "./saveGame";
 import { createTestGameState } from "./testState";
+import { updateEntity } from "./state";
 import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
 import type { CombatStructure, Companion, Enemy } from "./types";
 
@@ -51,8 +52,8 @@ describe("compact Warcamp restoration", () => {
     const restored = sanitizeGameStateForSave(state, 1000);
     expect(restored.entities[boss.id]).toMatchObject({ homePosition: ORC_WARCAMP_BOSS_POSITION, position: ORC_WARCAMP_BOSS_POSITION,
       health: 1500, combatSizeMultiplier: 1, movementBounds: ORC_WARCAMP_ARENA, minimumMovementBodyRadius: 1.875 });
-    state.entities[boss.id] = { ...boss, health: 0, state: "dead" };
-    expect(sanitizeGameStateForSave(state, 1000).entities[boss.id]).toMatchObject({ homePosition: ORC_WARCAMP_BOSS_POSITION, health: 0, state: "dead" });
+    const defeated = updateEntity(state, { ...boss, health: 0, state: "dead" }, 900);
+    expect(sanitizeGameStateForSave(defeated, 1000).entities[boss.id]).toMatchObject({ homePosition: ORC_WARCAMP_BOSS_POSITION, health: 0, state: "dead" });
   });
   it("repairs reinforcement homes and actors trapped by moved structures or reclaimed terrain", () => {
     const state = setup();
