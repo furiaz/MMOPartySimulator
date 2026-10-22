@@ -39,6 +39,7 @@ import {
   getEnemyTemperament,
 } from "./enemyArchetypes";
 import { isFakeDeathActive } from "./statusEffects";
+import { isInsideEnemyMovementBounds } from "./enemyMovementBounds";
 import type {
   AutonomousEntity,
   Enemy,
@@ -92,6 +93,7 @@ export function updateEnemyAISystem(
     }
 
     if (
+      nextState.forcedMovementsByEntityId?.[entity.id] ||
       isEnemyAbilityBusy(nextState, entity.id) ||
       isEnemyAoeChanneling(nextState, entity.id)
     ) {
@@ -704,6 +706,7 @@ function isInsideRoamLeash(enemy: Enemy, position: Position): boolean {
 }
 
 function isInsideAttackLeash(enemy: Enemy, position: Position): boolean {
+  if (enemy.movementBounds) return isInsideEnemyMovementBounds(enemy, position);
   if (enemy.questSpawn) {
     return true;
   }
@@ -823,6 +826,10 @@ function getTargetReachabilityCacheKey(
 }
 
 function getTargetRetainPathDistance(state: GameState, enemy: Enemy): number {
+  if (enemy.movementBounds) {
+    const bounds = enemy.movementBounds;
+    return 2 * (bounds.maxX - bounds.minX + bounds.maxY - bounds.minY);
+  }
   if (enemy.questSpawn && state.map) {
     return state.map.columns * state.map.rows * 2;
   }

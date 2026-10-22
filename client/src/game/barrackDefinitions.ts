@@ -1,10 +1,10 @@
 import { getScaledEnemyStats } from "./enemyScaling";
 import type { AoeBounds, CombatStructure, DebugMapId, EnemyTypeId, Position } from "./types";
+import { ORC_WARCAMP_ARENA, ORC_WARCAMP_ARENA_BARRACKS, ORC_WARCAMP_ENCOUNTER_ID, ORC_WARCAMP_ROUTE_BARRACK_POSITION } from "./orcWarcampLayout";
 
-export const BARRACK_PREPARATION_MS = 9_000;
+export const BARRACK_PREPARATION_MS = 12_000;
 export const BARRACK_RESPAWN_MS = 120_000;
 export const BARRACK_ACTIVATION_RADIUS = 10;
-export const BARRACK_REINFORCEMENT_CAP = 5;
 
 export type BarrackDefinition = {
   subzoneId: string;
@@ -14,26 +14,26 @@ export type BarrackDefinition = {
   footprint: AoeBounds;
   attackBounds: AoeBounds;
   spawnCandidates: Position[];
+  reinforcementCap: number;
   tutorial?: boolean;
+  activation?: { encounterId: string; bounds: AoeBounds };
 };
 
 export const BARRACK_DEFINITIONS: readonly BarrackDefinition[] = [
-  { id: "map-7-route-barrack", mapId: "map-7", subzoneId: "orc-warcamp", position: { x: 75, y: 26 },
+  { id: "map-7-route-barrack", mapId: "map-7", subzoneId: "orc-warcamp", position: ORC_WARCAMP_ROUTE_BARRACK_POSITION,
     footprint: { minX: 72.5, maxX: 77.5, minY: 24.5, maxY: 26.5 },
     attackBounds: { minX: 73, maxX: 78, minY: 22, maxY: 27 },
-    spawnCandidates: [{ x: 74, y: 23 }, { x: 77, y: 23 }, { x: 74, y: 29 }, { x: 77, y: 29 }], tutorial: true },
-  { id: "map-7-arena-barrack-west", mapId: "map-7", subzoneId: "orc-warcamp", position: { x: 88, y: 12 },
-    footprint: { minX: 86.5, maxX: 89.5, minY: 11.5, maxY: 12.5 },
-    attackBounds: { minX: 87, maxX: 90, minY: 10, maxY: 13 },
-    spawnCandidates: [{ x: 88, y: 15 }, { x: 85, y: 15 }, { x: 92, y: 15 }] },
-  { id: "map-7-arena-barrack-east", mapId: "map-7", subzoneId: "orc-warcamp", position: { x: 102, y: 12 },
-    footprint: { minX: 100.5, maxX: 103.5, minY: 11.5, maxY: 12.5 },
-    attackBounds: { minX: 101, maxX: 104, minY: 10, maxY: 13 },
-    spawnCandidates: [{ x: 102, y: 15 }, { x: 98, y: 15 }, { x: 106, y: 15 }] },
+    spawnCandidates: [{ x: 74, y: 23 }, { x: 77, y: 23 }, { x: 74, y: 29 }, { x: 77, y: 29 }], reinforcementCap: 5, tutorial: true },
+  ...ORC_WARCAMP_ARENA_BARRACKS.map(({ id, position, spawnCandidates }): BarrackDefinition => ({
+    id, position, spawnCandidates, reinforcementCap: 2, mapId: "map-7", subzoneId: "orc-warcamp",
+    footprint: { minX: position.x - 1.5, maxX: position.x + 1.5, minY: position.y - 0.5, maxY: position.y + 0.5 },
+    attackBounds: { minX: position.x - 1, maxX: position.x + 2, minY: position.y - 2, maxY: position.y + 1 },
+    activation: { encounterId: ORC_WARCAMP_ENCOUNTER_ID, bounds: ORC_WARCAMP_ARENA },
+  })),
 ];
 
 export function getBarrackMaxHealth(): number {
-  return getScaledEnemyStats(18, "orc").maxHealth * 3;
+  return getScaledEnemyStats(18, "orc").maxHealth * 6;
 }
 
 export function rollBarrackEnemy(random: () => number): EnemyTypeId {

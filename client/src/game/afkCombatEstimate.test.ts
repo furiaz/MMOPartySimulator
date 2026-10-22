@@ -10,6 +10,17 @@ import type { GameState } from "./state";
 import type { Companion, EnemyTypeId, GameEntity } from "./types";
 
 describe("afk combat estimate", () => {
+  it("uses authored Warmaster HP when estimating without live enemy records", () => {
+    const leader = createCompanion("leader", { x: 90, y: 30 }, "leader");
+    const estimate = estimateCurrentPartyAfkCombat(createTestGameState({
+      currentMapId: "map-7", map: createDebugMap("map-7"), partyLeaderId: leader.id,
+      entities: { [leader.id]: leader },
+    }));
+    expect(estimate.available).toBe(true);
+    if (!estimate.available) return;
+    expect(estimate.enemies.find(enemy => enemy.enemyTypeId === "orc_warmaster")?.maxHealth).toBe(1500);
+    expect(estimate.enemies.find(enemy => enemy.enemyTypeId === "orc")?.maxHealth).toBe(208);
+  });
   it("estimates nonzero combat gains for a matched party in a wild subzone", () => {
     const state = createWildState([
       createCompanionAtLevel("leader", "defender", 1),

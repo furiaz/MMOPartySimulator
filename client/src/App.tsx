@@ -3829,13 +3829,15 @@ function App() {
   const structureSpeech: ActiveNpcSpeech[] = Object.entries(gameState.barracksById ?? {}).flatMap(([id, runtime]) =>
     runtime.speech && gameState.entities[id]?.kind === "structure" && runtime.health > 0
       ? [{ ...runtime.speech, npcId: id, mapId: currentMap.id }] : []);
-  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech, ...structureSpeech]
+  const patronSpeech: ActiveNpcSpeech | null = gameState.warmasterAttempt?.speechStartedAt !== undefined
+    ? { createdAt: gameState.warmasterAttempt.speechStartedAt, expiresAt: gameState.warmasterAttempt.speechStartedAt + NPC_SPEECH_DURATION_MS, mapId: currentMap.id, npcId: gameState.warmasterAttempt.bossId, text: "Their borrowed power returns to me!" } : null;
+  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech, ...structureSpeech, patronSpeech]
     .filter(
       (speech): speech is ActiveNpcSpeech =>
         speech !== null &&
         speech.expiresAt > currentTime &&
         (!speech.mapId || speech.mapId === currentMap.id) &&
-        (gameState.entities[speech.npcId]?.kind === "npc" || gameState.entities[speech.npcId]?.kind === "structure"),
+        (gameState.entities[speech.npcId]?.kind === "npc" || gameState.entities[speech.npcId]?.kind === "structure" || (gameState.entities[speech.npcId]?.kind === "enemy" && gameState.entities[speech.npcId].state !== "dead")),
     )
     .sort((first, second) => first.createdAt - second.createdAt)
     .at(-1) ?? null;
@@ -7087,6 +7089,7 @@ function App() {
               navigationClickAccessibility={navigationClickAccessibility}
               npcSpeech={visibleNpcSpeech}
               barracksById={gameState.barracksById}
+              warmasterAttempt={gameState.warmasterAttempt}
               onCompanionDragCommand={commandCompanionByDrag}
               onEnemyClick={commandPartyToTargetEnemy}
               onEntityHover={updateEntityHoverTooltip}

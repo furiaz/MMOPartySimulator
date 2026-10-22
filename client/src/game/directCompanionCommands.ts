@@ -140,6 +140,8 @@ export function updateDirectCompanionCommandSystem(
       continue;
     }
 
+    if (nextState.forcedMovementsByEntityId?.[companion.id]) continue;
+
     if (command.type === "move") {
       nextState = updateDirectMoveCommand(nextState, companion, command, movedEntityIds, now);
       continue;

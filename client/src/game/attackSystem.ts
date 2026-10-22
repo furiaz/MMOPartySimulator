@@ -47,6 +47,7 @@ import {
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import { isEnemyEntity } from "./entityGuards";
 import { getCombatTargetPosition, getStructureApproachPosition, hasStructureLineOfSight } from "./combatStructures";
+import { isInsideEnemyMovementBounds } from "./enemyMovementBounds";
 import {
   getEnemyAttackRange,
   getEnemyCombatBodyRadius,
@@ -381,6 +382,7 @@ export function updateAttackSystem(
     if (
       movedAttacker &&
       isEnemy(currentAttacker) &&
+      !currentAttacker.movementBounds &&
       getEuclideanDistance(currentAttacker.homePosition, movedAttacker.position) >
         getEnemyAttackLeashDistance()
     ) {
@@ -810,6 +812,7 @@ function getDistance(
 }
 
 function canEnemyChaseTarget(enemy: Enemy, target: CombatEntity): boolean {
+  if (enemy.movementBounds) return isInsideEnemyMovementBounds(enemy, target.position);
   return (
     getEuclideanDistance(enemy.homePosition, target.position) <=
     getEnemyAttackLeashDistance()

@@ -248,9 +248,13 @@ describe("debug maps", () => {
     expect(destroyedBarrackMap.collisionWalls).toBeUndefined();
     expect(warmaster?.position).toEqual(MAP_SEVEN_WARMASTER_POSITION);
     expect(MAP_SEVEN_ARENA_BARRACK_POSITIONS).toEqual([
-      { x: 88, y: 12 },
-      { x: 102, y: 12 },
+      { x: 88, y: 29 },
+      { x: 102, y: 29 },
+      { x: 95, y: 26 },
     ]);
+    expect(isNavigationCellWalkable(map, { x: 95, y: 12 })).toBe(false);
+    expect(isNavigationCellWalkable(map, { x: 95, y: 21 })).toBe(false);
+    expect(isNavigationCellWalkable(map, { x: 95, y: 22 })).toBe(true);
     expect(mapSevenEnemyStartData).toHaveLength(19);
 
     for (const anchor of [

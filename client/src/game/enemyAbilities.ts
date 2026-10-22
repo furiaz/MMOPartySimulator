@@ -4,6 +4,12 @@ import { launchCombatProjectile } from "./combatProjectileSystem";
 import { isLivingEnemy, isTargetDummyEnemy } from "./entityGuards";
 import { applyStatusEffect } from "./statusEffects";
 import { prepareEnemyDash, startEnemyDash } from "./enemyDashSystem";
+import { resolveAndApplyCombatDamage } from "./combatResolver";
+import { startForcedMovement } from "./forcedMovement";
+import { getEnemyAttackRange, getEnemyCombatBodyRadius } from "./enemyArchetypes";
+import { getWarmasterPower } from "./warmasterState";
+import { hasTerrainLineOfSight } from "./movementPlanning";
+import { isFakeDeathActive } from "./statusEffects";
 import type {
   AoePattern,
   AoeVisualIntent,
@@ -79,6 +85,60 @@ export type EnemyAbilityRegistry = Readonly<
 >;
 
 export const ENEMY_ABILITY_DEFINITIONS: EnemyAbilityRegistry = {
+  orc_warmaster_rending_dash: {
+    ...createRendingDashDefinition({
+      id: "orc_warmaster_rending_dash",
+      range: 7.5,
+      pattern: { type: "rectangle", rows: 5, columns: 2 },
+      fullDistance: 7.5,
+      castDurationMs: 900,
+      windupDurationMs: 200,
+      movementDurationMs: 350,
+      powerMultiplier: 1.5,
+      cooldownMs: 10000,
+    }),
+    canStart: ({ state, caster }) => state.warmasterAttempt?.bossId === caster.id,
+  },
+  orc_warmaster_patron_cleave: createPatronAreaAbility({
+    id: "orc_warmaster_patron_cleave",
+    displayName: "Patron Cleave",
+    aoePattern: { type: "cone", range: 6, angleRadians: Math.PI / 2 },
+    range: 6,
+    castDurationMs: 1200,
+    windupDurationMs: 300,
+    cooldownMs: 12000,
+  }, { minimumPower: 5, powerMultiplier: 1.5 }),
+  orc_warmaster_patron_burst: createPatronAreaAbility({
+    id: "orc_warmaster_patron_burst",
+    displayName: "Patron Burst",
+    aoePattern: { type: "circle", radius: 4 },
+    range: 4,
+    castDurationMs: 1500,
+    windupDurationMs: 500,
+    cooldownMs: 20000,
+  }, { minimumPower: 10, powerMultiplier: 2 }),
+  orc_warmaster_kick: {
+    id: "orc_warmaster_kick",
+    displayName: "Kick",
+    range: 1,
+    castDurationMs: 600,
+    windupDurationMs: 200,
+    cooldownMs: 8000,
+    canStart: ({ state, caster }) => state.warmasterAttempt?.bossId === caster.id,
+    resolve: ({ state, caster, target, cast, now }) => {
+      const direction = { x: target.position.x - cast.origin.x, y: target.position.y - cast.origin.y };
+      const distance = Math.hypot(direction.x, direction.y);
+      if (distance > getEnemyAttackRange(caster) + getEnemyCombatBodyRadius(caster) ||
+          !hasTerrainLineOfSight(state, cast.origin, target.position)) return state;
+      const result = resolveAndApplyCombatDamage(state, caster, target, {
+        damageType: "physical", powerMultiplier: 1,
+        allowEvasion: true, allowPassiveBlock: true, label: "Kick", now,
+      });
+      return result.evaded || result.target.health <= 0 ? result.state : startForcedMovement(
+        result.state, target.id, caster.id, distance > 0 ? direction : cast.direction, 4, 250, now,
+      );
+    },
+  },
   fire_bolt: {
     id: "fire_bolt",
     displayName: "Fire Bolt",
@@ -148,6 +208,33 @@ export const ENEMY_ABILITY_DEFINITIONS: EnemyAbilityRegistry = {
     cooldownMs: 10000,
   }),
 };
+
+function createPatronAreaAbility(
+  definition: Omit<EnemyAbilityDefinition, "resolve">,
+  config: { minimumPower: number; powerMultiplier: number },
+): EnemyAbilityDefinition {
+  return {
+    ...definition,
+    aoeVisualIntent: "enemyOffensive",
+    canStart: ({ state, caster }) => state.warmasterAttempt?.bossId === caster.id &&
+      getWarmasterPower(state, caster.id) >= config.minimumPower,
+    prepareCast: ({ area, target }) => area && isPositionInsideAoe(area, target.position) ? { area } : null,
+    resolve: ({ state, caster, cast, now }) => {
+      if (!cast.area) return state;
+      let next = state;
+      for (const member of Object.values(state.entities)) {
+        const target = next.entities[member.id];
+        if (target?.kind !== "companion" || target.health <= 0 || target.state === "dead" ||
+            isFakeDeathActive(next, target.id) || !isPositionInsideAoe(cast.area, target.position)) continue;
+        next = resolveAndApplyCombatDamage(next, caster, target, {
+          damageType: "physical", powerMultiplier: config.powerMultiplier,
+          allowEvasion: true, allowPassiveBlock: true, label: definition.displayName, now,
+        }).state;
+      }
+      return next;
+    },
+  };
+}
 
 export function getEnemyAbilityDefinition(
   abilityId: EnemyAbilityId,

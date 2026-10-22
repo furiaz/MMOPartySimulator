@@ -4,7 +4,7 @@ import { getEntityCollisionShape, isPositionAvailable } from "./movementPlanning
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { hasStructureLineOfSight, refreshStructureCollision } from "./combatStructures";
 import { BARRACK_DEFINITIONS, BARRACK_ACTIVATION_RADIUS, BARRACK_PREPARATION_MS, BARRACK_RESPAWN_MS,
-  BARRACK_REINFORCEMENT_CAP, createBarrackEntity, getBarrackMaxHealth, rollBarrackEnemy } from "./barrackDefinitions";
+  createBarrackEntity, getBarrackMaxHealth, rollBarrackEnemy } from "./barrackDefinitions";
 import type { BarrackDefinition } from "./barrackDefinitions";
 import type { GameState } from "./state";
 import type { AoeBounds, BarrackRuntime, GameEntity, Position } from "./types";
@@ -16,7 +16,7 @@ export function initializeBarracks(state: GameState): GameState {
   const barracksById = { ...state.barracksById };
   for (const definition of definitions) {
     if (!barracksById[definition.id]) {
-      barracksById[definition.id] = { health: getBarrackMaxHealth(), preparationMs: 0, spawnSequence: 0 };
+      barracksById[definition.id] = { health: getBarrackMaxHealth(), maxHealth: getBarrackMaxHealth(), preparationMs: 0, spawnSequence: 0 };
       changed = true;
     }
     if (entities[definition.id]?.kind !== "structure") {
@@ -56,7 +56,9 @@ export function isBarrackFootprintOccupied(state: GameState, definition: Barrack
   return false;
 }
 
-export function updateBarracks(state: GameState, now: number, deltaMs: number, random = Math.random): GameState {
+export type BarrackActivationContext = { activeEncounterIds?: ReadonlySet<string> };
+
+export function updateBarracks(state: GameState, now: number, deltaMs: number, random = Math.random, context: BarrackActivationContext = {}): GameState {
   let nextState = initializeBarracks(state);
   for (const definition of BARRACK_DEFINITIONS) {
     let runtime = nextState.barracksById?.[definition.id];
@@ -67,18 +69,22 @@ export function updateBarracks(state: GameState, now: number, deltaMs: number, r
     }
     if (runtime.health <= 0) {
       if (runtime.respawnAtMs === undefined || now < runtime.respawnAtMs || isBarrackFootprintOccupied(nextState, definition)) continue;
-      runtime = { ...runtime, health: getBarrackMaxHealth(), preparationMs: 0, respawnAtMs: undefined, wasInRange: false, pendingEnemyTypeId: undefined };
+      runtime = { ...runtime, health: getBarrackMaxHealth(), maxHealth: getBarrackMaxHealth(), preparationMs: 0, respawnAtMs: undefined, wasInRange: false, pendingEnemyTypeId: undefined };
       nextState = refreshStructureCollision({ ...setRuntime(nextState, definition.id, runtime), entities: { ...nextState.entities, [definition.id]: createBarrackEntity(definition) } });
     }
     const barrack = nextState.entities[definition.id];
     if (barrack?.kind !== "structure") continue;
     // Hidden companions neither activate production nor become spawn-path goals.
-    const nearby = Object.values(nextState.entities).filter(entity => entity.kind === "companion" && entity.health > 0 && entity.state !== "dead" &&
-      Math.hypot(entity.position.x - definition.position.x, entity.position.y - definition.position.y) <= BARRACK_ACTIVATION_RADIUS &&
+    const activation = definition.activation;
+    const encounterActive = !activation || context.activeEncounterIds?.has(activation.encounterId);
+    const nearby = Object.values(nextState.entities).filter(entity => encounterActive && entity.kind === "companion" && entity.health > 0 && entity.state !== "dead" &&
+      (activation
+        ? entity.position.x >= activation.bounds.minX && entity.position.x <= activation.bounds.maxX && entity.position.y >= activation.bounds.minY && entity.position.y <= activation.bounds.maxY
+        : Math.hypot(entity.position.x - definition.position.x, entity.position.y - definition.position.y) <= BARRACK_ACTIVATION_RADIUS) &&
       hasStructureLineOfSight(nextState, entity.position, barrack));
     const inRange = nearby.length > 0;
     const count = Object.values(nextState.entities).filter(entity => entity.kind === "enemy" && entity.barrackSpawn?.barrackId === definition.id && entity.health > 0 && entity.state !== "dead").length;
-    const productionAllowed = inRange && count < BARRACK_REINFORCEMENT_CAP;
+    const productionAllowed = inRange && count < definition.reinforcementCap;
     const activated = productionAllowed && !runtime.wasInRange;
     runtime = { ...runtime, wasInRange: productionAllowed ? true : inRange ? runtime.wasInRange : false,
       speech: runtime.speech && runtime.speech.expiresAt > now ? runtime.speech : undefined,
@@ -133,8 +139,14 @@ export function restoreBarracks(state: GameState, now: number): GameState {
   for (const definition of BARRACK_DEFINITIONS) {
     const saved = state.barracksById?.[definition.id];
     if (!saved || typeof saved !== "object") continue;
-    const health = Math.max(0, Math.min(getBarrackMaxHealth(), finite(saved.health, getBarrackMaxHealth())));
-    barracksById[definition.id] = { health, preparationMs: Math.max(0, Math.min(BARRACK_PREPARATION_MS, finite(saved.preparationMs, 0))),
+    const serializedStructure = state.entities[definition.id];
+    const oldMaxHealth = saved.maxHealth && Number.isFinite(saved.maxHealth) && saved.maxHealth > 0
+      ? saved.maxHealth
+      : serializedStructure?.kind === "structure" && Number.isFinite(serializedStructure.maxHealth) && serializedStructure.maxHealth > 0
+        ? serializedStructure.maxHealth : 624;
+    const oldHealth = finite(saved.health, oldMaxHealth);
+    const health = oldHealth <= 0 ? 0 : Math.max(1, Math.min(getBarrackMaxHealth(), Math.round(oldHealth / oldMaxHealth * getBarrackMaxHealth())));
+    barracksById[definition.id] = { health, maxHealth: getBarrackMaxHealth(), preparationMs: Math.max(0, Math.min(BARRACK_PREPARATION_MS, finite(saved.preparationMs, 0))),
       spawnSequence: Number.isSafeInteger(saved.spawnSequence) && saved.spawnSequence >= 0 && saved.spawnSequence < Number.MAX_SAFE_INTEGER ? saved.spawnSequence : 0, tutorialSeen: saved.tutorialSeen === true,
       wasInRange: true,
       ...(health <= 0 ? { respawnAtMs: Math.max(0, finite(saved.respawnAtMs, now + BARRACK_RESPAWN_MS)) } : {}),
@@ -148,7 +160,7 @@ export function restoreBarracks(state: GameState, now: number): GameState {
     const definition = BARRACK_DEFINITIONS.find(item => item.id === entity.barrackSpawn?.barrackId && item.mapId === state.currentMapId);
     const sequence = entity.barrackSpawn.sequence;
     if (!definition || !Number.isSafeInteger(sequence) || sequence <= 0 || id !== `${definition.id}-orc-${sequence}` || !["orc", "orc_raider", "orc_shieldbearer"].includes(entity.enemyTypeId ?? "")) { delete entities[id]; continue; }
-    const runtime = barracksById[definition.id] ?? { health: getBarrackMaxHealth(), preparationMs: 0, spawnSequence: 0, wasInRange: true };
+    const runtime = barracksById[definition.id] ?? { health: getBarrackMaxHealth(), maxHealth: getBarrackMaxHealth(), preparationMs: 0, spawnSequence: 0, wasInRange: true };
     barracksById[definition.id] = { ...runtime, spawnSequence: Math.max(runtime.spawnSequence, sequence) };
     const normal = createEnemy(id, entity.homePosition, entity.aggressionMode, { enemyTypeId: entity.enemyTypeId });
     entities[id] = { ...entity, variant: undefined, level: normal.level,
