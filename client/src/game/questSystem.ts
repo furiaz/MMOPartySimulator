@@ -8,6 +8,7 @@ import {
   MAP_FOUR_ID,
   MAP_FIVE_ID,
   MAP_SIX_ID,
+  MAP_SEVEN_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
   SLIMEWARD_CHEST_ID,
@@ -24,6 +25,8 @@ import {
   npcIds,
 } from "./debugMap";
 import { isFirstClassId } from "./classes";
+import { ORC_WARCAMP_BOSS_POSITION, ORC_WARCAMP_CAGE_POSITION, ORC_WARCAMP_CHEST_POSITION, ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
+import { WARMASTER_CAPTIVE_ID, WARMASTER_CHEST_ID } from "./warmasterLifecycleState";
 import { createNpc } from "./entities";
 import { addItemToInventoryState } from "./inventory";
 import { getItemDefinition } from "./items";
@@ -92,6 +95,7 @@ export const ASH_GOBLIN_MAIN_QUEST_ID: QuestId = "break_the_ash_camp";
 export const BRIAR_BURROWS_MAIN_QUEST_ID: QuestId =
   "into_the_briar_burrows";
 export const NIGHTMIRE_PATRON_QUEST_ID: QuestId = "the_patrons_shadow";
+export const WARCAMP_MAIN_QUEST_ID: QuestId = "the_evil_patrons_chosen";
 export const NIGHTMIRE_WARD_SUPPRESSION_GROUP_ID = "nightmire-wards";
 const SMITHS_FIRST_WORK_ACCEPTANCE_GRANTS: QuestRewardItem[] = [
   { itemId: "copper_ore", quantity: 2 },
@@ -121,6 +125,7 @@ export const QUEST_ORDER: QuestId[] = [
   ASH_GOBLIN_MAIN_QUEST_ID,
   BRIAR_BURROWS_MAIN_QUEST_ID,
   NIGHTMIRE_PATRON_QUEST_ID,
+  WARCAMP_MAIN_QUEST_ID,
 ];
 
 export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
@@ -818,6 +823,7 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
     questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
     questGiverMapId: HUB_TWO_MAP_ID,
     requiresCompletedQuestIds: [BRIAR_BURROWS_MAIN_QUEST_ID],
+    unlocksQuestIds: [WARCAMP_MAIN_QUEST_ID],
     objectives: [
       {
         id: "break_night_bat_ward",
@@ -886,6 +892,41 @@ export const QUEST_DEFINITIONS: Record<QuestId, QuestDefinition> = {
       crowns: 1000,
       characterXp: 4000,
     },
+  },
+  the_evil_patrons_chosen: {
+    id: WARCAMP_MAIN_QUEST_ID,
+    displayName: "The Evil Patron's Chosen",
+    sourceType: "npc",
+    objectiveFlow: "parallel",
+    objectiveGuidance: "first_incomplete",
+    questGiverPoiId: HUB_TWO_QUEST_GIVER_NPC_ID,
+    questGiverMapId: HUB_TWO_MAP_ID,
+    requiresCompletedQuestIds: [NIGHTMIRE_PATRON_QUEST_ID],
+    objectives: [
+      {
+        id: "defeat_orc_warmaster", displayName: "Defeat the Orc Warmaster", type: "encounter_milestone",
+        encounterMilestone: { encounterId: ORC_WARCAMP_ENCOUNTER_ID, kind: "boss_defeated" },
+        targetMapId: MAP_SEVEN_ID, targetSubzoneId: "orc-warcamp", targetPosition: ORC_WARCAMP_BOSS_POSITION,
+        enemyTypeId: "orc_warmaster", requiredCount: 1,
+      },
+      {
+        id: "free_warmaster_captive", displayName: "Free the captive", type: "encounter_milestone",
+        encounterMilestone: { encounterId: ORC_WARCAMP_ENCOUNTER_ID, kind: "captive_rescued" },
+        targetMapId: MAP_SEVEN_ID, targetSubzoneId: "orc-warcamp", targetPosition: ORC_WARCAMP_CAGE_POSITION,
+        targetPoiId: WARMASTER_CAPTIVE_ID, requiredCount: 1,
+      },
+      {
+        id: "collect_warmaster_chest", displayName: "Fully collect the Warmaster's chest", type: "encounter_milestone",
+        encounterMilestone: { encounterId: ORC_WARCAMP_ENCOUNTER_ID, kind: "chest_collected" },
+        targetMapId: MAP_SEVEN_ID, targetSubzoneId: "orc-warcamp", targetPosition: ORC_WARCAMP_CHEST_POSITION,
+        targetPoiId: WARMASTER_CHEST_ID, requiredCount: 1,
+      },
+      {
+        id: "defeat_orc_warcamp_enemies", displayName: "Defeat 150 Orcs in Orc Warcamp", type: "defeat_enemy_count",
+        enemyMapId: MAP_SEVEN_ID, targetSubzoneId: "orc-warcamp", enemyArchetypeId: "orc", requiredCount: 150,
+      },
+    ],
+    rewards: { characterXp: 6000, crowns: 1500 },
   },
 };
 
@@ -1039,6 +1080,14 @@ export function getFirstIncompleteObjective(
   questId: QuestId,
 ): QuestObjectiveDefinition | null {
   return getIncompleteObjectives(state, questId)[0] ?? null;
+}
+
+/** Guidance order is independent of which parallel objectives can progress. */
+export function getQuestGuidanceObjectives(state: GameState, questId: QuestId): QuestObjectiveDefinition[] {
+  const objectives = getIncompleteObjectives(state, questId);
+  const definition = QUEST_DEFINITIONS[questId];
+  return definition.objectiveFlow === "sequential" || definition.objectiveGuidance === "first_incomplete"
+    ? objectives.slice(0, 1) : objectives;
 }
 
 export function getIncompleteObjectives(

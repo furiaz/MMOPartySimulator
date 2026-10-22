@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isWarmasterRewardUiOpen } from "./game/warmasterLifecycleState";
 
 import {
   getCycledMainMenuTransition,
@@ -16,6 +17,16 @@ const enabledOptions = {
 };
 
 describe("gameplay shortcuts", () => {
+  it.each([{ chestOpen: true as const }, { departure: { kind: "walk" as const } }])(
+    "blocks gameplay but permits explicit dismissal for Warmaster overlays (%j)", warmasterInteraction => {
+      const options = { enabled: true, blockingOverlayActive: isWarmasterRewardUiOpen({ warmasterInteraction }) };
+      for (const key of ["a", " ", "m", "i", "j", "1", "Tab"]) {
+        expect(resolveGameplayShortcut({ key }, options)?.shouldExecute).toBe(false);
+      }
+      expect(resolveGameplayShortcut({ key: "Escape" }, options)?.shouldExecute).toBe(true);
+      expect(isWarmasterRewardUiOpen({ warmasterInteraction: { chestRequested: true } })).toBe(false);
+    },
+  );
   it.each([
     ["Escape", false, "dismiss_ui", "escape"],
     ["Tab", false, "cycle_main_menu", "main_menu_cycle"],

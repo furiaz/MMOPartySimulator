@@ -3,6 +3,7 @@ import {
   isActiveResource,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
+  getQuestGuidanceObjectives,
   type Enemy,
   type GameEntity,
   type GameState,
@@ -85,15 +86,7 @@ function addMainQuestObjectiveIndicators(
       continue;
     }
 
-    const definition = QUEST_DEFINITIONS[questId];
-    const objectives =
-      definition.objectiveFlow === "sequential"
-        ? definition.objectives.filter(
-            (objective) => !quest.objectiveProgress[objective.id]?.completed,
-          ).slice(0, 1)
-        : definition.objectives.filter(
-            (objective) => !quest.objectiveProgress[objective.id]?.completed,
-          );
+    const objectives = getQuestGuidanceObjectives(state, questId);
 
     for (const objective of objectives) {
       for (const entity of entities) {
@@ -160,6 +153,11 @@ function isQuestObjectiveEntity(
   objective: QuestObjectiveDefinition,
 ): boolean {
   switch (objective.type) {
+    case "encounter_milestone":
+      return objective.targetMapId === state.currentMapId &&
+        (objective.encounterMilestone?.kind === "boss_defeated"
+          ? entity.kind === "enemy" && isLivingEnemy(entity) && matchesEnemyObjective(entity, objective) && matchesObjectiveSubzone(state, entity, objective)
+          : entity.kind === "npc" && entity.id === objective.targetPoiId);
     case "defeat_enemy_count":
     case "collect_enemy_quest_drop_count":
       return (

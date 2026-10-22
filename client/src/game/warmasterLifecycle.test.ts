@@ -18,6 +18,8 @@ import { resolveWarmasterDeparture, teleportWorldTravelDestination, triggerMapTe
 import { clearMapTransitionRuntimeState, pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import { ORC_WARCAMP_CHEST_POSITION, ORC_WARCAMP_GATE_POSITION } from "./orcWarcampLayout";
 import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { getPartyExecutionIntent, setPartyExecutionIntent } from "./partyIntentState";
+import { updateGame } from "./updateGame";
 import type { Companion, Enemy, EnemyTypeId, Position } from "./types";
 afterEach(() => vi.restoreAllMocks());
 function setup(position: Position = { x: 95, y: 44 }): GameState {
@@ -141,6 +143,75 @@ describe("Warmaster lifecycle", () => {
   });
 });
 describe("Warmaster rewards and exit", () => {
+  it("stops Auto Combat once on victory and clears automatic movement without locking it off", () => {
+    let state = setPartyExecutionIntent({ ...setup(), autoModeEnabled: true }, {
+      type: "move", source: "ai", targetId: null, targetPosition: { x: 25, y: 20 },
+    });
+    state = victory(state);
+    expect(state.autoModeEnabled).toBe(false);
+    expect(getPartyExecutionIntent(state)).toBeNull();
+    expect(state.localPoiTarget).toBeNull();
+    const reenabled = updateEntity({ ...state, autoModeEnabled: true }, { ...state.entities.boss }, 2000);
+    expect(updateWarmasterLifecycle(reenabled, 2000).autoModeEnabled).toBe(true);
+  });
+  it("preserves player movement and direct commands on victory", () => {
+    const intent = { type: "move" as const, source: "player" as const, targetId: null, targetPosition: { x: 95, y: 45 } };
+    const state = setPartyExecutionIntent({ ...setup(), autoModeEnabled: true }, intent);
+    const result = victory(state);
+    expect(result.autoModeEnabled).toBe(false);
+    expect(getPartyExecutionIntent(result)).toEqual(intent);
+    expect(result.directCompanionCommandsById).toEqual(state.directCompanionCommandsById);
+    expect(result.warmasterInteraction?.rescueSpeechStartedAt).toBe(1000);
+  });
+  it.each([true, false])("stops Auto Combat for a chest request (near=%s) and stays off after dismissal", near => {
+    let state = { ...victory(), autoModeEnabled: true };
+    if (near) state = { ...state, entities: { ...state.entities, leader: { ...state.entities.leader, position: ORC_WARCAMP_CHEST_POSITION } } };
+    state = requestWarmasterChest(state);
+    expect(state.autoModeEnabled).toBe(false);
+    if (!near) expect(getPartyExecutionIntent(state)).toMatchObject({ source: "player", targetPosition: ORC_WARCAMP_CHEST_POSITION });
+    state = claim(state);
+    expect(state.warmasterInteraction?.chestOpen).toBe(true);
+    expect(state.autoModeEnabled).toBe(false);
+    expect(closeWarmasterChest(state).autoModeEnabled).toBe(false);
+  });
+  it("stops the opening tick before AI can move the party away from the chest", () => {
+    let state = victory(setup(ORC_WARCAMP_CHEST_POSITION));
+    state = addEntity(state, createEnemy("field", { x: 25, y: 20 }, "aggressive", { enemyTypeId: "orc" }));
+    state = setPartyExecutionIntent({ ...state, autoModeEnabled: true,
+      warmasterInteraction: { ...state.warmasterInteraction, chestRequested: true } }, {
+      type: "move", source: "ai", targetId: null, targetPosition: { x: 25, y: 20 },
+    });
+    const opened = updateGame(state, { nowMs: 2000, deltaMs: 100 });
+    expect(opened.warmasterInteraction?.chestOpen).toBe(true);
+    expect(opened.entities.leader.position).toEqual(state.entities.leader.position);
+    expect(opened.entities.field).toBe(state.entities.field);
+    expect(opened.autoModeEnabled).toBe(false);
+    const paused = updateGame(opened, { nowMs: 3000, deltaMs: 100 });
+    expect(paused.warmasterInteraction?.chestOpen).toBe(true);
+    expect(paused.entities).toBe(opened.entities);
+    expect(paused.simulationTimeMs).toBe(opened.simulationTimeMs);
+  });
+  it.each([0, 50])("keeps the chest open across claims, ticks and autosave (capacity=%s)", capacity => {
+    const requested = { ...victory(setup(ORC_WARCAMP_CHEST_POSITION)), autoModeEnabled: true };
+    let state = claimWarmasterChest({ ...requested, inventory: { capacity, slots: [] } });
+    expect(state.autoModeEnabled).toBe(false);
+    expect(state.warmasterInteraction?.chestOpen).toBe(true);
+    const chest = state.warmasterLifecycle!.chest;
+    const position = state.entities.leader.position;
+    createSavedGame(state, 2100);
+    for (let tick = 0; tick < 10; tick++) state = updateGame(state, { nowMs: 2200 + tick * 100, deltaMs: 100 });
+    expect(state.warmasterInteraction?.chestOpen).toBe(true);
+    expect(state.warmasterLifecycle?.chest).toBe(chest);
+    expect(state.entities.leader.position).toEqual(position);
+    expect(closeWarmasterChest(state).autoModeEnabled).toBe(false);
+  });
+  it("does not disable Auto Combat for an invalid chest interaction", () => {
+    const state = { ...setup(), autoModeEnabled: true };
+    expect(requestWarmasterChest(state)).toBe(state);
+    expect(claimWarmasterChest(state)).toBe(state);
+    const elsewhere = { ...victory(), currentMapId: "hub" as const, autoModeEnabled: true };
+    expect(requestWarmasterChest(elsewhere)).toBe(elsewhere);
+  });
   it.each([[0.5, 0.5, 15], [0.95, 0.05, 20], [0.5, 0.05, "both"], [0.95, 0.5, "neither"]] as const)("rolls equipment independently (%s/%s)", (low, high, outcome) => {
     // Each successful equipment check consumes a separate item-selection roll.
     const values = [low, ...(low < 0.9 ? [0] : []), high, ...(high < 0.1 ? [0] : [])];

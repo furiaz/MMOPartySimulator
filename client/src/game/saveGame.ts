@@ -945,8 +945,10 @@ export function sanitizeGameStateForSave(
       guildUpgrades,
     },
   );
+  const warmasterLifecycle = state.warmasterLifecycle ? sanitizeWarmasterLifecycle(state.warmasterLifecycle) : undefined;
   let questReconciliationState: GameState = {
     ...state,
+    warmasterLifecycle,
     currentMapId,
     entities: savedEntities,
     restingCompanionsById,
@@ -1169,7 +1171,7 @@ export function sanitizeGameStateForSave(
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
     warmasterAttempt: undefined,
-    warmasterLifecycle: state.warmasterLifecycle ? sanitizeWarmasterLifecycle(state.warmasterLifecycle) : undefined,
+    warmasterLifecycle,
     warmasterInteraction: undefined,
     forcedMovementsByEntityId: {},
     ...enemyAbilityRuntime,

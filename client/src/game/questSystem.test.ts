@@ -393,6 +393,7 @@ describe("prototype quest system", () => {
       "break_the_ash_camp",
       "into_the_briar_burrows",
       "the_patrons_shadow",
+      "the_evil_patrons_chosen",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");

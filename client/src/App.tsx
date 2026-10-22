@@ -10,7 +10,7 @@ import {
 import "./App.css";
 import { WarmasterRewardOverlay } from "./WarmasterRewardOverlay";
 import { claimWarmasterChest, closeWarmasterChest, requestWarmasterChest } from "./game/warmasterLifecycle";
-import { WARMASTER_CAPTIVE_ID, WARMASTER_CHEST_ID } from "./game/warmasterLifecycleState";
+import { isWarmasterRewardUiOpen, WARMASTER_CAPTIVE_ID, WARMASTER_CHEST_ID } from "./game/warmasterLifecycleState";
 import { resolveWarmasterDeparture } from "./game/teleportSystem";
 import { CompanionVitalsPanel } from "./CompanionVitalsPanel";
 import {
@@ -6608,7 +6608,8 @@ function App() {
           activeWorldWipeRescue ||
           activeGuidePopupIdRef.current ||
           queuedGuidePopupIdsRef.current.length > 0 ||
-          activeDungeonChest,
+          activeDungeonChest ||
+          isWarmasterRewardUiOpen(gameState),
       ),
     });
 

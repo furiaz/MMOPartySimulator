@@ -984,6 +984,7 @@ export {
   getAvailableQuest,
   getCurrentQuest,
   getFirstIncompleteObjective,
+  getQuestGuidanceObjectives,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
