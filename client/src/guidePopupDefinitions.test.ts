@@ -60,7 +60,7 @@ describe("guide popup definitions", () => {
     expect(guide.panels).toHaveLength(2);
     expect(guide.panels[0]?.body).toContain("alongside main quests");
     expect(guide.panels[0]?.body).toContain("Only taken contracts");
-    expect(guide.panels[1]?.body).toContain("claim its Crowns and skill book");
+    expect(guide.panels[1]?.body).toContain("claim its character XP, Crowns and first-class skill books");
     expect(guide.panels.every((panel) =>
       panel.menuTarget?.tab === "atlas" &&
       panel.menuTarget.atlasSubpage === "guildTavern"

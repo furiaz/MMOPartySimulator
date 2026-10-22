@@ -953,6 +953,7 @@ describe("save game serialization", () => {
   });
 
   it("preserves Guild Notice Board quest, timer, and sequence through save restore", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW_MS);
     const guildNoticeBoard = {
       ...createInitialGuildNoticeBoardState(NOW_MS),
       questSequence: 5,
@@ -962,6 +963,9 @@ describe("save game serialization", () => {
       slots: [
         {
           ...createInitialGuildNoticeBoardState(NOW_MS).slots[0]!,
+          schemaVersion: undefined,
+          targetMapId: undefined,
+          rewards: { crowns: 100, skillBookItemId: "throw_rock_skill_book" as const },
           id: "guild-notice-board-quest-5",
           title: "Ashwatch Field Orders",
           category: "extermination" as const,
@@ -1642,6 +1646,9 @@ function createLegacyGuildNoticeBoardState() {
     slots: [
       {
         ...initial.slots[0]!,
+        schemaVersion: undefined,
+        targetMapId: undefined,
+        rewards: { crowns: 100, skillBookItemId: "throw_rock_skill_book" as const },
         id: "guild-notice-board-quest-5",
         title: "Ashwatch Field Orders",
         category: "extermination" as const,
@@ -1649,6 +1656,7 @@ function createLegacyGuildNoticeBoardState() {
         description: undefined,
         isStarterContract: undefined,
         sequence: 5,
+        status: "taken" as const,
         objectives: [
           {
             id: "defeat-goblin_shaman",

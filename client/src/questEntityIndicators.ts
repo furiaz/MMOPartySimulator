@@ -12,6 +12,8 @@ import {
   type ResourceType,
 } from "./game";
 import { getSubzoneAtPosition } from "./game/subzoneSystem";
+import { getBoardObjectiveEnemyTypes } from "./game/guildNoticeBoardContracts";
+import { isBoardOrdinaryEnemy } from "./game/guildNoticeBoardContracts";
 
 export type QuestEntityIndicatorKind =
   | "active_objective"
@@ -112,25 +114,28 @@ function addNoticeBoardObjectiveIndicators(
   indicatorsByEntityId: Map<string, QuestEntityIndicator>,
 ) {
   for (const quest of state.guildNoticeBoard?.slots ?? []) {
-    if (!quest || quest.status !== "taken") {
+    if (!quest || quest.status !== "taken" || (quest.targetMapId && quest.targetMapId !== state.currentMapId)) {
       continue;
     }
 
     const incompleteEnemyTypeIds = new Set(
       quest.objectives
         .filter((objective) => objective.currentCount < objective.requiredCount)
-        .map((objective) => objective.enemyTypeId),
+        .flatMap(getBoardObjectiveEnemyTypes),
     );
 
-    if (incompleteEnemyTypeIds.size === 0) {
-      continue;
-    }
+    const gathering = quest.objectives.some(objective => objective.type === "gather_resources" && objective.currentCount < objective.requiredCount);
 
     for (const entity of entities) {
+      if (gathering && entity.kind === "resource" && isActiveResource(entity)) {
+        addIndicator(indicatorsByEntityId, { entityId: entity.id, kind: "active_objective", source: "notice_board", noticeBoardQuestId: quest.id });
+        continue;
+      }
       if (
         entity.kind !== "enemy" ||
         entity.state === "dead" ||
         entity.health <= 0 ||
+        (quest.schemaVersion === 2 && !isBoardOrdinaryEnemy(entity)) ||
         !entity.enemyTypeId ||
         !incompleteEnemyTypeIds.has(entity.enemyTypeId)
       ) {

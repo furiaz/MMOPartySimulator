@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
+import { getBoardObjectiveLabel } from "./game/guildNoticeBoard";
 import {
   QUEST_DEFINITIONS,
-  getEnemyType,
   getGuildNoticeBoardState,
   type GameState,
   type GuildNoticeBoardQuest,
@@ -194,8 +194,7 @@ function getNoticeBoardQuestObjectiveSummary(
 ): string {
   return quest.objectives
     .map((objective) => {
-      const enemyType = getEnemyType(objective.enemyTypeId);
-      return `${enemyType?.displayName ?? objective.enemyTypeId} ${objective.currentCount}/${objective.requiredCount}`;
+      return `${getBoardObjectiveLabel(objective)} ${objective.currentCount}/${objective.requiredCount}`;
     })
     .join(", ");
 }

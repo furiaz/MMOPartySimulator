@@ -1393,13 +1393,55 @@ Current Guild & Inn behavior:
 
 - the shared service is opened through the Atlas where supported or by interacting with the Guild Coordinator or Inn Keeper in hubs where they are present
 - Guild Recruit shows generated recruit candidates, refresh timing, recruitment upgrades, and destination preview
-- Guild Notice Board shows available, taken, and done board quests, stored Assault or Extermination categories, descriptions, quest refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, rewards, and unseen update sign state
-- New parties receive a fixed `Assault on Ash Goblin Encampment` starter contract requiring 50 Ash Wisps and 50 Ember Imps. It uses the normal 100-Crown-plus-skill-book reward path and reward-quality scaling.
+- Guild Notice Board shows available, taken, and done contracts in four categories: Assault, Extermination, Rummage, and Forage, with descriptions, objectives, rewards, refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, and unseen update sign state
+- New parties receive a fixed `Assault on Ash Goblin Encampment` starter contract requiring 50 total ordinary-enemy credits in Zone 4, with 575 character XP, 150 base Crowns, and two independently rolled first-class skill books
 - The available starter contract is protected from scheduled refreshes and rerolls until taken. Other eligible slots may still reroll, and a reroll is not consumed when no slot can change.
-- Notice Board kill progress begins only after a posting is taken. After the starter is taken, its completion, claiming, refresh, and cancellation follow normal Board behavior.
+- All Notice Board progress begins only after a posting is taken. After the starter is taken, its completion, claiming, refresh, and cancellation follow normal Board behavior; cancellation does not undo the Guild onboarding outcome.
 - Guild Field Teams manage inactive companion assignment, roster movement, upgrades, AFK assignments, redeeming rewards, and return-to-hub behavior
 - Inn Rooms show every recruited companion as occupying a room slot, including active party, Inn reserve, and Field Team companions
 - Inn Kitchen cooks per-companion meals, manages selected recipes and auto-cook preferences, spends Hearth's Fire, and exposes Recipe Book, Pantry, and Kitchen upgrades
+
+Tier 2 Guild Notice Board contract rules:
+
+Ordinary postings target visited Zones 4–7 only. Zones 1–3, hubs, dungeons, and unvisited destinations are excluded. The fixed Zone 4 starter is the onboarding exception: it is available before the party first visits that map. With no eligible visited zone, ordinary slots stay empty.
+
+When generating a posting, compare the arithmetic mean level of all active companions, including dead active members but excluding Inn reserves and Field Teams, with each visited destination's mean ordinary-monster-type level. Choose from zones within ±5 levels with 80% probability and from other eligible visited zones with 20%; use the nonempty group exclusively when the other group is empty, and choose uniformly within the selected group. Recruitment and new visits affect future generation, not existing postings.
+
+Each slot independently chooses one of the four categories with equal probability. Duplicate zones, categories, or targets are allowed, and matching taken contracts can progress concurrently. Monster pools come from authored Standard encounters; Bosses, Elites, Champions, target dummies, and structures are excluded. Superior variants qualify through their underlying ordinary type, not as a separate contract target. Ordinary Barrack reinforcements count normally.
+
+| Category | Objective | Contract name |
+|---|---|---|
+| Assault | One shared ordinary-enemy kill-credit counter throughout the target map | `Assault on {Zone}` |
+| Extermination | One uniformly selected ordinary monster type in the target map | `{Enemy} Extermination in {Zone}` |
+| Rummage | Contract-specific supplies from ordinary enemies in the target map | `Rummage of {Zone}` |
+| Forage | Any successfully inventoried wood, ore, or herb units gathered in the target map | `Forage in {Zone}` |
+
+| Zone | Assault / Extermination credits | Rummage items | Forage units | Base Crowns |
+|---|---:|---:|---:|---:|
+| 4 — Ash Goblin Encampment | 50 | 30 | 10 | 150 |
+| 5 — Briar Burrows | 70 | 42 | 15 | 200 |
+| 6 — Nightmire Canopy | 90 | 54 | 20 | 250 |
+| 7 — Orc Warcamp | 110 | 66 | 25 | 300 |
+
+Progress is capped at the requirement. Direct Superior defeats grant two Assault or Extermination credits. Rummage instead rolls once per qualifying physical death per matching taken contract at exactly 50%, independently between contracts, with no pity or Superior quantity multiplier. `Recovered Supplies — {Zone}` appear in the quest pouch without occupying inventory slots; they belong only to that posting and disappear on cancellation or completed reward claiming.
+
+Forage counts only units successfully added to inventory by gathering. Existing inventory, purchases, Farm or Livestock outputs, Field Team resources, failed inventory additions, and merely depleting a node do not count. Gathered materials are not consumed when claiming. Field Teams contribute only reported kills to matching-map Assault or Extermination contracts, at one credit per reported kill; they do not generate Rummage supplies or Forage progress.
+
+Base XP, base Crowns, and random book outcomes are fixed when a posting is generated. Let `N` be its zone's kill requirement, `R` its Rummage requirement, and `M` the arithmetic mean normal XP of eligible monster types:
+
+- Assault and Forage: `floor(0.5 × N × M)` character XP.
+- Extermination: `floor(0.5 × N × target monster normal XP)` character XP.
+- Rummage: `floor(0.5 × (R ÷ 0.5) × M)` character XP.
+
+Round down only after the complete calculation. Generation uses normal authored enemy XP without Superior bonuses, player-level penalties, or debug multipliers. Claiming grants the full XP amount to each eligible living current-party companion through existing reward/leveling rules, including normal max-level and debug handling.
+
+Every new posting stores two independent, uniform first-class skill-book results across all eight first classes, excluding Beginner books; duplicates are allowed. It also stores an independent third-book candidate and chance roll. Reward Quality is applied at claim time: levels 1/2/3 grant 100%/110%/120% of base Crowns and a 0%/10%/20% chance of the third book, without scaling XP. Viewing, loading, or retrying a claim never rerolls rewards.
+
+Board interaction claims each completed contract atomically. If all awarded books cannot fit, including duplicate stacks and any bonus book, grant nothing and retain the done/unclaimed contract with inventory-full feedback. Taken and done/unclaimed contracts cannot be refreshed or rerolled away.
+
+The Board clock advances independently of the Guild menu and continues while menus pause combat. Opening or rendering the Board does not generate or retarget postings. Targets and rewards are snapshotted only on generation, scheduled refresh, or manual reroll; newly purchased slots are initialized by the game clock. Existing slot counts, refresh upgrades, and Scout/Wolf reroll limits remain unchanged. Restoration processes at most one overdue refresh, not every missed interval.
+
+Valid legacy taken/done contracts keep their original requirements, progress, and rewards without retroactive XP or new book rolls. Available legacy ordinary postings change only on their next actual refresh/reroll. An untaken legacy starter is upgraded once on restoration while preserving its identity and onboarding state. These optional contract fields require no save-version bump. Board contracts do not add World Travel route hints or new Auto Combat priorities.
 
 Current Farm behavior:
 
@@ -1717,8 +1759,8 @@ Current prototype world quest indicator behavior:
 - enemy name text remains unchanged; the `!` is a separate visual prefix
 - active incomplete main quest enemy, resource, guide NPC, rescue NPC, and explicit POI/NPC objectives may mark matching living or active entities on the current map
 - available and ready-to-turn-in NPC quests may mark their quest giver NPC
-- taken incomplete Guild Notice Board kill objectives may mark matching living enemies
-- completed objectives, completed quests, available Notice Board quests, and done Notice Board quests do not mark enemy targets
+- taken incomplete Guild Notice Board combat and Rummage objectives may mark matching living ordinary enemies on the target map; Forage objectives may mark active resources on that map
+- completed objectives, completed quests, available Notice Board quests, and done Notice Board quests do not mark objective targets
 - an entity shows at most one quest `!` even if multiple quests match it
 - a future Notice Board-specific alternate icon may exist later, but it is not part of the current prototype behavior
 
@@ -1726,7 +1768,7 @@ Current prototype quest reward behavior:
 
 - ready quests can grant rewards through Quest Giver turn-in
 - rewards may include Crowns, character XP, inventory items, and equipment items
-- current quest rewards do not grant skill books unless a quest definition explicitly adds them later
+- current NPC quest rewards do not grant skill books unless a quest definition explicitly adds them later; Guild Notice Board contracts have their separate first-class book rewards
 - quest rewards are all-or-nothing
 - reward values are validated before state changes are applied
 - if every reward can fit, all rewards are granted and the quest completes

@@ -693,6 +693,7 @@ function applyAssignmentResult(
       enemyTypeId: kill.enemyTypeId,
       quantity: kill.quantity,
     })),
+    assignment.mapId,
   );
 
   return replaceSecondaryParty(nextState, {

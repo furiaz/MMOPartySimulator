@@ -2211,6 +2211,7 @@ export type DropVisualEvent = {
   displayName?: string;
   iconRole?: "quest_giver";
   questId?: QuestId;
+  boardContractId?: string;
   objectiveId?: string;
   quantity: number;
   position: Position;
@@ -3040,6 +3041,7 @@ export type Enemy = LivingEntity & {
   subzoneId?: string;
   encounterAreaId?: string;
   defeatedAtMs?: number;
+  noticeBoardDefeatCounted?: true;
   roamTargetPosition?: Position | null;
   nextRoamAt?: number;
   roamMoveUntil?: number;
@@ -3274,23 +3276,34 @@ export type WorldDiscoveryState = {
 
 export type GuildNoticeBoardQuestStatus = "available" | "taken" | "done";
 
-export type GuildNoticeBoardQuestCategory = "assault" | "extermination";
+export type GuildNoticeBoardQuestCategory = "assault" | "extermination" | "rummage" | "forage";
 
-export type GuildNoticeBoardQuestObjective = {
+type GuildNoticeBoardObjectiveProgress = {
   id: string;
-  enemyTypeId: EnemyTypeId;
   requiredCount: number;
   currentCount: number;
 };
+export type GuildNoticeBoardQuestObjective = GuildNoticeBoardObjectiveProgress & (
+  | { type?: "enemy_kills"; enemyTypeId: EnemyTypeId }
+  | { type: "zone_kills"; eligibleEnemyTypeIds: EnemyTypeId[] }
+  | { type: "quest_drop"; eligibleEnemyTypeIds: EnemyTypeId[]; itemDisplayName: string }
+  | { type: "gather_resources" }
+);
 
 export type GuildNoticeBoardQuestReward = {
   crowns: number;
   skillBookItemId: SkillBookItemId;
+  characterXp?: number;
+  skillBookItemIds?: [SkillBookItemId, SkillBookItemId];
+  bonusSkillBookItemId?: SkillBookItemId;
+  bonusBookRoll?: number;
 };
 
 export type GuildNoticeBoardQuest = {
   id: string;
   title: string;
+  schemaVersion?: 2;
+  targetMapId?: DebugMapId;
   category?: GuildNoticeBoardQuestCategory;
   zoneDisplayName?: string;
   description?: string;
@@ -3313,6 +3326,7 @@ export type GuildNoticeBoardClaimedReward = {
   questTitle: string;
   crowns: number;
   skillBookItemIds: SkillBookItemId[];
+  characterXp: number;
 };
 
 export type InnKitchenRecipeId = "house_bread";

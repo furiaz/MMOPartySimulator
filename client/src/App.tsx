@@ -3563,6 +3563,18 @@ function App() {
   }, [appMode, writeCurrentSave]);
 
   useEffect(() => {
+    if (appMode !== "playing") return;
+    const timer = window.setInterval(() => {
+      setGameState(state => {
+        const next = refreshGuildNoticeBoardState(state, Date.now());
+        if (next !== state) queueSaveAfterStateChange("Notice board refresh saved");
+        return next;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [appMode, queueSaveAfterStateChange]);
+
+  useEffect(() => {
     if (
       appMode !== "playing" ||
       !isGameMenuOpen ||
@@ -3573,11 +3585,7 @@ function App() {
     }
 
     setGameState((state) => {
-      const refreshedRecruitState = refreshGuildRecruitState(state, currentTime);
-      const refreshedState = refreshGuildNoticeBoardState(
-        refreshedRecruitState,
-        currentTime,
-      );
+      const refreshedState = refreshGuildRecruitState(state, currentTime);
 
       if (refreshedState !== state) {
         queueSaveAfterStateChange("Guild and notice board refresh saved");
@@ -5573,7 +5581,7 @@ function App() {
             const bookNames = reward.skillBookItemIds
               .map((itemId) => getItemDefinition(itemId).displayName)
               .join(", ");
-            return `${reward.questTitle}: +${reward.crowns} Crowns, ${bookNames}`;
+            return `${reward.questTitle}: +${reward.characterXp} XP, +${reward.crowns} Crowns, ${bookNames}`;
           })
           .join(" | "),
       );
@@ -5582,6 +5590,9 @@ function App() {
       setGuildNoticeBoardResultMessage(null);
     }
 
+    if (opened.failedClaims.length) {
+      setGuildNoticeBoardResultMessage(`Inventory full: make room for all reward books, then check the Board again. Unclaimed: ${opened.failedClaims.join(", ")}`);
+    }
     setGameState(opened.state);
   }
 
@@ -5637,7 +5648,7 @@ function App() {
         const bookNames = reward.skillBookItemIds
           .map((itemId) => getItemDefinition(itemId).displayName)
           .join(", ");
-        return `${reward.questTitle}: +${reward.crowns} Crowns, ${bookNames}`;
+        return `${reward.questTitle}: +${reward.characterXp} XP, +${reward.crowns} Crowns, ${bookNames}`;
       })
       .join(" | ");
 
@@ -5662,6 +5673,9 @@ function App() {
       );
     }
 
+    if (rerolled.failedClaims.length) {
+      setGuildNoticeBoardResultMessage(`Inventory full: unclaimed rewards were preserved. Make room for all reward books, then check the Board again. ${rerolled.failedClaims.join(", ")}`);
+    }
     setGameState(rerolled.state);
   }
 
