@@ -52,6 +52,7 @@ import {
   canNpcShowSpeech,
   createNpcSpeech,
   NPC_SPEECH_DURATION_MS,
+  isWorldSpeechSpeaker,
   type ActiveNpcSpeech,
 } from "./npcSpeechPresentation";
 import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
@@ -3833,7 +3834,7 @@ function App() {
       }
     : null;
   const structureSpeech: ActiveNpcSpeech[] = Object.entries(gameState.barracksById ?? {}).flatMap(([id, runtime]) =>
-    runtime.speech && gameState.entities[id]?.kind === "structure" && runtime.health > 0
+    runtime.speech && gameState.entities[id]?.kind === "structure"
       ? [{ ...runtime.speech, npcId: id, mapId: currentMap.id }] : []);
   const patronSpeech: ActiveNpcSpeech | null = gameState.warmasterAttempt?.speechStartedAt !== undefined
     ? { createdAt: gameState.warmasterAttempt.speechStartedAt, expiresAt: gameState.warmasterAttempt.speechStartedAt + NPC_SPEECH_DURATION_MS, mapId: currentMap.id, npcId: gameState.warmasterAttempt.bossId, text: "Their borrowed power returns to me!" } : null;
@@ -3845,7 +3846,7 @@ function App() {
         speech !== null &&
         speech.expiresAt > currentTime &&
         (!speech.mapId || speech.mapId === currentMap.id) &&
-        (gameState.entities[speech.npcId]?.kind === "npc" || gameState.entities[speech.npcId]?.kind === "structure" || (gameState.entities[speech.npcId]?.kind === "enemy" && gameState.entities[speech.npcId].state !== "dead")),
+        isWorldSpeechSpeaker(gameState.entities[speech.npcId]),
     )
     .sort((first, second) => first.createdAt - second.createdAt)
     .at(-1) ?? null;

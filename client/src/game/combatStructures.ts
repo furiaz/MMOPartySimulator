@@ -56,7 +56,8 @@ export function updateStructureRuntime(state: GameState, structure: CombatStruct
   let nextState: GameState = { ...state, barracksById: { ...state.barracksById, [structure.id]: {
     preparationMs: 0, spawnSequence: 0, ...previous, health, maxHealth: getBarrackMaxHealth(),
     ...(health <= 0 ? { respawnAtMs: previous?.respawnAtMs ?? now + BARRACK_RESPAWN_MS,
-      preparationMs: 0, pendingEnemyTypeId: undefined, speech: undefined, hintExpiresAtMs: undefined, wasInRange: false } : {}),
+      preparationMs: 0, pendingEnemyTypeId: undefined, speech: undefined, hintExpiresAtMs: undefined, wasInRange: false,
+      ...(!previous || previous.health > 0 ? { rebuildWarningShown: false, nextClearanceRetryAtMs: undefined } : {}) } : {}),
   } } };
   if (health <= 0 && (!previous || previous.health > 0)) {
     nextState = clearEnemyFromPartyTargeting(nextState, structure.id);

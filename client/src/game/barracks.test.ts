@@ -358,17 +358,15 @@ describe("Orc Barracks", () => {
     expect(reinforcements(state)).toHaveLength(1);
     expect(destroy(state, 5_000).barracksById?.[id].respawnAtMs).toBe(121_000);
   });
-  it("rebuilds at 120 seconds, defers occupied footprints and preserves monotonic sequence", () => {
+  it("rebuilds at 120 seconds, safely separates occupants and preserves monotonic sequence", () => {
     let state = destroy(tick(setup()));
     state = updateBarracks(state, 120_999, 100);
     expect(structure(state).health).toBe(0);
     const leader = state.entities.leader as Companion;
     state.entities.leader = { ...leader, position: { x: 75, y: 26 } };
     state = updateBarracks(state, 121_000, 100);
-    expect(structure(state).health).toBe(0);
-    state.entities.leader = leader;
-    state = updateBarracks(state, 121_100, 100);
     expect(structure(state).health).toBe(1248);
+    expect(state.entities.leader.position).not.toEqual({ x: 75, y: 26 });
     expect(state.barracksById?.[id].spawnSequence).toBe(1);
     expect(state.barracksById?.[id].preparationMs).toBeLessThanOrEqual(100);
   });
@@ -382,6 +380,77 @@ describe("Orc Barracks", () => {
     expect(state.barracksById?.[id].tutorialSeen).toBe(true);
     state = updateBarracks(state, 10_100, 100);
     expect(state.barracksById?.[id].speech).toBeUndefined();
+  });
+  it("warns once at the exact ten-second lead, expires and resets on the next destruction", () => {
+    let state = destroy(setup());
+    state = updateBarracks(state, 110_999, 0);
+    expect(state.barracksById![id].speech).toBeUndefined();
+    state = updateBarracks(state, 111_000, 0);
+    expect(state.barracksById![id]).toMatchObject({ rebuildWarningShown: true,
+      speech: { text: "Work Work", createdAt: 111_000, expiresAt: 116_000 } });
+    expect(updateBarracks(state, 115_999, 0).barracksById![id].speech).toBeDefined();
+    state = updateBarracks(state, 116_000, 0);
+    expect(state.barracksById![id].speech).toBeUndefined();
+    state = updateBarracks(state, 121_000, 0);
+    expect(state.barracksById![id].rebuildWarningShown).toBeUndefined();
+    state = destroy(state, 122_000);
+    state = updateBarracks(state, 232_000, 0);
+    expect(state.barracksById![id].speech?.text).toBe("Work Work");
+  });
+  it("does not replay warnings on load, late/offline time advance or blocked rebuilds", () => {
+    let state = updateBarracks(destroy(setup()), 111_000, 0);
+    state = sanitizeGameStateForSave(state, 112_000);
+    expect(state.barracksById![id].rebuildWarningShown).toBe(true);
+    expect(updateBarracks(state, 112_100, 0).barracksById![id].speech).toBeUndefined();
+    state = destroy(setup());
+    state.reservedPositionsByEntityId = { leader: definition.position };
+    state = updateBarracks(state, 200_000, 0);
+    expect(structure(state).health).toBe(0);
+    expect(state.barracksById![id]).toMatchObject({ rebuildWarningShown: true, nextClearanceRetryAtMs: 200_250 });
+    expect(state.barracksById![id].speech).toBeUndefined();
+    expect(restoreBarracks(state, 200_100).barracksById![id].nextClearanceRetryAtMs).toBeUndefined();
+    expect(clearMapTransitionRuntimeState(state).barracksById![id].nextClearanceRetryAtMs).toBeUndefined();
+  });
+  it("keeps frozen arena ruins silent and unrepaired", () => {
+    const item = BARRACK_DEFINITIONS.find(candidate => candidate.activation)!;
+    let state = setup();
+    state = updateEntity(state, { ...(state.entities[item.id] as CombatStructure), health: 0, state: "dead" }, 1000);
+    const context = { frozenEncounterIds: new Set([ORC_WARCAMP_ENCOUNTER_ID]) };
+    for (const now of [110_999, 111_000, 116_000, 200_000]) {
+      state = updateBarracks(state, now, 0, () => 0, context);
+      expect(state.barracksById![item.id].health).toBe(0);
+      expect(state.barracksById![item.id].speech).toBeUndefined();
+    }
+  });
+  it("preserves actions and cast snapshots while marking safe rebuild corrections as movement", () => {
+    let state = destroy(setup());
+    const actor = { ...createEnemy("caster", definition.position, "aggressive", { enemyTypeId: "orc" }), state: "attack" as const, currentTargetId: "leader", lastAttackAt: 777 };
+    state.entities.caster = actor;
+    const cast = { id: "active", abilityId: "fire_bolt", casterId: actor.id, targetId: "leader", phase: "casting" as const,
+      startedAt: 120_000, castEndsAt: 121_500, windupEndsAt: 121_800, origin: actor.position, targetPosition: state.entities.leader.position, direction: { x: 0, y: -1 } };
+    state.enemyAbilityCastsByEnemyId = { caster: cast };
+    const movedEntityIds = new Set<string>();
+    state = updateBarracks(state, 121_000, 0, () => 0, { movedEntityIds });
+    expect(structure(state).health).toBe(1248);
+    expect(movedEntityIds.has("caster")).toBe(true);
+    expect(state.enemyAbilityCastsByEnemyId!.caster).toBe(cast);
+    expect(state.entities.caster).toMatchObject({ health: actor.health, state: "attack", currentTargetId: "leader", lastAttackAt: 777 });
+    expect(state.entities.caster.position).not.toEqual(actor.position);
+  });
+  it("preserves collector state, player orders and cooldowns during safe separation", () => {
+    let state = destroy(setup(definition.position));
+    const actor = { ...(state.entities.leader as Companion), state: "gather" as const, currentTargetId: "ore", lastGatherAt: 800 };
+    state.entities.leader = actor;
+    state.leaderIntent = { type: "gather", targetId: "ore", targetPosition: { x: 74, y: 29 }, source: "player" };
+    state.directCompanionCommandsById = { leader: { type: "gather", companionId: "leader", targetId: "ore", targetPosition: { x: 74, y: 29 }, issuedAt: 500 } };
+    state.skillCooldownsByCompanionId = { leader: { first_aid: { companionId: "leader", skillId: "first_aid", expiresAt: 130_000 } } };
+    const before = { intent: state.leaderIntent, commands: state.directCompanionCommandsById, cooldowns: state.skillCooldownsByCompanionId };
+    state = updateBarracks(state, 121_000, 0);
+    expect(structure(state).health).toBe(1248);
+    expect(state.entities.leader).toMatchObject({ state: "gather", currentTargetId: "ore", lastGatherAt: 800, health: actor.health });
+    expect(state.leaderIntent).toBe(before.intent);
+    expect(state.directCompanionCommandsById).toBe(before.commands);
+    expect(state.skillCooldownsByCompanionId).toBe(before.cooldowns);
   });
   it("sanitizes malformed records, orphaned ownership and missing legacy state", () => {
     let state = setup();
@@ -467,7 +536,8 @@ describe("Orc Barracks", () => {
     state = updateBarracks(state, 121_000, 100);
     expect(structure(state).health).toBe(0);
     state.reservedPositionsByEntityId = {};
-    expect(structure(updateBarracks(state, 121_100, 100)).health).toBe(1248);
+    expect(structure(updateBarracks(state, 121_249, 100)).health).toBe(0);
+    expect(structure(updateBarracks(state, 121_250, 100)).health).toBe(1248);
   });
   it.each([20, 33])("can produce reachable reinforcements for a party at y=%s", y => {
     const state = tick(setup({ x: 75, y }));

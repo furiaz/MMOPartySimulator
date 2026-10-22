@@ -7,6 +7,11 @@ import {
   type GameState,
   type NpcEntity,
 } from "./game";
+import type { GameEntity } from "./game/types";
+
+export function isWorldSpeechSpeaker(entity: GameEntity | undefined): boolean {
+  return Boolean(entity && (entity.kind === "npc" || entity.kind === "structure" || (entity.kind === "enemy" && entity.state !== "dead")));
+}
 
 export const NPC_SPEECH_DURATION_MS = 5_000;
 export const NPC_SPEECH_FADE_DURATION_MS = 500;
