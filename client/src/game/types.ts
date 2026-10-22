@@ -83,6 +83,7 @@ export type EnemyTypeDefinition = {
   archetypeId: EnemyArchetypeId;
   abilityIds?: EnemyAbilityId[];
   temperament: EnemyTemperament;
+  canRoam?: boolean;
   combatStyle?: EnemyCombatStyle;
   targetPreference: EnemyTargetPreference;
   level: number;

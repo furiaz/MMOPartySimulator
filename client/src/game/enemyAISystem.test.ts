@@ -8,6 +8,7 @@ import {
   updateEnemyAISystem,
 } from "./enemyAISystem";
 import { ENEMY_TYPES } from "./enemyArchetypes";
+import { updateAttackSystem } from "./attackSystem";
 import {
   addEntity,
   PROTOTYPE_VISUAL_FEEDBACK_DURATION_MS,
@@ -648,6 +649,53 @@ describe("enemy AI aggro and roaming", () => {
       entityId: enemy.id,
       targetEntityId: leader.id,
     });
+  });
+
+  it.each(["due", "moving"])("keeps an idle Warmaster stationary with %s roaming state", mode => {
+    const enemy = {
+      ...createEnemy("boss", { x: 0, y: 0 }, "aggressive", {
+        enemyTypeId: "orc_warmaster",
+      }),
+      nextRoamAt: 999,
+      ...(mode === "moving" ? {
+        roamTargetPosition: { x: 4, y: 0 },
+        roamMoveUntil: 20_000,
+      } : {}),
+    };
+    let state = createState([enemy, createIdleCompanion("leader", { x: 20, y: 0 })]);
+    const movedEntityIds = new Set<string>();
+
+    for (let frame = 0; frame < 20; frame++) {
+      state = updateEnemyAISystem(state, {
+        nowMs: 1000 + frame * 100,
+        deltaMs: 100,
+        deltaSeconds: 0.1,
+        frameNumber: frame,
+      }, movedEntityIds);
+    }
+
+    expect(state.entities.boss).toMatchObject({
+      position: enemy.homePosition,
+      state: "idle",
+      currentTargetId: null,
+      roamTargetPosition: null,
+    });
+    expect((state.entities.boss as Enemy).roamMoveUntil).toBeUndefined();
+    expect((state.entities.boss as Enemy).nextRoamAt).toBeUndefined();
+    expect(movedEntityIds.has("boss")).toBe(false);
+  });
+
+  it("lets a stationary Warmaster detect and chase the party normally", () => {
+    const leader = createIdleCompanion("leader", { x: 6, y: 0 });
+    const enemy = createEnemy("boss", { x: 0, y: 0 }, "aggressive", {
+      enemyTypeId: "orc_warmaster",
+    });
+    const detected = updateEnemyAISystem(createState([leader, enemy]));
+
+    expect(detected.entities.boss).toMatchObject({ state: "attack", currentTargetId: "leader" });
+    const moved = updateAttackSystem(detected, new Set(), 1000);
+    expect(moved.entities.boss.position.x).toBeGreaterThan(enemy.position.x);
+    expect((moved.entities.boss as Enemy).currentTargetId).toBe("leader");
   });
 
   it("chooses idle roam targets inside roam leash", () => {

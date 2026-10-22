@@ -2717,6 +2717,7 @@ Current Orc Barracks behavior (Issue #679):
 Current Orc Warmaster encounter (Issue #680):
 
 - The level-20 Boss has 1,500 HP and keeps his other combat stats, basic attack, XP and drops. Azure Mass retains its existing 900 HP. A living party member entering the eastern arena begins an attempt without granting unlimited-range aggro. The Warmaster's chase and dash stay inside that arena.
+- The Warmaster does not wander while idle. He waits near the Barracks at his safe home after spawning, resetting or rearming, then detects and fights the party normally; combat movement is unchanged.
 - Ready abilities use priority Patron Burst, Patron Cleave, Kick, then Rending Dash, with at least one committed normal attack between abilities. Cooldowns start when casting begins. Cast origin, direction and offensive areas are locked once.
 
 | Ability | Patron Power | Cast / windup | Cooldown | Effect |
