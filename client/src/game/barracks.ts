@@ -56,7 +56,7 @@ export function isBarrackFootprintOccupied(state: GameState, definition: Barrack
   return false;
 }
 
-export type BarrackActivationContext = { activeEncounterIds?: ReadonlySet<string> };
+export type BarrackActivationContext = { activeEncounterIds?: ReadonlySet<string>; frozenEncounterIds?: ReadonlySet<string> };
 
 export function updateBarracks(state: GameState, now: number, deltaMs: number, random = Math.random, context: BarrackActivationContext = {}): GameState {
   let nextState = initializeBarracks(state);
@@ -67,6 +67,7 @@ export function updateBarracks(state: GameState, now: number, deltaMs: number, r
       if (runtime.wasInRange || runtime.speech || runtime.hintExpiresAtMs) nextState = setRuntime(nextState, definition.id, { ...runtime, wasInRange: false, speech: undefined, hintExpiresAtMs: undefined });
       continue;
     }
+    if (definition.activation && context.frozenEncounterIds?.has(definition.activation.encounterId)) continue;
     if (runtime.health <= 0) {
       if (runtime.respawnAtMs === undefined || now < runtime.respawnAtMs || isBarrackFootprintOccupied(nextState, definition)) continue;
       runtime = { ...runtime, health: getBarrackMaxHealth(), maxHealth: getBarrackMaxHealth(), preparationMs: 0, respawnAtMs: undefined, wasInRange: false, pendingEnemyTypeId: undefined };

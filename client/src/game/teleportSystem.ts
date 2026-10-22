@@ -50,6 +50,8 @@ import {
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
 import { preparePatronWardStateForMapExit } from "./patronWardSystem";
+import { requestWarmasterDeparture } from "./warmasterLifecycleState";
+import { answerWarmasterDeparture } from "./warmasterLifecycle";
 import { assignCurrentRoleBonuses } from "./roleBonus";
 import { getWorldTravelTeleportStatus } from "./worldTravelTeleports";
 import {
@@ -76,7 +78,8 @@ export type WorldTravelTeleportFailureReason =
   | "current_map"
   | "locked"
   | "active_transition"
-  | "recovery_active";
+  | "recovery_active"
+  | "unclaimed_chest";
 
 export type WorldTravelTeleportResult =
   | {
@@ -108,6 +111,9 @@ export function triggerMapTeleport(
   if (!isTeleportWorking(state, teleport.id)) {
     return appendTeleportSkippedEvent(state, "teleport_not_working", teleport.id);
   }
+
+  const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
+  if (guarded !== state) return guarded;
 
   const nextState = setTeleportMoveIntent(state, teleport, triggeredBy);
 
@@ -183,6 +189,9 @@ export function teleportWorldTravelDestination(
     };
   }
 
+  const guarded = requestWarmasterDeparture(state, { kind: "teleport", targetMapId });
+  if (guarded !== state) return { state: guarded, result: { status: "failed", targetMapId, reason: "unclaimed_chest" } };
+
   const teleport: ActiveTeleport = {
     id: `world-travel-teleport-to-${targetMapId}`,
     position: status.arrivalPositions[0] ?? { x: 0, y: 0 },
@@ -230,6 +239,16 @@ export function setMapTeleportPoi(
   return teleport && isTeleportWorking(state, teleport.id)
     ? setTeleportMoveIntent(state, teleport, triggeredBy)
     : state;
+}
+
+export function resolveWarmasterDeparture(state: GameState, leave: boolean): GameState {
+  const departure = state.warmasterInteraction?.departure;
+  const next = answerWarmasterDeparture(state, leave);
+  if (!leave || !departure || departure.kind === "walk") return next;
+  const ready = { ...next, activeTeleport: null };
+  return departure.kind === "teleport"
+    ? teleportWorldTravelDestination(ready, departure.targetMapId).state
+    : triggerMapTeleport(ready, "player", departure.teleportId);
 }
 
 export function updateTeleportSystem(
@@ -427,6 +446,9 @@ function completeTeleport(state: GameState): GameState {
   if (!teleportDefinition) {
     return appendTeleportSkippedEvent(state, "teleport_definition_missing", teleport.id);
   }
+
+  const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
+  if (guarded !== state) return guarded;
 
   return completeTeleportWithDefinition(
     state,

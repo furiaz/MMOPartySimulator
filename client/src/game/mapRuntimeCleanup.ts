@@ -1,5 +1,6 @@
 import type { GameState } from "./state";
 import { initializeBarracks } from "./barracks";
+import { reconcileWarmasterLifecycle } from "./warmasterLifecycle";
 import type { PartyFormationState } from "./types";
 
 function createIdlePartyFormation(): PartyFormationState {
@@ -18,6 +19,8 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
     warmasterAttempt: undefined,
+    warmasterInteraction: undefined,
+    warmasterLifecycle: state.warmasterLifecycle?.phase === "active" ? { ...state.warmasterLifecycle, phase: "ready" } : state.warmasterLifecycle,
     forcedMovementsByEntityId: {},
     barracksById: state.barracksById ? Object.fromEntries(Object.entries(state.barracksById).map(([id, runtime]) =>
       [id, { ...runtime, wasInRange: false, speech: undefined, hintExpiresAtMs: undefined }])) : undefined,
@@ -101,6 +104,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
     state = { ...state, forcedMovementsByEntityId: Object.fromEntries(Object.entries(state.forcedMovementsByEntityId ?? {}).filter(([id]) => Boolean(state.entities[id]))) };
   }
   state = initializeBarracks(state);
+  state = reconcileWarmasterLifecycle(state);
   const currentEntityIds = new Set(Object.keys(state.entities));
   const followTrailsByEntityId =
     pruneRecordById(state.followTrailsByEntityId, currentEntityIds) ??

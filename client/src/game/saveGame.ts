@@ -1,4 +1,5 @@
 import { restoreBarracks } from "./barracks";
+import { reconcileWarmasterLifecycle, sanitizeWarmasterLifecycle } from "./warmasterLifecycle";
 import { restoreOrcWarcampLayout } from "./orcWarcampRestoration";
 import { resetWarmasterAttempt } from "./warmasterSystem";
 import {
@@ -1069,7 +1070,7 @@ export function sanitizeGameStateForSave(
     enemyAbilityDefinitions,
   );
 
-  return resetWarmasterAttempt(restoreOrcWarcampLayout(restoreBarracks({
+  return resetWarmasterAttempt(restoreOrcWarcampLayout(reconcileWarmasterLifecycle(restoreBarracks({
     ...state,
     entities,
     restingCompanionsById,
@@ -1168,6 +1169,8 @@ export function sanitizeGameStateForSave(
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
     warmasterAttempt: undefined,
+    warmasterLifecycle: state.warmasterLifecycle ? sanitizeWarmasterLifecycle(state.warmasterLifecycle) : undefined,
+    warmasterInteraction: undefined,
     forcedMovementsByEntityId: {},
     ...enemyAbilityRuntime,
     aoeDummyPatternSequenceIndex: 0,
@@ -1188,7 +1191,7 @@ export function sanitizeGameStateForSave(
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
     debugTelemetry: undefined,
-  }, now)), now);
+  }, now))), now);
 }
 
 function sanitizeQuestStates(

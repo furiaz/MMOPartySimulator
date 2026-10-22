@@ -90,6 +90,7 @@ import {
 import { recordCurrentWorldDiscovery } from "./worldDiscovery";
 import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
 import { updateForcedMovements } from "./forcedMovement";
+import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
 
 export function updateGame(
   state: GameState,
@@ -97,7 +98,7 @@ export function updateGame(
 ): GameState {
   const timing = getUpdateTiming(state, timingInput);
 
-  if (isSlimewardDungeonChestUiOpen(state)) {
+  if (isSlimewardDungeonChestUiOpen(state) || state.warmasterInteraction?.chestOpen || state.warmasterInteraction?.departure) {
     return recordDebugTelemetryTick(state, state, timing);
   }
 
@@ -106,11 +107,12 @@ export function updateGame(
     timing.nowMs,
   );
   nextState = updateAutoRouteRuntime(nextState);
+  nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = updateWarmasterSystem(nextState, timing.nowMs);
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
-  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState) });
+  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState), frozenEncounterIds: getFrozenWarmasterEncounterIds(nextState) });
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
@@ -259,6 +261,7 @@ export function updateGame(
   nextState = updatePassiveHealthRegen(nextState, timing.nowMs);
   nextState = updateTargetDummyHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
+  nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = updateSlimewardDungeonSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(

@@ -322,13 +322,13 @@ describe("Warmaster encounter", () => {
     const dead = updateEntity(state, damageEntity(state.entities.boss as Enemy, 10000), 2500);
     expect(sanitizeGameStateForSave(dead, 3000).entities.boss).toMatchObject({ health: 0, state: "dead" });
   });
-  it("updates legacy Boss health on restoration and keeps 1500 HP after respawn", () => {
+  it("updates legacy Boss health, starts legacy encounters ready and excludes generic respawn", () => {
     const state = setup();
     const legacy = { ...state, entities: { ...state.entities, boss: { ...state.entities.boss, health: 140, maxHealth: 240 } } };
     expect(sanitizeGameStateForSave(legacy, 1000).entities.boss).toMatchObject({ health: 1500, maxHealth: 1500 });
     const dead = { ...legacy, entities: { ...legacy.entities, boss: { ...legacy.entities.boss, health: 0, state: "dead" as const, defeatedAtMs: 0 } } };
-    expect(sanitizeGameStateForSave(dead, 1000).entities.boss).toMatchObject({ health: 0, maxHealth: 1500, state: "dead" });
-    expect(updateEnemyRespawnSystem(dead, 30000, () => 1).entities.boss).toMatchObject({ health: 1500, maxHealth: 1500, state: "idle" });
+    expect(sanitizeGameStateForSave(dead, 1000).entities.boss).toMatchObject({ health: 1500, maxHealth: 1500, state: "idle" });
+    expect(updateEnemyRespawnSystem(dead, 30000, () => 1).entities.boss).toMatchObject({ health: 0, state: "dead" });
   });
   it("reserves maximum-growth terrain clearance and cannot move outside the arena", () => {
     const state = setup();
