@@ -12,6 +12,7 @@ import type {
   ResourceType,
 } from "./types";
 import type { PoiCategory } from "./poiTypes";
+import type { ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
 
 export type QuestId =
   | "clear_the_shore"
@@ -30,7 +31,8 @@ export type QuestId =
   | "orders_from_the_guild"
   | "break_the_ash_camp"
   | "into_the_briar_burrows"
-  | "the_patrons_shadow";
+  | "the_patrons_shadow"
+  | "the_evil_patrons_chosen";
 
 export type QuestStatus =
   | "locked"
@@ -62,7 +64,13 @@ export type QuestObjectiveType =
   | "take_guild_notice_board_quest"
   | "own_livestock_creature"
   | "active_party_member_count"
-  | "patron_ward";
+  | "patron_ward"
+  | "encounter_milestone";
+
+export type QuestEncounterMilestone = {
+  encounterId: typeof ORC_WARCAMP_ENCOUNTER_ID;
+  kind: "boss_defeated" | "captive_rescued" | "chest_collected";
+};
 
 export type PatronWardId =
   | "night_bat_ward"
@@ -102,7 +110,9 @@ export type QuestObjectiveStartSpeech = {
 
 export type QuestObjectiveDefinition = {
   id: string;
+  displayName?: string;
   type: QuestObjectiveType;
+  encounterMilestone?: QuestEncounterMilestone;
   targetMapId?: DebugMapId;
   targetSubzoneId?: string;
   targetPoiId?: string;
@@ -161,6 +171,7 @@ export type QuestDefinition = {
   displayName: string;
   sourceType?: QuestSourceType;
   objectiveFlow?: QuestObjectiveFlow;
+  objectiveGuidance?: "first_incomplete";
   questGiverPoiId: string;
   questGiverMapId: DebugMapId;
   objectives: QuestObjectiveDefinition[];

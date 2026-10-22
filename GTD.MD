@@ -1695,6 +1695,7 @@ Current quest ids are:
 - `break_the_ash_camp`
 - `into_the_briar_burrows`
 - `the_patrons_shadow`
+- `the_evil_patrons_chosen`
 
 Current quest display names are:
 
@@ -1715,6 +1716,7 @@ Current quest display names are:
 - `break_the_ash_camp`: Break the Ash Camp
 - `into_the_briar_burrows`: Into the Briar Burrows
 - `the_patrons_shadow`: The Patron's Shadow
+- `the_evil_patrons_chosen`: The Evil Patron's Chosen
 
 Current quest objective types are:
 
@@ -1742,7 +1744,8 @@ type QuestObjectiveType =
   | "take_guild_notice_board_quest"
   | "own_livestock_creature"
   | "active_party_member_count"
-  | "patron_ward";
+  | "patron_ward"
+  | "encounter_milestone";
 ```
 
 Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, tracked quest-spawn defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, taking a matching Guild Notice Board quest, Livestock ownership, active-party size, and Patron Ward charge/defense completion.
@@ -1750,6 +1753,10 @@ Current implemented quest objective behavior includes defeat counts, enemy quest
 `QuestObjectiveDefinition.startSpeech` may provide an NPC id, display name, text, and optional speaker position for one-shot objective-start presentation. `questSpawnTarget` configures a tracked target by enemy type, level, position, optional variant, and encounter band. The `defeat_quest_spawn` objective uses the objective's saved runtime entity-id list as its authority for targeting and kill progress.
 
 Each `QuestDefinition` owns `questGiverPoiId` and `questGiverMapId`. Availability may also require completed quests and a first-class active or resting roster companion. `reconcileQuestAvailability` evaluates those state-derived requirements after relevant quest completion, first-class selection, and save restoration.
+
+Optional `QuestObjectiveDefinition.displayName` is consumed by shared objective labels rather than quest-ID UI checks. Optional `QuestDefinition.objectiveGuidance: "first_incomplete"` limits guidance, not parallel progression. `getQuestGuidanceObjectives` supplies the first incomplete objective for this policy or sequential flow, otherwise all incomplete objectives. POI selection, world indicators and route hints share that guidance; Auto Combat honors it on the objective's current map after defense focus and active threats, with stale farming selections invalidated when guidance changes. Existing manual orders and no-policy quests retain their behavior, and reaching a chest never invokes a claim.
+
+`encounter_milestone` carries a typed encounter identity and `boss_defeated`, `captive_rescued` or `chest_collected` kind. The pure `encounterQuestMilestones.ts` resolver reads existing durable Warmaster lifecycle facts as its first adapter; unknown encounters, kinds or missing data return false. Boss victory and captive rescue use the durable rescued fact; full chest collection uses `chestCollectedOnce`. The existing state-derived reconciler runs on acceptance, after lifecycle/combat updates, immediately after successful chest claims and during restoration. Completed objectives are monotonic, React owns no progress coordination, and the central death seam gains no quest-specific calls.
 
 `gather_item_count` may omit `resourceType` to match any successfully inventoried resource while retaining map and subzone filters. The `first_class_weapon` equipment requirement inspects current active-companion hand slots for equipment whose kind is `weapon`, whose type is not a Training Sword, and whose allowed-class list includes a first class. Quest acceptance, equipment changes, and restoration call the shared equipment-objective check; completed equipment objectives are monotonic.
 
@@ -1779,12 +1786,15 @@ Current prototype quest chain:
 - `orders_from_the_guild` unlocks `break_the_ash_camp`
 - `break_the_ash_camp` unlocks `into_the_briar_burrows`
 - `into_the_briar_burrows` unlocks `the_patrons_shadow`
+- `the_patrons_shadow` unlocks `the_evil_patrons_chosen`
 
 `orders_from_the_guild` completes its objective when the dedicated starter Notice Board contract is taken and grants no rewards. `break_the_ash_camp` uses parallel map-4 objectives for 200 direct kill credits, 20 successfully inventoried resources of any supported type, and one first-class weapon, then grants 1800 character XP through the existing quest reward path and 500 Crowns once.
 
 `into_the_briar_burrows` uses parallel map-5 and roster objectives for 300 direct kill credits, ownership of one `tin_crawler` Livestock creature, and 3 active party members, then grants 2800 character XP and 750 Crowns. Tin Crawler acquisition presentation uses `Tin Crawler Hatchling`, its permanent key item is `Tin Crawler Hatchling Discovery`, and its placed adult Livestock name remains `Tin Crawler`. Existing Tin Crawler ownership completes the objective without consuming the creature or changing its 10%/5%/1% discovery chances.
 
 `the_patrons_shadow` uses three `patron_ward` objectives plus an `elder_mossling` Livestock ownership objective, then grants 4000 character XP and 1000 Crowns. Each Ward accumulates 100 matching direct enemy credits before manual activation. `patronWardState.ts` owns Ward definitions, positions, wave counts, barrier geometry, timing constants, route-open checks, and persistent/transient runtime sanitation. `patronWardSystem.ts` owns click-and-approach activation, mutually exclusive defenses, normal-only quest-defender waves, retreat/wipe/map-exit resets, objective completion, prop fades, the barrier/route transition, legacy map-7 access, and renderer-facing Ward/Warmaster presentation. The route unlock persists before quest turn-in while encounter, fade, and finale timing remain transient.
+
+`the_evil_patrons_chosen` is one non-repeatable Hub 2 quest with parallel progress and first-incomplete guidance. Its displayed objectives are Warmaster victory, captive rescue, full chest collection, then 150 `defeat_enemy_count` credits filtered by archetype `orc`, map-7 and `orc-warcamp`. All four Orc types and Barrack reinforcements use existing direct-kill credit; no ordinary kills are banked before acceptance, and recharge remains one independent physical-death credit. Prior durable milestones count on acceptance. Normal turn-in grants each eligible living current-party companion 6000 XP and the party 1500 Crowns once, without modifying Boss/chest rewards or unlocking further content.
 
 `directKillCredit.ts` is the shared direct-defeat credit helper. It returns 2 for Superior enemies and 1 otherwise. Direct NPC `defeat_enemy_count` objectives and direct Notice Board kill objectives use it. Quest-item drop rolls remain once per enemy, `defeat_elite` remains one completion, and `defeat_quest_spawn` completes once for the tracked entity id without applying Superior double credit. Aggregate Field Team kill redemption keeps the quantities reported by the estimator without applying Superior credit.
 
@@ -1981,7 +1991,7 @@ The game loop runs continuously while enabled, executes systems in order, update
 
 Current high-level order:
 
-1. If the Slimeward or Warmaster chest UI, or a Warmaster departure choice, is open, record telemetry and stop the tick early
+1. If the Slimeward chest UI or `isWarmasterRewardUiOpen` (chest/departure choice) is open, record telemetry and stop the tick early; also return immediately after a lifecycle or teleport update opens a Warmaster reward interaction during the tick
 2. Advance simulation timing, clear frame movement planning, and clear expired combat feedback
 3. Update status effects
 4. Update rune skill runtime
@@ -2432,13 +2442,19 @@ Wipes, three seconds of arena absence, map exit, encounter reset and restoration
 
 The central `state.updateEntity` alive-to-dead seam calls both Patron transfer and lifecycle recording. A genuine available Warmaster death records victory and rolls one chest exactly once. Only subsequent physical Grunt/Raider/Shieldbearer deaths on map-7 increment recharge, including Barrack reinforcements and Superiors at one credit each, capped by `WARMASTER_RECHARGE_KILLS` (60). Duplicate dead updates, despawns and cleanup do not count. `enemyRespawnSystem.ts` excludes the Warmaster from generic timed respawning; encounter reconstruction alone creates the next Boss.
 
+The genuine victory transition calls `stopPartyAutoCombat` once, not every defeated-arena tick. This shared party-intent helper switches off Auto Combat, clears cached AI POIs and automatic execution/resume orders, and cancels a pending automatic on-arrival enable when no travel route remains. It preserves direct/player-authored orders and queued/interrupted manual work. This does not pause simulation or permanently lock the toggle; normal self-defense and rescue speech remain available.
+
 Lifecycle reconciliation runs before normal AI/Barrack work and again after combat drops. It removes remaining arena enemies, their relevant combat runtime and stale commands without emitting defeat events, rejects reconstructed living Bosses while unavailable, and retains the genuine Boss corpse for ordinary reward handling. Orchestration supplies `frozenEncounterIds` to the reusable Barrack loop, freezing both production and overdue rebuilding for the defeated arena without Boss-specific checks inside that loop. Field enemies and the route Barrack remain independent.
 
 Gate presentation uses the shared authored anchor/radius and collision cells. Closing requires the party's full bodies, including dead companions, reserved steps and forced-movement landings to be clear of the arena and gate. Pending chest loot keeps access open; restoration reopens an unsafe closed gate rather than trapping companions or rewards. At 60 credits with collection complete, the party outside and Barrack footprints clear, rearming restores the Boss and three arena buildings, resets preparation, preserves reinforcement sequence high-water marks and refreshes navigation/attack/movement caches. Existing attempt reset supplies fresh Boss action state and safe home placement. This completed-clear repair is an explicit exception to normal independent rebuilding, not a wipe repair.
 
-`rollWarmasterChest` stores immutable original item rolls plus pending/collected quantities and a `crownsClaimed` flag under the encounter sequence. Rewards are 500 Crowns, independent 90% level-15 and 10% level-20 equipment checks, and five independent first-class book selections with duplicates allowed. Pools derive from existing item/skill definitions, uniformly and without party weighting or new rarity rules. `requestWarmasterChest` owns manual approach; `claimWarmasterChest` validates a living leader within three units and uses shared inventory/wallet operations. Overflow remains pending and disables Auto Combat. Closing the overlay preserves the ledger; repeated interactions cannot reroll or pay currency twice.
+`rollWarmasterChest` stores immutable original item rolls plus pending/collected quantities and a `crownsClaimed` flag under the encounter sequence. Rewards are 500 Crowns, independent 90% level-15 and 10% level-20 equipment checks, and five independent first-class book selections with duplicates allowed. Pools derive from existing item/skill definitions, uniformly and without party weighting or new rarity rules. `requestWarmasterChest` owns manual approach and stops Auto Combat before approaching; `claimWarmasterChest` validates a living leader within three units, uses shared inventory/wallet operations and stops Auto Combat on every successful claim, including complete collection. Overflow remains pending. Closing the overlay preserves the ledger and leaves Auto Combat off; repeated interactions cannot reroll or pay currency twice.
+
+Optional durable `chestCollectedOnce` becomes true only when a valid claim has collected all currency/items and survives rearming after the sequence ledger is removed. Legacy sanitation recognizes a valid fully collected ledger or a valid later sequence with rescued state, not chest absence or repaired malformed quantities. `saveGame.ts` sanitizes lifecycle before state-derived quest reconciliation. Missing lifecycle retains first-ready behavior without invented milestones; world reset clears history and no save-version bump is required.
 
 Shared walking movement, including party position swaps, guards the leader's arena exit when loot remains. Physical and unlocked direct teleport entrypoints use the same departure request. `resolveWarmasterDeparture` resumes the requested travel only after `Leave anyway`; `Return to chest` cancels departure and issues a manual approach without automatic collection. A transient acknowledgement suppresses duplicate warnings for the excursion and clears on re-entry. `WarmasterRewardOverlay.tsx` presents choices and collected/pending loot; simulation pauses while the chest UI or departure choice is open, as with the existing dungeon chest.
+
+`isWarmasterRewardUiOpen` is shared by simulation pause checks and React's existing blocking-shortcut input. Mid-tick checks after lifecycle and teleport processing prevent subsequent AI, movement or reconstruction from running once a chest/departure overlay opens. Live overlay state remains authoritative until explicit controls or existing dismissal shortcuts change it; saving serializes cleared transient interaction state without mutating the live overlay. Reward/departure overlays block gameplay shortcuts, while explicit dismissal remains available. No automatic re-enable or new modal framework is introduced.
 
 The first victory persists rescue immediately and creates a transient captive-bound speech using the existing five-second HUD-aware layout. `warcampPropPresentation.ts` derives the closed/open cage visual from that durable rescued flag at the shared authored anchor. Both states use aligned transparent 128×128 sprites displayed at three world units square, with the existing captive drawn behind the bars using renderer-only alignment. The open state persists through repeat encounters, travel and restoration without new collision or interaction logic. The full renderer retains existing chest/NPC assets and the pulsing recharge barrier, and includes lifecycle changes in signatures/timed work. Speech, chest overlays, cage art and barrier effects are excluded from minimap presentation; no town service is unlocked.
 

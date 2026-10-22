@@ -10,12 +10,60 @@ import {
   setPartyExecutionIntent,
   setPartyIntent,
   setWorldTravelTargetMapId,
+  stopPartyAutoCombat,
 } from "./partyIntentState";
 import { createTestGameState } from "./testState";
+import { createCompanion, createEnemy } from "./entities";
+import { updatePartyIntentSelfDefenseSystem } from "./partyIntentSystem";
 import type { LocalPoiTarget, PoiDecisionState } from "./questTypes";
 import type { PartyExecutionIntent, PartyIntent } from "./types";
 
 describe("party intent state helpers", () => {
+  it("stops automatic selection, queued/resumable AI movement and delayed re-enabling", () => {
+    const selection = { globalPoiIntent: { type: "idle" as const, reason: "test" }, localPoiTarget: createLocalPoiTarget(),
+      lastPoiDecision: createPoiDecisionState(), worldTravelTargetMapId: null };
+    const state = setPartyExecutionIntent(createTestGameState({ ...selection, autoModeEnabled: true,
+      autoRoute: { autoCombatEnableAtMs: 1000 }, interruptedPoiTarget: { ...selection, interruptedByEnemyId: "enemy-1",
+        mapId: MAP_ONE_ID, leaderIntent: createMoveIntent() } }), createMoveIntent());
+    state.partyIntent!.queuedIntent = { ...selection, executionIntent: createMoveIntent() };
+    const stopped = stopPartyAutoCombat(state);
+    expect(stopped).toMatchObject({ autoModeEnabled: false, localPoiTarget: null, globalPoiIntent: null,
+      leaderIntent: null, interruptedPoiTarget: null });
+    expect(stopped.partyIntent).toBeNull();
+    expect(stopped.lastPoiDecision).toBeUndefined();
+    expect(stopped.autoRoute).toBeUndefined();
+    expect(state.autoModeEnabled).toBe(true);
+  });
+  it("preserves player execution and queued/interrupted manual orders while clearing AI POIs", () => {
+    const executionIntent = { ...createMoveIntent(), source: "player" as const };
+    const snapshot = { executionIntent, globalPoiIntent: null, localPoiTarget: createLocalPoiTarget(), worldTravelTargetMapId: null };
+    const state = setPartyExecutionIntent(createTestGameState({ autoModeEnabled: true,
+      interruptedPoiTarget: { ...snapshot, interruptedByEnemyId: "enemy-1", mapId: MAP_ONE_ID, leaderIntent: executionIntent } }), executionIntent);
+    state.partyIntent!.queuedIntent = snapshot;
+    const stopped = stopPartyAutoCombat(state);
+    expect(getPartyExecutionIntent(stopped)).toEqual(executionIntent);
+    expect(stopped.partyIntent?.queuedIntent?.executionIntent).toEqual(executionIntent);
+    expect(stopped.interruptedPoiTarget?.leaderIntent).toEqual(executionIntent);
+    expect(stopped.partyIntent?.localPoiTarget).toBeNull();
+    expect(stopped.partyIntent?.queuedIntent?.localPoiTarget).toBeNull();
+    expect(stopped.interruptedPoiTarget?.localPoiTarget).toBeNull();
+  });
+  it("keeps resurrection recovery even when its queued automatic destination is cleared", () => {
+    const state = setPartyExecutionIntent(createTestGameState(), createMoveIntent());
+    state.partyIntent!.recoveryIntent = { action: "resurrect", deadCompanionId: "fallen", threatEnemyIds: [] };
+    state.partyIntent!.queuedIntent = { executionIntent: createMoveIntent(), globalPoiIntent: null, localPoiTarget: null, worldTravelTargetMapId: null };
+    const stopped = stopPartyAutoCombat(state);
+    expect(stopped.partyIntent?.recoveryIntent).toEqual(state.partyIntent?.recoveryIntent);
+    expect(stopped.partyIntent?.queuedIntent).toBeNull();
+    expect(getPartyExecutionIntent(stopped)).toBeNull();
+  });
+  it("does not prevent normal self-defense after switching off", () => {
+    const leader = createCompanion("leader", { x: 10, y: 10 }, "leader", "fighter");
+    const enemy = { ...createEnemy("enemy", { x: 11, y: 10 }, "aggressive"), state: "attack" as const, currentTargetId: leader.id };
+    const stopped = stopPartyAutoCombat(createTestGameState({ partyLeaderId: leader.id, entities: { leader, enemy }, autoModeEnabled: true,
+      movementFailureMsByEntityId: { [leader.id]: 1000 } }));
+    expect(getPartyExecutionIntent(updatePartyIntentSelfDefenseSystem(stopped))).toMatchObject({ type: "attack", targetId: enemy.id });
+  });
   it("sets execution intent and mirrors it to leaderIntent", () => {
     const executionIntent = createMoveIntent();
     const nextState = setPartyExecutionIntent(

@@ -4,6 +4,7 @@ import {
   createDebugMapForQuestState,
 } from "./debugMap";
 import { isFirstClassId } from "./classes";
+import { isEncounterQuestMilestoneComplete } from "./encounterQuestMilestones";
 import { getDirectEnemyKillCredit } from "./directKillCredit";
 import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
 import { getItemDefinition } from "./items";
@@ -330,7 +331,8 @@ export function reconcileStateDerivedQuestObjectivesForQuests(
     for (const objective of QUEST_DEFINITIONS[questId].objectives) {
       if (
         objective.type !== "own_livestock_creature" &&
-        objective.type !== "active_party_member_count"
+        objective.type !== "active_party_member_count" &&
+        objective.type !== "encounter_milestone"
       ) {
         continue;
       }
@@ -344,7 +346,9 @@ export function reconcileStateDerivedQuestObjectivesForQuests(
 
       const requiredCount = Math.max(1, objective.requiredCount ?? 1);
       const currentValue =
-        objective.type === "own_livestock_creature"
+        objective.type === "encounter_milestone"
+          ? Number(isEncounterQuestMilestoneComplete(nextState, objective.encounterMilestone))
+          : objective.type === "own_livestock_creature"
           ? objective.livestockCreatureId
             ? nextState.livestock?.ownedCreaturesById[
                 objective.livestockCreatureId

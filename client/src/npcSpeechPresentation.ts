@@ -116,6 +116,14 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
     "Defeat Cinder Wisps in Nightmire Canopy, then break their Patron Ward.",
   find_elder_mossling:
     "Find an Elder Mossling for the Livestock keeper while you search Nightmire Canopy.",
+  defeat_orc_warmaster:
+    "The Evil Patron's chosen waits in Orc Warcamp. Defeat the Warmaster.",
+  free_warmaster_captive:
+    "Defeating the Warmaster will free the captive from the cage.",
+  collect_warmaster_chest:
+    "Collect every reward from the Warmaster's chest before you leave.",
+  defeat_orc_warcamp_enemies:
+    "Thin the Orc ranks. These victories can also recharge your next Warmaster fight.",
 };
 
 const genericGreetings = ["Welcome.", "Hello.", "What’s up, dood?"] as const;

@@ -49,6 +49,8 @@ import {
   getActiveQuest,
   getAvailableQuest,
   getFirstIncompleteObjective,
+  getQuestGuidanceObjectives,
+  getQuestTargetMapId,
   getIncompleteObjectives,
   getQuestGiverAvailableQuests,
   getQuestGiverReadyQuests,
@@ -282,6 +284,15 @@ function canReusePoiSelection(
 ): state is GameState & { localPoiTarget: LocalPoiTarget } {
   if (!state.localPoiTarget) {
     return false;
+  }
+
+  const activeQuest = getActiveQuest(state);
+  if (activeQuest?.status === "active" &&
+    QUEST_DEFINITIONS[activeQuest.questId].objectiveGuidance === "first_incomplete" &&
+    getQuestTargetMapId(state, activeQuest.questId) === state.currentMapId &&
+    state.localPoiTarget.reason !== "active party threat") {
+    const objective = getQuestGuidanceObjectives(state, activeQuest.questId)[0];
+    if (state.localPoiTarget.questId !== activeQuest.questId || state.localPoiTarget.objectiveId !== objective?.id) return false;
   }
 
   const defenseFocus = getActiveQuestDefenseFocus(state);

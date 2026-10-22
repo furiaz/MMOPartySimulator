@@ -28,6 +28,7 @@ import {
   getActiveQuest,
   getIncompleteObjectives,
   getQuestTargetMapId,
+  getQuestGuidanceObjectives,
   matchesObjectiveSubzoneAtPosition,
 } from "./questSystem";
 import { isTeleportWorking } from "./teleportState";
@@ -132,7 +133,7 @@ export function selectQuestGuidePoiTarget(state: GameState): PoiSelectionResult 
     return createEmptyPoiSelection();
   }
 
-  const objective = getTargetableQuestObjectives(state, activeQuest.questId).find(
+  const objective = getQuestGuidanceObjectives(state, activeQuest.questId).find(
     (candidate) =>
       candidate.type === "guide_npc_to_poi" &&
       (candidate.targetMapId ?? state.currentMapId) === state.currentMapId,
@@ -179,6 +180,19 @@ export function selectAutoCombatPoiTarget(
 
   if (activeThreatSelection.localTarget) {
     return activeThreatSelection;
+  }
+
+  const activeQuest = getActiveQuest(state);
+  if (activeQuest?.status === "active" &&
+    QUEST_DEFINITIONS[activeQuest.questId].objectiveGuidance === "first_incomplete" &&
+    getQuestTargetMapId(state, activeQuest.questId) === state.currentMapId) {
+    const skippedReasons: Record<string, string> = {};
+    const options = getQuestTargetOptions(state,
+      { type: "complete_current_quest", questId: activeQuest.questId, reason: "ordered quest guidance" },
+      candidates, getMapType(state.currentMapId), getPoiSearchScope(state), gathererReservations);
+    const scored = selectScoredPoiTargets(state, filterPoiOptionsToLeaderSubzone(options, getLeaderSubzoneRestriction(state)), skippedReasons);
+    const selected = selectStablePoiTarget(state, scored);
+    if (selected) return { localTarget: selected.localTarget, consideredTargets: getPoiConsiderations(scored, selected), skippedReasons };
   }
 
   const leader = getPartyLeader(state);
@@ -644,7 +658,7 @@ function getQuestTargetOptions(
       : [];
   }
 
-  return getTargetableQuestObjectives(state, questId).flatMap((objective) =>
+  return getQuestGuidanceObjectives(state, questId).flatMap((objective) =>
     getQuestObjectiveTargetOptions(
       state,
       questId,
@@ -653,17 +667,6 @@ function getQuestTargetOptions(
       gathererReservations,
     ),
   );
-}
-
-function getTargetableQuestObjectives(
-  state: GameState,
-  questId: QuestId,
-): QuestObjectiveDefinition[] {
-  const incompleteObjectives = getIncompleteObjectives(state, questId);
-
-  return QUEST_DEFINITIONS[questId].objectiveFlow === "sequential"
-    ? incompleteObjectives.slice(0, 1)
-    : incompleteObjectives;
 }
 
 function getQuestObjectiveTargetOptions(
@@ -701,9 +704,10 @@ function getQuestObjectiveTargetOptions(
 
   if (
     objective.type === "defeat_enemy_count" ||
-    objective.type === "collect_enemy_quest_drop_count"
+    objective.type === "collect_enemy_quest_drop_count" ||
+    (objective.type === "encounter_milestone" && objective.encounterMilestone?.kind === "boss_defeated")
   ) {
-    return candidates
+    const options = candidates
       .filter((poi) => isQuestCombatPoi(state, poi, objective))
       .map((poi) => ({
         poi,
@@ -712,6 +716,9 @@ function getQuestObjectiveTargetOptions(
         questId,
         objectiveId: objective.id,
       }));
+    if (options.length || objective.type !== "encounter_milestone") return options;
+    return [{ poi: createObjectivePositionPoi(state, questId, objective, `${questId}-${objective.id}-target`),
+      priority: 10, reason: "active quest encounter target position", questId, objectiveId: objective.id }];
   }
 
   if (objective.type === "gather_item_count") {
@@ -753,7 +760,8 @@ function getQuestObjectiveTargetOptions(
     objective.type === "defend_area" ||
     objective.type === "rescue_npc" ||
     objective.type === "unlock_route" ||
-    objective.type === "collect_dungeon_chest"
+    objective.type === "collect_dungeon_chest" ||
+    objective.type === "encounter_milestone"
   ) {
     return [
       {

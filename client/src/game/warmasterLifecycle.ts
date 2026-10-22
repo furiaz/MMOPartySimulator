@@ -10,7 +10,8 @@ import { ITEM_DEFINITIONS } from "./items";
 import { bakeNavigationGrid } from "./navigation";
 import { ORC_WARCAMP_ARENA, ORC_WARCAMP_BOSS_POSITION, ORC_WARCAMP_CAGE_POSITION, ORC_WARCAMP_CHEST_POSITION, ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
 import { clearEnemyFromPartyTargeting } from "./partyTargetSystem";
-import { setPartyExecutionIntent } from "./partyIntentState";
+import { setPartyExecutionIntent, stopPartyAutoCombat } from "./partyIntentState";
+import { reconcileStateDerivedQuestObjectivesForQuests } from "./questProgressionHooks";
 import { clearStatusEffectsForEntity } from "./statusEffects";
 import { resetWarmasterAttempt } from "./warmasterSystem";
 import { addCurrencyToWalletState } from "./wallet";
@@ -39,6 +40,9 @@ export function sanitizeWarmasterLifecycle(value: WarmasterLifecycle | undefined
   const sequence = Math.max(1, integer(value.sequence, 1));
   const slots = (input: InventorySlot[] | undefined): InventorySlot[] => Array.isArray(input) ? input.filter(slot => slot && Object.hasOwn(ITEM_DEFINITIONS, slot.itemId) && integer(slot.quantity) > 0).map(slot => ({ itemId: slot.itemId, quantity: Math.min(999, integer(slot.quantity)) })) : [];
   const phase = ["ready", "active", "defeated", "recharging", "reset_pending"].includes(value.phase) ? value.phase : "ready";
+  // A prior sequence can only be rearmed after its chest has been fully claimed.
+  let chestCollectedOnce = value.chestCollectedOnce === true ||
+    (sequence > 1 && phase === value.phase && value.rescued === true);
   let chest: WarmasterChest | undefined;
   if (value.chest && typeof value.chest === "object" && value.chest.sequence === sequence && Array.isArray(value.chest.rolledLoot) && Array.isArray(value.chest.collectedLoot) && Array.isArray(value.chest.pendingLoot) && !["ready", "active"].includes(phase)) {
     // The original roll is the authority; sanitize pending/collected amounts against it.
@@ -49,8 +53,15 @@ export function sanitizeWarmasterLifecycle(value: WarmasterLifecycle | undefined
     const pending = new Map(pendingLoot.map(slot => [slot.itemId, slot.quantity]));
     const collectedLoot = rolledLoot.map(slot => ({ ...slot, quantity: slot.quantity - (pending.get(slot.itemId) ?? 0) })).filter(slot => slot.quantity > 0);
     chest = { sequence, rolledLoot, collectedLoot, pendingLoot, crownsClaimed: value.chest.crownsClaimed !== false };
+    // Do not turn a repaired/malformed ledger into evidence of a historical claim.
+    chestCollectedOnce ||= value.chest.crownsClaimed === true && value.chest.pendingLoot.length === 0 &&
+      slots(value.chest.rolledLoot).length === value.chest.rolledLoot.length &&
+      slots(value.chest.collectedLoot).length === value.chest.collectedLoot.length &&
+      savedCollected.size === rolledLoot.length &&
+      rolledLoot.every(slot => savedCollected.get(slot.itemId) === slot.quantity);
   }
-  return { phase: phase === "active" ? "ready" : phase, sequence, recharge: ["ready", "active"].includes(phase) ? 0 : Math.min(WARMASTER_RECHARGE_KILLS, integer(value.recharge)), rescued: value.rescued === true, ...(chest ? { chest } : {}) };
+  return { phase: phase === "active" ? "ready" : phase, sequence, recharge: ["ready", "active"].includes(phase) ? 0 : Math.min(WARMASTER_RECHARGE_KILLS, integer(value.recharge)), rescued: value.rescued === true,
+    ...(chestCollectedOnce ? { chestCollectedOnce: true } : {}), ...(chest ? { chest } : {}) };
 }
 
 /** Reconstruct only this encounter. Called before navigation on restore and map entry. */
@@ -173,7 +184,7 @@ function isLeaderNearChest(state: GameState): boolean {
 }
 export function requestWarmasterChest(state: GameState): GameState {
   if (state.currentMapId !== "map-7" || !state.warmasterLifecycle?.chest) return state;
-  const next = { ...state, activeTeleport: null, worldTravelTargetMapId: null, autoRoute: undefined, warmasterInteraction: { ...state.warmasterInteraction, chestRequested: true as const } };
+  const next = stopPartyAutoCombat({ ...state, activeTeleport: null, worldTravelTargetMapId: null, autoRoute: undefined, warmasterInteraction: { ...state.warmasterInteraction, chestRequested: true as const } });
   return isLeaderNearChest(next) ? claimWarmasterChest(next) : setPartyExecutionIntent(next, { type: "move", targetId: null, targetPosition: ORC_WARCAMP_CHEST_POSITION, source: "player" });
 }
 export function claimWarmasterChest(state: GameState): GameState {
@@ -188,9 +199,10 @@ export function claimWarmasterChest(state: GameState): GameState {
     if (result.result.addedQuantity) collectedLoot.push({ ...slot, quantity: result.result.addedQuantity });
     if (result.result.overflowQuantity) pendingLoot.push({ ...slot, quantity: result.result.overflowQuantity });
   }
-  return updateWarmasterProps({ ...next, autoModeEnabled: pendingLoot.length ? false : next.autoModeEnabled,
-    warmasterLifecycle: { ...next.warmasterLifecycle!, chest: { ...chest, crownsClaimed: true, pendingLoot, collectedLoot: mergeLoot(collectedLoot) } },
-    warmasterInteraction: { ...next.warmasterInteraction, chestRequested: undefined, chestOpen: true } });
+  return reconcileStateDerivedQuestObjectivesForQuests(updateWarmasterProps({ ...stopPartyAutoCombat(next),
+    warmasterLifecycle: { ...next.warmasterLifecycle!, ...(pendingLoot.length === 0 ? { chestCollectedOnce: true } : {}),
+      chest: { ...chest, crownsClaimed: true, pendingLoot, collectedLoot: mergeLoot(collectedLoot) } },
+    warmasterInteraction: { ...next.warmasterInteraction, chestRequested: undefined, chestOpen: true } }), "encounter_chest_claim");
 }
 
 export function closeWarmasterChest(state: GameState): GameState {

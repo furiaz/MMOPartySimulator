@@ -48,6 +48,7 @@ import {
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
 import { updateQuestGuideSystem } from "./questGuideSystem";
+import { reconcileStateDerivedQuestObjectivesForQuests } from "./questProgressionHooks";
 import { updatePatronWardSystem } from "./patronWardSystem";
 import { createResourceWorkContext } from "./gathererResourceReservation";
 import { updateResurrectionSystem } from "./resurrectionSystem";
@@ -91,6 +92,7 @@ import { recordCurrentWorldDiscovery } from "./worldDiscovery";
 import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
 import { updateForcedMovements } from "./forcedMovement";
 import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
+import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 
 export function updateGame(
   state: GameState,
@@ -98,7 +100,7 @@ export function updateGame(
 ): GameState {
   const timing = getUpdateTiming(state, timingInput);
 
-  if (isSlimewardDungeonChestUiOpen(state) || state.warmasterInteraction?.chestOpen || state.warmasterInteraction?.departure) {
+  if (isSlimewardDungeonChestUiOpen(state) || isWarmasterRewardUiOpen(state)) {
     return recordDebugTelemetryTick(state, state, timing);
   }
 
@@ -109,6 +111,8 @@ export function updateGame(
   const movedEntityIds = new Set<string>();
   nextState = updateAutoRouteRuntime(nextState);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
+  nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_lifecycle_update");
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateWarmasterSystem(nextState, timing.nowMs);
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
@@ -166,6 +170,7 @@ export function updateGame(
   nextState = updatePartyIntentRecoverySystem(nextState);
 
   nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = initializeBarracks(nextState);
   nextState = updateMartialPassiveRuntime(
     nextState,
@@ -262,6 +267,8 @@ export function updateGame(
   nextState = updateTargetDummyHealthRegen(nextState, timing.nowMs);
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
+  nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_combat_update");
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateSlimewardDungeonSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(

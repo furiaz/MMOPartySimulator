@@ -234,7 +234,10 @@ export function getNpcQuestRouteHintGroupsByMap(
       { location: QuestLocationDisplay; objectiveLines: string[] }
     >();
 
-    for (const objective of definition.objectives) {
+    const hintObjectives = definition.objectiveGuidance === "first_incomplete"
+      ? definition.objectives.filter(objective => !quest.objectiveProgress[objective.id]?.completed).slice(0, 1)
+      : definition.objectives;
+    for (const objective of hintObjectives) {
       if (quest.objectiveProgress[objective.id]?.completed) {
         continue;
       }
@@ -483,6 +486,7 @@ export function getObjectiveLabel(
   objective: QuestObjectiveDefinition,
   requiredCount = objective.requiredCount ?? 1,
 ): string {
+  if (objective.displayName) return objective.displayName;
   if (objective.id === "defeat_briar_burrows_enemies") {
     return `Defeat ${requiredCount} Briar Burrows Enemies`;
   }

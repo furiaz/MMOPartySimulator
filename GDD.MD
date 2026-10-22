@@ -1497,6 +1497,8 @@ Supported prototype quest objective type definitions:
 - return to POI
 - take Guild Notice Board quest
 
+Encounter-milestone objectives read durable Boss victory, captive rescue, or full chest collection without creating another encounter or NPC.
+
 Current prototype quest content currently uses:
 
 - reach POI
@@ -1631,6 +1633,17 @@ Current prototype quests:
   - Each Ward requires 100 matching Nightmire Canopy enemy credits before it can be manually activated; ambient Superior enemies grant 2 credits and quest-spawned Ward defenders are always normal variants
   - Ward defenses may be completed in any order and use waves of 3+3 Night Bats, 4+4 Elder Mosslings, and 3+3+4 Cinder Wisps respectively
   - Rewards: 1000 Crowns and 4000 character XP
+  - Unlocks: The Evil Patron's Chosen
+
+- The Evil Patron's Chosen
+  - Quest id: the_evil_patrons_chosen
+  - Available from the Forward Bastion Quest Giver after The Patron's Shadow is turned in; non-repeatable
+  - Display objectives in this order: defeat the Orc Warmaster once, free the captive, fully collect the Warmaster's chest, and earn 150 Orc kill credits in Orc Warcamp
+  - All four progress in parallel. Orc kills count after acceptance, including Grunts, Raiders, Shieldbearers, the Warmaster and Barrack reinforcements; normal enemies grant 1 credit and Superiors 2, capped at 150
+  - Prior Boss victory, automatic captive rescue and fully collected chest milestones count on acceptance and remain complete through later attempts, rearming, travel and loading; ordinary kills before acceptance are not banked
+  - Chest completion requires its Crowns and every pending item to be collected; opening it or leaving inventory overflow does not qualify
+  - Rewards: 1500 Crowns once and 6000 character XP for each eligible living current-party companion, separate from Boss XP/drops and chest rewards
+  - No further quest unlock
 
 Quest definitions own their quest-giver map. Quest Givers in Harbor Union Bastion and Forward Bastion can accept their available quests and turn in their ready quests from anywhere in the matching hub while that Quest Giver is present.
 
@@ -1641,6 +1654,8 @@ The Class Mentor may act as the current prototype quest source for The Azure Tri
 `Break the Ash Camp` counts only resource quantities successfully added to inventory from `map-4` / `ash-goblin-encampment`; failed full-inventory collection does not progress the quest. A generic gather objective may omit a resource type to match any supported resource while retaining its map and subzone restrictions.
 
 `Into the Briar Burrows` uses state-derived Livestock ownership and active-party-size objectives. Incomplete state-derived objectives reconcile on quest acceptance, the matching roster or Livestock action, and save restoration; once completed, they remain complete.
+
+Quests may author first-incomplete objective guidance independently of parallel progression. The Evil Patron's Chosen guides toward the Boss, any remaining rescue/chest milestone, then remaining Orc kills; turn-in routes to Forward Bastion once ready. Tracker labels use optional authored objective names. Manual orders and self-defense retain priority. If the player re-enables Auto Combat after victory, guidance may approach the chest but never claims it automatically.
 
 `The Patron's Shadow` places three manually activated Wards around the Nightmire Canopy route to Orc Warcamp. Only one Ward defense can be active at a time. Starting a defense removes all ambient Nightmire enemies and leaves only the matching quest defenders. Failed, abandoned, wiped, or interrupted defenses reset to charged-and-ready without requiring another 100 credits. Ambient enemies return at full health near their authored homes 2 seconds after the defense ends unless another Ward begins during that breathing period.
 
@@ -2739,13 +2754,15 @@ Current Warmaster repeat lifecycle and rewards (Issue #681):
 
 - The first encounter is ready immediately. The Warmaster no longer uses ordinary timed enemy respawning. After each victory, 60 physical Zone 7 Orc Grunt, Raider or Shieldbearer deaths recharge the next encounter, including Barrack reinforcements. Each death grants one credit, including Superiors. Progress starts at victory, caps at 60 and does not bank kills from before victory or while another fight is ready/active. Structures, the Warmaster, other maps, despawns and cleanup grant none.
 - Victory removes remaining arena enemies without defeat rewards and stops arena production, enemy respawning and Barrack rebuilding across travel and saves. The farming field and route Barrack are unaffected. Normal Boss XP and drops remain separate from the chest reward.
+- Each genuine victory switches Auto Combat off once and clears AI-created targets and movement intent without discarding player-authored orders or direct companion commands. Simulation and rescue speech continue; self-defense remains available. The player may explicitly re-enable Auto Combat afterward, and later defeated-arena updates do not switch it off again.
 - The southern arena entrance uses a pulsing radius-five dark-green collision barrier and shows recharge progress while unavailable. It stays open after victory until loot is collected and the party can safely leave. An unclaimed chest keeps access open even at 60 credits; neither the chest nor its contents are discarded.
 - Once all loot is collected and the party, including dead members and movement reservations, is clear of the arena and gate, the gate closes. At 60 credits, safe reconstruction restores the Boss and all three arena Barracks to full health, resets their preparation and reopens access. Reinforcement ID sequences are retained. This completed-clear restoration does not apply to wipes or the route Barrack.
 - Each victory creates exactly one manually claimed chest at (102,45). It grants 500 Crowns, an independent 90% chance for one level-15 equipment item, an independent 10% chance for one level-20 item, and five independently selected first-class skill books. Both equipment rolls may succeed or fail; duplicate books are allowed. Choices are uniform within existing exact-level equipment and all first-class book pools, without party weighting or Beginner books.
-- Chest contents roll once per completed encounter. Manual interaction requires a living leader within three units; clicking from farther away approaches first. Auto Combat never claims the chest. Full inventory stops Auto Combat and leaves overflow pending; partial collection and the one-time currency grant persist without rerolls or duplicate claims. The chest overlay pauses simulation and can be closed without losing loot.
+- Chest contents roll once per completed encounter. Manual interaction requires a living leader within three units; clicking from farther away approaches first. A valid manual chest request and every successful claim switch Auto Combat off, whether or not inventory is full. Auto Combat never claims the chest. Overflow remains pending; partial collection and the one-time currency grant persist without rerolls or duplicate claims. The chest overlay pauses simulation immediately on opening and stays open until explicitly dismissed through its controls or the existing dismissal shortcut. Gameplay shortcuts cannot issue conflicting actions behind it. Closing it or leaving does not automatically re-enable Auto Combat.
 - Attempting to walk out or use a supported teleport with unclaimed loot offers `Return to chest` or `Leave anyway`. Returning cancels departure and directs the party toward the chest without claiming it. Leaving preserves loot and gate access, delaying reconstruction. The acknowledged excursion does not repeatedly warn; re-entry permits a new warning.
 - The first victory automatically opens the cage at (88,45) and rescues its captive, who says `You’ve freed me. Thank you!` through the existing five-second HUD-aware speech. Rescue persists and does not replay on loading or later clears. Matching transparent closed/open cage sprites occupy a three-world-unit-square visual with a shared ground anchor; widely spaced bars reveal the existing captive behind them. The cage remains open through travel, restoration and repeat encounters. It adds no collision or manual rescue interaction; existing chest/NPC artwork is retained and the captive's town service remains undefined.
 - Saves preserve encounter sequence, recharge, availability, rescue and rolled/partially collected rewards. Active fights restore as ready attempts without victory rewards. Legacy saves missing lifecycle data start ready, even if their old Warmaster was dead, without retroactive loot or rescue. No save-version change or general persistent-zone system is introduced. Post-Warmaster content remains out of scope.
+- Full chest collection also preserves a lifetime collection milestone after the current chest ledger is cleared on rearming. Older saves recognize a valid fully collected ledger or a valid later encounter sequence as collection evidence, never chest absence alone. Milestones reconcile only after lifecycle sanitation; malformed or missing data must not invent prior victories or collection.
 
 Current Slimeward dungeon prototype rooms/subzones are:
 

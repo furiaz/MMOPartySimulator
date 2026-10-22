@@ -3,6 +3,7 @@ import { SKILL_DEFINITIONS } from "./skills";
 import type { GameState } from "./state";
 import type { DebugMapId, GameEntity, InventorySlot, Position } from "./types";
 import { ORC_WARCAMP_ARENA } from "./orcWarcampLayout";
+import { stopPartyAutoCombat } from "./partyIntentState";
 
 export const WARMASTER_RECHARGE_KILLS = 60;
 export const WARMASTER_CHEST_ID = "map-7-warmaster-chest";
@@ -20,6 +21,7 @@ export type WarmasterLifecycle = {
   sequence: number;
   recharge: number;
   rescued: boolean;
+  chestCollectedOnce?: boolean;
   chest?: WarmasterChest;
 };
 export type WarmasterInteraction = {
@@ -38,6 +40,9 @@ export function isWarmasterAvailable(state: Pick<GameState, "warmasterLifecycle"
 export function hasPendingWarmasterChest(state: Pick<GameState, "warmasterLifecycle">): boolean {
   const chest = state.warmasterLifecycle?.chest;
   return Boolean(chest && (!chest.crownsClaimed || chest.pendingLoot.length));
+}
+export function isWarmasterRewardUiOpen(state: Pick<GameState, "warmasterInteraction">): boolean {
+  return Boolean(state.warmasterInteraction?.chestOpen || state.warmasterInteraction?.departure);
 }
 export function requestWarmasterDeparture(state: GameState, departure: WarmasterInteraction["departure"]): GameState {
   if (state.currentMapId !== "map-7" || !hasPendingWarmasterChest(state) || state.warmasterInteraction?.departureAcknowledged) return state;
@@ -72,8 +77,8 @@ export function recordWarmasterLifecycleDeath(state: GameState, previous: GameEn
   if (state.currentMapId !== "map-7" || previous?.kind !== "enemy" || previous.health <= 0 || previous.state === "dead" || entity.kind !== "enemy" || (entity.health > 0 && entity.state !== "dead")) return state;
   const lifecycle = state.warmasterLifecycle ?? createWarmasterLifecycle();
   if (entity.enemyTypeId === "orc_warmaster" && isWarmasterAvailable(state)) {
-    return { ...state, warmasterLifecycle: { ...lifecycle, phase: "defeated", recharge: 0, rescued: true, chest: rollWarmasterChest(lifecycle.sequence) },
-      warmasterInteraction: { ...state.warmasterInteraction, ...(!lifecycle.rescued ? { rescueSpeechStartedAt: now } : {}), departureAcknowledged: undefined } };
+    return stopPartyAutoCombat({ ...state, warmasterLifecycle: { ...lifecycle, phase: "defeated", recharge: 0, rescued: true, chest: rollWarmasterChest(lifecycle.sequence) },
+      warmasterInteraction: { ...state.warmasterInteraction, ...(!lifecycle.rescued ? { rescueSpeechStartedAt: now } : {}), departureAcknowledged: undefined } });
   }
   if (isWarmasterAvailable(state) || lifecycle.recharge >= WARMASTER_RECHARGE_KILLS || !["orc", "orc_raider", "orc_shieldbearer"].includes(entity.enemyTypeId ?? "")) return state;
   return { ...state, warmasterLifecycle: { ...lifecycle, recharge: Math.min(WARMASTER_RECHARGE_KILLS, lifecycle.recharge + 1) } };
