@@ -4,6 +4,8 @@ import { ORC_WARCAMP_ARENA, ORC_WARCAMP_ARENA_BARRACKS, ORC_WARCAMP_ENCOUNTER_ID
 
 export const BARRACK_PREPARATION_MS = 12_000;
 export const BARRACK_RESPAWN_MS = 120_000;
+export const BARRACK_REBUILD_SPEECH = { text: "Work Work", leadMs: 10_000, durationMs: 5_000 } as const;
+export const BARRACK_CLEARANCE_RETRY_MS = 250;
 export const BARRACK_ACTIVATION_RADIUS = 10;
 
 export type BarrackDefinition = {

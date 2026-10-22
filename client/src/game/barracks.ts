@@ -1,13 +1,16 @@
 import { createEnemy } from "./entities";
 import { findNavigationPath } from "./navigation";
-import { getEntityCollisionShape, isPositionAvailable } from "./movementPlanning";
+import { isPositionAvailable } from "./movementPlanning";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { hasStructureLineOfSight, refreshStructureCollision } from "./combatStructures";
 import { BARRACK_DEFINITIONS, BARRACK_ACTIVATION_RADIUS, BARRACK_PREPARATION_MS, BARRACK_RESPAWN_MS,
+  BARRACK_REBUILD_SPEECH, BARRACK_CLEARANCE_RETRY_MS,
   createBarrackEntity, getBarrackMaxHealth, rollBarrackEnemy } from "./barrackDefinitions";
 import type { BarrackDefinition } from "./barrackDefinitions";
-import type { GameState } from "./state";
-import type { AoeBounds, BarrackRuntime, GameEntity, Position } from "./types";
+import { updateEntity, type GameState } from "./state";
+import type { BarrackRuntime, Position } from "./types";
+import { doesEntityOverlapFootprint, isStructureFootprintOccupied, planStructureRebuildClearance } from "./structureRebuildClearance";
+export { doesEntityOverlapFootprint } from "./structureRebuildClearance";
 
 export function initializeBarracks(state: GameState): GameState {
   const definitions = BARRACK_DEFINITIONS.filter(definition => definition.mapId === state.currentMapId);
@@ -27,36 +30,11 @@ export function initializeBarracks(state: GameState): GameState {
   return changed ? refreshStructureCollision({ ...state, entities, barracksById }) : state;
 }
 
-export function doesEntityOverlapFootprint(entity: GameEntity, bounds: AoeBounds, position = entity.position): boolean {
-  if (entity.state === "dead" || (entity.kind === "resource" && entity.isDepleted)) return false;
-  if (entity.kind === "structure") return entity.health > 0 && entity.footprint.minX < bounds.maxX && entity.footprint.maxX > bounds.minX &&
-    entity.footprint.minY < bounds.maxY && entity.footprint.maxY > bounds.minY;
-  const shape = getEntityCollisionShape(entity);
-  const radius = (entity.kind === "enemy" ? Math.max(shape.radius, getEnemyCombatBodyRadius(entity)) : shape.radius) + 0.05;
-  const top = shape.kind === "verticalCapsule" ? position.y - shape.height * shape.anchorY + shape.radius : position.y;
-  const bottom = shape.kind === "verticalCapsule" ? position.y - shape.height * shape.anchorY + shape.height - shape.radius : position.y;
-  const dx = Math.max(bounds.minX - position.x, position.x - bounds.maxX, 0);
-  const dy = Math.max(bounds.minY - bottom, top - bounds.maxY, 0);
-  return dx * dx + dy * dy <= radius * radius;
-}
-
 export function isBarrackFootprintOccupied(state: GameState, definition: BarrackDefinition): boolean {
-  for (const entity of Object.values(state.entities)) {
-    if (entity.id === definition.id) continue;
-    if (doesEntityOverlapFootprint(entity, definition.footprint)) return true;
-    const reservation = state.reservedPositionsByEntityId?.[entity.id];
-    if (reservation && doesEntityOverlapFootprint(entity, definition.footprint, reservation)) return true;
-    const movement = state.moveIntentsByEntityId?.[entity.id];
-    if (movement && doesEntityOverlapFootprint(entity, definition.footprint, movement)) return true;
-    const dash = state.enemyDashesByEnemyId?.[entity.id];
-    if (dash && doesEntityOverlapFootprint(entity, definition.footprint, dash.destination)) return true;
-    const pendingDash = state.enemyAbilityCastsByEnemyId?.[entity.id]?.dashPlan;
-    if (pendingDash && doesEntityOverlapFootprint(entity, definition.footprint, pendingDash.destination)) return true;
-  }
-  return false;
+  return isStructureFootprintOccupied(state, definition.id, definition.footprint);
 }
 
-export type BarrackActivationContext = { activeEncounterIds?: ReadonlySet<string>; frozenEncounterIds?: ReadonlySet<string> };
+export type BarrackActivationContext = { activeEncounterIds?: ReadonlySet<string>; frozenEncounterIds?: ReadonlySet<string>; movedEntityIds?: Set<string> };
 
 export function updateBarracks(state: GameState, now: number, deltaMs: number, random = Math.random, context: BarrackActivationContext = {}): GameState {
   let nextState = initializeBarracks(state);
@@ -67,10 +45,31 @@ export function updateBarracks(state: GameState, now: number, deltaMs: number, r
       if (runtime.wasInRange || runtime.speech || runtime.hintExpiresAtMs) nextState = setRuntime(nextState, definition.id, { ...runtime, wasInRange: false, speech: undefined, hintExpiresAtMs: undefined });
       continue;
     }
-    if (definition.activation && context.frozenEncounterIds?.has(definition.activation.encounterId)) continue;
+    if (definition.activation && context.frozenEncounterIds?.has(definition.activation.encounterId)) {
+      if (runtime.speech || runtime.nextClearanceRetryAtMs !== undefined) nextState = setRuntime(nextState, definition.id, { ...runtime, speech: undefined, nextClearanceRetryAtMs: undefined });
+      continue;
+    }
     if (runtime.health <= 0) {
-      if (runtime.respawnAtMs === undefined || now < runtime.respawnAtMs || isBarrackFootprintOccupied(nextState, definition)) continue;
-      runtime = { ...runtime, health: getBarrackMaxHealth(), maxHealth: getBarrackMaxHealth(), preparationMs: 0, respawnAtMs: undefined, wasInRange: false, pendingEnemyTypeId: undefined };
+      if (runtime.respawnAtMs === undefined) continue;
+      const rebuildAt = runtime.respawnAtMs;
+      const warningAt = rebuildAt - BARRACK_REBUILD_SPEECH.leadMs;
+      runtime = { ...runtime, speech: runtime.speech && runtime.speech.expiresAt > now ? runtime.speech : undefined };
+      if (!runtime.rebuildWarningShown && now >= warningAt) {
+        runtime = { ...runtime, rebuildWarningShown: true, speech: now < warningAt + BARRACK_REBUILD_SPEECH.durationMs
+          ? { text: BARRACK_REBUILD_SPEECH.text, createdAt: warningAt, expiresAt: warningAt + BARRACK_REBUILD_SPEECH.durationMs } : undefined };
+      }
+      nextState = setRuntime(nextState, definition.id, runtime);
+      if (now < rebuildAt || now < (runtime.nextClearanceRetryAtMs ?? 0)) continue;
+      const corrections = planStructureRebuildClearance(nextState, definition.id, definition.footprint);
+      const clearedState = corrections && applyRebuildCorrections(nextState, corrections);
+      if (!clearedState || isBarrackFootprintOccupied(clearedState, definition)) {
+        nextState = setRuntime(nextState, definition.id, { ...runtime, nextClearanceRetryAtMs: now + BARRACK_CLEARANCE_RETRY_MS });
+        continue;
+      }
+      nextState = clearedState;
+      for (const correctedId of corrections!.keys()) context.movedEntityIds?.add(correctedId);
+      runtime = { ...runtime, health: getBarrackMaxHealth(), maxHealth: getBarrackMaxHealth(), preparationMs: 0, respawnAtMs: undefined,
+        wasInRange: false, pendingEnemyTypeId: undefined, speech: undefined, rebuildWarningShown: undefined, nextClearanceRetryAtMs: undefined };
       nextState = refreshStructureCollision({ ...setRuntime(nextState, definition.id, runtime), entities: { ...nextState.entities, [definition.id]: createBarrackEntity(definition) } });
     }
     const barrack = nextState.entities[definition.id];
@@ -134,6 +133,20 @@ function setRuntime(state: GameState, id: string, runtime: BarrackRuntime): Game
   return { ...state, barracksById: { ...state.barracksById, [id]: runtime } };
 }
 
+function applyRebuildCorrections(state: GameState, corrections: ReadonlyMap<string, Position>): GameState {
+  if (!corrections.size) return state;
+  let next = state;
+  for (const [id, position] of corrections) next = updateEntity(next, { ...next.entities[id], position });
+  const withoutCorrected = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => !corrections.has(id)));
+  return { ...next,
+    moveIntentsByEntityId: withoutCorrected(next.moveIntentsByEntityId), reservedPositionsByEntityId: withoutCorrected(next.reservedPositionsByEntityId),
+    movementPathsByEntityId: withoutCorrected(next.movementPathsByEntityId), attackSlotCacheByEntityId: withoutCorrected(next.attackSlotCacheByEntityId),
+    movementDecisionsByEntityId: withoutCorrected(next.movementDecisionsByEntityId), movementPathRetryAtMsByEntityId: withoutCorrected(next.movementPathRetryAtMsByEntityId),
+    enemyTargetReachabilityCacheByEnemyId: withoutCorrected(next.enemyTargetReachabilityCacheByEnemyId),
+    lastPositionsByEntityId: { ...next.lastPositionsByEntityId, ...Object.fromEntries(corrections) },
+  };
+}
+
 export function restoreBarracks(state: GameState, now: number): GameState {
   const barracksById: Record<string, BarrackRuntime> = {};
   const finite = (value: unknown, fallback: number) => typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -150,6 +163,7 @@ export function restoreBarracks(state: GameState, now: number): GameState {
     barracksById[definition.id] = { health, maxHealth: getBarrackMaxHealth(), preparationMs: Math.max(0, Math.min(BARRACK_PREPARATION_MS, finite(saved.preparationMs, 0))),
       spawnSequence: Number.isSafeInteger(saved.spawnSequence) && saved.spawnSequence >= 0 && saved.spawnSequence < Number.MAX_SAFE_INTEGER ? saved.spawnSequence : 0, tutorialSeen: saved.tutorialSeen === true,
       wasInRange: true,
+      rebuildWarningShown: saved.rebuildWarningShown === true,
       ...(health <= 0 ? { respawnAtMs: Math.max(0, finite(saved.respawnAtMs, now + BARRACK_RESPAWN_MS)) } : {}),
       ...(["orc", "orc_raider", "orc_shieldbearer"].includes(saved.pendingEnemyTypeId ?? "") ? { pendingEnemyTypeId: saved.pendingEnemyTypeId } : {}),
     };

@@ -2916,6 +2916,9 @@ export type MapVisualObjectId =
   | "nightmire_corrupted_sap_patch"
   | "nightmire_broken_hunter_signpost"
   | "orc_warcamp_barracks"
+  | "orc_warcamp_barracks_ruined"
+  | "orc_warcamp_cage_closed"
+  | "orc_warcamp_cage_open"
   | "orc_warcamp_orc_command_banner_standard"
   | "orc_warcamp_crude_war_drum_platform"
   | "orc_warcamp_orc_weapon_rack"
@@ -3508,6 +3511,8 @@ export type BarrackRuntime = {
   maxHealth?: number;
   preparationMs: number;
   respawnAtMs?: number;
+  rebuildWarningShown?: boolean;
+  nextClearanceRetryAtMs?: number;
   spawnSequence: number;
   pendingEnemyTypeId?: EnemyTypeId;
   tutorialSeen?: boolean;

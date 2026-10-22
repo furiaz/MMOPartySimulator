@@ -23,7 +23,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
     warmasterLifecycle: state.warmasterLifecycle?.phase === "active" ? { ...state.warmasterLifecycle, phase: "ready" } : state.warmasterLifecycle,
     forcedMovementsByEntityId: {},
     barracksById: state.barracksById ? Object.fromEntries(Object.entries(state.barracksById).map(([id, runtime]) =>
-      [id, { ...runtime, wasInRange: false, speech: undefined, hintExpiresAtMs: undefined }])) : undefined,
+      [id, { ...runtime, wasInRange: false, speech: undefined, hintExpiresAtMs: undefined, nextClearanceRetryAtMs: undefined }])) : undefined,
     activeTeleport: null,
     directCompanionCommandsById: {},
     directCommandGraceUntilByCompanionId: {},

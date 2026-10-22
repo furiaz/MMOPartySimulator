@@ -106,20 +106,20 @@ export function updateGame(
     clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
     timing.nowMs,
   );
+  const movedEntityIds = new Set<string>();
   nextState = updateAutoRouteRuntime(nextState);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = updateWarmasterSystem(nextState, timing.nowMs);
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
-  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState), frozenEncounterIds: getFrozenWarmasterEncounterIds(nextState) });
+  nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState), frozenEncounterIds: getFrozenWarmasterEncounterIds(nextState), movedEntityIds });
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
   nextState = updateMagicSupportPassiveRuntime(nextState, timing.nowMs);
   nextState = clearExpiredConsumableBuffs(nextState, timing.nowMs);
   nextState = updateRoleBonusAssignments(nextState, timing.nowMs);
-  const movedEntityIds = new Set<string>();
   const attackSlotPathDistanceCache = createAttackSlotPathDistanceCache();
   const mapIdBeforeTeleport = nextState.currentMapId;
   const wasTeleportActive = Boolean(nextState.activeTeleport);

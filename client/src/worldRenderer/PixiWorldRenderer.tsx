@@ -102,6 +102,7 @@ import {
 import { PUBLIC_ASSET_ROOT } from "../publicAssetUrl";
 import {
   getNpcSpeechOpacity,
+  isWorldSpeechSpeaker,
   type ActiveNpcSpeech,
 } from "../npcSpeechPresentation";
 import {
@@ -299,8 +300,9 @@ const skillFeedbackDisplayNames = new Set(
 
 import type { WarmasterAttempt } from "../game/warmasterState";
 import type { WarmasterLifecycle } from "../game/warmasterLifecycleState";
-import { WARMASTER_RECHARGE_KILLS } from "../game/warmasterLifecycleState";
-import { ORC_WARCAMP_CAGE_POSITION, ORC_WARCAMP_GATE_POSITION } from "../game/orcWarcampLayout";
+import { WARMASTER_CAPTIVE_ID, WARMASTER_RECHARGE_KILLS } from "../game/warmasterLifecycleState";
+import { ORC_WARCAMP_GATE_POSITION } from "../game/orcWarcampLayout";
+import { getStructurePropVisualId, getWarmasterCageVisual } from "./warcampPropPresentation";
 import { MAP_SEVEN_ARENA_GATE_RADIUS } from "../game/debugMap";
 import { isInsideWarmasterArena } from "../game/warmasterState";
 import { getPatronTransferPosition, isAuraVisible } from "./warmasterPresentation";
@@ -5531,7 +5533,7 @@ function drawFullMapVisualObjects({
   const visualObjects = getStaticMapRenderCache(map).sortedVisualObjects;
 
   for (const visualObject of visualObjects) {
-    if (entities.some(entity => entity.kind === "structure" && entity.id === visualObject.id && entity.health <= 0)) continue;
+    const destroyed = entities.some(entity => entity.kind === "structure" && entity.id === visualObject.id && entity.health <= 0);
     if (
       map.id === "map-6" &&
       PATRON_WARD_VISUAL_OBJECT_IDS.has(visualObject.id)
@@ -5558,7 +5560,7 @@ function drawFullMapVisualObjects({
         y: objectPosition.y + transform.cellPixelSize / 2,
       },
       requestRedraw,
-      src: MAP_VISUAL_OBJECT_SRC[visualObject.visualId],
+      src: MAP_VISUAL_OBJECT_SRC[getStructurePropVisualId(visualObject.visualId, destroyed)],
       width: visualObject.widthCells * transform.cellPixelSize,
     });
   }
@@ -6016,7 +6018,7 @@ function drawFullEntities({
     });
     const spritePosition = {
       x: entityPosition.x,
-      y: entityPosition.y + transform.cellPixelSize / 2,
+      y: entityPosition.y + transform.cellPixelSize / 2 - (entity.id === WARMASTER_CAPTIVE_ID ? transform.cellPixelSize * 0.4 : 0),
     };
 
     if (entity.kind === "enemy" && isSuperiorEnemy(entity)) {
@@ -6795,12 +6797,14 @@ function drawFullMap({
           position: { x: pixel.x, y: pixel.y - 35 }, text: `Orc defeats: ${warmasterLifecycle.recharge}/${WARMASTER_RECHARGE_KILLS}` });
       }
     }
-    if (isPositionInTileBounds(ORC_WARCAMP_CAGE_POSITION, visibleTileBounds)) {
-      const pixel = toFullPosition(ORC_WARCAMP_CAGE_POSITION, transform);
-      const size = cellPixelSize;
-      effectsGraphics.rect(pixel.x - size, pixel.y - size * 1.7, size * 2, size * 1.8).stroke({ color: 0x9ca3af, width: 3 });
-      if (!warmasterLifecycle.rescued) for (let bar = -0.5; bar <= 0.5; bar += 0.5) effectsGraphics.moveTo(pixel.x + bar * size, pixel.y - size * 1.7).lineTo(pixel.x + bar * size, pixel.y + size * 0.1).stroke({ color: 0x9ca3af, width: 3 });
-      else effectsGraphics.moveTo(pixel.x + size, pixel.y - size * 1.7).lineTo(pixel.x + size * 1.5, pixel.y - size * 1.1).lineTo(pixel.x + size * 1.5, pixel.y + size * 0.7).stroke({ color: 0x9ca3af, width: 3 });
+    const cage = getWarmasterCageVisual(warmasterLifecycle.rescued);
+    if (isMapVisualObjectInTileBounds(cage, visibleTileBounds)) {
+      const pixel = toFullPosition(cage.position, transform);
+      drawManagedImageSprite({ anchorX: 0.5, anchorY: 1, cache: textureCache,
+        height: cage.heightCells * cellPixelSize, width: cage.widthCells * cellPixelSize,
+        key: cage.id, layer: layers.effectsLayer, managedState, metrics,
+        position: { x: pixel.x, y: pixel.y + cellPixelSize / 2 }, requestRedraw,
+        src: MAP_VISUAL_OBJECT_SRC[cage.visualId] });
     }
   }
   drawPatronWarmasterScene({
@@ -7119,7 +7123,7 @@ function drawNpcSpeechLayer({
 }): boolean {
   const speaker = speech
     ? entities.find(
-        (entity) => entity.id === speech.npcId && (entity.kind === "npc" || (entity.kind === "structure" && entity.health > 0)),
+        (entity) => entity.id === speech.npcId && isWorldSpeechSpeaker(entity),
       )
     : null;
 
@@ -7568,6 +7572,7 @@ function hasActiveTimedRendererWork({
   return (
     Boolean(activeTeleport) ||
     Boolean(warmasterAttempt) ||
+    Object.values(barracksById).some(runtime => runtime.speech && runtime.speech.expiresAt > currentTime) ||
     (warmasterLifecycle !== undefined && ["recharging", "reset_pending"].includes(warmasterLifecycle.phase)) ||
     entities.some(entity => entity.kind === "structure" && (barracksById[entity.id]?.health ?? entity.health) > 0) ||
     Boolean(
