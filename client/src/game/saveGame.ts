@@ -36,6 +36,7 @@ import { normalizeEquipmentDropPopupThreshold } from "./equipmentDropPopups";
 import {
   ensureStarterGuildNoticeBoardContract,
   sanitizeGuildNoticeBoardState,
+  restoreGuildNoticeBoard,
 } from "./guildNoticeBoard";
 import { addItemToInventoryState } from "./inventory";
 import { sanitizeGuildRecruitState } from "./guildRecruit";
@@ -633,7 +634,10 @@ export function restoreGameStateFromSave(value: unknown): RestoreSaveResult {
     currentMapId,
     map,
   }, restoredAtMs);
-  const normalizedState = normalizeAoeTargetDummyPosition(sanitizedState);
+  const normalizedState = restoreGuildNoticeBoard(normalizeAoeTargetDummyPosition({
+    ...sanitizedState,
+    guildNoticeBoard: validation.save.state.guildNoticeBoard ? sanitizedState.guildNoticeBoard : undefined,
+  }), restoredAtMs);
 
   return {
     ok: true,

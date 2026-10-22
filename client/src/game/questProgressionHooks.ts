@@ -8,7 +8,7 @@ import { isEncounterQuestMilestoneComplete } from "./encounterQuestMilestones";
 import { getDirectEnemyKillCredit } from "./directKillCredit";
 import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
 import { getItemDefinition } from "./items";
-import { recordEnemyDefeatedForGuildNoticeBoard } from "./guildNoticeBoard";
+import { recordEnemyDefeatedForGuildNoticeBoard, recordResourceGatheredForGuildNoticeBoard } from "./guildNoticeBoard";
 import {
   QUEST_DEFINITIONS,
   QUEST_ORDER,
@@ -110,7 +110,7 @@ export function recordEnemyDefeatedForQuests(
     );
   }
 
-  nextState = recordEnemyDefeatedForGuildNoticeBoard(nextState, defeatedEnemy);
+  nextState = recordEnemyDefeatedForGuildNoticeBoard(nextState, defeatedEnemy, mapId, random, now);
 
   return nextState;
 }
@@ -132,7 +132,7 @@ export function recordResourceGatheredForQuests(
       ? undefined
       : getSubzoneIdAtPosition(state, resource.position);
 
-  return updateMatchingQuestObjectives(
+  const nextState = updateMatchingQuestObjectives(
     state,
     (objective) =>
       objective.type === "gather_item_count" &&
@@ -141,6 +141,7 @@ export function recordResourceGatheredForQuests(
       matchesOptionalSubzone(objective, resourceSubzoneId),
     quantity,
   );
+  return recordResourceGatheredForGuildNoticeBoard(nextState, mapId, resourceType, quantity);
 }
 
 export function recordMapReachedForQuests(

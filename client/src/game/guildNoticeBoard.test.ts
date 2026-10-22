@@ -4,6 +4,7 @@ import {
   GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
   GUILD_NOTICE_BOARD_STARTER_QUEST_ID,
   createInitialGuildNoticeBoardState,
+  getBoardObjectiveEnemyTypes,
   formatGuildNoticeBoardQuestTitle,
   cancelGuildNoticeBoardQuest,
   openGuildNoticeBoard,
@@ -45,8 +46,7 @@ describe("guild notice board", () => {
       isStarterContract: true,
       status: "available",
       objectives: [
-        { enemyTypeId: "ash_wisp", requiredCount: 50, currentCount: 0 },
-        { enemyTypeId: "ember_imp", requiredCount: 50, currentCount: 0 },
+        { type: "zone_kills", eligibleEnemyTypeIds: ["goblin_shaman", "ash_wisp", "ember_imp"], requiredCount: 50, currentCount: 0 },
       ],
     });
     expect(board.starterContractAccepted).toBe(false);
@@ -139,7 +139,7 @@ describe("guild notice board", () => {
     );
 
     expect(progressed.guildNoticeBoard?.slots[0]?.objectives[0]).toMatchObject({
-      enemyTypeId: "ash_wisp",
+      type: "zone_kills",
       currentCount: 1,
     });
   });
@@ -166,7 +166,7 @@ describe("guild notice board", () => {
     );
 
     expect(progressed.guildNoticeBoard?.slots[0]?.objectives[0]).toMatchObject({
-      enemyTypeId: "ash_wisp",
+      type: "zone_kills",
       currentCount: 1,
     });
   });
@@ -203,13 +203,11 @@ describe("guild notice board", () => {
     const reward = completedQuest?.rewards;
 
     expect(opened.claimedRewards).toHaveLength(1);
-    expect(getCurrencyBalance(opened.state.wallet, "crowns")).toBe(100);
+    expect(getCurrencyBalance(opened.state.wallet, "crowns")).toBe(150);
     expect(
       reward ? countInventoryItem(opened.state.inventory, reward.skillBookItemId) : 0,
-    ).toBe(1);
-    expect(opened.claimedRewards[0]?.skillBookItemIds).toEqual([
-      reward?.skillBookItemId,
-    ]);
+    ).toBe(reward?.skillBookItemIds?.filter(id => id === reward.skillBookItemId).length);
+    expect(opened.claimedRewards[0]?.skillBookItemIds).toEqual(reward?.skillBookItemIds);
     expect(opened.state.guildNoticeBoard?.slots[0]?.rewardClaimedAtMs).toBe(NOW_MS);
   });
 
@@ -239,6 +237,8 @@ function createNoticeBoardState(): GameState {
   };
 
   return createTestGameState({
+    currentMapId: "map-4",
+    worldDiscovery: { visitedMapIds: ["map-4"], visitedSubzonesByMapId: {} },
     entities: {
       [leader.id]: leader,
     },
@@ -252,7 +252,7 @@ function finishAlmostDoneQuest(state: GameState): GameState {
     (nextState, objective) =>
       recordEnemyDefeatedForGuildNoticeBoard(
         nextState,
-        createDeadEnemy(objective.enemyTypeId, 11),
+        createDeadEnemy(getBoardObjectiveEnemyTypes(objective)[0], 11),
       ),
     state,
   );

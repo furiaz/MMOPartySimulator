@@ -229,7 +229,7 @@ export const guidePopupDefinitions: Record<GuidePopupId, GuidePopupDefinition> =
       },
       {
         title: "Claim Board Rewards",
-        body: "Return to the Guild Notice Board after completing a contract to claim its Crowns and skill book.",
+        body: "Return to the Guild Notice Board after completing a contract to claim its character XP, Crowns and first-class skill books. Make room for all reward books before claiming.",
         menuTarget: {
           tab: "atlas",
           atlasSubpage: "guildTavern",

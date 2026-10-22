@@ -2001,9 +2001,9 @@ function grantQuestRewards(
   return nextState;
 }
 
-function grantQuestXpToCurrentParty(
+export function grantQuestXpToCurrentParty(
   state: GameState,
-  questId: QuestId,
+  questId: QuestId | undefined,
   amount: number,
   now = Date.now(),
 ): GameState {

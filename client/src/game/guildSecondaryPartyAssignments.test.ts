@@ -436,7 +436,9 @@ describe("guild field team assignments", () => {
   });
 
   it("progresses taken Notice Board quests from redeemed assignment kills", () => {
-    const taken = takeGuildNoticeBoardQuest(createAssignmentState(), NOW_MS, 0);
+    const initial = createAssignmentState();
+    initial.worldDiscovery = { visitedMapIds: ["map-4"], visitedSubzonesByMapId: { "map-4": ["ash-goblin-encampment"] } };
+    const taken = takeGuildNoticeBoardQuest(initial, NOW_MS, 0);
     expect(taken.ok).toBe(true);
     if (!taken.ok) {
       return;
@@ -445,8 +447,8 @@ describe("guild field team assignments", () => {
     const assigned = assignGuildSecondaryParty(
       taken.state,
       GUILD_SECONDARY_PARTY_ID,
-      MAP_ONE_ID,
-      SHORE_FRINGE_ID,
+      "map-4",
+      "ash-goblin-encampment",
       NOW_MS,
     );
     expect(assigned.ok).toBe(true);

@@ -4,6 +4,7 @@ import {
   GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
   cancelGuildNoticeBoardQuest,
   createInitialGuildNoticeBoardState,
+  getBoardObjectiveEnemyTypes,
   getGuildNoticeBoardRerollDisplayState,
   openGuildNoticeBoard,
   recordEnemyDefeatedForGuildNoticeBoard,
@@ -270,7 +271,7 @@ describe("guild notice board upgrades", () => {
 
     expect(rerolled.ok).toBe(true);
     expect(rerolled.claimedRewards).toHaveLength(1);
-    expect(getCurrencyBalance(rerolled.state.wallet, "crowns")).toBe(1_600);
+    expect(getCurrencyBalance(rerolled.state.wallet, "crowns")).toBe(1_650);
   });
 
   it("expands board slots to two and three through upgrades", () => {
@@ -344,7 +345,7 @@ describe("guild notice board upgrades", () => {
     const opened = openGuildNoticeBoard(state, NOW_MS);
 
     expect(opened.claimedRewards[0]).toMatchObject({
-      crowns: 120,
+      crowns: 180,
     });
     expect(opened.claimedRewards[0]?.skillBookItemIds).toHaveLength(2);
     expect(
@@ -381,6 +382,8 @@ function createUpgradeState(crowns = 0, livestock?: LivestockState): GameState {
     characterLevel: 10,
   };
   const state = createTestGameState({
+    currentMapId: "map-4",
+    worldDiscovery: { visitedMapIds: ["map-4"], visitedSubzonesByMapId: {} },
     entities: {
       [leader.id]: leader,
     },
@@ -422,6 +425,7 @@ function createUpgradeStateWithRegularBoard(
       },
     },
     NOW_MS,
+    () => 0.5,
   );
 }
 
@@ -449,7 +453,7 @@ function createDoneQuest(quest: GuildNoticeBoardQuest): GuildNoticeBoardQuest {
   for (const objective of quest.objectives) {
     state = recordEnemyDefeatedForGuildNoticeBoard(
       state,
-      createDeadEnemy(objective.enemyTypeId),
+      createDeadEnemy(getBoardObjectiveEnemyTypes(objective)[0]),
     );
   }
 
