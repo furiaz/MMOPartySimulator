@@ -51,7 +51,7 @@ describe("structure attackable bounds and approach cost", () => {
     expect(isWallPosition(state, { x: 75, y: 26 })).toBe(true);
   });
 
-  it.each([{ x: 74, y: 21 }, { x: 77, y: 21 }, { x: 75, y: 23.5 }, { x: 75, y: 28 }])(
+  it.each([{ x: 74, y: 21 }, { x: 77, y: 21 }, { x: 75, y: 22.8 }, { x: 75, y: 28 }])(
     "keeps an existing broad-edge firing position without any path searches: %j", position => {
       const state = setup(position);
       const leader = state.entities.leader;
@@ -96,7 +96,7 @@ describe("structure attackable bounds and approach cost", () => {
   });
 
   it("does not rerun navigation on successive party formation ticks beside the Barrack", () => {
-    let state = setup({ x: 75, y: 23.5 });
+    let state = setup({ x: 75, y: 22.8 });
     state = setPartyExecutionIntent(state, {
       type: "attack", source: "player", targetId: routeId, targetPosition: state.entities[routeId].position,
     });

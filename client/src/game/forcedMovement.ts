@@ -1,5 +1,4 @@
-import { getEntityCollisionShape } from "./movementPlanning";
-import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
+import { getCollisionBody as segment } from "./spatialGeometry";
 import { updateEntity, type GameState } from "./state";
 import type { GameEntity, Position } from "./types";
 import { applyStatusEffect } from "./statusEffects";
@@ -19,29 +18,6 @@ export type ForcedMovement = {
 };
 const SAMPLE_DISTANCE = 0.1;
 const CLEARANCE = 0.05;
-function segment(entity: GameEntity, position: Position) {
-  if (entity.kind === "enemy")
-    return {
-      x: position.x,
-      top: position.y,
-      bottom: position.y,
-      radius: getEnemyCombatBodyRadius(entity) || 0.7
-    };
-  const shape = getEntityCollisionShape(entity);
-  return shape.kind === "circle"
-    ? {
-      x: position.x,
-      top: position.y,
-      bottom: position.y,
-      radius: shape.radius
-    }
-    : {
-      x: position.x,
-      top: position.y - shape.height * shape.anchorY + shape.radius,
-      bottom: position.y + shape.height * (1 - shape.anchorY) - shape.radius,
-      radius: shape.radius
-    };
-}
 /** Full circle/capsule clearance; living bodies may be crossed, never terrain. */
 export function isForcedMovementPositionAvailable(state: GameState, entity: GameEntity, position: Position, landing = false): boolean {
   if (entity.kind === "enemy" && !isEnemyMovementPositionAllowed(state, entity, position)) return false;

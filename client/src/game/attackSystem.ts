@@ -17,7 +17,7 @@ import {
   type GameState,
 } from "./state";
 import {
-  isWalkablePosition,
+  isCombatPositionAvailable,
   moveEntityTowardPositionIfUnoccupied,
   reservePositionForFrame,
 } from "./movementPlanning";
@@ -47,10 +47,10 @@ import {
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import { isEnemyEntity } from "./entityGuards";
 import { getCombatTargetPosition, getStructureApproachPosition, hasStructureLineOfSight } from "./combatStructures";
+import { getEffectiveAttackRange, isWithinAttackReach } from "./spatialGeometry";
 import { isInsideEnemyMovementBounds } from "./enemyMovementBounds";
 import {
   getEnemyAttackRange,
-  getEnemyCombatBodyRadius,
 } from "./enemyArchetypes";
 import {
   DEFAULT_COMPANION_ATTACK_RANGE,
@@ -207,7 +207,9 @@ export function updateAttackSystem(
       }
     }
 
-    if (isInAttackRange(attackReadyAttacker, target) && hasStructureLineOfSight(nextState, attackReadyAttacker.position, target)) {
+    if (isInAttackRange(attackReadyAttacker, target) &&
+      isCombatPositionAvailable(nextState, attackReadyAttacker, attackReadyAttacker.position, { allowPartyPassThrough: true }) &&
+      hasStructureLineOfSight(nextState, attackReadyAttacker.position, target)) {
       if (isEnemy(attackReadyAttacker) && isStompOnlyEnemy(attackReadyAttacker)) {
         nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;
@@ -316,8 +318,8 @@ export function updateAttackSystem(
     const candidateAttackSlot = chooseAttackSlot(
       nextState,
       currentAttacker,
-      getCombatTargetPosition(currentAttacker.position, target),
-      getEffectiveAttackRange(currentAttacker, target),
+      target,
+      getAttackRange(currentAttacker),
       {
         allowPartyPassThrough: true,
         maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
@@ -328,7 +330,6 @@ export function updateAttackSystem(
           currentAttacker.kind === "companion" && !isResurrectionParticipant
             ? "prefer"
             : "off",
-        targetId: target.id,
       },
     );
     const attackSlot =
@@ -340,7 +341,8 @@ export function updateAttackSystem(
 
     const movementTarget = isResurrectionParticipant
       ? attackSlot
-      : attackSlot ?? (target.kind === "structure" ? getStructureApproachPosition(nextState, currentAttacker, target) : target.position);
+      : attackSlot ?? (target.kind === "structure" ? getStructureApproachPosition(nextState, currentAttacker, target)
+        : isInAttackRange(currentAttacker, target) ? null : target.position);
 
     if (!movementTarget) {
       continue;
@@ -352,13 +354,12 @@ export function updateAttackSystem(
       nextState = rememberAttackSlot(
         nextState,
         currentAttacker,
-        getCombatTargetPosition(currentAttacker.position, target),
-        getEffectiveAttackRange(currentAttacker, target),
+        target,
+        getAttackRange(currentAttacker),
         attackSlot,
         {
           allowPartyPassThrough: true,
           nowMs: now,
-          targetId: target.id,
         },
       );
       nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
@@ -550,10 +551,7 @@ function isFakeDeathTarget(
 }
 
 function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
-  return (
-    getDistance(attacker.position, getCombatTargetPosition(attacker.position, target)) <=
-    getEffectiveAttackRange(attacker, target)
-  );
+  return isWithinAttackReach(attacker, target, getAttackRange(attacker));
 }
 
 function canAttack(
@@ -639,7 +637,7 @@ function getFinalStepAttackPosition(
 
   const targetPosition = getCombatTargetPosition(attacker.position, target);
   const euclideanDistance = getEuclideanDistance(attacker.position, targetPosition);
-  const effectiveAttackRange = getEffectiveAttackRange(attacker, target);
+  const effectiveAttackRange = getEffectiveAttackRange(attacker, target, getAttackRange(attacker));
   const gap = euclideanDistance - effectiveAttackRange;
 
   if (gap <= 0 || gap > FINAL_STEP_ATTACK_DISTANCE) {
@@ -664,7 +662,8 @@ function getFinalStepAttackPosition(
   if (
     getEuclideanDistance(attacker.position, finalPosition) >
       FINAL_STEP_ATTACK_DISTANCE ||
-    !isWalkablePosition(state, finalPosition, attacker.id) ||
+    !isCombatPositionAvailable(state, attacker, finalPosition, { allowPartyPassThrough: true }) ||
+    !hasStructureLineOfSight(state, finalPosition, target) ||
     (isPartyCombatEntity(attacker) &&
       !isCombatPositionSpacedFromParty(state, attacker, finalPosition))
   ) {
@@ -689,8 +688,8 @@ function moveTowardRequiredSpacedAttackSlot(
   const attackSlot = chooseAttackSlot(
     state,
     attacker,
-    getCombatTargetPosition(attacker.position, target),
-    getEffectiveAttackRange(attacker, target),
+    target,
+    getAttackRange(attacker),
     {
       allowPartyPassThrough: true,
       maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
@@ -698,7 +697,6 @@ function moveTowardRequiredSpacedAttackSlot(
       pathDistanceCache,
       preferredSlotIndex: getAttackSlotPreference(attacker),
       partySpacingMode: "required",
-      targetId: target.id,
     },
   );
 
@@ -709,13 +707,12 @@ function moveTowardRequiredSpacedAttackSlot(
   let nextState = rememberAttackSlot(
     state,
     attacker,
-    getCombatTargetPosition(attacker.position, target),
-    getEffectiveAttackRange(attacker, target),
+    target,
+    getAttackRange(attacker),
     attackSlot,
     {
       allowPartyPassThrough: true,
       nowMs: now,
-      targetId: target.id,
     },
   );
   nextState = setCombatSlot(nextState, attacker.id, attackSlot);
@@ -753,18 +750,6 @@ function getBasicAttackProjectileProfile(
   return isEnemy(attacker)
     ? getEnemyBasicProjectileProfile(attacker)
     : attacker.kind === "companion" ? getCompanionBasicProjectileProfile(attacker) : null;
-}
-
-function getEffectiveAttackRange(attacker: GameEntity, target: GameEntity): number {
-  return (
-    getAttackRange(attacker) +
-    getCombatBodyRadius(attacker) +
-    getCombatBodyRadius(target)
-  );
-}
-
-function getCombatBodyRadius(entity: GameEntity): number {
-  return isEnemy(entity) ? getEnemyCombatBodyRadius(entity) : 0;
 }
 
 function setCombatSlot(

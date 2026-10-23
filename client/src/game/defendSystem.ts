@@ -4,6 +4,7 @@ import {
 } from "./state";
 import {
   getBoundedPathDistance,
+  isCombatPositionAvailable,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
@@ -30,6 +31,7 @@ import {
 import { getCommittedPartyThreatTarget } from "./partyThreatSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
+import { isWithinAttackReach } from "./spatialGeometry";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
@@ -124,7 +126,7 @@ export function updateDefendSystem(
 
     if (
       target &&
-      isInAttackRange(syncedDefender, target)
+      isInLegalAttackPosition(nextState, syncedDefender, target)
     ) {
       if (
         !isCombatPositionSpacedFromParty(
@@ -371,8 +373,9 @@ function isWithinLeaderLeash(
   );
 }
 
-function isInAttackRange(defender: Companion, target: Enemy): boolean {
-  return getGridDistance(defender.position, target.position) <= DEFENDER_ATTACK_RANGE;
+function isInLegalAttackPosition(state: GameState, defender: Companion, target: Enemy): boolean {
+  return isWithinAttackReach(defender, target, DEFENDER_ATTACK_RANGE) &&
+    isCombatPositionAvailable(state, defender, defender.position, { allowPartyPassThrough: true });
 }
 
 function shouldLeaderWaitForDefender(
@@ -452,7 +455,7 @@ function moveDefenderTowardCommittedTarget(
     );
   }
 
-  if (isInAttackRange(defender, target)) {
+  if (isInLegalAttackPosition(state, defender, target)) {
     return updateDefenderBlockedMs(state, defender.id, false);
   }
 
@@ -463,9 +466,10 @@ function moveDefenderTowardCommittedTarget(
   const attackPosition = chooseAttackSlot(
     state,
     defender,
-    target.position,
+    target,
     DEFENDER_ATTACK_RANGE,
     {
+      allowPartyPassThrough: true,
       maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
       leader,
       leaderSafeDistance: DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE,
@@ -473,7 +477,6 @@ function moveDefenderTowardCommittedTarget(
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
       partySpacingMode: "prefer",
-      targetId: target.id,
     },
   );
 
@@ -502,12 +505,12 @@ function moveDefenderTowardCommittedTarget(
   const slotState = rememberAttackSlot(
     state,
     defender,
-    target.position,
+    target,
     DEFENDER_ATTACK_RANGE,
     attackPosition,
     {
+      allowPartyPassThrough: true,
       nowMs: state.simulationTimeMs,
-      targetId: target.id,
     },
   );
   const nextPosition = previewMoveTowardPosition(
@@ -555,14 +558,14 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
   const attackPosition = chooseAttackSlot(
     state,
     defender,
-    target.position,
+    target,
     DEFENDER_ATTACK_RANGE,
     {
+      allowPartyPassThrough: true,
       maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
       partySpacingMode: "required",
-      targetId: target.id,
     },
   );
 
@@ -579,12 +582,12 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
   const slotState = rememberAttackSlot(
     state,
     defender,
-    target.position,
+    target,
     DEFENDER_ATTACK_RANGE,
     attackPosition,
     {
+      allowPartyPassThrough: true,
       nowMs: state.simulationTimeMs,
-      targetId: target.id,
     },
   );
   const nextState = moveEntityTowardPositionIfUnoccupied(
