@@ -428,6 +428,7 @@ When the user later asks to execute an approved issue or plan:
 - After implementation and verification are complete, apply the `Completed` label to the GitHub Issue.
 - Completion notes should list the main files changed, verification performed, and confirm the `Completed` label was applied to the GitHub Issue.
 - Do not move the issue to Done unless the user explicitly approves completion after review.
+- Whenever an issue moves to Done, place its GitHub Project item at the top of the Done column, with the most recently completed issue first. Verify placement even when a PR merge or automatic workflow moves it to Done. Preserve the relative order of all other items.
 - Before implementation, verify the active GitHub Issue number and URL.
 - If the active issue is a parent epic or child epic, do not implement code from it directly. Ask which leaf implementation issue should be executed, or summarize the next unblocked leaf issues.
 - If the active issue has a `Depends On` section, verify those dependencies before moving the issue to In Progress.
