@@ -4,6 +4,7 @@ import {
   isEntitySeparationPositionAvailable,
 } from "./movementPlanning";
 import { areEntitiesOverlapping } from "./spatialGeometry";
+import { getNormalMovementResult } from "./movementAuthority";
 import { getEuclideanDistance } from "./positionUtils";
 import { updateEntity, type GameState } from "./state";
 import type { GameEntity, Position } from "./types";
@@ -179,6 +180,7 @@ function isStationaryForSeparation(
 ): boolean {
   return (
     !movedEntityIds.has(entity.id) &&
+    getNormalMovementResult(state, entity.id)?.outcome !== "moved" &&
     !state.moveIntentsByEntityId?.[entity.id] &&
     !state.reservedPositionsByEntityId?.[entity.id]
   );

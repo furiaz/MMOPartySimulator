@@ -411,6 +411,9 @@ export function updateAzureMassFleeBehavior(
       allowPartyPassThrough: false,
       pathProfile: "other",
       pathTargetKey: `azure-mass-flee:${getPositionKey(fleeTarget)}`,
+      source: "enemyFlee",
+      isPositionAllowed: position => isPositionInsideSubzone(position, bossRoom),
+      rejectedPositionOutcome: "held",
       pathTargetPosition: fleeTarget,
       speedMultiplier: AZURE_MASS_FLEE_SPEED_MULTIPLIER,
     },
@@ -419,13 +422,6 @@ export function updateAzureMassFleeBehavior(
   const movedBoss = nextState.entities[boss.id];
   if (!movedBoss || movedBoss.kind !== "enemy") {
     return nextState;
-  }
-
-  if (!isPositionInsideSubzone(movedBoss.position, bossRoom)) {
-    return updateEntity(nextState, {
-      ...movedBoss,
-      position: boss.position,
-    });
   }
 
   if (getDistance(boss.position, movedBoss.position) > 0.001) {

@@ -26,7 +26,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { flushNormalMovementForEntity, holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import {
   getPartyExecutionIntent,
   hasDirectPlayerPartyIntent,
@@ -124,7 +124,7 @@ export function updatePartyFormationSystem(
   );
 
   if (smallObjectiveHoldActive) {
-    markSmallObjectiveHoldMembers(nextState, movedEntityIds);
+    nextState = markSmallObjectiveHoldMembers(nextState, movedEntityIds);
   } else {
     const handoffActive = isLeaderHandoffActive(nextState, leader);
     const travelCohesion = getPartyTravelCohesion(nextState, leader);
@@ -156,7 +156,8 @@ export function updatePartyFormationSystem(
 function markSmallObjectiveHoldMembers(
   state: GameState,
   movedEntityIds: Set<string>,
-): void {
+): GameState {
+  let nextState = state;
   for (const member of getPartyMembers(state)) {
     if (
       member.state === "dead" ||
@@ -169,7 +170,9 @@ function markSmallObjectiveHoldMembers(
     }
 
     movedEntityIds.add(member.id);
+    nextState = holdEntityMovement(nextState, member, "partyTravel", "objective hold");
   }
+  return nextState;
 }
 
 function isSmallObjectiveHoldActive(
@@ -451,7 +454,7 @@ function moveLeaderTowardPoi(
     getDistance(leader.position, escortGuide.position) <=
       ESCORT_GUIDE_RESUME_DISTANCE
   ) {
-    return state;
+    return holdEntityMovement(state, leader, "partyTravel", "escort hold");
   }
 
   if (
@@ -459,16 +462,17 @@ function moveLeaderTowardPoi(
     getDistance(leader.position, plan.targetPosition) <=
     getPoiReachedDistance(state, plan)
   ) {
-    return state;
+    return holdEntityMovement(state, leader, "partyTravel", "travel destination reached");
   }
 
-  const nextState = moveEntityTowardPositionIfUnoccupied(
+  let nextState = moveEntityTowardPositionIfUnoccupied(
     state,
     leader,
     plan.targetPosition,
     {
       allowPartyPassThrough: true,
       pathProfile: plan.target ? "chase" : "poi",
+      source: "partyTravel",
       pathTargetKey: plan.target
         ? `leader-chase:${plan.target.id}`
         : `leader-poi:${getPositionPathKey(plan.targetPosition)}`,
@@ -477,6 +481,7 @@ function moveLeaderTowardPoi(
     },
   );
 
+  nextState = flushNormalMovementForEntity(nextState, leader.id);
   if (didEntityMove(nextState, leader)) {
     movedEntityIds.add(leader.id);
   }
@@ -555,6 +560,7 @@ function moveFollowersTowardLeader(
         !isStackedWithPartyMember(nextState, currentMember)
       ) {
         movedEntityIds.add(currentMember.id);
+        nextState = holdEntityMovement(nextState, currentMember, "partyTravel", "escort hold");
         continue;
       }
     }
@@ -563,6 +569,7 @@ function moveFollowersTowardLeader(
       getDistance(currentMember.position, leader.position) <= FOLLOW_DISTANCE &&
       !isStackedWithPartyMember(nextState, currentMember)
     ) {
+      nextState = holdEntityMovement(nextState, currentMember, "partyTravel", "travel follow settled");
       continue;
     }
 
@@ -584,6 +591,7 @@ function moveFollowersTowardLeader(
       {
         allowPartyPassThrough: true,
         pathProfile: "follow",
+        source: "partyTravel",
         pathTargetKey: `follow:${leader.id}`,
         pathTargetPosition: followPosition,
         speedMultiplier: shouldCatchUp ? FOLLOWER_CATCH_UP_SPEED_MULTIPLIER : 1,

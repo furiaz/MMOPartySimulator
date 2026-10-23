@@ -1,13 +1,11 @@
 import {
   isAutonomousEntity,
   isCombatEntity,
-  moveEntityTo,
   MOVEMENT_STEP_DISTANCE,
   setLastAttackAt,
 } from "./entities";
 import {
   chooseAttackSlot,
-  rememberAttackSlot,
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
@@ -18,9 +16,12 @@ import {
 } from "./state";
 import {
   isCombatPositionAvailable,
+  flushNormalMovementForEntity,
+  holdEntityMovement,
+  moveEntityToPositionIfUnoccupied,
   moveEntityTowardPositionIfUnoccupied,
-  reservePositionForFrame,
 } from "./movementPlanning";
+import { getNormalMovementResult } from "./movementAuthority";
 import { getRolePriority } from "./roleProfiles";
 import { isEnemyBound } from "./skillRuntime";
 import {
@@ -169,18 +170,19 @@ export function updateAttackSystem(
         : null;
     const finalStepPosition =
       candidateAllowedFinalStepPosition &&
+      !movedEntityIds.has(currentAttacker.id) &&
+      !getNormalMovementResult(nextState, currentAttacker.id) &&
       !isMovementBlockedByStatus(nextState, currentAttacker.id)
         ? candidateAllowedFinalStepPosition
         : null;
-    const attackReadyAttacker = finalStepPosition
-      ? moveEntityTo(currentAttacker, finalStepPosition)
-      : currentAttacker;
-
     if (finalStepPosition) {
-      nextState = reservePositionForFrame(nextState, currentAttacker.id, finalStepPosition);
-      nextState = updateEntity(nextState, attackReadyAttacker);
-      movedEntityIds.add(currentAttacker.id);
+      nextState = moveEntityToPositionIfUnoccupied(nextState, currentAttacker, finalStepPosition, {
+        source: "attack", sourceReason: "combat final step", allowPartyPassThrough: true,
+      });
+      nextState = flushNormalMovementForEntity(nextState, currentAttacker.id);
+      if (didEntityMove(nextState, currentAttacker)) movedEntityIds.add(currentAttacker.id);
     }
+    const attackReadyAttacker = nextState.entities[currentAttacker.id] as CombatEntity;
 
     if (
       isInAttackRange(attackReadyAttacker, target) &&
@@ -201,8 +203,9 @@ export function updateAttackSystem(
         pathDistanceCache,
       );
 
-      if (spacedSlotState !== nextState) {
-        nextState = spacedSlotState;
+      const spacingMoved = didEntityMove(spacedSlotState, attackReadyAttacker);
+      nextState = spacedSlotState;
+      if (spacingMoved) {
         continue;
       }
     }
@@ -210,6 +213,7 @@ export function updateAttackSystem(
     if (isInAttackRange(attackReadyAttacker, target) &&
       isCombatPositionAvailable(nextState, attackReadyAttacker, attackReadyAttacker.position, { allowPartyPassThrough: true }) &&
       hasStructureLineOfSight(nextState, attackReadyAttacker.position, target)) {
+      nextState = holdEntityMovement(nextState, attackReadyAttacker, "attack", "legal engagement");
       if (isEnemy(attackReadyAttacker) && isStompOnlyEnemy(attackReadyAttacker)) {
         nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;
@@ -311,7 +315,7 @@ export function updateAttackSystem(
 
     nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
 
-    if (movedEntityIds.has(currentAttacker.id)) {
+    if (movedEntityIds.has(currentAttacker.id) || getNormalMovementResult(nextState, currentAttacker.id)) {
       continue;
     }
 
@@ -345,30 +349,18 @@ export function updateAttackSystem(
         : isInAttackRange(currentAttacker, target) ? null : target.position);
 
     if (!movementTarget) {
+      nextState = holdEntityMovement(nextState, currentAttacker, "attack", "no legal engagement slot");
       continue;
     }
 
     const previousPosition = currentAttacker.position;
 
-    if (attackSlot) {
-      nextState = rememberAttackSlot(
-        nextState,
-        currentAttacker,
-        target,
-        getAttackRange(currentAttacker),
-        attackSlot,
-        {
-          allowPartyPassThrough: true,
-          nowMs: now,
-        },
-      );
-      nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
-      nextState = reservePositionForFrame(nextState, currentAttacker.id, attackSlot, {
-        allowPartyPassThrough: true,
-      });
-    }
-
     nextState = moveEntityTowardPositionIfUnoccupied(nextState, currentAttacker, movementTarget, {
+      source: "attack",
+      combatSlot: attackSlot ? { targetId: target.id, attackReach: getAttackRange(currentAttacker), position: attackSlot } : undefined,
+      isPositionAllowed: position => !isEnemy(currentAttacker) || Boolean(currentAttacker.movementBounds) ||
+        getEuclideanDistance(currentAttacker.homePosition, position) <= getEnemyAttackLeashDistance(),
+      rejectedPositionOutcome: "held",
       allowPartyPassThrough: true,
       pathProfile: attackSlot ? "combatSlot" : "chase",
       pathTargetKey: attackSlot
@@ -378,21 +370,11 @@ export function updateAttackSystem(
       speedMultiplier: isEnemy(currentAttacker) ? getEnemyChaseSpeedMultiplier() : 1,
     });
 
+    nextState = flushNormalMovementForEntity(nextState, currentAttacker.id);
     const movedAttacker = getEntityById(nextState, currentAttacker.id);
 
-    if (
-      movedAttacker &&
-      isEnemy(currentAttacker) &&
-      !currentAttacker.movementBounds &&
-      getEuclideanDistance(currentAttacker.homePosition, movedAttacker.position) >
-        getEnemyAttackLeashDistance()
-    ) {
-      nextState = updateEntity(
-        nextState,
-        moveEntityTo(movedAttacker, previousPosition),
-      );
-      continue;
-    }
+    if (attackSlot && getNormalMovementResult(nextState, currentAttacker.id)?.request.source === "attack")
+      nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
 
     if (
       movedAttacker &&
@@ -681,7 +663,7 @@ function moveTowardRequiredSpacedAttackSlot(
   movedEntityIds: Set<string>,
   pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
-  if (movedEntityIds.has(attacker.id)) {
+  if (movedEntityIds.has(attacker.id) || getNormalMovementResult(state, attacker.id)) {
     return state;
   }
 
@@ -704,34 +686,24 @@ function moveTowardRequiredSpacedAttackSlot(
     return state;
   }
 
-  let nextState = rememberAttackSlot(
-    state,
-    attacker,
-    target,
-    getAttackRange(attacker),
-    attackSlot,
-    {
-      allowPartyPassThrough: true,
-      nowMs: now,
-    },
-  );
-  nextState = setCombatSlot(nextState, attacker.id, attackSlot);
-  nextState = reservePositionForFrame(nextState, attacker.id, attackSlot, {
-    allowPartyPassThrough: true,
-  });
-  nextState = moveEntityTowardPositionIfUnoccupied(nextState, attacker, attackSlot, {
+  let nextState = moveEntityTowardPositionIfUnoccupied(state, attacker, attackSlot, {
+    source: "attack",
+    combatSlot: { targetId: target.id, attackReach: getAttackRange(attacker), position: attackSlot },
     allowPartyPassThrough: true,
     pathProfile: "combatSlot",
     pathTargetKey: `combat-slot:${target.id}:${getPositionPathKey(attackSlot)}`,
     pathTargetPosition: attackSlot,
   });
+  nextState = flushNormalMovementForEntity(nextState, attacker.id);
+  if (getNormalMovementResult(nextState, attacker.id)?.request.source === "attack")
+    nextState = setCombatSlot(nextState, attacker.id, attackSlot);
 
   if (didEntityMove(nextState, attacker)) {
     movedEntityIds.add(attacker.id);
     return nextState;
   }
 
-  return state;
+  return nextState;
 }
 
 function getAttackRange(attacker: GameEntity): number {

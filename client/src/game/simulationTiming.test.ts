@@ -35,6 +35,7 @@ describe("real-time simulation timing", () => {
             {
               ...firstHalfState,
               simulationDeltaMs: 50,
+              simulationTimeMs: (firstHalfState.simulationTimeMs ?? 0) + 50,
             },
             halfwayLeader,
             target,

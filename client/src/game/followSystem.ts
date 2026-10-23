@@ -3,7 +3,7 @@ import {
   getEntityById,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
   getOrderedPartyMembers,
@@ -50,6 +50,7 @@ export function updateFollowSystem(
       isWithinFollowLeash(nextState, follower, leader) &&
       !isStackedWithPartyMember(nextState, follower)
     ) {
+      nextState = holdEntityMovement(nextState, follower, "follow", "follow settled");
       continue;
     }
 
@@ -76,6 +77,7 @@ export function updateFollowSystem(
       {
         allowPartyPassThrough: true,
         pathProfile: "follow",
+        source: "follow",
         pathTargetKey: getFollowPathTargetKey(
           leader.id,
           follower.id,

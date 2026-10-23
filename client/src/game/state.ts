@@ -102,6 +102,9 @@ import type {
 } from "./questTypes";
 import type { SimulationTiming } from "./simulationTiming";
 import type {
+  NormalMovementResult,
+  NormalMovementSubmission,
+  ExternalMovementOwner,
   MovementFailureDetail,
   MovementPath,
 } from "./movementTypes";
@@ -193,6 +196,9 @@ export type {
 import { updateStructureRuntime } from "./combatStructures";
 
 export type GameState = {
+  normalMovementResultsByEntityId?: Record<string, NormalMovementResult>;
+  normalMovementPhase?: { submissions: NormalMovementSubmission[] };
+  externalMovementOwnersByEntityId?: Record<string, ExternalMovementOwner>;
   barracksById?: Record<string, import("./types").BarrackRuntime>;
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;

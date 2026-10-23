@@ -57,6 +57,7 @@ export function updateExplorationSystem(
     targetPosition,
     {
       pathProfile: "explore",
+      source: "explore",
       pathTargetKey: `explore:${getNavigationPositionKey(targetPosition)}`,
       pathTargetPosition: targetPosition,
     },

@@ -13,7 +13,7 @@ import {
   type GameState,
 } from "./state";
 import { pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { flushNormalMovementForEntity, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import {
   beginQuestAmbientEnemySuppression,
   releaseQuestAmbientEnemySuppression,
@@ -245,9 +245,11 @@ function updateEscortObjective(
     allowPartyPassThrough: true,
     pathProfile: "poi",
     pathTargetKey: `quest-guide:${context.questId}:${context.objective.id}`,
+    source: "questGuide",
     pathTargetPosition: targetPosition,
     speedMultiplier: QUEST_GUIDE_MOVE_SPEED_MULTIPLIER,
   });
+  nextState = flushNormalMovementForEntity(nextState, guide.id);
   movedEntityIds.add(guide.id);
 
   const movedGuide = nextState.entities[guide.id];

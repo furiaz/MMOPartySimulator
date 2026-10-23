@@ -764,7 +764,7 @@ describe("enemy AI aggro and roaming", () => {
     let state = createState([enemy], { simulationDeltaMs: 16 });
 
     for (let frame = 0; frame < 10; frame += 1) {
-      state = updateEnemyAISystem(state, {
+      state = updateEnemyAISystem({ ...state, simulationTimeMs: 1_000 + frame * 16, simulationFrame: frame + 1 }, {
         nowMs: 1_000 + frame * 16,
         deltaMs: 16,
         deltaSeconds: 0.016,

@@ -18,6 +18,9 @@ function createIdlePartyFormation(): PartyFormationState {
 export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
+    normalMovementResultsByEntityId: {},
+    normalMovementPhase: undefined,
+    externalMovementOwnersByEntityId: {},
     warmasterAttempt: undefined,
     warmasterInteraction: undefined,
     warmasterLifecycle: state.warmasterLifecycle?.phase === "active" ? { ...state.warmasterLifecycle, phase: "ready" } : state.warmasterLifecycle,
@@ -99,6 +102,12 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 }
 
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
+  const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
+  state = { ...state,
+    normalMovementResultsByEntityId: Object.fromEntries(Object.entries(state.normalMovementResultsByEntityId ?? {}).filter(([id]) => living(id))),
+    normalMovementPhase: state.normalMovementPhase ? { submissions: state.normalMovementPhase.submissions.filter(submission => living(submission.request.entityId)) } : undefined,
+    externalMovementOwnersByEntityId: Object.fromEntries(Object.entries(state.externalMovementOwnersByEntityId ?? {}).filter(([id]) => living(id))),
+  };
   if (state.warmasterAttempt && !state.entities[state.warmasterAttempt.bossId]) state = { ...state, warmasterAttempt: undefined };
   if (Object.keys(state.forcedMovementsByEntityId ?? {}).some(id => !state.entities[id])) {
     state = { ...state, forcedMovementsByEntityId: Object.fromEntries(Object.entries(state.forcedMovementsByEntityId ?? {}).filter(([id]) => Boolean(state.entities[id]))) };

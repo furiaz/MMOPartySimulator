@@ -2576,6 +2576,10 @@ export type DebugTelemetryEntitySnapshot = {
   directCommandTargetPosition?: Position | null;
   directCommandGraceRemainingMs?: number;
   movementResult: DebugMovementResult;
+  movementOwner?: string;
+  movementRequestPriority?: number;
+  normalMovementOutcome?: "moved" | "held" | "blocked" | "invalid" | "deferred";
+  normalMovementCommitCount?: number;
   reason?: string;
   formationPhase?: FormationPhase;
   formationSlot?: Position | null;
