@@ -8,6 +8,8 @@ The player is the party manager, not a physical character in the world. Party me
 
 The game is primarily idle/AFK with optional active intervention. The player guides party intent, assigns roles, chooses class direction, reacts to danger, and may directly command party members when needed.
 
+Issue #693 records the approved movement and formation design for the implementation leaves under Issue #689. Sections marked as approved movement design describe that contract; they do not mean the runtime redesign is already implemented. Existing skill, encounter, quest, and travel rules remain in force unless a movement section explicitly revises them.
+
 ---
 
 ## Core Pillars
@@ -84,7 +86,7 @@ Leader identity and combat role are separate.
 
 A leader can have any role, including None / Unassigned.
 
-If a party member is attacked, the party may temporarily prioritize that attacker.
+If a party member is attacked, autonomous party behavior may temporarily prioritize that attacker through the combat commitment rules. An active player movement or focus order remains authoritative.
 
 If the current leader is missing, dead, or invalid, party behavior may fall back to another living party member as leader.
 
@@ -165,6 +167,8 @@ When a collector is actively threatened or attacked, combat/self-defense priorit
 6. Idle / follow
 
 This priority hierarchy applies to autonomous party behavior unless a specific system documents a narrower exception.
+
+For the approved movement design, an individual direct companion command takes precedence over party-wide execution for that companion. Explicit player party movement and focus take precedence over autonomous targeting, role movement, following, and formation correction. Physical constraints, inability to act, and forced displacement can suspend execution without replacing valid player intent. The existing direct-gather personal self-defense exception retains the gather command for later resumption; a transient movement blocker alone does not trigger it.
 
 ---
 
@@ -319,7 +323,9 @@ Gatherers:
 
 ## Party Movement
 
-Party movement is simple and leader-centered.
+Party movement uses continuous world positions and the current leader as its world-space reference.
+
+The following is the approved movement design for Issue #689. Its foundation, command, and formation leaves implement it incrementally.
 
 The leader moves toward the current intent:
 
@@ -331,25 +337,33 @@ The leader moves toward the current intent:
 - prototype map transition point
 - prototype World Travel route step
 
-Other party members follow the leader unless their role, current task, resurrection participation, or direct command gives them another task.
+Other party members use soft formation positions unless their role, current task, resurrection participation, or direct command gives them another task. Navigation may use internal cells or nodes, but gameplay positions, ranges, collision clearance, and formation offsets are continuous and are not snapped to a gameplay grid.
 
-The party does not use a player-authored grid formation.
+Movement authority:
 
-Current prototype movement uses a lightweight automatic party formation and cohesion layer.
+- combat and role behavior choose intent and request movement; they do not compete by independently changing final positions
+- ordinary walking, following, gathering approach, combat approach, and travel resolve through one normal locomotion request and commit path
+- each entity has one movement owner and at most one committed movement result per simulation update
+- companion mobility skills, enemy dashes or charges, and forced displacement use exclusive specialized movement transactions with their existing timing, collision sweeps, action restrictions, and effects
+- normal locomotion, avoidance, and formation correction yield while specialized movement owns that entity
+- valid player intent remains stored during temporary displacement and resumes when control returns
+- completion, interruption, the moved entity's defeat/removal, map transition, restoration, and encounter reset release stale movement ownership through each transaction's existing rules; launched forced movement may still outlive its source
 
-Current prototype party formation and activity behavior:
+Selectable formations:
 
-- tracks whether the party is idle, forming, traveling, or in combat
-- uses party activity coordination to choose travel or combat from direct player intent, nearby active threats, party combat targets, movement targets, and current distance
-- assigns shared travel or combat intent from the leader's current target or POI target
-- moves the leader toward the current POI or target when cohesion allows it
-- moves followers toward the leader or soft follow positions
-- allows party members to pass through each other in specific party movement cases
-- may assign all autonomous party members to gather when the leader intent is a shared gather target
-- assigns combat targets to autonomous party members when combat begins
-- excludes direct-commanded, direct-command grace, resurrection-assigned, and threat-responding companions from autonomous travel cohesion where appropriate
-- clears formation state when no valid target or travel point remains
-- records formation changes in debug telemetry
+- Arrow 1-2-2, Balanced 2-1-2, and Side-by-side are the initial presets, supporting parties of one to five members
+- slots use local forward and side offsets with soft role preferences, party order, and deterministic ties
+- prior slot ownership is retained where possible to avoid unnecessary crossing or reassignment
+- the leader receives a role-appropriate slot like any other companion; leadership does not grant a protected, central, or rear position
+- all slot positions are derived relative to the leader's assigned local slot and the formation's facing
+- slots suggest acceptable areas rather than exact points; obstacles, valid engagement positions, and higher-priority actions can require substitutes
+- one selected preset adapts between travel and combat using smoothed facing and spacing
+- travel uses projected leader movement so front slots can remain ahead even when the leader is in a rear slot
+- constrained passages reduce lateral spacing first, then use stable legal substitutes or temporary trailing rather than collapsing every slot onto one point
+- combat expands spacing toward committed threats; melee engagement, Defender interception, Support positioning, skills, and recovery may leave their slots
+- direct commands, gathering, mobility skills, forced displacement, and other temporary departures reserve the companion's slot
+- death leaves a hole during combat; permanent roster changes and post-combat reflow may update assignments
+- companions gradually recover their prior slots and travel shape when the interruption ends
 
 Party members should:
 
@@ -364,15 +378,11 @@ Gatherers are allowed to temporarily leave the group while gathering.
 
 Direct-commanded party members are not forced back into group movement by autonomous behavior.
 
-Current prototype movement also includes lightweight overlap cleanup:
+Combat approach and collision clearance use shared body-aware continuous geometry, including variable enemy sizes and targetable structures. A legal engagement position must also be a legal standing position. Structure attackable bounds and their smaller ground collision footprints remain distinct, and renderer size never defines either rule.
 
-- stationary overlapping companions, normal enemies, and NPCs may be nudged apart when an available position exists
-- moving entities, reserved positions, walls, active resources, and blocked positions are respected
-- same-party overlap cleanup treats the current leader as anchored; followers may be nudged away from the leader, but the leader is not moved by follower overlap cleanup
-- companions and small/simple enemies may be pushed; NPCs can participate as overlap sources but are not general movement actors
-- this is a readability and unclogging aid, not a final crowd simulation, physics system, or collision-push combat mechanic
+Bounded, damped local avoidance considers nearby bodies inside movement resolution. It preserves same-party leader stability, large-enemy and NPC stability, walls, resources, movement bounds, and reservations. It does not repeatedly push entities after their normal movement commit. Exceptional overlap recovery handles invalid starting positions from spawn, load, teleport, or safe structure rebuilding. Rebuild clearance remains an atomic correction that preserves actor actions and player orders and defers if specialized movement or unsafe occupancy prevents it.
 
-This is an automatic prototype movement aid, not a final formation editor, tactical formation system, or player-authored positioning system.
+Formation slots and avoidance respect quest barriers, live structure footprints and rebuild reservations, and current zone/encounter bounds. Formation positioning does not introduce automatic telegraph dodging, skill bonuses, manual slot editing, advanced aggro, or a final physics/navigation system.
 
 ---
 
@@ -395,6 +405,8 @@ Gatherers are required for cohesion only when they are not actively gathering an
 Direct-commanded members and resurrection participants are excluded from autonomous cohesion behavior.
 
 Current prototype cohesion distances are implementation tuning values and should not be treated as final balance.
+
+Under the approved movement design, cohesion coordinates soft formation travel with coarse slow/wait thresholds and bounded follower catch-up. Temporary slot departures do not force slot reassignment or an indefinite leader wait; slot recovery and passage re-expansion are gradual.
 
 ---
 
@@ -437,7 +449,25 @@ Current prototype enemies may be passive or aggressive by archetype or setup.
 
 Aggressive enemies may be introduced by enemy archetype, enemy type, zone, event, or explicit debug scenario.
 
-If any party member is attacked, blocked by a nearby enemy while moving, or stuck near a threat during active party intent, the party may temporarily switch to self-defense and preserve the interrupted POI or travel intent for later restoration.
+Approved movement design: combat chooses and retains a target; movement resolves how to reach a valid engagement area. A nearby movement blocker first supplies avoidance/pathing information. It cannot immediately replace a valid commitment.
+
+Combat target commitment:
+
+- explicit party focus and individual direct attack commands retain their selected living enemy or targetable hostile structure until completed, invalid, replaced, or canceled
+- autonomous commitments survive minor distance changes, temporary obstruction, avoidance, formation correction, and enemies dashing across lanes
+- documented reasons to switch an automatic target include death, target invalidation, sustained obstruction or lost reachability, leash failure, and a meaningful emergency threat
+- a personal attacker or an enemy threatening a vulnerable companion may trigger an autonomous defensive response, subject to player-command authority
+- new automatic targets use soft left/center/right formation-lane preference, reachability, active threat, and a soft penalty for existing claims, with deterministic ties
+- cross-lane fallback is allowed, and single-target encounters or explicit player focus allow shared focus fire
+- lane preference governs base engagement targets; existing skill-specific and area-target preferences keep their own ownership and manual-target constraints
+- hostile structures remain manually targetable and are not discovered as autonomous combat or skill targets
+- scripted autonomous suppression releases affected automatic commitments only; the existing Azure Mass direct-command exception remains valid
+- destruction, removal, or an encounter state that truly makes a target unavailable invalidates the relevant commitment, including the Warmaster departure lifecycle
+- target changes record a deterministic reason rather than relying on one-frame movement failure
+
+Combat positioning expands around a smoothed committed threat direction, using slots as staging and recovery areas. Valid role actions and engagement range can take companions out of those areas without formation correction fighting them. When combat ends, companions gradually recover travel positioning and any still-valid interrupted autonomous task.
+
+An ordinary player map-move order keeps the party moving even when an enemy attacks. Automatic pursuit or protection cannot silently replace that destination. Once the move completes, eligible automatic combat behavior can respond to the remaining threat. World Travel Auto Route has its own documented emergency pause/resume contract below.
 
 ---
 
@@ -1106,7 +1136,9 @@ Direct gather orders respect resource `maxGatherers`.
 
 Direct party orders may be rejected without changing party intent when the target is invalid, blocked, or unreachable. Rejections should be recorded through debug telemetry.
 
-A direct-commanded companion may temporarily attack a personal threat or movement blocker while keeping direct-command priority.
+A direct gather command may temporarily pause for its existing personal self-defense behavior while retaining the resource order. Under the approved movement design, a transient blocker alone cannot replace a direct move or attack target. Automatic formation, role, and target decisions cannot rewrite active direct intent.
+
+Temporary forced displacement pauses execution while preserving a valid original destination or target and the companion's formation slot. Execution resumes after movement authority returns. Death, target destruction, invalidation, replacement, and cancellation still end the command through its normal lifecycle.
 
 Temporary status effects may still prevent a direct-commanded companion from moving, attacking, gathering, or using skills when the current prototype status rules block that action.
 
@@ -1114,7 +1146,7 @@ Example:
 
 If the party is attacking but the player orders one party member to gather, that party member gathers while the rest continue fighting.
 
-Future input may include click-and-drag commands from a unit to a target.
+Dragging a companion to a place issues an individual move, then returns control to normal behavior after completion. Dragging it to a valid enemy or hostile structure issues individual focus until the target or command ends. Physical constraints and inability to act still apply.
 
 ---
 
@@ -1300,9 +1332,9 @@ Leader identity remains separate from role.
 
 Party Order may support ordering companions for party behavior and display.
 
-Formation may appear as a UI placeholder only.
+Approved movement design: Formation offers Arrow 1-2-2, Balanced 2-1-2, and Side-by-side through game-logic commands. The UI displays and selects a preset; game logic assigns roles to slots and resolves movement. Implementation is owned by Issue #704 after its movement and formation prerequisites.
 
-The current simulation has lightweight automatic party formation behavior, but there is no player-facing formation editor yet.
+The selected preset persists through save/load and map or recovery transitions. Runtime positions, facing, substitutes, and reservations are rebuilt. Older saves use a supported authored default. Switching presets blends into the new shape while preserving active commands and targets; custom slot editing remains outside this design.
 
 Behavior Settings currently supports prototype companion behavior controls:
 
@@ -1519,6 +1551,12 @@ It may show:
 World Travel selection may request travel to a known prototype map destination.
 
 The POI system should route the party toward the next valid teleport step along the current prototype route.
+
+Auto Route is persistent player-selected travel intent, separate from Auto Combat. It uses known eligible destinations and working route steps, refuses blocked routes, and does not proactively choose enemies. It pauses for body blocking, movement-blocking control, or a companion below 50 percent health near a hostile. After the emergency ends, it resumes after 1500 milliseconds of calm and required party cohesion. Formation compression and temporary displacement do not erase the destination.
+
+Approved movement design: individual follower commands complete independently and then rejoin the route. Direct leader movement temporarily overrides route execution and moves the formation reference while retaining the route for later resumption. Companion drag orders are distinguished from normal non-menu world clicks, which cancel Auto Route and perform the clicked action. Explicit Travel stop also cancels it. Arrival clears the route; Auto Combat on arrival enables after the existing 500-millisecond delay when selected and when no encounter rule cancels that pending enable.
+
+Routing and formation movement respect the current Zones 4–7 gates, Patron Ward unlock, active encounter restrictions, and Warmaster chest/departure choice. A blocking chest or departure overlay pauses simulation; movement cannot bypass it or an unacknowledged departure guard.
 
 Direct Teleportation Echo selection may immediately move the party to an unlocked supported prototype destination when no active transition or recovery interaction blocks it.
 
@@ -1838,10 +1876,12 @@ POI selection should avoid selecting invalid, unreachable, depleted, dead, compl
 
 POI selection may use path distance, priority, target scoring, progressive fallback, local target preference, and short commitment windows to avoid unstable target switching.
 
+The POI categories above are shared guidance capabilities, not permission for Auto Combat to choose every category. Auto Combat and explicit World Travel have separate ownership; existing authored quest-defense and encounter guidance remains applicable.
+
 Current prototype UI exposes Auto Combat as an Off/On control:
 
-- Auto Combat: Off disables autonomous combat targeting.
-- Auto Combat: On enables autonomous combat targeting and keeps POI selection inside the leader's current internal subzone where supported, while still allowing valid teleport POIs and local quest interactions.
+- Auto Combat: Off disables proactive combat acquisition; existing personal/party self-defense remains available subject to player-command priority.
+- Auto Combat: On enables local combat, roles, Gatherer-role behavior, and supported dungeon/encounter guidance inside the current scope. It does not independently start generic open-world quest, NPC, resource, exploration, idle, or World Travel routes; authored quest-defense and encounter guidance remains governed by its existing rules.
 
 Player-facing Zone/Subzone/Free Travel cycling has been removed. Internal POI scope compatibility may exist, but the current game-facing Auto Combat behavior is Off or On using the local subzone boundary.
 
@@ -2997,6 +3037,7 @@ Current prototype save behavior:
 - invalid, unsupported, malformed, or incompatible saves are rejected with player-facing feedback
 - restored saves rebuild the current prototype map from saved quest state
 - restored saves preserve valid shared inventory, wallet, bank, key item, quest, companion, Guild & Inn, world discovery, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers
+- approved formation persistence under Issue #704 preserves the selected preset, defaults older saves safely, and rebuilds transient assignments, substitutes, reservations, and movement ownership from the current world
 - restored saves clear transient runtime state such as active travel, direct commands, combat feedback, projectiles, companion skill and global cooldowns, movement caches, resurrection channels, recovery overlays, temporary visuals, consumable buffs, skill runtime state, status effects, companion AoE channels, enemy AoE channels, enemy AoE cooldowns, active reusable enemy ability casts, and debug telemetry
 - reusable enemy ability cooldowns are the narrow cooldown exception: valid unexpired absolute expiration timestamps and the required-basic-attack gate survive restoration, while expired, malformed, unknown-ability, or missing-enemy records are discarded
 - restored saves clear short-lived news broadcast feedback
