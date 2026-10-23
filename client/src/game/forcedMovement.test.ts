@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createResource } from "./entities";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
-import { cancelForcedMovement, clearForcedMovements, isForcedMovementPositionAvailable, startForcedMovement, updateForcedMovements } from "./forcedMovement";
+import { cancelForcedMovement, clearForcedMovements, isForcedMovementPositionAvailable, startForcedMovement, updateForcedMovements as updateForcedMovementFrame } from "./forcedMovement";
+import { clearFrameMovementPlanning } from "./movementState";
+import type { GameState } from "./state";
+// Each call in these trajectory tests represents a new simulation update.
+function updateForcedMovements(state: GameState, moved: Set<string>, now: number) {
+  return updateForcedMovementFrame({ ...clearFrameMovementPlanning(state), simulationTimeMs: now }, moved, now);
+}
 import { isAttackBlockedByStatus, isGatherBlockedByStatus, isMovementBlockedByStatus, isSkillUseBlockedByStatus } from "./statusEffects";
 import { clearMapTransitionRuntimeState, pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import { sanitizeGameStateForSave } from "./saveGame";
@@ -85,9 +91,12 @@ describe("reusable forced movement", () => {
     state = updateForcedMovements(state, new Set(), 1125);
     state = addEntity(state, createEnemy("blocker", { x: 12, y: 10 }));
     state = updateForcedMovements(state, new Set(), 1130);
+    const oldSafePosition = state.forcedMovementsByEntityId!.target.lastSafePosition;
+    expect(isForcedMovementPositionAvailable(state, state.entities.target, oldSafePosition, true)).toBe(false);
     const restored = sanitizeGameStateForSave(state, 1140);
     expect(restored.forcedMovementsByEntityId).toEqual({});
-    expect(restored.entities.target.position).toEqual(state.forcedMovementsByEntityId?.target.lastSafePosition);
+    expect(restored.entities.target.position).not.toEqual(oldSafePosition);
+    expect(isForcedMovementPositionAvailable(restored, restored.entities.target, restored.entities.target.position, true)).toBe(true);
   });
   it("ignores invalid movement requests without interrupting actions", () => {
     const state = setup();

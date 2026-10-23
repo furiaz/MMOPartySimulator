@@ -8,6 +8,7 @@ const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
 export function clearFrameMovementPlanning(state: GameState): GameState {
   const hasFramePlanning =
     Boolean(state.normalMovementPhase) ||
+    Object.keys(state.movementPositionCommitsByEntityId ?? {}).length > 0 ||
     Object.keys(state.normalMovementResultsByEntityId ?? {}).length > 0 ||
     Object.keys(state.externalMovementOwnersByEntityId ?? {}).length > 0 ||
     Object.keys(state.failedMoveByEntityId ?? {}).length > 0 ||
@@ -46,6 +47,7 @@ export function clearFrameMovementPlanning(state: GameState): GameState {
   return {
     ...state,
     normalMovementResultsByEntityId: {},
+    movementPositionCommitsByEntityId: {},
     normalMovementPhase: undefined,
     externalMovementOwnersByEntityId: {},
     failedMoveByEntityId: {},

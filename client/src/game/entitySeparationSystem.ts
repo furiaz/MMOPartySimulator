@@ -1,12 +1,11 @@
-import { moveEntityTo } from "./entities";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import {
   isEntitySeparationPositionAvailable,
 } from "./movementPlanning";
 import { areEntitiesOverlapping } from "./spatialGeometry";
-import { getNormalMovementResult } from "./movementAuthority";
+import { commitSpecializedMovementPosition, getMovementPositionCommit, getSpecializedMovementOwner, getNormalMovementResult } from "./movementAuthority";
 import { getEuclideanDistance } from "./positionUtils";
-import { updateEntity, type GameState } from "./state";
+import type { GameState } from "./state";
 import type { GameEntity, Position } from "./types";
 
 const SEPARATION_NUDGE_DISTANCE = 0.12;
@@ -158,7 +157,7 @@ function pushEntityAwayFromSource(
     return state;
   }
 
-  return updateEntity(state, moveEntityTo(entity, nextPosition));
+  return commitSpecializedMovementPosition(state, entity.id, nextPosition, "separation", `separation:${entity.id}`).state;
 }
 
 function isSeparationParticipant(
@@ -180,6 +179,8 @@ function isStationaryForSeparation(
 ): boolean {
   return (
     !movedEntityIds.has(entity.id) &&
+    !getSpecializedMovementOwner(state, entity.id) &&
+    !getMovementPositionCommit(state, entity.id) &&
     getNormalMovementResult(state, entity.id)?.outcome !== "moved" &&
     !state.moveIntentsByEntityId?.[entity.id] &&
     !state.reservedPositionsByEntityId?.[entity.id]

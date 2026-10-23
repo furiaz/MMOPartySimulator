@@ -50,7 +50,8 @@ import {
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
 import { preparePatronWardStateForMapExit } from "./patronWardSystem";
-import { requestWarmasterDeparture } from "./warmasterLifecycleState";
+import { isWarmasterRewardUiOpen, requestWarmasterDeparture } from "./warmasterLifecycleState";
+import { updateForcedMovements } from "./forcedMovement";
 import { answerWarmasterDeparture } from "./warmasterLifecycle";
 import { assignCurrentRoleBonuses } from "./roleBonus";
 import { getWorldTravelTeleportStatus } from "./worldTravelTeleports";
@@ -254,12 +255,11 @@ export function resolveWarmasterDeparture(state: GameState, leave: boolean): Gam
 export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
-  _nowMs = Date.now(),
+  nowMs = Date.now(),
 ): GameState {
-  void _nowMs;
-
   if (isAiTeleportPausedForResurrection(state)) {
-    return state;
+    // Recovery helpers must also regain control while AI travel waits for them.
+    return updateForcedMovements(state, movedEntityIds, nowMs);
   }
 
   const autoTeleport = getAutoTeleport(state);
@@ -270,11 +270,15 @@ export function updateTeleportSystem(
     return activatedState;
   }
 
-  if (isPartyWithinTeleportRange(activatedState)) {
-    return completeTeleport(activatedState);
+  // Rallying exits the ordinary update loop early. Finish existing displacement
+  // here so its owner cannot permanently prevent a companion from joining it.
+  const displacedState = updateForcedMovements(activatedState, movedEntityIds, nowMs);
+  if (isWarmasterRewardUiOpen(displacedState)) return displacedState;
+  if (isPartyWithinTeleportRange(displacedState)) {
+    return completeTeleport(displacedState);
   }
 
-  return movePartyToTeleport(activatedState, movedEntityIds);
+  return movePartyToTeleport(displacedState, movedEntityIds);
 }
 
 export function isTeleportRallyActive(state: GameState): boolean {

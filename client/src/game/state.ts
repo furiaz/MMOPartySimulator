@@ -103,6 +103,7 @@ import type {
 import type { SimulationTiming } from "./simulationTiming";
 import type {
   NormalMovementResult,
+  MovementPositionCommit,
   NormalMovementSubmission,
   ExternalMovementOwner,
   MovementFailureDetail,
@@ -199,6 +200,8 @@ export type GameState = {
   normalMovementResultsByEntityId?: Record<string, NormalMovementResult>;
   normalMovementPhase?: { submissions: NormalMovementSubmission[] };
   externalMovementOwnersByEntityId?: Record<string, ExternalMovementOwner>;
+  movementPositionCommitsByEntityId?: Record<string, MovementPositionCommit>;
+  warmasterResetPending?: string;
   barracksById?: Record<string, import("./types").BarrackRuntime>;
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;
@@ -371,7 +374,7 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
     return state;
   }
 
-  const nextState: GameState = {
+  let nextState: GameState = {
     ...state,
     entities: {
       ...state.entities,
@@ -389,6 +392,15 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
           }
         : state.followTrailsByEntityId,
   };
+  if (entity.state === "dead" || ("health" in entity && entity.health <= 0)) {
+    const withoutEntity = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => id !== entity.id));
+    nextState = { ...nextState,
+      forcedMovementsByEntityId: withoutEntity(nextState.forcedMovementsByEntityId),
+      enemyDashesByEnemyId: withoutEntity(nextState.enemyDashesByEnemyId),
+      externalMovementOwnersByEntityId: withoutEntity(nextState.externalMovementOwnersByEntityId),
+      warmasterResetPending: nextState.warmasterResetPending === entity.id ? undefined : nextState.warmasterResetPending,
+    };
+  }
   return entity.kind === "structure" ? updateStructureRuntime(nextState, entity, now) : recordWarmasterLifecycleDeath(recordPatronDeath(nextState, previousEntity, entity, now), previousEntity, entity, now);
 }
 

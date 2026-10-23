@@ -97,7 +97,22 @@ export type NormalMovementResult = {
   timeMs: number;
 };
 
-export type ExternalMovementOwner = { source: string; positionCommitted: boolean };
+export type ExternalMovementOwner = { source: string; transactionId?: string; positionCommitted: boolean; released?: true };
+
+/** Actual position publication, distinct from a normal hold or an active owner. */
+export type MovementPositionCommit = {
+  source: string;
+  transactionId: string;
+  from: Position;
+  to: Position;
+  frameNumber: number;
+  timeMs: number;
+};
+
+export type MovementAuthorityResult = {
+  state: import("./state").GameState;
+  outcome: "acquired" | "released" | "moved" | "held" | "deferred" | "invalid";
+};
 
 export type NavigationBlockerLookup = {
   resourceKeys: Set<string>;

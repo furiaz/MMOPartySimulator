@@ -1,4 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
+import { acquireSpecializedMovement } from "./movementAuthority";
+import { isCompanionMovementSkill } from "./skillMovement";
 import { getSkillRoleScore } from "./skillRolePreferences";
 import { getActiveSkillsForCompanion } from "./skillProgression";
 import { getSkillCooldownMs } from "./skills";
@@ -61,6 +64,7 @@ export function updateSkillSystem(state: GameState, now = Date.now()): GameState
   const firstAidReservedTargetIds = new Set<string>();
 
   for (const entity of Object.values(state.entities)) {
+    if (isWarmasterRewardUiOpen(nextState)) break;
     const caster = nextState.entities[entity.id];
 
     if (
@@ -104,6 +108,7 @@ export function updateCombatSkillSystem(
   let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
+    if (isWarmasterRewardUiOpen(nextState)) break;
     const caster = nextState.entities[entity.id];
 
     if (
@@ -642,6 +647,8 @@ function applySkill(
   now: number,
 ): GameState {
   const { skill, target } = skillUse;
+  if (isCompanionMovementSkill(skill) && acquireSpecializedMovement(state, caster.id, "companionSkill", `skill:${caster.id}:${skill.id}:${now}`).outcome !== "acquired")
+    return recordSkillTelemetry(state, caster, { type: "skill_skipped", skill, reason: "movement_authority" });
   const usedState = recordSkillTelemetry(state, caster, {
     type: "skill_used",
     skill,

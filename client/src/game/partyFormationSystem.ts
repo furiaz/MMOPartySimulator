@@ -27,6 +27,7 @@ import {
   type GameState,
 } from "./state";
 import { flushNormalMovementForEntity, holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { getSpecializedMovementOwner } from "./movementAuthority";
 import {
   getPartyExecutionIntent,
   hasDirectPlayerPartyIntent,
@@ -792,8 +793,8 @@ function setFormationState(state: GameState, plan: PartyActivityPlan): GameState
     targetId: plan.target?.id ?? null,
     approachPoint: plan.targetPosition,
     direction: { x: 0, y: 0 },
-    slotsByEntityId: {},
-    slotReasonsByEntityId: {},
+    slotsByEntityId: Object.fromEntries(Object.entries(previousFormation.slotsByEntityId).filter(([id]) => getSpecializedMovementOwner(state, id))),
+    slotReasonsByEntityId: Object.fromEntries(Object.entries(previousFormation.slotReasonsByEntityId).filter(([id]) => getSpecializedMovementOwner(state, id))),
     skippedTargetIds: [],
   };
 
@@ -825,14 +826,18 @@ function clearFormation(state: GameState): GameState {
 
   return {
     ...state,
-    partyFormation: createIdleFormation(),
+    partyFormation: { ...createIdleFormation(),
+      slotsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))),
+      slotReasonsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotReasonsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))) },
   };
 }
 
 function clearFormationTarget(state: GameState): GameState {
   return {
     ...state,
-    partyFormation: createIdleFormation(),
+    partyFormation: { ...createIdleFormation(),
+      slotsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))),
+      slotReasonsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotReasonsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))) },
   };
 }
 

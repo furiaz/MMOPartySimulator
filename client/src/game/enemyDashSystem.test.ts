@@ -9,6 +9,7 @@ import {
 import { addEntity, type GameState } from "./state";
 import { applyStatusEffect } from "./statusEffects";
 import { createTestGameState } from "./testState";
+import { clearFrameMovementPlanning } from "./movementState";
 import type { Companion, Enemy } from "./types";
 
 describe("enemy Rending Dash runtime", () => {
@@ -67,7 +68,7 @@ describe("enemy Rending Dash runtime", () => {
     ).toBe(true);
 
     const healthAfterFirstAttempt = (nextState.entities[leader.id] as Companion).health;
-    nextState = updateEnemyDashSystem(nextState, movedEntityIds, 2050, () => 0.99);
+    nextState = updateEnemyDashSystem(clearFrameMovementPlanning(nextState), movedEntityIds, 2050, () => 0.99);
 
     expect(nextState.enemyDashesByEnemyId?.[enemy.id]).toBeUndefined();
     expect(nextState.entities[enemy.id]).toMatchObject({
@@ -210,7 +211,7 @@ describe("enemy Rending Dash runtime", () => {
       { type: "incapacitated", targetId: enemy.id, durationMs: 1000 },
       1900,
     );
-    nextState = updateEnemyDashSystem(nextState, new Set(), 1950, () => 0.99);
+    nextState = updateEnemyDashSystem(clearFrameMovementPlanning(nextState), new Set(), 1950, () => 0.99);
 
     expect(nextState.enemyDashesByEnemyId?.[enemy.id]).toBeUndefined();
     expect(nextState.entities[enemy.id].position).toEqual(lastSafePosition);
@@ -251,7 +252,7 @@ describe("enemy Rending Dash runtime", () => {
     const lastSafePosition = nextState.enemyDashesByEnemyId?.[enemy.id]
       ?.lastSafePosition;
 
-    nextState = cancelEnemyDash(nextState, enemy.id, "encounter_reset", 1910);
+    nextState = cancelEnemyDash(clearFrameMovementPlanning(nextState), enemy.id, "encounter_reset", 1910);
 
     expect(nextState.enemyDashesByEnemyId?.[enemy.id]).toBeUndefined();
     expect(nextState.entities[enemy.id].position).toEqual(lastSafePosition);

@@ -14,6 +14,7 @@ import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEnemyAbilitySystem } from "./enemyAbilitySystem";
 import {
+  cancelEnemyDash,
   cleanupEnemyDashRuntime,
   updateEnemyDashSystem,
 } from "./enemyDashSystem";
@@ -90,7 +91,7 @@ import {
 } from "./simulationTiming";
 import { recordCurrentWorldDiscovery } from "./worldDiscovery";
 import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
-import { updateForcedMovements } from "./forcedMovement";
+import { cancelForcedMovement, updateForcedMovements } from "./forcedMovement";
 import { beginNormalMovementPhase } from "./movementAuthority";
 import { endNormalMovementPhase, flushNormalMovementPhase } from "./movementPlanning";
 import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
@@ -111,6 +112,11 @@ export function updateGame(
     timing.nowMs,
   );
   const movedEntityIds = new Set<string>();
+  for (const movement of Object.values(nextState.forcedMovementsByEntityId ?? {}))
+    if (movement.pendingFinalization) nextState = cancelForcedMovement(nextState, movement.targetId);
+  for (const dash of Object.values(nextState.enemyDashesByEnemyId ?? {}))
+    if (dash.pendingFinalization) nextState = cancelEnemyDash(nextState, dash.casterId, "incapacitated", timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateAutoRouteRuntime(nextState);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_lifecycle_update");
@@ -120,6 +126,7 @@ export function updateGame(
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
   nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState), frozenEncounterIds: getFrozenWarmasterEncounterIds(nextState), movedEntityIds });
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
@@ -194,6 +201,7 @@ export function updateGame(
   }
 
   nextState = updateForcedMovements(nextState, movedEntityIds, timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateDirectCompanionCommandSystem(
     nextState,
     movedEntityIds,
@@ -215,6 +223,7 @@ export function updateGame(
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState, resourceWorkContext);
     nextState = updateSkillSystem(nextState, timing.nowMs);
+    if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   }
 
   if (shouldMovePartyTowardPoi) {
@@ -249,6 +258,7 @@ export function updateGame(
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
   nextState = updateCombatSkillSystem(nextState, timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,
@@ -286,6 +296,7 @@ export function updateGame(
   nextState = endNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
   nextState = updateEntitySeparationSystem(nextState, movedEntityIds);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,

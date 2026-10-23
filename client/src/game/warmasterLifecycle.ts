@@ -113,7 +113,7 @@ function partyOverlaps(state: GameState, bounds = ORC_WARCAMP_ARENA): boolean {
     if (entity.kind !== "companion") return false;
     const solid = { ...entity, state: "idle" as const };
     const forced = state.forcedMovementsByEntityId?.[entity.id];
-    const landing = forced ? { x: forced.origin.x + forced.direction.x * forced.distance, y: forced.origin.y + forced.direction.y * forced.distance } : undefined;
+    const landing = forced ? forced.pendingFinalization ? forced.lastSafePosition : { x: forced.origin.x + forced.direction.x * forced.distance, y: forced.origin.y + forced.direction.y * forced.distance } : undefined;
     const positions = [entity.position, state.reservedPositionsByEntityId?.[entity.id], state.moveIntentsByEntityId?.[entity.id], landing];
     return positions.some(position => position && doesEntityOverlapFootprint(solid, bounds, position));
   });
