@@ -7,7 +7,9 @@ import { BARRACK_DEFINITIONS, BARRACK_ACTIVATION_RADIUS, BARRACK_PREPARATION_MS,
   BARRACK_REBUILD_SPEECH, BARRACK_CLEARANCE_RETRY_MS,
   createBarrackEntity, getBarrackMaxHealth, rollBarrackEnemy } from "./barrackDefinitions";
 import type { BarrackDefinition } from "./barrackDefinitions";
-import { updateEntity, type GameState } from "./state";
+import type { GameState } from "./state";
+import { commitSpecializedMovementPosition, getMovementPositionCommit, getSpecializedMovementOwner } from "./movementAuthority";
+import { guardWarmasterWalkingDeparture, isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import type { BarrackRuntime, Position } from "./types";
 import { doesEntityOverlapFootprint, isStructureFootprintOccupied, planStructureRebuildClearance } from "./structureRebuildClearance";
 export { doesEntityOverlapFootprint } from "./structureRebuildClearance";
@@ -62,6 +64,7 @@ export function updateBarracks(state: GameState, now: number, deltaMs: number, r
       if (now < rebuildAt || now < (runtime.nextClearanceRetryAtMs ?? 0)) continue;
       const corrections = planStructureRebuildClearance(nextState, definition.id, definition.footprint);
       const clearedState = corrections && applyRebuildCorrections(nextState, corrections);
+      if (clearedState && isWarmasterRewardUiOpen(clearedState)) return clearedState;
       if (!clearedState || isBarrackFootprintOccupied(clearedState, definition)) {
         nextState = setRuntime(nextState, definition.id, { ...runtime, nextClearanceRetryAtMs: now + BARRACK_CLEARANCE_RETRY_MS });
         continue;
@@ -133,10 +136,21 @@ function setRuntime(state: GameState, id: string, runtime: BarrackRuntime): Game
   return { ...state, barracksById: { ...state.barracksById, [id]: runtime } };
 }
 
-function applyRebuildCorrections(state: GameState, corrections: ReadonlyMap<string, Position>): GameState {
+function applyRebuildCorrections(state: GameState, corrections: ReadonlyMap<string, Position>): GameState | null {
   if (!corrections.size) return state;
+  if ([...corrections.keys()].some(id => getMovementPositionCommit(state, id) || getSpecializedMovementOwner(state, id))) return null;
   let next = state;
-  for (const [id, position] of corrections) next = updateEntity(next, { ...next.entities[id], position });
+  // Validate every departure before publishing any leg of this atomic correction.
+  for (const [id, position] of corrections) {
+    next = guardWarmasterWalkingDeparture(next, next.entities[id], position) ?? next;
+    if (isWarmasterRewardUiOpen(next)) return next;
+  }
+  for (const [id, position] of corrections) {
+    const result = commitSpecializedMovementPosition(next, id, position, "rebuild", `rebuild:${id}`);
+    if (result.outcome !== "moved" && result.outcome !== "held")
+      return result.state.warmasterInteraction?.departure ? { ...state, warmasterInteraction: result.state.warmasterInteraction } : null;
+    next = result.state;
+  }
   const withoutCorrected = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => !corrections.has(id)));
   return { ...next,
     moveIntentsByEntityId: withoutCorrected(next.moveIntentsByEntityId), reservedPositionsByEntityId: withoutCorrected(next.reservedPositionsByEntityId),

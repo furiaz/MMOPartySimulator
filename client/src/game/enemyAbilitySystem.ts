@@ -1,4 +1,5 @@
 import { isCombatEntity, setLastAttackAt } from "./entities";
+import { releaseSpecializedMovement } from "./movementAuthority";
 import {
   ENEMY_ABILITY_DEFINITIONS,
   getEnemyAbilityDefinition,
@@ -120,6 +121,7 @@ export function clearEnemyAbilityRuntimeForEnemy(
   state: GameState,
   enemyId: string,
 ): GameState {
+  const dash = state.enemyDashesByEnemyId?.[enemyId];
   const enemyAbilityCastsByEnemyId = { ...(state.enemyAbilityCastsByEnemyId ?? {}) };
   const enemyAbilityCooldownsByEnemyId = {
     ...(state.enemyAbilityCooldownsByEnemyId ?? {}),
@@ -133,13 +135,14 @@ export function clearEnemyAbilityRuntimeForEnemy(
   delete enemyAbilityBasicAttackRequiredByEnemyId[enemyId];
   delete enemyDashesByEnemyId[enemyId];
 
-  return {
+  const nextState = {
     ...state,
     enemyAbilityCastsByEnemyId,
     enemyAbilityCooldownsByEnemyId,
     enemyAbilityBasicAttackRequiredByEnemyId,
     enemyDashesByEnemyId,
   };
+  return dash ? releaseSpecializedMovement(nextState, enemyId, dash.id).state : nextState;
 }
 
 export function sanitizeEnemyAbilityRuntimeForSave(

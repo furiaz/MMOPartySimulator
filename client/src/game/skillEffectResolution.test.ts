@@ -1874,8 +1874,8 @@ describe("skill effect resolution", () => {
   });
 
   it("uses Rune Step mobility preference and traps enemies near the placement point", () => {
-    const runecaster = createSkillCompanion("runecaster", "support", { x: 0, y: 0 }, "runecaster");
-    const enemy = createSkillEnemy("enemy", { x: 3, y: 0 });
+    const runecaster = createSkillCompanion("runecaster", "support", { x: 2, y: 2 }, "runecaster");
+    const enemy = createSkillEnemy("enemy", { x: 5.5, y: 2 });
     const result = resolveSkillEffect(
       createSkillState([runecaster, enemy], {
         map: createSkillMap([], 8),
@@ -2234,7 +2234,7 @@ describe("skill effect resolution", () => {
       ally.id,
     ]);
 
-    const stepEnemy = createSkillEnemy("step-enemy", { x: 4, y: 1 });
+    const stepEnemy = createSkillEnemy("step-enemy", { x: 4.5, y: 1 });
     const offensiveStepState = resolveSkillEffect(
       createSkillState([penitent, stepEnemy]),
       penitent,
@@ -2386,10 +2386,10 @@ describe("skill effect resolution", () => {
     const lightbearer = createSkillCompanion(
       "lightbearer",
       "support",
-      { x: 1, y: 0 },
+      { x: 1, y: 2 },
       "lightbearer",
     );
-    const enemy = createSkillEnemy("enemy", { x: 4, y: 0 });
+    const enemy = createSkillEnemy("enemy", { x: 4.5, y: 2 });
     const offensiveState = resolveSkillEffect(
       createSkillState([lightbearer, enemy]),
       lightbearer,
@@ -2417,7 +2417,7 @@ describe("skill effect resolution", () => {
       },
       health: Math.floor(lightbearer.maxHealth * 0.5),
     };
-    const defensiveEnemy = createSkillEnemy("defensive-enemy", { x: 2, y: 0 });
+    const defensiveEnemy = createSkillEnemy("defensive-enemy", { x: 2, y: 2 });
     const defensiveState = resolveSkillEffect(
       createSkillState([defensiveLightbearer, defensiveEnemy]),
       defensiveLightbearer,

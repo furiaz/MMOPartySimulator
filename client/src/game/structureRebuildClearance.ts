@@ -2,6 +2,7 @@ import { getEnemyMovementBodyRadius, isEnemyMovementPositionAllowed } from "./en
 import { getCollisionBody as body, getEntityCollisionShape } from "./spatialGeometry";
 import type { GameState } from "./state";
 import type { AoeBounds, GameEntity, Position } from "./types";
+import { getMovementPositionCommit, getSpecializedMovementOwner } from "./movementAuthority";
 
 const CLEARANCE = 0.05;
 const PERIMETER_STEP = 0.25;
@@ -29,8 +30,8 @@ function reservations(state: GameState): Array<{ entity: GameEntity; position: P
   const points: Array<[string, Position]> = [
     ...Object.entries(state.reservedPositionsByEntityId ?? {}), ...Object.entries(state.moveIntentsByEntityId ?? {}),
     ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).filter(cast => cast.dashPlan).map(cast => [cast.casterId, cast.dashPlan!.destination] as [string, Position]),
-    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => [dash.casterId, dash.destination] as [string, Position]),
-    ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => [move.targetId, { x: move.origin.x + move.direction.x * move.distance,
+    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => [dash.casterId, dash.pendingFinalization ? dash.lastSafePosition : dash.destination] as [string, Position]),
+    ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => [move.targetId, move.pendingFinalization ? move.lastSafePosition : { x: move.origin.x + move.direction.x * move.distance,
       y: move.origin.y + move.direction.y * move.distance }] as [string, Position]),
   ];
   return points
@@ -39,9 +40,9 @@ function reservations(state: GameState): Array<{ entity: GameEntity; position: P
 function motionCrossesFootprint(state: GameState, bounds: AoeBounds): boolean {
   const motions = [
     ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).filter(cast => cast.dashPlan).map(cast => ({ id: cast.casterId, from: cast.origin, to: cast.dashPlan!.destination })),
-    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => ({ id: dash.casterId, from: state.entities[dash.casterId]?.position ?? dash.origin, to: dash.destination })),
+    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => ({ id: dash.casterId, from: state.entities[dash.casterId]?.position ?? dash.origin, to: dash.pendingFinalization ? dash.lastSafePosition : dash.destination })),
     ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => ({ id: move.targetId, from: state.entities[move.targetId]?.position ?? move.origin,
-      to: { x: move.origin.x + move.direction.x * move.distance, y: move.origin.y + move.direction.y * move.distance } })),
+      to: move.pendingFinalization ? move.lastSafePosition : { x: move.origin.x + move.direction.x * move.distance, y: move.origin.y + move.direction.y * move.distance } })),
   ];
   return motions.some(motion => {
     const entity = state.entities[motion.id];
@@ -89,6 +90,7 @@ function perimeterCandidates(actor: GameEntity, bounds: AoeBounds): Position[] {
 export function planStructureRebuildClearance(state: GameState, structureId: string, bounds: AoeBounds): Map<string, Position> | null {
   if (motionCrossesFootprint(state, bounds)) return null;
   const blockers = Object.values(state.entities).filter(entity => entity.id !== structureId && doesEntityOverlapFootprint(entity, bounds)).sort((a, b) => a.id.localeCompare(b.id));
+  if (blockers.some(entity => getMovementPositionCommit(state, entity.id) || getSpecializedMovementOwner(state, entity.id))) return null;
   if (blockers.some(entity => entity.kind !== "companion" && entity.kind !== "enemy")) return null;
   const blockerIds = new Set(blockers.map(entity => entity.id)), reserved = reservations(state);
   if (reserved.some(item => !blockerIds.has(item.entity.id) && item.entity.id !== structureId && doesEntityOverlapFootprint(item.entity, bounds, item.position))) return null;

@@ -603,8 +603,8 @@ export function isCombatPositionAvailable(
   ];
   const landingReservations: Array<[string, Position]> = [
     ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).flatMap(cast => cast.dashPlan ? [[cast.casterId, cast.dashPlan.destination] as [string, Position]] : []),
-    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => [dash.casterId, dash.destination] as [string, Position]),
-    ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => [move.targetId, {
+    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => [dash.casterId, dash.pendingFinalization ? dash.lastSafePosition : dash.destination] as [string, Position]),
+    ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => [move.targetId, move.pendingFinalization ? move.lastSafePosition : {
       x: move.origin.x + move.direction.x * move.distance,
       y: move.origin.y + move.direction.y * move.distance,
     }] as [string, Position]),

@@ -5,6 +5,7 @@ import { updateEntitySeparationSystem } from "./entitySeparationSystem";
 import { getEuclideanDistance } from "./positionUtils";
 import { areEntitiesOverlapping } from "./spatialGeometry";
 import { createTestGameState } from "./testState";
+import { clearFrameMovementPlanning } from "./movementState";
 import type { Enemy, GameEntity, GameMap, Position } from "./types";
 
 const OPEN_MAP: GameMap = {
@@ -24,7 +25,7 @@ describe("stationary overlap separation", () => {
     const second = createEnemy("second", { x: 5, y: 6 }, "passive", { combatBodyRadius: 0.7 });
     let state = createState([actor, first, second]);
 
-    for (let frame = 0; frame < 30; frame++) state = updateEntitySeparationSystem(state, new Set());
+    for (let frame = 0; frame < 30; frame++) state = updateEntitySeparationSystem(clearFrameMovementPlanning(state), new Set());
 
     expect(state.entities.actor.position).not.toEqual(actor.position);
     expect(areEntitiesOverlapping(state.entities.actor, first)).toBe(false);
@@ -33,7 +34,7 @@ describe("stationary overlap separation", () => {
     expect(state.entities.second.position).toEqual(second.position);
     const settled = state.entities.actor.position;
     for (let frame = 0; frame < 30; frame++) {
-      state = updateEntitySeparationSystem(state, new Set());
+      state = updateEntitySeparationSystem(clearFrameMovementPlanning(state), new Set());
       expect(state.entities.actor.position).toEqual(settled);
     }
   });

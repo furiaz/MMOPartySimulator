@@ -2571,7 +2571,7 @@ describe("game update intent priority", () => {
   });
 
   it("uses combat skills when a direct collector is forced into self-defense", () => {
-    const resource = createResource("direct-resource", { x: 4, y: 6 }, {
+    const resource = createResource("direct-resource", { x: 4, y: 7 }, {
       maxGatherers: 2,
     });
     const collector = {

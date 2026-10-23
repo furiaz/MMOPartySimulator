@@ -3,7 +3,10 @@ import {
   isPositionInsideAoe,
 } from "./aoePatterns";
 import { resolveAndApplyCombatDamage, type CombatRng } from "./combatResolver";
-import { moveEntityTo, setLastAttackAt } from "./entities";
+import { setLastAttackAt } from "./entities";
+import { acquireSpecializedMovement, commitSpecializedMovementPosition, getMovementPositionCommit, releaseSpecializedMovement } from "./movementAuthority";
+import { isSpecializedMovementPathAvailable, isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
+import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { getEnemyMovementBodyRadius, isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
 import { ENEMY_ATTACK_LEASH_DISTANCE } from "./enemyLeash";
@@ -138,6 +141,7 @@ export function updateEnemyDashSystem(
   let nextState = state;
 
   for (const dash of Object.values(state.enemyDashesByEnemyId ?? {})) {
+    if (isWarmasterRewardUiOpen(nextState)) break;
     nextState = updateEnemyDash(nextState, dash.casterId, movedEntityIds, now, rng);
   }
 
@@ -149,6 +153,7 @@ export function cancelEnemyDash(
   enemyId: string,
   _reason: EnemyDashInterruptReason,
   now = Date.now(),
+  options: { handoff?: boolean } = {},
 ): GameState {
   const dash = state.enemyDashesByEnemyId?.[enemyId];
 
@@ -156,19 +161,20 @@ export function cancelEnemyDash(
     return state;
   }
 
-  const enemyDashesByEnemyId = { ...(state.enemyDashesByEnemyId ?? {}) };
-  delete enemyDashesByEnemyId[enemyId];
-  let nextState: GameState = { ...state, enemyDashesByEnemyId };
-  const caster = getEntityById(nextState, enemyId);
-
-  if (caster?.kind === "enemy" && caster.state !== "dead" && caster.health > 0) {
-    nextState = updateEntity(
-      nextState,
-      setLastAttackAt(moveEntityTo(caster, dash.lastSafePosition), now),
-    );
-  }
-
-  return nextState;
+  const caster = getEntityById(state, enemyId);
+  if (caster?.kind !== "enemy" || caster.state === "dead" || caster.health <= 0) return removeEnemyDash(state, enemyId);
+  let nextState = updateEntity(state, setLastAttackAt(caster, dash.pendingFinalization ? caster.lastAttackAt ?? now : now));
+  if (options.handoff) return removeEnemyDash(nextState, enemyId);
+  nextState = { ...nextState, enemyDashesByEnemyId: { ...nextState.enemyDashesByEnemyId,
+    [enemyId]: { ...dash, pendingFinalization: true } } };
+  const safeDistance = getForwardDistance(dash.origin, dash.direction, dash.lastSafePosition);
+  const distance = findFurthestSafeDashDistance(nextState, caster, dash.origin, dash.direction, safeDistance, 0);
+  if (distance === null) return nextState;
+  const position = getPositionAlongDirection(dash.origin, dash.direction, distance);
+  if (caster.position.x === position.x && caster.position.y === position.y) return removeEnemyDash(nextState, enemyId);
+  if (!isSpecializedMovementPathAvailable(nextState, caster, caster.position, position)) return nextState;
+  const result = commitSpecializedMovementPosition(nextState, enemyId, position, "enemyDash", dash.id);
+  return result.outcome === "moved" || result.outcome === "held" ? removeEnemyDash(result.state, enemyId) : result.state;
 }
 
 export function cleanupEnemyDashRuntime(
@@ -219,6 +225,11 @@ function updateEnemyDash(
   if (caster.kind !== "enemy" || caster.state === "dead" || caster.health <= 0) {
     return removeEnemyDash(state, enemyId);
   }
+  if (dash.pendingFinalization) {
+    const nextState = cancelEnemyDash(state, enemyId, "incapacitated", now);
+    if (getMovementPositionCommit(nextState, enemyId)?.source === "enemyDash") movedEntityIds.add(enemyId);
+    return nextState;
+  }
 
   if (hasActiveStatusEffect(state, caster.id, "incapacitated")) {
     return cancelEnemyDash(state, caster.id, "incapacitated", now);
@@ -227,6 +238,10 @@ function updateEnemyDash(
   if (isEnemyBound(state, caster)) {
     return cancelEnemyDash(state, caster.id, "bound", now);
   }
+
+  const acquisition = acquireSpecializedMovement(state, caster.id, "enemyDash", dash.id);
+  if (acquisition.outcome !== "acquired") return state;
+  state = acquisition.state;
 
   const durationMs = Math.max(0, dash.endsAt - dash.startedAt);
   const progress = durationMs === 0
@@ -239,14 +254,25 @@ function updateEnemyDash(
     progressDistance,
   );
 
-  if (progress >= 1) {
+  let terrainBlocked = false;
+  const sweepSteps = Math.ceil(Math.max(0, progressDistance - dash.lastProgressDistance) / DASH_TERRAIN_SAMPLE_DISTANCE);
+  for (let step = 1; step <= sweepSteps; step++) {
+    const distance = Math.min(progressDistance, dash.lastProgressDistance + step * DASH_TERRAIN_SAMPLE_DISTANCE);
+    if (!isDashTerrainAvailable(state, caster, getPositionAlongDirection(dash.origin, dash.direction, distance))) {
+      progressDistance = Math.max(dash.lastProgressDistance, distance - DASH_TERRAIN_SAMPLE_DISTANCE);
+      nextPosition = getPositionAlongDirection(dash.origin, dash.direction, progressDistance);
+      terrainBlocked = true;
+      break;
+    }
+  }
+  if (progress >= 1 || terrainBlocked) {
     const finalDistance = findFurthestSafeDashDistance(
       state,
       caster,
       dash.origin,
       dash.direction,
-      dash.distance,
-      dash.lastProgressDistance,
+      terrainBlocked ? progressDistance : dash.distance,
+      0,
     );
 
     if (finalDistance !== null) {
@@ -257,10 +283,12 @@ function updateEnemyDash(
         progressDistance,
       );
     } else {
-      progressDistance = dash.lastProgressDistance;
-      nextPosition = dash.lastSafePosition;
+      return cancelEnemyDash(state, caster.id, "incapacitated", now);
     }
   }
+
+  if (progressDistance < dash.lastProgressDistance && !isSpecializedMovementPathAvailable(state, caster, caster.position, nextPosition))
+    return cancelEnemyDash(state, caster.id, "incapacitated", now);
 
   let nextState = applyDashHits(
     state,
@@ -277,11 +305,13 @@ function updateEnemyDash(
     return removeEnemyDash(nextState, caster.id);
   }
 
-  const movedCaster = moveEntityTo(currentCaster, nextPosition);
-  nextState = updateEntity(nextState, movedCaster);
-  movedEntityIds.add(caster.id);
+  const movement = commitSpecializedMovementPosition(nextState, caster.id, nextPosition, "enemyDash", dash.id);
+  if (movement.outcome !== "moved" && movement.outcome !== "held") return movement.state;
+  nextState = movement.state;
+  const movedCaster = nextState.entities[caster.id] as Enemy;
+  if (movement.outcome === "moved") movedEntityIds.add(caster.id);
 
-  if (progress >= 1) {
+  if (progress >= 1 || terrainBlocked) {
     return finishEnemyDash(nextState, caster.id, now);
   }
 
@@ -406,13 +436,14 @@ function finishEnemyDash(
 }
 
 function removeEnemyDash(state: GameState, enemyId: string): GameState {
+  const dash = state.enemyDashesByEnemyId?.[enemyId];
   if (!state.enemyDashesByEnemyId?.[enemyId]) {
     return state;
   }
 
   const enemyDashesByEnemyId = { ...(state.enemyDashesByEnemyId ?? {}) };
   delete enemyDashesByEnemyId[enemyId];
-  return { ...state, enemyDashesByEnemyId };
+  return releaseSpecializedMovement({ ...state, enemyDashesByEnemyId }, enemyId, dash?.id ?? "").state;
 }
 
 function getTerrainLimitedDashDistance(
@@ -465,7 +496,7 @@ function findFurthestSafeDashDistance(
     }
   }
 
-  return null;
+  return isDashLandingAvailable(state, caster, getPositionAlongDirection(origin, direction, minimumDistance), caster.id) ? minimumDistance : null;
 }
 
 function isDashTerrainAvailable(
@@ -473,6 +504,7 @@ function isDashTerrainAvailable(
   caster: Enemy,
   position: Position,
 ): boolean {
+  if (!isSpecializedMovementPositionAvailable(state, caster, position)) return false;
   const radius = getEnemyMovementBodyRadius(caster) + DASH_CLEARANCE;
   if (!isEnemyMovementPositionAllowed(state, caster, position)) return false;
 
@@ -552,6 +584,7 @@ function isDashLandingAvailable(
   position: Position,
   ignoredEnemyId: string,
 ): boolean {
+  if (!isSpecializedMovementPositionAvailable(state, caster, position, { landing: true })) return false;
   if (!isDashTerrainAvailable(state, caster, position)) {
     return false;
   }
@@ -609,7 +642,7 @@ function getReservedDashDestinations(
       enemy?.kind === "enemy" &&
       enemy.state !== "dead"
     ) {
-      reservations.push({ enemy, position: dash.destination });
+      reservations.push({ enemy, position: dash.pendingFinalization ? dash.lastSafePosition : dash.destination });
     }
   }
 

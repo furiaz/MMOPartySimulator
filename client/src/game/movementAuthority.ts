@@ -3,6 +3,8 @@ import { getPartyLeader } from "./partySystem";
 import type { GameState } from "./state";
 import type { GameEntity, Position } from "./types";
 import type { MovementOptions, NormalMovementOutcome, NormalMovementRequest, NormalMovementSource } from "./movementTypes";
+import type { ExternalMovementOwner, MovementAuthorityResult } from "./movementTypes";
+import { guardWarmasterWalkingDeparture, isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 
 // Explicit source ties, independent of producer submission/iteration order.
 const SOURCE_ORDER: NormalMovementSource[] = [
@@ -73,12 +75,13 @@ export function getNormalMovementResult(state: GameState, entityId: string) {
 }
 
 export function getMovementRequestRejection(state: GameState, request: NormalMovementRequest): NormalMovementOutcome | undefined {
+  if (isWarmasterRewardUiOpen(state)) return "deferred";
   const actor = state.entities[request.entityId];
   if (!Number.isFinite(request.destination.x) || !Number.isFinite(request.destination.y) ||
     !Number.isFinite(request.acceptableRadius) || request.acceptableRadius < 0) return "invalid";
   if (!actor || actor.state === "dead" || ("health" in actor && actor.health <= 0)) return "invalid";
-  if (getNormalMovementResult(state, actor.id) || state.externalMovementOwnersByEntityId?.[actor.id] ||
-    state.forcedMovementsByEntityId?.[actor.id] || state.enemyDashesByEnemyId?.[actor.id]) return "deferred";
+  if (getNormalMovementResult(state, actor.id) || getMovementPositionCommit(state, actor.id) ||
+    getSpecializedMovementOwner(state, actor.id)) return "deferred";
   const required = requiredSource(state, actor);
   return required && required !== request.source ? "deferred" : undefined;
 }
@@ -101,7 +104,57 @@ export function finishNormalMovement(
       frameNumber: state.simulationFrame ?? state.simulationTick ?? 0, timeMs: state.simulationTimeMs ?? 0 } } };
 }
 
-/** Frame-scoped handoff for #734; transaction timing remains owned by specialized producers. */
+export function getMovementPositionCommit(state: GameState, entityId: string) {
+  const commit = state.movementPositionCommitsByEntityId?.[entityId];
+  return commit && commit.frameNumber === (state.simulationFrame ?? state.simulationTick ?? 0) &&
+    commit.timeMs === (state.simulationTimeMs ?? 0) ? commit : undefined;
+}
+
+/** Runtime remains with its producer; even pre-phase consumers see its ownership. */
+export function getSpecializedMovementOwner(state: GameState, entityId: string): ExternalMovementOwner | undefined {
+  const actor = state.entities[entityId];
+  if (!actor || actor.state === "dead" || ("health" in actor && actor.health <= 0)) return undefined;
+  const forced = state.forcedMovementsByEntityId?.[entityId];
+  if (forced) return { source: "forcedMovement", transactionId: `forced:${entityId}:${forced.startedAt}`, positionCommitted: false };
+  const dash = state.enemyDashesByEnemyId?.[entityId];
+  if (dash) return { source: "enemyDash", transactionId: dash.id, positionCommitted: false };
+  if (state.warmasterResetPending === entityId)
+    return { source: "encounterReset", transactionId: `reset:${entityId}`, positionCommitted: false };
+  const frameOwner = state.externalMovementOwnersByEntityId?.[entityId];
+  return frameOwner?.released ? undefined : frameOwner;
+}
+
+export function acquireSpecializedMovement(state: GameState, entityId: string, source: string, transactionId: string): MovementAuthorityResult {
+  const actor = state.entities[entityId];
+  if (!actor || actor.state === "dead" || ("health" in actor && actor.health <= 0)) return { state, outcome: "invalid" };
+  const owner = getSpecializedMovementOwner(state, entityId);
+  if (getMovementPositionCommit(state, entityId) || getNormalMovementResult(state, entityId)?.outcome === "moved" || owner?.positionCommitted ||
+    (owner && (owner.source !== source || (owner.transactionId ?? owner.source) !== transactionId)))
+    return { state, outcome: "deferred" };
+  return { state: { ...state, externalMovementOwnersByEntityId: { ...state.externalMovementOwnersByEntityId,
+    [entityId]: { source, transactionId, positionCommitted: false } } }, outcome: "acquired" };
+}
+
+/** Change the active transaction without refunding this update's position budget. */
+export function handoffSpecializedMovement(state: GameState, entityId: string, source: string, transactionId: string): MovementAuthorityResult {
+  const actor = state.entities[entityId];
+  if (!actor || actor.state === "dead" || ("health" in actor && actor.health <= 0)) return { state, outcome: "invalid" };
+  return { state: { ...state, externalMovementOwnersByEntityId: { ...state.externalMovementOwnersByEntityId,
+    [entityId]: { source, transactionId, positionCommitted: Boolean(getMovementPositionCommit(state, entityId)) } } }, outcome: "acquired" };
+}
+
+export function releaseSpecializedMovement(state: GameState, entityId: string, transactionId: string): MovementAuthorityResult {
+  const owner = state.externalMovementOwnersByEntityId?.[entityId];
+  if ((owner && owner.transactionId !== transactionId) || state.forcedMovementsByEntityId?.[entityId] ||
+    state.enemyDashesByEnemyId?.[entityId] || state.warmasterResetPending === entityId) return { state, outcome: "deferred" };
+  if (!owner) return { state, outcome: "released" };
+  const owners = { ...state.externalMovementOwnersByEntityId };
+  if (owner.positionCommitted) owners[entityId] = { ...owner, released: true };
+  else delete owners[entityId];
+  return { state: { ...state, externalMovementOwnersByEntityId: owners }, outcome: "released" };
+}
+
+/** Compatibility handoff; callers must still use the guarded position publisher. */
 export function claimExternalMovement(state: GameState, entityId: string, source: string, positionCommitted = false): GameState {
   if (!state.entities[entityId] || state.entities[entityId].state === "dead") return state;
   const currentOwner = state.externalMovementOwnersByEntityId?.[entityId];
@@ -122,10 +175,52 @@ export function releaseExternalMovement(state: GameState, entityId: string): Gam
 
 /** The sole normal-locomotion position publication point (also used for both swap legs). */
 export function commitNormalMovementPosition(state: GameState, entity: GameEntity): GameState {
+  if (getMovementPositionCommit(state, entity.id) || getSpecializedMovementOwner(state, entity.id)) return state;
+  return publishMovementPosition(state, entity.id, entity.position, "normal", "normal");
+}
+
+/** Specialized producers validate their own sweep/landing before calling this boundary. */
+export function commitSpecializedMovementPosition(
+  state: GameState, entityId: string, position: Position, source: string, transactionId: string,
+): MovementAuthorityResult {
+  if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return { state, outcome: "invalid" };
+  const acquisition = acquireSpecializedMovement(state, entityId, source, transactionId);
+  if (acquisition.outcome !== "acquired") return acquisition;
+  const actor = state.entities[entityId];
+  if (actor.position.x === position.x && actor.position.y === position.y) return { state: acquisition.state, outcome: "held" };
+  if (isWarmasterRewardUiOpen(state)) return { state, outcome: "deferred" };
+  const guarded = guardWarmasterWalkingDeparture(acquisition.state, actor, position);
+  if (guarded && isWarmasterRewardUiOpen(guarded)) return { state: guarded, outcome: "deferred" };
+  const next = publishMovementPosition(guarded ?? acquisition.state, entityId, position, source, transactionId);
+  return { state: { ...next, externalMovementOwnersByEntityId: { ...next.externalMovementOwnersByEntityId,
+    [entityId]: { source, transactionId, positionCommitted: true } } }, outcome: "moved" };
+}
+
+/** Only this function publishes locomotion coordinates and the shared commit evidence. */
+function publishMovementPosition(state: GameState, entityId: string, position: Position, source: string, transactionId: string): GameState {
+  const entity = state.entities[entityId];
+  if (!entity || getMovementPositionCommit(state, entityId)) return state;
   const previous = state.entities[entity.id];
-  const changed = previous && (previous.position.x !== entity.position.x || previous.position.y !== entity.position.y);
+  const changed = previous.position.x !== position.x || previous.position.y !== position.y;
+  if (!changed) return state;
   const trail = state.followTrailsByEntityId[entity.id] ?? [];
-  return { ...state, entities: { ...state.entities, [entity.id]: entity },
+  const withoutActor = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => id !== entityId));
+  return { ...state, entities: { ...state.entities, [entity.id]: { ...entity, position: { ...position } } },
+    movementPositionCommitsByEntityId: { ...state.movementPositionCommitsByEntityId,
+      [entityId]: { source, transactionId, from: { ...previous.position }, to: { ...position },
+        frameNumber: state.simulationFrame ?? state.simulationTick ?? 0, timeMs: state.simulationTimeMs ?? 0 } },
+    lastPositionsByEntityId: { ...state.lastPositionsByEntityId, [entityId]: previous.position },
+    reservedPositionsByEntityId: { ...state.reservedPositionsByEntityId, [entityId]: { ...position } },
+    ...(source === "normal" ? {} : {
+      movementPathsByEntityId: withoutActor(state.movementPathsByEntityId),
+      attackSlotCacheByEntityId: withoutActor(state.attackSlotCacheByEntityId),
+      movementPathRetryAtMsByEntityId: withoutActor(state.movementPathRetryAtMsByEntityId),
+      movementFailureMsByEntityId: withoutActor(state.movementFailureMsByEntityId),
+      failedMoveByEntityId: withoutActor(state.failedMoveByEntityId),
+      movementFailuresByEntityId: withoutActor(state.movementFailuresByEntityId),
+      moveIntentsByEntityId: { ...state.moveIntentsByEntityId, [entityId]: { ...position } },
+      movementDecisionsByEntityId: withoutActor(state.movementDecisionsByEntityId),
+    }),
     followTrailsByEntityId: changed ? { ...state.followTrailsByEntityId,
       [entity.id]: [previous.position, ...trail.filter(position => position.x !== previous.position.x || position.y !== previous.position.y)].slice(0, 12),
     } : state.followTrailsByEntityId };

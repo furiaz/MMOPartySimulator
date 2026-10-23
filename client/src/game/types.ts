@@ -2170,6 +2170,7 @@ export type EnemyDashPlan = {
 };
 
 export type EnemyDashState = {
+  pendingFinalization?: true;
   id: string;
   abilityId: EnemyAbilityId;
   casterId: string;
@@ -2580,6 +2581,8 @@ export type DebugTelemetryEntitySnapshot = {
   movementRequestPriority?: number;
   normalMovementOutcome?: "moved" | "held" | "blocked" | "invalid" | "deferred";
   normalMovementCommitCount?: number;
+  movementPositionCommitCount?: number;
+  movementTransactionId?: string;
   reason?: string;
   formationPhase?: FormationPhase;
   formationSlot?: Position | null;
