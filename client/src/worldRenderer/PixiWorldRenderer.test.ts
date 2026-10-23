@@ -544,6 +544,15 @@ describe("Rending Dash afterimages", () => {
 });
 
 describe("getFullRenderSignature", () => {
+  it("redraws for companion area geometry and visual intent changes", () => {
+    const area = resolveAoePattern({ type: "circle", radius: 2 }, createAoeCastTransform({ x: 4, y: 4 }, { x: 5, y: 4 }));
+    const event = { id: "area", sourceId: "companion", type: "slash" as const, createdAt: 1000, expiresAt: 1500, area, visualIntent: "partyOffensive" as const };
+    const input = createFullRenderSignatureInput({ skillVisualEvents: [event] });
+    const signature = getFullRenderSignature(input);
+    expect(getFullRenderSignature({ ...input, skillVisualEvents: [{ ...event, area: resolveAoePattern({ type: "circle", radius: 3 }, area.castTransform) }] })).not.toBe(signature);
+    expect(getFullRenderSignature({ ...input, skillVisualEvents: [{ ...event, visualIntent: "partyHealing" }] })).not.toBe(signature);
+    expect(getFullRenderSignature({ ...input, skillVisualEvents: [] })).not.toBe(signature);
+  });
   it("stays stable across non-visual simulation ticks", () => {
     const input = createFullRenderSignatureInput();
     const baseSignature = getFullRenderSignature(input);

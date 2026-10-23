@@ -944,7 +944,9 @@ Companions store:
 skillBehavior: CompanionSkillBehavior;
 ```
 
-Current companion skill behavior settings include:
+`skillBehavior.preferencesBySkillId` is the optional typed per-skill preference record. `skillBehavior.ts` owns authored control allowlists, defaults, validation, updates and one-time migration from the following legacy fields. Valid individual settings take precedence; legacy fields remain readable for compatibility, not as shared live controls. All targeting/effect reads use the owning skill ID. Active and stored roster normalization preserves settings through class changes, recruitment, Inn/Field Team movement and restoration. Unsupported choices are discarded or defaulted; no save-version bump is needed.
+
+Legacy companion skill behavior fields include:
 
 - `beginnerFirstAidSelfHealHpThresholdPercent`
 - `beginnerFirstAidAllyHealHpThresholdPercent`
@@ -971,23 +973,23 @@ Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped fro
 
 Second Wind self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Hold Fast use threshold defaults to 40 percent and is clamped from 1 percent to 100 percent.
+Hold Fast use threshold defaults to 30 percent and is clamped from 1 percent to 100 percent.
 
-Fake Death use threshold defaults to 25 percent and is clamped from 1 percent to 100 percent.
+Fake Death use threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Blood Feast use threshold defaults to 45 percent and is clamped from 1 percent to 100 percent.
+Blood Feast use threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Light Mend ally-heal threshold defaults to 60 percent and is clamped from 1 percent to 100 percent.
+Light Mend ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 80 percent.
 
-Self Sacrifice safety floor defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Supported self-sacrifice skills individually default to a 20-percent safety floor, clamped from 1 percent to 50 percent.
 
-Penitent's Gift ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 100 percent.
+Penitent's Gift ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 80 percent.
 
-Penitent's Gift self-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Penitent's Gift self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Eternal Hope use threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Eternal Hope use threshold defaults to 60 percent and is clamped from 1 percent to 80 percent.
 
-Defensive mobility threshold defaults to 50 percent and is clamped from 1 percent to 100 percent.
+Each supported mobility skill defaults to Offensive use with a 30-percent defensive threshold, clamped from 1 percent to 30 percent.
 
 Overcharge is enabled by default.
 
@@ -1014,6 +1016,7 @@ Current Circle of Renewal target mode values are:
 type CircleOfRenewalTargetMode =
   | "big_group"
   | "low_health"
+  | "highest_health"
   | "defender";
 ```
 Support Focus, mobility skill use mode, FireBurst target mode, Circle of Renewal target mode, overcharge enablement, and skill HP thresholds are targeting and usage preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
@@ -2370,11 +2373,24 @@ Current companion AoE channel behavior:
 - stores active companion AoE channels by caster id
 - resolves supported companion AoE impacts after their channel timing completes
 - removes the channel after impact or invalidation
-- Shield Shockwave damages nearby enemies and can apply bind runtime
-- Maul Sweep damages nearby enemies and can apply `disarmed`
+- Shield Shockwave and Maul Sweep snapshot a resolved variant area and rank-adjusted coefficient for their unchanged 200ms channels; later preference edits and movement do not rewrite that area
+- Shield Shockwave's circle retains bind/taunt; its cone applies stun at impact and requests reusable forced movement with deferred taunt metadata
+- Maul Sweep applies its selected semicircle/full-circle damage and existing `disarmed`
 - companion AoE impact can grant XP, progress quest defeat objectives, and trigger enemy drops through normal combat resolution where supported
 
 Companion AoE channel runtime is skill runtime and should stay in game logic.
+
+### Companion Area Variants and Individual Preferences
+
+`companionAoeVariants.ts` owns renderer-neutral authored patterns, defaults and effect modifiers. `companionSkillAreas.ts` prepares a snapped caster/target/mobility transform and resolves the shared `ResolvedAoeArea` once per use. Immediate effects and channels reuse their area for recipient checks and presentation; actor centers and existing structure-rectangle intersection rules apply. Square patterns are 1.5-unit touching squares, not grid-snapped casts. Empty or unusable candidates do not consume cooldowns.
+
+The catalog covers Sweeping Strike/Maul Sweep semicircle or full circle (0.7 damage modifier), Shield Shockwave circle/cone, Arrow Burst forward line/cone, FireBurst target-centered circle/cross/X/strip, Renewal normal/concentrated circle (radius 5√0.7 and 1.3 healing modifier), and Dawn/Atonement circle/cross. Rune Step reuses a fixed radius-2 circle. Exact dimensions and defaults are documented in the GDD variant table. Existing rank scaling occurs before variant multiplication and final combat rounding. Skill cooldowns, GCDs, party-wide effects and existing enemy ability runtime are unchanged.
+
+`skillTargeting.ts` scores actual areas for Big Group, considering valid prospective mobility landings and deterministic distance/ID ties. High HP sorts remaining health and Low HP sorts health percentage. Melee caster-centered areas use attack context/current facing without target-priority controls; Arrow/Fire and offensive Dawn/Atonement support three priorities. Renewal additionally supports Defender and retains main-target injury/HP/range checks. Defensive mobility uses the existing threat and escape logic. Manual constraints and autonomous structure exclusions remain intact.
+
+`CompanionSkillPreferences.tsx` renders learned current-class skills' authored controls and enabled legacy skills' controls under exact skill names. It filters legacy preference cards through the existing enabled-state helper, without mutating learned skills or saved preferences. The separate legacy Enable/Disable controls remain available, and re-enabling restores the visible settings. It submits per-skill updates, never targeting or effects. `skillPreferenceDetails.ts` supplies descriptions using authored variants and scaled definitions. Choice tooltips support hover and keyboard focus. Shared flat fields migrate once to independent settings; malformed values normalize through the same game-owned read/update path.
+
+Optional resolved area/visual intent on transient `SkillVisualEvent` records lets the full renderer reuse shared area drawing and bounds culling. Geometry participates in signatures, timed work and final cleanup frames, with existing companion colors/blue labels. The minimap omits this presentation. Areas/channels and pending completion effects are transient on restoration.
 
 ---
 
@@ -2464,6 +2480,8 @@ Save sanitation preserves valid sequence, phase, charge, rescue and chest quanti
 ### Reusable Forced Movement
 
 `forcedMovement.ts` owns optional `forcedMovementsByEntityId` and focused start/update/cancel helpers. Each record locks source/target identity, origin, direction, distance, movement timestamps and the latest safe landing. Terrain sampling respects map bounds, walls, structures, resources, full companion capsules and enemy circles. Living actors may be crossed; destinations must be unoccupied and respect movement/dash reservations. Revalidation only shortens travel backward on the locked line; there is no lateral redirection or rebound.
+
+Optional typed `completionStatus` requests Shield Shockwave's three-second taunt at actual displacement completion. A completely blocked push completes immediately; dynamic obstruction completes at the stopping update. Natural completion uses the actual movement deadline, even under large deltas, rather than extending the status from a late frame. Cancel/reset/removal/restoration discard pending completion effects. Movement can outlive its source, but a dead/missing source cannot apply taunt. Enemy casts/dashes use their existing interruption helpers; enemy movement bounds and other forced-movement destinations are included in safe landing checks.
 
 Kick requests four units over 0.25 seconds, with duration shortened proportionally when clipped. Updates check intervening terrain even under large deltas and report moved entity IDs. Shared movement, attack, skill, gathering, consumable and resurrection guards suspend actions during displacement; direct-command processing preserves pending player orders. Starting displacement cancels active channels and conflicting motion. Death/removal, map cleanup, reset and restoration clear it; the source's later death alone does not cancel launched motion. Restoration uses a valid saved last-safe position rather than leaving a target mid-overlap. All fields remain optional and transient; no save-version bump or general physics framework is introduced.
 

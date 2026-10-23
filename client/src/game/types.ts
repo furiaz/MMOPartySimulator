@@ -720,9 +720,28 @@ export type FireBurstTargetMode = "big_group" | "low_health" | "highest_health";
 export type CircleOfRenewalTargetMode =
   | "big_group"
   | "low_health"
+  | "highest_health"
   | "defender";
 
+export type CompanionAoeVariantId =
+  | "circle" | "semicircle" | "cone" | "line" | "cross" | "x" | "concentrated";
+
+export type SkillPreferenceValues = {
+  variant?: CompanionAoeVariantId;
+  targetMode?: CircleOfRenewalTargetMode;
+  mobilityMode?: MobilitySkillUseMode;
+  defensiveHpThresholdPercent?: number;
+  supportFocus?: SupportFocus;
+  selfHealHpThresholdPercent?: number;
+  allyHealHpThresholdPercent?: number;
+  useHpThresholdPercent?: number;
+  safetyFloorPercent?: number;
+  enabled?: boolean;
+  mainTargetHpThresholdPercent?: number;
+};
+
 export type CompanionSkillBehavior = {
+  preferencesBySkillId?: Partial<Record<SkillId, SkillPreferenceValues>>;
   beginnerFirstAidSelfHealHpThresholdPercent: number;
   beginnerFirstAidAllyHealHpThresholdPercent: number;
   secondWindSelfHealHpThresholdPercent: number;
@@ -1941,6 +1960,8 @@ export type SkillVisualEvent = {
   sourceId: string;
   targetId?: string;
   position?: Position;
+  area?: ResolvedAoeArea;
+  visualIntent?: AoeVisualIntent;
   createdAt: number;
   expiresAt: number;
 };
@@ -2196,6 +2217,8 @@ export type CompanionAoeChannelState = {
   bindDurationMs?: number;
   disarmDurationMs?: number;
   tauntDurationMs?: number;
+  knockbackDistance?: number;
+  stunDurationMs?: number;
   startedAt: number;
   channelEndsAt: number;
 };

@@ -462,6 +462,8 @@ export function addSkillVisualEvent(
         sourceId: event.sourceId,
         targetId: event.targetId,
         position: event.position,
+        area: event.area,
+        visualIntent: event.visualIntent,
         createdAt: event.now,
         expiresAt: event.now + event.durationMs,
       },

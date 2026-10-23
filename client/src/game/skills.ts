@@ -240,9 +240,9 @@ export const SKILL_DEFINITIONS: Record<SkillDefinition["id"], SkillDefinition> =
     id: "sweeping_strike",
     classId: "blade",
     displayName: "Sweeping Strike",
-    tags: ["Offensive", "Damage", "Single Target", "AoE"],
+    tags: ["Offensive", "Damage", "Multi Target", "AoE"],
     type: "active",
-    range: 1,
+    range: 2,
     cooldownMs: 10000,
     effect: {
       type: "sweepingDamage",

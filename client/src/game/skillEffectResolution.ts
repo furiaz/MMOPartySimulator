@@ -1,6 +1,8 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { prepareCompanionSkillArea } from "./companionSkillAreas";
+import { isEntityInsideCompanionAoe } from "./companionAoeVariants";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
-import { isLivingHostileTarget, isHostileTargetInRadius } from "./combatStructures";
+import { getCombatTargetPosition, isLivingHostileTarget } from "./combatStructures";
 import type { CombatStructure, HostileCombatTarget } from "./types";
 import {
   isLivingCompanion,
@@ -196,7 +198,7 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "sweepingDamage" && isLivingHostileTarget(target)) {
+  if (skill.effect.type === "sweepingDamage" && (isLivingHostileTarget(target) || isLivingCompanion(target))) {
     return resolveAppliedSkillEffect(
       state,
       applySweepingStrike(state, caster, target, skill, now),
@@ -220,18 +222,18 @@ function resolvePreparedSkillEffect(
     );
   }
 
-  if (skill.effect.type === "shockwave" && isLivingCompanion(target)) {
+  if (skill.effect.type === "shockwave" && (isLivingCompanion(target) || isLivingHostileTarget(target))) {
     return resolveAppliedSkillEffect(
       state,
-      startShieldShockwaveChannel(state, caster, skill, now),
+      startShieldShockwaveChannel(state, caster, skill, now, isLivingHostileTarget(target) ? getCombatTargetPosition(caster.position, target) : undefined),
       caster.id,
     );
   }
 
-  if (skill.effect.type === "maulSweep" && isLivingCompanion(target)) {
+  if (skill.effect.type === "maulSweep" && (isLivingCompanion(target) || isLivingHostileTarget(target))) {
     return resolveAppliedSkillEffect(
       state,
-      startMaulSweepChannel(state, caster, skill, now),
+      startMaulSweepChannel(state, caster, skill, now, isLivingHostileTarget(target) ? getCombatTargetPosition(caster.position, target) : undefined),
       caster.id,
     );
   }
@@ -929,7 +931,7 @@ function applyLungeDamageSkill(
 function applySweepingStrike(
   state: GameState,
   caster: Companion,
-  target: HostileCombatTarget,
+  target: HostileCombatTarget | Companion,
   skill: SkillDefinition,
   now: number,
 ): GameState {
@@ -937,37 +939,22 @@ function applySweepingStrike(
     return state;
   }
 
-  let nextState = damageEnemy(
-    state,
-    caster,
-    target,
-    skill.displayName,
-    now,
-    skill.effect.damageType,
-    skill.effect.mainPowerMultiplier,
-    true,
-  );
-  const currentTarget = nextState.entities[target.id];
-
-  for (const enemy of Object.values(nextState.entities)) {
-    if (
-      !isLivingHostileTarget(enemy) ||
-      enemy.id === target.id ||
-      enemy.state === "dead" ||
-      !currentTarget ||
-      !isHostileTargetInRadius(enemy, currentTarget.position, skill.effect.splashRange)
-    ) {
-      continue;
-    }
-
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.kind === "companion" ? undefined : target.position);
+  if (!prepared) return state;
+  const targets = Object.values(state.entities).filter(enemy => isLivingHostileTarget(enemy) && isEntityInsideCompanionAoe(prepared.area, enemy));
+  if (targets.length === 0) return state;
+  let nextState = state;
+  for (const enemy of targets) {
+    const current = nextState.entities[enemy.id];
+    if (!isLivingHostileTarget(current)) continue;
     nextState = damageEnemy(
       nextState,
       caster,
-      enemy,
-      "Sweep",
+      current,
+      skill.displayName,
       now,
       skill.effect.damageType,
-      skill.effect.splashPowerMultiplier,
+      skill.effect.mainPowerMultiplier * prepared.powerMultiplier,
       true,
     );
   }
@@ -977,6 +964,8 @@ function applySweepingStrike(
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
+    area: prepared.area,
+    visualIntent: "partyOffensive",
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -1670,7 +1659,7 @@ function applySacrificialBarrier(
     state,
     caster,
     skill.effect.hpCostCurrentPercent,
-    { respectSafetyFloor: true },
+    { respectSafetyFloor: true, skillId: skill.id },
   );
 
   if (!sacrifice) {
@@ -2096,7 +2085,7 @@ function applyOvercharge(
 ): GameState {
   if (
     skill.effect.type !== "overcharge" ||
-    !getCompanionSkillBehavior(caster).overchargeEnabled ||
+    !getCompanionSkillBehavior(caster, skill.id).overchargeEnabled ||
     !canApplyRefreshableRuntimeState(
       state.skillOverchargesByCompanionId?.[caster.id]?.expiresAt,
       skill.effect.refreshWindowMs,
@@ -2331,7 +2320,7 @@ function applyQuickStep(
   }
 
   const direction =
-    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+    getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode === "offensive"
       ? getDirectionToward(caster, target)
       : getDirectionAwayFrom(caster, target);
   const position = getSkillDashPosition(
@@ -2388,7 +2377,7 @@ function applySkirmishShot(
   }
 
   const direction =
-    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+    getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode === "offensive"
       ? getDirectionToward(caster, target)
       : getDirectionAwayFrom(caster, target);
   const position = getSkillDashPosition(
@@ -2461,7 +2450,7 @@ function applyPounce(
   }
 
   const direction =
-    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+    getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode === "offensive"
       ? getDirectionToward(caster, target)
       : getDirectionAwayFrom(caster, target);
   const position = getSkillDashPosition(
@@ -2534,7 +2523,7 @@ function applyFlameStep(
   }
 
   const direction =
-    getCompanionSkillBehavior(caster).mobilitySkillUseMode === "offensive"
+    getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode === "offensive"
       ? getDirectionToward(caster, target)
       : getDirectionAwayFrom(caster, target);
   const position = getSkillDashPosition(
@@ -2603,7 +2592,7 @@ function applyRuneStep(
     return null;
   }
 
-  const useMode = getCompanionSkillBehavior(caster).mobilitySkillUseMode;
+  const useMode = getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode;
   const direction =
     useMode === "offensive"
       ? getDirectionToward(caster, target)
@@ -2628,6 +2617,8 @@ function applyRuneStep(
   }
 
   const trapPosition = useMode === "offensive" ? position : caster.position;
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.position, trapPosition);
+  if (!prepared) return null;
   let nextState = updateEntity(state, {
     ...caster,
     position,
@@ -2637,7 +2628,7 @@ function applyRuneStep(
   for (const enemy of Object.values(nextState.entities)) {
     if (
       !isLivingEnemy(enemy) ||
-      getGridDistance(enemy.position, trapPosition) > skill.effect.trapRadius
+      !isEntityInsideCompanionAoe(prepared.area, enemy)
     ) {
       continue;
     }
@@ -2666,6 +2657,8 @@ function applyRuneStep(
     sourceId: caster.id,
     targetId: target.id,
     position: trapPosition,
+    area: prepared.area,
+    visualIntent: "partyOffensive",
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -2690,7 +2683,7 @@ function applyDawnStep(
     return null;
   }
 
-  const useMode = getCompanionSkillBehavior(caster).mobilitySkillUseMode;
+  const useMode = getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode;
   const direction =
     useMode === "offensive"
       ? getDirectionToward(caster, target)
@@ -2715,6 +2708,8 @@ function applyDawnStep(
   }
 
   const disarmPosition = useMode === "offensive" ? position : caster.position;
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.position, disarmPosition);
+  if (!prepared) return null;
   let nextState = updateEntity(state, {
     ...caster,
     position,
@@ -2724,8 +2719,7 @@ function applyDawnStep(
   for (const enemy of Object.values(nextState.entities)) {
     if (
       !isLivingEnemy(enemy) ||
-      getGridDistance(enemy.position, disarmPosition) >
-        skill.effect.disarmRadius
+      !isEntityInsideCompanionAoe(prepared.area, enemy)
     ) {
       continue;
     }
@@ -2754,6 +2748,8 @@ function applyDawnStep(
     sourceId: caster.id,
     targetId: target.id,
     position: disarmPosition,
+    area: prepared.area,
+    visualIntent: "partyOffensive",
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -2779,11 +2775,13 @@ function applyArrowBurst(
   }
 
   let nextState = state;
-  const { damageType, powerMultiplier, radius } = skill.effect;
+  const { damageType, powerMultiplier } = skill.effect;
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.position);
+  if (!prepared) return state;
   const targets = Object.values(state.entities)
     .filter(
       (entity): entity is HostileCombatTarget =>
-        isLivingHostileTarget(entity) && isHostileTargetInRadius(entity, target.position, radius),
+        isLivingHostileTarget(entity) && isEntityInsideCompanionAoe(prepared.area, entity),
     )
     .sort(
       (a, b) =>
@@ -2820,6 +2818,8 @@ function applyArrowBurst(
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
+    area: prepared.area,
+    visualIntent: "partyOffensive",
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -2839,11 +2839,13 @@ function applyFireBurst(
   }
 
   const effect = skill.effect;
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.position);
+  if (!prepared) return state;
   let nextState = state;
   const targets = Object.values(state.entities)
     .filter(
       (entity): entity is HostileCombatTarget =>
-        isLivingHostileTarget(entity) && isHostileTargetInRadius(entity, target.position, effect.radius),
+        isLivingHostileTarget(entity) && isEntityInsideCompanionAoe(prepared.area, entity),
     )
     .sort(
       (a, b) =>
@@ -2892,6 +2894,8 @@ function applyFireBurst(
     skillId: skill.id,
     sourceId: caster.id,
     targetId: target.id,
+    area: prepared.area,
+    visualIntent: "partyOffensive",
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -2992,7 +2996,7 @@ function applyAtonementStep(
   }
 
   const effect = skill.effect;
-  const useMode = getCompanionSkillBehavior(caster).mobilitySkillUseMode;
+  const useMode = getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode;
   const direction =
     useMode === "offensive"
       ? getDirectionToward(caster, target)
@@ -3017,6 +3021,8 @@ function applyAtonementStep(
   }
 
   const effectPosition = useMode === "offensive" ? position : caster.position;
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.position, effectPosition);
+  if (!prepared) return null;
   const healTargets =
     useMode === "defensive"
       ? getPartyMembers(state).filter(
@@ -3024,8 +3030,7 @@ function applyAtonementStep(
           member.id !== caster.id &&
           isLivingCompanion(member) &&
           member.health < member.maxHealth &&
-          getGridDistance(member.position, effectPosition) <=
-              effect.healRadius,
+          isEntityInsideCompanionAoe(prepared.area, member),
         )
       : [];
   const affectedEnemies =
@@ -3033,8 +3038,7 @@ function applyAtonementStep(
       ? Object.values(state.entities).filter(
           (entity): entity is Enemy =>
             isLivingEnemy(entity) &&
-            getGridDistance(entity.position, effectPosition) <=
-              effect.disarmRadius,
+            isEntityInsideCompanionAoe(prepared.area, entity),
         )
       : [];
 
@@ -3049,7 +3053,7 @@ function applyAtonementStep(
     state,
     caster,
     skill.effect.hpCostCurrentPercent,
-    { respectSafetyFloor: true },
+    { respectSafetyFloor: true, skillId: skill.id },
   );
 
   if (!sacrifice) {
@@ -3111,6 +3115,8 @@ function applyAtonementStep(
     sourceId: caster.id,
     targetId: target.id,
     position: effectPosition,
+    area: prepared.area,
+    visualIntent: useMode === "defensive" ? "partyHealing" : "partyOffensive",
     now,
     durationMs: VISUAL_DURATION_MS,
   });
@@ -3276,7 +3282,9 @@ function applyCircleOfRenewal(
     return state;
   }
 
-  const healAmount = getHealingAmount(caster, skill.effect.powerMultiplier, state);
+  const prepared = prepareCompanionSkillArea(state, caster, skill, target.position);
+  if (!prepared) return state;
+  const healAmount = getHealingAmount(caster, skill.effect.powerMultiplier * prepared.powerMultiplier, state);
   let nextState = state;
   let healedAny = false;
 
@@ -3284,7 +3292,7 @@ function applyCircleOfRenewal(
     if (
       !isLivingCompanion(member) ||
       member.health >= member.maxHealth ||
-      getGridDistance(member.position, target.position) > skill.effect.radius
+      !isEntityInsideCompanionAoe(prepared.area, member)
     ) {
       continue;
     }
@@ -3317,6 +3325,8 @@ function applyCircleOfRenewal(
     sourceId: caster.id,
     targetId: target.id,
     position: target.position,
+    area: prepared.area,
+    visualIntent: "partyHealing",
     now,
     durationMs: 1000,
   });
@@ -3414,7 +3424,7 @@ function applySacrificeHeal(
     state,
     caster,
     skill.effect.hpCostCurrentPercent,
-    { respectSafetyFloor: target.id !== caster.id },
+    { respectSafetyFloor: target.id !== caster.id, skillId: skill.id },
   );
 
   if (!sacrifice) {
@@ -3495,7 +3505,7 @@ function applyEternalHope(
     state,
     caster,
     skill.effect.hpCostCurrentPercent,
-    { respectSafetyFloor: false },
+    { respectSafetyFloor: false, skillId: skill.id },
   );
 
   if (!sacrifice) {
@@ -3571,7 +3581,7 @@ function applyCurrentHpSacrifice(
   state: GameState,
   caster: Companion,
   hpCostCurrentPercent: number,
-  { respectSafetyFloor }: { respectSafetyFloor: boolean },
+  { respectSafetyFloor, skillId }: { respectSafetyFloor: boolean; skillId: SkillDefinition["id"] },
 ): { state: GameState; caster: Companion; sacrificedHp: number } | null {
   const currentCaster = state.entities[caster.id];
 
@@ -3591,7 +3601,7 @@ function applyCurrentHpSacrifice(
 
   if (respectSafetyFloor) {
     const safetyFloor =
-      getCompanionSkillBehavior(currentCaster).selfSacrificeSafetyFloorPercent;
+      getCompanionSkillBehavior(currentCaster, skillId).selfSacrificeSafetyFloorPercent;
     const nextHealthPercent =
       currentCaster.maxHealth > 0 ? (nextHealth / currentCaster.maxHealth) * 100 : 0;
 
@@ -3768,7 +3778,7 @@ function applyFlagellantLash(
     state,
     caster,
     skill.effect.hpCostCurrentPercent,
-    { respectSafetyFloor: true },
+    { respectSafetyFloor: true, skillId: skill.id },
   );
 
   if (!sacrifice) {

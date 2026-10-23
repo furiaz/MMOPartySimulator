@@ -1741,6 +1741,8 @@ function getSkillVisualSignature(event: SkillVisualEvent): string {
     event.sourceId,
     event.targetId ?? "",
     getPositionSignature(event.position),
+    event.area ? getAoeAreaSignature(event.area) : "",
+    event.visualIntent ?? "",
     event.createdAt,
     event.expiresAt,
   ].join(":");

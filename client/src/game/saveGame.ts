@@ -84,6 +84,7 @@ import {
 } from "./questProgressionHooks";
 import { sanitizeQuestAmbientEnemySuppressionsAfterLoad } from "./questAmbientEnemySuppressionSystem";
 import { sanitizeProgressionForCompanion } from "./skillProgression";
+import { normalizeCompanionSkillBehavior } from "./skillBehavior";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import type { GameState } from "./state";
 import type {
@@ -1591,6 +1592,7 @@ function sanitizeEntityForSave(
 
     return {
       ...sanitizedCompanion,
+      skillBehavior: normalizeCompanionSkillBehavior(sanitizedCompanion),
       state: entity.state === "dead" ? "dead" : isLeader ? "idle" : "follow",
       currentTargetId: entity.state === "dead" || isLeader ? null : leaderId,
       commandPriority: "autonomous",
@@ -1684,6 +1686,7 @@ function sanitizeRestingCompanionsForSave(
           companionId,
           {
             ...sanitizedCompanion,
+            skillBehavior: normalizeCompanionSkillBehavior(sanitizedCompanion),
             state: "idle",
             currentTargetId: null,
             commandPriority: "autonomous",

@@ -523,7 +523,8 @@ describe("Orc Barracks", () => {
   it("incidental AoE damages a footprint with its center outside, once, without CC", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     let state = setup({ x: 71.5, y: 25.5 });
-    const caster = state.entities.leader as Companion;
+    const original = state.entities.leader as Companion;
+    const caster = { ...original, skillBehavior: { ...original.skillBehavior, preferencesBySkillId: { maul_sweep: { variant: "circle" as const } } } };
     state = startMaulSweepChannel(state, caster, SKILL_DEFINITIONS.maul_sweep, 0);
     state = updateCompanionAoeChannelSystem(state, 200);
     expect(structure(state).health).toBeLessThan(1248);

@@ -599,12 +599,30 @@ Prototype enemy AoE behavior is debug combat-test and early enemy-skill behavior
 
 Current prototype companion AoE channel behavior:
 
-- Shield Shockwave may briefly channel a circular party-offensive area before impact
-- Maul Sweep may briefly channel a circular party-offensive area before impact
-- companion AoE channels resolve against living enemies inside the locked circle at impact
-- Shield Shockwave may damage and bind affected non-dummy enemies
-- Maul Sweep may damage and disarm affected non-dummy enemies
+- Shield Shockwave and Maul Sweep retain their 0.2-second channels; other currently immediate companion area skills remain immediate
+- each use snapshots its selected variant, origin, direction and rank-adjusted effect coefficient; effects and full-world visuals reuse the same resolved geometry
+- living actor centers determine inclusion; damaging areas intersect hostile structure attackable rectangles once, even when shape primitives overlap
+- Shield Shockwave's circle binds for one second and taunts for five; its cone stuns for one second, pushes up to two units at 16 units/second, then taunts for three seconds from actual movement completion
+- cone evasion prevents damage and control; blocking or absorption does not stop the push. Terrain and full-body safe landings can shorten displacement; a fully blocked push starts taunt immediately
+- Maul Sweep retains its existing disarm, including the full-circle damage tradeoff
 - companion AoE channels are temporary skill runtime behavior, not a final casting, telegraph, or player-authored area-targeting system
+
+Companion area variants (world units; damage coefficients below are rank one, with existing rank and combat modifiers preserved):
+
+| Skill | Variants | Default |
+|---|---|---|
+| Sweeping Strike | Caster-centered 180-degree semicircle, radius 2: 1.5× Attack uniformly per recipient; full radius-2 circle: 1.05× Attack (70% normal skill damage), without primary/splash distinction | Semicircle |
+| Shield Shockwave | Caster-centered radius-2 circle or forward 180-degree cone reaching 2; both 0.7× Attack, with the control sequencing above | Circle |
+| Arrow Burst | Forward 6×1.5 line or 90-degree cone reaching 3.4; both 1.2× Attack | Cone |
+| Maul Sweep | Caster-centered radius-2 180-degree semicircle: 1.15× Attack; full circle: 0.805× Attack, both with existing disarm | Semicircle |
+| FireBurst | Selected-enemy-centered radius-3 circle (area 28.27), 13-square cross or X (area 29.25), or centered 9×3 strip (area 27); normal magic damage and Burn for all | Circle |
+| Circle of Renewal | Selected-ally-centered radius-5 circle, or radius 5√0.7 (about 4.18) with exactly 70% area and 130% normal healing | Normal circle |
+| Dawn Step | Radius-2 circle or five-square cross; offensive effects at landing, defensive effects at departure; existing disarm | Circle |
+| Atonement Step | Same circle/cross choices; offensive landing disarms, defensive departure heals other injured allies; existing HP cost and safety rules | Circle |
+
+Square patterns use touching 1.5×1.5 squares and rotate smoothly in world space. FireBurst's directional patterns align caster-to-target, with three squares per arm on its cross/X. Rune Step uses one fixed true radius-2 circle under its existing offensive/defensive rules, without shape or target-priority choices. Shield Challenge, Threatening Roar and party-wide buffs remain unchanged. No rings or orbiting effects are introduced.
+
+Sweeping Strike, Shield Shockwave and Maul Sweep use normal attack context and current combat facing, without target-priority settings or priority-driven approach movement. Arrow Burst and FireBurst offer High HP / Big Group / Low HP. Dawn Step and Atonement Step offer those priorities only for offensive approaches; defensive escape remains threat-based. Renewal also offers Defender. Big Group is the default and scores the actual selected shape, including valid prospective mobility landings. High HP uses remaining HP; Low HP uses HP percentage. Healing main targets must remain living, injured and satisfy their HP threshold. Distance and ID break ties deterministically. Manual targeting and movement safety remain authoritative, and Barracks are never discovered as autonomous skill targets.
 
 Current prototype enemy archetype/family ids:
 
@@ -1222,7 +1240,7 @@ Current Skills UI may show:
 
 Active skills are grouped by class. Learned earlier-class active skills may appear in a separate legacy section when they have reached the fixed rank-5 eligibility threshold. Passives appear in a separate passive presentation and never show legacy controls.
 
-Skill Preferences may show supported skill behavior settings.
+Skill Preferences show independent entries under each learned current-class skill's exact name and for enabled legacy skills with supported controls. Disabled legacy skills hide their preference cards without deleting saved settings; enabling them reveals those settings again. A setting for one skill never changes another skill. Unsupported or ineffective controls are omitted; the separate legacy Enable/Disable controls remain available. Hover and keyboard-focus details explain area origin, angle, dimensions, damage/healing tradeoffs, control timing and target meaning, including rank-adjusted potency.
 
 Current supported Skill Preferences may include:
 
@@ -1238,15 +1256,16 @@ Current supported Skill Preferences may include:
 - Penitent's Gift Self HP Threshold up to the current prototype cap
 - Eternal Hope Use Threshold up to the current prototype cap
 - Overcharge enabled or disabled
-- Mobility Skill Use as Offensive or Defensive
-- Defensive Mobility Threshold up to the current prototype cap
-- Support Focus or Support Skill Focus selection for lowest-health ally, leader, or Defender
-- FireBurst Target selection for Big Group, Low HP, or High HP
-- Circle of Renewal Target selection for Big Group, Low HP, or Defender
+- Offensive or Defensive use and defensive HP threshold separately for each supported mobility skill
+- Ally focus separately for each supported healing or support skill
+- Area variants and target priorities only on the individual skills listed above
+- Circle of Renewal Target selection for High HP, Big Group, Low HP, or Defender
 - Circle Main Target HP Threshold up to the current prototype cap
 - legacy Beginner skill toggles when eligible
 
 Skill Preferences must remain backed by game-logic behavior settings and should not define skill targeting, healing rules, or support behavior inside React UI.
+
+Valid saved per-skill settings take precedence. Legacy shared choices seed individual entries once; subsequent changes remain independent. Settings survive class changes, reserve/Field Team roster movement and restoration, with malformed or unsupported options falling back to authored defaults. Preference edits affect subsequent uses, never an active channel. Transient areas and post-knockback effects clear on restoration without a save-version change. New area visuals use companion palettes and blue skill-name feedback in the full renderer only, not the minimap.
 
 The Party menu is not the primary place for whole-party decisions such as role assignment, party order, formation, or behavior settings.
 
