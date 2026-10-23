@@ -389,9 +389,12 @@ describe("entity visual assets", () => {
     expect(MAP_VISUAL_OBJECT_SRC.nightmire_bat_roost_dead_tree).toBe(
       "/assets/world/props/regions/nightmire-canopy/bat_roost_dead_tree.png",
     );
-    expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_heavy_orc_spike_barricade).toBe(
-      "/assets/world/props/regions/orc-warcamp/heavy_orc_spike_barricade.png",
+    expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_barracks).toBe(
+      "/assets/world/props/regions/orc-warcamp/barracks.png",
     );
+    expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_barracks_ruined).toBe("/assets/world/props/regions/orc-warcamp/barracks-ruined.png");
+    expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_cage_closed).toBe("/assets/world/props/regions/orc-warcamp/cage-closed.png");
+    expect(MAP_VISUAL_OBJECT_SRC.orc_warcamp_cage_open).toBe("/assets/world/props/regions/orc-warcamp/cage-open.png");
     expect(GAMEPLAY_HUD_CONTROL_SRC.autoCombatOn).toBe(
       "/assets/ui/controls/gameplay/auto_combat_on.png",
     );

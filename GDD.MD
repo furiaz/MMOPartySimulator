@@ -535,8 +535,19 @@ Current prototype enemy variants:
 - A subzone can have at most one living Superior enemy at a time.
 - Superior enemies have increased health, attack, defense, magic defense, XP, drop tables, render scale, and a visible renderer aura.
 - Superior enemy spawning may happen during map spawn, enemy respawn, or explicit debug forcing.
+- A directly defeated Superior enemy grants 2 kill credits to matching NPC defeat-count objectives and taken Guild Notice Board kill objectives. Quest-item drops still roll once per defeated enemy, and aggregate Guild Field Team kill reports remain 1 credit per reported kill.
 
 Superior enemies are prototype rare-variant behavior, not final elite design, named boss design, affix design, or production rare-monster tuning.
+
+Encounter bands describe an individual authored enemy spawn, independently of its enemy type and Superior variant:
+
+- Standard is the default band for ordinary spawns. A Standard enemy may still spawn as a Superior.
+- Elite is a deliberately designed, stronger area monster based on the area's average enemy strength, rather than an ordinary enemy made stronger by the Superior roll.
+- Champion is reserved for future handcrafted special-arena enemies and is not the final challenge of a tier.
+- Boss is the end-of-tier challenge, generally placed around a tier boundary such as levels 9–10, 19–20, or 29–30.
+- Hover inspection shows the rank for Elite, Champion, and Boss enemies; Standard rank is omitted, and rank does not appear in world nameplates.
+
+The Azure Mass and the single Orc Warmaster in Orc Warcamp are Bosses. The Orc Warmaster is authored once in the Warmaster encounter area. Encounter-band labels currently classify spawns only; they do not independently change stats, AI, drops, XP, or Superior behavior.
 
 Current prototype enemy scaling:
 
@@ -588,12 +599,30 @@ Prototype enemy AoE behavior is debug combat-test and early enemy-skill behavior
 
 Current prototype companion AoE channel behavior:
 
-- Shield Shockwave may briefly channel a circular party-offensive area before impact
-- Maul Sweep may briefly channel a circular party-offensive area before impact
-- companion AoE channels resolve against living enemies inside the locked circle at impact
-- Shield Shockwave may damage and bind affected non-dummy enemies
-- Maul Sweep may damage and disarm affected non-dummy enemies
+- Shield Shockwave and Maul Sweep retain their 0.2-second channels; other currently immediate companion area skills remain immediate
+- each use snapshots its selected variant, origin, direction and rank-adjusted effect coefficient; effects and full-world visuals reuse the same resolved geometry
+- living actor centers determine inclusion; damaging areas intersect hostile structure attackable rectangles once, even when shape primitives overlap
+- Shield Shockwave's circle binds for one second and taunts for five; its cone stuns for one second, pushes up to two units at 16 units/second, then taunts for three seconds from actual movement completion
+- cone evasion prevents damage and control; blocking or absorption does not stop the push. Terrain and full-body safe landings can shorten displacement; a fully blocked push starts taunt immediately
+- Maul Sweep retains its existing disarm, including the full-circle damage tradeoff
 - companion AoE channels are temporary skill runtime behavior, not a final casting, telegraph, or player-authored area-targeting system
+
+Companion area variants (world units; damage coefficients below are rank one, with existing rank and combat modifiers preserved):
+
+| Skill | Variants | Default |
+|---|---|---|
+| Sweeping Strike | Caster-centered 180-degree semicircle, radius 2: 1.5× Attack uniformly per recipient; full radius-2 circle: 1.05× Attack (70% normal skill damage), without primary/splash distinction | Semicircle |
+| Shield Shockwave | Caster-centered radius-2 circle or forward 180-degree cone reaching 2; both 0.7× Attack, with the control sequencing above | Circle |
+| Arrow Burst | Forward 6×1.5 line or 90-degree cone reaching 3.4; both 1.2× Attack | Cone |
+| Maul Sweep | Caster-centered radius-2 180-degree semicircle: 1.15× Attack; full circle: 0.805× Attack, both with existing disarm | Semicircle |
+| FireBurst | Selected-enemy-centered radius-3 circle (area 28.27), 13-square cross or X (area 29.25), or centered 9×3 strip (area 27); normal magic damage and Burn for all | Circle |
+| Circle of Renewal | Selected-ally-centered radius-5 circle, or radius 5√0.7 (about 4.18) with exactly 70% area and 130% normal healing | Normal circle |
+| Dawn Step | Radius-2 circle or five-square cross; offensive effects at landing, defensive effects at departure; existing disarm | Circle |
+| Atonement Step | Same circle/cross choices; offensive landing disarms, defensive departure heals other injured allies; existing HP cost and safety rules | Circle |
+
+Square patterns use touching 1.5×1.5 squares and rotate smoothly in world space. FireBurst's directional patterns align caster-to-target, with three squares per arm on its cross/X. Rune Step uses one fixed true radius-2 circle under its existing offensive/defensive rules, without shape or target-priority choices. Shield Challenge, Threatening Roar and party-wide buffs remain unchanged. No rings or orbiting effects are introduced.
+
+Sweeping Strike, Shield Shockwave and Maul Sweep use normal attack context and current combat facing, without target-priority settings or priority-driven approach movement. Arrow Burst and FireBurst offer High HP / Big Group / Low HP. Dawn Step and Atonement Step offer those priorities only for offensive approaches; defensive escape remains threat-based. Renewal also offers Defender. Big Group is the default and scores the actual selected shape, including valid prospective mobility landings. High HP uses remaining HP; Low HP uses HP percentage. Healing main targets must remain living, injured and satisfy their HP threshold. Distance and ID break ties deterministically. Manual targeting and movement safety remain authoritative, and Barracks are never discovered as autonomous skill targets.
 
 Current prototype enemy archetype/family ids:
 
@@ -880,6 +909,15 @@ Current prototype crafting behavior:
 - current craftable equipment covers prototype level 1, 5, 10, and 15 equipment paths where recipes exist
 - current key item crafting may include the Harbor Union Bastion Teleportation Echo
 - successful crafting may advance explicit crafting quest objectives
+
+Equipment recipe material rules (Issue #683):
+
+- Prefer materials available at or below the equipment's level. Armor, accessories, shields, quivers, talismans, and other non-weapon offhands may use sources at most 2 levels above the item; weapons, including weapons used offhand, may use sources at most 3 levels above it.
+- Above-level materials are supplementary: each quantity must be smaller than the main gathered ingredient's quantity (the largest gathered-material quantity when several are used).
+- Source level means the earliest reliable source of the exact material tier: a normal authored enemy, an authored gathering location, or the acquisition source of the producing Livestock creature. Superior variants do not increase source level.
+- Every equipment recipe must comply, including recipes for consumed previous equipment. These are content-authoring rules, not new material equip requirements, player crafting gates, or restrictions on slotless key-item recipes.
+- Corrected level-10 recipes use appropriate Goblin/Imp parts or older Wolf Pelts instead of level-18 Orc parts; level-15 Sentinel Boots and Bastion Sabatons use Briar Wolf Pelts. Level-10 pendants use Iron Ore instead of Tin Ore; level-15 pendants retain Tin Ore from Tin Crawler Livestock.
+- Orc Hide and Orc Tusk retain their drops and sale values but have no current crafting use after these corrections. New uses require separate design approval.
 
 This is not the full inventory, wallet, equipment economy, shop, crafting, trading, bank, loot, backend persistence, cloud save, account save, or cross-device persistence system.
 
@@ -1202,7 +1240,7 @@ Current Skills UI may show:
 
 Active skills are grouped by class. Learned earlier-class active skills may appear in a separate legacy section when they have reached the fixed rank-5 eligibility threshold. Passives appear in a separate passive presentation and never show legacy controls.
 
-Skill Preferences may show supported skill behavior settings.
+Skill Preferences show independent entries under each learned current-class skill's exact name and for enabled legacy skills with supported controls. Disabled legacy skills hide their preference cards without deleting saved settings; enabling them reveals those settings again. A setting for one skill never changes another skill. Unsupported or ineffective controls are omitted; the separate legacy Enable/Disable controls remain available. Hover and keyboard-focus details explain area origin, angle, dimensions, damage/healing tradeoffs, control timing and target meaning, including rank-adjusted potency.
 
 Current supported Skill Preferences may include:
 
@@ -1218,15 +1256,16 @@ Current supported Skill Preferences may include:
 - Penitent's Gift Self HP Threshold up to the current prototype cap
 - Eternal Hope Use Threshold up to the current prototype cap
 - Overcharge enabled or disabled
-- Mobility Skill Use as Offensive or Defensive
-- Defensive Mobility Threshold up to the current prototype cap
-- Support Focus or Support Skill Focus selection for lowest-health ally, leader, or Defender
-- FireBurst Target selection for Big Group, Low HP, or High HP
-- Circle of Renewal Target selection for Big Group, Low HP, or Defender
+- Offensive or Defensive use and defensive HP threshold separately for each supported mobility skill
+- Ally focus separately for each supported healing or support skill
+- Area variants and target priorities only on the individual skills listed above
+- Circle of Renewal Target selection for High HP, Big Group, Low HP, or Defender
 - Circle Main Target HP Threshold up to the current prototype cap
 - legacy Beginner skill toggles when eligible
 
 Skill Preferences must remain backed by game-logic behavior settings and should not define skill targeting, healing rules, or support behavior inside React UI.
+
+Valid saved per-skill settings take precedence. Legacy shared choices seed individual entries once; subsequent changes remain independent. Settings survive class changes, reserve/Field Team roster movement and restoration, with malformed or unsupported options falling back to authored defaults. Preference edits affect subsequent uses, never an active channel. Transient areas and post-knockback effects clear on restoration without a save-version change. New area visuals use companion palettes and blue skill-name feedback in the full renderer only, not the minimap.
 
 The Party menu is not the primary place for whole-party decisions such as role assignment, party order, formation, or behavior settings.
 
@@ -1373,10 +1412,55 @@ Current Guild & Inn behavior:
 
 - the shared service is opened through the Atlas where supported or by interacting with the Guild Coordinator or Inn Keeper in hubs where they are present
 - Guild Recruit shows generated recruit candidates, refresh timing, recruitment upgrades, and destination preview
-- Guild Notice Board shows available, taken, and done board quests, quest refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, rewards, and unseen update sign state
+- Guild Notice Board shows available, taken, and done contracts in four categories: Assault, Extermination, Rummage, and Forage, with descriptions, objectives, rewards, refresh timing, Scout and Wolf-helper rerolls, source breakdown tooltips, and unseen update sign state
+- New parties receive a fixed `Assault on Ash Goblin Encampment` starter contract requiring 50 total ordinary-enemy credits in Zone 4, with 575 character XP, 150 base Crowns, and two independently rolled first-class skill books
+- The available starter contract is protected from scheduled refreshes and rerolls until taken. Other eligible slots may still reroll, and a reroll is not consumed when no slot can change.
+- All Notice Board progress begins only after a posting is taken. After the starter is taken, its completion, claiming, refresh, and cancellation follow normal Board behavior; cancellation does not undo the Guild onboarding outcome.
 - Guild Field Teams manage inactive companion assignment, roster movement, upgrades, AFK assignments, redeeming rewards, and return-to-hub behavior
 - Inn Rooms show every recruited companion as occupying a room slot, including active party, Inn reserve, and Field Team companions
 - Inn Kitchen cooks per-companion meals, manages selected recipes and auto-cook preferences, spends Hearth's Fire, and exposes Recipe Book, Pantry, and Kitchen upgrades
+
+Tier 2 Guild Notice Board contract rules:
+
+Ordinary postings target visited Zones 4–7 only. Zones 1–3, hubs, dungeons, and unvisited destinations are excluded. The fixed Zone 4 starter is the onboarding exception: it is available before the party first visits that map. With no eligible visited zone, ordinary slots stay empty.
+
+When generating a posting, compare the arithmetic mean level of all active companions, including dead active members but excluding Inn reserves and Field Teams, with each visited destination's mean ordinary-monster-type level. Choose from zones within ±5 levels with 80% probability and from other eligible visited zones with 20%; use the nonempty group exclusively when the other group is empty, and choose uniformly within the selected group. Recruitment and new visits affect future generation, not existing postings.
+
+Each slot independently chooses one of the four categories with equal probability. Duplicate zones, categories, or targets are allowed, and matching taken contracts can progress concurrently. Monster pools come from authored Standard encounters; Bosses, Elites, Champions, target dummies, and structures are excluded. Superior variants qualify through their underlying ordinary type, not as a separate contract target. Ordinary Barrack reinforcements count normally.
+
+| Category | Objective | Contract name |
+|---|---|---|
+| Assault | One shared ordinary-enemy kill-credit counter throughout the target map | `Assault on {Zone}` |
+| Extermination | One uniformly selected ordinary monster type in the target map | `{Enemy} Extermination in {Zone}` |
+| Rummage | Contract-specific supplies from ordinary enemies in the target map | `Rummage of {Zone}` |
+| Forage | Any successfully inventoried wood, ore, or herb units gathered in the target map | `Forage in {Zone}` |
+
+| Zone | Assault / Extermination credits | Rummage items | Forage units | Base Crowns |
+|---|---:|---:|---:|---:|
+| 4 — Ash Goblin Encampment | 50 | 30 | 10 | 150 |
+| 5 — Briar Burrows | 70 | 42 | 15 | 200 |
+| 6 — Nightmire Canopy | 90 | 54 | 20 | 250 |
+| 7 — Orc Warcamp | 110 | 66 | 25 | 300 |
+
+Progress is capped at the requirement. Direct Superior defeats grant two Assault or Extermination credits. Rummage instead rolls once per qualifying physical death per matching taken contract at exactly 50%, independently between contracts, with no pity or Superior quantity multiplier. `Recovered Supplies — {Zone}` appear in the quest pouch without occupying inventory slots; they belong only to that posting and disappear on cancellation or completed reward claiming.
+
+Forage counts only units successfully added to inventory by gathering. Existing inventory, purchases, Farm or Livestock outputs, Field Team resources, failed inventory additions, and merely depleting a node do not count. Gathered materials are not consumed when claiming. Field Teams contribute only reported kills to matching-map Assault or Extermination contracts, at one credit per reported kill; they do not generate Rummage supplies or Forage progress.
+
+Base XP, base Crowns, and random book outcomes are fixed when a posting is generated. Let `N` be its zone's kill requirement, `R` its Rummage requirement, and `M` the arithmetic mean normal XP of eligible monster types:
+
+- Assault and Forage: `floor(0.5 × N × M)` character XP.
+- Extermination: `floor(0.5 × N × target monster normal XP)` character XP.
+- Rummage: `floor(0.5 × (R ÷ 0.5) × M)` character XP.
+
+Round down only after the complete calculation. Generation uses normal authored enemy XP without Superior bonuses, player-level penalties, or debug multipliers. Claiming grants the full XP amount to each eligible living current-party companion through existing reward/leveling rules, including normal max-level and debug handling.
+
+Every new posting stores two independent, uniform first-class skill-book results across all eight first classes, excluding Beginner books; duplicates are allowed. It also stores an independent third-book candidate and chance roll. Reward Quality is applied at claim time: levels 1/2/3 grant 100%/110%/120% of base Crowns and a 0%/10%/20% chance of the third book, without scaling XP. Viewing, loading, or retrying a claim never rerolls rewards.
+
+Board interaction claims each completed contract atomically. If all awarded books cannot fit, including duplicate stacks and any bonus book, grant nothing and retain the done/unclaimed contract with inventory-full feedback. Taken and done/unclaimed contracts cannot be refreshed or rerolled away.
+
+The Board clock advances independently of the Guild menu and continues while menus pause combat. Opening or rendering the Board does not generate or retarget postings. Targets and rewards are snapshotted only on generation, scheduled refresh, or manual reroll; newly purchased slots are initialized by the game clock. Existing slot counts, refresh upgrades, and Scout/Wolf reroll limits remain unchanged. Restoration processes at most one overdue refresh, not every missed interval.
+
+Valid legacy taken/done contracts keep their original requirements, progress, and rewards without retroactive XP or new book rolls. Available legacy ordinary postings change only on their next actual refresh/reroll. An untaken legacy starter is upgraded once on restoration while preserving its identity and onboarding state. These optional contract fields require no save-version bump. Board contracts do not add World Travel route hints or new Auto Combat priorities.
 
 Current Farm behavior:
 
@@ -1481,6 +1565,9 @@ Supported prototype quest objective type definitions:
 - unlock route
 - collect dungeon chest
 - return to POI
+- take Guild Notice Board quest
+
+Encounter-milestone objectives read durable Boss victory, captive rescue, or full chest collection without creating another encounter or NPC.
 
 Current prototype quest content currently uses:
 
@@ -1500,6 +1587,7 @@ Current prototype quest content currently uses:
 - craft item
 - unlock route
 - collect dungeon chest
+- take Guild Notice Board quest
 
 Talk-to-POI and return-to-POI objective types are lightweight type support and should not be treated as implemented quest content unless a quest definition uses them.
 
@@ -1551,11 +1639,15 @@ Current prototype quests:
   - Quest id: hold_the_field_cache
   - Objectives: defend the Old Grove field cache while quest-spawned enemies attack
   - Rewards: 75 Crowns, 28 character XP, 1 Soldier's Recovery Flask
-  - Unlocks: Open the Wolf Causeway
+  - Unlocks: Open the Causeway
 
-- Open the Wolf Causeway
+- Open the Causeway
   - Quest id: open_wolf_causeway
-  - Objectives: escort the Causeway Worker, defend the Wolf Causeway blockage, defeat the causeway elite, and unlock the map-3 route
+  - Objectives: escort the Causeway Worker, repair the Wolf Causeway blockage for 10 seconds while defeating its three ambushers (two Wolves and one Goblin Thrower), defeat the tracked level-8 Superior Wolf, and unlock the map-3 route
+  - The 10-second repair defense begins with the Causeway Worker saying, “Its an ambush! Protect me!”
+  - The repair step completes only after both the full repair timer and all three ambushers are defeated. The tracked Superior Wolf is the encounter’s second step and appears only after the repair defense ends.
+  - Ambient enemies remain suppressed across both steps and return three seconds after the tracked Wolf is defeated.
+  - The quest Wolf is a Superior variant with Standard encounter rank. It uses normal Superior combat and rewards; unrelated Superior Wolves do not count.
   - Rewards: 100 Crowns, 40 character XP, 1 Bulwark Cuirass, 1 Plain Charm
   - Unlocks: Broken Thicket Survey
 
@@ -1582,9 +1674,64 @@ Current prototype quests:
   - Objectives: enter Slimeward Floor 1, defeat The Azure Mass on Slimeward Floor 2, and collect the Slimeward boss chest
   - Rewards: 100 Crowns, 1500 character XP
 
-The Quest Giver in Harbor Union Bastion can accept available Quest Giver quests and turn in ready Quest Giver quests from anywhere in that hub while the Quest Giver is present.
+- Orders from the Guild
+  - Quest id: orders_from_the_guild
+  - Availability: The Azure Trial is completed and at least one active or resting roster companion has selected a first class
+  - Objective: take the fixed `Assault on Ash Goblin Encampment` Guild Notice Board contract
+  - Rewards: none
+  - Unlocks: Break the Ash Camp after normal turn-in
+
+- Break the Ash Camp
+  - Quest id: break_the_ash_camp
+  - Objectives progress in parallel: earn 200 direct enemy kill credits in Ash Goblin Encampment, successfully collect 20 Wood, Ore, or Herb units from that map, and equip one class-restricted first-class weapon on an active party companion
+  - Training Sword variants and offhand-only shields, quivers, talismans, and daggers do not satisfy the weapon objective
+  - The equipment objective remains complete after it is first satisfied
+  - Rewards: 500 Crowns and 1800 character XP
+  - Unlocks: Into the Briar Burrows
+
+- Into the Briar Burrows
+  - Quest id: into_the_briar_burrows
+  - Objectives progress in parallel: earn 300 direct enemy kill credits in Briar Burrows, own one Tin Crawler Hatchling, and have at least 3 active party companions
+  - Existing Tin Crawler ownership and active-party size are recognized immediately; resting and Field Team companions do not count toward the party-size objective
+  - The Hatchling is not consumed and retains the existing first/second/further discovery chances of 10%/5%/1%
+  - Rewards: 750 Crowns and 2800 character XP
+  - Unlocks: The Patron's Shadow
+
+- The Patron's Shadow
+  - Quest id: the_patrons_shadow
+  - Objectives progress in parallel: charge and break the Night Bat, Elder Mossling, and Cinder Wisp Patron Wards, and own one Elder Mossling Livestock creature
+  - Each Ward requires 100 matching Nightmire Canopy enemy credits before it can be manually activated; ambient Superior enemies grant 2 credits and quest-spawned Ward defenders are always normal variants
+  - Ward defenses may be completed in any order and use waves of 3+3 Night Bats, 4+4 Elder Mosslings, and 3+3+4 Cinder Wisps respectively
+  - Rewards: 1000 Crowns and 4000 character XP
+  - Unlocks: The Evil Patron's Chosen
+
+- The Evil Patron's Chosen
+  - Quest id: the_evil_patrons_chosen
+  - Available from the Forward Bastion Quest Giver after The Patron's Shadow is turned in; non-repeatable
+  - Display objectives in this order: defeat the Orc Warmaster once, free the captive, fully collect the Warmaster's chest, and earn 150 Orc kill credits in Orc Warcamp
+  - All four progress in parallel. Orc kills count after acceptance, including Grunts, Raiders, Shieldbearers, the Warmaster and Barrack reinforcements; normal enemies grant 1 credit and Superiors 2, capped at 150
+  - Prior Boss victory, automatic captive rescue and fully collected chest milestones count on acceptance and remain complete through later attempts, rearming, travel and loading; ordinary kills before acceptance are not banked
+  - Chest completion requires its Crowns and every pending item to be collected; opening it or leaving inventory overflow does not qualify
+  - Rewards: 1500 Crowns once and 6000 character XP for each eligible living current-party companion, separate from Boss XP/drops and chest rewards
+  - No further quest unlock
+
+Quest definitions own their quest-giver map. Quest Givers in Harbor Union Bastion and Forward Bastion can accept their available quests and turn in their ready quests from anywhere in the matching hub while that Quest Giver is present.
 
 The Class Mentor may act as the current prototype quest source for The Azure Trial.
+
+`Orders from the Guild` is reconciled after Azure Trial turn-in, successful first-class selection, and save restoration so either requirement may be completed first. Taking its starter Board contract before accepting the onboarding quest satisfies the objective immediately when the quest is later accepted. The Board take action owns this progress in game logic rather than React UI.
+
+`Break the Ash Camp` counts only resource quantities successfully added to inventory from `map-4` / `ash-goblin-encampment`; failed full-inventory collection does not progress the quest. A generic gather objective may omit a resource type to match any supported resource while retaining its map and subzone restrictions.
+
+`Into the Briar Burrows` uses state-derived Livestock ownership and active-party-size objectives. Incomplete state-derived objectives reconcile on quest acceptance, the matching roster or Livestock action, and save restoration; once completed, they remain complete.
+
+Quests may author first-incomplete objective guidance independently of parallel progression. The Evil Patron's Chosen guides toward the Boss, any remaining rescue/chest milestone, then remaining Orc kills; turn-in routes to Forward Bastion once ready. Tracker labels use optional authored objective names. Manual orders and self-defense retain priority. If the player re-enables Auto Combat after victory, guidance may approach the chest but never claims it automatically.
+
+`The Patron's Shadow` places three manually activated Wards around the Nightmire Canopy route to Orc Warcamp. Only one Ward defense can be active at a time. Starting a defense removes all ambient Nightmire enemies and leaves only the matching quest defenders. Failed, abandoned, wiped, or interrupted defenses reset to charged-and-ready without requiring another 100 credits. Ambient enemies return at full health near their authored homes 2 seconds after the defense ends unless another Ward begins during that breathing period.
+
+During an active quest defense, Auto Combat prioritizes that encounter's living defenders and holds at the defense anchor between waves. Focus continues across sequential objectives that hand off the same ambient-enemy suppression group, targeting the current objective's quest enemies or holding near its target position before they appear. It does not select resource POIs, and autonomous Gatherer-role companions rejoin the party instead of starting or continuing autonomous gathering. Manual party gathering and direct companion gathering commands remain allowed and may still cause the existing retreat/reset behavior. Focus ends when the current encounter objective completes or resets; a remaining ambient-enemy restoration delay does not extend it.
+
+Completing the third Ward unlocks the Orc Warcamp route before quest turn-in. The dark-green collision barrier around the teleporter fades, and an untargetable Orc Warmaster scene actor says `You have drawn the Patron's gaze. Come, then.`, remains visible for 3 seconds, then fades through the portal. Existing saves that had already reached Orc Warcamp preserve that access without replaying the barrier scene.
 
 Current lightweight NPC speech bubble behavior:
 
@@ -1592,6 +1739,8 @@ Current lightweight NPC speech bubble behavior:
 - service NPC speech may provide a short role tip while the existing service UI opens normally
 - Quest Giver and Class Mentor speech may reflect ready, available, or active quest state through authored hints
 - supported dog NPCs may show a short bark without opening a service panel
+- world speech bubbles prefer centered-above placement, shift horizontally around registered HUD regions, fall below the speaker when needed, and remain clamped inside the usable world viewport; their tails continue to point toward the speaker
+- the Orc Warmaster Ward finale uses the same HUD-aware speech placement so its sentence remains readable beside the minimap and coordinate panel
 - speech is presentation-only, does not pause simulation, does not persist in saves, and does not change quest or NPC behavior
 - Bank Chests, dungeon chests, and temporary quest-objective NPCs do not use this speech presentation
 - this does not implement branching dialogue, choices, conversation history, relationships, cutscenes, or a full dialogue system
@@ -1610,8 +1759,11 @@ Current prototype quest guide behavior:
 - repair objectives can be progressed by a nearby party member or quest guide NPC
 - repair progress pauses if the repair actor is targeted by an enemy
 - defend objectives can spawn quest enemies during repair progress
-- defend objectives may temporarily suppress normal enemies in the objective subzone, including living and defeated normal enemies, so the defense encounter can use quest-spawned attackers cleanly
-- normal enemies suppressed for a defend objective restore together 3 seconds after that defense objective completes
+- a defend objective may opt into requiring all configured defender waves to be defeated as well as completing its repair timer; without this setting, existing timer-only defense behavior is unchanged
+- quest objectives may data-drive ambient-enemy suppression for a map or subzone, including living, defeated, respawning, normal, and Superior ambient enemies while leaving target dummies and quest-spawned enemies untouched
+- suppression groups allow consecutive objectives to share captured enemies and cancel a pending restoration without briefly repopulating the area
+- suppressed enemies restore together after the objective's configured delay, at full health and near safe authored home positions; each objective chooses whether original variants are preserved or rerolled
+- the existing field-cache and Wolf Causeway defenses use subzone suppression, a 3-second delay, and variant rerolls; the Patron Wards share map-wide suppression, a 2-second delay, and preserved variants
 - living quest-spawned defense enemies are cleaned up when the defense objective completes
 - defeat elite objectives can spawn an aggressive quest enemy
 - unlock route objectives complete the associated route step
@@ -1626,8 +1778,8 @@ Current prototype world quest indicator behavior:
 - enemy name text remains unchanged; the `!` is a separate visual prefix
 - active incomplete main quest enemy, resource, guide NPC, rescue NPC, and explicit POI/NPC objectives may mark matching living or active entities on the current map
 - available and ready-to-turn-in NPC quests may mark their quest giver NPC
-- taken incomplete Guild Notice Board kill objectives may mark matching living enemies
-- completed objectives, completed quests, available Notice Board quests, and done Notice Board quests do not mark enemy targets
+- taken incomplete Guild Notice Board combat and Rummage objectives may mark matching living ordinary enemies on the target map; Forage objectives may mark active resources on that map
+- completed objectives, completed quests, available Notice Board quests, and done Notice Board quests do not mark objective targets
 - an entity shows at most one quest `!` even if multiple quests match it
 - a future Notice Board-specific alternate icon may exist later, but it is not part of the current prototype behavior
 
@@ -1635,7 +1787,7 @@ Current prototype quest reward behavior:
 
 - ready quests can grant rewards through Quest Giver turn-in
 - rewards may include Crowns, character XP, inventory items, and equipment items
-- current quest rewards do not grant skill books unless a quest definition explicitly adds them later
+- current NPC quest rewards do not grant skill books unless a quest definition explicitly adds them later; Guild Notice Board contracts have their separate first-class book rewards
 - quest rewards are all-or-nothing
 - reward values are validated before state changes are applied
 - if every reward can fit, all rewards are granted and the quest completes
@@ -1649,6 +1801,7 @@ Current prototype quest reward behavior:
 - non-repeatable quests grant rewards once total
 - completed quests may unlock later quests
 - later quests may require specific earlier quests to be completed
+- direct Superior kills grant 2 credits to matching defeat-count objectives without multiplying elite objectives, quest-item drops, resources, equipment requirements, or other objective quantities
 
 Prototype POI direction may choose local targets for auto-mode behavior.
 
@@ -2511,6 +2664,7 @@ Current Forward Bastion prototype hub:
 - It is a safe forward settlement connected between Azurefen Hollow and Ash Goblin Encampment.
 - It currently includes basic hub services, a Guild & Inn building, Farm and Livestock service anchors, decorative structure visuals, a healing fountain, and physical route teleports.
 - Current placeholders may include Quest Giver, Merchant, Smith, Bank Chest, Guild Coordinator, Inn Keeper, Farmer, Livestock keeper, and dog NPCs.
+- The Quest Giver owns the current Guild Notice Board onboarding quest and the Ash Goblin Encampment main quest.
 - The Class Mentor may appear in Forward Bastion through current quest-aware hub NPC data.
 - The standalone Bounty Board NPC is removed; board work is accessed through the Guild & Inn Notice Board UI.
 - The Guild Coordinator and Inn Keeper open the current Guild & Inn Atlas service page.
@@ -2579,6 +2733,7 @@ Current non-working starter routes:
 
 - `map-1` -> `map-2`
 - `map-2` -> `map-3`
+- `map-6` -> `map-7` until all three Patron Wards have been completed, except for legacy saves that already reached map-7
 - `hub-2` north route placeholder
 - `hub-2` east route placeholder
 - `slimeward-camp` broken exit placeholder
@@ -2619,7 +2774,65 @@ Current post-Hub-2 wilderness structure:
 - Ash Goblin Encampment contains Goblin Shaman level 10, Ash Wisp level 11, and Ember Imp level 12. Ember Imps use the telegraphed reusable Fire Bolt before returning to their normal ranged basic attacks.
 - Briar Burrows contains Tin Crawler level 13, Briar Wolf level 15, and Mire Spider level 15.
 - Nightmire Canopy contains Night Bat level 16, Elder Mossling level 17, and Cinder Wisp level 18.
+- Nightmire Canopy's three Patron Wards reuse the Bat roost tree, Elder Moss stump, and Cinder-veined stone landmarks near the Orc Warcamp teleporter. Uncompleted Wards and their quest defenders show the looping dark-green Orc aura as a narrative marker rather than a combat bonus.
+- The Orc Warcamp teleporter is covered by a radius-5 dark-green barrier until the third Ward is completed; its visual circle and collision use the same authored geometry, and the barrier is omitted for legacy-preserved access.
 - Orc Warcamp contains Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, and Orc Warmaster level 20.
+
+Planned Orc Warcamp layout (Issue #678):
+
+- Keep the overall map footprint the same as Nightmire Canopy.
+- Use roughly 60% of the map for a broad, freely accessible Orc field, about 15% for a vertical route, and the remaining 25% for the Warmaster arena. These are layout targets, not exact partition boundaries.
+- Keep the open field useful for repeatable Orc farming and backtracking; loose enemy squads may organize the field, but players do not need to clear it as a mandatory sequence of checkpoints.
+- Start the route near the top of the field, run it downward, and enter the arena from below. Place one Orc squad and a destructible, health-bearing, non-attacking Barrack along the vertical passage. Keep walkable lanes beside the living Barrack, so destroying it is optional rather than required to advance; retain the passage's outer walls.
+- The compact arena spans X80.5–108.5 and Y21.5–51.5 within the unchanged 110×57 map. Its former northern footprint is solid terrain. Three arena Barracks stand at (88,29), (95,26) and (102,29), around the Warmaster and dais at (95,32). Keep clear central movement and AoE space, the southern gate at (87,51), cage at (88,45) and chest at (102,45).
+- The arena entrance may use a dark-green circular collision barrier following the visual and collision behavior of the Nightmire Patron Ward barrier. Its open/closed progression is separate from the fixed map layout, and it must not trap the party inside the arena.
+
+Current Orc Barracks behavior (Issue #679):
+
+- All four Barracks are manually targetable hostile combat structures, never autonomous Auto Combat targets. Basic attacks, projectiles, damaging skills and incidental AoEs can damage them; DoTs work, while crowd control and aura buffs do not.
+- Each has six times normal level-18 Orc Grunt health (currently 1,248 HP), zero attack, defense, magic defense, evasion and block. The route artwork and attackable rectangle are 5×5 units; arena artwork and attackable rectangles are 3×3. Their smaller bottom-aligned 5×2 and 3×1 ground footprints define movement collision only. Companions attack from any reachable position in range of the attackable rectangle, without crowding the building center; unrelated walls still block direct attacks. Any AoE intersection with the attackable rectangle counts once, including roof-area and boundary contact, while ring holes remain empty.
+- The route Barrack requires a living active companion within 10 units and clear line of sight. Arena Barracks instead require an active Warmaster attempt and a visible living active companion anywhere inside the arena, without the ten-unit restriction. Walls and solid map collision obstacles block visibility; companions and enemies do not. Each uses a twelve-second preparation cycle, including the first spawn. The route Barrack caps at five living owned reinforcements; each arena Barrack caps at two, for six arena reinforcements total. Spawn weights remain 80% Orc Grunt, 10% Orc Raider and 10% Orc Shieldbearer. They use normal type levels, abilities and rewards, never roll Superior and do not independently respawn. Existing over-cap reinforcements remain alive; their building pauses production until fewer than its configured cap remain.
+- Preparation pauses without losing progress when activation requirements fail or the cap is reached. Losing visibility or the active attempt also preserves any completed preparation and pending rolled type. Blocked spawn positions retain the finished preparation and rolled type until a reachable, body-clear candidate is available; there are no catch-up production bursts or immediate opening wave.
+- Destruction replaces the healthy building with ruined artwork at its unchanged visual size and ground anchor, removing collision, attack commands and combat overlays. Ruins are nonblocking and untargetable. Destruction grants no XP, drops, quest kills, flask recharge or enemy-kill triggers. Existing reinforcements remain alive and continue counting against its cap.
+- Each Barrack independently rebuilds at full health two minutes after destruction, including during Boss combat. At the deadline, physically overlapping living companions and enemies may be safely separated to the nearest valid local positions outside its ground footprint. Full bodies, terrain, other occupants, enemy movement bounds and reservations must all fit; corrections are planned together and applied only if every blocker can be placed safely. This is position correction, not combat knockback: health, statuses, targets, casts, cooldowns, gathering state and player orders remain unchanged. NPCs, resources, terrain and other structures are never displaced. Active/pending dashes, forced movement, reservation-only blockers or unsafe landings defer rebuilding, with blocked clearance checks at most once every 250 milliseconds.
+- Rebuilding swaps back to the healthy artwork, starts a fresh preparation cycle and keeps surviving reinforcement ownership. The defeated Warmaster arena freezes its three Barracks until the completed-clear lifecycle below rearms them; frozen buildings neither rebuild independently nor give repair warnings. The route Barrack remains independent.
+- Health, preparation, monotonic reinforcement IDs, rebuild deadlines, the route tutorial-seen flag and whether the current repair warning has played survive saves and travel. Increasing Barrack durability preserves each living building's health percentage; destroyed buildings remain destroyed. Older saves safely relocate full actor bodies out of reclaimed terrain and moved buildings, repair reinforcement homes and rebind the Warmaster's home without changing companions' life state or progression. No reinforcements are produced offline. Map exit removes local reinforcements without defeat rewards; a same-map restoration retains valid owned reinforcements. An overdue rebuild occurs only on the active map after safe clearance.
+- Living Barracks show health, preparation and pulsing hostile outlines. The route Barrack introduces manual targeting with “Click the Barrack to attack it” and one five-second HUD-aware speech bubble when production begins after approaching or rebuilding; loading does not replay it. Arena Barracks omit the tutorial. All four buildings say `Work Work` once per destruction/rebuild cycle, ten seconds before their rebuild deadline, using the same five-second bubble and final half-second fade. An occupied footprint does not repeat or postpone the line; loading clears transient speech, preserves whether it played and skips a warning whose display window was already missed offline. Ruins have no health/preparation bars or hostile outlines, but may show this repair speech.
+- Barrack-spawned Orc deaths count toward Warmaster recharge after victory. Independent rebuild timers still apply during active fights; completed-clear arena freezing and restoration are the explicit exceptions described below.
+
+Current Orc Warmaster encounter (Issue #680):
+
+- The level-20 Boss has 1,500 HP and keeps his other combat stats, basic attack, XP and drops. Azure Mass retains its existing 900 HP. A living party member entering the eastern arena begins an attempt without granting unlimited-range aggro. The Warmaster's chase and dash stay inside that arena.
+- The Warmaster does not wander while idle. He waits near the Barracks at his safe home after spawning, resetting or rearming, then detects and fights the party normally; combat movement is unchanged.
+- Ready abilities use priority Patron Burst, Patron Cleave, Kick, then Rending Dash, with at least one committed normal attack between abilities. Cooldowns start when casting begins. Cast origin, direction and offensive areas are locked once.
+
+| Ability | Patron Power | Cast / windup | Cooldown | Effect |
+| --- | --- | --- | --- | --- |
+| Rending Dash | 0 | 0.9s / 0.2s | 10s | Existing 7.5×3-unit Raider dash, 0.35s full travel, 1.5× attack as physical damage. |
+| Kick | 0 | 0.6s / 0.2s | 8s | 1× attack as physical damage at melee reach; pushes the surviving target up to 4 units over 0.25s. Moving out of reach or line of sight avoids the hit. |
+| Patron Cleave | 5 | 1.2s / 0.3s | 12s | Locked 90-degree cone with 6-unit reach; 1.5× attack as physical damage. |
+| Patron Burst | 10 | 1.5s / 0.5s | 20s | Locked filled circle with 4-unit radius; 2× attack as physical damage. |
+
+- Kick's reusable forced movement respects terrain, resources, structures and the target's full body. It can cross living actors but must finish at a free point on the same line, falling back backward if needed. Evasion prevents the push; blocking, shielding or absorbing the damage does not. Displacement suspends actions while preserving pending player orders.
+- Each genuine Orc Grunt, Raider or Shieldbearer death inside an active arena attempt sends one visible Patron-energy transfer to the living Boss, including Barrack reinforcements. Superior quest credits do not multiply this energy; despawning and cleanup grant none. Transfers arrive after one second, track the moving Boss visually, cannot be intercepted and are discarded when the Boss or attempt ends.
+- Patron Power caps at 10 and does not decay. Cleave becomes available at five power and Burst at ten for the rest of that attempt. Overflow is discarded. Destroying a Barrack prevents its future reinforcements but does not remove power already acquired; only ending or resetting the attempt clears power.
+- Each stack adds 5% of the authored base size to the Boss's sprite, aura and combat radius, up to 1.5× at 10 stacks. His base 1.25-unit radius becomes 1.875 units; combat stats and authored ability dimensions do not grow. Movement reserves enough terrain clearance for maximum growth.
+- Existing Orc auras render behind living arena Orcs and the Boss, never over their sprites. Energy copies travel from defeated Orcs to him. His overhead display shows `Patron Power: N/10`; the first completed transfer each attempt triggers `Their borrowed power returns to me!` through the shared five-second HUD-aware speech bubble. Cast names use enemy red, with existing offensive telegraphs and dash afterimages.
+- A wipe, three continuous seconds without a living party member inside the arena, map exit, explicit encounter reset or save restoration resets a living Boss to full health near home, zero power and base size. It clears his active actions, cooldowns, basic-attack gate, transfers, speech and associated displacement. Failed attempts require no recharge and do not repair Barracks or remove surviving reinforcements. A defeated Boss remains unavailable under the lifecycle below; legacy saves without that lifecycle instead start with the first encounter ready.
+
+Current Warmaster repeat lifecycle and rewards (Issue #681):
+
+- The first encounter is ready immediately. The Warmaster no longer uses ordinary timed enemy respawning. After each victory, 60 physical Zone 7 Orc Grunt, Raider or Shieldbearer deaths recharge the next encounter, including Barrack reinforcements. Each death grants one credit, including Superiors. Progress starts at victory, caps at 60 and does not bank kills from before victory or while another fight is ready/active. Structures, the Warmaster, other maps, despawns and cleanup grant none.
+- Victory removes remaining arena enemies without defeat rewards and stops arena production, enemy respawning and Barrack rebuilding across travel and saves. The farming field and route Barrack are unaffected. Normal Boss XP and drops remain separate from the chest reward.
+- Each genuine victory switches Auto Combat off once and clears AI-created targets and movement intent without discarding player-authored orders or direct companion commands. Simulation and rescue speech continue; self-defense remains available. The player may explicitly re-enable Auto Combat afterward, and later defeated-arena updates do not switch it off again.
+- The southern arena entrance uses a pulsing radius-five dark-green collision barrier and shows recharge progress while unavailable. It stays open after victory until loot is collected and the party can safely leave. An unclaimed chest keeps access open even at 60 credits; neither the chest nor its contents are discarded.
+- Once all loot is collected and the party, including dead members and movement reservations, is clear of the arena and gate, the gate closes. At 60 credits, safe reconstruction restores the Boss and all three arena Barracks to full health, resets their preparation and reopens access. Reinforcement ID sequences are retained. This completed-clear restoration does not apply to wipes or the route Barrack.
+- Each victory creates exactly one manually claimed chest at (102,45). It grants 500 Crowns, an independent 90% chance for one level-15 equipment item, an independent 10% chance for one level-20 item, and five independently selected first-class skill books. Both equipment rolls may succeed or fail; duplicate books are allowed. Choices are uniform within existing exact-level equipment and all first-class book pools, without party weighting or Beginner books.
+- Chest contents roll once per completed encounter. Manual interaction requires a living leader within three units; clicking from farther away approaches first. A valid manual chest request and every successful claim switch Auto Combat off, whether or not inventory is full. Auto Combat never claims the chest. Overflow remains pending; partial collection and the one-time currency grant persist without rerolls or duplicate claims. The chest overlay pauses simulation immediately on opening and stays open until explicitly dismissed through its controls or the existing dismissal shortcut. Gameplay shortcuts cannot issue conflicting actions behind it. Closing it or leaving does not automatically re-enable Auto Combat.
+- Attempting to walk out or use a supported teleport with unclaimed loot offers `Return to chest` or `Leave anyway`. Returning cancels departure and directs the party toward the chest without claiming it. Leaving preserves loot and gate access, delaying reconstruction. The acknowledged excursion does not repeatedly warn; re-entry permits a new warning.
+- The first victory automatically opens the cage at (88,45) and rescues its captive, who says `You’ve freed me. Thank you!` through the existing five-second HUD-aware speech. Rescue persists and does not replay on loading or later clears. Matching transparent closed/open cage sprites occupy a three-world-unit-square visual with a shared ground anchor; widely spaced bars reveal the existing captive behind them. The cage remains open through travel, restoration and repeat encounters. It adds no collision or manual rescue interaction; existing chest/NPC artwork is retained and the captive's town service remains undefined.
+- Saves preserve encounter sequence, recharge, availability, rescue and rolled/partially collected rewards. Active fights restore as ready attempts without victory rewards. Legacy saves missing lifecycle data start ready, even if their old Warmaster was dead, without retroactive loot or rescue. No save-version change or general persistent-zone system is introduced. Post-Warmaster content remains out of scope.
+- Full chest collection also preserves a lifetime collection milestone after the current chest ledger is cleared on rearming. Older saves recognize a valid fully collected ledger or a valid later encounter sequence as collection evidence, never chest absence alone. Milestones reconcile only after lifecycle sanitation; malformed or missing data must not invent prior victories or collection.
 
 Current Slimeward dungeon prototype rooms/subzones are:
 
@@ -2788,6 +3001,9 @@ Current prototype save behavior:
 - reusable enemy ability cooldowns are the narrow cooldown exception: valid unexpired absolute expiration timestamps and the required-basic-attack gate survive restoration, while expired, malformed, unknown-ability, or missing-enemy records are discarded
 - restored saves clear short-lived news broadcast feedback
 - restored saves sanitize companion skill progression and preserve valid learned skill rank data
+- eligible legacy saves that predate the Guild Board onboarding quest treat that onboarding as completed and expose `Break the Ash Camp` without replacing existing Board slots or progress
+- pre-eligibility legacy saves retain the onboarding path and receive the protected starter contract when its Azure Trial and first-class requirements are later met
+- restored active `Break the Ash Camp` quests recheck the currently equipped first-class weapon requirement while preserving already-completed objective progress
 
 Current prototype offline progress:
 
@@ -2806,6 +3022,7 @@ Current prototype guide popups:
 
 - may appear when starting a new game
 - may appear when the equipment tutorial quest becomes active
+- may appear when `Orders from the Guild` becomes active to explain concurrent main/Board progress, taken-only Board kill counting, and Board reward claiming through the Atlas Guild & Inn page
 - may appear after the first world-wipe rescue
 - pause the simulation while active
 - are UI guidance only

@@ -2,14 +2,17 @@ import type {
   DebugMapId,
   Enemy,
   EnemyArchetypeId,
+  EnemyEncounterBand,
   EnemyTypeId,
   EnemyVariant,
   EquipmentSlot,
   ItemId,
+  LivestockCreatureId,
   Position,
   ResourceType,
 } from "./types";
 import type { PoiCategory } from "./poiTypes";
+import type { ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
 
 export type QuestId =
   | "clear_the_shore"
@@ -24,7 +27,12 @@ export type QuestId =
   | "broken_thicket_survey"
   | "crawler_shelf_report"
   | "find_slimeward_camp"
-  | "azure_trial";
+  | "azure_trial"
+  | "orders_from_the_guild"
+  | "break_the_ash_camp"
+  | "into_the_briar_burrows"
+  | "the_patrons_shadow"
+  | "the_evil_patrons_chosen";
 
 export type QuestStatus =
   | "locked"
@@ -50,8 +58,33 @@ export type QuestObjectiveType =
   | "guide_npc_to_poi"
   | "unlock_route"
   | "defeat_elite"
+  | "defeat_quest_spawn"
   | "collect_dungeon_chest"
-  | "return_to_poi";
+  | "return_to_poi"
+  | "take_guild_notice_board_quest"
+  | "own_livestock_creature"
+  | "active_party_member_count"
+  | "patron_ward"
+  | "encounter_milestone";
+
+export type QuestEncounterMilestone = {
+  encounterId: typeof ORC_WARCAMP_ENCOUNTER_ID;
+  kind: "boss_defeated" | "captive_rescued" | "chest_collected";
+};
+
+export type PatronWardId =
+  | "night_bat_ward"
+  | "elder_mossling_ward"
+  | "cinder_wisp_ward";
+
+export type QuestEquipmentRequirement = "first_class_weapon";
+
+export type QuestAmbientEnemySuppressionConfig = {
+  scope: "map" | "subzone";
+  groupId?: string;
+  restoreDelayMs: number;
+  variantPolicy: "preserve" | "reroll";
+};
 
 export type QuestSpawnEnemyDefinition = {
   enemyTypeId?: EnemyTypeId;
@@ -60,9 +93,26 @@ export type QuestSpawnEnemyDefinition = {
   count?: number;
 };
 
+export type QuestSpawnTargetDefinition = {
+  enemyTypeId: EnemyTypeId;
+  level: number;
+  position: Position;
+  variant?: EnemyVariant;
+  encounterBand?: EnemyEncounterBand;
+};
+
+export type QuestObjectiveStartSpeech = {
+  npcId: string;
+  displayName: string;
+  text: string;
+  position?: Position;
+};
+
 export type QuestObjectiveDefinition = {
   id: string;
+  displayName?: string;
   type: QuestObjectiveType;
+  encounterMilestone?: QuestEncounterMilestone;
   targetMapId?: DebugMapId;
   targetSubzoneId?: string;
   targetPoiId?: string;
@@ -78,15 +128,24 @@ export type QuestObjectiveDefinition = {
   resourceType?: ResourceType;
   itemId?: ItemId;
   targetSlot?: EquipmentSlot;
+  equipmentRequirement?: QuestEquipmentRequirement;
+  livestockCreatureId?: LivestockCreatureId;
+  patronWardId?: PatronWardId;
+  patronWardWaveCounts?: number[];
+  ambientEnemySuppression?: QuestAmbientEnemySuppressionConfig;
+  noticeBoardQuestId?: string;
   requiredCount?: number;
   questItemDisplayName?: string;
   dropChance?: number;
   pityKillCount?: number;
   repairDurationMs?: number;
+  waitForSpawnedDefendersToBeDefeated?: boolean;
   defenseRadius?: number;
   defenseDurationMs?: number;
   waveProgressPercents?: number[];
   questSpawnEnemies?: QuestSpawnEnemyDefinition[];
+  startSpeech?: QuestObjectiveStartSpeech;
+  questSpawnTarget?: QuestSpawnTargetDefinition;
   routeTeleportId?: string;
   eliteSpawnPosition?: Position;
   eliteEnemy?: QuestSpawnEnemyDefinition;
@@ -112,18 +171,32 @@ export type QuestDefinition = {
   displayName: string;
   sourceType?: QuestSourceType;
   objectiveFlow?: QuestObjectiveFlow;
+  objectiveGuidance?: "first_incomplete";
   questGiverPoiId: string;
+  questGiverMapId: DebugMapId;
   objectives: QuestObjectiveDefinition[];
   rewards?: QuestReward;
   repeatable?: boolean;
   unlocksQuestIds?: QuestId[];
   requiresCompletedQuestIds?: QuestId[];
+  requiresFirstClassCompanion?: boolean;
 };
 
 export type QuestObjectiveProgress = {
   objectiveId: string;
   currentCount: number;
   completed: boolean;
+};
+
+export type QuestAmbientEnemySuppressionRuntime = {
+  targetMapId: DebugMapId;
+  targetSubzoneId?: string;
+  scope: "map" | "subzone";
+  restoreDelayMs: number;
+  variantPolicy: "preserve" | "reroll";
+  activeObjectiveIds: string[];
+  enemySnapshots: Enemy[];
+  restoreAtMs?: number;
 };
 
 export type QuestRuntimeState = {
@@ -135,6 +208,24 @@ export type QuestRuntimeState = {
   despawnedSubzoneEnemyIdsByObjectiveId?: Record<string, string[]>;
   suppressedSubzoneEnemiesByObjectiveId?: Record<string, Enemy[]>;
   suppressedSubzoneEnemyRestoreAtMsByObjectiveId?: Record<string, number>;
+  ambientEnemySuppressionsByGroupId?: Record<
+    string,
+    QuestAmbientEnemySuppressionRuntime
+  >;
+  patronWards?: PatronWardRuntimeState;
+};
+
+export type PatronWardRuntimeState = {
+  pendingActivationWardId?: PatronWardId;
+  activeWardId?: PatronWardId;
+  activeWaveIndex?: number;
+  trackedDefenderIds?: string[];
+  nextWaveAtMs?: number;
+  retreatStartedAtMs?: number;
+  wardFadeStartedAtMsByWardId?: Partial<Record<PatronWardId, number>>;
+  finaleStartedAtMs?: number;
+  routeUnlocked?: true;
+  legacyRoutePreserved?: true;
 };
 
 export type QuestState = {

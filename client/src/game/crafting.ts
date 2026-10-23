@@ -363,7 +363,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     "bronze_pendant",
     [
       itemCost("copper_ore", 6),
-      itemCost("tin_ore", 3),
+      itemCost("iron_ore", 3),
       itemCost("crawler_pebble_t1", 2),
     ],
     18,
@@ -372,7 +372,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     "field_bronze_pendant",
     [
       itemCost("copper_ore", 4),
-      itemCost("tin_ore", 3),
+      itemCost("iron_ore", 3),
       itemCost("field_herb", 3),
     ],
     18,
@@ -561,7 +561,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     "guard_mace",
     [
       itemCost("iron_ore", 12),
-      itemCost("orc_hide", 3),
+      itemCost("imp_horn_chip_t2", 3),
       itemCost("goblin_ear_t2", 4),
     ],
     20,
@@ -570,7 +570,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     "claw_gauntlets",
     [
       itemCost("hardwood", 16),
-      itemCost("orc_hide", 4),
+      itemCost("imp_horn_chip_t2", 4),
       itemCost("wisp_ash_t2", 3),
     ],
     26,
@@ -580,7 +580,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     [
       itemCost("redleaf_herb", 10),
       itemCost("wisp_ash_t2", 5),
-      itemCost("orc_tusk", 1),
+      itemCost("imp_tail_t2", 1),
     ],
     22,
   ),
@@ -615,7 +615,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     [
       itemCost("hardwood", 12),
       itemCost("iron_ore", 8),
-      itemCost("orc_hide", 3),
+      itemCost("imp_horn_chip_t2", 3),
     ],
     24,
   ),
@@ -632,7 +632,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     "leather_quiver",
     [
       itemCost("hardwood", 10),
-      itemCost("orc_hide", 3),
+      itemCost("wolf_pelt", 3),
       itemCost("goblin_ear_t2", 3),
     ],
     20,
@@ -641,7 +641,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     "sacrificial_dagger",
     [
       itemCost("iron_ore", 8),
-      itemCost("orc_tusk", 1),
+      itemCost("goblin_tooth_t2", 1),
       itemCost("wisp_ash_t2", 3),
     ],
     20,
@@ -679,8 +679,8 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
       boots: "trailrunner_boots",
     },
     "hardwood",
-    "orc_hide",
-    "orc_tusk",
+    "wolf_pelt",
+    "goblin_tooth_t2",
   ),
   ...createLevel10ArmorSetRecipes(
     {
@@ -715,8 +715,8 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
       boots: "ironmarch_boots",
     },
     "iron_ore",
-    "orc_hide",
-    "orc_tusk",
+    "imp_horn_chip_t2",
+    "goblin_tooth_t2",
   ),
   ...createLevel10ArmorSetRecipes(
     {
@@ -727,8 +727,8 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
       boots: "bulwark_sabatons",
     },
     "iron_ore",
-    "orc_hide",
-    "orc_tusk",
+    "imp_horn_chip_t2",
+    "imp_tail_t2",
   ),
   ...createLevel10ArmorSetRecipes(
     {
@@ -1143,7 +1143,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     [
       itemCost("iron_ore", 14),
       itemCost("crawler_pebble_t2", 5),
-      itemCost("orc_hide", 2),
+      itemCost("wolf_pelt_t2", 2),
     ],
     30,
   ),
@@ -1253,7 +1253,7 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     [
       itemCost("iron_ore", 16),
       itemCost("crawler_pebble_t2", 5),
-      itemCost("orc_hide", 3),
+      itemCost("wolf_pelt_t2", 3),
     ],
     32,
   ),

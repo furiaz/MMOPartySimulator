@@ -8,6 +8,10 @@ import {
   Suspense,
 } from "react";
 import "./App.css";
+import { WarmasterRewardOverlay } from "./WarmasterRewardOverlay";
+import { claimWarmasterChest, closeWarmasterChest, requestWarmasterChest } from "./game/warmasterLifecycle";
+import { isWarmasterRewardUiOpen, WARMASTER_CAPTIVE_ID, WARMASTER_CHEST_ID } from "./game/warmasterLifecycleState";
+import { resolveWarmasterDeparture } from "./game/teleportSystem";
 import { CompanionVitalsPanel } from "./CompanionVitalsPanel";
 import {
   DebugToolsPanel,
@@ -47,6 +51,8 @@ import { getPoiDisplayName } from "./poiPresentation";
 import {
   canNpcShowSpeech,
   createNpcSpeech,
+  NPC_SPEECH_DURATION_MS,
+  isWorldSpeechSpeaker,
   type ActiveNpcSpeech,
 } from "./npcSpeechPresentation";
 import { PUBLIC_ASSET_ROOT } from "./publicAssetUrl";
@@ -67,7 +73,10 @@ import { getQuestEntityIndicators } from "./questEntityIndicators";
 import { QuestTrackerPanel } from "./QuestTrackerPanel";
 import { BankPanel } from "./BankPanel";
 import { MerchantSellPanel } from "./MerchantSellPanel";
-import type { PixiRendererPerformanceSample } from "./worldRenderer/PixiWorldRendererHelpers";
+import type {
+  PixiRendererPerformanceSample,
+  ViewportRect,
+} from "./worldRenderer/PixiWorldRendererHelpers";
 import {
   normalizeBackgroundMusicPreferences,
   readBackgroundMusicPreferences,
@@ -166,6 +175,7 @@ import {
   finishReadyQuestsForQuestGiver,
   createSavedGame,
   getPartyLeader,
+  getPatronWardPresentationState,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
@@ -175,6 +185,7 @@ import {
   hasQuestGiverWork,
   issueCompanionDirectCommand,
   issuePartyOrder,
+  requestPatronWardActivation,
   isActiveResource,
   isMerchantUnlockedForQuests,
   isMerchantFirstAidPurchaseRequired,
@@ -230,7 +241,7 @@ import {
   refreshGuildRecruitState,
   shouldShowGuildNoticeBoardSign,
   shouldQueuePartySizeGrowthGuide,
-  takeGuildNoticeBoardQuest,
+  takeGuildNoticeBoardQuestForQuests,
   cancelGuildNoticeBoardQuest,
   getNavigationClickCellKey,
   resolveNavigationClickTarget,
@@ -321,6 +332,8 @@ import {
   type NpcEntity,
   type OfflineFarmingSummary,
   type PartyMemberRole,
+  type PatronWardId,
+  type PatronWardPresentationState,
   type PrimaryStatId,
   type PoiConsideration,
   type Position,
@@ -853,6 +866,8 @@ function getWorldTravelTeleportFailureMessage(
       return "Teleport already in progress.";
     case "recovery_active":
       return "Teleport unavailable during recovery.";
+    case "unclaimed_chest":
+      return "Choose whether to collect your Warmaster chest before leaving.";
     case "invalid_destination":
     default:
       return "Teleport destination unavailable.";
@@ -1753,6 +1768,66 @@ function getWorldViewportSize(isCompanionHudCollapsed = false): ViewportSize {
     width: window.innerWidth,
     height: Math.max(1, window.innerHeight - bottomHudReservedHeight),
   };
+}
+
+function areViewportRectsEqual(
+  first: ViewportRect | null,
+  second: ViewportRect | null,
+): boolean {
+  return (
+    first === second ||
+    Boolean(
+      first &&
+        second &&
+        Math.abs(first.x - second.x) < 0.1 &&
+        Math.abs(first.y - second.y) < 0.1 &&
+        Math.abs(first.width - second.width) < 0.1 &&
+        Math.abs(first.height - second.height) < 0.1,
+    )
+  );
+}
+
+function useMeasuredViewportRect() {
+  const elementRef = useRef<HTMLDivElement | null>(null);
+  const [rect, setRect] = useState<ViewportRect | null>(null);
+
+  useEffect(() => {
+    const element = elementRef.current;
+
+    if (!element) {
+      return;
+    }
+    const measuredElement = element;
+
+    function updateRect() {
+      const bounds = measuredElement.getBoundingClientRect();
+      const nextRect = {
+        x: bounds.left,
+        y: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      };
+
+      setRect((currentRect) =>
+        areViewportRectsEqual(currentRect, nextRect) ? currentRect : nextRect,
+      );
+    }
+
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateRect);
+    resizeObserver?.observe(measuredElement);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateRect);
+    };
+  }, []);
+
+  return [elementRef, rect] as const;
 }
 
 function getMaximumCameraOffset({
@@ -2874,6 +2949,9 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
       title: enemyType?.displayName ?? archetype?.displayName ?? "Enemy",
       rows: [
         { label: "Level", value: entity.level.toString() },
+        ...(entity.encounterBand === "standard"
+          ? []
+          : [{ label: "Rank", value: encounterBandLabels[entity.encounterBand] }]),
         { label: "HP", value: `${entity.health}/${entity.maxHealth}` },
         {
           label: "Temperament",
@@ -2888,6 +2966,11 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
     return getResourceTooltipDetails(entity);
   }
 
+  if (entity.kind === "structure") return { title: entity.displayName, rows: [
+    { label: "HP", value: `${entity.health}/${entity.maxHealth}` },
+    { label: "Type", value: "Combat structure" },
+  ] };
+
   return {
     title: entity.displayName,
     rows: [
@@ -2896,6 +2979,12 @@ function getEntityHoverDetails(gameState: GameState, entity: GameEntity): {
     ],
   };
 }
+
+const encounterBandLabels = {
+  elite: "Elite",
+  champion: "Champion",
+  boss: "Boss",
+} as const;
 
 function getCompanionDisplayName(member: Companion): string {
   const index = companionIds.indexOf(member.id);
@@ -3247,6 +3336,10 @@ function App() {
   const [viewportSize, setViewportSize] = useState<ViewportSize>(() =>
     getWorldViewportSize(false),
   );
+  const [minimapViewportRect, setMinimapViewportRect] =
+    useState<ViewportRect | null>(null);
+  const [minimapCoordinateRef, minimapCoordinateRect] =
+    useMeasuredViewportRect();
   const [
     visualMovementByEntityId,
     setVisualMovementByEntityId,
@@ -3281,6 +3374,21 @@ function App() {
   const previousCameraFocusRef = useRef<Position | null>(null);
   const currentCrownBalance = getCurrencyBalance(gameState.wallet, "crowns");
   const previousCrownBalanceRef = useRef(currentCrownBalance);
+  const handleMinimapViewportRectChange = useCallback(
+    (rect: ViewportRect | null) => {
+      setMinimapViewportRect((currentRect) =>
+        areViewportRectsEqual(currentRect, rect) ? currentRect : rect,
+      );
+    },
+    [],
+  );
+  const speechBubbleAvoidanceRects = useMemo(
+    () =>
+      [minimapViewportRect, minimapCoordinateRect].filter(
+        (rect): rect is ViewportRect => Boolean(rect),
+      ),
+    [minimapCoordinateRect, minimapViewportRect],
+  );
   const currentMap = gameState.map ?? debugMap;
   const renderMap = useMemo(() => {
     const currentMapId = currentMap.id;
@@ -3455,6 +3563,18 @@ function App() {
   }, [appMode, writeCurrentSave]);
 
   useEffect(() => {
+    if (appMode !== "playing") return;
+    const timer = window.setInterval(() => {
+      setGameState(state => {
+        const next = refreshGuildNoticeBoardState(state, Date.now());
+        if (next !== state) queueSaveAfterStateChange("Notice board refresh saved");
+        return next;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [appMode, queueSaveAfterStateChange]);
+
+  useEffect(() => {
     if (
       appMode !== "playing" ||
       !isGameMenuOpen ||
@@ -3465,11 +3585,7 @@ function App() {
     }
 
     setGameState((state) => {
-      const refreshedRecruitState = refreshGuildRecruitState(state, currentTime);
-      const refreshedState = refreshGuildNoticeBoardState(
-        refreshedRecruitState,
-        currentTime,
-      );
+      const refreshedState = refreshGuildRecruitState(state, currentTime);
 
       if (refreshedState !== state) {
         queueSaveAfterStateChange("Guild and notice board refresh saved");
@@ -3597,6 +3713,8 @@ function App() {
     () => getQuestEntityIndicators(gameState),
     [gameState],
   );
+  const patronWardPresentation: PatronWardPresentationState | null =
+    getPatronWardPresentationState(gameState);
   const targetEnemy = enemies.find((enemy) => enemy.state !== "dead");
   const targetResource = resources.find(isActiveResource);
   const inventory = gameState.inventory;
@@ -3713,13 +3831,33 @@ function App() {
   const activeMovementClickFeedbackEvents = movementClickFeedbackEvents.filter(
     (event) => event.expiresAt > currentTime,
   );
-  const visibleNpcSpeech =
-    activeNpcSpeech &&
-    activeNpcSpeech.expiresAt > currentTime &&
-    (!activeNpcSpeech.mapId || activeNpcSpeech.mapId === currentMap.id) &&
-    gameState.entities[activeNpcSpeech.npcId]?.kind === "npc"
-      ? activeNpcSpeech
-      : null;
+  const questSpeechCue = gameState.questNpcSpeechCue;
+  const scriptedNpcSpeech: ActiveNpcSpeech | null = questSpeechCue
+    ? {
+        createdAt: questSpeechCue.createdAt,
+        expiresAt: questSpeechCue.createdAt + NPC_SPEECH_DURATION_MS,
+        mapId: questSpeechCue.mapId,
+        npcId: questSpeechCue.npcId,
+        text: questSpeechCue.text,
+      }
+    : null;
+  const structureSpeech: ActiveNpcSpeech[] = Object.entries(gameState.barracksById ?? {}).flatMap(([id, runtime]) =>
+    runtime.speech && gameState.entities[id]?.kind === "structure"
+      ? [{ ...runtime.speech, npcId: id, mapId: currentMap.id }] : []);
+  const patronSpeech: ActiveNpcSpeech | null = gameState.warmasterAttempt?.speechStartedAt !== undefined
+    ? { createdAt: gameState.warmasterAttempt.speechStartedAt, expiresAt: gameState.warmasterAttempt.speechStartedAt + NPC_SPEECH_DURATION_MS, mapId: currentMap.id, npcId: gameState.warmasterAttempt.bossId, text: "Their borrowed power returns to me!" } : null;
+  const rescueSpeechAt = gameState.warmasterInteraction?.rescueSpeechStartedAt;
+  const rescueSpeech: ActiveNpcSpeech | null = rescueSpeechAt === undefined ? null : { createdAt: rescueSpeechAt, expiresAt: rescueSpeechAt + NPC_SPEECH_DURATION_MS, mapId: "map-7", npcId: WARMASTER_CAPTIVE_ID, text: "You’ve freed me. Thank you!" };
+  const visibleNpcSpeech = [activeNpcSpeech, scriptedNpcSpeech, ...structureSpeech, patronSpeech, rescueSpeech]
+    .filter(
+      (speech): speech is ActiveNpcSpeech =>
+        speech !== null &&
+        speech.expiresAt > currentTime &&
+        (!speech.mapId || speech.mapId === currentMap.id) &&
+        isWorldSpeechSpeaker(gameState.entities[speech.npcId]),
+    )
+    .sort((first, second) => first.createdAt - second.createdAt)
+    .at(-1) ?? null;
   const activeDirectCommandCount = Object.keys(
     directCompanionCommandsById,
   ).length;
@@ -4838,6 +4976,10 @@ function App() {
     );
   }
 
+  function commandPartyToActivatePatronWard(wardId: PatronWardId) {
+    setGameState((state) => requestPatronWardActivation(state, wardId));
+  }
+
   function commandCompanionsToGatherResource(targetResourceId = targetResource?.id) {
     if (!targetResourceId) {
       return;
@@ -5439,7 +5581,7 @@ function App() {
             const bookNames = reward.skillBookItemIds
               .map((itemId) => getItemDefinition(itemId).displayName)
               .join(", ");
-            return `${reward.questTitle}: +${reward.crowns} Crowns, ${bookNames}`;
+            return `${reward.questTitle}: +${reward.characterXp} XP, +${reward.crowns} Crowns, ${bookNames}`;
           })
           .join(" | "),
       );
@@ -5448,6 +5590,9 @@ function App() {
       setGuildNoticeBoardResultMessage(null);
     }
 
+    if (opened.failedClaims.length) {
+      setGuildNoticeBoardResultMessage(`Inventory full: make room for all reward books, then check the Board again. Unclaimed: ${opened.failedClaims.join(", ")}`);
+    }
     setGameState(opened.state);
   }
 
@@ -5457,7 +5602,11 @@ function App() {
       return;
     }
 
-    const taken = takeGuildNoticeBoardQuest(gameState, currentTime, slotIndex);
+    const taken = takeGuildNoticeBoardQuestForQuests(
+      gameState,
+      currentTime,
+      slotIndex,
+    );
 
     if (taken.ok) {
       queueSaveAfterStateChange("Guild notice board quest taken");
@@ -5499,7 +5648,7 @@ function App() {
         const bookNames = reward.skillBookItemIds
           .map((itemId) => getItemDefinition(itemId).displayName)
           .join(", ");
-        return `${reward.questTitle}: +${reward.crowns} Crowns, ${bookNames}`;
+        return `${reward.questTitle}: +${reward.characterXp} XP, +${reward.crowns} Crowns, ${bookNames}`;
       })
       .join(" | ");
 
@@ -5518,10 +5667,15 @@ function App() {
       setGuildNoticeBoardResultMessage(
         rerolled.reason === "locked"
           ? "Unlock Scouts or place a fed Wolf to reroll postings."
-          : "No rerolls remaining today.",
+          : rerolled.reason === "no_change"
+            ? "No eligible postings can be rerolled."
+            : "No rerolls remaining today.",
       );
     }
 
+    if (rerolled.failedClaims.length) {
+      setGuildNoticeBoardResultMessage(`Inventory full: unclaimed rewards were preserved. Make room for all reward books, then check the Board again. ${rerolled.failedClaims.join(", ")}`);
+    }
     setGameState(rerolled.state);
   }
 
@@ -6027,6 +6181,7 @@ function App() {
     setSaveStatusMessage(
       getWorldTravelTeleportFailureMessage(teleport.result.reason),
     );
+    if (teleport.result.reason === "unclaimed_chest") setGameState(teleport.state);
   }
 
   function debugTeleportToHubOne() {
@@ -6386,8 +6541,8 @@ function App() {
   }
 
   function closeDungeonChest() {
-    queueSaveAfterStateChange("Dungeon chest continued");
-    setGameState(closeSlimewardDungeonChestUi);
+    queueSaveAfterStateChange("Chest closed");
+    setGameState(state => state.warmasterInteraction?.chestOpen ? closeWarmasterChest(state) : closeSlimewardDungeonChestUi(state));
   }
 
   function recordAppliedGameplayShortcut(
@@ -6408,7 +6563,7 @@ function App() {
       ),
       guidePopupOpen: Boolean(activeGuidePopupIdRef.current),
       queuedGuidePopups: queuedGuidePopupIdsRef.current.length > 0,
-      dungeonChestOpen: Boolean(activeDungeonChest),
+      dungeonChestOpen: Boolean(activeDungeonChest || gameState.warmasterInteraction?.chestOpen || gameState.warmasterInteraction?.departure),
       offlineSummaryOpen: Boolean(offlineSummary),
       secondaryPartySummaryOpen: Boolean(guildSecondaryPartyRedeemSummary),
     });
@@ -6433,7 +6588,7 @@ function App() {
     ) {
       dismissGuidePopups(true);
     }
-    if (activeDungeonChest) {
+    if (activeDungeonChest || gameState.warmasterInteraction?.chestOpen) {
       closeDungeonChest();
     }
     if (offlineSummary) {
@@ -6467,7 +6622,8 @@ function App() {
           activeWorldWipeRescue ||
           activeGuidePopupIdRef.current ||
           queuedGuidePopupIdsRef.current.length > 0 ||
-          activeDungeonChest,
+          activeDungeonChest ||
+          isWarmasterRewardUiOpen(gameState),
       ),
     });
 
@@ -6674,6 +6830,11 @@ function App() {
   }
 
   function commandPartyToInteractWithNpc(npcId: string) {
+    if (npcId === WARMASTER_CHEST_ID) {
+      queueSaveAfterStateChange("Warmaster chest interaction saved");
+      setGameState(requestWarmasterChest);
+      return;
+    }
     const npc = gameState.entities[npcId];
 
     if (npc?.kind !== "npc") {
@@ -6957,6 +7118,9 @@ function App() {
               movementClickFeedbackEvents={activeMovementClickFeedbackEvents}
               navigationClickAccessibility={navigationClickAccessibility}
               npcSpeech={visibleNpcSpeech}
+              barracksById={gameState.barracksById}
+              warmasterAttempt={gameState.warmasterAttempt}
+              warmasterLifecycle={gameState.warmasterLifecycle}
               onCompanionDragCommand={commandCompanionByDrag}
               onEnemyClick={commandPartyToTargetEnemy}
               onEntityHover={updateEntityHoverTooltip}
@@ -6965,12 +7129,15 @@ function App() {
               onPerformanceSample={handleRendererPerformanceSample}
               onCursorPositionChange={updateMapCursorPosition}
               onResourceClick={commandCompanionsToGatherResource}
+              onPatronWardClick={commandPartyToActivatePatronWard}
               partyIntent={gameState.partyIntent}
+              patronWardPresentation={patronWardPresentation}
               questEntityIndicators={questEntityIndicators}
               questObjectiveMarkers={questObjectiveMarkers}
               questGiverHasWork={questGiverHasWork}
               resurrectionProgressByCompanionId={resurrectionProgressByCompanionId}
               showDebugOverlays={showEntityInfo}
+              speechBubbleAvoidanceRects={speechBubbleAvoidanceRects}
               skillBindsByEnemyId={skillBindsByEnemyId}
               skillMarksByEnemyId={skillMarksByEnemyId}
               skillShieldBlocksById={skillShieldBlocksById}
@@ -6991,7 +7158,11 @@ function App() {
               viewportSize={viewportSize}
             />
           ) : null}
-          <div className="minimap-coordinate-readout" aria-label="Minimap coordinates">
+          <div
+            ref={minimapCoordinateRef}
+            className="minimap-coordinate-readout"
+            aria-label="Minimap coordinates"
+          >
             <span>Leader: {leaderCoordinateText}</span>
             <span>Cursor: {mapCursorCoordinateText}</span>
           </div>
@@ -7010,6 +7181,7 @@ function App() {
               questObjectiveMarkers={questObjectiveMarkers}
               onFloorClick={commandPartyToMoveFromMinimapPosition}
               onPerformanceSample={handleRendererPerformanceSample}
+              onViewportRectChange={handleMinimapViewportRectChange}
               onCursorPositionChange={updateMapCursorPosition}
               suppressMovePoiRing={suppressEscortGuideMovePoiRing}
               teleportWorkingById={teleportWorkingById}
@@ -7354,6 +7526,15 @@ function App() {
             </div>
           </section>
         ) : null}
+
+        <WarmasterRewardOverlay
+          chest={gameState.warmasterLifecycle?.chest}
+          open={Boolean(gameState.warmasterInteraction?.chestOpen)}
+          departurePending={Boolean(gameState.warmasterInteraction?.departure)}
+          onCollect={() => { queueSaveAfterStateChange("Warmaster chest collected"); setGameState(claimWarmasterChest); }}
+          onClose={closeDungeonChest}
+          onDeparture={leave => setGameState(state => resolveWarmasterDeparture(state, leave))}
+        />
 
         {activeDungeonChest ? (
           <section className="dungeon-chest-overlay" aria-label="Dungeon chest loot">

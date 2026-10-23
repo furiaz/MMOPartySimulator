@@ -4,9 +4,13 @@ import { createCompanion, createEnemy, createNpc } from "./entities";
 import {
   companionIds,
   createDebugMap,
+  HUB_MAP_ID,
+  HUB_TWO_MAP_ID,
   hubCompanionStartPositions,
+  hubTwoCompanionStartPositions,
   slimewardCampArrivalPositions,
   SLIMEWARD_CAMP_ID,
+  SLIMEWARD_FLOOR_ONE_ID,
   TELEPORTER_ID,
 } from "./debugMap";
 import {
@@ -25,8 +29,10 @@ import {
   debugLevelUpCompanion,
   debugLevelUpAllCompanions,
   debugRemoveDebugEnemies,
+  debugResetSlimewardDungeon,
   debugRestoreCompanionHealth,
   debugSummonEnemy,
+  debugTeleportToHub,
   debugTeleportToSlimewardCamp,
   debugToggleCompanionInfiniteHealth,
   debugTurnInCurrentQuest,
@@ -95,8 +101,19 @@ describe("debugAddCompanionToParty", () => {
 
 describe("debugTeleportToSlimewardCamp", () => {
   it("moves the party to Slimeward Camp and clears map-local runtime", () => {
-    const companions = companionIds.map((companionId, index) =>
-      createCompanion(companionId, { x: 5 + index, y: 5 }, companionId),
+    const companionData = [
+      { id: companionIds[0], partyOrder: 0 },
+      { id: "guild-recruit-1", partyOrder: 1 },
+      { id: companionIds[2], partyOrder: 2 },
+    ];
+    const companions = companionData.map(({ id, partyOrder }) =>
+      createCompanion(
+        id,
+        { x: 5 + partyOrder, y: 5 },
+        companionIds[0],
+        "fighter",
+        partyOrder,
+      ),
     );
     const state = createTestGameState({
       partyLeaderId: companionIds[0],
@@ -145,6 +162,82 @@ describe("debugTeleportToSlimewardCamp", () => {
     expect(nextState.combatFeedbackEvents).toEqual([]);
     expect(nextState.dropVisualEvents).toEqual([]);
     expect(nextState.entities[companionIds[0]]?.position).toEqual(
+      slimewardCampArrivalPositions[0],
+    );
+    expect(nextState.entities["guild-recruit-1"]?.position).toEqual(
+      slimewardCampArrivalPositions[1],
+    );
+  });
+});
+
+describe("debug map reconstruction", () => {
+  it.each([
+    {
+      targetMapId: HUB_MAP_ID,
+      arrivalPositions: hubCompanionStartPositions,
+    },
+    {
+      targetMapId: HUB_TWO_MAP_ID,
+      arrivalPositions: hubTwoCompanionStartPositions,
+    },
+  ])(
+    "preserves a generated companion when teleporting to $targetMapId",
+    ({ targetMapId, arrivalPositions }) => {
+      const generatedLeader = createCompanion(
+        "guild-recruit-3",
+        { x: 5, y: 5 },
+        "guild-recruit-3",
+        "fighter",
+        0,
+      );
+      const fixedFollower = createCompanion(
+        companionIds[0],
+        { x: 6, y: 5 },
+        generatedLeader.id,
+        "fighter",
+        1,
+      );
+      const state = createTestGameState({
+        currentMapId: "map-1",
+        map: createDebugMap("map-1"),
+        partyLeaderId: generatedLeader.id,
+        entities: {
+          [fixedFollower.id]: fixedFollower,
+          [generatedLeader.id]: generatedLeader,
+        },
+      });
+
+      const nextState = debugTeleportToHub(state, targetMapId);
+
+      expect(nextState.entities[generatedLeader.id]?.position).toEqual(
+        arrivalPositions[0],
+      );
+      expect(nextState.entities[fixedFollower.id]?.position).toEqual(
+        arrivalPositions[1],
+      );
+    },
+  );
+
+  it("preserves a generated companion when resetting Slimeward", () => {
+    const generatedCompanion = createCompanion(
+      "guild-recruit-5",
+      { x: 20, y: 20 },
+      "guild-recruit-5",
+      "fighter",
+      0,
+    );
+    const state = createTestGameState({
+      currentMapId: SLIMEWARD_FLOOR_ONE_ID,
+      map: createDebugMap(SLIMEWARD_FLOOR_ONE_ID),
+      partyLeaderId: generatedCompanion.id,
+      entities: {
+        [generatedCompanion.id]: generatedCompanion,
+      },
+    });
+
+    const nextState = debugResetSlimewardDungeon(state);
+
+    expect(nextState.entities[generatedCompanion.id]?.position).toEqual(
       slimewardCampArrivalPositions[0],
     );
   });

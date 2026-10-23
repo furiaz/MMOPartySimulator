@@ -34,6 +34,7 @@ import {
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
 import { recordMapReachedForQuests } from "./questSystem";
+import { preparePatronWardStateForMapExit } from "./patronWardSystem";
 import { assignCurrentRoleBonuses } from "./roleBonus";
 import { updateEntity, type GameState } from "./state";
 import type {
@@ -260,10 +261,11 @@ function resetStateToRescueHub(
   state: GameState,
   choice: WorldWipeRecoveryChoice,
 ): GameState {
+  const preparedState = preparePatronWardStateForMapExit(state);
   const sourceState =
     choice.mapId === SLIMEWARD_CAMP_ID
-      ? clearSlimewardDungeonRuntime(state)
-      : state;
+      ? clearSlimewardDungeonRuntime(preparedState)
+      : preparedState;
   const targetMap = createDebugMapForQuestState(choice.mapId, sourceState.quests);
   let nextState: GameState = {
     ...clearMapTransitionRuntimeState(sourceState),

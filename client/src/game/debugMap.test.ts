@@ -15,8 +15,18 @@ import {
   MAP_ONE_ROWS,
   MAP_ONE_ID,
   MAP_SEVEN_ID,
+  MAP_SEVEN_ARENA_BARRACK_POSITIONS,
+  MAP_SEVEN_ARENA_GATE_COLLISION_CELLS,
+  MAP_SEVEN_ARENA_GATE_POSITION,
+  MAP_SEVEN_CAGE_POSITION,
+  MAP_SEVEN_REPEAT_CHEST_POSITION,
+  MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS,
+  MAP_SEVEN_ROUTE_BARRACK_ID,
+  MAP_SEVEN_ROUTE_BARRACK_POSITION,
   MAP_SEVEN_TO_MAP_SIX_TELEPORTER_ID,
+  MAP_SEVEN_WARMASTER_POSITION,
   MAP_SIX_ID,
+  NIGHTMIRE_BARRIER_COLLISION_CELLS,
   MAP_SIX_TO_MAP_FIVE_TELEPORTER_ID,
   MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
   MAP_THREE_ID,
@@ -89,10 +99,16 @@ import {
   mapSixResourceStartData,
   mapSixSubzones,
   SLIMEWARD_CAMP_ID,
+  slimewardFloorTwoEnemyStartData,
   targetDummyPosition,
 } from "./debugMap";
 import { ENEMY_TYPES } from "./enemyArchetypes";
-import { getNavigationDistance, isNavigationCellWalkable } from "./navigation";
+import {
+  findNavigationPath,
+  getNavigationDistance,
+  isNavigationCellWalkable,
+} from "./navigation";
+import { NIGHTMIRE_BARRIER_CENTER } from "./patronWardState";
 import { QUEST_DEFINITIONS } from "./questSystem";
 import type { DebugMapId, GameMap, Position, ZoneSubzone } from "./types";
 
@@ -171,7 +187,7 @@ const wildernessMaps = [
     resources: mapSevenResourceStartData,
     labels: mapSevenSubzoneNameLabels,
     expectedSubzoneCount: 1,
-    expectedEnemyCount: 20,
+    expectedEnemyCount: 19,
     expectedResourceCount: 3,
   },
 ] as const;
@@ -188,6 +204,106 @@ const secureLandingCompleteQuestStates = {
 };
 
 describe("debug maps", () => {
+  it("authors a single Boss Warmaster and classifies the Azure Mass as a Boss", () => {
+    const warmasters = mapSevenEnemyStartData.filter(
+      (enemy) => enemy.enemyTypeId === "orc_warmaster",
+    );
+
+    expect(warmasters).toEqual([
+      expect.objectContaining({
+        position: MAP_SEVEN_WARMASTER_POSITION,
+        encounterBand: "boss",
+      }),
+    ]);
+    expect(
+      slimewardFloorTwoEnemyStartData.find(
+        (enemy) => enemy.enemyTypeId === "azure_mass",
+      ),
+    ).toMatchObject({ encounterBand: "boss" });
+  });
+
+  it("lays out Orc Warcamp as an open farm, a passable vertical route, and a bottom-entry arena", () => {
+    const map = createDebugMap(MAP_SEVEN_ID);
+    const destroyedBarrackMap = createDebugMap(MAP_SEVEN_ID, {
+      mapSevenRouteBarrackDestroyed: true,
+    });
+    const blockedGateMap = createDebugMap(MAP_SEVEN_ID, {
+      mapSevenRouteBarrackDestroyed: true,
+      mapSevenArenaGateClosed: true,
+    });
+    const routeBarrack = map.visualObjects?.find(
+      (visualObject) => visualObject.id === MAP_SEVEN_ROUTE_BARRACK_ID,
+    );
+    const warmaster = mapSevenEnemyStartData.find(
+      (enemy) => enemy.enemyTypeId === "orc_warmaster",
+    );
+
+    expect(routeBarrack?.position).toEqual(MAP_SEVEN_ROUTE_BARRACK_POSITION);
+    expect(map.collisionWalls).toEqual(MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS);
+    expect(
+      destroyedBarrackMap.visualObjects?.some(
+        (visualObject) => visualObject.id === MAP_SEVEN_ROUTE_BARRACK_ID,
+      ),
+    ).toBe(false);
+    expect(destroyedBarrackMap.collisionWalls).toBeUndefined();
+    expect(warmaster?.position).toEqual(MAP_SEVEN_WARMASTER_POSITION);
+    expect(MAP_SEVEN_ARENA_BARRACK_POSITIONS).toEqual([
+      { x: 88, y: 29 },
+      { x: 102, y: 29 },
+      { x: 95, y: 26 },
+    ]);
+    expect(isNavigationCellWalkable(map, { x: 95, y: 12 })).toBe(false);
+    expect(isNavigationCellWalkable(map, { x: 95, y: 21 })).toBe(false);
+    expect(isNavigationCellWalkable(map, { x: 95, y: 22 })).toBe(true);
+    expect(mapSevenEnemyStartData).toHaveLength(19);
+
+    for (const anchor of [
+      ...MAP_SEVEN_ARENA_BARRACK_POSITIONS,
+      MAP_SEVEN_WARMASTER_POSITION,
+      MAP_SEVEN_CAGE_POSITION,
+      MAP_SEVEN_REPEAT_CHEST_POSITION,
+    ]) {
+      expect(isNavigationCellWalkable(destroyedBarrackMap, anchor)).toBe(true);
+    }
+
+    expect(
+      findNavigationPath(
+        map,
+        { x: 75, y: 22 },
+        [{ x: 75, y: 30 }],
+      ),
+    ).not.toHaveLength(0);
+    const openArenaPath = findNavigationPath(
+      destroyedBarrackMap,
+      { x: 7, y: 29 },
+      [MAP_SEVEN_WARMASTER_POSITION],
+    );
+    expect(openArenaPath.length).toBeGreaterThan(0);
+    expect(openArenaPath.some((position) => position.y >= 53)).toBe(true);
+    expect(
+      openArenaPath.some(
+        (position) =>
+          position.y === 52 && position.x >= 82 && position.x <= 91,
+      ),
+    ).toBe(true);
+    expect(blockedGateMap.collisionWalls).toEqual(
+      expect.arrayContaining(MAP_SEVEN_ARENA_GATE_COLLISION_CELLS),
+    );
+    expect(
+      isNavigationCellWalkable(blockedGateMap, MAP_SEVEN_ARENA_GATE_POSITION),
+    ).toBe(false);
+    expect(
+      findNavigationPath(
+        blockedGateMap,
+        { x: 75, y: 53 },
+        [MAP_SEVEN_WARMASTER_POSITION],
+      ),
+    ).toEqual([]);
+    expect(
+      getNavigationDistance(blockedGateMap, { x: 7, y: 29 }, { x: 5, y: 29 }, 20),
+    ).not.toBeNull();
+  });
+
   it("remakes the hub as a larger port base while preserving wilderness map sizes", () => {
     expect(createDebugMap(HUB_MAP_ID)).toMatchObject({
       columns: DEBUG_MAP_COLUMNS,
@@ -487,12 +603,26 @@ describe("debug maps", () => {
 
   it("keeps wilderness teleports and arrivals on reachable open floor", () => {
     for (const definition of Object.values(debugMapDefinitions)) {
-      const sourceMap = createReachabilityValidationMap(definition.id);
+      const sourceMap =
+        definition.id === MAP_SIX_ID
+          ? createDebugMapForQuestState(MAP_SIX_ID, {
+              the_patrons_shadow: {
+                runtime: { patronWards: { routeUnlocked: true } },
+              },
+            })
+          : createReachabilityValidationMap(definition.id);
 
       for (const teleport of definition.teleports) {
         assertOpenReachablePosition(sourceMap, teleport.position);
 
-        const targetMap = createReachabilityValidationMap(teleport.targetMapId);
+        const targetMap =
+          teleport.targetMapId === MAP_SIX_ID
+            ? createDebugMapForQuestState(MAP_SIX_ID, {
+                the_patrons_shadow: {
+                  runtime: { patronWards: { routeUnlocked: true } },
+                },
+              })
+            : createReachabilityValidationMap(teleport.targetMapId);
         for (const arrivalPosition of teleport.arrivalPositions) {
           assertOpenReachablePosition(targetMap, arrivalPosition);
         }
@@ -599,6 +729,29 @@ describe("debug maps", () => {
     expect(isNavigationCellWalkable(openMap, OLD_GROVE_PASSAGE_BLOCKER_POSITION)).toBe(true);
     expect(getNavigationDistance(closedMap, { x: 100, y: 29 }, { x: 110, y: 29 }, 80)).toBeNull();
     expect(getNavigationDistance(openMap, { x: 100, y: 29 }, { x: 110, y: 29 }, 80)).not.toBeNull();
+  });
+
+  it("blocks the Nightmire route with one shared circular barrier until the Wards unlock it", () => {
+    const closedMap = createDebugMap(MAP_SIX_ID);
+    const openMap = createDebugMapForQuestState(MAP_SIX_ID, {
+      the_patrons_shadow: {
+        runtime: { patronWards: { routeUnlocked: true } },
+      },
+    });
+    const forwardTeleport = closedMap.teleports.find(
+      (teleport) => teleport.id === MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID,
+    );
+
+    expect(forwardTeleport?.startsWorking).toBe(false);
+    expect(closedMap.collisionWalls).toEqual(NIGHTMIRE_BARRIER_COLLISION_CELLS);
+    expect(closedMap.collisionWalls).toContainEqual(NIGHTMIRE_BARRIER_CENTER);
+    expect(isNavigationCellWalkable(closedMap, NIGHTMIRE_BARRIER_CENTER)).toBe(
+      false,
+    );
+    expect(openMap.collisionWalls).toBeUndefined();
+    expect(isNavigationCellWalkable(openMap, NIGHTMIRE_BARRIER_CENTER)).toBe(
+      true,
+    );
   });
 
   it("keeps authored subzones, passages, encounter areas, and resource locations valid", () => {
@@ -964,6 +1117,10 @@ function assertMapPlacements(mapId: DebugMapId, positions: Position[]) {
 }
 
 function createReachabilityValidationMap(mapId: DebugMapId): GameMap {
+  if (mapId === MAP_SEVEN_ID) {
+    return createDebugMap(mapId, { mapSevenRouteBarrackDestroyed: true });
+  }
+
   return createDebugMapForQuestState(mapId, secureLandingCompleteQuestStates);
 }
 

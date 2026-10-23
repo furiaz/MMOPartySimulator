@@ -78,6 +78,8 @@ export function applyStatusEffect(
 ): GameState {
   const target = state.entities[input.targetId];
 
+  if (target?.kind === "structure" && input.type !== "poison" && input.type !== "burning" && input.type !== "bleed") return state;
+
   if (
     !target ||
     target.state === "dead" ||
@@ -206,21 +208,21 @@ export function isMovementBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["immobilized", "incapacitated"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["immobilized", "incapacitated"]);
 }
 
 export function isAttackBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated", "disarmed"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["incapacitated", "disarmed"]);
 }
 
 export function isSkillUseBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated", "silenced"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["incapacitated", "silenced"]);
 }
 
 export function hasActiveStatusEffect(
@@ -235,7 +237,7 @@ export function isGatherBlockedByStatus(
   state: GameState,
   entityId: string,
 ): boolean {
-  return hasActiveStatus(state, entityId, ["incapacitated"]);
+  return Boolean(state.forcedMovementsByEntityId?.[entityId]) || hasActiveStatus(state, entityId, ["incapacitated"]);
 }
 
 export function isFakeDeathActive(state: GameState, entityId: string): boolean {
@@ -387,7 +389,7 @@ export function updateStatusEffects(
       const incrementalDamage = nextAppliedDamage - appliedDotDamage;
       if (incrementalDamage > 0) {
         const damagedTarget = damageEntity(currentTarget, incrementalDamage);
-        nextState = updateEntity(nextState, damagedTarget);
+        nextState = updateEntity(nextState, damagedTarget, nextTickAt);
         appliedDotDamage = nextAppliedDamage;
         if (damagedTarget.state === "dead" || damagedTarget.health <= 0) {
           targetDied = true;
@@ -622,6 +624,6 @@ function isCombatEntity(entity: unknown): entity is CombatEntity {
       typeof entity === "object" &&
       "kind" in entity &&
       ((entity as CombatEntity).kind === "companion" ||
-        (entity as CombatEntity).kind === "enemy"),
+        (entity as CombatEntity).kind === "enemy" || (entity as CombatEntity).kind === "structure"),
   );
 }

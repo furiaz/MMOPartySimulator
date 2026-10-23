@@ -1,6 +1,7 @@
 import type {
   DebugMapId,
   DebugTeleportPoint,
+  EnemyEncounterBand,
   EnemyVariant,
   EnemyTypeId,
   GameMap,
@@ -14,6 +15,13 @@ import type {
   ZoneSubzonePassage,
 } from "./types";
 import { bakeNavigationGrid } from "./navigation";
+import { BARRACK_DEFINITIONS, getBarrackCollisionCells } from "./barrackDefinitions";
+import { ORC_WARCAMP_ARENA, ORC_WARCAMP_ARENA_BARRACKS, ORC_WARCAMP_BOSS_POSITION, ORC_WARCAMP_CAGE_POSITION, ORC_WARCAMP_CHEST_POSITION, ORC_WARCAMP_ENCOUNTER_ID, ORC_WARCAMP_GATE_POSITION, ORC_WARCAMP_ROUTE_BARRACK_POSITION } from "./orcWarcampLayout";
+import {
+  createCircularBarrierCollisionCells,
+  createNightmireBarrierCollisionCells,
+  isNightmireRouteOpen,
+} from "./patronWardState";
 
 export const DEBUG_MAP_COLUMNS = 110;
 export const DEBUG_MAP_ROWS = 60;
@@ -71,6 +79,7 @@ export const SLIMEWARD_CHEST_ID = "slimeward-boss-chest";
 export const SLIMEWARD_CHEST_POSITION: Position = { x: 138, y: 22 };
 export const SLIMEWARD_EXIT_POSITION: Position = { x: 144, y: 22 };
 export const CLASS_MENTOR_NPC_ID = "hub-class-mentor";
+export const HUB_TWO_QUEST_GIVER_NPC_ID = "hub-2-quest-giver";
 
 export const companionIds = [
   "test-companion-1",
@@ -160,6 +169,20 @@ export const mapFiveForwardTeleporterPosition: Position = { x: 104, y: 29 };
 export const mapSixReturnTeleporterPosition: Position = { x: 5, y: 29 };
 export const mapSixForwardTeleporterPosition: Position = { x: 104, y: 29 };
 export const mapSevenReturnTeleporterPosition: Position = { x: 5, y: 29 };
+export const MAP_SEVEN_ROUTE_BARRACK_ID = "map-7-route-barrack";
+export const MAP_SEVEN_ROUTE_BARRACK_POSITION = ORC_WARCAMP_ROUTE_BARRACK_POSITION;
+export const MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS = getBarrackCollisionCells(BARRACK_DEFINITIONS[0]);
+export const MAP_SEVEN_ARENA_GATE_POSITION = ORC_WARCAMP_GATE_POSITION;
+export const MAP_SEVEN_ARENA_GATE_RADIUS = 5;
+export const MAP_SEVEN_ARENA_GATE_COLLISION_CELLS =
+  createCircularBarrierCollisionCells(
+    MAP_SEVEN_ARENA_GATE_POSITION,
+    MAP_SEVEN_ARENA_GATE_RADIUS,
+  );
+export const MAP_SEVEN_ARENA_BARRACK_POSITIONS = ORC_WARCAMP_ARENA_BARRACKS.map(barrack => barrack.position);
+export const MAP_SEVEN_WARMASTER_POSITION = ORC_WARCAMP_BOSS_POSITION;
+export const MAP_SEVEN_CAGE_POSITION = ORC_WARCAMP_CAGE_POSITION;
+export const MAP_SEVEN_REPEAT_CHEST_POSITION = ORC_WARCAMP_CHEST_POSITION;
 export const HUB_HEALING_FOUNTAIN_RANGE = 5;
 export const HUB_TWO_HEALING_FOUNTAIN_RANGE = 5;
 export const hubHealingFountains: HealingFountain[] = [
@@ -391,7 +414,7 @@ export const classMentorNpcStartData = {
 
 export const hubTwoNpcStartData = [
   {
-    id: "hub-2-quest-giver",
+    id: HUB_TWO_QUEST_GIVER_NPC_ID,
     position: { x: 56, y: 31 },
     displayName: "Quest Giver",
     npcRole: "quest_giver",
@@ -772,14 +795,17 @@ export const mapSevenSubzones: ZoneSubzone[] = [
     levelRange: { min: 18, max: 20 },
     enemyTypeIds: ["orc", "orc_raider", "orc_shieldbearer", "orc_warmaster"],
     encounterAreas: [
-      { id: "orc-warcamp-outer-patrol", subzoneId: "orc-warcamp", center: { x: 25, y: 19 }, radius: 21, leashRadius: 24 },
-      { id: "orc-warcamp-shield-line", subzoneId: "orc-warcamp", center: { x: 56, y: 39 }, radius: 22, leashRadius: 25 },
-      { id: "orc-warcamp-warmaster-ring", subzoneId: "orc-warcamp", center: { x: 87, y: 20 }, radius: 23, leashRadius: 27 },
+      { id: "orc-warcamp-outer-patrol", subzoneId: "orc-warcamp", center: { x: 26, y: 18 }, radius: 19, leashRadius: 22 },
+      { id: "orc-warcamp-shield-line", subzoneId: "orc-warcamp", center: { x: 53, y: 18 }, radius: 15, leashRadius: 18 },
+      { id: "orc-warcamp-farm-east", subzoneId: "orc-warcamp", center: { x: 53, y: 45 }, radius: 17, leashRadius: 20 },
+      { id: "orc-warcamp-farm-south", subzoneId: "orc-warcamp", center: { x: 25, y: 46 }, radius: 17, leashRadius: 20 },
+      { id: "orc-warcamp-route-squad", subzoneId: "orc-warcamp", center: { x: 75, y: 15 }, radius: 8, leashRadius: 11 },
+      { id: ORC_WARCAMP_ENCOUNTER_ID, subzoneId: "orc-warcamp", center: MAP_SEVEN_WARMASTER_POSITION, radius: 14, leashRadius: 17 },
     ],
     resourceLocations: [
-      { id: resourceIds[0], subzoneId: "orc-warcamp", position: { x: 13, y: 48 }, resourceType: "wood", tier: 2 },
-      { id: resourceIds[3], subzoneId: "orc-warcamp", position: { x: 51, y: 9 }, resourceType: "ore", tier: 2 },
-      { id: resourceIds[5], subzoneId: "orc-warcamp", position: { x: 99, y: 47 }, resourceType: "herb", tier: 2 },
+      { id: resourceIds[0], subzoneId: "orc-warcamp", position: { x: 11, y: 50 }, resourceType: "wood", tier: 2 },
+      { id: resourceIds[3], subzoneId: "orc-warcamp", position: { x: 51, y: 7 }, resourceType: "ore", tier: 2 },
+      { id: resourceIds[5], subzoneId: "orc-warcamp", position: { x: 60, y: 28 }, resourceType: "herb", tier: 2 },
     ],
     passages: [],
   },
@@ -854,9 +880,9 @@ const mapSixSourceSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
 ];
 
 export const mapSevenSubzoneNameLabels: ZoneSubzoneNameLabel[] = [
-  { id: "map-7-warcamp-entry-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 17, y: 29 } },
-  { id: "map-7-warcamp-center-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 56, y: 29 } },
-  { id: "map-7-warcamp-end-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 92, y: 29 } },
+  { id: "map-7-warcamp-entry-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 20, y: 28 } },
+  { id: "map-7-warcamp-center-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 51, y: 25 } },
+  { id: "map-7-warcamp-end-label", subzoneId: "orc-warcamp", text: "Orc Warcamp", position: { x: 91, y: 24 } },
 ];
 
 export const mapOneSubzoneNameLabels: ZoneSubzoneNameLabel[] =
@@ -1102,30 +1128,29 @@ const mapSixProgressionEnemyStartData: WildZoneEnemyStartData[] = [
   { position: { x: 99, y: 18 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
   { position: { x: 81, y: 27 }, enemyTypeId: "elder_mossling", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
   { position: { x: 92, y: 29 }, enemyTypeId: "cinder_wisp", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
-  { position: { x: 101, y: 25 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
+  { position: { x: 101, y: 22 }, enemyTypeId: "night_bat", subzoneId: "nightmire-canopy", encounterAreaId: "nightmire-cinder-hollow" },
 ];
 
 const mapSevenProgressionEnemyStartData: WildZoneEnemyStartData[] = [
-  { position: { x: 17, y: 15 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { position: { x: 26, y: 12 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { position: { x: 36, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { position: { x: 19, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { position: { x: 31, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1.15 },
-  { position: { x: 43, y: 20 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
-  { position: { x: 48, y: 37 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
-  { position: { x: 57, y: 33 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { position: { x: 66, y: 39 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { position: { x: 50, y: 48 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
-  { position: { x: 61, y: 50 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { position: { x: 72, y: 44 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
-  { position: { x: 80, y: 15 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
-  { position: { x: 89, y: 11 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { position: { x: 99, y: 19 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { position: { x: 82, y: 29 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
-  { position: { x: 93, y: 30 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.15 },
-  { position: { x: 101, y: 27 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
-  { position: { x: 88, y: 22 }, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25 },
-  { position: { x: 96, y: 24 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1 },
+  { position: { x: 15, y: 13 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 25, y: 10 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 33, y: 19 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1 },
+  { position: { x: 39, y: 25 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-outer-patrol", combatBodyRadius: 1.15 },
+  { position: { x: 51, y: 11 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1.15 },
+  { position: { x: 55, y: 9 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 62, y: 17 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 63, y: 25 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-shield-line", combatBodyRadius: 1 },
+  { position: { x: 49, y: 43 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-east", combatBodyRadius: 1 },
+  { position: { x: 57, y: 45 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-east", combatBodyRadius: 1 },
+  { position: { x: 61, y: 50 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-east", combatBodyRadius: 1.15 },
+  { position: { x: 64, y: 42 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-east", combatBodyRadius: 1 },
+  { position: { x: 13, y: 42 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-south", combatBodyRadius: 1 },
+  { position: { x: 23, y: 48 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-south", combatBodyRadius: 1 },
+  { position: { x: 34, y: 50 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-farm-south", combatBodyRadius: 1.15 },
+  { position: { x: 72, y: 9 }, enemyTypeId: "orc", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-route-squad", combatBodyRadius: 1 },
+  { position: { x: 76, y: 13 }, enemyTypeId: "orc_raider", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-route-squad", combatBodyRadius: 1 },
+  { position: { x: 73, y: 17 }, enemyTypeId: "orc_shieldbearer", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-route-squad", combatBodyRadius: 1.15 },
+  { position: MAP_SEVEN_WARMASTER_POSITION, enemyTypeId: "orc_warmaster", subzoneId: "orc-warcamp", encounterAreaId: "orc-warcamp-warmaster-ring", combatBodyRadius: 1.25, encounterBand: "boss" },
 ];
 
 export const mapThreeEnemyStartData: EnemyStartData[] = createEnemyStartData(
@@ -1277,7 +1302,7 @@ export const slimewardFloorTwoEnemyStartData: EnemyStartData[] = [
   { id: "slimeward-f2-r4-3", position: { x: 102, y: 22 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
   { id: "slimeward-f2-r4-4", position: { x: 94, y: 25 }, enemyTypeId: "slimeward_spitter_slime", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
   { id: "slimeward-f2-r4-5", position: { x: 104, y: 25 }, enemyTypeId: "slimeward_pale_ooze", subzoneId: "f2-room-4", encounterAreaId: "f2-room-4-pack" },
-  { id: SLIMEWARD_BOSS_ID, position: { x: 132, y: 22 }, enemyTypeId: "azure_mass", subzoneId: "f2-boss-room", encounterAreaId: "f2-boss-pack" },
+  { id: SLIMEWARD_BOSS_ID, position: { x: 132, y: 22 }, enemyTypeId: "azure_mass", subzoneId: "f2-boss-room", encounterAreaId: "f2-boss-pack", encounterBand: "boss" },
 ];
 
 export function getEnemyStartDataForMap(
@@ -1360,6 +1385,7 @@ export type EnemyStartData = {
   enemyTypeId: EnemyTypeId;
   subzoneId: string;
   encounterAreaId: string;
+  encounterBand?: EnemyEncounterBand;
   variant?: EnemyVariant;
   combatBodyRadius?: number;
 };
@@ -1369,6 +1395,9 @@ type WildZoneEnemyStartData = Omit<EnemyStartData, "id">;
 type DebugMapCreationOptions = {
   secureLandingGateOpen?: boolean;
   oldGrovePassageOpen?: boolean;
+  nightmireRouteOpen?: boolean;
+  mapSevenRouteBarrackDestroyed?: boolean;
+  mapSevenArenaGateClosed?: boolean;
 };
 
 type DebugMapQuestStates = Partial<
@@ -1377,6 +1406,12 @@ type DebugMapQuestStates = Partial<
     {
       status?: string;
       objectiveProgress?: Record<string, { completed?: boolean }>;
+      runtime?: {
+        patronWards?: {
+          routeUnlocked?: true;
+          legacyRoutePreserved?: true;
+        };
+      };
     }
   >
 >;
@@ -1600,19 +1635,23 @@ const MAP_FIVE_VISUAL_OBJECTS: MapVisualObject[] = [
 ];
 
 const MAP_SIX_VISUAL_OBJECTS: MapVisualObject[] = [
-  { id: "map-6-bat-roost", visualId: "nightmire_bat_roost_dead_tree", position: { x: 23, y: 20 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-bat-roost", visualId: "nightmire_bat_roost_dead_tree", position: { x: 96, y: 20 }, widthCells: 4, heightCells: 4, anchorY: 1 },
   { id: "map-6-hanging-roots", visualId: "nightmire_hanging_root_curtain", position: { x: 41, y: 44 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-6-oldroot-stump", visualId: "nightmire_ancient_elder_moss_stump", position: { x: 61, y: 27 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-6-cinder-pool", visualId: "nightmire_cinder_veined_standing_stone", position: { x: 88, y: 22 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-oldroot-stump", visualId: "nightmire_ancient_elder_moss_stump", position: { x: 96, y: 29 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-6-cinder-pool", visualId: "nightmire_cinder_veined_standing_stone", position: { x: 96, y: 38 }, widthCells: 4, heightCells: 4, anchorY: 1 },
   { id: "map-6-glowcap-cluster", visualId: "nightmire_mushroom_ring", position: { x: 86, y: 45 }, widthCells: 4, heightCells: 4, anchorY: 1 },
 ];
 
+export const NIGHTMIRE_BARRIER_COLLISION_CELLS =
+  createNightmireBarrierCollisionCells();
+
 const MAP_SEVEN_VISUAL_OBJECTS: MapVisualObject[] = [
-  { id: "map-7-war-banner", visualId: "orc_warcamp_orc_command_banner_standard", position: { x: 24, y: 18 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-7-shield-rack", visualId: "orc_warcamp_orc_weapon_rack", position: { x: 56, y: 44 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-7-spiked-barricade", visualId: "orc_warcamp_heavy_orc_spike_barricade", position: { x: 63, y: 22 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-7-warmaster-dais", visualId: "orc_warcamp_crude_war_drum_platform", position: { x: 88, y: 28 }, widthCells: 4, heightCells: 4, anchorY: 1 },
-  { id: "map-7-weapon-pile", visualId: "orc_warcamp_skull_bone_trophy_mound", position: { x: 38, y: 49 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-war-banner", visualId: "orc_warcamp_orc_command_banner_standard", position: { x: 24, y: 20 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-shield-rack", visualId: "orc_warcamp_orc_weapon_rack", position: { x: 50, y: 27 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: MAP_SEVEN_ROUTE_BARRACK_ID, visualId: "orc_warcamp_barracks", position: MAP_SEVEN_ROUTE_BARRACK_POSITION, widthCells: 5, heightCells: 5, anchorY: 1 },
+  { id: "map-7-warmaster-dais", visualId: "orc_warcamp_crude_war_drum_platform", position: MAP_SEVEN_WARMASTER_POSITION, widthCells: 4, heightCells: 4, anchorY: 1 },
+  { id: "map-7-weapon-pile", visualId: "orc_warcamp_skull_bone_trophy_mound", position: { x: 35, y: 50 }, widthCells: 4, heightCells: 4, anchorY: 1 },
+  ...ORC_WARCAMP_ARENA_BARRACKS.map((barrack): MapVisualObject => ({ id: barrack.id, visualId: "orc_warcamp_barracks", position: barrack.position, widthCells: 3, heightCells: 3, anchorY: 1 })),
 ];
 
 const MAP_ONE_WALLS = dedupeWalls([
@@ -1671,10 +1710,18 @@ const MAP_SIX_WALLS = dedupeWalls([
 
 const MAP_SEVEN_WALLS = dedupeWalls([
   ...createPerimeterWalls(POST_HUB_TWO_MAP_COLUMNS, POST_HUB_TWO_MAP_ROWS),
-  ...createWallBlock(17, 28, 36, 46),
-  ...createWallBlock(35, 45, 9, 17),
-  ...createWallBlock(57, 68, 12, 22),
-  ...createWallBlock(80, 92, 36, 46),
+  // The route begins at the north edge of the field and runs down the center-right.
+  ...createVerticalWall(69, 5, 55, []),
+  // Keep walkable lanes beside the route Barrack; destroying it is optional.
+  // The Boss arena occupies the east side and opens only from the route's southern end.
+  ...createVerticalWall(80, 1, 51, []),
+  // Reclaimed northern space is solid terrain, not an isolated walkable room.
+  ...createWallBlock(Math.ceil(ORC_WARCAMP_ARENA.minX), Math.floor(ORC_WARCAMP_ARENA.maxX), 1, Math.floor(ORC_WARCAMP_ARENA.minY)),
+  ...createHorizontalWall(Math.ceil(ORC_WARCAMP_ARENA.maxY), Math.ceil(ORC_WARCAMP_ARENA.minX), Math.floor(ORC_WARCAMP_ARENA.maxX), [[MAP_SEVEN_ARENA_GATE_POSITION.x - 5, MAP_SEVEN_ARENA_GATE_POSITION.x + 4]]),
+  // Sparse field landmarks keep the farming space open rather than checkpoint-shaped.
+  ...createWallBlock(20, 27, 37, 44),
+  ...createWallBlock(42, 47, 8, 13),
+  ...createWallBlock(58, 63, 30, 34),
 ]);
 
 const SLIMEWARD_CAMP_COLUMNS = 44;
@@ -1975,6 +2022,7 @@ export const debugMapDefinitions: Record<
         sourceMapId: MAP_SIX_ID,
         targetMapId: MAP_SEVEN_ID,
         arrivalPositions: mapSixMapSevenArrivalPositions,
+        startsWorking: false,
         autoSelectAfterEnemiesCleared: true,
       },
     ],
@@ -2152,7 +2200,7 @@ export function createDebugMap(
   options: DebugMapCreationOptions = {},
 ): GameMap {
   const definition = debugMapDefinitions[mapId];
-  const walls = getDebugMapWalls(definition, options);
+  const walls = getDebugMapWalls(definition);
   const collisionWalls = getDebugMapCollisionWalls(definition, options);
   const visualObjects = getDebugMapVisualObjects(definition, options);
   const map = {
@@ -2186,6 +2234,7 @@ export function createDebugMapForQuestState(
   return createDebugMap(mapId, {
     secureLandingGateOpen: isSecureLandingPassageGateOpen(quests),
     oldGrovePassageOpen: isOldGrovePassageOpen(quests),
+    nightmireRouteOpen: isNightmireRouteOpen(quests),
   });
 }
 
@@ -2233,7 +2282,6 @@ export function getDebugMapDefinition(mapId: DebugMapId) {
 
 function getDebugMapWalls(
   definition: (typeof debugMapDefinitions)[DebugMapId],
-  _options: DebugMapCreationOptions,
 ): Position[] {
   return definition.walls;
 }
@@ -2254,7 +2302,29 @@ function getDebugMapCollisionWalls(
     return HUB_TWO_STRUCTURE_COLLISION_WALLS;
   }
 
-  if (definition.id !== MAP_ONE_ID && definition.id !== MAP_TWO_ID) {
+  if (definition.id === MAP_SIX_ID && !options.nightmireRouteOpen) {
+    return NIGHTMIRE_BARRIER_COLLISION_CELLS;
+  }
+
+  if (definition.id === MAP_SEVEN_ID) {
+    const collisionCells = [
+      ...(options.mapSevenRouteBarrackDestroyed
+        ? []
+        : MAP_SEVEN_ROUTE_BARRACK_COLLISION_CELLS),
+      ...(options.mapSevenArenaGateClosed
+        ? MAP_SEVEN_ARENA_GATE_COLLISION_CELLS
+        : []),
+    ];
+
+    return collisionCells.length > 0 ? dedupeWalls(collisionCells) : undefined;
+  }
+
+  if (
+    definition.id !== MAP_ONE_ID &&
+    definition.id !== MAP_TWO_ID &&
+    definition.id !== MAP_SIX_ID &&
+    definition.id !== MAP_SEVEN_ID
+  ) {
     return undefined;
   }
 
@@ -2284,6 +2354,15 @@ function getDebugMapVisualObjects(
         ? OLD_GROVE_REPAIRED_COLUMN_VISUAL
         : OLD_GROVE_PASSAGE_BLOCKER_VISUAL,
     ];
+  }
+
+  if (
+    definition.id === MAP_SEVEN_ID &&
+    options.mapSevenRouteBarrackDestroyed
+  ) {
+    return (definition.visualObjects ?? []).filter(
+      (visualObject) => visualObject.id !== MAP_SEVEN_ROUTE_BARRACK_ID,
+    );
   }
 
   if (!definition.visualObjects) {

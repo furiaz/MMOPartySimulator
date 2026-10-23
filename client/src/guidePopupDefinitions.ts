@@ -16,6 +16,7 @@ export type GuidePopupId =
   | "first_route_unlocked"
   | "first_class_path"
   | "first_class_selected"
+  | "guild_notice_board_onboarding"
   | "first_party_size_growth"
   | "first_wipe_rescue";
 
@@ -211,6 +212,28 @@ export const guidePopupDefinitions: Record<GuidePopupId, GuidePopupDefinition> =
       {
         title: "First Class Chosen",
         body: "Classes unlock new skills, stats, and equipment direction. Roles still decide how companions behave.",
+      },
+    ],
+  },
+  guild_notice_board_onboarding: {
+    id: "guild_notice_board_onboarding",
+    ariaLabel: "Guild Notice Board guide",
+    panels: [
+      {
+        title: "Guild Notice Board",
+        body: "Board contracts run alongside main quests. Only taken contracts record their listed kills.",
+        menuTarget: {
+          tab: "atlas",
+          atlasSubpage: "guildTavern",
+        },
+      },
+      {
+        title: "Claim Board Rewards",
+        body: "Return to the Guild Notice Board after completing a contract to claim its character XP, Crowns and first-class skill books. Make room for all reward books before claiming.",
+        menuTarget: {
+          tab: "atlas",
+          atlasSubpage: "guildTavern",
+        },
       },
     ],
   },

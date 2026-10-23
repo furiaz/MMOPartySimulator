@@ -1,3 +1,7 @@
+import { restoreBarracks } from "./barracks";
+import { reconcileWarmasterLifecycle, sanitizeWarmasterLifecycle } from "./warmasterLifecycle";
+import { restoreOrcWarcampLayout } from "./orcWarcampRestoration";
+import { resetWarmasterAttempt } from "./warmasterSystem";
 import {
   aoeTargetDummyId,
   aoeTargetDummyPosition,
@@ -29,7 +33,11 @@ import {
 } from "./enemyAbilities";
 import { SUPERIOR_ENEMY_CHANCE } from "./enemyVariants";
 import { normalizeEquipmentDropPopupThreshold } from "./equipmentDropPopups";
-import { sanitizeGuildNoticeBoardState } from "./guildNoticeBoard";
+import {
+  ensureStarterGuildNoticeBoardContract,
+  sanitizeGuildNoticeBoardState,
+  restoreGuildNoticeBoard,
+} from "./guildNoticeBoard";
 import { addItemToInventoryState } from "./inventory";
 import { sanitizeGuildRecruitState } from "./guildRecruit";
 import { sanitizeGuildUpgradesState } from "./guildRecruitUpgrades";
@@ -43,6 +51,10 @@ import {
 import { sanitizeInnKitchenState } from "./innKitchen";
 import { sanitizeInnUpgradesState } from "./innRoomUpgrades";
 import { sanitizeWorldDiscoveryState } from "./worldDiscovery";
+import {
+  isLegacyNightmireRouteSave,
+  restorePatronWardStateFromSave,
+} from "./patronWardSystem";
 import { sanitizePartyInventory } from "./inventory";
 import {
   getItemDefinition,
@@ -58,16 +70,27 @@ import {
   recordHighestCharacterLevelEver,
 } from "./partySystem";
 import {
+  ASH_GOBLIN_MAIN_QUEST_ID,
+  GUILD_BOARD_ONBOARDING_QUEST_ID,
   createInitialQuestStates,
+  hasFirstClassRosterCompanion,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
+  reconcileQuestAvailability,
 } from "./questSystem";
+import {
+  reconcileStateDerivedQuestObjectivesForQuests,
+  recordEquippedItemObjectivesForQuests,
+} from "./questProgressionHooks";
+import { sanitizeQuestAmbientEnemySuppressionsAfterLoad } from "./questAmbientEnemySuppressionSystem";
 import { sanitizeProgressionForCompanion } from "./skillProgression";
+import { normalizeCompanionSkillBehavior } from "./skillBehavior";
 import { getSubzoneAtPosition } from "./subzoneSystem";
 import type { GameState } from "./state";
 import type {
   Companion,
   DebugMapId,
+  EnemyEncounterBand,
   GameEntity,
   InventorySlot,
   ItemId,
@@ -400,6 +423,10 @@ function migrateLegacyQuestEnemyIds(value: unknown): unknown {
                 quest.runtime.suppressedSubzoneEnemiesByObjectiveId,
                 idMappingByObjectiveId,
               ),
+            ambientEnemySuppressionsByGroupId:
+              remapAmbientEnemySuppressionSnapshots(
+                quest.runtime.ambientEnemySuppressionsByGroupId,
+              ),
           },
         },
       ];
@@ -465,6 +492,44 @@ function remapObjectiveEnemySnapshots(
               };
             })
           : enemies,
+      ];
+    }),
+  );
+}
+
+function remapAmbientEnemySuppressionSnapshots(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([groupId, runtime]) => {
+      if (!isRecord(runtime) || !Array.isArray(runtime.enemySnapshots)) {
+        return [groupId, runtime];
+      }
+
+      const targetMapId = getWildMapId(runtime.targetMapId);
+      const idMapping = targetMapId
+        ? getLegacyWildEnemyIdMapping(targetMapId)
+        : undefined;
+
+      return [
+        groupId,
+        idMapping
+          ? {
+              ...runtime,
+              enemySnapshots: runtime.enemySnapshots.map((enemy) => {
+                if (!isRecord(enemy) || typeof enemy.id !== "string") {
+                  return enemy;
+                }
+
+                return {
+                  ...enemy,
+                  id: idMapping[enemy.id] ?? enemy.id,
+                };
+              }),
+            }
+          : runtime,
       ];
     }),
   );
@@ -570,7 +635,10 @@ export function restoreGameStateFromSave(value: unknown): RestoreSaveResult {
     currentMapId,
     map,
   }, restoredAtMs);
-  const normalizedState = normalizeAoeTargetDummyPosition(sanitizedState);
+  const normalizedState = restoreGuildNoticeBoard(normalizeAoeTargetDummyPosition({
+    ...sanitizedState,
+    guildNoticeBoard: validation.save.state.guildNoticeBoard ? sanitizedState.guildNoticeBoard : undefined,
+  }), restoredAtMs);
 
   return {
     ok: true,
@@ -842,16 +910,123 @@ export function sanitizeGameStateForSave(
   enemyAbilityDefinitions: EnemyAbilityRegistry = ENEMY_ABILITY_DEFINITIONS,
 ): GameState {
   const currentMapId = state.currentMapId ?? "hub";
-  const quests = sanitizeQuestStates(state.quests);
-  const map = createDebugMapForQuestState(currentMapId, quests);
-  const savedEntities = Object.fromEntries(
-    Object.entries(state.entities).map(([id, entity]) => [id, sanitizeEntityForSave(entity, state.partyLeaderId)]),
+  // Displacements are transient; restore their last safe point, not a body-overlap mid-flight.
+  const restoredPositions = Object.fromEntries(Object.entries(state.entities).map(([id, entity]) => {
+    const savedPosition = state.forcedMovementsByEntityId?.[id]?.lastSafePosition;
+    return [id, savedPosition && Number.isFinite(savedPosition.x) && Number.isFinite(savedPosition.y)
+      ? { ...entity, position: { ...savedPosition } } : entity];
+  }));
+  state = { ...state, entities: restoredPositions };
+  const didSaveHaveNewQuestStates = Boolean(
+    state.quests[GUILD_BOARD_ONBOARDING_QUEST_ID] ||
+      state.quests[ASH_GOBLIN_MAIN_QUEST_ID],
   );
-  const entities = restoreCurrentMapNpcs(savedEntities, currentMapId, quests);
+  const authoredEncounterBandsByEnemyId = new Map<string, EnemyEncounterBand>(
+    getEnemyStartDataForMap(currentMapId).map((enemyStart) => [
+      enemyStart.id,
+      enemyStart.encounterBand ?? "standard",
+    ]),
+  );
+  const savedEntities = Object.fromEntries(
+    Object.entries(state.entities).map(([id, entity]) => [
+      id,
+      sanitizeEntityForSave(
+        entity,
+        state.partyLeaderId,
+        authoredEncounterBandsByEnemyId,
+      ),
+    ]),
+  );
   const restingCompanionsById = sanitizeRestingCompanionsForSave(
     state.restingCompanionsById,
-    entities,
+    savedEntities,
   );
+  const guildUpgrades = sanitizeGuildUpgradesState(state.guildUpgrades);
+  let guildNoticeBoard = sanitizeGuildNoticeBoardState(
+    state.guildNoticeBoard,
+    undefined,
+    {
+      ...state,
+      guildUpgrades,
+    },
+  );
+  const warmasterLifecycle = state.warmasterLifecycle ? sanitizeWarmasterLifecycle(state.warmasterLifecycle) : undefined;
+  let questReconciliationState: GameState = {
+    ...state,
+    warmasterLifecycle,
+    currentMapId,
+    entities: savedEntities,
+    restingCompanionsById,
+    guildUpgrades,
+    guildNoticeBoard,
+    quests: sanitizeQuestStates(state.quests),
+  };
+
+  const isEligibleLegacyQuestSave =
+    !didSaveHaveNewQuestStates &&
+    questReconciliationState.quests.azure_trial.status === "completed" &&
+    hasFirstClassRosterCompanion(questReconciliationState);
+
+  if (isEligibleLegacyQuestSave) {
+    questReconciliationState = {
+      ...questReconciliationState,
+      quests: {
+        ...questReconciliationState.quests,
+        [GUILD_BOARD_ONBOARDING_QUEST_ID]: completeSanitizedQuest(
+          questReconciliationState.quests[GUILD_BOARD_ONBOARDING_QUEST_ID],
+        ),
+        [ASH_GOBLIN_MAIN_QUEST_ID]: {
+          ...questReconciliationState.quests[ASH_GOBLIN_MAIN_QUEST_ID],
+          status: "available",
+        },
+      },
+    };
+  } else {
+    questReconciliationState = reconcileQuestAvailability(
+      questReconciliationState,
+    );
+
+    if (
+      questReconciliationState.quests[GUILD_BOARD_ONBOARDING_QUEST_ID]
+        .status !== "completed" &&
+      !questReconciliationState.guildNoticeBoard?.starterContractAccepted
+    ) {
+      questReconciliationState = ensureStarterGuildNoticeBoardContract(
+        questReconciliationState,
+      );
+    }
+  }
+
+  questReconciliationState = recordEquippedItemObjectivesForQuests(
+    questReconciliationState,
+    "save_restoration",
+  );
+  questReconciliationState = reconcileStateDerivedQuestObjectivesForQuests(
+    questReconciliationState,
+    "save_restoration",
+  );
+
+  let quests = questReconciliationState.quests;
+  guildNoticeBoard = questReconciliationState.guildNoticeBoard ?? guildNoticeBoard;
+  let map = createDebugMapForQuestState(currentMapId, quests);
+  let entities = restoreCurrentMapNpcs(savedEntities, currentMapId, quests);
+  const restoredSuppressionState =
+    sanitizeQuestAmbientEnemySuppressionsAfterLoad(
+      {
+        ...questReconciliationState,
+        quests,
+        map,
+        entities,
+      },
+      now,
+    );
+  const restoredPatronWardState = restorePatronWardStateFromSave(
+    restoredSuppressionState,
+    isLegacyNightmireRouteSave(state),
+  );
+  quests = restoredPatronWardState.quests;
+  map = restoredPatronWardState.map ?? map;
+  entities = restoredPatronWardState.entities;
   const followTrailsByEntityId = Object.fromEntries(
     Object.keys(entities).map((entityId) => [entityId, []]),
   );
@@ -860,21 +1035,12 @@ export function sanitizeGameStateForSave(
     entities,
     restingCompanionsById,
   });
-  const guildUpgrades = sanitizeGuildUpgradesState(state.guildUpgrades);
   const innUpgrades = sanitizeInnUpgradesState(state.innUpgrades);
   const guildRecruit = sanitizeGuildRecruitState(state.guildRecruit, undefined, {
     ...state,
     guildUpgrades,
     innUpgrades,
   });
-  const guildNoticeBoard = sanitizeGuildNoticeBoardState(
-    state.guildNoticeBoard,
-    undefined,
-    {
-      ...state,
-      guildUpgrades,
-    },
-  );
   const guildSecondaryParties = sanitizeGuildSecondaryPartiesState(
     state.guildSecondaryParties,
     restingCompanionsById,
@@ -911,7 +1077,7 @@ export function sanitizeGameStateForSave(
     enemyAbilityDefinitions,
   );
 
-  return {
+  return resetWarmasterAttempt(restoreOrcWarcampLayout(reconcileWarmasterLifecycle(restoreBarracks({
     ...state,
     entities,
     restingCompanionsById,
@@ -941,6 +1107,7 @@ export function sanitizeGameStateForSave(
     currentMapId,
     map,
     quests,
+    teleportStatesById: restoredPatronWardState.teleportStatesById,
     activeTeleport: null,
     autoCombatOnArrivalEnabled: Boolean(state.autoCombatOnArrivalEnabled),
     autoRoute: undefined,
@@ -949,6 +1116,7 @@ export function sanitizeGameStateForSave(
     directCompanionCommandsById: {},
     directCommandGraceUntilByCompanionId: {},
     interruptedPoiTarget: null,
+    questNpcSpeechCue: undefined,
     globalPoiIntent: null,
     localPoiTarget: null,
     lastPoiDecision: undefined,
@@ -1007,6 +1175,10 @@ export function sanitizeGameStateForSave(
     companionAoeChannelsByCasterId: {},
     enemyAoeChannelsByCasterId: {},
     enemyAoeCooldownsByCasterId: {},
+    warmasterAttempt: undefined,
+    warmasterLifecycle,
+    warmasterInteraction: undefined,
+    forcedMovementsByEntityId: {},
     ...enemyAbilityRuntime,
     aoeDummyPatternSequenceIndex: 0,
     consumableUsesByCompanionId: {},
@@ -1026,7 +1198,7 @@ export function sanitizeGameStateForSave(
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
     debugTelemetry: undefined,
-  };
+  }, now))), now);
 }
 
 function sanitizeQuestStates(
@@ -1059,9 +1231,10 @@ function sanitizeQuestStates(
           : shouldCompleteMissingObjective
             ? requiredCount
             : 0;
-        const completed = Boolean(savedProgress?.completed) ||
+        const completed =
+          Boolean(savedProgress?.completed) ||
           shouldCompleteMissingObjective ||
-          currentCount >= requiredCount;
+          (objective.type !== "patron_ward" && currentCount >= requiredCount);
 
         return [
           objective.id,
@@ -1407,7 +1580,11 @@ function sanitizeNonNegativeNumber(value: unknown): number {
     : 0;
 }
 
-function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity {
+function sanitizeEntityForSave(
+  entity: GameEntity,
+  leaderId: string,
+  authoredEncounterBandsByEnemyId: ReadonlyMap<string, EnemyEncounterBand>,
+): GameEntity {
   if (entity.kind === "companion") {
     const isLeader = entity.id === leaderId;
 
@@ -1415,6 +1592,7 @@ function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity
 
     return {
       ...sanitizedCompanion,
+      skillBehavior: normalizeCompanionSkillBehavior(sanitizedCompanion),
       state: entity.state === "dead" ? "dead" : isLeader ? "idle" : "follow",
       currentTargetId: entity.state === "dead" || isLeader ? null : leaderId,
       commandPriority: "autonomous",
@@ -1429,14 +1607,31 @@ function sanitizeEntityForSave(entity: GameEntity, leaderId: string): GameEntity
   }
 
   if (entity.kind === "enemy") {
+    const authoredEncounterBand = authoredEncounterBandsByEnemyId.get(entity.id);
+    const encounterBand =
+      authoredEncounterBand ??
+      (isEnemyEncounterBand(entity.encounterBand)
+        ? entity.encounterBand
+        : "standard");
+
     return {
       ...entity,
+      encounterBand,
       state: entity.state === "dead" ? "dead" : "idle",
       currentTargetId: null,
     };
   }
 
   return entity;
+}
+
+function isEnemyEncounterBand(value: unknown): value is EnemyEncounterBand {
+  return (
+    value === "standard" ||
+    value === "elite" ||
+    value === "champion" ||
+    value === "boss"
+  );
 }
 
 function restoreCurrentMapNpcs(
@@ -1491,6 +1686,7 @@ function sanitizeRestingCompanionsForSave(
           companionId,
           {
             ...sanitizedCompanion,
+            skillBehavior: normalizeCompanionSkillBehavior(sanitizedCompanion),
             state: "idle",
             currentTargetId: null,
             commandPriority: "autonomous",

@@ -126,6 +126,14 @@ describe("prototype enemy identity definitions", () => {
     }
   });
 
+  it("uses authored Warmaster health without changing ordinary level scaling", () => {
+    const boss = createEnemy("boss", { x: 0, y: 0 }, undefined, { enemyTypeId: "orc_warmaster" });
+    expect(boss).toMatchObject({ health: 1500, maxHealth: 1500, attack: 20, defense: 12 });
+    expect(boss.scalingOverrides).toContain("maxHealth");
+    expect(createEnemy("grunt", { x: 0, y: 0 }, undefined, { enemyTypeId: "orc" }).maxHealth).toBe(208);
+    expect(createEnemy("custom", { x: 0, y: 0 }, undefined, { enemyTypeId: "orc_warmaster", maxHealth: 123 }).maxHealth).toBe(123);
+  });
+
   it("creates Green Slime as a passive starter enemy", () => {
     const enemy = createEnemy("starter-slime", { x: 0, y: 0 }, undefined, {
       enemyTypeId: "green_slime",

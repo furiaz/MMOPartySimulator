@@ -15,7 +15,7 @@ export type EntityState =
   | "defend"
   | "dead";
 
-export type EntityKind = "companion" | "enemy" | "resource" | "npc";
+export type EntityKind = "companion" | "enemy" | "resource" | "npc" | "structure";
 
 export type EnemyTemperament = "passive" | "aggressive";
 
@@ -26,6 +26,8 @@ export type EnemyCombatStyle = "melee" | "ranged" | "support";
 export type EnemyTargetPreference = "closest" | "leader" | "lowestHealth";
 
 export type EnemyVariant = "superior";
+
+export type EnemyEncounterBand = "standard" | "elite" | "champion" | "boss";
 
 export type EnemyArchetypeId =
   | "slime"
@@ -81,9 +83,11 @@ export type EnemyTypeDefinition = {
   archetypeId: EnemyArchetypeId;
   abilityIds?: EnemyAbilityId[];
   temperament: EnemyTemperament;
+  canRoam?: boolean;
   combatStyle?: EnemyCombatStyle;
   targetPreference: EnemyTargetPreference;
   level: number;
+  maxHealth?: number;
   attackCooldownMs: number;
   detectionRange: number;
   attackRange?: number;
@@ -716,9 +720,28 @@ export type FireBurstTargetMode = "big_group" | "low_health" | "highest_health";
 export type CircleOfRenewalTargetMode =
   | "big_group"
   | "low_health"
+  | "highest_health"
   | "defender";
 
+export type CompanionAoeVariantId =
+  | "circle" | "semicircle" | "cone" | "line" | "cross" | "x" | "concentrated";
+
+export type SkillPreferenceValues = {
+  variant?: CompanionAoeVariantId;
+  targetMode?: CircleOfRenewalTargetMode;
+  mobilityMode?: MobilitySkillUseMode;
+  defensiveHpThresholdPercent?: number;
+  supportFocus?: SupportFocus;
+  selfHealHpThresholdPercent?: number;
+  allyHealHpThresholdPercent?: number;
+  useHpThresholdPercent?: number;
+  safetyFloorPercent?: number;
+  enabled?: boolean;
+  mainTargetHpThresholdPercent?: number;
+};
+
 export type CompanionSkillBehavior = {
+  preferencesBySkillId?: Partial<Record<SkillId, SkillPreferenceValues>>;
   beginnerFirstAidSelfHealHpThresholdPercent: number;
   beginnerFirstAidAllyHealHpThresholdPercent: number;
   secondWindSelfHealHpThresholdPercent: number;
@@ -1937,6 +1960,8 @@ export type SkillVisualEvent = {
   sourceId: string;
   targetId?: string;
   position?: Position;
+  area?: ResolvedAoeArea;
+  visualIntent?: AoeVisualIntent;
   createdAt: number;
   expiresAt: number;
 };
@@ -2160,6 +2185,7 @@ export type EnemyDashState = {
   lastSafePosition: Position;
   powerMultiplier: number;
   hitTargetIds: string[];
+  bodyScale?: number;
 };
 
 export type EnemyDashInterruptReason =
@@ -2191,6 +2217,8 @@ export type CompanionAoeChannelState = {
   bindDurationMs?: number;
   disarmDurationMs?: number;
   tauntDurationMs?: number;
+  knockbackDistance?: number;
+  stunDurationMs?: number;
   startedAt: number;
   channelEndsAt: number;
 };
@@ -2206,6 +2234,7 @@ export type DropVisualEvent = {
   displayName?: string;
   iconRole?: "quest_giver";
   questId?: QuestId;
+  boardContractId?: string;
   objectiveId?: string;
   quantity: number;
   position: Position;
@@ -2910,10 +2939,12 @@ export type MapVisualObjectId =
   | "nightmire_ash_moss_boulder_cluster"
   | "nightmire_corrupted_sap_patch"
   | "nightmire_broken_hunter_signpost"
-  | "orc_warcamp_heavy_orc_spike_barricade"
+  | "orc_warcamp_barracks"
+  | "orc_warcamp_barracks_ruined"
+  | "orc_warcamp_cage_closed"
+  | "orc_warcamp_cage_open"
   | "orc_warcamp_orc_command_banner_standard"
   | "orc_warcamp_crude_war_drum_platform"
-  | "orc_warcamp_armored_watchtower_platform"
   | "orc_warcamp_orc_weapon_rack"
   | "orc_warcamp_bonfire_meat_spit"
   | "orc_warcamp_orc_training_post"
@@ -3020,8 +3051,10 @@ export type LivingEntity = BaseEntity & {
 
 export type Enemy = LivingEntity & {
   kind: "enemy";
+  barrackSpawn?: { barrackId: string; sequence: number };
   currentTargetId: string | null;
   aggressionMode: EnemyAggressionMode;
+  encounterBand: EnemyEncounterBand;
   variant?: EnemyVariant;
   debugSpawn?: true;
   isTargetDummy?: true;
@@ -3031,6 +3064,7 @@ export type Enemy = LivingEntity & {
   subzoneId?: string;
   encounterAreaId?: string;
   defeatedAtMs?: number;
+  noticeBoardDefeatCounted?: true;
   roamTargetPosition?: Position | null;
   nextRoamAt?: number;
   roamMoveUntil?: number;
@@ -3048,6 +3082,9 @@ export type Enemy = LivingEntity & {
   attackRange?: number;
   combatBodyRadius?: number;
   attackWindupStartedAt?: number;
+  combatSizeMultiplier?: number;
+  movementBounds?: AoeBounds;
+  minimumMovementBodyRadius?: number;
   attackWindupDurationMs?: number;
   attackWindupTargetId?: string | null;
   targetDecisionReason?: EnemyTargetDecisionReason;
@@ -3057,6 +3094,7 @@ export type Enemy = LivingEntity & {
     targetPosition?: Position;
     isElite?: true;
     suppressNormalDrops?: true;
+    patronAura?: true;
   };
 };
 
@@ -3261,21 +3299,38 @@ export type WorldDiscoveryState = {
 
 export type GuildNoticeBoardQuestStatus = "available" | "taken" | "done";
 
-export type GuildNoticeBoardQuestObjective = {
+export type GuildNoticeBoardQuestCategory = "assault" | "extermination" | "rummage" | "forage";
+
+type GuildNoticeBoardObjectiveProgress = {
   id: string;
-  enemyTypeId: EnemyTypeId;
   requiredCount: number;
   currentCount: number;
 };
+export type GuildNoticeBoardQuestObjective = GuildNoticeBoardObjectiveProgress & (
+  | { type?: "enemy_kills"; enemyTypeId: EnemyTypeId }
+  | { type: "zone_kills"; eligibleEnemyTypeIds: EnemyTypeId[] }
+  | { type: "quest_drop"; eligibleEnemyTypeIds: EnemyTypeId[]; itemDisplayName: string }
+  | { type: "gather_resources" }
+);
 
 export type GuildNoticeBoardQuestReward = {
   crowns: number;
   skillBookItemId: SkillBookItemId;
+  characterXp?: number;
+  skillBookItemIds?: [SkillBookItemId, SkillBookItemId];
+  bonusSkillBookItemId?: SkillBookItemId;
+  bonusBookRoll?: number;
 };
 
 export type GuildNoticeBoardQuest = {
   id: string;
   title: string;
+  schemaVersion?: 2;
+  targetMapId?: DebugMapId;
+  category?: GuildNoticeBoardQuestCategory;
+  zoneDisplayName?: string;
+  description?: string;
+  isStarterContract?: true;
   sequence: number;
   status: GuildNoticeBoardQuestStatus;
   generatedAtMs: number;
@@ -3294,6 +3349,7 @@ export type GuildNoticeBoardClaimedReward = {
   questTitle: string;
   crowns: number;
   skillBookItemIds: SkillBookItemId[];
+  characterXp: number;
 };
 
 export type InnKitchenRecipeId = "house_bread";
@@ -3437,6 +3493,7 @@ export type GuildNoticeBoardState = {
   hasSeenCurrentRefresh: boolean;
   rerollsUsedToday: number;
   rerollDayStartMs: number;
+  starterContractAccepted?: boolean;
 };
 
 export type ResourceEntity = BaseEntity & {
@@ -3472,8 +3529,37 @@ export type NpcEntity = BaseEntity & {
     | "dungeon_chest_open";
 };
 
-export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity;
+export type CombatStructure = LivingEntity & {
+  kind: "structure";
+  structureType: "orc_barracks";
+  displayName: string;
+  footprint: AoeBounds;
+  attackBounds: AoeBounds;
+  currentTargetId: string | null;
+  attack: number;
+  defense: number;
+  magicDefense: number;
+  evasion: number;
+};
+export type HostileCombatTarget = Enemy | CombatStructure;
+
+export type BarrackRuntime = {
+  health: number;
+  maxHealth?: number;
+  preparationMs: number;
+  respawnAtMs?: number;
+  rebuildWarningShown?: boolean;
+  nextClearanceRetryAtMs?: number;
+  spawnSequence: number;
+  pendingEnemyTypeId?: EnemyTypeId;
+  tutorialSeen?: boolean;
+  wasInRange?: boolean;
+  speech?: { text: string; createdAt: number; expiresAt: number };
+  hintExpiresAtMs?: number;
+};
+
+export type GameEntity = Enemy | Companion | ResourceEntity | NpcEntity | CombatStructure;
 
 export type AutonomousEntity = Companion;
 
-export type CombatEntity = Companion | Enemy;
+export type CombatEntity = Companion | Enemy | CombatStructure;

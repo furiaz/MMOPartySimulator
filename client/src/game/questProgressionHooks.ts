@@ -3,9 +3,12 @@ import {
   MAP_TWO_ID,
   createDebugMapForQuestState,
 } from "./debugMap";
+import { isFirstClassId } from "./classes";
+import { isEncounterQuestMilestoneComplete } from "./encounterQuestMilestones";
+import { getDirectEnemyKillCredit } from "./directKillCredit";
 import { DROP_VISUAL_DURATION_MS } from "./dropSystem";
 import { getItemDefinition } from "./items";
-import { recordEnemyDefeatedForGuildNoticeBoard } from "./guildNoticeBoard";
+import { recordEnemyDefeatedForGuildNoticeBoard, recordResourceGatheredForGuildNoticeBoard } from "./guildNoticeBoard";
 import {
   QUEST_DEFINITIONS,
   QUEST_ORDER,
@@ -45,8 +48,20 @@ export function recordEnemyDefeatedForQuests(
       matchesOptionalEnemyType(objective, defeatedEnemy.enemyTypeId) &&
       matchesOptionalEnemyArchetype(objective, defeatedEnemy.archetypeId) &&
       matchesOptionalEnemyVariant(objective, defeatedEnemy),
-    1,
+    getDirectEnemyKillCredit(defeatedEnemy),
   );
+
+  if (!defeatedEnemy.questSpawn) {
+    nextState = updateMatchingQuestObjectives(
+      nextState,
+      (objective) =>
+        objective.type === "patron_ward" &&
+        objective.enemyMapId === mapId &&
+        matchesOptionalSubzone(objective, defeatedEnemy.subzoneId) &&
+        matchesOptionalEnemyType(objective, defeatedEnemy.enemyTypeId),
+      getDirectEnemyKillCredit(defeatedEnemy),
+    );
+  }
 
   nextState = recordEnemyQuestDropObjectives(
     nextState,
@@ -67,7 +82,35 @@ export function recordEnemyDefeatedForQuests(
     );
   }
 
-  nextState = recordEnemyDefeatedForGuildNoticeBoard(nextState, defeatedEnemy);
+  const questSpawn = defeatedEnemy.questSpawn;
+  const trackedObjective = questSpawn
+    ? QUEST_DEFINITIONS[questSpawn.questId]?.objectives.find(
+        (objective) =>
+          objective.id === questSpawn.objectiveId &&
+          objective.type === "defeat_quest_spawn" &&
+          objective.targetMapId === mapId,
+      )
+    : undefined;
+  const trackedEnemyIds = questSpawn
+    ? nextState.quests[questSpawn.questId]?.runtime
+        ?.questSpawnedEnemyIdsByObjectiveId?.[questSpawn.objectiveId]
+    : undefined;
+
+  if (
+    questSpawn &&
+    trackedObjective &&
+    nextState.quests[questSpawn.questId]?.status === "active" &&
+    trackedEnemyIds?.includes(defeatedEnemy.id)
+  ) {
+    nextState = updateObjectiveProgress(
+      nextState,
+      questSpawn.questId,
+      trackedObjective,
+      1,
+    );
+  }
+
+  nextState = recordEnemyDefeatedForGuildNoticeBoard(nextState, defeatedEnemy, mapId, random, now);
 
   return nextState;
 }
@@ -89,15 +132,16 @@ export function recordResourceGatheredForQuests(
       ? undefined
       : getSubzoneIdAtPosition(state, resource.position);
 
-  return updateMatchingQuestObjectives(
+  const nextState = updateMatchingQuestObjectives(
     state,
     (objective) =>
       objective.type === "gather_item_count" &&
       objective.targetMapId === mapId &&
-      objective.resourceType === resourceType &&
+      (!objective.resourceType || objective.resourceType === resourceType) &&
       matchesOptionalSubzone(objective, resourceSubzoneId),
     quantity,
   );
+  return recordResourceGatheredForGuildNoticeBoard(nextState, mapId, resourceType, quantity);
 }
 
 export function recordMapReachedForQuests(
@@ -193,7 +237,8 @@ export function recordQuestRepairProgress(
     },
   };
 
-  return clampedProgressMs >= durationMs
+  return clampedProgressMs >= durationMs &&
+    !objective.waitForSpawnedDefendersToBeDefeated
     ? updateObjectiveProgress(nextState, questId, objective, 1)
     : nextState;
 }
@@ -207,7 +252,9 @@ export function completeQuestObjective(
     (candidate) => candidate.id === objectiveId,
   );
 
-  return objective ? updateObjectiveProgress(state, questId, objective, 1) : state;
+  return objective
+    ? updateObjectiveProgress(state, questId, objective, 1, true)
+    : state;
 }
 
 export function recordEquippedItemObjectivesForQuests(
@@ -226,20 +273,27 @@ export function recordEquippedItemObjectivesForQuests(
     for (const objective of QUEST_DEFINITIONS[questId].objectives) {
       if (
         (objective.type !== "equip_item" && objective.type !== "equip_flask") ||
-        quest.objectiveProgress[objective.id]?.completed ||
-        !objective.itemId
+        quest.objectiveProgress[objective.id]?.completed
       ) {
         continue;
       }
 
       const isEquipped =
         objective.type === "equip_flask"
-          ? isFlaskEquippedByAnyCompanion(nextState, objective.itemId)
-          : isItemEquippedByAnyCompanion(
-              nextState,
-              objective.itemId,
-              objective.targetSlot,
-            );
+          ? Boolean(
+              objective.itemId &&
+                isFlaskEquippedByAnyCompanion(nextState, objective.itemId),
+            )
+          : objective.equipmentRequirement === "first_class_weapon"
+            ? isFirstClassWeaponEquippedByActiveCompanion(nextState)
+            : Boolean(
+                objective.itemId &&
+                  isItemEquippedByAnyCompanion(
+                    nextState,
+                    objective.itemId,
+                    objective.targetSlot,
+                  ),
+              );
 
       nextState = appendDebugTelemetryEvent(nextState, {
         type: "quest_equipment_state_checked",
@@ -262,6 +316,127 @@ export function recordEquippedItemObjectivesForQuests(
   }
 
   return nextState;
+}
+
+export function reconcileStateDerivedQuestObjectivesForQuests(
+  state: GameState,
+  reason = "state_derived_objective_check",
+): GameState {
+  let nextState = state;
+
+  for (const questId of QUEST_ORDER) {
+    if (nextState.quests[questId]?.status !== "active") {
+      continue;
+    }
+
+    for (const objective of QUEST_DEFINITIONS[questId].objectives) {
+      if (
+        objective.type !== "own_livestock_creature" &&
+        objective.type !== "active_party_member_count" &&
+        objective.type !== "encounter_milestone"
+      ) {
+        continue;
+      }
+
+      const quest = nextState.quests[questId];
+      const progress = quest.objectiveProgress[objective.id];
+
+      if (!progress || progress.completed) {
+        continue;
+      }
+
+      const requiredCount = Math.max(1, objective.requiredCount ?? 1);
+      const currentValue =
+        objective.type === "encounter_milestone"
+          ? Number(isEncounterQuestMilestoneComplete(nextState, objective.encounterMilestone))
+          : objective.type === "own_livestock_creature"
+          ? objective.livestockCreatureId
+            ? nextState.livestock?.ownedCreaturesById[
+                objective.livestockCreatureId
+              ] ?? 0
+            : 0
+          : Object.values(nextState.entities).filter(
+              (entity) => entity.kind === "companion",
+            ).length;
+      const currentCount = Math.min(
+        requiredCount,
+        Math.max(0, Math.floor(currentValue)),
+      );
+      const completed = currentCount >= requiredCount;
+
+      if (
+        progress.currentCount === currentCount &&
+        progress.completed === completed
+      ) {
+        continue;
+      }
+
+      nextState = appendDebugTelemetryEvent(
+        {
+          ...nextState,
+          quests: {
+            ...nextState.quests,
+            [questId]: {
+              ...quest,
+              objectiveProgress: {
+                ...quest.objectiveProgress,
+                [objective.id]: {
+                  ...progress,
+                  currentCount,
+                  completed,
+                },
+              },
+            },
+          },
+        },
+        {
+          type: "quest_objective_progress",
+          entityId: "party",
+          questId,
+          objectiveId: objective.id,
+          objectiveProgress: currentCount,
+          objectiveRequiredCount: requiredCount,
+          result: reason,
+          currentMapId: nextState.currentMapId,
+          currentMapDisplayName: nextState.map?.displayName,
+          currentMapDebugName: nextState.map?.debugName,
+        },
+      );
+
+      if (completed) {
+        nextState = appendDebugTelemetryEvent(nextState, {
+          type: "quest_objective_completed",
+          entityId: "party",
+          questId,
+          objectiveId: objective.id,
+          objectiveProgress: currentCount,
+          objectiveRequiredCount: requiredCount,
+          result: reason,
+          currentMapId: nextState.currentMapId,
+          currentMapDisplayName: nextState.map?.displayName,
+          currentMapDebugName: nextState.map?.debugName,
+        });
+      }
+    }
+
+    nextState = maybeMarkQuestReadyToTurnIn(nextState, questId);
+  }
+
+  return nextState;
+}
+
+export function recordGuildNoticeBoardQuestTakenForQuests(
+  state: GameState,
+  noticeBoardQuestId: string,
+): GameState {
+  return updateMatchingQuestObjectives(
+    state,
+    (objective) =>
+      objective.type === "take_guild_notice_board_quest" &&
+      (!objective.noticeBoardQuestId ||
+        objective.noticeBoardQuestId === noticeBoardQuestId),
+    1,
+  );
 }
 
 export function recordMerchantItemPurchasedForQuests(
@@ -359,6 +534,33 @@ function isItemEquippedByAnyCompanion(
     return targetSlot
       ? entity.equipment[targetSlot] === itemId
       : Object.values(entity.equipment).includes(itemId);
+  });
+}
+
+function isFirstClassWeaponEquippedByActiveCompanion(
+  state: GameState,
+): boolean {
+  return Object.values(state.entities).some((entity) => {
+    if (entity.kind !== "companion") {
+      return false;
+    }
+
+    return (["mainHand", "offhand"] as const).some((slot) => {
+      const itemId = entity.equipment[slot];
+
+      if (!itemId) {
+        return false;
+      }
+
+      const itemDefinition = getItemDefinition(itemId);
+
+      return (
+        itemDefinition?.category === "equipment" &&
+        itemDefinition.equipmentKind === "weapon" &&
+        itemDefinition.equipmentType !== "training_sword" &&
+        itemDefinition.allowedClassIds?.some(isFirstClassId) === true
+      );
+    });
   });
 }
 
@@ -530,6 +732,7 @@ function updateObjectiveProgress(
   questId: QuestId,
   objective: QuestObjectiveDefinition,
   amount: number,
+  forceComplete = false,
 ): GameState {
   const quest = state.quests[questId];
   const progress = quest.objectiveProgress[objective.id];
@@ -540,7 +743,10 @@ function updateObjectiveProgress(
   }
 
   const currentCount = Math.min(requiredCount, progress.currentCount + amount);
-  const completed = currentCount >= requiredCount;
+  const completed =
+    objective.type === "patron_ward"
+      ? forceComplete && currentCount >= requiredCount
+      : currentCount >= requiredCount;
   let nextState = appendDebugTelemetryEvent(
     {
       ...state,

@@ -37,8 +37,10 @@ import {
   getEnemyDetectionRange as getArchetypeDetectionRange,
   getEnemyTargetPreference,
   getEnemyTemperament,
+  getEnemyType,
 } from "./enemyArchetypes";
 import { isFakeDeathActive } from "./statusEffects";
+import { isInsideEnemyMovementBounds } from "./enemyMovementBounds";
 import type {
   AutonomousEntity,
   Enemy,
@@ -92,6 +94,7 @@ export function updateEnemyAISystem(
     }
 
     if (
+      nextState.forcedMovementsByEntityId?.[entity.id] ||
       isEnemyAbilityBusy(nextState, entity.id) ||
       isEnemyAoeChanneling(nextState, entity.id)
     ) {
@@ -466,6 +469,17 @@ function updateEnemyWander(
   timing: SimulationTiming,
   movedEntityIds: Set<string>,
 ): GameState {
+  if (getEnemyType(enemy.enemyTypeId)?.canRoam === false) {
+    return enemy.roamTargetPosition || enemy.roamMoveUntil !== undefined || enemy.nextRoamAt !== undefined
+      ? updateEntity(state, {
+          ...enemy,
+          roamTargetPosition: null,
+          roamMoveUntil: undefined,
+          nextRoamAt: undefined,
+        })
+      : state;
+  }
+
   const now = timing.nowMs;
 
   if (enemy.roamTargetPosition && enemy.roamMoveUntil && now <= enemy.roamMoveUntil) {
@@ -704,6 +718,7 @@ function isInsideRoamLeash(enemy: Enemy, position: Position): boolean {
 }
 
 function isInsideAttackLeash(enemy: Enemy, position: Position): boolean {
+  if (enemy.movementBounds) return isInsideEnemyMovementBounds(enemy, position);
   if (enemy.questSpawn) {
     return true;
   }
@@ -823,6 +838,10 @@ function getTargetReachabilityCacheKey(
 }
 
 function getTargetRetainPathDistance(state: GameState, enemy: Enemy): number {
+  if (enemy.movementBounds) {
+    const bounds = enemy.movementBounds;
+    return 2 * (bounds.maxX - bounds.minX + bounds.maxY - bounds.minY);
+  }
   if (enemy.questSpawn && state.map) {
     return state.map.columns * state.map.rows * 2;
   }

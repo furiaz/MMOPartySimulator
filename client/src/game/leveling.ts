@@ -29,35 +29,34 @@ const XP_TO_NEXT_LEVEL_ANCHORS: Record<number, number> = {
   8: 1008,
   9: 1440,
   10: 2100,
-  20: 8736,
-  30: 26460,
-  40: 57948,
-  50: 106800,
-  75: 324192,
-  100: 713708,
-  150: 2175085,
-  199: 4727448,
-};
-
-const TOTAL_XP_ANCHORS: Record<number, number> = {
-  1: 0,
-  2: 6,
-  3: 24,
-  4: 74,
-  5: 186,
-  6: 402,
-  7: 787,
-  8: 1411,
-  9: 2419,
-  10: 3859,
-  20: 44972,
-  30: 201991,
-  40: 595531,
-  50: 1378392,
-  75: 6341709,
-  100: 18721319,
-  150: 85983356,
-  199: 248705990,
+  11: 2422,
+  12: 2793,
+  13: 3547,
+  14: 4295,
+  15: 5204,
+  16: 6238,
+  17: 7474,
+  18: 8948,
+  19: 10605,
+  20: 12230,
+  30: 37044,
+  40: 81127,
+  50: 149520,
+  60: 233127,
+  70: 363483,
+  80: 531464,
+  90: 728721,
+  100: 999191,
+  110: 1248647,
+  120: 1560381,
+  130: 1949944,
+  140: 2436762,
+  150: 3045119,
+  160: 3567882,
+  170: 4180389,
+  180: 4898047,
+  190: 5738907,
+  199: 6618427,
 };
 
 const SAME_LEVEL_MOB_XP_ANCHORS: Record<number, number> = {
@@ -106,12 +105,6 @@ export function getCharacterXpToNextLevel(level: number): number | null {
 
 export function getTotalCharacterXpForLevel(level: number): number {
   const clampedLevel = clampLevel(level);
-  const anchoredTotal = TOTAL_XP_ANCHORS[clampedLevel];
-
-  if (anchoredTotal !== undefined) {
-    return anchoredTotal;
-  }
-
   let totalXp = 0;
 
   for (let currentLevel = 1; currentLevel < clampedLevel; currentLevel += 1) {

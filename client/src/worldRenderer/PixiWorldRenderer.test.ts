@@ -544,6 +544,15 @@ describe("Rending Dash afterimages", () => {
 });
 
 describe("getFullRenderSignature", () => {
+  it("redraws for companion area geometry and visual intent changes", () => {
+    const area = resolveAoePattern({ type: "circle", radius: 2 }, createAoeCastTransform({ x: 4, y: 4 }, { x: 5, y: 4 }));
+    const event = { id: "area", sourceId: "companion", type: "slash" as const, createdAt: 1000, expiresAt: 1500, area, visualIntent: "partyOffensive" as const };
+    const input = createFullRenderSignatureInput({ skillVisualEvents: [event] });
+    const signature = getFullRenderSignature(input);
+    expect(getFullRenderSignature({ ...input, skillVisualEvents: [{ ...event, area: resolveAoePattern({ type: "circle", radius: 3 }, area.castTransform) }] })).not.toBe(signature);
+    expect(getFullRenderSignature({ ...input, skillVisualEvents: [{ ...event, visualIntent: "partyHealing" }] })).not.toBe(signature);
+    expect(getFullRenderSignature({ ...input, skillVisualEvents: [] })).not.toBe(signature);
+  });
   it("stays stable across non-visual simulation ticks", () => {
     const input = createFullRenderSignatureInput();
     const baseSignature = getFullRenderSignature(input);
@@ -1321,6 +1330,62 @@ describe("NPC speech bubble layout", () => {
     expect(left.tailBaseLeftX).toBeGreaterThanOrEqual(left.bubbleX);
     expect(right.bubbleX + 180).toBe(232);
     expect(right.tailBaseRightX).toBeLessThanOrEqual(right.bubbleX + 180);
+  });
+
+  it("shifts an above-speaker bubble away from an overlapping HUD region", () => {
+    const layout = getNpcSpeechBubbleLayout({
+      avoidanceRects: [{ height: 180, width: 200, x: 592, y: 120 }],
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 600,
+      renderWidth: 800,
+      speakerBottomY: 330,
+      speakerTopY: 270,
+      speakerX: 680,
+    });
+
+    expect(layout.placement).toBe("above");
+    expect(layout.bubbleX + 180).toBeLessThanOrEqual(584);
+    expect(layout.tailPointX).toBe(680);
+    expect(layout.tailPointX).toBeGreaterThan(layout.tailBaseRightX);
+  });
+
+  it("uses a below-speaker placement when multiple HUD regions block above", () => {
+    const layout = getNpcSpeechBubbleLayout({
+      avoidanceRects: [
+        { height: 160, width: 400, x: 0, y: 120 },
+        { height: 160, width: 400, x: 400, y: 120 },
+      ],
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 600,
+      renderWidth: 800,
+      speakerBottomY: 330,
+      speakerTopY: 270,
+      speakerX: 400,
+    });
+
+    expect(layout.placement).toBe("below");
+    expect(layout.bubbleY).toBeGreaterThan(330);
+    expect(layout.tailPointY).toBeLessThan(layout.bubbleY);
+  });
+
+  it("chooses a clamped least-overlap fallback in a constrained viewport", () => {
+    const layout = getNpcSpeechBubbleLayout({
+      avoidanceRects: [{ height: 600, width: 240, x: 0, y: 0 }],
+      bubbleHeight: 52,
+      bubbleWidth: 180,
+      renderHeight: 240,
+      renderWidth: 240,
+      speakerBottomY: 180,
+      speakerTopY: 120,
+      speakerX: 120,
+    });
+
+    expect(layout.bubbleX).toBeGreaterThanOrEqual(8);
+    expect(layout.bubbleX + 180).toBeLessThanOrEqual(232);
+    expect(layout.bubbleY).toBeGreaterThanOrEqual(8);
+    expect(layout.bubbleY + 52).toBeLessThanOrEqual(232);
   });
 });
 

@@ -6,6 +6,7 @@ import type {
   Enemy,
   EnemyAggressionMode,
   EnemyArchetypeId,
+  EnemyEncounterBand,
   EnemyTypeId,
   EnemyVariant,
   EntityState,
@@ -78,6 +79,7 @@ type CreateEnemyOptions = {
   magicDefense?: number;
   evasion?: number;
   variant?: EnemyVariant;
+  encounterBand?: EnemyEncounterBand;
   attackCooldownMs?: number;
   attackRange?: number;
   combatBodyRadius?: number;
@@ -97,8 +99,12 @@ export function createEnemy(
   const archetype = getEnemyArchetype(archetypeId);
   const level = options.level ?? enemyType?.level ?? STARTING_ENEMY_LEVEL;
   const scaledStats = getScaledEnemyStats(level, archetypeId);
-  const maxHealth = options.maxHealth ?? scaledStats.maxHealth;
-  const scalingOverrides = getEnemyScalingOverrides(options);
+  const authoredMaxHealth = options.maxHealth ?? enemyType?.maxHealth;
+  const maxHealth = authoredMaxHealth ?? scaledStats.maxHealth;
+  const scalingOverrides = getEnemyScalingOverrides({
+    ...options,
+    maxHealth: authoredMaxHealth,
+  });
 
   return applyEnemyVariantStats({
     id,
@@ -114,6 +120,7 @@ export function createEnemy(
       enemyType?.temperament ??
       archetype?.defaultTemperament ??
       "passive",
+    encounterBand: options.encounterBand ?? "standard",
     variant: options.variant,
     isTargetDummy: options.isTargetDummy,
     archetypeId,
@@ -380,7 +387,7 @@ export function isAutonomousEntity(
 export function isCombatEntity(
   entity: GameEntity | undefined,
 ): entity is CombatEntity {
-  return isAutonomousEntity(entity) || entity?.kind === "enemy";
+  return isAutonomousEntity(entity) || entity?.kind === "enemy" || entity?.kind === "structure";
 }
 
 export function isResourceEntity(

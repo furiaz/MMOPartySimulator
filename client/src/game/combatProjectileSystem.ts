@@ -1,4 +1,5 @@
 import { getEuclideanDistance } from "./positionUtils";
+import { getCombatTargetPosition, hasStructureLineOfSight } from "./combatStructures";
 import { resolveBasicAttackImpact } from "./combatBasicAttackResolution";
 import { getEntityById, type GameState } from "./state";
 import type {
@@ -84,7 +85,8 @@ export function updateCombatProjectileSystem(
       continue;
     }
 
-    const targetPosition = target.position;
+    const targetPosition = getCombatTargetPosition(projectile.position, target);
+    if (!hasStructureLineOfSight(nextState, projectile.position, target)) continue;
     const distanceToTarget = getEuclideanDistance(
       projectile.position,
       targetPosition,
@@ -138,7 +140,7 @@ function isLiveCombatEntity(
 ): entity is CombatEntity {
   return (
     Boolean(entity) &&
-    (entity?.kind === "companion" || entity?.kind === "enemy") &&
+    (entity?.kind === "companion" || entity?.kind === "enemy" || entity?.kind === "structure") &&
     entity.state !== "dead" &&
     entity.health > 0
   );

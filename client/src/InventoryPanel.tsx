@@ -8,6 +8,7 @@ import {
   getItemDisplayName,
   getOwnedKeyItemEntries,
   getQuestItemInventoryEntries,
+  getGuildNoticeBoardPouchEntries,
   formatCurrencyDisplay,
   getSkillBookReadCandidates,
   getUsedInventorySlots,
@@ -75,7 +76,7 @@ export function InventoryPanel({
     ItemCategory | "all" | "questItems" | "keyItems"
   >("all");
   const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null);
-  const questItemEntries = getQuestItemInventoryEntries(quests);
+  const questItemEntries = [...getQuestItemInventoryEntries(quests), ...getGuildNoticeBoardPouchEntries(gameState.guildNoticeBoard)];
   const keyItemEntries = getOwnedKeyItemEntries(gameState);
   const availableCategories = Array.from(
     new Set(

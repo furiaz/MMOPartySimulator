@@ -20,6 +20,7 @@ import {
   getRestingCompanions,
   recordHighestCharacterLevelEver,
 } from "./partySystem";
+import { reconcileStateDerivedQuestObjectivesForQuests } from "./questProgressionHooks";
 import { SKILL_DEFINITIONS } from "./skills";
 import { addEntity, type GameState } from "./state";
 import {
@@ -176,17 +177,22 @@ export function recruitGuildCandidate(
           },
         };
 
-  return {
-    ok: true,
-    destination,
-    companion,
-    state: recordHighestCharacterLevelEver(
+  const nextState = reconcileStateDerivedQuestObjectivesForQuests(
+    recordHighestCharacterLevelEver(
       {
         ...routedState,
         guildRecruit: nextGuildRecruit,
       },
       companion.characterLevel,
     ),
+    "guild_recruitment",
+  );
+
+  return {
+    ok: true,
+    destination,
+    companion,
+    state: nextState,
   };
 }
 

@@ -457,7 +457,7 @@ function ensureResurrectionProgress(
 }
 
 function getLivingCompanions(state: GameState): Companion[] {
-  return Object.values(state.entities).filter(isLivingCompanion);
+  return Object.values(state.entities).filter(isLivingCompanion).filter(companion => !state.forcedMovementsByEntityId?.[companion.id]);
 }
 
 function isDeadCompanion(entity: GameEntity | undefined): entity is Companion {

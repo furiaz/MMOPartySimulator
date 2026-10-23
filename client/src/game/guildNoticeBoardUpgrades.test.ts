@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import {
   GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
+  cancelGuildNoticeBoardQuest,
   createInitialGuildNoticeBoardState,
+  getBoardObjectiveEnemyTypes,
   getGuildNoticeBoardRerollDisplayState,
   openGuildNoticeBoard,
   recordEnemyDefeatedForGuildNoticeBoard,
@@ -82,7 +84,7 @@ describe("guild notice board upgrades", () => {
   });
 
   it("unlocks Scout rerolls and resets uses at local midnight", () => {
-    let state = createUpgradeState(1_000);
+    let state = createUpgradeStateWithRegularBoard(1_000);
     expect(getGuildNoticeBoardRerollDisplayState(state, NOW_MS)).toMatchObject({
       isUnlocked: false,
       dailyLimit: 0,
@@ -113,9 +115,25 @@ describe("guild notice board upgrades", () => {
     });
   });
 
+  it("does not consume a reroll when the starter contract is the only slot", () => {
+    let state = createUpgradeState(1_000);
+    state = purchaseGuildNoticeBoardUpgrade(state, "notice_board_scouts").state;
+
+    const rerolled = rerollGuildNoticeBoard(state, NOW_MS);
+
+    expect(rerolled.ok).toBe(false);
+    if (rerolled.ok) {
+      return;
+    }
+    expect(rerolled.reason).toBe("no_change");
+    expect(
+      getGuildNoticeBoardRerollDisplayState(rerolled.state, NOW_MS),
+    ).toMatchObject({ usedToday: 0, remaining: 1 });
+  });
+
   it("adds placed fed Wolf helpers to Notice Board rerolls", () => {
     const livestock = createInitialLivestockState();
-    let state = createUpgradeState(1_000, {
+    let state = createUpgradeStateWithRegularBoard(1_000, {
       ...livestock,
       ownedCreaturesById: {
         ...livestock.ownedCreaturesById,
@@ -230,7 +248,7 @@ describe("guild notice board upgrades", () => {
       return;
     }
 
-    expect(rerolled.state.guildNoticeBoard?.slots[0]?.id).not.toBe(
+    expect(rerolled.state.guildNoticeBoard?.slots[0]?.id).toBe(
       state.guildNoticeBoard?.slots[0]?.id,
     );
     expect(rerolled.state.guildNoticeBoard?.slots[1]?.id).toBe(taken.quest.id);
@@ -253,7 +271,7 @@ describe("guild notice board upgrades", () => {
 
     expect(rerolled.ok).toBe(true);
     expect(rerolled.claimedRewards).toHaveLength(1);
-    expect(getCurrencyBalance(rerolled.state.wallet, "crowns")).toBe(1_600);
+    expect(getCurrencyBalance(rerolled.state.wallet, "crowns")).toBe(1_650);
   });
 
   it("expands board slots to two and three through upgrades", () => {
@@ -296,7 +314,7 @@ describe("guild notice board upgrades", () => {
   });
 
   it("applies reward quality to crowns and item extra chance at claim time", () => {
-    let state = createUpgradeState(2_000);
+    let state = createUpgradeStateWithRegularBoard(2_000);
     state = purchaseGuildNoticeBoardUpgrade(
       state,
       "notice_board_reward_quality",
@@ -327,7 +345,7 @@ describe("guild notice board upgrades", () => {
     const opened = openGuildNoticeBoard(state, NOW_MS);
 
     expect(opened.claimedRewards[0]).toMatchObject({
-      crowns: 120,
+      crowns: 180,
     });
     expect(opened.claimedRewards[0]?.skillBookItemIds).toHaveLength(2);
     expect(
@@ -364,6 +382,8 @@ function createUpgradeState(crowns = 0, livestock?: LivestockState): GameState {
     characterLevel: 10,
   };
   const state = createTestGameState({
+    currentMapId: "map-4",
+    worldDiscovery: { visitedMapIds: ["map-4"], visitedSubzonesByMapId: {} },
     entities: {
       [leader.id]: leader,
     },
@@ -375,6 +395,38 @@ function createUpgradeState(crowns = 0, livestock?: LivestockState): GameState {
   });
 
   return setCurrencyBalanceForDebug(state, "crowns", crowns).state;
+}
+
+function createUpgradeStateWithRegularBoard(
+  crowns = 0,
+  livestock?: LivestockState,
+): GameState {
+  const taken = takeGuildNoticeBoardQuest(
+    createUpgradeState(crowns, livestock),
+    NOW_MS,
+  );
+
+  if (!taken.ok) {
+    throw new Error("Expected starter Notice Board contract to be takeable");
+  }
+
+  const canceled = cancelGuildNoticeBoardQuest(taken.state, NOW_MS);
+
+  if (!canceled.ok) {
+    throw new Error("Expected starter Notice Board contract to be cancelable");
+  }
+
+  return refreshGuildNoticeBoardState(
+    {
+      ...canceled.state,
+      guildNoticeBoard: {
+        ...canceled.state.guildNoticeBoard!,
+        nextRefreshAtMs: NOW_MS,
+      },
+    },
+    NOW_MS,
+    () => 0.5,
+  );
 }
 
 function createDoneQuest(quest: GuildNoticeBoardQuest): GuildNoticeBoardQuest {
@@ -401,7 +453,7 @@ function createDoneQuest(quest: GuildNoticeBoardQuest): GuildNoticeBoardQuest {
   for (const objective of quest.objectives) {
     state = recordEnemyDefeatedForGuildNoticeBoard(
       state,
-      createDeadEnemy(objective.enemyTypeId),
+      createDeadEnemy(getBoardObjectiveEnemyTypes(objective)[0]),
     );
   }
 

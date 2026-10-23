@@ -9,6 +9,7 @@ import {
   refreshGuildRecruitState,
 } from "./guildRecruit";
 import { createInitialInnUpgradesState } from "./innRoomUpgrades";
+import { createInitialQuestStates } from "./questSystem";
 import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
 import type { Companion } from "./types";
@@ -32,6 +33,35 @@ describe("guild recruit", () => {
     expect(result.destination).toBe("active_party");
     expect(result.state.entities[result.companion.id]).toEqual(result.companion);
     expect(result.state.restingCompanionsById?.[result.companion.id]).toBeUndefined();
+  });
+
+  it("updates the active-party quest objective after recruitment", () => {
+    const baseState = createRosterState({
+      activeCount: 2,
+      highestCharacterLevelEver: 10,
+    });
+    const quests = createInitialQuestStates();
+    const state = {
+      ...baseState,
+      quests: {
+        ...quests,
+        into_the_briar_burrows: {
+          ...quests.into_the_briar_burrows,
+          status: "active" as const,
+        },
+      },
+    };
+
+    const result = recruitGuildCandidate(state, NOW_MS);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(
+      result.state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
   });
 
   it("routes a recruited companion to the Inn's Reserve when active party is full", () => {

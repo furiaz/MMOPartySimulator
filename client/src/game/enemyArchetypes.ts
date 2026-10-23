@@ -376,10 +376,13 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDefinition> = {
   orc_warmaster: {
     id: "orc_warmaster",
     displayName: "Orc Warmaster",
+    abilityIds: ["orc_warmaster_patron_burst", "orc_warmaster_patron_cleave", "orc_warmaster_kick", "orc_warmaster_rending_dash"],
     archetypeId: "orc",
     temperament: "aggressive",
+    canRoam: false,
     targetPreference: "leader",
     level: 20,
+    maxHealth: 1500,
     attackCooldownMs: 2800,
     detectionRange: 12,
     combatBodyRadius: 1.1,
@@ -453,8 +456,8 @@ export function getEnemyAttackRange(enemy: Enemy): number {
 export function getEnemyCombatBodyRadius(enemy: Enemy): number {
   return Math.max(
     0,
-    enemy.combatBodyRadius ??
+    (enemy.combatBodyRadius ??
       getEnemyTypeDefinition(enemy)?.combatBodyRadius ??
-      0,
+      0) * (enemy.combatSizeMultiplier ?? 1),
   );
 }

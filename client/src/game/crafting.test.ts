@@ -703,7 +703,7 @@ describe("Smith crafting", () => {
       crownCost: 20,
       costs: [
         { kind: "item", itemId: "hardwood", quantity: 10 },
-        { kind: "item", itemId: "orc_hide", quantity: 3 },
+        { kind: "item", itemId: "wolf_pelt", quantity: 3 },
         { kind: "item", itemId: "goblin_ear_t2", quantity: 3 },
       ],
     });
@@ -726,14 +726,108 @@ describe("Smith crafting", () => {
     expect(getCraftingRecipe("veteran_quiver")).toBeUndefined();
   });
 
-  it("defines bronze accessory recipes from Tin Ore and Copper Ore", () => {
+  it.each([
+    ["guard_mace", "imp_horn_chip_t2", 3],
+    ["claw_gauntlets", "imp_horn_chip_t2", 4],
+    ["thorn_whip", "imp_tail_t2", 1],
+    ["wooden_shield", "imp_horn_chip_t2", 3],
+    ["leather_quiver", "wolf_pelt", 3],
+    ["sacrificial_dagger", "goblin_tooth_t2", 1],
+    ["sentinel_boots", "wolf_pelt_t2", 2],
+    ["bastion_sabatons", "wolf_pelt_t2", 3],
+    ["bronze_pendant", "iron_ore", 3],
+    ["field_bronze_pendant", "iron_ore", 3],
+  ] as const)("uses the approved replacement in %s", (id, itemId, quantity) => {
+    expect(getCraftingRecipe(id)?.costs).toContainEqual({ kind: "item", itemId, quantity });
+  });
+
+  it.each([
+    [
+      ["trailrunner_cap", "trailrunner_jacket", "trailrunner_trousers", "trailrunner_gloves", "trailrunner_boots"],
+      "hardwood", "wolf_pelt", "goblin_tooth_t2",
+    ],
+    [
+      ["ironmarch_coif", "ironmarch_hauberk", "ironmarch_legguards", "ironmarch_gloves", "ironmarch_boots"],
+      "iron_ore", "imp_horn_chip_t2", "goblin_tooth_t2",
+    ],
+    [
+      ["bulwark_helm", "bulwark_cuirass", "bulwark_greaves", "bulwark_gauntlets", "bulwark_sabatons"],
+      "iron_ore", "imp_horn_chip_t2", "imp_tail_t2",
+    ],
+  ] as const)("preserves piece quantities and fees for %s", (ids, main, common, rare) => {
+    const quantities = [[12, 5, 1, 16], [22, 10, 2, 28], [16, 7, 2, 22], [12, 5, 1, 16], [12, 5, 1, 16]];
+    ids.forEach((id, index) => {
+      const [mainQuantity, commonQuantity, rareQuantity, crownCost] = quantities[index];
+      expect(getCraftingRecipe(id)).toMatchObject({
+        outputItemId: id,
+        outputQuantity: 1,
+        crownCost,
+        costs: [
+          { kind: "item", itemId: main, quantity: mainQuantity },
+          { kind: "item", itemId: common, quantity: commonQuantity },
+          { kind: "item", itemId: rare, quantity: rareQuantity },
+        ],
+      });
+    });
+  });
+
+  it.each([
+    "guard_mace", "claw_gauntlets", "thorn_whip", "wooden_shield", "leather_quiver", "sacrificial_dagger",
+    "trailrunner_cap", "trailrunner_jacket", "trailrunner_trousers", "trailrunner_gloves", "trailrunner_boots",
+    "ironmarch_coif", "ironmarch_hauberk", "ironmarch_legguards", "ironmarch_gloves", "ironmarch_boots",
+    "bulwark_helm", "bulwark_cuirass", "bulwark_greaves", "bulwark_gauntlets", "bulwark_sabatons",
+    "sentinel_boots", "bastion_sabatons", "bronze_pendant", "field_bronze_pendant",
+  ] as const)("crafts corrected %s with exact consumption and preserves stored Orc materials", (id) => {
+    const recipe = getCraftingRecipe(id)!;
+    let state = addItems(createCraftingState(), [["orc_hide", 7], ["orc_tusk", 2]]);
+    state = addRecipeInputs(state, recipe);
+    state = setCurrencyBalanceForDebug(state, "crowns", recipe.crownCost).state;
+
+    const crafted = craftRecipe(state, id);
+
+    expect(crafted.result.status).toBe("success");
+    expect(countInventoryItem(crafted.state.inventory, id)).toBe(1);
+    expect(getCurrencyBalance(crafted.state.wallet, "crowns")).toBe(0);
+    expect(crafted.state.inventory.slots).toHaveLength(3);
+    expect(countInventoryItem(crafted.state.inventory, "orc_hide")).toBe(7);
+    expect(countInventoryItem(crafted.state.inventory, "orc_tusk")).toBe(2);
+  });
+
+  it.each([
+    ["guard_mace", "bastion_mace"],
+    ["claw_gauntlets", "steel_claws"],
+    ["thorn_whip", "barbed_whip"],
+    ["wooden_shield", "reinforced_shield"],
+    ["leather_quiver", "reinforced_quiver"],
+    ["sacrificial_dagger", "ritual_dagger"],
+    ["trailrunner_boots", "pathfinder_boots"],
+    ["ironmarch_boots", "sentinel_boots"],
+    ["bulwark_sabatons", "bastion_sabatons"],
+    ["bronze_pendant", "reinforced_bronze_pendant"],
+    ["field_bronze_pendant", "polished_bronze_pendant"],
+  ] as const)("crafts the corrected %s -> %s upgrade chain", (baseId, upgradeId) => {
+    let state = addRecipeInputs(createCraftingState(), getCraftingRecipe(baseId)!);
+    state = setCurrencyBalanceForDebug(state, "crowns", 200).state;
+    const base = craftRecipe(state, baseId);
+    expect(base.result.status).toBe("success");
+    state = addRecipeInputs(base.state, getCraftingRecipe(upgradeId)!, false);
+
+    const upgraded = craftRecipe(state, upgradeId);
+
+    expect(upgraded.result.status).toBe("success");
+    expect(countInventoryItem(upgraded.state.inventory, baseId)).toBe(0);
+    expect(countInventoryItem(upgraded.state.inventory, upgradeId)).toBe(1);
+    expect(upgraded.state.inventory.slots).toHaveLength(1);
+  });
+
+  it("uses Iron Ore for level 10 pendants and retains Tin Ore for level 15", () => {
     expect(getCraftingRecipe("bronze_pendant")).toMatchObject({
       outputItemId: "bronze_pendant",
       outputQuantity: 1,
       crownCost: 18,
       costs: [
         { kind: "item", itemId: "copper_ore", quantity: 6 },
-        { kind: "item", itemId: "tin_ore", quantity: 3 },
+        { kind: "item", itemId: "iron_ore", quantity: 3 },
         { kind: "item", itemId: "crawler_pebble_t1", quantity: 2 },
       ],
     });
@@ -743,7 +837,7 @@ describe("Smith crafting", () => {
       crownCost: 18,
       costs: [
         { kind: "item", itemId: "copper_ore", quantity: 4 },
-        { kind: "item", itemId: "tin_ore", quantity: 3 },
+        { kind: "item", itemId: "iron_ore", quantity: 3 },
         { kind: "item", itemId: "field_herb", quantity: 3 },
       ],
     });
@@ -1093,6 +1187,23 @@ function addItems(
       addItemToInventoryState(nextState, itemId, quantity, "debug").state,
     state,
   );
+}
+
+function addRecipeInputs(
+  state: GameState,
+  recipe: CraftingRecipe,
+  includePreviousEquipment = true,
+): GameState {
+  return recipe.costs.reduce((next, cost) => {
+    if (cost.kind === "item") return addItems(next, [[cost.itemId, cost.quantity]]);
+    if (!includePreviousEquipment) return next;
+    const previous = Object.values(ITEM_DEFINITIONS).find((item) =>
+      item.category === "equipment" && item.equipmentType === cost.equipmentType &&
+      item.levelRequirement === cost.levelRequirement &&
+      (!cost.armorFamily || item.armorFamily === cost.armorFamily));
+    expect(previous).toBeDefined();
+    return addItems(next, [[previous!.id, 1]]);
+  }, state);
 }
 
 function getTeleportEchoCraftingCosts(): Array<[ItemId, number]> {

@@ -7,6 +7,11 @@ import {
   type GameState,
   type NpcEntity,
 } from "./game";
+import type { GameEntity } from "./game/types";
+
+export function isWorldSpeechSpeaker(entity: GameEntity | undefined): boolean {
+  return Boolean(entity && (entity.kind === "npc" || entity.kind === "structure" || (entity.kind === "enemy" && entity.state !== "dead")));
+}
 
 export const NPC_SPEECH_DURATION_MS = 5_000;
 export const NPC_SPEECH_FADE_DURATION_MS = 500;
@@ -61,7 +66,7 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
   defend_wolf_causeway:
     "Defend the worker while the causeway is opened.",
   defeat_causeway_elite:
-    "A stronger wolf is blocking the route. Bring it down.",
+    "A Superior Wolf is blocking the route. Bring it down.",
   unlock_map_three_route:
     "The causeway is clear. Open the route into Azurefen Hollow.",
   inspect_broken_thicket_trail_marker:
@@ -89,6 +94,36 @@ export const npcSpeechObjectiveHints: Readonly<Record<string, string>> = {
   defeat_azure_mass: "The Azure Mass waits below. Defeat it.",
   collect_slimeward_boss_chest:
     "Claim the chest beyond the Azure Mass to finish the trial.",
+  take_ash_goblin_assault_contract:
+    "Take the Ash Goblin Encampment posting from the Guild Notice Board.",
+  defeat_ash_goblin_encampment_enemies:
+    "Break the Ash Camp by defeating its defenders.",
+  gather_ash_goblin_encampment_resources:
+    "Collect useful wood, ore, or herbs from the Ash Goblin Encampment.",
+  equip_first_class_weapon:
+    "Equip a weapon made for one of your companions’ first classes.",
+  defeat_briar_burrows_enemies:
+    "Push through Briar Burrows and defeat the creatures inside.",
+  find_tin_crawler_hatchling:
+    "Tin Crawlers sometimes leave a hatchling behind. Find one for the Livestock keeper.",
+  assemble_three_companions:
+    "The Guild & Inn can help you assemble three active companions.",
+  break_night_bat_ward:
+    "Defeat Night Bats in Nightmire Canopy, then break their Patron Ward.",
+  break_elder_mossling_ward:
+    "Defeat Elder Mosslings in Nightmire Canopy, then break their Patron Ward.",
+  break_cinder_wisp_ward:
+    "Defeat Cinder Wisps in Nightmire Canopy, then break their Patron Ward.",
+  find_elder_mossling:
+    "Find an Elder Mossling for the Livestock keeper while you search Nightmire Canopy.",
+  defeat_orc_warmaster:
+    "The Evil Patron's chosen waits in Orc Warcamp. Defeat the Warmaster.",
+  free_warmaster_captive:
+    "Defeating the Warmaster will free the captive from the cage.",
+  collect_warmaster_chest:
+    "Collect every reward from the Warmaster's chest before you leave.",
+  defeat_orc_warcamp_enemies:
+    "Thin the Orc ranks. These victories can also recharge your next Warmaster fight.",
 };
 
 const genericGreetings = ["Welcome.", "Hello.", "What’s up, dood?"] as const;

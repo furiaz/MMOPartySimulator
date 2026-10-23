@@ -1,4 +1,7 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { recordPatronDeath, type WarmasterAttempt } from "./warmasterState";
+import { recordWarmasterLifecycleDeath, type WarmasterLifecycle, type WarmasterInteraction } from "./warmasterLifecycleState";
+import type { ForcedMovement } from "./forcedMovement";
 import { findClosestAvailablePosition } from "./movementPlanning";
 import type {
   CombatDamageType,
@@ -148,6 +151,14 @@ export type InterruptedPoiTarget = {
   lastPoiDecision?: PoiDecisionState;
 };
 
+export type QuestNpcSpeechCue = {
+  id: string;
+  mapId?: DebugMapId;
+  npcId: string;
+  text: string;
+  createdAt: number;
+};
+
 export { clearFrameMovementPlanning, clearTickMovementPlanning } from "./movementState";
 export {
   COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
@@ -179,7 +190,10 @@ export type {
   MovementPathProfile,
 } from "./movementTypes";
 
+import { updateStructureRuntime } from "./combatStructures";
+
 export type GameState = {
+  barracksById?: Record<string, import("./types").BarrackRuntime>;
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;
   highestCharacterLevelEver?: number;
@@ -219,6 +233,7 @@ export type GameState = {
   directCommandGraceUntilByCompanionId?: Record<string, number>;
   interruptedPoiTarget?: InterruptedPoiTarget | null;
   quests: Record<QuestId, QuestState>;
+  questNpcSpeechCue?: QuestNpcSpeechCue;
   globalPoiIntent: GlobalPoiIntent | null;
   localPoiTarget: LocalPoiTarget | null;
   lastPoiDecision?: PoiDecisionState;
@@ -293,6 +308,10 @@ export type GameState = {
   >;
   enemyAbilityBasicAttackRequiredByEnemyId?: Record<string, true>;
   enemyDashesByEnemyId?: Record<string, EnemyDashState>;
+  forcedMovementsByEntityId?: Record<string, ForcedMovement>;
+  warmasterAttempt?: WarmasterAttempt;
+  warmasterLifecycle?: WarmasterLifecycle;
+  warmasterInteraction?: WarmasterInteraction;
   aoeDummyPatternSequenceIndex?: number;
   consumableUsesByCompanionId?: Record<string, ConsumableUseState>;
   flaskRechargeEnemyKillCounter?: number;
@@ -339,14 +358,14 @@ export function addEnemy(state: GameState, enemy: Enemy): GameState {
   });
 }
 
-export function updateEntity(state: GameState, entity: GameEntity): GameState {
+export function updateEntity(state: GameState, entity: GameEntity, now = Date.now()): GameState {
   const previousEntity = state.entities[entity.id];
 
   if (previousEntity === entity) {
     return state;
   }
 
-  return {
+  const nextState: GameState = {
     ...state,
     entities: {
       ...state.entities,
@@ -364,6 +383,7 @@ export function updateEntity(state: GameState, entity: GameEntity): GameState {
           }
         : state.followTrailsByEntityId,
   };
+  return entity.kind === "structure" ? updateStructureRuntime(nextState, entity, now) : recordWarmasterLifecycleDeath(recordPatronDeath(nextState, previousEntity, entity, now), previousEntity, entity, now);
 }
 
 export function addCombatFeedback(
@@ -442,6 +462,8 @@ export function addSkillVisualEvent(
         sourceId: event.sourceId,
         targetId: event.targetId,
         position: event.position,
+        area: event.area,
+        visualIntent: event.visualIntent,
         createdAt: event.now,
         expiresAt: event.now + event.durationMs,
       },

@@ -13,6 +13,7 @@ import {
   queueImportantItemAcquisitionBroadcast,
   queueUnlockNewsBroadcast,
 } from "./newsBroadcast";
+import { reconcileStateDerivedQuestObjectivesForQuests } from "./questProgressionHooks";
 import { isTownServicesUnlocked } from "./townServices";
 import {
   getCurrencyBalance,
@@ -730,16 +731,22 @@ export function addOwnedLivestockCreature(
     );
   }
 
+  nextState = appendLivestockTelemetry(nextState, "livestock_creature_unlocked", {
+    creatureId,
+    keyItemId: creature.discoveryKeyItemId,
+    quantityBefore: previousOwned,
+    quantityAfter: previousOwned + 1,
+    livestockUnlockSource: source,
+    result: "success",
+  });
+  nextState = reconcileStateDerivedQuestObjectivesForQuests(
+    nextState,
+    "livestock_acquisition",
+  );
+
   return {
     ok: true,
-    state: appendLivestockTelemetry(nextState, "livestock_creature_unlocked", {
-      creatureId,
-      keyItemId: creature.discoveryKeyItemId,
-      quantityBefore: previousOwned,
-      quantityAfter: previousOwned + 1,
-      livestockUnlockSource: source,
-      result: "success",
-    }),
+    state: nextState,
     creature,
     source,
     awardedQuantity: 1,
@@ -2571,9 +2578,15 @@ function getLivestockDiscoveryKeyItemId(
 function getLivestockCreatureDropDisplayName(
   creature: LivestockCreatureDefinition,
 ): string {
-  return creature.id === LIVESTOCK_WOLF_CREATURE_ID
-    ? "Wolf Pup"
-    : creature.displayName;
+  if (creature.id === LIVESTOCK_WOLF_CREATURE_ID) {
+    return "Wolf Pup";
+  }
+
+  if (creature.id === LIVESTOCK_TIN_CRAWLER_CREATURE_ID) {
+    return "Tin Crawler Hatchling";
+  }
+
+  return creature.displayName;
 }
 
 function getLivestockUnlockSourceForEnemyType(

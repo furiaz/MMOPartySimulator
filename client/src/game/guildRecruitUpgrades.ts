@@ -311,7 +311,7 @@ const GUILD_NOTICE_BOARD_UPGRADE_DEFINITIONS: Record<
   notice_board_reward_quality: {
     id: "notice_board_reward_quality",
     displayName: "Reward Quality",
-    description: "Improves Crowns and extra book reward chance.",
+    description: "Improves Crowns and the chance of an independent third book; character XP is unchanged.",
     costsByNextLevel: {
       2: 300,
       3: 750,

@@ -6,7 +6,10 @@ import { DROP_VISUAL_DURATION_MS, updateDropSystem } from "./dropSystem";
 import {
   createDebugMap,
   CLASS_MENTOR_NPC_ID,
+  HUB_TWO_QUEST_GIVER_NPC_ID,
   HUB_TWO_MAP_ID,
+  MAP_FIVE_ID,
+  MAP_FOUR_ID,
   MAP_TWO_ID,
   MAP_THREE_ID,
   MAP_THREE_TO_SLIMEWARD_CAMP_TELEPORTER_ID,
@@ -39,8 +42,10 @@ import {
   recordQuestPoiReachedForQuests,
   recordQuestRepairProgress,
   recordResourceGatheredForQuests,
+  reconcileQuestAvailability,
   updateQuestGiverInteraction,
 } from "./questSystem";
+import { takeGuildNoticeBoardQuestForQuests } from "./guildNoticeBoardQuestIntegration";
 import { isTeleportWorking } from "./teleportState";
 import { isNavigationCellWalkable } from "./navigation";
 import { equipItemToCompanion } from "./equipmentSystem";
@@ -215,6 +220,130 @@ describe("prototype quest system", () => {
     expect(getCompanion(nextState, "companion-2").lastCharacterXpGained).toBe(1500);
   });
 
+  it("unlocks Guild Board onboarding after Azure and first-class requirements are met in either order", () => {
+    const firstClassLeader = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1", "defender", 0),
+      classId: "blade" as const,
+      characterLevel: 10,
+    };
+    let classFirstState = createStateWithParty({
+      entities: {
+        [firstClassLeader.id]: firstClassLeader,
+      },
+      partyLeaderId: firstClassLeader.id,
+      quests: createQuestStates({
+        azure_trial: "ready_to_turn_in",
+      }),
+    });
+
+    classFirstState = finishReadyQuestForQuestGiver(
+      classFirstState,
+      CLASS_MENTOR_NPC_ID,
+      "azure_trial",
+    );
+    expect(classFirstState.quests.orders_from_the_guild.status).toBe("available");
+
+    let azureFirstState = createStateWithParty({
+      quests: createQuestStates({
+        azure_trial: "completed",
+      }),
+    });
+    expect(azureFirstState.quests.orders_from_the_guild.status).toBe("locked");
+
+    const beginnerLeader = getCompanion(azureFirstState, "companion-1");
+    azureFirstState = reconcileQuestAvailability({
+      ...azureFirstState,
+      entities: {
+        ...azureFirstState.entities,
+        [beginnerLeader.id]: {
+          ...beginnerLeader,
+          classId: "blade",
+          characterLevel: 10,
+        },
+      },
+    });
+    expect(azureFirstState.quests.orders_from_the_guild.status).toBe("available");
+  });
+
+  it("counts a resting first-class companion for Guild Board onboarding", () => {
+    const restingCompanion = {
+      ...createCompanion("resting-blade", { x: 0, y: 0 }, "resting-blade"),
+      classId: "blade" as const,
+      characterLevel: 10,
+    };
+    const state = reconcileQuestAvailability(
+      createStateWithParty({
+        quests: createQuestStates({ azure_trial: "completed" }),
+        restingCompanionsById: {
+          [restingCompanion.id]: restingCompanion,
+        },
+      }),
+    );
+
+    expect(state.quests.orders_from_the_guild.status).toBe("available");
+  });
+
+  it("completes Guild Board onboarding whether the starter contract is taken before or after quest acceptance", () => {
+    const eligibleQuestStates = createQuestStates({
+      azure_trial: "completed",
+      orders_from_the_guild: "available",
+    });
+    let beforeAccept = createStateWithParty({ quests: eligibleQuestStates });
+    const earlyTake = takeGuildNoticeBoardQuestForQuests(beforeAccept, 1_000);
+    expect(earlyTake.ok).toBe(true);
+    if (!earlyTake.ok) {
+      return;
+    }
+    beforeAccept = acceptQuestFromQuestGiver(
+      earlyTake.state,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "orders_from_the_guild",
+    );
+    expect(beforeAccept.quests.orders_from_the_guild.status).toBe(
+      "ready_to_turn_in",
+    );
+
+    let afterAccept = createStateWithParty({
+      quests: createQuestStates({
+        azure_trial: "completed",
+        orders_from_the_guild: "available",
+      }),
+    });
+    afterAccept = acceptQuestFromQuestGiver(
+      afterAccept,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "orders_from_the_guild",
+    );
+    const laterTake = takeGuildNoticeBoardQuestForQuests(afterAccept, 1_000);
+    expect(laterTake.ok).toBe(true);
+    if (!laterTake.ok) {
+      return;
+    }
+    expect(laterTake.state.quests.orders_from_the_guild.status).toBe(
+      "ready_to_turn_in",
+    );
+  });
+
+  it("turns in Guild Board onboarding without rewards and unlocks the Zone 4 main quest", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({
+        azure_trial: "completed",
+        orders_from_the_guild: "ready_to_turn_in",
+      }),
+    });
+
+    const nextState = finishReadyQuestForQuestGiver(
+      state,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "orders_from_the_guild",
+    );
+
+    expect(nextState.quests.orders_from_the_guild.status).toBe("completed");
+    expect(nextState.quests.break_the_ash_camp.status).toBe("available");
+    expect(nextState.wallet.balancesByCurrencyId.crowns).toBe(0);
+    expect(getCompanion(nextState, "companion-1").lastCharacterXpGained).toBe(0);
+  });
+
   it("creates level-up feedback when quest XP levels companions", () => {
     let state = createStateWithParty({
       quests: createQuestStates({
@@ -260,6 +389,11 @@ describe("prototype quest system", () => {
       "crawler_shelf_report",
       "find_slimeward_camp",
       "azure_trial",
+      "orders_from_the_guild",
+      "break_the_ash_camp",
+      "into_the_briar_burrows",
+      "the_patrons_shadow",
+      "the_evil_patrons_chosen",
     ]);
     expect(quests.clear_the_shore.status).toBe("available");
     expect(quests.outfit_the_expedition.status).toBe("locked");
@@ -269,6 +403,59 @@ describe("prototype quest system", () => {
     expect(quests.crawler_shelf_report.status).toBe("locked");
     expect(quests.find_slimeward_camp.status).toBe("locked");
     expect(quests.azure_trial.status).toBe("locked");
+    expect(quests.orders_from_the_guild.status).toBe("locked");
+    expect(quests.break_the_ash_camp.status).toBe("locked");
+    expect(quests.into_the_briar_burrows.status).toBe("locked");
+    expect(quests.the_patrons_shadow.status).toBe("locked");
+  });
+
+  it("configures Open the Causeway with one repair wave and a tracked Superior Wolf", () => {
+    const defense = QUEST_DEFINITIONS.open_wolf_causeway.objectives.find(
+      (objective) => objective.id === "defend_wolf_causeway",
+    );
+    const trackedWolf = QUEST_DEFINITIONS.open_wolf_causeway.objectives.find(
+      (objective) => objective.id === "defeat_causeway_elite",
+    );
+
+    expect(defense).toMatchObject({
+      type: "defend_area",
+      repairDurationMs: 10_000,
+      waitForSpawnedDefendersToBeDefeated: true,
+      waveProgressPercents: [0],
+      ambientEnemySuppression: {
+        scope: "subzone",
+        groupId: "wolf-causeway-encounter",
+        restoreDelayMs: 3_000,
+        variantPolicy: "reroll",
+      },
+      questSpawnEnemies: [
+        { enemyTypeId: "wolf", level: 7, count: 2 },
+        { enemyTypeId: "goblin_thrower", level: 7, count: 1 },
+      ],
+      startSpeech: {
+        npcId: "map-2-causeway-worker",
+        displayName: "Causeway Worker",
+        text: "Its an ambush! Protect me!",
+      },
+    });
+    expect(trackedWolf).toMatchObject({
+      type: "defeat_quest_spawn",
+      enemyTypeId: "wolf",
+      requiredCount: 1,
+      ambientEnemySuppression: {
+        scope: "subzone",
+        groupId: "wolf-causeway-encounter",
+        restoreDelayMs: 3_000,
+        variantPolicy: "reroll",
+      },
+      questSpawnTarget: {
+        enemyTypeId: "wolf",
+        level: 8,
+        position: { x: 145, y: 22 },
+        variant: "superior",
+        encounterBand: "standard",
+      },
+    });
   });
 
   it("grants smithy starter materials on accept so Plain Charm can be crafted", () => {
@@ -771,10 +958,279 @@ describe("prototype quest system", () => {
       expect(
         state.quests.clear_the_shore.objectiveProgress
           .defeat_shore_fringe_slimes.currentCount,
-      ).toBe(1);
+      ).toBe(2);
     } finally {
       delete objective!.enemyVariant;
     }
+  });
+
+  it("counts Zone 4 direct kills with two credits for Superior enemies", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_FOUR_ID,
+      map: createDebugMap(MAP_FOUR_ID),
+      quests: createQuestStates({ break_the_ash_camp: "active" }),
+    });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("ash-wisp", "goblin", "ash-goblin-encampment"),
+      MAP_FOUR_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      {
+        ...createDefeatedEnemy(
+          "superior-imp",
+          "goblin",
+          "ash-goblin-encampment",
+        ),
+        variant: "superior",
+      },
+      MAP_FOUR_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-map", "goblin", "ash-goblin-encampment"),
+      MAP_THREE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-subzone", "goblin", "other-subzone"),
+      MAP_FOUR_ID,
+    );
+
+    expect(
+      state.quests.break_the_ash_camp.objectiveProgress
+        .defeat_ash_goblin_encampment_enemies.currentCount,
+    ).toBe(3);
+  });
+
+  it("counts any successfully inventoried Zone 4 resource units", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_FOUR_ID,
+      map: createDebugMap(MAP_FOUR_ID),
+      quests: createQuestStates({ break_the_ash_camp: "active" }),
+    });
+    const wood = createResource("zone-4-wood", { x: 18, y: 49 }, {
+      resourceType: "wood",
+    });
+    const ore = createResource("zone-4-ore", { x: 76, y: 8 }, {
+      resourceType: "ore",
+    });
+    const herb = createResource("zone-4-herb", { x: 98, y: 45 }, {
+      resourceType: "herb",
+    });
+
+    state = recordResourceGatheredForQuests(state, wood, MAP_FOUR_ID, 7);
+    state = recordResourceGatheredForQuests(state, ore, MAP_FOUR_ID, 8);
+    state = recordResourceGatheredForQuests(state, herb, MAP_THREE_ID, 5);
+    state = recordResourceGatheredForQuests(state, herb, MAP_FOUR_ID, 0);
+    state = recordResourceGatheredForQuests(state, herb, MAP_FOUR_ID, 5);
+
+    expect(
+      state.quests.break_the_ash_camp.objectiveProgress
+        .gather_ash_goblin_encampment_resources,
+    ).toMatchObject({ currentCount: 20, completed: true });
+  });
+
+  it("requires an active companion to equip a class-restricted weapon", () => {
+    const blade = {
+      ...createCompanion("companion-1", { x: 0, y: 0 }, "companion-1"),
+      classId: "blade" as const,
+      characterLevel: 10,
+      equipment: {
+        ...createCompanion("template", { x: 0, y: 0 }, "companion-1").equipment,
+        mainHand: "training_sword" as const,
+      },
+    };
+    let state = createTestGameState({
+      entities: { [blade.id]: blade },
+      partyLeaderId: blade.id,
+      quests: createQuestStates({ break_the_ash_camp: "active" }),
+    });
+
+    state = recordEquippedItemObjectivesForQuests(state, "test_training_sword");
+    expect(
+      state.quests.break_the_ash_camp.objectiveProgress.equip_first_class_weapon
+        .completed,
+    ).toBe(false);
+
+    state = recordEquippedItemObjectivesForQuests(
+      {
+        ...state,
+        entities: {
+          ...state.entities,
+          [blade.id]: {
+            ...blade,
+            equipment: {
+              ...blade.equipment,
+              mainHand: "iron_sword",
+            },
+          },
+        },
+      },
+      "test_first_class_weapon",
+    );
+    expect(
+      state.quests.break_the_ash_camp.objectiveProgress.equip_first_class_weapon,
+    ).toMatchObject({ currentCount: 1, completed: true });
+
+    const equippedBlade = getCompanion(state, blade.id);
+    state = recordEquippedItemObjectivesForQuests({
+      ...state,
+      entities: {
+        ...state.entities,
+        [blade.id]: {
+          ...equippedBlade,
+          equipment: {
+            ...equippedBlade.equipment,
+            mainHand: null,
+          },
+        },
+      },
+    });
+    expect(
+      state.quests.break_the_ash_camp.objectiveProgress.equip_first_class_weapon
+        .completed,
+    ).toBe(true);
+  });
+
+  it("grants Break the Ash Camp rewards once through the normal quest path", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({ break_the_ash_camp: "ready_to_turn_in" }),
+    });
+
+    const rewarded = finishReadyQuestForQuestGiver(
+      state,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "break_the_ash_camp",
+    );
+    const repeated = finishReadyQuestForQuestGiver(
+      rewarded,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "break_the_ash_camp",
+    );
+
+    expect(rewarded.quests.break_the_ash_camp.status).toBe("completed");
+    expect(rewarded.quests.into_the_briar_burrows.status).toBe("available");
+    expect(rewarded.wallet.balancesByCurrencyId.crowns).toBe(500);
+    expect(getCompanion(rewarded, "companion-1").lastCharacterXpGained).toBe(1800);
+    expect(getCompanion(rewarded, "companion-2").lastCharacterXpGained).toBe(1800);
+    expect(repeated.wallet.balancesByCurrencyId.crowns).toBe(500);
+  });
+
+  it("defines and accepts Into the Briar Burrows through the Hub 2 quest giver", () => {
+    const thirdCompanion = createCompanion(
+      "companion-3",
+      { x: 2, y: 0 },
+      "companion-1",
+    );
+    const initialState = createStateWithParty({
+      quests: createQuestStates({
+        break_the_ash_camp: "completed",
+        into_the_briar_burrows: "available",
+      }),
+    });
+    const state = acceptQuestFromQuestGiver(
+      {
+        ...initialState,
+        entities: {
+          ...initialState.entities,
+          [thirdCompanion.id]: thirdCompanion,
+        },
+        livestock: {
+          ...initialState.livestock!,
+          ownedCreaturesById: {
+            ...initialState.livestock!.ownedCreaturesById,
+            tin_crawler: 1,
+          },
+        },
+      },
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "into_the_briar_burrows",
+    );
+
+    expect(QUEST_DEFINITIONS.into_the_briar_burrows).toMatchObject({
+      displayName: "Into the Briar Burrows",
+      questGiverMapId: HUB_TWO_MAP_ID,
+      requiresCompletedQuestIds: ["break_the_ash_camp"],
+      rewards: { crowns: 750, characterXp: 2800 },
+    });
+    expect(state.quests.into_the_briar_burrows.status).toBe("active");
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+  });
+
+  it("counts only Briar Burrows kills and gives Superior enemies two credits", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_FIVE_ID,
+      map: createDebugMap(MAP_FIVE_ID),
+      quests: createQuestStates({ into_the_briar_burrows: "active" }),
+    });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("tin-crawler", "crawler", "briar-burrows"),
+      MAP_FIVE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      {
+        ...createDefeatedEnemy("superior-wolf", "wolf", "briar-burrows"),
+        variant: "superior",
+      },
+      MAP_FIVE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-zone", "crawler", "other-subzone"),
+      MAP_FIVE_ID,
+    );
+    state = recordEnemyDefeatedForQuests(
+      state,
+      createDefeatedEnemy("wrong-map", "crawler", "briar-burrows"),
+      MAP_FOUR_ID,
+    );
+
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .defeat_briar_burrows_enemies.currentCount,
+    ).toBe(3);
+  });
+
+  it("grants Into the Briar Burrows rewards once", () => {
+    const state = createStateWithParty({
+      quests: createQuestStates({
+        into_the_briar_burrows: "ready_to_turn_in",
+      }),
+    });
+
+    const rewarded = finishReadyQuestForQuestGiver(
+      state,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "into_the_briar_burrows",
+    );
+    const repeated = finishReadyQuestForQuestGiver(
+      rewarded,
+      HUB_TWO_QUEST_GIVER_NPC_ID,
+      "into_the_briar_burrows",
+    );
+
+    expect(rewarded.quests.into_the_briar_burrows.status).toBe("completed");
+    expect(rewarded.wallet.balancesByCurrencyId.crowns).toBe(750);
+    expect(getCompanion(rewarded, "companion-1").lastCharacterXpGained).toBe(
+      2800,
+    );
+    expect(getCompanion(rewarded, "companion-2").lastCharacterXpGained).toBe(
+      2800,
+    );
+    expect(repeated.wallet.balancesByCurrencyId.crowns).toBe(750);
   });
 
   it("uses chance and pity for special enemy quest drops without overflowing", () => {

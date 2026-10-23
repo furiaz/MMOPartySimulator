@@ -3,6 +3,7 @@ import { createCompanion, createEnemy, createResource } from "./entities";
 import {
   createDebugMap,
   MAP_ONE_ID,
+  MAP_SIX_ID,
   SLIMEWARD_CHEST_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   SLIMEWARD_FLOOR_TWO_ID,
@@ -19,6 +20,7 @@ import {
   recordQuestPoiReachedForQuests,
   recordQuestRepairProgress,
   recordResourceGatheredForQuests,
+  reconcileStateDerivedQuestObjectivesForQuests,
 } from "./questProgressionHooks";
 import {
   createInitialQuestStates,
@@ -326,6 +328,257 @@ describe("quest progression hooks", () => {
       completed: true,
     });
     expect(state.quests.outfit_the_expedition.status).toBe("ready_to_turn_in");
+  });
+
+  it("reconciles current livestock ownership and active party size until completion", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 0, y: 0 },
+      "companion-1",
+    );
+    const follower = createCompanion(
+      "companion-2",
+      { x: 1, y: 0 },
+      leader.id,
+    );
+    const thirdCompanion = {
+      ...createCompanion("companion-3", { x: 2, y: 0 }, leader.id),
+      state: "dead" as const,
+      health: 0,
+    };
+    let state = createTestGameState({
+      entities: {
+        [leader.id]: leader,
+        [follower.id]: follower,
+      },
+      restingCompanionsById: {
+        [thirdCompanion.id]: thirdCompanion,
+      },
+      partyLeaderId: leader.id,
+      quests: createQuestStates({ into_the_briar_burrows: "active" }),
+    });
+
+    state = reconcileStateDerivedQuestObjectivesForQuests(state, "test");
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 2, completed: false });
+
+    const leaderOnlyEntities = { ...state.entities };
+    delete leaderOnlyEntities[follower.id];
+    state = reconcileStateDerivedQuestObjectivesForQuests(
+      {
+        ...state,
+        entities: leaderOnlyEntities,
+      },
+      "test",
+    );
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 1, completed: false });
+
+    state = reconcileStateDerivedQuestObjectivesForQuests(
+      {
+        ...state,
+        entities: {
+          ...state.entities,
+          [follower.id]: follower,
+          [thirdCompanion.id]: thirdCompanion,
+        },
+        restingCompanionsById: {},
+        livestock: {
+          ...state.livestock!,
+          ownedCreaturesById: {
+            ...state.livestock!.ownedCreaturesById,
+            tin_crawler: 1,
+          },
+        },
+      },
+      "test",
+    );
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+
+    const withoutThirdCompanion = { ...state.entities };
+    delete withoutThirdCompanion[thirdCompanion.id];
+    state = reconcileStateDerivedQuestObjectivesForQuests(
+      {
+        ...state,
+        entities: withoutThirdCompanion,
+        livestock: {
+          ...state.livestock!,
+          ownedCreaturesById: {
+            ...state.livestock!.ownedCreaturesById,
+            tin_crawler: 0,
+          },
+        },
+      },
+      "test",
+    );
+
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
+    expect(
+      state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+  });
+
+  it("charges Patron Wards only from matching ambient Nightmire enemies", () => {
+    let state = createStateWithParty({
+      currentMapId: MAP_SIX_ID,
+      map: createDebugMap(MAP_SIX_ID),
+      quests: createQuestStates({ the_patrons_shadow: "active" }),
+    });
+    const nightBat = {
+      ...createEnemy("night-bat", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "night_bat",
+        subzoneId: "nightmire-canopy",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const superiorNightBat = {
+      ...createEnemy("superior-night-bat", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "night_bat",
+        subzoneId: "nightmire-canopy",
+        variant: "superior",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const questDefender = {
+      ...createEnemy("quest-night-bat", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "night_bat",
+        subzoneId: "nightmire-canopy",
+        questSpawn: {
+          questId: "the_patrons_shadow",
+          objectiveId: "break_night_bat_ward",
+          targetPosition: { x: 96, y: 20 },
+          patronAura: true,
+        },
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const wrongEnemy = {
+      ...createEnemy("cinder-wisp", { x: 0, y: 0 }, undefined, {
+        enemyTypeId: "cinder_wisp",
+        subzoneId: "nightmire-canopy",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    state = recordEnemyDefeatedForQuests(state, nightBat, MAP_SIX_ID);
+    state = recordEnemyDefeatedForQuests(state, superiorNightBat, MAP_SIX_ID);
+    state = recordEnemyDefeatedForQuests(state, questDefender, MAP_SIX_ID);
+    state = recordEnemyDefeatedForQuests(state, wrongEnemy, MAP_SIX_ID);
+
+    expect(
+      state.quests.the_patrons_shadow.objectiveProgress.break_night_bat_ward,
+    ).toMatchObject({ currentCount: 3, completed: false });
+    expect(
+      state.quests.the_patrons_shadow.objectiveProgress.break_cinder_wisp_ward,
+    ).toMatchObject({ currentCount: 1, completed: false });
+  });
+
+  it("completes a tracked quest-spawn target once without applying Superior double credit", () => {
+    const quests = createQuestStates({ open_wolf_causeway: "active" });
+    const causewayQuest = quests.open_wolf_causeway;
+    quests.open_wolf_causeway = {
+      ...causewayQuest,
+      objectiveProgress: {
+        ...causewayQuest.objectiveProgress,
+        escort_causeway_worker: {
+          objectiveId: "escort_causeway_worker",
+          currentCount: 1,
+          completed: true,
+        },
+        defend_wolf_causeway: {
+          objectiveId: "defend_wolf_causeway",
+          currentCount: 1,
+          completed: true,
+        },
+      },
+      runtime: {
+        questSpawnedEnemyIdsByObjectiveId: {
+          defeat_causeway_elite: ["tracked-superior-wolf"],
+        },
+      },
+    };
+    let state = createStateWithParty({
+      currentMapId: MAP_TWO_ID,
+      map: createDebugMap(MAP_TWO_ID),
+      quests,
+    });
+    const unrelatedSuperiorWolf = {
+      ...createEnemy("ambient-superior-wolf", { x: 0, y: 0 }, "aggressive", {
+        enemyTypeId: "wolf",
+        level: 8,
+        variant: "superior",
+        subzoneId: "north-east",
+      }),
+      state: "dead" as const,
+      health: 0,
+    };
+    const trackedSuperiorWolf = {
+      ...createEnemy(
+        "tracked-superior-wolf",
+        { x: 145, y: 22 },
+        "aggressive",
+        {
+          enemyTypeId: "wolf",
+          level: 8,
+          variant: "superior",
+          encounterBand: "standard",
+          subzoneId: "north-east",
+          questSpawn: {
+            questId: "open_wolf_causeway",
+            objectiveId: "defeat_causeway_elite",
+            targetPosition: { x: 145, y: 22 },
+          },
+        },
+      ),
+      state: "dead" as const,
+      health: 0,
+    };
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      unrelatedSuperiorWolf,
+      MAP_TWO_ID,
+    );
+    expect(
+      state.quests.open_wolf_causeway.objectiveProgress.defeat_causeway_elite,
+    ).toMatchObject({ currentCount: 0, completed: false });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      trackedSuperiorWolf,
+      MAP_TWO_ID,
+    );
+    expect(
+      state.quests.open_wolf_causeway.objectiveProgress.defeat_causeway_elite,
+    ).toMatchObject({ currentCount: 1, completed: true });
+
+    state = recordEnemyDefeatedForQuests(
+      state,
+      trackedSuperiorWolf,
+      MAP_TWO_ID,
+    );
+    expect(
+      state.quests.open_wolf_causeway.objectiveProgress.defeat_causeway_elite,
+    ).toMatchObject({ currentCount: 1, completed: true });
   });
 });
 

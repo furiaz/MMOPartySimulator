@@ -504,10 +504,10 @@ describe("skill effect resolution", () => {
     expect(blocked.state.entities.hunter.position).toEqual(hunter.position);
   });
 
-  it("hits enemies near the selected target with Arrow Burst", () => {
+  it("hits enemies inside Arrow Burst's forward cone", () => {
     const hunter = createSkillCompanion("hunter", "fighter", { x: 0, y: 0 }, "hunter");
-    const primary = createSkillEnemy("primary", { x: 4, y: 0 }, { maxHealth: 200 });
-    const nearby = createSkillEnemy("nearby", { x: 5, y: 1 }, { maxHealth: 200 });
+    const primary = createSkillEnemy("primary", { x: 2, y: 0 }, { maxHealth: 200 });
+    const nearby = createSkillEnemy("nearby", { x: 2, y: 1 }, { maxHealth: 200 });
     const far = createSkillEnemy("far", { x: 8, y: 0 }, { maxHealth: 200 });
     const result = resolveSkillEffect(
       createSkillState([hunter, primary, nearby, far]),
@@ -1997,7 +1997,7 @@ describe("skill effect resolution", () => {
   });
 
   it("channels Maul Sweep damage and disarm", () => {
-    const beast = createSkillCompanion("beast", "fighter", { x: 0, y: 0 }, "beast");
+    const beast = { ...createSkillCompanion("beast", "fighter", { x: 0, y: 0 }, "beast"), currentTargetId: "nearby" };
     const nearby = createSkillEnemy("nearby", { x: 1, y: 0 }, { maxHealth: 50 });
     const far = createSkillEnemy("far", { x: 4, y: 0 }, { maxHealth: 50 });
     const channelState = resolveSkillEffect(

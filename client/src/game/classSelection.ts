@@ -2,6 +2,7 @@ import { FIRST_CLASS_IDS, type FirstClassId, isFirstClassId } from "./classes";
 import { isClassAllowedForEquipment } from "./equipmentRules";
 import { getItemDefinition } from "./items";
 import { BEGINNER_CLASS_UNLOCK_LEVEL } from "./leveling";
+import { reconcileQuestAvailability } from "./questSystem";
 import { setPartyMemberClass, type GameState } from "./state";
 import type { ClassId, Companion, EquipmentSlot, ItemId } from "./types";
 
@@ -121,8 +122,14 @@ export function selectFirstClass(
     };
   }
 
+  const selectedState = setPartyMemberClass(
+    state,
+    companionId,
+    validation.classId,
+  );
+
   return {
-    state: setPartyMemberClass(state, companionId, validation.classId),
+    state: reconcileQuestAvailability(selectedState),
     result: {
       status: "success",
       companionId,

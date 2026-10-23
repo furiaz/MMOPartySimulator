@@ -57,8 +57,22 @@ describe("world travel routing", () => {
     expect(teleport?.id).toBe(HUB_TWO_TO_MAP_FOUR_TELEPORTER_ID);
   });
 
-  it("routes from map 4 through the new Zone 5-7 stretch", () => {
-    const routingState = createRoutingState(createUnlockedMainRouteTeleportStates());
+  it("routes from map 4 through the Zone 5-7 stretch only after the Nightmire route opens", () => {
+    const lockedRoutingState = createRoutingState(
+      createUnlockedMainRouteTeleportStates(),
+    );
+    const routingState = createRoutingState({
+      ...createUnlockedMainRouteTeleportStates(),
+      [MAP_SIX_TO_MAP_SEVEN_TELEPORTER_ID]: { isWorking: true },
+    });
+
+    expect(
+      getNextWorldTravelTeleport(
+        lockedRoutingState,
+        MAP_FOUR_ID,
+        MAP_SEVEN_ID,
+      ),
+    ).toBeNull();
 
     expect(
       getNextWorldTravelTeleport(routingState, MAP_FOUR_ID, MAP_SEVEN_ID)?.id,

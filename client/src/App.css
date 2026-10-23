@@ -6041,6 +6041,40 @@
   gap: 10px;
 }
 
+.skill-preference-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(102, 143, 155, 0.6);
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.skill-preference-card h4 { margin: 0 0 4px; }
+.skill-preference-card h4 small { color: #a8bcc4; font-weight: 400; }
+.skill-preference-option { position: relative; min-width: 0; }
+.behavior-choice-group > .skill-preference-option { flex: 1 1 100px; }
+.skill-preference-option > button { width: 100%; }
+.skill-preference-tooltip {
+  visibility: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  width: min(340px, 65vw);
+  padding: 10px;
+  box-sizing: border-box;
+  border: 1px solid #86b9d1;
+  border-radius: 5px;
+  background: #101c29;
+  color: #edf6fc;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.skill-preference-tooltip[data-open="true"] { visibility: visible; }
+
 .behavior-toggle-row,
 .behavior-range-row,
 .behavior-choice-row {
@@ -6530,6 +6564,17 @@
 .dungeon-chest-panel h2 {
   margin: 0;
   font-size: 18px;
+}
+
+.warmaster-reward-panel {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+.warmaster-reward-panel .dungeon-chest-grid {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
 }
 
 .dungeon-chest-warning {

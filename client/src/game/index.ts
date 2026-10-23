@@ -272,6 +272,8 @@ export type {
   LocalPoiTarget,
   PoiConsideration,
   PoiDecisionState,
+  PatronWardId,
+  PatronWardRuntimeState,
   QuestDefinition,
   QuestId,
   QuestObjectiveDefinition,
@@ -749,6 +751,7 @@ export {
 export {
   getOrderedFormationMembers,
   getActiveCompanions,
+  getActiveCompanionsInPartyOrder,
   getAllRosterCompanions,
   getHighestCharacterLevelEver,
   getHighestCompanionCharacterLevel,
@@ -934,6 +937,10 @@ export {
 } from "./equipmentDropPopups";
 export { updatePoiSystem } from "./poiSystem";
 export {
+  getActiveQuestDefenseFocus,
+  type ActiveQuestDefenseFocus,
+} from "./questDefenseFocus";
+export {
   AUTO_COMBAT_ON_ARRIVAL_DELAY_MS,
   AUTO_ROUTE_CALM_TIME_MS,
   AUTO_ROUTE_COHESION_DISTANCE,
@@ -961,7 +968,11 @@ export {
   getPartyMovementTargetPosition,
 } from "./partyTargetSystem";
 export {
+  ASH_GOBLIN_MAIN_QUEST_ID,
+  BRIAR_BURROWS_MAIN_QUEST_ID,
   EQUIPMENT_TUTORIAL_QUEST_ID,
+  GUILD_BOARD_ONBOARDING_QUEST_ID,
+  NIGHTMIRE_PATRON_QUEST_ID,
   QUEST_DEFINITIONS,
   QUEST_GIVER_POI_ID,
   QUEST_ORDER,
@@ -973,6 +984,7 @@ export {
   getAvailableQuest,
   getCurrentQuest,
   getFirstIncompleteObjective,
+  getQuestGuidanceObjectives,
   getQuestGiverAvailableQuests,
   getQuestGiverCurrentQuests,
   getQuestGiverReadyQuests,
@@ -986,6 +998,7 @@ export {
   recordDungeonChestCollectedForQuests,
   recordEnemyDefeatedForQuests,
   recordEquippedItemObjectivesForQuests,
+  reconcileStateDerivedQuestObjectivesForQuests,
   recordMerchantItemPurchasedForQuests,
   recordMerchantLockedForQuest,
   recordMapReachedForQuests,
@@ -993,6 +1006,11 @@ export {
   updateQuestGiverInteraction,
   type QuestItemInventoryEntry,
 } from "./questSystem";
+export {
+  getPatronWardPresentationState,
+  requestPatronWardActivation,
+  type PatronWardPresentationState,
+} from "./patronWardSystem";
 export { startGameLoop, type GameStateUpdater } from "./gameLoop";
 export {
   companionIds,
@@ -1281,6 +1299,10 @@ export {
   createInitialGuildNoticeBoardState,
   getGuildNoticeBoardRerollDisplayState,
   getGuildNoticeBoardState,
+  getGuildNoticeBoardRewardPreview,
+  getGuildNoticeBoardPouchEntries,
+  getBoardObjectiveLabel,
+  getBoardObjectiveEnemyTypes,
   openGuildNoticeBoard,
   recordEnemyDefeatedForGuildNoticeBoard,
   refreshGuildNoticeBoardState,
@@ -1294,6 +1316,7 @@ export {
   type GuildNoticeBoardRerollResult,
   type GuildNoticeBoardTakeResult,
 } from "./guildNoticeBoard";
+export { takeGuildNoticeBoardQuestForQuests } from "./guildNoticeBoardQuestIntegration";
 export {
   GUILD_RECRUIT_REFRESH_INTERVAL_MS,
   GUILD_RECRUIT_RESERVE_CAPACITY,

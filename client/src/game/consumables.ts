@@ -289,6 +289,7 @@ export function startCompanionConsumableUse(
   now: number,
   source: ConsumableUseSource = "manual",
 ): GameState {
+  if (state.forcedMovementsByEntityId?.[companionId]) return state;
   const companion = state.entities[companionId];
 
   if (companion?.kind !== "companion" || !isLivingCompanion(companion)) {

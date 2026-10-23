@@ -93,6 +93,37 @@ export function clearPartyIntent(state: GameState): GameState {
   return setPartyIntent(state, null);
 }
 
+/** Stop autonomous work without discarding player-authored or recovery orders. */
+export function stopPartyAutoCombat(state: GameState): GameState {
+  const queued = state.partyIntent?.queuedIntent;
+  const interrupted = state.interruptedPoiTarget;
+  const cleared: GameState = {
+    ...state,
+    autoModeEnabled: false,
+    autoRoute: state.worldTravelTargetMapId ? state.autoRoute : undefined,
+    globalPoiIntent: null,
+    localPoiTarget: null,
+    lastPoiDecision: undefined,
+    interruptedPoiTarget: interrupted?.leaderIntent?.source === "player" || interrupted?.worldTravelTargetMapId
+      ? { ...interrupted, globalPoiIntent: null, localPoiTarget: null, lastPoiDecision: undefined }
+      : null,
+    partyIntent: state.partyIntent ? {
+      ...state.partyIntent,
+      globalPoiIntent: null,
+      localPoiTarget: null,
+      lastPoiDecision: undefined,
+      queuedIntent: queued?.executionIntent?.source === "player" || queued?.worldTravelTargetMapId
+        ? { ...queued, globalPoiIntent: null, localPoiTarget: null, lastPoiDecision: undefined }
+        : null,
+    } : null,
+  };
+  if (hasDirectPlayerPartyIntent(cleared)) return cleared;
+  if (cleared.partyIntent?.recoveryIntent) {
+    return { ...cleared, leaderIntent: null, partyIntent: { ...cleared.partyIntent, executionIntent: null } };
+  }
+  return setPartyExecutionIntent(cleared, null);
+}
+
 export function queuePartyIntent(state: GameState): GameState {
   const existingQueuedIntent = state.partyIntent?.queuedIntent;
 

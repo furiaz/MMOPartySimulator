@@ -1,9 +1,9 @@
 import {
   debugMapDefinitions,
   getFirstIncompleteObjective,
+  getEnemyType,
   getItemDefinition,
   HUB_MAP_ID,
-  HUB_TWO_MAP_ID,
   MAP_THREE_ID,
   QUEST_DEFINITIONS,
   QUEST_ORDER,
@@ -234,7 +234,10 @@ export function getNpcQuestRouteHintGroupsByMap(
       { location: QuestLocationDisplay; objectiveLines: string[] }
     >();
 
-    for (const objective of definition.objectives) {
+    const hintObjectives = definition.objectiveGuidance === "first_incomplete"
+      ? definition.objectives.filter(objective => !quest.objectiveProgress[objective.id]?.completed).slice(0, 1)
+      : definition.objectives;
+    for (const objective of hintObjectives) {
       if (quest.objectiveProgress[objective.id]?.completed) {
         continue;
       }
@@ -354,7 +357,7 @@ function getStrictQuestRouteTargetMapId(
   quest: QuestState,
 ): DebugMapId | null {
   if (quest.status === "ready_to_turn_in") {
-    return quest.questId === "azure_trial" ? HUB_TWO_MAP_ID : HUB_MAP_ID;
+    return QUEST_DEFINITIONS[quest.questId].questGiverMapId;
   }
 
   if (quest.status !== "active") {
@@ -401,9 +404,7 @@ function getObjectiveQuestLocation(
 }
 
 function getQuestTurnInLocation(quest: QuestState): QuestLocationDisplay {
-  return createQuestLocation(
-    quest.questId === "azure_trial" ? HUB_TWO_MAP_ID : HUB_MAP_ID,
-  );
+  return createQuestLocation(QUEST_DEFINITIONS[quest.questId].questGiverMapId);
 }
 
 function createQuestLocation(
@@ -485,6 +486,11 @@ export function getObjectiveLabel(
   objective: QuestObjectiveDefinition,
   requiredCount = objective.requiredCount ?? 1,
 ): string {
+  if (objective.displayName) return objective.displayName;
+  if (objective.id === "defeat_briar_burrows_enemies") {
+    return `Defeat ${requiredCount} Briar Burrows Enemies`;
+  }
+
   if (objective.type === "defeat_enemy_count") {
     return `Kill ${requiredCount} ${formatQuestEnemyName(
       objective.enemyArchetypeId,
@@ -501,7 +507,41 @@ export function getObjectiveLabel(
     )}`;
   }
 
+  if (objective.type === "take_guild_notice_board_quest") {
+    return "Take Guild Board Contract";
+  }
+
+  if (objective.type === "own_livestock_creature") {
+    if (objective.livestockCreatureId === "tin_crawler") {
+      return "Find Tin Crawler Hatchling";
+    }
+
+    return objective.livestockCreatureId === "elder_mossling"
+      ? "Find Elder Mossling"
+      : "Find Livestock Creature";
+  }
+
+  if (objective.type === "active_party_member_count") {
+    return `Have ${requiredCount} Active Companions`;
+  }
+
+  if (objective.type === "patron_ward") {
+    if (objective.patronWardId === "night_bat_ward") {
+      return "Break the Night Bat Ward";
+    }
+
+    if (objective.patronWardId === "elder_mossling_ward") {
+      return "Break the Elder Mossling Ward";
+    }
+
+    return "Break the Cinder Wisp Ward";
+  }
+
   if (objective.type === "equip_item" || objective.type === "equip_flask") {
+    if (objective.equipmentRequirement === "first_class_weapon") {
+      return "Equip First-Class Weapon";
+    }
+
     const itemDefinition = objective.itemId
       ? getItemDefinition(objective.itemId)
       : null;
@@ -557,6 +597,16 @@ export function getObjectiveLabel(
 
   if (objective.type === "defeat_elite") {
     return "Defeat Elite";
+  }
+
+  if (objective.type === "defeat_quest_spawn") {
+    const enemyName = getEnemyType(
+      objective.questSpawnTarget?.enemyTypeId,
+    )?.displayName ?? "Quest Enemy";
+    const variantName =
+      objective.questSpawnTarget?.variant === "superior" ? "Superior " : "";
+
+    return `Defeat ${variantName}${enemyName}`;
   }
 
   if (objective.type === "collect_dungeon_chest") {

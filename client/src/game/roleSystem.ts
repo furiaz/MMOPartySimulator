@@ -19,8 +19,10 @@ import {
   getPartyMovementTargetPosition,
 } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
+import { shouldUseAutomaticQuestDefenseFocus } from "./questDefenseFocus";
 import type {
   Companion,
+  CombatStructure,
   Enemy,
   GameEntity,
   Position,
@@ -96,6 +98,10 @@ function getRoleTarget(
   }
 
   if (partyMember.role === "gatherer") {
+    if (shouldUseAutomaticQuestDefenseFocus(state)) {
+      return leader ? getFollowTarget(partyMember, leader) : null;
+    }
+
     if (leader && !isWithinGathererLeaderBoundary(state, partyMember, leader)) {
       return getFollowTarget(partyMember, leader);
     }
@@ -192,12 +198,13 @@ export function getDefenderAnchorPosition(
 
 function getLeaderCombatTarget(
   state: GameState,
-): Enemy | undefined {
-  return getLeaderEnemyTarget(state);
+): Enemy | CombatStructure | undefined {
+  return getPartyCombatTarget(state) ?? undefined;
 }
 
 export function getLeaderEnemyTarget(state: GameState): Enemy | undefined {
-  return getPartyCombatTarget(state) ?? undefined;
+  const target = getPartyCombatTarget(state);
+  return target?.kind === "enemy" ? target : undefined;
 }
 
 export function isDefenderAttackTargetRelevant(

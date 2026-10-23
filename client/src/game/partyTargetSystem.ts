@@ -1,4 +1,4 @@
-import { isLivingCompanion, isLivingEnemy } from "./entityGuards";
+import { isLivingCompanion } from "./entityGuards";
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
 import { getGridDistance } from "./positionUtils";
@@ -8,10 +8,12 @@ import {
   setPartyExecutionIntent,
 } from "./partyIntentState";
 import type { Enemy, Position } from "./types";
+import { isLivingHostileTarget, getCombatTargetPosition } from "./combatStructures";
+import type { CombatStructure } from "./types";
 
 const DEFAULT_SUPPRESSION_TIME_MS = 0;
 
-export function getPartyCombatTarget(state: GameState): Enemy | null {
+export function getPartyCombatTarget(state: GameState): Enemy | CombatStructure | null {
   const executionIntent = getPartyExecutionIntent(state);
 
   if (executionIntent?.type !== "attack" || !executionIntent.targetId) {
@@ -20,7 +22,8 @@ export function getPartyCombatTarget(state: GameState): Enemy | null {
 
   const target = getEntityById(state, executionIntent.targetId);
 
-  return isLivingEnemy(target) &&
+  return isLivingHostileTarget(target) &&
+    (target.kind !== "structure" || executionIntent.source === "player") &&
     !isEnemySuppressedForAutonomousTargeting(state, target.id)
     ? target
     : null;
@@ -48,7 +51,7 @@ export function getPartyMovementTargetPosition(
   }
 
   if (target && target.state !== "dead") {
-    return target.position;
+    return getCombatTargetPosition(state.entities[state.partyLeaderId]?.position ?? target.position, target);
   }
 
   return executionIntent.targetPosition;

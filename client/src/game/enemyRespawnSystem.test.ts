@@ -69,6 +69,7 @@ describe("enemy respawn system", () => {
       ...createEnemy("enemy", { x: 8, y: 7 }, "aggressive", {
         subzoneId: "north-west",
         encounterAreaId: "shore-fringe-den",
+        encounterBand: "elite",
         combatBodyRadius: 1.75,
       }),
       position: { x: 12, y: 12 },
@@ -103,6 +104,7 @@ describe("enemy respawn system", () => {
       position: enemy.homePosition,
       subzoneId: "north-west",
       encounterAreaId: "shore-fringe-den",
+      encounterBand: "elite",
       combatBodyRadius: 1.75,
     });
     const respawnedEnemy = nextState.entities[enemy.id];

@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, type MouseEvent, type PointerEvent } from "react";
+import { getEntityPointerHit as getSharedEntityPointerHit } from "./PixiWorldRendererHelpers";
+import type { BarrackRuntime } from "../game/types";
+import { BARRACK_PREPARATION_MS } from "../game/barrackDefinitions";
 import * as PIXI from "pixi.js";
 import type {
   Application as PixiApplication,
@@ -40,7 +43,6 @@ import type {
   LeaderIntent,
   MapVisualObject,
   NavigationClickAccessibility,
-  NpcEntity,
   PartyIntent,
   Position,
   ResolvedAoeArea,
@@ -84,9 +86,23 @@ import {
   type SpriteDirection,
   type SpriteVisualAsset,
 } from "../visualAssets";
+import { REGIONAL_ENEMY_SPRITE_SRC } from "../visualAssets";
+import {
+  getPatronFinaleOpacity,
+  getPatronWardFadeOpacity,
+  isPatronWarmasterSpeechVisible,
+  PATRON_WARMASTER_SCENE_FADE_DURATION_MS,
+  type PatronWardPresentationState,
+} from "../game/patronWardSystem";
+import {
+  PATRON_AURA_FRAME_DURATION_MS,
+  PATRON_BARRIER_FADE_DURATION_MS,
+  PATRON_WARD_VISUAL_OBJECT_IDS,
+} from "../game/patronWardState";
 import { PUBLIC_ASSET_ROOT } from "../publicAssetUrl";
 import {
   getNpcSpeechOpacity,
+  isWorldSpeechSpeaker,
   type ActiveNpcSpeech,
 } from "../npcSpeechPresentation";
 import {
@@ -106,6 +122,7 @@ import {
   type OverheadUiBox,
   type PixiRendererPerformanceSample,
   type QuestEntityIndicator,
+  type ViewportRect,
 } from "./PixiWorldRendererHelpers";
 
 const { Application, Assets, Container, Graphics, Sprite, Text } = PIXI;
@@ -180,6 +197,11 @@ const teleportPulseSrc = `${prototypeVfxSpritePath}/teleport-pulse.png`;
 const burnDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-burn.png`;
 const poisonDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-poison.png`;
 const bleedDotDamageIconSrc = `${prototypeVfxSpritePath}/dot-bleed.png`;
+const patronAuraFrameSrcs = Array.from(
+  { length: 7 },
+  (_, index) =>
+    `${prototypeVfxSpritePath}/orc-aura/OrcAura${String(index + 1).padStart(4, "0")}.png`,
+);
 const overheadStatusLabelHeight = 10;
 const overheadStatusLabelGap = 2;
 const overheadStatusBarHeight = 8;
@@ -276,6 +298,15 @@ const skillFeedbackDisplayNames = new Set(
   Object.values(SKILL_DEFINITIONS).map((skill) => skill.displayName),
 );
 
+import type { WarmasterAttempt } from "../game/warmasterState";
+import type { WarmasterLifecycle } from "../game/warmasterLifecycleState";
+import { WARMASTER_CAPTIVE_ID, WARMASTER_RECHARGE_KILLS } from "../game/warmasterLifecycleState";
+import { ORC_WARCAMP_GATE_POSITION } from "../game/orcWarcampLayout";
+import { getStructurePropVisualId, getWarmasterCageVisual } from "./warcampPropPresentation";
+import { MAP_SEVEN_ARENA_GATE_RADIUS } from "../game/debugMap";
+import { isInsideWarmasterArena } from "../game/warmasterState";
+import { getPatronTransferPosition, isAuraVisible } from "./warmasterPresentation";
+
 type PixiRendererMode = "preview" | "full";
 
 type QuestObjectiveMarker = {
@@ -317,9 +348,15 @@ type PixiWorldRendererProps = {
   onFloorClick?: (position: Position) => void;
   onNpcClick?: (npcId: string) => void;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
+  onViewportRectChange?: (rect: ViewportRect | null) => void;
   onCursorPositionChange?: (position: Position | null) => void;
   onResourceClick?: (resourceId: string) => void;
+  onPatronWardClick?: (wardId: import("../game").PatronWardId) => void;
   partyIntent?: PartyIntent | null;
+  patronWardPresentation?: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
+  warmasterLifecycle?: WarmasterLifecycle;
+  barracksById?: Record<string, BarrackRuntime>;
   questEntityIndicators?: QuestEntityIndicator[];
   questObjectiveMarkers?: QuestObjectiveMarker[];
   resurrectionProgressByCompanionId?: Record<string, ResurrectionProgressState>;
@@ -331,6 +368,7 @@ type PixiWorldRendererProps = {
   skillVisualEvents?: SkillVisualEvent[];
   statusEffectsById?: Record<string, StatusEffectState>;
   statusPresentationTime?: number;
+  speechBubbleAvoidanceRects?: readonly ViewportRect[];
   suppressMovePoiRing?: boolean;
   teleportWorkingById?: Record<string, boolean>;
   viewportSize?: ViewportSize;
@@ -382,6 +420,7 @@ type TileBounds = {
 };
 
 type PixiRenderLayers = {
+  auraLayer: Container;
   backgroundGraphics: Graphics;
   entityLayer: Container;
   effectsGraphics: Graphics;
@@ -448,14 +487,14 @@ type StaticMapRenderCache = {
   sortedVisualObjects: MapVisualObject[];
 };
 
-type InteractableEntityKind = "enemy" | "resource" | "npc";
+type InteractableEntityKind = "enemy" | "structure" | "resource" | "npc";
 
 type InteractableEntity = GameEntity & {
   kind: InteractableEntityKind;
 };
 
 type DirectCommandDropTarget = GameEntity & {
-  kind: "resource" | "enemy";
+  kind: "resource" | "enemy" | "structure";
 };
 
 type EntitySpriteLayout = {
@@ -509,6 +548,10 @@ type DrawWorldOptions = {
   navigationClickAccessibility: NavigationClickAccessibility | null;
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
+  patronWardPresentation: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
+  warmasterLifecycle?: WarmasterLifecycle;
+  barracksById: Record<string, BarrackRuntime>;
   questEntityIndicators: QuestEntityIndicator[];
   questObjectiveMarkers: QuestObjectiveMarker[];
   questGiverHasWork: boolean;
@@ -516,6 +559,7 @@ type DrawWorldOptions = {
   renderSize: RenderSize;
   resurrectionProgressByCompanionId: Record<string, ResurrectionProgressState>;
   showDebugOverlays: boolean;
+  speechBubbleAvoidanceRects: readonly ViewportRect[];
   skillBindsByEnemyId: Record<string, SkillBindState>;
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
@@ -608,6 +652,7 @@ function clearLayers(layers: PixiRenderLayers) {
   clearLayer(layers.floorLayer);
   clearLayer(layers.wallLayer);
   clearLayer(layers.objectLayer);
+  clearLayer(layers.auraLayer);
   clearLayer(layers.entityLayer);
   clearLayer(layers.effectsLayer);
   layers.backgroundGraphics.clear();
@@ -1563,7 +1608,7 @@ function getEntityHealthPercent(entity: GameEntity): number | null {
 }
 
 function isInteractableEntity(entity: GameEntity): entity is InteractableEntity {
-  if (entity.kind === "enemy") {
+  if (entity.kind === "enemy" || entity.kind === "structure") {
     return entity.state !== "dead";
   }
 
@@ -1589,7 +1634,7 @@ function getNearestInteractableEntity({
   map: GameMap;
   mapPosition: Position;
 }): InteractableEntity | null {
-  const priorities: InteractableEntityKind[] = ["npc", "resource", "enemy"];
+  const priorities: InteractableEntityKind[] = ["npc", "structure", "resource", "enemy"];
   const maximumDistanceSquared =
     fullModeInteractionRadius * fullModeInteractionRadius;
 
@@ -1692,7 +1737,7 @@ function getNearestDirectCommandDropTarget({
   map: GameMap;
   mapPosition: Position;
 }): DirectCommandDropTarget | null {
-  const priorities: DirectCommandDropTarget["kind"][] = ["resource", "enemy"];
+  const priorities: DirectCommandDropTarget["kind"][] = ["structure", "resource", "enemy"];
   const maximumDistanceSquared =
     fullModeInteractionRadius * fullModeInteractionRadius;
 
@@ -1768,7 +1813,7 @@ function getCompanionDragPreview({
     };
   }
 
-  if (target?.kind === "enemy") {
+  if (target?.kind === "enemy" || target?.kind === "structure") {
     return {
       companionId,
       targetKind: "enemy",
@@ -1797,6 +1842,7 @@ function getNearestHoverEntity({
   const priorities: Array<GameEntity["kind"]> = [
     "npc",
     "companion",
+    "structure",
     "resource",
     "enemy",
   ];
@@ -1850,6 +1896,9 @@ function getEntityPointerHit({
   map: GameMap;
   mapPosition: Position;
 }): { distanceSquared: number } | null {
+  if (entity.kind === "structure") {
+    return getSharedEntityPointerHit({ cellPixelSize, entity, map, mapPosition });
+  }
   const isContentBoundsHit = isInsideImageContentBounds(
     entity,
     map,
@@ -2240,6 +2289,7 @@ function drawDebugCollisionShape(
 }
 
 function drawEntityOverheadUiPass({
+  warmasterAttempt,
   currentTime,
   enemyAbilityCastsByEnemyId,
   entities,
@@ -2253,6 +2303,7 @@ function drawEntityOverheadUiPass({
   transform,
   visibleTileBounds,
 }: {
+  warmasterAttempt?: WarmasterAttempt;
   currentTime: number;
   enemyAbilityCastsByEnemyId: Record<string, EnemyAbilityCastState>;
   entities: GameEntity[];
@@ -2284,7 +2335,7 @@ function drawEntityOverheadUiPass({
           : undefined;
       const layoutBox =
         box && activeCast && activeCast.windupEndsAt > currentTime
-          ? { ...box, height: box.height + 18 }
+          ? { ...box, height: box.height + 18 + (warmasterAttempt?.bossId === entity.id ? 14 : 0) }
           : box;
 
       return layoutBox ? { box: layoutBox, entity, status } : null;
@@ -2351,6 +2402,9 @@ function drawEntityOverheadUiPass({
       managedState,
       metrics,
     });
+    if (warmasterAttempt?.bossId === entry.entity.id) {
+      drawManagedFeedbackText({ color: 0x86efac, fontSize: 9, key: `patron-power:${entry.entity.id}`, layer, managedState, metrics, position: { x: entry.box.x + entry.box.width / 2, y: entry.box.healthY + overheadHealthHeight + 7 }, text: `Patron Power: ${warmasterAttempt.power}/10` });
+    }
   }
 
   drawQuestEntityLabels({
@@ -2396,7 +2450,7 @@ function drawEnemyAbilityCastUi({
   const labelHeight = 10;
   const barHeight = 4;
   const gap = 2;
-  const labelY = box.healthY + overheadHealthHeight + gap;
+  const labelY = box.healthY + overheadHealthHeight + gap + (enemy.enemyTypeId === "orc_warmaster" ? 14 : 0);
   const barY = labelY + labelHeight + gap;
   const progress = getEnemyAbilityCastProgress(cast, currentTime);
 
@@ -2470,7 +2524,7 @@ function getEntityOverheadUiBox(
     };
   }
 
-  const y = center.y - transform.cellPixelSize * (status ? 1.05 : 0.86);
+  const y = center.y - transform.cellPixelSize * (status ? 1.05 : 0.86) * (entity.kind === "enemy" ? entity.combatSizeMultiplier ?? 1 : 1);
   const statusLabelY = y;
   const statusBarY = statusLabelY + overheadStatusLabelHeight + overheadStatusLabelGap;
   const healthY = status
@@ -2591,7 +2645,7 @@ function getEnemyNameplatePosition(
 
   return {
     x: center.x,
-    y: center.y - transform.cellPixelSize * 1.32,
+    y: center.y - transform.cellPixelSize * 1.32 * (enemy.combatSizeMultiplier ?? 1),
   };
 }
 
@@ -3023,9 +3077,7 @@ function getEntitySpriteLayout(
       visualAsset.kind === "image" || visualAsset.kind === "sprite"
         ? visualAsset.naturalSize
         : undefined;
-    const variantScale = isSuperiorEnemy(entity)
-      ? SUPERIOR_ENEMY_RENDER_SCALE
-      : 1;
+    const variantScale = (isSuperiorEnemy(entity) ? SUPERIOR_ENEMY_RENDER_SCALE : 1) * (entity.combatSizeMultiplier ?? 1);
 
     return {
       anchorX: 0.5,
@@ -4071,6 +4123,21 @@ function drawCompanionAoeChannels(
       intent: channel.visualIntent,
       opacity: 0.35 + progress * 0.65,
     });
+  }
+}
+
+function drawCompanionSkillAreas(
+  graphics: Graphics,
+  events: SkillVisualEvent[],
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const event of events) {
+    if (!event.area || !event.visualIntent || event.expiresAt <= currentTime ||
+        !doAoeBoundsIntersect(event.area.bounds, visibleTileBounds)) continue;
+    const opacity = Math.max(0, Math.min(1, (event.expiresAt - currentTime) / Math.max(1, event.expiresAt - event.createdAt)));
+    drawResolvedAoeArea(graphics, { area: event.area, intent: event.visualIntent, transform, opacity });
   }
 }
 
@@ -5466,6 +5533,7 @@ function drawFullMapVisualObjects({
   requestRedraw,
   transform,
   visibleTileBounds,
+  entities,
 }: {
   cache: TextureCache;
   layer: Container;
@@ -5475,10 +5543,19 @@ function drawFullMapVisualObjects({
   requestRedraw?: () => void;
   transform: FullTransform;
   visibleTileBounds: TileBounds;
+  entities: GameEntity[];
 }) {
   const visualObjects = getStaticMapRenderCache(map).sortedVisualObjects;
 
   for (const visualObject of visualObjects) {
+    const destroyed = entities.some(entity => entity.kind === "structure" && entity.id === visualObject.id && entity.health <= 0);
+    if (
+      map.id === "map-6" &&
+      PATRON_WARD_VISUAL_OBJECT_IDS.has(visualObject.id)
+    ) {
+      continue;
+    }
+
     if (!isMapVisualObjectInTileBounds(visualObject, visibleTileBounds)) {
       continue;
     }
@@ -5498,7 +5575,7 @@ function drawFullMapVisualObjects({
         y: objectPosition.y + transform.cellPixelSize / 2,
       },
       requestRedraw,
-      src: MAP_VISUAL_OBJECT_SRC[visualObject.visualId],
+      src: MAP_VISUAL_OBJECT_SRC[getStructurePropVisualId(visualObject.visualId, destroyed)],
       width: visualObject.widthCells * transform.cellPixelSize,
     });
   }
@@ -5516,6 +5593,375 @@ function isMapVisualObjectInTileBounds(
     visualObject.position.y >= bounds.minY &&
     visualObject.position.y - visualObject.heightCells <= bounds.maxY
   );
+}
+
+function drawPatronWardObjects({
+  cache,
+  currentTime,
+  layer,
+  map,
+  managedState,
+  metrics,
+  presentation,
+  requestRedraw,
+  transform,
+  visibleTileBounds,
+}: {
+  cache: TextureCache;
+  currentTime: number;
+  layer: Container;
+  map: GameMap;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  presentation: PatronWardPresentationState | null;
+  requestRedraw?: () => void;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  if (!presentation) {
+    return;
+  }
+
+  for (const ward of presentation.wards) {
+    const visualObject = map.visualObjects?.find(
+      (candidate) => candidate.id === ward.visualObjectId,
+    );
+
+    if (!visualObject || !isMapVisualObjectInTileBounds(visualObject, visibleTileBounds)) {
+      continue;
+    }
+
+    const propAlpha = ward.completed
+      ? getPatronWardFadeOpacity(ward.propFadeStartedAtMs, currentTime)
+      : 1;
+
+    if (propAlpha <= 0) {
+      continue;
+    }
+
+    const objectPosition = toFullPosition(ward.position, transform);
+    const bottomPosition = {
+      x: objectPosition.x,
+      y: objectPosition.y + transform.cellPixelSize / 2,
+    };
+
+    if (!ward.completed) {
+      drawManagedImageSprite({
+        anchorX: 0.5,
+        anchorY: 1,
+        cache,
+        height: 128,
+        key: `patron-ward-aura:${ward.id}`,
+        layer,
+        managedState,
+        metrics,
+        position: bottomPosition,
+        requestRedraw,
+        src: getPatronAuraFrameSrc(currentTime),
+        width: 128,
+      });
+    }
+
+    drawManagedImageSprite({
+      alpha: propAlpha,
+      anchorX: visualObject.anchorX ?? 0.5,
+      anchorY: visualObject.anchorY ?? 1,
+      cache,
+      height: visualObject.heightCells * transform.cellPixelSize,
+      key: `patron-ward-prop:${ward.id}`,
+      layer,
+      managedState,
+      metrics,
+      position: bottomPosition,
+      requestRedraw,
+      src: MAP_VISUAL_OBJECT_SRC[visualObject.visualId],
+      width: visualObject.widthCells * transform.cellPixelSize,
+    });
+  }
+}
+
+function drawPatronDefenderAuras({
+  warmasterAttempt,
+  cache,
+  currentTime,
+  entities,
+  layer,
+  managedState,
+  metrics,
+  requestRedraw,
+  transform,
+  visibleTileBounds,
+}: {
+  warmasterAttempt?: WarmasterAttempt;
+  cache: TextureCache;
+  currentTime: number;
+  entities: GameEntity[];
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  requestRedraw?: () => void;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  for (const entity of entities) {
+    if (
+      entity.kind !== "enemy" ||
+      !(entity.questSpawn?.patronAura === true || entity.enemyTypeId === "orc_warmaster" || (warmasterAttempt && isInsideWarmasterArena(entity.position) && ["orc", "orc_raider", "orc_shieldbearer"].includes(entity.enemyTypeId ?? ""))) ||
+      entity.state === "dead" ||
+      !isAuraVisible(entity.position, 4 * (entity.combatSizeMultiplier ?? 1), visibleTileBounds)
+    ) {
+      continue;
+    }
+
+    const position = toFullPosition(entity.position, transform);
+
+    drawManagedImageSprite({
+      anchorX: 0.5,
+      anchorY: 1,
+      cache,
+      height: 128 * (entity.combatSizeMultiplier ?? 1),
+      key: `patron-defender-aura:${entity.id}`,
+      layer,
+      managedState,
+      metrics,
+      position: {
+        x: position.x,
+        y: position.y + transform.cellPixelSize / 2,
+      },
+      requestRedraw,
+      src: getPatronAuraFrameSrc(currentTime),
+      width: 128 * (entity.combatSizeMultiplier ?? 1),
+    });
+  }
+  const boss = entities.find(entity => entity.id === warmasterAttempt?.bossId);
+  if (!boss || boss.state === "dead") return;
+  for (const transfer of warmasterAttempt?.transfers ?? []) {
+    if (currentTime >= transfer.arrivesAt) continue;
+    const position = getPatronTransferPosition(transfer, boss.position, currentTime);
+    if (!isAuraVisible(position, 4, visibleTileBounds)) continue;
+    const pixel = toFullPosition(position, transform);
+    drawManagedImageSprite({ anchorX: 0.5, anchorY: 1, cache, height: 128, width: 128, key: `patron-transfer:${transfer.id}`, layer, managedState, metrics, position: { x: pixel.x, y: pixel.y + transform.cellPixelSize / 2 }, requestRedraw, src: getPatronAuraFrameSrc(currentTime) });
+  }
+}
+
+function drawPatronBarrier(
+  graphics: Graphics,
+  presentation: PatronWardPresentationState | null,
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  const barrier = presentation?.barrier;
+
+  if (
+    !barrier ||
+    barrier.center.x + barrier.radius < visibleTileBounds.minX ||
+    barrier.center.x - barrier.radius > visibleTileBounds.maxX ||
+    barrier.center.y + barrier.radius < visibleTileBounds.minY ||
+    barrier.center.y - barrier.radius > visibleTileBounds.maxY
+  ) {
+    return;
+  }
+
+  const opacity = getPatronFinaleOpacity(
+    barrier.finaleStartedAtMs,
+    currentTime,
+    PATRON_BARRIER_FADE_DURATION_MS,
+  );
+
+  if (opacity <= 0) {
+    return;
+  }
+
+  const center = toFullPosition(barrier.center, transform);
+  const pulse = 0.88 + Math.sin(currentTime / 240) * 0.12;
+
+  graphics
+    .circle(center.x, center.y, barrier.radius * transform.cellPixelSize)
+    .fill({ color: 0x052e16, alpha: 0.28 * opacity * pulse })
+    .stroke({ color: 0x22c55e, alpha: 0.82 * opacity * pulse, width: 4 });
+}
+
+function drawPatronWarmasterScene({
+  cache,
+  currentTime,
+  graphics,
+  layer,
+  managedState,
+  metrics,
+  presentation,
+  renderSize,
+  requestRedraw,
+  speechBubbleAvoidanceRects,
+  transform,
+  visibleTileBounds,
+}: {
+  cache: TextureCache;
+  currentTime: number;
+  graphics: Graphics;
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  presentation: PatronWardPresentationState | null;
+  renderSize: RenderSize;
+  requestRedraw?: () => void;
+  speechBubbleAvoidanceRects: readonly ViewportRect[];
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  const warmaster = presentation?.warmaster;
+
+  if (!warmaster || !isPositionInTileBounds(warmaster.position, visibleTileBounds)) {
+    return;
+  }
+
+  const alpha = getPatronFinaleOpacity(
+    warmaster.finaleStartedAtMs,
+    currentTime,
+    PATRON_WARMASTER_SCENE_FADE_DURATION_MS,
+  );
+
+  if (alpha <= 0) {
+    return;
+  }
+
+  const position = toFullPosition(warmaster.position, transform);
+  const bottomPosition = {
+    x: position.x,
+    y: position.y + transform.cellPixelSize / 2,
+  };
+
+  drawManagedImageSprite({
+    alpha,
+    anchorX: 0.5,
+    anchorY: 1,
+    cache,
+    height: 128,
+    key: "patron-warmaster-scene",
+    layer,
+    managedState,
+    metrics,
+    position: bottomPosition,
+    requestRedraw,
+    src: REGIONAL_ENEMY_SPRITE_SRC.orcWarmaster,
+    width: 128,
+  });
+  drawManagedFeedbackText({
+    alpha,
+    color: aggressiveEnemyNameplateColor,
+    fontSize: 12,
+    key: "patron-warmaster-name",
+    layer,
+    managedState,
+    metrics,
+    position: { x: position.x, y: bottomPosition.y + 12 },
+    strokeColor: 0x020617,
+    strokeWidth: 4,
+    text: "Orc Warmaster",
+  });
+
+  if (
+    warmaster.speech &&
+    isPatronWarmasterSpeechVisible(warmaster.finaleStartedAtMs, currentTime)
+  ) {
+    const bubbleWidth = Math.min(380, Math.max(1, renderSize.width - 16));
+    const bubbleHeight = 40;
+    const layout = getNpcSpeechBubbleLayout({
+      avoidanceRects: speechBubbleAvoidanceRects,
+      bubbleHeight,
+      bubbleWidth,
+      renderHeight: renderSize.height,
+      renderWidth: renderSize.width,
+      speakerBottomY: bottomPosition.y,
+      speakerTopY: bottomPosition.y - 128,
+      speakerX: position.x,
+    });
+
+    graphics
+      .poly([
+        layout.tailBaseLeftX,
+        layout.tailBaseY,
+        layout.tailBaseRightX,
+        layout.tailBaseY,
+        layout.tailPointX,
+        layout.tailPointY,
+      ])
+      .fill(npcSpeechBackgroundColor)
+      .stroke({ color: npcSpeechBorderColor, width: 3 });
+    graphics
+      .roundRect(
+        layout.bubbleX,
+        layout.bubbleY,
+        bubbleWidth,
+        bubbleHeight,
+        8,
+      )
+      .fill(npcSpeechBackgroundColor)
+      .stroke({ color: npcSpeechBorderColor, width: 3 });
+    drawManagedFeedbackText({
+      color: npcSpeechTextColor,
+      fontSize: npcSpeechFontSize,
+      key: "patron-warmaster-speech",
+      layer,
+      managedState,
+      metrics,
+      position: {
+        x: layout.bubbleX + bubbleWidth / 2,
+        y: layout.bubbleY + bubbleHeight / 2,
+      },
+      strokeColor: npcSpeechBackgroundColor,
+      strokeWidth: 0,
+      text: warmaster.speech,
+    });
+  }
+}
+
+function drawPatronWardLabels({
+  layer,
+  managedState,
+  metrics,
+  presentation,
+  transform,
+  visibleTileBounds,
+}: {
+  layer: Container;
+  managedState: ManagedRendererState;
+  metrics: PixiDrawMetrics;
+  presentation: PatronWardPresentationState | null;
+  transform: FullTransform;
+  visibleTileBounds: TileBounds;
+}) {
+  for (const ward of presentation?.wards ?? []) {
+    if (!ward.label || !isPositionInTileBounds(ward.position, visibleTileBounds)) {
+      continue;
+    }
+
+    const position = toFullPosition(ward.position, transform);
+
+    drawManagedFeedbackText({
+      color: 0x86efac,
+      fontSize: 12,
+      key: `patron-ward-label:${ward.id}`,
+      layer,
+      managedState,
+      metrics,
+      position: {
+        x: position.x,
+        y: position.y - transform.cellPixelSize * 4,
+      },
+      strokeColor: 0x052e16,
+      strokeWidth: 4,
+      text: ward.label,
+    });
+  }
+}
+
+function getPatronAuraFrameSrc(currentTime: number): string {
+  const frameIndex =
+    Math.floor(currentTime / PATRON_AURA_FRAME_DURATION_MS) %
+    patronAuraFrameSrcs.length;
+
+  return patronAuraFrameSrcs[frameIndex];
 }
 
 function drawFullEntities({
@@ -5556,6 +6002,7 @@ function drawFullEntities({
 
   for (const entity of sortedByY) {
     if (
+      entity.kind === "structure" ||
       !shouldRenderEntity(entity) ||
       !isPositionInTileBounds(entity.position, visibleTileBounds)
     ) {
@@ -5586,7 +6033,7 @@ function drawFullEntities({
     });
     const spritePosition = {
       x: entityPosition.x,
-      y: entityPosition.y + transform.cellPixelSize / 2,
+      y: entityPosition.y + transform.cellPixelSize / 2 - (entity.id === WARMASTER_CAPTIVE_ID ? transform.cellPixelSize * 0.4 : 0),
     };
 
     if (entity.kind === "enemy" && isSuperiorEnemy(entity)) {
@@ -5729,7 +6176,7 @@ function drawEnemyDashAfterimages({
 
     const visualAsset = getEntityVisualAsset(caster, map.id);
     const layout = getEntitySpriteLayout(
-      caster,
+      { ...caster, combatSizeMultiplier: dash.bodyScale ?? caster.combatSizeMultiplier },
       transform.cellPixelSize,
       visualAsset,
     );
@@ -6067,7 +6514,7 @@ function drawPreviewMap(
   }
 
   for (const entity of entities) {
-    if (!shouldRenderEntity(entity)) {
+    if (entity.kind === "structure" || !shouldRenderEntity(entity)) {
       continue;
     }
 
@@ -6152,6 +6599,10 @@ function drawFullMap({
   movementClickFeedbackEvents,
   onPerformanceSample,
   partyIntent,
+  patronWardPresentation,
+  warmasterAttempt,
+  warmasterLifecycle,
+  barracksById,
   questEntityIndicators,
   questObjectiveMarkers,
   questGiverHasWork,
@@ -6159,6 +6610,7 @@ function drawFullMap({
   renderSize,
   resurrectionProgressByCompanionId,
   showDebugOverlays,
+  speechBubbleAvoidanceRects,
   skillBindsByEnemyId,
   skillMarksByEnemyId,
   skillShieldBlocksById,
@@ -6191,6 +6643,10 @@ function drawFullMap({
   movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   onPerformanceSample?: (sample: PixiRendererPerformanceSample) => void;
   partyIntent: PartyIntent | null;
+  patronWardPresentation: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
+  warmasterLifecycle?: WarmasterLifecycle;
+  barracksById: Record<string, BarrackRuntime>;
   questEntityIndicators: QuestEntityIndicator[];
   questObjectiveMarkers: QuestObjectiveMarker[];
   questGiverHasWork: boolean;
@@ -6198,6 +6654,7 @@ function drawFullMap({
   renderSize: RenderSize;
   resurrectionProgressByCompanionId: Record<string, ResurrectionProgressState>;
   showDebugOverlays: boolean;
+  speechBubbleAvoidanceRects: readonly ViewportRect[];
   skillBindsByEnemyId: Record<string, SkillBindState>;
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
@@ -6264,6 +6721,19 @@ function drawFullMap({
     requestRedraw,
     transform,
     visibleTileBounds,
+    entities,
+  });
+  drawPatronWardObjects({
+    cache: textureCache,
+    currentTime,
+    layer: layers.objectLayer,
+    map,
+    managedState,
+    metrics,
+    presentation: patronWardPresentation,
+    requestRedraw,
+    transform,
+    visibleTileBounds,
   });
   drawFullMapObjects({
     cache: textureCache,
@@ -6298,6 +6768,18 @@ function drawFullMap({
     visibleTileBounds,
     visualMovementByEntityId,
   });
+  drawPatronDefenderAuras({
+    warmasterAttempt,
+    cache: textureCache,
+    currentTime,
+    entities,
+    layer: layers.auraLayer,
+    managedState,
+    metrics,
+    requestRedraw,
+    transform,
+    visibleTileBounds,
+  });
   drawFullEntities({
     cache: textureCache,
     combatFeedbackEvents,
@@ -6313,6 +6795,46 @@ function drawFullMap({
     transform,
     visibleTileBounds,
     visualMovementByEntityId,
+  });
+  drawPatronBarrier(
+    effectsGraphics,
+    patronWardPresentation,
+    currentTime,
+    transform,
+    visibleTileBounds,
+  );
+  if (map.id === "map-7" && warmasterLifecycle) {
+    if (["recharging", "reset_pending"].includes(warmasterLifecycle.phase)) {
+      drawPatronBarrier(effectsGraphics, { barrier: { center: ORC_WARCAMP_GATE_POSITION, radius: MAP_SEVEN_ARENA_GATE_RADIUS }, warmaster: null, wards: [] }, currentTime, transform, visibleTileBounds);
+      if (isPositionInTileBounds(ORC_WARCAMP_GATE_POSITION, visibleTileBounds)) {
+        const pixel = toFullPosition(ORC_WARCAMP_GATE_POSITION, transform);
+        drawManagedFeedbackText({ color: 0x86efac, fontSize: 12, key: "warmaster-recharge", layer: layers.effectsLayer, managedState, metrics,
+          position: { x: pixel.x, y: pixel.y - 35 }, text: `Orc defeats: ${warmasterLifecycle.recharge}/${WARMASTER_RECHARGE_KILLS}` });
+      }
+    }
+    const cage = getWarmasterCageVisual(warmasterLifecycle.rescued);
+    if (isMapVisualObjectInTileBounds(cage, visibleTileBounds)) {
+      const pixel = toFullPosition(cage.position, transform);
+      drawManagedImageSprite({ anchorX: 0.5, anchorY: 1, cache: textureCache,
+        height: cage.heightCells * cellPixelSize, width: cage.widthCells * cellPixelSize,
+        key: cage.id, layer: layers.effectsLayer, managedState, metrics,
+        position: { x: pixel.x, y: pixel.y + cellPixelSize / 2 }, requestRedraw,
+        src: MAP_VISUAL_OBJECT_SRC[cage.visualId] });
+    }
+  }
+  drawPatronWarmasterScene({
+    cache: textureCache,
+    currentTime,
+    graphics: effectsGraphics,
+    layer: layers.effectsLayer,
+    managedState,
+    metrics,
+    presentation: patronWardPresentation,
+    renderSize,
+    requestRedraw,
+    speechBubbleAvoidanceRects,
+    transform,
+    visibleTileBounds,
   });
   drawFortifyingAuraOutlines(
     effectsGraphics,
@@ -6345,6 +6867,7 @@ function drawFullMap({
     transform,
     visibleTileBounds,
   );
+  drawCompanionSkillAreas(effectsGraphics, skillVisualEvents, currentTime, transform, visibleTileBounds);
   drawFullEffects({
     cache: textureCache,
     combatFeedbackEvents,
@@ -6515,6 +7038,7 @@ function drawFullMap({
   );
 
   drawEntityOverheadUiPass({
+    warmasterAttempt,
     currentTime,
     enemyAbilityCastsByEnemyId,
     entities,
@@ -6525,6 +7049,38 @@ function drawFullMap({
     questEntityIndicators,
     statusPresentationTime,
     statusEffectsById,
+    transform,
+    visibleTileBounds,
+  });
+  for (const entity of entities) {
+    if (entity.kind !== "structure" || entity.health <= 0) continue;
+    const visual = map.visualObjects?.find(object => object.id === entity.id);
+    if (!visual || !isMapVisualObjectInTileBounds(visual, visibleTileBounds)) continue;
+    const runtime = barracksById[entity.id];
+    const center = toFullPosition(entity.position, transform);
+    const width = visual.widthCells * cellPixelSize;
+    const height = visual.heightCells * cellPixelSize;
+    const x = center.x - width / 2;
+    const y = center.y + cellPixelSize / 2 - height;
+    const pulse = 0.35 + Math.sin(currentTime / 240) * 0.15;
+    overlayGraphics.roundRect(x, y, width, height, 6).stroke({ color: 0xef4444, alpha: pulse, width: visual.widthCells > 3 ? 3 : 2 });
+    overlayGraphics.rect(x, y - 12, width, 6).fill(0x450a0a);
+    overlayGraphics.rect(x, y - 12, width * entity.health / entity.maxHealth, 6).fill(0xef4444);
+    if (runtime?.wasInRange && runtime.preparationMs > 0) {
+      overlayGraphics.rect(x, y - 4, width, 4).fill(0x422006);
+      overlayGraphics.rect(x, y - 4, width * runtime.preparationMs / BARRACK_PREPARATION_MS, 4).fill(0xfbbf24);
+    }
+    if ((runtime?.hintExpiresAtMs ?? 0) > currentTime) {
+      drawManagedFeedbackText({ color: 0xfef08a, fontSize: 12, key: `barrack-hint:${entity.id}`,
+        layer: layers.effectsLayer, managedState, metrics,
+        position: { x: center.x, y: center.y + cellPixelSize }, text: "Click the Barrack to attack it" });
+    }
+  }
+  drawPatronWardLabels({
+    layer: layers.effectsLayer,
+    managedState,
+    metrics,
+    presentation: patronWardPresentation,
     transform,
     visibleTileBounds,
   });
@@ -6557,6 +7113,7 @@ function drawFullMap({
 }
 
 function drawNpcSpeechLayer({
+  avoidanceRects,
   cameraOffset,
   cellPixelSize,
   currentTime,
@@ -6568,6 +7125,7 @@ function drawNpcSpeechLayer({
   renderSize,
   speech,
 }: {
+  avoidanceRects: readonly ViewportRect[];
   cameraOffset: Position;
   cellPixelSize: number;
   currentTime: number;
@@ -6581,8 +7139,7 @@ function drawNpcSpeechLayer({
 }): boolean {
   const speaker = speech
     ? entities.find(
-        (entity): entity is NpcEntity =>
-          entity.id === speech.npcId && entity.kind === "npc",
+        (entity) => entity.id === speech.npcId && isWorldSpeechSpeaker(entity),
       )
     : null;
 
@@ -6607,7 +7164,9 @@ function drawNpcSpeechLayer({
   const transform: FullTransform = { cameraOffset, cellPixelSize };
   const entityPosition = toFullPosition(speaker.position, transform);
   const visualAsset = getEntityVisualAsset(speaker, map.id);
-  const spriteLayout = getEntitySpriteLayout(
+  const spriteLayout = speaker.kind === "structure"
+    ? { height: (map.visualObjects?.find(object => object.id === speaker.id)?.heightCells ?? 3) * cellPixelSize, anchorY: 1 }
+    : getEntitySpriteLayout(
     speaker,
     cellPixelSize,
     visualAsset,
@@ -6628,6 +7187,7 @@ function drawNpcSpeechLayer({
     cellPixelSize,
     renderSize.width,
     renderSize.height,
+    getViewportRectsSignature(avoidanceRects),
     map.id ?? map.debugName,
   ].join("|");
   let didChange = false;
@@ -6670,6 +7230,7 @@ function drawNpcSpeechLayer({
     );
     const bubbleHeight = Math.ceil(label.height) + npcSpeechVerticalPadding * 2;
     const layout = getNpcSpeechBubbleLayout({
+      avoidanceRects,
       bubbleHeight,
       bubbleWidth,
       renderHeight: renderSize.height,
@@ -6756,6 +7317,10 @@ function drawWorld({
   navigationClickAccessibility,
   onPerformanceSample,
   partyIntent,
+  patronWardPresentation,
+  warmasterAttempt,
+  warmasterLifecycle,
+  barracksById,
   fullHadTimedWorkRef,
   fullSignatureRef,
   lastDrawnTextureRevisionRef,
@@ -6767,6 +7332,7 @@ function drawWorld({
   renderSize,
   resurrectionProgressByCompanionId,
   showDebugOverlays,
+  speechBubbleAvoidanceRects,
   skillBindsByEnemyId,
   skillMarksByEnemyId,
   skillShieldBlocksById,
@@ -6794,6 +7360,10 @@ function drawWorld({
       entities,
       movementClickFeedbackEvents,
       mode,
+      patronWardPresentation,
+      warmasterAttempt,
+      warmasterLifecycle,
+      barracksById,
       skillBindsByEnemyId,
       skillMarksByEnemyId,
       skillShieldBlocksById,
@@ -6802,7 +7372,8 @@ function drawWorld({
       statusEffectsById,
       visualMovementByEntityId,
     });
-    const fullSignature = getFullRenderSignature({
+    const fullSignature = `${getFullRenderSignature({
+      barracksById,
       activeTeleport,
       cameraOffset,
       cellPixelSize,
@@ -6833,7 +7404,11 @@ function drawWorld({
       suppressMovePoiRing,
       teleportWorkingById,
       visualMovementByEntityId,
-    });
+    })}|patron:${getPatronWardPresentationSignature(
+      patronWardPresentation,
+    )}|warmaster:${JSON.stringify(warmasterAttempt)}|lifecycle:${JSON.stringify(warmasterLifecycle)}|speech-avoidance:${getViewportRectsSignature(
+      speechBubbleAvoidanceRects,
+    )}`;
 
     const textureRevision = textureCache.textureRevision;
 
@@ -6874,6 +7449,10 @@ function drawWorld({
       movementClickFeedbackEvents,
       onPerformanceSample,
       partyIntent,
+      patronWardPresentation,
+      warmasterAttempt,
+      warmasterLifecycle,
+      barracksById,
       questEntityIndicators,
       questObjectiveMarkers,
       questGiverHasWork,
@@ -6881,6 +7460,7 @@ function drawWorld({
       renderSize,
       resurrectionProgressByCompanionId,
       showDebugOverlays,
+      speechBubbleAvoidanceRects,
       skillBindsByEnemyId,
       skillMarksByEnemyId,
       skillShieldBlocksById,
@@ -6961,6 +7541,10 @@ function hasActiveTimedRendererWork({
   entities,
   movementClickFeedbackEvents,
   mode,
+  patronWardPresentation,
+  warmasterAttempt,
+  warmasterLifecycle,
+  barracksById,
   skillBindsByEnemyId,
   skillMarksByEnemyId,
   skillShieldBlocksById,
@@ -6981,6 +7565,10 @@ function hasActiveTimedRendererWork({
   entities: GameEntity[];
   movementClickFeedbackEvents: MovementClickFeedbackEvent[];
   mode: PixiRendererMode;
+  patronWardPresentation: PatronWardPresentationState | null;
+  warmasterAttempt?: WarmasterAttempt;
+  warmasterLifecycle?: WarmasterLifecycle;
+  barracksById: Record<string, BarrackRuntime>;
   skillBindsByEnemyId: Record<string, SkillBindState>;
   skillMarksByEnemyId: Record<string, SkillMarkState>;
   skillShieldBlocksById: Record<string, SkillShieldBlockState>;
@@ -6999,6 +7587,27 @@ function hasActiveTimedRendererWork({
 
   return (
     Boolean(activeTeleport) ||
+    Boolean(warmasterAttempt) ||
+    Object.values(barracksById).some(runtime => runtime.speech && runtime.speech.expiresAt > currentTime) ||
+    (warmasterLifecycle !== undefined && ["recharging", "reset_pending"].includes(warmasterLifecycle.phase)) ||
+    entities.some(entity => entity.kind === "structure" && (barracksById[entity.id]?.health ?? entity.health) > 0) ||
+    Boolean(
+      patronWardPresentation?.barrier ||
+        patronWardPresentation?.wards.some(
+          (ward) =>
+            !ward.completed ||
+            getPatronWardFadeOpacity(
+              ward.propFadeStartedAtMs,
+              currentTime,
+            ) > 0,
+        ) ||
+        entities.some(
+          (entity) =>
+            entity.kind === "enemy" &&
+            entity.questSpawn?.patronAura === true &&
+            entity.state !== "dead",
+        ),
+    ) ||
     hasActiveMovementClickFeedback ||
     combatProjectiles.length > 0 ||
     combatFeedbackEvents.some((event) => event.expiresAt > currentTime) ||
@@ -7044,6 +7653,21 @@ function hasActiveTimedRendererWork({
   );
 }
 
+function getPatronWardPresentationSignature(
+  presentation: PatronWardPresentationState | null,
+): string {
+  return presentation ? JSON.stringify(presentation) : "none";
+}
+
+function getViewportRectsSignature(rects: readonly ViewportRect[]): string {
+  return rects
+    .map(
+      (rect) =>
+        `${rect.x.toFixed(1)},${rect.y.toFixed(1)},${rect.width.toFixed(1)},${rect.height.toFixed(1)}`,
+    )
+    .join("|");
+}
+
 export function PixiWorldRenderer({
   activeTeleport = null,
   cameraOffset = { x: 0, y: 0 },
@@ -7070,14 +7694,21 @@ export function PixiWorldRenderer({
   onFloorClick,
   onNpcClick,
   onPerformanceSample,
+  onViewportRectChange,
   onCursorPositionChange,
+  onPatronWardClick,
   onResourceClick,
   partyIntent = null,
+  patronWardPresentation = null,
+  warmasterAttempt,
+  warmasterLifecycle,
+  barracksById = {},
   questEntityIndicators = [],
   questObjectiveMarkers = [],
   resurrectionProgressByCompanionId = {},
   questGiverHasWork = false,
   showDebugOverlays = false,
+  speechBubbleAvoidanceRects = [],
   skillBindsByEnemyId = {},
   skillMarksByEnemyId = {},
   skillShieldBlocksById = {},
@@ -7137,6 +7768,10 @@ export function PixiWorldRenderer({
   const latestModeRef = useRef(mode);
   const latestOnPerformanceSampleRef = useRef(onPerformanceSample);
   const latestPartyIntentRef = useRef<PartyIntent | null>(partyIntent);
+  const latestPatronWardPresentationRef = useRef(patronWardPresentation);
+  const latestWarmasterAttemptRef = useRef(warmasterAttempt);
+  const latestWarmasterLifecycleRef = useRef(warmasterLifecycle);
+  const latestBarracksByIdRef = useRef(barracksById);
   const latestQuestEntityIndicatorsRef = useRef(questEntityIndicators);
   const latestQuestObjectiveMarkersRef = useRef(questObjectiveMarkers);
   const latestQuestGiverHasWorkRef = useRef(questGiverHasWork);
@@ -7146,6 +7781,9 @@ export function PixiWorldRenderer({
     resurrectionProgressByCompanionId,
   );
   const latestShowDebugOverlaysRef = useRef(showDebugOverlays);
+  const latestSpeechBubbleAvoidanceRectsRef = useRef(
+    speechBubbleAvoidanceRects,
+  );
   const latestSkillBindsByEnemyIdRef = useRef(skillBindsByEnemyId);
   const latestSkillMarksByEnemyIdRef = useRef(skillMarksByEnemyId);
   const latestSkillShieldBlocksByIdRef = useRef(skillShieldBlocksById);
@@ -7171,6 +7809,45 @@ export function PixiWorldRenderer({
     () => [...entities].sort((first, second) => first.id.localeCompare(second.id)),
     [entities],
   );
+
+  useEffect(() => {
+    if (!onViewportRectChange) {
+      return;
+    }
+
+    const host = hostRef.current;
+
+    if (!host) {
+      onViewportRectChange(null);
+      return;
+    }
+    const measuredHost = host;
+
+    function reportBounds() {
+      const bounds = measuredHost.getBoundingClientRect();
+
+      onViewportRectChange?.({
+        x: bounds.left,
+        y: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      });
+    }
+
+    reportBounds();
+    window.addEventListener("resize", reportBounds);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(reportBounds);
+    resizeObserver?.observe(measuredHost);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", reportBounds);
+      onViewportRectChange(null);
+    };
+  }, [onViewportRectChange]);
 
   useEffect(() => {
     latestActiveTeleportRef.current = activeTeleport;
@@ -7202,6 +7879,10 @@ export function PixiWorldRenderer({
     latestModeRef.current = mode;
     latestOnPerformanceSampleRef.current = onPerformanceSample;
     latestPartyIntentRef.current = partyIntent;
+    latestPatronWardPresentationRef.current = patronWardPresentation;
+    latestWarmasterAttemptRef.current = warmasterAttempt;
+    latestWarmasterLifecycleRef.current = warmasterLifecycle;
+    latestBarracksByIdRef.current = barracksById;
     latestQuestEntityIndicatorsRef.current = questEntityIndicators;
     latestQuestObjectiveMarkersRef.current = questObjectiveMarkers;
     latestQuestGiverHasWorkRef.current = questGiverHasWork;
@@ -7210,6 +7891,7 @@ export function PixiWorldRenderer({
     latestResurrectionProgressByCompanionIdRef.current =
       resurrectionProgressByCompanionId;
     latestShowDebugOverlaysRef.current = showDebugOverlays;
+    latestSpeechBubbleAvoidanceRectsRef.current = speechBubbleAvoidanceRects;
     latestSkillBindsByEnemyIdRef.current = skillBindsByEnemyId;
     latestSkillMarksByEnemyIdRef.current = skillMarksByEnemyId;
     latestSkillShieldBlocksByIdRef.current = skillShieldBlocksById;
@@ -7239,12 +7921,17 @@ export function PixiWorldRenderer({
     npcSpeech,
     onPerformanceSample,
     partyIntent,
+    patronWardPresentation,
+    warmasterAttempt,
+    warmasterLifecycle,
+    barracksById,
     questEntityIndicators,
     questObjectiveMarkers,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,
     showDebugOverlays,
+    speechBubbleAvoidanceRects,
     skillBindsByEnemyId,
     skillMarksByEnemyId,
     skillShieldBlocksById,
@@ -7283,6 +7970,7 @@ export function PixiWorldRenderer({
     const app = new Application();
     const stage = new Container();
     const layers: PixiRenderLayers = {
+      auraLayer: new Container(),
       backgroundGraphics: new Graphics(),
       entityLayer: new Container(),
       effectsLayer: new Container(),
@@ -7316,6 +8004,10 @@ export function PixiWorldRenderer({
         movementClickFeedbackEvents:
           latestMovementClickFeedbackEventsRef.current,
         mode: latestModeRef.current,
+        patronWardPresentation: latestPatronWardPresentationRef.current,
+        warmasterAttempt: latestWarmasterAttemptRef.current,
+        warmasterLifecycle: latestWarmasterLifecycleRef.current,
+        barracksById: latestBarracksByIdRef.current,
         skillBindsByEnemyId: latestSkillBindsByEnemyIdRef.current,
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
@@ -7368,6 +8060,10 @@ export function PixiWorldRenderer({
           latestNavigationClickAccessibilityRef.current,
         onPerformanceSample: latestOnPerformanceSampleRef.current,
         partyIntent: latestPartyIntentRef.current,
+        patronWardPresentation: latestPatronWardPresentationRef.current,
+        warmasterAttempt: latestWarmasterAttemptRef.current,
+        warmasterLifecycle: latestWarmasterLifecycleRef.current,
+        barracksById: latestBarracksByIdRef.current,
         fullHadTimedWorkRef,
         fullSignatureRef,
         lastDrawnTextureRevisionRef,
@@ -7380,6 +8076,8 @@ export function PixiWorldRenderer({
         resurrectionProgressByCompanionId:
           latestResurrectionProgressByCompanionIdRef.current,
         showDebugOverlays: latestShowDebugOverlaysRef.current,
+        speechBubbleAvoidanceRects:
+          latestSpeechBubbleAvoidanceRectsRef.current,
         skillBindsByEnemyId: latestSkillBindsByEnemyIdRef.current,
         skillMarksByEnemyId: latestSkillMarksByEnemyIdRef.current,
         skillShieldBlocksById: latestSkillShieldBlocksByIdRef.current,
@@ -7403,6 +8101,7 @@ export function PixiWorldRenderer({
         mode: latestModeRef.current,
         renderSize: latestRenderSizeRef.current,
         speech: latestNpcSpeechRef.current,
+        avoidanceRects: latestSpeechBubbleAvoidanceRectsRef.current,
       });
       if (didDrawWorld || didDrawSpeech) {
         appRef.current?.render();
@@ -7465,6 +8164,7 @@ export function PixiWorldRenderer({
       stage.addChild(layers.floorLayer);
       stage.addChild(layers.wallLayer);
       stage.addChild(layers.objectLayer);
+      stage.addChild(layers.auraLayer);
       stage.addChild(layers.entityLayer);
       stage.addChild(layers.fallbackGraphics);
       stage.addChild(layers.effectsGraphics);
@@ -7541,11 +8241,13 @@ export function PixiWorldRenderer({
     onPerformanceSample,
     partyIntent,
     questEntityIndicators,
+    warmasterAttempt,
     questObjectiveMarkers,
     questGiverHasWork,
     renderSize,
     resurrectionProgressByCompanionId,
     showDebugOverlays,
+    speechBubbleAvoidanceRects,
     skillBindsByEnemyId,
     skillMarksByEnemyId,
     skillShieldBlocksById,
@@ -7719,7 +8421,7 @@ export function PixiWorldRenderer({
       return;
     }
 
-    if (target?.kind === "enemy") {
+    if (target?.kind === "enemy" || target?.kind === "structure") {
       onCompanionDragCommand({
         type: "attack",
         companionId: dragState.companionId,
@@ -7783,6 +8485,23 @@ export function PixiWorldRenderer({
         cellPixelSize,
       },
     );
+    const patronWard = patronWardPresentation?.wards
+      .filter((ward) => ward.isInteractable)
+      .map((ward) => ({
+        ward,
+        distance: Math.hypot(
+          ward.position.x - mapPosition.x,
+          ward.position.y - mapPosition.y,
+        ),
+      }))
+      .filter((candidate) => candidate.distance <= 2.5)
+      .sort((first, second) => first.distance - second.distance)[0]?.ward;
+
+    if (patronWard) {
+      onPatronWardClick?.(patronWard.id);
+      return;
+    }
+
     const entity = getNearestInteractableEntity({
       cellPixelSize,
       entities: sortedEntities,
@@ -7800,7 +8519,7 @@ export function PixiWorldRenderer({
       return;
     }
 
-    if (entity?.kind === "enemy") {
+    if (entity?.kind === "enemy" || entity?.kind === "structure") {
       onEnemyClick?.(entity.id);
       return;
     }

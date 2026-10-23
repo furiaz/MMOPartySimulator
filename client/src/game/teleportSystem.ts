@@ -17,7 +17,6 @@ import { recordMapReachedForQuests } from "./questSystem";
 import { createActiveQuestGuideNpc } from "./questGuideSystem";
 import { isTeleportWorking } from "./teleportState";
 import {
-  companionIds,
   aoeTargetDummyId,
   aoeTargetDummyPosition,
   createDebugMapForQuestState,
@@ -42,11 +41,17 @@ import {
   targetDummyId,
   targetDummyPosition,
 } from "./debugMap";
-import { hasDeadPartyMembers } from "./partySystem";
+import {
+  getActiveCompanionsInPartyOrder,
+  hasDeadPartyMembers,
+} from "./partySystem";
 import {
   clearMapTransitionRuntimeState,
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
+import { preparePatronWardStateForMapExit } from "./patronWardSystem";
+import { requestWarmasterDeparture } from "./warmasterLifecycleState";
+import { answerWarmasterDeparture } from "./warmasterLifecycle";
 import { assignCurrentRoleBonuses } from "./roleBonus";
 import { getWorldTravelTeleportStatus } from "./worldTravelTeleports";
 import {
@@ -73,7 +78,8 @@ export type WorldTravelTeleportFailureReason =
   | "current_map"
   | "locked"
   | "active_transition"
-  | "recovery_active";
+  | "recovery_active"
+  | "unclaimed_chest";
 
 export type WorldTravelTeleportResult =
   | {
@@ -105,6 +111,9 @@ export function triggerMapTeleport(
   if (!isTeleportWorking(state, teleport.id)) {
     return appendTeleportSkippedEvent(state, "teleport_not_working", teleport.id);
   }
+
+  const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
+  if (guarded !== state) return guarded;
 
   const nextState = setTeleportMoveIntent(state, teleport, triggeredBy);
 
@@ -180,6 +189,9 @@ export function teleportWorldTravelDestination(
     };
   }
 
+  const guarded = requestWarmasterDeparture(state, { kind: "teleport", targetMapId });
+  if (guarded !== state) return { state: guarded, result: { status: "failed", targetMapId, reason: "unclaimed_chest" } };
+
   const teleport: ActiveTeleport = {
     id: `world-travel-teleport-to-${targetMapId}`,
     position: status.arrivalPositions[0] ?? { x: 0, y: 0 },
@@ -229,11 +241,23 @@ export function setMapTeleportPoi(
     : state;
 }
 
+export function resolveWarmasterDeparture(state: GameState, leave: boolean): GameState {
+  const departure = state.warmasterInteraction?.departure;
+  const next = answerWarmasterDeparture(state, leave);
+  if (!leave || !departure || departure.kind === "walk") return next;
+  const ready = { ...next, activeTeleport: null };
+  return departure.kind === "teleport"
+    ? teleportWorldTravelDestination(ready, departure.targetMapId).state
+    : triggerMapTeleport(ready, "player", departure.teleportId);
+}
+
 export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
   _nowMs = Date.now(),
 ): GameState {
+  void _nowMs;
+
   if (isAiTeleportPausedForResurrection(state)) {
     return state;
   }
@@ -423,6 +447,9 @@ function completeTeleport(state: GameState): GameState {
     return appendTeleportSkippedEvent(state, "teleport_definition_missing", teleport.id);
   }
 
+  const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
+  if (guarded !== state) return guarded;
+
   return completeTeleportWithDefinition(
     state,
     teleport,
@@ -437,15 +464,17 @@ function completeTeleportWithDefinition(
 ): GameState {
   const previousMapId = state.currentMapId;
   const previousMap = state.map;
+  const preparedState = preparePatronWardStateForMapExit(state);
   const sourceState = shouldResetSlimewardDungeonOnTeleport(teleport.id)
-    ? clearSlimewardDungeonRuntime(state)
-    : state;
+    ? clearSlimewardDungeonRuntime(preparedState)
+    : preparedState;
   const positionsBeforeTransition = getEntityPositions(sourceState.entities);
   const targetMap = createDebugMapForQuestState(
     teleport.targetMapId,
     sourceState.quests,
   );
-  const entities = getMapEntities(sourceState, targetMap);
+  const activeCompanions = getActiveCompanionsInPartyOrder(sourceState);
+  const entities = getMapEntities(sourceState, targetMap, activeCompanions);
   let nextState: GameState = {
     ...clearMapTransitionRuntimeState(sourceState),
     entities,
@@ -457,15 +486,15 @@ function completeTeleportWithDefinition(
     lastPoiDecision: undefined,
   };
 
-  for (const companionId of companionIds) {
-    const companion = nextState.entities[companionId];
+  for (const [index, activeCompanion] of activeCompanions.entries()) {
+    const companion = nextState.entities[activeCompanion.id];
 
     if (companion?.kind !== "companion") {
       continue;
     }
 
     const position =
-      teleportDefinition.arrivalPositions[companionIds.indexOf(companionId)] ??
+      teleportDefinition.arrivalPositions[index] ??
       teleportDefinition.arrivalPositions[0];
 
     nextState = updateEntity(nextState, {
@@ -526,8 +555,9 @@ function completeTeleportWithDefinition(
 function getMapEntities(
   state: GameState,
   map: GameMap,
+  activeCompanions: readonly Companion[],
 ): Record<string, GameEntity> {
-  const entities = getPreservedCompanions(state);
+  const entities = getPreservedCompanions(activeCompanions);
   const mapId = map.id ?? HUB_MAP_ID;
 
   if (
@@ -596,6 +626,7 @@ function getMapEntities(
       enemyTypeId: enemyStart.enemyTypeId,
       subzoneId: enemyStart.subzoneId,
       encounterAreaId: enemyStart.encounterAreaId,
+      encounterBand: enemyStart.encounterBand,
       variant,
       combatBodyRadius: enemyStart.combatBodyRadius,
       maxHealth: enemyStart.enemyTypeId === "azure_mass" ? 900 : undefined,
@@ -652,15 +683,13 @@ function appendSuperiorEnemySpawnEvents(
   return nextState;
 }
 
-function getPreservedCompanions(state: GameState): Record<string, GameEntity> {
+function getPreservedCompanions(
+  activeCompanions: readonly Companion[],
+): Record<string, GameEntity> {
   const entities: Record<string, GameEntity> = {};
 
-  for (const companionId of companionIds) {
-    const companion = state.entities[companionId];
-
-    if (companion?.kind === "companion") {
-      entities[companion.id] = companion;
-    }
+  for (const companion of activeCompanions) {
+    entities[companion.id] = companion;
   }
 
   return entities;

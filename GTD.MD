@@ -258,7 +258,7 @@ type NpcRole =
 
 `hubNpcAccess.ts` owns town-hub recognition, the functional hub NPC role allowlist, and current-map NPC-presence checks. Only `hub` and `hub-2` are current town hubs. Functional roles are `quest_giver`, `class_mentor`, `merchant`, `smith`, `bank_chest`, `guild_coordinator`, `tavern_keeper`, `farmer`, and `livestock_keeper`. Their interactions are available across the current town hub while the matching entity exists. `npcInteractionRange.ts` keeps numeric range fallback for excluded interactions such as dogs, quest guides, and dungeon chests.
 
-Supported character NPCs may display one transient, non-branching speech bubble after their interaction becomes available. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. Speech is not persisted and does not define simulation behavior.
+Supported character NPCs may display one transient, non-branching speech bubble after their interaction becomes available. React coordinates the transient speaker and timing state, a focused UI-presentation helper resolves role or quest-state text without mutating game state, and the PixiJS renderer owns bubble layout and drawing. React measures registered HUD regions such as the minimap and coordinate panel and passes viewport-space avoidance rectangles to the renderer. The shared pure layout helper tries centered-above, horizontally shifted, and below-speaker candidates, clamps the complete bubble inside the usable world viewport, chooses the least-overlapping candidate only as a constrained fallback, and keeps the tail directed toward the speaker. Ordinary NPC speech and the Orc Warmaster finale use this same layout; HUD layers remain above the world renderer. Speech is not persisted and does not define simulation behavior.
 
 NPCs do not implement branching dialogue, dialogue choices, conversation history, full shops beyond fixed prototype Merchant Buy stock, production crafting or smithing beyond current prototype Smith crafting, recruitment beyond current Guild Recruit helpers, relationship behavior, or general follower behavior.
 
@@ -631,6 +631,12 @@ Current reusable enemy ability runtime fields include:
 - `enemyAbilityCastsByEnemyId`
 - `enemyAbilityCooldownsByEnemyId`
 - `enemyAbilityBasicAttackRequiredByEnemyId`
+- `enemyDashesByEnemyId`
+
+Current forced-movement and Warmaster attempt runtime fields include:
+
+- `forcedMovementsByEntityId`
+- `warmasterAttempt`
 
 Current resurrection and recovery fields include:
 
@@ -695,6 +701,9 @@ Current save game behavior:
 - restore rebuilds the current debug map from saved quest state
 - restore applies Farm and Livestock catch-up through their capped production rules
 - save sanitization preserves valid shared inventory, bank, key item, wallet, quest, companion progression, companion equipment, companion flask assignment, Guild & Inn state, Farm state, Livestock state, world discovery state, pending offline loot, and teleport working state while dropping removed or invalid item IDs from saved item containers
+- save sanitization reconciles state-derived quest availability, rechecks active equipment objectives, and persists starter-contract acceptance with existing Notice Board progress
+- Board sanitization preserves valid stored objectives, counters, and reward rolls without refreshing or rerolling existing postings. After party and world discovery restoration, `restoreGuildNoticeBoard` explicitly migrates an untaken legacy starter once and processes at most one overdue refresh using the restored party. Taken/done legacy contracts retain their original requirements and rewards; available legacy ordinary postings remain until an actual refresh/reroll. Optional posting fields require no save-version bump.
+- legacy saves missing both new quest ids skip onboarding when The Azure Trial is already completed and any active or resting roster companion has a first class; otherwise they retain the onboarding flow and receive the dedicated starter contract without replacing saved Board slots
 - save sanitization resets transient runtime state such as active teleports, party intent, direct commands, interrupted POI state, movement caches, attack slots, combat feedback, combat projectiles, autonomous target suppressions, skill runtime, status-effect runtime, companion AoE runtime, enemy AoE channels, enemy AoE cooldowns, active reusable enemy ability casts, consumable use runtime, drop visuals, resurrection runtime, world-wipe recovery, health timing, target dummy timing, companion damage timing, short-lived news broadcasts, and debug telemetry
 - reusable enemy ability cooldowns are the focused exception to normal combat-cooldown clearing: sanitization preserves only known configured abilities with finite unexpired absolute expiration timestamps and preserves a valid required-basic-attack gate, while discarding malformed, expired, unknown-ability, and missing-enemy records
 - companion save sanitization keeps dead companions dead, returns living companions to idle or follow state, clears temporary consumable buffs, and sanitizes skill progression data
@@ -935,7 +944,9 @@ Companions store:
 skillBehavior: CompanionSkillBehavior;
 ```
 
-Current companion skill behavior settings include:
+`skillBehavior.preferencesBySkillId` is the optional typed per-skill preference record. `skillBehavior.ts` owns authored control allowlists, defaults, validation, updates and one-time migration from the following legacy fields. Valid individual settings take precedence; legacy fields remain readable for compatibility, not as shared live controls. All targeting/effect reads use the owning skill ID. Active and stored roster normalization preserves settings through class changes, recruitment, Inn/Field Team movement and restoration. Unsupported choices are discarded or defaulted; no save-version bump is needed.
+
+Legacy companion skill behavior fields include:
 
 - `beginnerFirstAidSelfHealHpThresholdPercent`
 - `beginnerFirstAidAllyHealHpThresholdPercent`
@@ -962,23 +973,23 @@ Beginner First Aid ally-heal threshold defaults to 35 percent and is clamped fro
 
 Second Wind self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Hold Fast use threshold defaults to 40 percent and is clamped from 1 percent to 100 percent.
+Hold Fast use threshold defaults to 30 percent and is clamped from 1 percent to 100 percent.
 
-Fake Death use threshold defaults to 25 percent and is clamped from 1 percent to 100 percent.
+Fake Death use threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Blood Feast use threshold defaults to 45 percent and is clamped from 1 percent to 100 percent.
+Blood Feast use threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Light Mend ally-heal threshold defaults to 60 percent and is clamped from 1 percent to 100 percent.
+Light Mend ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 80 percent.
 
-Self Sacrifice safety floor defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Supported self-sacrifice skills individually default to a 20-percent safety floor, clamped from 1 percent to 50 percent.
 
-Penitent's Gift ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 100 percent.
+Penitent's Gift ally-heal threshold defaults to 50 percent and is clamped from 1 percent to 80 percent.
 
-Penitent's Gift self-heal threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Penitent's Gift self-heal threshold defaults to 30 percent and is clamped from 1 percent to 30 percent.
 
-Eternal Hope use threshold defaults to 35 percent and is clamped from 1 percent to 100 percent.
+Eternal Hope use threshold defaults to 60 percent and is clamped from 1 percent to 80 percent.
 
-Defensive mobility threshold defaults to 50 percent and is clamped from 1 percent to 100 percent.
+Each supported mobility skill defaults to Offensive use with a 30-percent defensive threshold, clamped from 1 percent to 30 percent.
 
 Overcharge is enabled by default.
 
@@ -1005,6 +1016,7 @@ Current Circle of Renewal target mode values are:
 type CircleOfRenewalTargetMode =
   | "big_group"
   | "low_health"
+  | "highest_health"
   | "defender";
 ```
 Support Focus, mobility skill use mode, FireBurst target mode, Circle of Renewal target mode, overcharge enablement, and skill HP thresholds are targeting and usage preferences for supported skill behavior. They must not create new role values or move skill targeting rules into React UI.
@@ -1665,6 +1677,8 @@ Current quest runtime state may include:
 - legacy despawned subzone enemy ids by objective id
 - suppressed subzone enemy snapshots by objective id
 - suppressed subzone enemy restore timestamps by objective id
+- generalized ambient-enemy suppression sessions by quest-scoped group id
+- Patron Ward pending activation, active Ward/wave, tracked defenders, retreat/fade/finale timing, route unlock, and legacy-route preservation
 
 Current quest ids are:
 
@@ -1681,6 +1695,11 @@ Current quest ids are:
 - `crawler_shelf_report`
 - `find_slimeward_camp`
 - `azure_trial`
+- `orders_from_the_guild`
+- `break_the_ash_camp`
+- `into_the_briar_burrows`
+- `the_patrons_shadow`
+- `the_evil_patrons_chosen`
 
 Current quest display names are:
 
@@ -1692,11 +1711,16 @@ Current quest display names are:
 - `scout_rise_samples`: Scout Rise Samples
 - `rescue_the_grove_runner`: Rescue the Grove Runner
 - `hold_the_field_cache`: Hold the Field Cache
-- `open_wolf_causeway`: Open the Wolf Causeway
+- `open_wolf_causeway`: Open the Causeway
 - `broken_thicket_survey`: Broken Thicket Survey
 - `crawler_shelf_report`: Crawler Shelf Report
 - `find_slimeward_camp`: Slimeward Trail
 - `azure_trial`: The Azure Trial
+- `orders_from_the_guild`: Orders from the Guild
+- `break_the_ash_camp`: Break the Ash Camp
+- `into_the_briar_burrows`: Into the Briar Burrows
+- `the_patrons_shadow`: The Patron's Shadow
+- `the_evil_patrons_chosen`: The Evil Patron's Chosen
 
 Current quest objective types are:
 
@@ -1718,15 +1742,35 @@ type QuestObjectiveType =
   | "guide_npc_to_poi"
   | "unlock_route"
   | "defeat_elite"
+  | "defeat_quest_spawn"
   | "collect_dungeon_chest"
-  | "return_to_poi";
+  | "return_to_poi"
+  | "take_guild_notice_board_quest"
+  | "own_livestock_creature"
+  | "active_party_member_count"
+  | "patron_ward"
+  | "encounter_milestone";
 ```
 
-Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, and crafted item checks.
+Current implemented quest objective behavior includes defeat counts, enemy quest drop counts, gather counts, reach POIs, inspect POIs, guide NPC escort objectives, rescue NPC objectives, repair POIs, defend areas, route unlocks, elite defeat objectives, tracked quest-spawn defeat objectives, dungeon chest collection checks, equipment equip checks, flask equip checks, Merchant Buy item checks, crafted item checks, taking a matching Guild Notice Board quest, Livestock ownership, active-party size, and Patron Ward charge/defense completion.
 
-Current NPC quest location display and World Travel quest hints are derived UI data from `QUEST_DEFINITIONS` and `QuestState`. Active NPC quests use incomplete objectives in definition order, resolving objective location from `targetMapId` first and then `enemyMapId`. Unmapped active NPC quest objectives point to Harbor Union Bastion. Ready-to-turn-in NPC quests point to the quest giver hub and render as completed without objective lines. Slimeward special-region objectives resolve to Azurefen Hollow / Imp Fen, the nearest routeable parent zone/subzone, instead of dungeon floor route rows. Guild Notice Board quests do not participate in these NPC quest route hints. This UI hint layer must not add persisted quest-location state, new route commands, or Notice Board routing behavior.
+`QuestObjectiveDefinition.startSpeech` may provide an NPC id, display name, text, and optional speaker position for one-shot objective-start presentation. `questSpawnTarget` configures a tracked target by enemy type, level, position, optional variant, and encounter band. The `defeat_quest_spawn` objective uses the objective's saved runtime entity-id list as its authority for targeting and kill progress.
 
-`questEntityIndicators.ts` derives UI-only quest entity indicators from current quest state, Guild Notice Board state, and current entities. It returns at most one indicator per entity id. Active incomplete main quest objectives may mark matching living enemies, active resources, guide NPCs, rescue NPCs, or explicit objective NPC/POI entities on the current map. Available and ready-to-turn-in main quests may mark their quest giver NPC. Taken incomplete Guild Notice Board kill objectives may mark matching living enemies by `enemyTypeId`; available and done Notice Board quests do not mark enemies. This helper must not persist indicator state or own quest simulation behavior.
+Each `QuestDefinition` owns `questGiverPoiId` and `questGiverMapId`. Availability may also require completed quests and a first-class active or resting roster companion. `reconcileQuestAvailability` evaluates those state-derived requirements after relevant quest completion, first-class selection, and save restoration.
+
+Optional `QuestObjectiveDefinition.displayName` is consumed by shared objective labels rather than quest-ID UI checks. Optional `QuestDefinition.objectiveGuidance: "first_incomplete"` limits guidance, not parallel progression. `getQuestGuidanceObjectives` supplies the first incomplete objective for this policy or sequential flow, otherwise all incomplete objectives. POI selection, world indicators and route hints share that guidance; Auto Combat honors it on the objective's current map after defense focus and active threats, with stale farming selections invalidated when guidance changes. Existing manual orders and no-policy quests retain their behavior, and reaching a chest never invokes a claim.
+
+`encounter_milestone` carries a typed encounter identity and `boss_defeated`, `captive_rescued` or `chest_collected` kind. The pure `encounterQuestMilestones.ts` resolver reads existing durable Warmaster lifecycle facts as its first adapter; unknown encounters, kinds or missing data return false. Boss victory and captive rescue use the durable rescued fact; full chest collection uses `chestCollectedOnce`. The existing state-derived reconciler runs on acceptance, after lifecycle/combat updates, immediately after successful chest claims and during restoration. Completed objectives are monotonic, React owns no progress coordination, and the central death seam gains no quest-specific calls.
+
+`gather_item_count` may omit `resourceType` to match any successfully inventoried resource while retaining map and subzone filters. The `first_class_weapon` equipment requirement inspects current active-companion hand slots for equipment whose kind is `weapon`, whose type is not a Training Sword, and whose allowed-class list includes a first class. Quest acceptance, equipment changes, and restoration call the shared equipment-objective check; completed equipment objectives are monotonic.
+
+`own_livestock_creature` and `active_party_member_count` are state-derived objectives reconciled in game logic after quest acceptance, matching Livestock acquisition, recruitment or roster movement, and save restoration. Incomplete progress reflects current ownership or active-party size; completed progress remains monotonic. Active-party count includes living or dead active members but excludes Inn reserve and Field Team companions.
+
+`guildNoticeBoardQuestIntegration.ts` owns the Board-take-to-quest-progress seam. React invokes that game-logic action rather than coordinating onboarding progress itself. A previously accepted starter contract is state-derived on onboarding acceptance.
+
+Current NPC quest location display and World Travel quest hints are derived UI data from `QUEST_DEFINITIONS` and `QuestState`. Active NPC quests use incomplete objectives in definition order, resolving objective location from `targetMapId` first and then `enemyMapId`; unmapped objectives use the definition's `questGiverMapId`. Ready-to-turn-in and available NPC quests use the same data-driven quest-giver map and render turn-ins as completed without objective lines. Slimeward special-region objectives resolve to Azurefen Hollow / Imp Fen, the nearest routeable parent zone/subzone, instead of dungeon floor route rows. Guild Notice Board quests do not participate in these NPC quest route hints. This UI hint layer must not add persisted quest-location state, new route commands, or Notice Board routing behavior.
+
+`questEntityIndicators.ts` derives UI-only quest entity indicators from current quest state, Guild Notice Board state, and current entities. It returns at most one indicator per entity id. Active incomplete main quest objectives may mark matching living enemies, active resources, guide NPCs, rescue NPCs, or explicit objective NPC/POI entities on the current map. Available and ready-to-turn-in main quests may mark their quest giver NPC. Taken incomplete Guild Notice Board combat/Rummage objectives may mark matching living Standard enemies from the posting's stored target pool on its target map; Forage objectives may mark active resources on that map. Available and done Board contracts do not mark targets. This helper must not persist indicator state or own quest simulation behavior.
 
 Current prototype quest chain:
 
@@ -1738,10 +1782,25 @@ Current prototype quest chain:
 - `scout_rise_samples` unlocks `rescue_the_grove_runner`
 - `rescue_the_grove_runner` unlocks `hold_the_field_cache`
 - `hold_the_field_cache` unlocks `open_wolf_causeway`
-- `open_wolf_causeway` unlocks `broken_thicket_survey`
+- `open_wolf_causeway` (Open the Causeway) unlocks `broken_thicket_survey`
 - `broken_thicket_survey` unlocks `crawler_shelf_report`
 - `crawler_shelf_report` unlocks `find_slimeward_camp`
 - `find_slimeward_camp` unlocks `azure_trial`
+- completed `azure_trial` plus any first-class active or resting roster companion makes `orders_from_the_guild` available
+- `orders_from_the_guild` unlocks `break_the_ash_camp`
+- `break_the_ash_camp` unlocks `into_the_briar_burrows`
+- `into_the_briar_burrows` unlocks `the_patrons_shadow`
+- `the_patrons_shadow` unlocks `the_evil_patrons_chosen`
+
+`orders_from_the_guild` completes its objective when the dedicated starter Notice Board contract is taken and grants no rewards. `break_the_ash_camp` uses parallel map-4 objectives for 200 direct kill credits, 20 successfully inventoried resources of any supported type, and one first-class weapon, then grants 1800 character XP through the existing quest reward path and 500 Crowns once.
+
+`into_the_briar_burrows` uses parallel map-5 and roster objectives for 300 direct kill credits, ownership of one `tin_crawler` Livestock creature, and 3 active party members, then grants 2800 character XP and 750 Crowns. Tin Crawler acquisition presentation uses `Tin Crawler Hatchling`, its permanent key item is `Tin Crawler Hatchling Discovery`, and its placed adult Livestock name remains `Tin Crawler`. Existing Tin Crawler ownership completes the objective without consuming the creature or changing its 10%/5%/1% discovery chances.
+
+`the_patrons_shadow` uses three `patron_ward` objectives plus an `elder_mossling` Livestock ownership objective, then grants 4000 character XP and 1000 Crowns. Each Ward accumulates 100 matching direct enemy credits before manual activation. `patronWardState.ts` owns Ward definitions, positions, wave counts, barrier geometry, timing constants, route-open checks, and persistent/transient runtime sanitation. `patronWardSystem.ts` owns click-and-approach activation, mutually exclusive defenses, normal-only quest-defender waves, retreat/wipe/map-exit resets, objective completion, prop fades, the barrier/route transition, legacy map-7 access, and renderer-facing Ward/Warmaster presentation. The route unlock persists before quest turn-in while encounter, fade, and finale timing remain transient.
+
+`the_evil_patrons_chosen` is one non-repeatable Hub 2 quest with parallel progress and first-incomplete guidance. Its displayed objectives are Warmaster victory, captive rescue, full chest collection, then 150 `defeat_enemy_count` credits filtered by archetype `orc`, map-7 and `orc-warcamp`. All four Orc types and Barrack reinforcements use existing direct-kill credit; no ordinary kills are banked before acceptance, and recharge remains one independent physical-death credit. Prior durable milestones count on acceptance. Normal turn-in grants each eligible living current-party companion 6000 XP and the party 1500 Crowns once, without modifying Boss/chest rewards or unlocking further content.
+
+`directKillCredit.ts` is the shared direct-defeat credit helper. It returns 2 for Superior enemies and 1 otherwise. Direct NPC `defeat_enemy_count` objectives and direct Notice Board kill objectives use it. Quest-item drop rolls remain once per enemy, `defeat_elite` remains one completion, and `defeat_quest_spawn` completes once for the tracked entity id without applying Superior double credit. Aggregate Field Team kill redemption keeps the quantities reported by the estimator without applying Superior credit.
 
 Current quest rewards may include:
 
@@ -1754,7 +1813,7 @@ Merchant interaction is gated by quest progress where implemented.
 
 Merchant Buy can be locked until the equipment tutorial flow allows it.
 
-`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, and elite-spawn objective helpers.
+`questGuideSystem.ts` currently owns prototype quest NPC, rescue, repair, defend, route unlock, elite-spawn, and tracked quest-spawn objective helpers. Patron Ward behavior remains in the focused `patronWardSystem.ts` rather than being hardcoded into the generic guide system.
 
 Current quest objective helper behavior:
 
@@ -1765,12 +1824,20 @@ Current quest objective helper behavior:
 - guide NPCs pause when no companion is within escort range or nearby living enemies are present
 - rescue objectives complete when the leader reaches the NPC after nearby enemies are cleared
 - repair objectives progress while a party member or quest guide NPC is near the target and not targeted by an enemy
-- defend objectives start from a nearby repair actor, suppress normal objective-subzone enemies, spawn quest enemy waves, and use repair progress as the defense timer
-- defend objective suppression removes and stores living or dead normal non-quest-spawn enemies in the objective subzone while leaving quest-spawned enemies available for defense waves
-- completed defend objectives clean up living quest-spawned enemies and schedule normal subzone enemy restoration
-- suppressed normal subzone enemies restore together after `QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS`
-- legacy defense saves with only despawned enemy ids may rebuild missing authored enemies from map enemy start data during restoration
+- defend objectives start from a nearby repair actor, begin their configured ambient-enemy suppression, spawn quest enemy waves, and use repair progress as the defense timer
+- defend objectives may opt into waiting for every configured defender wave to be defeated in addition to reaching the repair-duration threshold; objectives without this setting retain timer-only completion
+- defend objectives may define one-shot start speech data; the first start transition emits a transient NPC speech cue that React presents through the shared HUD-aware bubble, and save restoration/map transitions clear the cue while the persisted started flag prevents replay
+- Open the Causeway configures its defense wave only at repair progress 0, preserving the 10-second repair and the two-Wolf/one-Goblin Thrower composition; the Causeway Worker says `Its an ambush! Protect me!` when the defense starts
+- `questAmbientEnemySuppressionSystem.ts` owns reusable begin, maintain, release, restore, clear, and load-sanitization behavior for data-driven `map` or `subzone` suppression
+- suppression configuration provides scope, an optional quest-scoped group id, restore delay, and `preserve` or `reroll` variant policy; missing configuration causes no suppression
+- active sessions snapshot matching living, dead, respawning, normal, or Superior non-dummy ambient enemies, continuously remove newly introduced matching ambient enemies, and leave quest-spawned enemies untouched
+- releasing the last objective owner schedules deterministic safe restoration at full health near authored homes; a new owner in the same group cancels the timer without an intermediate repopulation. The quest-guide update processes the active objective before timed restoration so a newly active owner can claim the group first
+- Hold the Field Cache and Defend Wolf Causeway use subzone scope, a 3-second delay, and variant rerolls; all Patron Wards share map scope through `nightmire-wards`, a 2-second delay, and preserved variants
+- completed defend objectives clean up living quest-spawned enemies and release their suppression session
+- Open the Causeway requires both its 10-second repair and defeat of all three first-wave defenders; its following tracked Superior Wolf objective joins the same `wolf-causeway-encounter` subzone-suppression group, so ambient enemies return only three seconds after the Wolf objective completes
+- legacy defense saves with objective-owned despawn ids, snapshots, or restore timestamps are converted into the generalized runtime when valid; malformed or orphaned sessions restore safely instead of leaving enemies absent
 - defeat elite objectives ensure the configured elite quest enemy is spawned
+- tracked quest-spawn objectives ensure a configured, tracked enemy exists and progress only when its runtime-tracked entity id is defeated; the Causeway objective replaces an old live Elite Wolf with its configured level-8 Superior Wolf, preserving Standard encounter rank and normal Superior drops/rewards
 - unlock route objectives complete the current route objective when active
 - collect dungeon chest objectives complete when the matching dungeon chest has been collected
 - craft item objectives complete when `recordCraftedItemForQuests` observes the matching crafted item
@@ -1782,6 +1849,8 @@ They must not become a general follower, recruitment, companion NPC, production 
 Current quest guide constants include:
 
 - `QUEST_DEFENSE_SUBZONE_ENEMY_RESTORE_DELAY_MS = 3_000`
+
+`questDefenseFocus.ts` resolves encounter focus without quest, Ward, map, or enemy-type allowlists. It recognizes started incomplete `defend_area` objectives, the active typed `patron_ward` runtime, and a current sequential objective that owns or is taking over a live shared ambient-suppression group. The handoff case includes the pending-restoration window between sequential objectives, before the next objective claims ownership. The resolver returns the current quest/objective, its target position, and living quest-spawn enemy ids. While Auto Combat owns party behavior, `poiSystem.ts`, `poiTargetSelection.ts`, and `roleSystem.ts` use that context to clear AI-created resource work, prioritize encounter enemies, hold at the objective position between waves or before a spawn, and keep autonomous Gatherer-role companions with the party. Player-authored party gathering and direct companion commands are preserved. Focus ends when the current encounter objective completes or resets, even if the suppression group still has a pending ambient-restoration delay.
 
 POI selection types live in `poiTypes.ts`.
 
@@ -1926,7 +1995,7 @@ The game loop runs continuously while enabled, executes systems in order, update
 
 Current high-level order:
 
-1. If the Slimeward dungeon chest UI is open, record telemetry and stop the tick early
+1. If the Slimeward chest UI or `isWarmasterRewardUiOpen` (chest/departure choice) is open, record telemetry and stop the tick early; also return immediately after a lifecycle or teleport update opens a Warmaster reward interaction during the tick
 2. Advance simulation timing, clear frame movement planning, and clear expired combat feedback
 3. Update status effects
 4. Update rune skill runtime
@@ -1985,6 +2054,8 @@ Current high-level order:
 56. Record debug telemetry
 
 Movement conflicts are guarded with per-tick moved entity ids, movement intent records, path records, attack slot cache records, and reserved positions.
+
+The Patron Ward system updates before world-wipe recovery so active Ward state can reset cleanly on wipes and map exits. Generalized ambient-enemy suppression updates through the quest-guide stage before enemy AI, ensuring suppressed enemies cannot act or respawn during the defense. Defense-focused POI cleanup and selection occurs in the POI stage before role behavior, so autonomous Gatherer-role companions see the same active-defense context during that tick.
 
 ---
 
@@ -2302,11 +2373,24 @@ Current companion AoE channel behavior:
 - stores active companion AoE channels by caster id
 - resolves supported companion AoE impacts after their channel timing completes
 - removes the channel after impact or invalidation
-- Shield Shockwave damages nearby enemies and can apply bind runtime
-- Maul Sweep damages nearby enemies and can apply `disarmed`
+- Shield Shockwave and Maul Sweep snapshot a resolved variant area and rank-adjusted coefficient for their unchanged 200ms channels; later preference edits and movement do not rewrite that area
+- Shield Shockwave's circle retains bind/taunt; its cone applies stun at impact and requests reusable forced movement with deferred taunt metadata
+- Maul Sweep applies its selected semicircle/full-circle damage and existing `disarmed`
 - companion AoE impact can grant XP, progress quest defeat objectives, and trigger enemy drops through normal combat resolution where supported
 
 Companion AoE channel runtime is skill runtime and should stay in game logic.
+
+### Companion Area Variants and Individual Preferences
+
+`companionAoeVariants.ts` owns renderer-neutral authored patterns, defaults and effect modifiers. `companionSkillAreas.ts` prepares a snapped caster/target/mobility transform and resolves the shared `ResolvedAoeArea` once per use. Immediate effects and channels reuse their area for recipient checks and presentation; actor centers and existing structure-rectangle intersection rules apply. Square patterns are 1.5-unit touching squares, not grid-snapped casts. Empty or unusable candidates do not consume cooldowns.
+
+The catalog covers Sweeping Strike/Maul Sweep semicircle or full circle (0.7 damage modifier), Shield Shockwave circle/cone, Arrow Burst forward line/cone, FireBurst target-centered circle/cross/X/strip, Renewal normal/concentrated circle (radius 5√0.7 and 1.3 healing modifier), and Dawn/Atonement circle/cross. Rune Step reuses a fixed radius-2 circle. Exact dimensions and defaults are documented in the GDD variant table. Existing rank scaling occurs before variant multiplication and final combat rounding. Skill cooldowns, GCDs, party-wide effects and existing enemy ability runtime are unchanged.
+
+`skillTargeting.ts` scores actual areas for Big Group, considering valid prospective mobility landings and deterministic distance/ID ties. High HP sorts remaining health and Low HP sorts health percentage. Melee caster-centered areas use attack context/current facing without target-priority controls; Arrow/Fire and offensive Dawn/Atonement support three priorities. Renewal additionally supports Defender and retains main-target injury/HP/range checks. Defensive mobility uses the existing threat and escape logic. Manual constraints and autonomous structure exclusions remain intact.
+
+`CompanionSkillPreferences.tsx` renders learned current-class skills' authored controls and enabled legacy skills' controls under exact skill names. It filters legacy preference cards through the existing enabled-state helper, without mutating learned skills or saved preferences. The separate legacy Enable/Disable controls remain available, and re-enabling restores the visible settings. It submits per-skill updates, never targeting or effects. `skillPreferenceDetails.ts` supplies descriptions using authored variants and scaled definitions. Choice tooltips support hover and keyboard focus. Shared flat fields migrate once to independent settings; malformed values normalize through the same game-owned read/update path.
+
+Optional resolved area/visual intent on transient `SkillVisualEvent` records lets the full renderer reuse shared area drawing and bounds culling. Geometry participates in signatures, timed work and final cleanup frames, with existing companion colors/blue labels. The minimap omits this presentation. Areas/channels and pending completion effects are transient on restoration.
 
 ---
 
@@ -2349,15 +2433,79 @@ Current reusable enemy ability behavior:
 - map transitions discard all reusable enemy ability runtime for departing enemies
 - save restoration cancels active casts, preserves sanitized unexpired cooldown expiration timestamps and valid required-basic-attack gates, and requires no save-version bump because the fields are optional
 
-The production registry currently contains `fire_bolt`, assigned only to Ember Imp. It uses a 5-unit selection range, 0.9-second cast, 0.3-second release windup, and 6-second cooldown starting at cast initiation. Its resolver launches a homing projectile from the cast's locked origin at 8 world units per second with a 0.35-unit impact radius, then resolves 1.5-times enemy attack as direct magic damage through existing combat rules. The projectile uses the semantic `enemy_fire_bolt` visual profile, reusing the existing Imp fireball asset at 32 by 32 pixels, and supplies `Fire Bolt` as its impact label. Fire Bolt does not add Burn, splash, ground fire, straight-line collision, or a new resource system.
+The production registry contains `fire_bolt`, the Tin Crawler and Shieldbearer Fortifying Aura variants, the Night Bat and Raider Rending Dash variants, and the Warmaster's Rending Dash, Kick, Patron Cleave and Patron Burst definitions. Enemy types retain ordered references rather than copies of their execution logic.
+
+`fire_bolt`, assigned only to Ember Imp, uses a 5-unit selection range, 0.9-second cast, 0.3-second release windup, and 6-second cooldown starting at cast initiation. Its resolver launches a homing projectile from the cast's locked origin at 8 world units per second with a 0.35-unit impact radius, then resolves 1.5-times enemy attack as direct magic damage through existing combat rules. The projectile uses the semantic `enemy_fire_bolt` visual profile, reusing the existing Imp fireball asset at 32 by 32 pixels, and supplies `Fire Bolt` as its impact label. Fire Bolt does not add Burn, splash, ground fire, straight-line collision, or a new resource system.
 
 Ability handlers should delegate to existing damage, projectile, status-effect, and shared AoE helpers. This focused runtime does not replace enemy AI, the current enemy AoE channel system, companion skills, or the future full ability and casting framework.
+
+### Warmaster Attempt and Patron Power
+
+`orcWarcampLayout.ts` owns pure authored arena bounds and placement anchors shared by map geometry, Barrack definitions and Boss simulation, without renderer/runtime imports. The compact arena spans X80.5–108.5 and Y21.5–51.5; map reconstruction fills its reclaimed northern footprint with terrain. `warmasterState.ts` owns renderer-neutral attempt/transfer types and the pure death-recording seam. `state.updateEntity` records genuine alive-to-dead enemy transitions centrally, covering direct damage, projectiles, AoEs and DoTs. Only Grunts, Raiders and Shieldbearers inside the active arena qualify, including owned Barrack reinforcements; one death produces one transfer regardless of Superior kill-credit multipliers. A later respawned enemy can qualify again, while duplicate dead updates cannot.
+
+`warmasterSystem.ts` starts attempts on living active-party arena entry, advances transfers, applies non-compounding size changes and resets living attempts. Optional `warmasterAttempt` stores Boss/attempt identity, power, pending transfers, retreat timing and speech state. Transfers store corpse origin and a one-second arrival deadline; simulation, not animation, awards power. Due arrivals are consumed once in timestamp order, including across large time advances. Power caps at ten, discards overflow and persists without decay until the attempt ends or resets; no decay deadline is stored.
+
+The Warmaster's enemy definition authors 1,500 max HP through optional `EnemyTypeDefinition.maxHealth`. Enemy construction prefers an explicit spawn override, then authored type HP, then ordinary level scaling; reconstruction reuses that construction path. Boss attempt reset/restoration reconciles legacy max HP to the current definition and fully heals living Bosses. Defeated Bosses remain unavailable under the durable lifecycle; only legacy saves without lifecycle data initialize a ready first encounter even when their old Boss was dead. Azure Mass's existing 900-HP spawn override is unchanged. Barracks use one shared 12,000ms preparation constant for the first and subsequent reinforcements, including after rebuilding; existing pause, cap and pending-roll behavior remains unchanged.
+
+Warmaster ability priority is Burst → Cleave → Kick → Dash. `canStart` gates Cleave at five power and Burst at ten; these thresholds remain met for the rest of the attempt. Shared AoE resolution locks the six-unit 90-degree cone and radius-four circle once for selection, telegraphing and exactly-once physical hits. Kick uses a locked origin/target and terrain-aware melee validation at resolution; evasion prevents displacement, but a blocked or shielded hit still pushes a surviving target. The Warmaster definition reuses the existing Rending Dash factory, deferred completion, clipping, safe landing and swept-hit implementation.
+
+`Enemy.combatSizeMultiplier` scales the authored combat radius and renderer sprite/aura from 1 to 1.5 without modifying stats or AoE dimensions. Optional `movementBounds` constrain only explicitly bounded enemies, while `minimumMovementBodyRadius` reserves maximum-growth terrain clearance. `enemyMovementBounds.ts`, movement planning, AI chase and dash planning share these checks; other enemies retain existing leash behavior. Size changes invalidate movement/attack-slot caches rather than doing so on every animated aura frame. Dash runtime snapshots its body scale for static afterimages.
+
+Wipes, three seconds of arena absence, map exit, encounter reset and restoration clear the attempt. A living Boss returns to full health at a safe home position with base size and fresh action runtime; a tracked defeated Boss is not revived by attempt reset. This is a narrow Boss-attempt exception to normal restored enemy cooldown/gate preservation. Failed attempts retain availability without recharge and leave Barrack health, ownership and rebuild deadlines untouched. Completed-clear lifecycle transitions are separate from these attempt resets.
+
+### Warmaster Lifecycle, Rewards and Rescue
+
+`warmasterLifecycleState.ts` owns optional durable `warmasterLifecycle` data: `ready`, `active`, `defeated`, `recharging` or `reset_pending` phase, monotonic encounter sequence, recharge count, rescued flag and a sequence-bound chest ledger. Optional `warmasterInteraction` owns transient manual approach, chest UI, departure acknowledgement/choice and rescue-speech timing. `warmasterLifecycle.ts` owns reconstruction, arena cleanup, gate collision, safe rearming, inventory collection and interaction state changes. React displays those states and submits actions rather than owning reward or encounter transitions.
+
+The central `state.updateEntity` alive-to-dead seam calls both Patron transfer and lifecycle recording. A genuine available Warmaster death records victory and rolls one chest exactly once. Only subsequent physical Grunt/Raider/Shieldbearer deaths on map-7 increment recharge, including Barrack reinforcements and Superiors at one credit each, capped by `WARMASTER_RECHARGE_KILLS` (60). Duplicate dead updates, despawns and cleanup do not count. `enemyRespawnSystem.ts` excludes the Warmaster from generic timed respawning; encounter reconstruction alone creates the next Boss.
+
+The genuine victory transition calls `stopPartyAutoCombat` once, not every defeated-arena tick. This shared party-intent helper switches off Auto Combat, clears cached AI POIs and automatic execution/resume orders, and cancels a pending automatic on-arrival enable when no travel route remains. It preserves direct/player-authored orders and queued/interrupted manual work. This does not pause simulation or permanently lock the toggle; normal self-defense and rescue speech remain available.
+
+Lifecycle reconciliation runs before normal AI/Barrack work and again after combat drops. It removes remaining arena enemies, their relevant combat runtime and stale commands without emitting defeat events, rejects reconstructed living Bosses while unavailable, and retains the genuine Boss corpse for ordinary reward handling. Orchestration supplies `frozenEncounterIds` to the reusable Barrack loop, freezing both production and overdue rebuilding for the defeated arena without Boss-specific checks inside that loop. Field enemies and the route Barrack remain independent.
+
+Gate presentation uses the shared authored anchor/radius and collision cells. Closing requires the party's full bodies, including dead companions, reserved steps and forced-movement landings to be clear of the arena and gate. Pending chest loot keeps access open; restoration reopens an unsafe closed gate rather than trapping companions or rewards. At 60 credits with collection complete, the party outside and Barrack footprints clear, rearming restores the Boss and three arena buildings, resets preparation, preserves reinforcement sequence high-water marks and refreshes navigation/attack/movement caches. Existing attempt reset supplies fresh Boss action state and safe home placement. This completed-clear repair is an explicit exception to normal independent rebuilding, not a wipe repair.
+
+`rollWarmasterChest` stores immutable original item rolls plus pending/collected quantities and a `crownsClaimed` flag under the encounter sequence. Rewards are 500 Crowns, independent 90% level-15 and 10% level-20 equipment checks, and five independent first-class book selections with duplicates allowed. Pools derive from existing item/skill definitions, uniformly and without party weighting or new rarity rules. `requestWarmasterChest` owns manual approach and stops Auto Combat before approaching; `claimWarmasterChest` validates a living leader within three units, uses shared inventory/wallet operations and stops Auto Combat on every successful claim, including complete collection. Overflow remains pending. Closing the overlay preserves the ledger and leaves Auto Combat off; repeated interactions cannot reroll or pay currency twice.
+
+Optional durable `chestCollectedOnce` becomes true only when a valid claim has collected all currency/items and survives rearming after the sequence ledger is removed. Legacy sanitation recognizes a valid fully collected ledger or a valid later sequence with rescued state, not chest absence or repaired malformed quantities. `saveGame.ts` sanitizes lifecycle before state-derived quest reconciliation. Missing lifecycle retains first-ready behavior without invented milestones; world reset clears history and no save-version bump is required.
+
+Shared walking movement, including party position swaps, guards the leader's arena exit when loot remains. Physical and unlocked direct teleport entrypoints use the same departure request. `resolveWarmasterDeparture` resumes the requested travel only after `Leave anyway`; `Return to chest` cancels departure and issues a manual approach without automatic collection. A transient acknowledgement suppresses duplicate warnings for the excursion and clears on re-entry. `WarmasterRewardOverlay.tsx` presents choices and collected/pending loot; simulation pauses while the chest UI or departure choice is open, as with the existing dungeon chest.
+
+`isWarmasterRewardUiOpen` is shared by simulation pause checks and React's existing blocking-shortcut input. Mid-tick checks after lifecycle and teleport processing prevent subsequent AI, movement or reconstruction from running once a chest/departure overlay opens. Live overlay state remains authoritative until explicit controls or existing dismissal shortcuts change it; saving serializes cleared transient interaction state without mutating the live overlay. Reward/departure overlays block gameplay shortcuts, while explicit dismissal remains available. No automatic re-enable or new modal framework is introduced.
+
+The first victory persists rescue immediately and creates a transient captive-bound speech using the existing five-second HUD-aware layout. `warcampPropPresentation.ts` derives the closed/open cage visual from that durable rescued flag at the shared authored anchor. Both states use aligned transparent 128×128 sprites displayed at three world units square, with the existing captive drawn behind the bars using renderer-only alignment. The open state persists through repeat encounters, travel and restoration without new collision or interaction logic. The full renderer retains existing chest/NPC assets and the pulsing recharge barrier, and includes lifecycle changes in signatures/timed work. Speech, chest overlays, cage art and barrier effects are excluded from minimap presentation; no town service is unlocked.
+
+Save sanitation preserves valid sequence, phase, charge, rescue and chest quantities while clearing interaction/cast/attempt presentation. Original rolls bound sanitized pending/collected amounts conservatively so malformed ledgers do not recreate collected loot or replay currency. Active saves restore ready without victory rewards. Missing legacy state initializes the first encounter ready without retroactive rewards/rescue. Reconstruction reconciles lifecycle before navigation so travel cannot repopulate a defeated arena. Fields remain optional with no save-version bump, generalized Boss framework or persistent-zone system.
+
+### Reusable Forced Movement
+
+`forcedMovement.ts` owns optional `forcedMovementsByEntityId` and focused start/update/cancel helpers. Each record locks source/target identity, origin, direction, distance, movement timestamps and the latest safe landing. Terrain sampling respects map bounds, walls, structures, resources, full companion capsules and enemy circles. Living actors may be crossed; destinations must be unoccupied and respect movement/dash reservations. Revalidation only shortens travel backward on the locked line; there is no lateral redirection or rebound.
+
+Optional typed `completionStatus` requests Shield Shockwave's three-second taunt at actual displacement completion. A completely blocked push completes immediately; dynamic obstruction completes at the stopping update. Natural completion uses the actual movement deadline, even under large deltas, rather than extending the status from a late frame. Cancel/reset/removal/restoration discard pending completion effects. Movement can outlive its source, but a dead/missing source cannot apply taunt. Enemy casts/dashes use their existing interruption helpers; enemy movement bounds and other forced-movement destinations are included in safe landing checks.
+
+Kick requests four units over 0.25 seconds, with duration shortened proportionally when clipped. Updates check intervening terrain even under large deltas and report moved entity IDs. Shared movement, attack, skill, gathering, consumable and resurrection guards suspend actions during displacement; direct-command processing preserves pending player orders. Starting displacement cancels active channels and conflicting motion. Death/removal, map cleanup, reset and restoration clear it; the source's later death alone does not cancel launched motion. Restoration uses a valid saved last-safe position rather than leaving a target mid-overlap. All fields remain optional and transient; no save-version bump or general physics framework is introduced.
+
+### Warmaster Presentation
+
+React passes the simulation attempt to the full renderer without owning transfer timing or power rules. Existing Orc aura frames loop behind arena Orcs and the Boss on a dedicated container below the entity layer, so cached sprite creation/reuse cannot place them in front. The same behind-entity layer carries energy-transfer copies, which interpolate toward the Boss's current rendered position until the simulation deadline. Sprite and aura scale together; overhead power, red cast labels, locked telegraphs and existing tinted dash afterimages remain renderer-owned.
+
+The shared HUD-aware speech binding also accepts enemy speakers, including the first-transfer line `Their borrowed power returns to me!`, using the existing five-second duration and final half-second fade. Attempt, body scale, transfers and forced motion participate in render signatures, bounds-based culling, timed work and final cleanup frames. These extra effects and speech are excluded from the minimap. Existing assets are reused without asset-library changes.
 
 ---
 
 ## Enemy Archetypes
 
 `enemyArchetypes.ts` owns lightweight prototype enemy archetype defaults and enemy type setup data.
+
+### Encounter Bands
+
+Encounter bands belong to individual authored enemy spawns, not enemy types or archetypes. `EnemyStartData.encounterBand` accepts `standard`, `elite`, `champion`, or `boss`; missing authored values resolve to `standard` when an enemy is created. Runtime `Enemy.encounterBand` carries the resolved value through map reconstruction and respawn. Respawn preserves the current enemy's band.
+
+Encounter bands are independent of the optional `superior` enemy variant. Superior spawning may strengthen a Standard spawn without changing its band. Bands currently provide classification and hover inspection only; they do not alter combat stats, AI, rewards, drops, or quest behavior. The React enemy hover tooltip shows Elite, Champion, or Boss and omits the row for Standard enemies. World nameplates remain unchanged.
+
+Save sanitation matches current-map enemies against authored spawn IDs and uses the authored band when available. For dynamic or otherwise unmatched enemies, it preserves a valid saved band and defaults missing or invalid values to `standard`. These optional fields require no save-version migration.
+
+The Azure Mass and the retained Orc Warmaster spawn are authored as Bosses. Orc Warcamp has one Orc Warmaster spawn. Boss design is expected to align with tier-boundary challenges; this is guidance for content authoring, not a runtime scaling rule.
 
 Current enemy archetype ids are:
 
@@ -2431,6 +2579,7 @@ Current enemy behavior:
 - passive enemies do not seek combat targets on their own
 - passive enemies may wander near their home position
 - aggressive enemies search for nearby party targets
+- Optional `EnemyTypeDefinition.canRoam` defaults to existing idle roaming. The Warmaster sets it to `false`; after normal target selection, the idle-roaming path clears any queued roam without changing detection, chase, attacks, dashes or home/reset handling. No saved runtime field is needed.
 - enemy types define setup data such as level, attack cooldown, detection range, attack range override, temperament, combat style override, target preference, and an optional ordered reusable ability-id list
 - enemy archetypes do not define XP rewards
 - enemy XP defaults from level-table data unless an individual spawn explicitly overrides `xpReward`
@@ -2788,6 +2937,12 @@ Current crafting recipes include:
 - level 1, 5, 10, and 15 prototype equipment recipes where matching item definitions exist
 - previous-equipment upgrade requirements for supported level 5 and level 15 recipes
 
+Issue #683 enforces equipment recipe material-source policy through focused content tests beside the existing crafting tests, not through simulation-time checks or React. Tests resolve normal enemy-part sources from authored enemy definitions and effective drop tables at the matching loot tier, gathered materials from authored resource locations and their subzone levels, and Livestock outputs from the producing creature's acquisition source. Shared materials use their earliest reliable source; unknown material sources fail validation rather than defaulting to an early level.
+
+Non-weapon equipment permits source levels up to item level +2; weapons (including weapon types equipped offhand) permit +3. Each above-level material must have a smaller quantity than the largest gathered-material cost. Every equipment recipe is checked, including recipes that produce previous-equipment inputs, while slotless key-item recipes are excluded. Boundary, tier, source-sharing, quantity, and representative upgrade-chain tests protect this policy. Material definitions gain no equip-level restrictions, crafting runtime gains no new gates, and existing saves require no migration.
+
+The approved substitutions affect 25 recipes without changing their fees, quantities, IDs, names, stats, or previous-equipment matching. Tin Ore remains in level-15 pendants but not level-10 pendants. Orc Hide/Tusk have no remaining recipe costs; their drop tables, sale values, and Warmaster chest rewards remain unchanged.
+
 Prototype consumable logic lives in `consumables.ts`.
 
 Current consumable kinds are:
@@ -2962,6 +3117,7 @@ Guild & Inn service logic lives in:
 - `guildRecruit.ts`
 - `guildRecruitUpgrades.ts`
 - `guildNoticeBoard.ts`
+- `guildNoticeBoardContracts.ts`
 - `guildSecondaryParties.ts`
 - `guildSecondaryPartyAssignments.ts`
 - `innRoomUpgrades.ts`
@@ -2984,12 +3140,22 @@ Current Guild Recruit behavior:
 
 Current Guild Notice Board behavior:
 
-- stores board slots, refresh timing, seen state, quest sequence, rerolls, and taken/done quest progress
-- records enemy-defeat progress only after board quests are taken
-- supports available, taken, and done board quest states
-- claims completed board rewards through board interaction
-- uses board upgrades for slot count, reward quality, refresh speed, and Scout rerolls
-- derives daily reroll limit from Guild Scouts plus active Livestock helper bonuses from placed, fed Wolves
+- `guildNoticeBoardContracts.ts` owns Tier 2 tuning, authored Standard-spawn target pools, weighted visited-zone selection, category/title/objective generation, and fixed reward rolls. Eligible maps are `map-4` through `map-7`; hubs, dungeons, earlier maps, Boss/Elite/Champion encounters, dummies, and structures are not ordinary posting targets.
+- Zone selection uses the mean level of all active companion entities, including dead active members but excluding inactive rosters, against the mean level of each destination's eligible monster types. It chooses the inclusive ±5 group with 80% probability or the other visited eligible group with 20%, falls back to the nonempty group, and chooses uniformly within it. Categories and Extermination types are uniform; slots are independent and allow duplicates.
+- New postings carry local `schemaVersion: 2`, `targetMapId`, category, description, typed objectives, fixed XP/Crowns, two stored book results, an independent third-book candidate, and its stored chance roll. Objectives are `zone_kills`, `enemy_kills`, `quest_drop`, or `gather_resources`; zone-kill and drop objectives store eligible enemy-type IDs. Legacy enemy objectives may omit their type discriminator.
+- Zone 4/5/6/7 tuning is respectively 50/70/90/110 kill credits, 30/42/54/66 Rummage items, 10/15/20/25 Forage units, and 150/200/250/300 base Crowns. Names are `Assault on {Zone}`, `{Enemy} Extermination in {Zone}`, `Rummage of {Zone}`, and `Forage in {Zone}`.
+- `guildNoticeBoard.ts` owns available/taken/done state, accepted-only capped progress, claims, rerolls, refreshes, and sanitation. `questProgressionHooks.ts` passes actual map context, randomness, and time from genuine defeats, and passes successfully inventoried gathering quantities. Direct Superior kills use shared two-credit combat rules; normal Barrack reinforcements qualify through their regular type.
+- Each matching taken Rummage contract gets one independent `random() < 0.5` trial per qualifying physical death. It does not use NPC quest-drop pity logic or multiply Superior drops. `Enemy.noticeBoardDefeatCounted` marks a processed physical corpse, preventing duplicate credit/rolls; normal reconstruction/respawn creates a fresh enemy so later deaths of the same authored ID can count.
+- `getGuildNoticeBoardPouchEntries` exposes contract-owned `Recovered Supplies — {Zone}` progress alongside existing NPC quest-pouch entries, without inventory slots or dynamic entries in static NPC quest definitions. Drop visuals reuse `kind: "quest_item"` with `boardContractId` rather than inventing a `QuestId`. Cancellation and completed claiming remove the pouch entry.
+- Forage accepts successfully added wood/ore/herb units from its map, not attempts, prior inventory, purchases, Farm/Livestock output, or Field Team resources. `guildSecondaryPartyAssignments.ts` passes assignment map context to aggregate combat progress; only Assault/Extermination accept reported kills, with one credit per reported kill and no Rummage or Forage simulation.
+- XP generation uses normal authored type levels through `getSameLevelEnemyXp`, excluding Superior, player-level, and debug modifiers. For zone kill requirement `N`, Rummage count `R`, and mean normal XP `M`, Assault/Forage use `floor(0.5 * N * M)`, Extermination uses `floor(0.5 * N * targetXp)`, and Rummage uses `floor(0.5 * (R / 0.5) * M)`. The complete expression is rounded down once.
+- Two book results and the independent bonus candidate are drawn uniformly from skill books whose skills belong to the eight first classes; Beginner books are excluded and duplicates are allowed. `getGuildNoticeBoardRewardPreview` is the shared claim/UI read model. At claim time Reward Quality scales Crowns to 100/110/120% and applies the stored 0/10/20% third-book chance, never an XP multiplier.
+- Claims trial all book additions on immutable state using existing inventory operations, accounting for stacks, duplicates, bonus books, and locked slots. Failure publishes no inventory, wallet, XP, or telemetry mutation and leaves the contract done/unclaimed with clear feedback. Success adds Crowns and delegates XP to `grantQuestXpToCurrentParty` without a fabricated NPC quest ID, retaining living-party, max-level, debug, level-up, and feedback behavior. Repeated claims cannot award again.
+- `getGuildNoticeBoardState` and other read models do not initialize, refresh, or retarget postings. App's playing-session clock calls the game-owned `refreshGuildNoticeBoardState` every second independently of menu/combat pause; React owns only scheduling and display, not generation rules. Newly purchased slots initialize through this clock. Targets/rewards are snapshotted only at actual generation, and no eligible visited map leaves ordinary slots empty.
+- Refresh/reroll preserve taken and done/unclaimed contracts. Slot, refresh-rate, Scout, and placed/fed Wolf-helper upgrades retain existing limits; a reroll consumes no use when no slot can change. Restoration processes one due refresh at most and schedules the next from restoration time, without missed-cycle catch-up.
+- The dedicated `guild-notice-board-starter-ash-goblin-encampment` identity remains outside normal sequence IDs. It bypasses the visited-map filter for onboarding, uses the Zone 4 Assault counter of 50 total ordinary-enemy credits and its new rewards, and stays protected while available. Acceptance persists independently of later cancellation.
+- Deterministic sanitation retains valid stored requirements/progress/rewards, clamps counters, rejects malformed new postings, and does not reroll stored results. Valid legacy taken/done postings keep original rewards without new XP/books; available legacy ordinary postings change at their next actual refresh/reroll. Explicit restoration upgrades an untaken legacy starter once while preserving identity/onboarding. New fields are optional, with no global save-version bump.
+- Board details, quest summaries, pouch entries, target indicators, and claim messages consume game-owned state/read models. Board-specific World Travel routing and new Auto Combat priorities remain outside this implementation.
 
 Current Field Team behavior:
 
@@ -3372,7 +3538,39 @@ Current post-Hub-2 map enemy groups:
 - `map-6`: Night Bat level 16, Elder Mossling level 17, Cinder Wisp level 18
 - `map-7`: Orc Grunt level 18, Orc Raider level 19, Orc Shieldbearer level 19, Orc Warmaster level 20
 
+Planned `map-7` topology for Issue #678:
+
+- Keep the 110-by-57 footprint already used by `map-6`.
+- Treat an open Orc field of roughly 60% of the map, a vertical route of roughly 15%, and a Boss arena of roughly 25% as approximate authoring budgets rather than rigid region boundaries.
+- Keep the field open and farmable, with Orcs authored in loose squads. Auto Mode may route toward the route and arena anchors, but must not turn the field into a mandatory ordered checkpoint gauntlet.
+- Start the route near the field's upper side, run it south, and connect it to the arena from below. The route contains one squad and one Barrack, with walkable lanes beside the living building. Issue #679 removes only the ten fixed wall cells adjoining its footprint (x70–72 and x78–79 at y25–26); retain the passage walls and the Barrack's own collision. Traversal and reinforcement reachability must not require its destruction.
+- The shared compact arena layout reserves three Barracks at (88,29), (95,26) and (102,29), the Warmaster/dais at (95,32), cage at (88,45), chest at (102,45) and southern gate at (87,51). Retain central combat lanes for party movement, dashes and AoEs; the route Barrack and farming field remain outside this arena.
+- Map data owns fixed geometry and placement anchors. Barrack health/behavior and Boss-gate progression are owned by their separate implementation issues; the layout must not encode them as a chain of mandatory field checkpoints.
+- The arena entrance barrier should follow the existing Nightmire Patron barrier's circular collision and visual behavior. Keep its rendered area and collision geometry aligned, and let Boss-gate progression determine when the passage is open.
+
 Authored wild-enemy ids are assigned centrally after encounter-area filtering. Their format is `zone-<zone-number>-<enemy-type-token>-<two-digit-sequence>`, with underscores in the enemy type converted to hyphens. Sequences are one-based, restart independently for each enemy type, and span the whole wilderness zone rather than each subzone. Dungeon, quest-spawned, hub target-dummy, and explicit debug-summon ids retain their existing ownership and formats.
+
+---
+
+## Combat Structures and Orc Barracks
+
+Issue #679 adds `CombatStructure` to game/combat-target unions, not autonomous actors, enemy types or archetypes. `barrackDefinitions.ts` owns placement identity, ground collision bounds, separate authored attackable bounds, spawn candidates and shared tuning. The route attack bounds cover 5×5 world units and arena attack bounds 3×3, aligned with their displayed buildings without reading renderer dimensions. `barracks.ts` owns initialization, preparation, capped reinforcement production, safe rebuilding and restoration sanitation. Definitions and runtime contain no artwork, asset dimensions or rendering instructions.
+
+`combatStructures.ts` provides shared hostile-target validation, nearest-attack-bound positions, reachable approach positions and structure line-of-sight checks. A companion already in range with line of sight retains its position without a path search. Otherwise, one shared reachable-position search uses the normal movement blockers; party-order validation reuses that result rather than searching every perimeter candidate and then validating it again. Manual party/direct orders accept living structures; autonomous enemy discovery does not. Existing damage, projectile, skill and DoT paths use the normal combat rules. Structure updates synchronize durable health and centralize exactly-once destruction, command cleanup, collision removal, navigation rebaking and movement/attack-cache invalidation. Enemy-only reward and retaliation paths remain enemy-only. Status application rejects non-damaging components on structures; enemy support auras exclude them.
+
+Shared resolved-AoE geometry supports boolean rectangle intersection for circles, rings, cones, rotated squares/rectangles and unions. Combat uses the attackable bounds, including roof-area and boundary contact; ring holes remain empty and overlapping union primitives never multiply an effect. Navigation, dash clipping, spawn clearance and rebuild occupancy continue using only the smaller ground collision footprint. Restoration recreates both bounds from authored definitions, so older saves require no migration.
+
+Optional `barracksById` state stores health, recorded maximum health, preparation, pending rolled type, monotonic spawn sequence, absolute rebuild deadline, tutorial-seen state and optional durable `rebuildWarningShown`. All four buildings derive 1,248 HP from six normal level-18 Grunts, with zero defense and magic defense. The default activation policy retains ten-unit living-companion proximity. Optional definition activation data instead references an encounter identity and bounds: orchestration supplies active identities after the Warmaster attempt update, keeping Boss checks outside production. Arena buildings require a matching active encounter and a living active companion inside those bounds, without a distance limit. Both policies require clear structure line of sight and room below the definition's `reinforcementCap`: five for the route building and two for each arena building. Caps are authored data, not saved runtime. Existing over-cap ownership remains valid and pauses production without clearing preparation or pending rolls; no save migration or forced despawning is needed. Reuse `hasStructureLineOfSight` for a short wall/collision-obstruction check rather than a path search; actor entities do not occlude it. Only qualifying visible companions become spawn-reachability goals. Loss of activation pauses preparation and preserves pending rolls, as do blocked candidates. Normal reinforcements carry typed `barrackSpawn` ownership, use normal type levels/stats/abilities/rewards, and are excluded from independent respawning. Ownership remains valid after building destruction/rebuild; map reconstruction discards departing reinforcements normally without kill rewards.
+
+Restoration clamps malformed values, removes unknown structure/ownership records, reconciles sequence high-water marks, clears speech, clearance-retry timing and pending commands, recreates structures and derives collision before navigation. Living health is converted proportionally from the recorded maximum, falling back to serialized structure max HP or legacy 624 HP. Recording the new maximum makes conversion idempotent, including off-map state; dead buildings retain zero HP and their deadlines. Missing legacy fields create authored healthy Barracks, including the new North building. `orcWarcampRestoration.ts` then rebinds the authored Boss home and bounds, repairs owned reinforcement homes and deterministically relocates full actor bodies blocked by changed terrain or structure collision. It preserves roster/progression/life state and runs only during reconstruction/restoration, before living Boss attempt reset; movement caches and transient runtime are cleared by the existing sanitation path. No save-version bump is needed. Normal rebuilding requires the independent 120-second deadline and successful shared footprint clearance. Warmaster lifecycle orchestration freezes its defeated arena and force-restores only its three buildings during a safe completed-clear rearm; it does not repair them on wipes or change the route building. No offline reinforcement production is performed.
+
+`structureRebuildClearance.ts` owns a pure, reusable all-or-nothing clearance planner and footprint occupancy helpers, independent of Barrack IDs and rendering. It considers physically overlapping living companions/enemies in deterministic ID order and searches bounded local perimeter candidates ordered by displacement distance and coordinates. Checks use full companion capsules, current enemy combat bodies, reserved maximum-growth clearance, enemy movement bounds, swept terrain clearance, other solids and movement reservations. NPCs, resources and structures are immovable; reservation-only blockers and active/pending dash or forced-movement paths defer rebuilding. If any blocker has no safe landing, no actor moves. `barracks.ts` applies successful corrections atomically, preserves entity actions/statuses/targets/casts/cooldowns/gathering/player orders, invalidates corrected actors' stale movement/attack caches and reservations, records IDs in the shared frame movement set, rechecks occupancy and restores building collision through the existing helper. This is immediate safe separation, not combat knockback or a physics system. Optional transient `nextClearanceRetryAtMs` limits blocked planning to once every 250ms and is cleared on restoration/travel.
+
+Shared `BARRACK_REBUILD_SPEECH` configuration schedules `Work Work` at rebuild deadline minus 10,000ms for 5,000ms, retaining the final 500ms fade. `rebuildWarningShown` is reset on genuine destruction and the next successful rebuild, sanitized/preserved across saves, and prevents repeated or postponed warnings while blocked. Speech timestamps use the scheduled window rather than the current tick; missed/offline windows are skipped. Frozen arena buildings do not produce warning speech. Restoration clears transient bubbles without replaying an already-shown warning.
+
+The full renderer draws each Barrack once, selecting healthy or ruined artwork through `warcampPropPresentation.ts` without changing its route 5×5 or arena 3×3 size/anchor. Ruins remain nonblocking and untargetable and have no bars, hostile outline or tutorial overlay. Shared HUD-aware speech binding accepts destroyed structures with valid speech, using `isWorldSpeechSpeaker` consistently in React filtering and Pixi presentation. Runtime signatures and timed-work detection cover prop-state changes, speech fades and final cleanup; minimap rendering excludes these overlays and speech. The Issue #681 lifecycle counts reinforcement deaths for recharge and coordinates defeated-arena freezing/rearming while preserving normal in-fight rebuild behavior.
+
+`assetIcons.ts` registers base-path-aware URLs for `cage-closed.png`, `cage-open.png` and `barracks-ruined.png` in the existing `assets/world/props/regions/orc-warcamp/` owner folder. Their aligned 128×128 RGBA canvases retain genuine transparency, including cage-bar gaps; the healthy Barrack asset remains unchanged. Runtime copies have exact Used-assets mirrors and size/SHA-256 manifest entries in the external Library, while generation masters, prompts and review captures remain outside the runtime project.
 
 ---
 
@@ -3436,6 +3634,8 @@ Current teleport behavior:
 - supports per-teleport runtime working state
 - teleports default to working unless their map definition sets `startsWorking: false`
 - quest route-unlock objectives may set a teleport to working
+- `map-6-to-map-7` starts non-working for new progression and is surrounded by collision cells generated from the same radius-5 circle used to render the Patron barrier; completing all three Patron Wards fades the barrier and persists the route unlock before quest turn-in
+- save restoration preserves valid route unlock state and marks saves that had already reached or occupied map-7 as legacy-preserved, omitting the barrier and Warmaster scene rather than removing access
 - non-working teleports cannot be triggered or selected for route movement
 - can be triggered by player/debug action, World Travel menu selection, or AI conditions
 - can set a teleport point as party movement intent
@@ -3668,9 +3868,12 @@ Current public asset path root:
 
 - `client/public/assets/`
 
+The Orc aura runtime frames live under `client/public/assets/effects/gameplay/orc-aura/`; their exact-copy mirrors and manifest records live in the external Used Assets library according to the repository asset lifecycle.
+
 Current semantic asset groups referenced by the UI include:
 
 - `assets/effects/gameplay`
+- `assets/effects/gameplay/orc-aura`
 - `assets/effects/projectiles`
 - `assets/entities/companions`
 - `assets/entities/enemies`
@@ -3696,9 +3899,11 @@ Current world renderer behavior:
 - PixiJS renders the main world view.
 - React hosts the renderer and passes game state and command callbacks.
 - The renderer supports preview and full modes.
-- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, reusable enemy ability cast labels/bars/glows, combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, and camera-follow presentation.
+- The renderer may draw floor chunks, walls, obstacles, decorative map visual objects, entities, resources, NPCs, teleports, labels, combat feedback, skill visuals, companion AoE visuals, enemy AoE danger circles and channel bars, reusable enemy ability cast labels/bars/glows, combat projectile visuals, drop visuals, resurrection feedback, world-wipe feedback, status-effect presentation where supported, Patron Ward props/aura/labels, the Nightmire barrier, the Warmaster finale, HUD-aware speech bubbles, and camera-follow presentation.
 - The renderer may draw quest entity indicators as separate yellow `!` text prefixes beside relevant enemy, NPC, or resource labels without modifying entity display names.
 - The renderer uses redraw gating so stable preview/full renderer frames are skipped unless game state, timed visual work, texture readiness, or sizing changes require a draw. Active enemy ability casts participate in full-render signatures and timed redraw work so cast progress and glow animation receive a final cleanup frame.
+- Patron aura loops, barrier pulses, Ward/finale fades, speech timing, and HUD avoidance rectangles participate in the applicable full-render signatures and timed redraw work. The preview/minimap renderer omits Ward speech and barrier presentation.
+- The seven Orc aura frames loop at approximately 10 FPS behind uncompleted Wards and quest-spawned Ward defenders. The aura marker is presentation-only and does not apply combat stats.
 - The renderer tracks Pixi texture lifetime with shared, current-map, previous-map, and durable texture scopes, then best-effort evicts old map-only textures.
 - The renderer reuses managed Pixi sprites and text where safe, caches static map-derived render data, and records draw/texture/performance sample metrics for debugging.
 - Texture cache and redraw behavior are renderer-only optimizations and must not define simulation cadence, gameplay timing, or map ownership rules.
@@ -3866,7 +4071,7 @@ These should remain isolated from core systems and must not define final gamepla
 
 ## Current UI Responsibilities
 
-The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, reusable enemy ability cast presentation, companion AoE skill visuals, status-effect presentation where supported, combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
+The React UI currently may display and control map/debug map view through the PixiJS world renderer, generated terrain tiles, subzone name labels, party members, enemies, resources, NPCs, quest guide NPCs, healing fountains, hub target dummies, Guild & Inn service NPCs, Farm and Livestock service NPCs, Patron Wards, Patron aura animation, the Nightmire route barrier, the untargetable Warmaster finale actor, HUD-aware world speech bubbles, sprite animation, enemy and NPC name labels, Superior enemy name/aura presentation, enemy AoE danger circles and channel bars, reusable enemy ability cast presentation, companion AoE skill visuals, status-effect presentation where supported, combat projectile visuals, teleport working/broken presentation, camera follow behavior, combat feedback, skill visual feedback, news broadcast overlays, companion global cooldown display, direct command overlays and rejection feedback, drop visual feedback, resurrection progress, world-wipe rescue choice and rescue feedback overlays, party selection, role changes, role bonus status, class changes, first-class selection, party order changes, leader changes, Party Management leader status and leader switching controls, group/direct commands, inventory counters, wallet balance, inventory item details, key item display, skill book details, skill book reading actions, prototype equipment slot state, prototype equipment equip/unequip commands, prototype flask equipment, auto-flask settings, Beginner First Aid self-heal settings, Beginner First Aid ally-heal settings, Second Wind self-heal settings, Hold Fast use settings, Fake Death use settings, Blood Feast use settings, Light Mend ally-heal settings, Self Sacrifice safety-floor settings, Penitent's Gift ally/self-heal settings, Eternal Hope use settings, mobility skill use mode settings, defensive mobility threshold settings, Support Focus settings, Overcharge toggle settings, FireBurst target mode settings, Circle of Renewal target mode and HP-threshold settings, learned skill summaries, legacy skill toggles, quest tracker, quest log, Notice Board quest grouping, prototype quest reward text, quest turn-in error feedback, equipment tutorial quest state, Smithy quest state, guide popup overlays, Merchant Buy UI, Merchant Sell UI, Bank Chest interaction UI, bank slot display, bank transfer controls, bank slot locking controls, Smith crafting UI, crafting filters, crafting recipe details, crafting result feedback, AFK Estimate UI, Guild & Inn UI, Guild Recruit UI, Notice Board UI, Field Team UI, Inn Rooms UI, Inn Kitchen UI, Farm & Livestock UI, crop and creature filters, Farm and Livestock upgrade overlays, Livestock grid placement controls, Livestock helper summaries, Hearth's Fire display, World Travel menu state, prototype destination selection, direct Teleportation Echo travel options, Options save controls, start screen save and Patch Notes controls, bundled Markdown patch-note presentation, offline progress summary, pending offline loot claiming, XP and level progress, party size limit, bottom HUD Auto Combat and Pause/Resume controls, companion buff/debuff placeholder rails, debug controls, performance/debug telemetry, and debug telemetry export.
 
 The full renderer viewport should reserve the bottom HUD area so the map camera and interactable world view do not place important content behind the companion vitals and buff/debuff rail UI.
 
@@ -3897,6 +4102,7 @@ React may:
 - track start-screen Patch Notes dialog state and focus restoration
 - render UI-facing enemy and NPC name labels
 - track one transient NPC speech bubble and pass it to the PixiJS world renderer
+- measure registered HUD bounds on mount, renderer remount, window resize, and element-size changes, then pass those viewport-space avoidance rectangles to the renderer without owning speech-layout decisions
 - call existing game command/helper functions for supported actions
 - call existing party leader helper functions for leadership switching
 - call existing stat allocation helpers for supported stat allocation actions

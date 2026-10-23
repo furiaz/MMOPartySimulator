@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy } from "./entities";
 import {
   GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
+  GUILD_NOTICE_BOARD_STARTER_QUEST_ID,
   createInitialGuildNoticeBoardState,
+  getBoardObjectiveEnemyTypes,
+  formatGuildNoticeBoardQuestTitle,
   cancelGuildNoticeBoardQuest,
   openGuildNoticeBoard,
   recordEnemyDefeatedForGuildNoticeBoard,
@@ -19,18 +22,34 @@ import { getCurrencyBalance } from "./wallet";
 const NOW_MS = 1_000_000;
 
 describe("guild notice board", () => {
+  it("formats reusable Assault and Extermination contract titles", () => {
+    expect(
+      formatGuildNoticeBoardQuestTitle("assault", "Ash Goblin Encampment"),
+    ).toBe("Assault on Ash Goblin Encampment");
+    expect(
+      formatGuildNoticeBoardQuestTitle(
+        "extermination",
+        "Ash Goblin Encampment",
+        "Ember Imp",
+      ),
+    ).toBe("Ember Imp Extermination in Ash Goblin Encampment");
+  });
+
   it("creates one available quest in the initial board state", () => {
     const board = createInitialGuildNoticeBoardState(NOW_MS);
 
     expect(board.slots).toHaveLength(1);
     expect(board.slots[0]).toMatchObject({
-      id: "guild-notice-board-quest-1",
+      id: GUILD_NOTICE_BOARD_STARTER_QUEST_ID,
+      title: "Assault on Ash Goblin Encampment",
+      category: "assault",
+      isStarterContract: true,
       status: "available",
       objectives: [
-        { enemyTypeId: "goblin_shaman", requiredCount: 50, currentCount: 0 },
-        { enemyTypeId: "ash_wisp", requiredCount: 50, currentCount: 0 },
+        { type: "zone_kills", eligibleEnemyTypeIds: ["goblin_shaman", "ash_wisp", "ember_imp"], requiredCount: 50, currentCount: 0 },
       ],
     });
+    expect(board.starterContractAccepted).toBe(false);
     expect(board.hasSeenCurrentRefresh).toBe(false);
   });
 
@@ -45,7 +64,7 @@ describe("guild notice board", () => {
     expect(shouldShowGuildNoticeBoardSign(opened.state, NOW_MS)).toBe(false);
   });
 
-  it("refreshes an ignored available quest after three hours", () => {
+  it("keeps the available starter contract pinned after three hours", () => {
     const state = createNoticeBoardState();
     const refreshed = refreshGuildNoticeBoardState(
       state,
@@ -53,9 +72,9 @@ describe("guild notice board", () => {
     );
 
     expect(refreshed.guildNoticeBoard?.slots[0]).toMatchObject({
-      id: "guild-notice-board-quest-2",
+      id: GUILD_NOTICE_BOARD_STARTER_QUEST_ID,
       status: "available",
-      sequence: 2,
+      sequence: 0,
     });
     expect(refreshed.guildNoticeBoard?.hasSeenCurrentRefresh).toBe(false);
   });
@@ -92,11 +111,12 @@ describe("guild notice board", () => {
 
     expect(canceled.ok).toBe(true);
     expect(canceled.state.guildNoticeBoard?.slots[0]).toBeNull();
+    expect(canceled.state.guildNoticeBoard?.starterContractAccepted).toBe(true);
   });
 
   it("does not count kills before the quest is taken", () => {
     const state = createNoticeBoardState();
-    const enemy = createDeadEnemy("goblin_shaman", 10);
+    const enemy = createDeadEnemy("ash_wisp", 10);
     const progressed = recordEnemyDefeatedForGuildNoticeBoard(state, enemy);
 
     expect(progressed.guildNoticeBoard?.slots[0]?.objectives[0].currentCount).toBe(0);
@@ -115,11 +135,11 @@ describe("guild notice board", () => {
 
     const progressed = recordEnemyDefeatedForGuildNoticeBoard(
       taken.state,
-      createDeadEnemy("goblin_shaman", 10),
+      createDeadEnemy("ash_wisp", 10),
     );
 
     expect(progressed.guildNoticeBoard?.slots[0]?.objectives[0]).toMatchObject({
-      enemyTypeId: "goblin_shaman",
+      type: "zone_kills",
       currentCount: 1,
     });
   });
@@ -142,25 +162,38 @@ describe("guild notice board", () => {
 
     progressed = recordEnemyDefeatedForGuildNoticeBoard(
       progressed,
-      createDeadEnemy("goblin_shaman", 99),
+      createDeadEnemy("ash_wisp", 99),
     );
 
     expect(progressed.guildNoticeBoard?.slots[0]?.objectives[0]).toMatchObject({
-      enemyTypeId: "goblin_shaman",
+      type: "zone_kills",
       currentCount: 1,
     });
   });
 
+  it("grants two direct kill credits for a Superior enemy", () => {
+    const taken = takeGuildNoticeBoardQuest(createNoticeBoardState(), NOW_MS);
+
+    expect(taken.ok).toBe(true);
+    if (!taken.ok) {
+      return;
+    }
+
+    const progressed = recordEnemyDefeatedForGuildNoticeBoard(
+      taken.state,
+      {
+        ...createDeadEnemy("ash_wisp", 11),
+        variant: "superior",
+      },
+    );
+
+    expect(progressed.guildNoticeBoard?.slots[0]?.objectives[0].currentCount)
+      .toBe(2);
+  });
+
   it("marks the quest done and claims rewards on board interaction", () => {
     const almostDone = createAlmostDoneQuestState();
-    let completed = recordEnemyDefeatedForGuildNoticeBoard(
-      almostDone,
-      createDeadEnemy("goblin_shaman", 10),
-    );
-    completed = recordEnemyDefeatedForGuildNoticeBoard(
-      completed,
-      createDeadEnemy("ash_wisp", 11),
-    );
+    const completed = finishAlmostDoneQuest(almostDone);
     const completedQuest = completed.guildNoticeBoard?.slots[0];
 
     expect(completedQuest?.status).toBe("done");
@@ -170,26 +203,17 @@ describe("guild notice board", () => {
     const reward = completedQuest?.rewards;
 
     expect(opened.claimedRewards).toHaveLength(1);
-    expect(getCurrencyBalance(opened.state.wallet, "crowns")).toBe(100);
+    expect(getCurrencyBalance(opened.state.wallet, "crowns")).toBe(150);
     expect(
       reward ? countInventoryItem(opened.state.inventory, reward.skillBookItemId) : 0,
-    ).toBe(1);
-    expect(opened.claimedRewards[0]?.skillBookItemIds).toEqual([
-      reward?.skillBookItemId,
-    ]);
+    ).toBe(reward?.skillBookItemIds?.filter(id => id === reward.skillBookItemId).length);
+    expect(opened.claimedRewards[0]?.skillBookItemIds).toEqual(reward?.skillBookItemIds);
     expect(opened.state.guildNoticeBoard?.slots[0]?.rewardClaimedAtMs).toBe(NOW_MS);
   });
 
   it("refreshes a claimed done quest into a different quest", () => {
     const almostDone = createAlmostDoneQuestState();
-    let completed = recordEnemyDefeatedForGuildNoticeBoard(
-      almostDone,
-      createDeadEnemy("goblin_shaman", 10),
-    );
-    completed = recordEnemyDefeatedForGuildNoticeBoard(
-      completed,
-      createDeadEnemy("ash_wisp", 11),
-    );
+    const completed = finishAlmostDoneQuest(almostDone);
     const opened = openGuildNoticeBoard(completed, NOW_MS);
     const refreshed = refreshGuildNoticeBoardState(
       opened.state,
@@ -197,10 +221,12 @@ describe("guild notice board", () => {
     );
 
     expect(refreshed.guildNoticeBoard?.slots[0]).toMatchObject({
-      id: "guild-notice-board-quest-2",
       status: "available",
-      title: "Shaman Watch Culling",
     });
+    expect(refreshed.guildNoticeBoard?.slots[0]?.isStarterContract).not.toBe(true);
+    expect(refreshed.guildNoticeBoard?.slots[0]?.id).not.toBe(
+      GUILD_NOTICE_BOARD_STARTER_QUEST_ID,
+    );
   });
 });
 
@@ -211,12 +237,25 @@ function createNoticeBoardState(): GameState {
   };
 
   return createTestGameState({
+    currentMapId: "map-4",
+    worldDiscovery: { visitedMapIds: ["map-4"], visitedSubzonesByMapId: {} },
     entities: {
       [leader.id]: leader,
     },
     partyLeaderId: leader.id,
     guildNoticeBoard: createInitialGuildNoticeBoardState(NOW_MS),
   });
+}
+
+function finishAlmostDoneQuest(state: GameState): GameState {
+  return state.guildNoticeBoard!.slots[0]!.objectives.reduce(
+    (nextState, objective) =>
+      recordEnemyDefeatedForGuildNoticeBoard(
+        nextState,
+        createDeadEnemy(getBoardObjectiveEnemyTypes(objective)[0], 11),
+      ),
+    state,
+  );
 }
 
 function createAlmostDoneQuestState(): GameState {

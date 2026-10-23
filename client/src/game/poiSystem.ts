@@ -39,12 +39,18 @@ import {
   setPartyIntent,
 } from "./partyIntentState";
 import {
+  clearAutomaticResourceWorkForQuestDefense,
+  getActiveQuestDefenseFocus,
+} from "./questDefenseFocus";
+import {
   QUEST_DEFINITIONS,
   QUEST_ORDER,
   completeQuestObjective,
   getActiveQuest,
   getAvailableQuest,
   getFirstIncompleteObjective,
+  getQuestGuidanceObjectives,
+  getQuestTargetMapId,
   getIncompleteObjectives,
   getQuestGiverAvailableQuests,
   getQuestGiverReadyQuests,
@@ -85,10 +91,11 @@ export function updatePoiSystem(
   state: GameState,
   resourceWorkContext?: ResourceWorkContext,
 ): GameState {
+  const focusedState = clearAutomaticResourceWorkForQuestDefense(state);
   const markerInteractionState =
-    state.activeTeleport || isAutoRoutePaused(state)
-      ? state
-      : updateReachedQuestMarkerInteractions(state);
+    focusedState.activeTeleport || isAutoRoutePaused(focusedState)
+      ? focusedState
+      : updateReachedQuestMarkerInteractions(focusedState);
 
   if (
     (!markerInteractionState.autoModeEnabled &&
@@ -276,6 +283,29 @@ function canReusePoiSelection(
   gathererReservations: GathererResourceReservations,
 ): state is GameState & { localPoiTarget: LocalPoiTarget } {
   if (!state.localPoiTarget) {
+    return false;
+  }
+
+  const activeQuest = getActiveQuest(state);
+  if (activeQuest?.status === "active" &&
+    QUEST_DEFINITIONS[activeQuest.questId].objectiveGuidance === "first_incomplete" &&
+    getQuestTargetMapId(state, activeQuest.questId) === state.currentMapId &&
+    state.localPoiTarget.reason !== "active party threat") {
+    const objective = getQuestGuidanceObjectives(state, activeQuest.questId)[0];
+    if (state.localPoiTarget.questId !== activeQuest.questId || state.localPoiTarget.objectiveId !== objective?.id) return false;
+  }
+
+  const defenseFocus = getActiveQuestDefenseFocus(state);
+
+  if (
+    defenseFocus &&
+    (state.localPoiTarget.category === "resource" ||
+      (state.localPoiTarget.category === "combat" &&
+        (!state.localPoiTarget.targetEntityId ||
+          !defenseFocus.defenderIds.includes(
+            state.localPoiTarget.targetEntityId,
+          ))))
+  ) {
     return false;
   }
 

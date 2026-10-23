@@ -1,4 +1,5 @@
 import { useEffect, useState, type DragEvent, type ReactNode } from "react";
+import { getBoardObjectiveEnemyTypes, getBoardObjectiveLabel, getGuildNoticeBoardRewardPreview } from "./game/guildNoticeBoard";
 import {
   CLASS_DEFINITIONS,
   getGuildNoticeBoardRerollDisplayState,
@@ -1563,14 +1564,6 @@ function GuildNoticeBoardView({
     : quest && isDone
       ? getNoticeBoardQuestStatusLabel(quest)
       : "Take Quest";
-  const statusText = !canUse
-    ? GUILD_INN_UNAVAILABLE_MESSAGE
-    : quest
-      ? getNoticeBoardQuestStatusLabel(quest)
-      : `Next posting in ${formatRecruitCountdown(
-          board.nextRefreshAtMs,
-          currentTime,
-        )}`;
   const rerollDisabled = !canUse || !rerollState.isUnlocked || rerollState.remaining <= 0;
 
   useEffect(() => {
@@ -1640,7 +1633,7 @@ function GuildNoticeBoardView({
               </strong>
               <span>{slot?.title ?? "No posting"}</span>
               <small>
-                {slot ? getNoticeBoardQuestStatusLabel(slot) : statusText}
+                {slot ? getNoticeBoardQuestStatusLabel(slot) : `Next posting in ${formatRecruitCountdown(board.nextRefreshAtMs, currentTime)}`}
               </small>
             </button>
           ))}
@@ -1657,22 +1650,22 @@ function GuildNoticeBoardView({
                   </div>
                   <div>
                     <dt>Type</dt>
-                    <dd>Exterminate</dd>
+                    <dd>{getNoticeBoardQuestCategoryLabel(quest)}</dd>
                   </div>
                 </dl>
               </div>
               <div className="guild-notice-board-monsters" aria-label="Quest targets">
-                {quest.objectives.map((objective) => {
-                  const enemyType = getEnemyType(objective.enemyTypeId);
+                {Array.from(new Set(quest.objectives.flatMap(getBoardObjectiveEnemyTypes))).map((enemyTypeId) => {
+                  const enemyType = getEnemyType(enemyTypeId);
                   const enemyDisplayName =
-                    enemyType?.displayName ?? objective.enemyTypeId;
+                    enemyType?.displayName ?? enemyTypeId;
                   const animation = getEnemyWalkingAnimation(
-                    objective.enemyTypeId,
+                    enemyTypeId,
                     "east",
                   );
 
                   return (
-                    <div key={objective.id}>
+                    <div key={enemyTypeId}>
                       <SpriteAnimation
                         alt={`${enemyDisplayName} walking east`}
                         animation={animation}
@@ -1685,15 +1678,18 @@ function GuildNoticeBoardView({
               </div>
             </div>
 
+            {quest.description ? (
+              <p className="guild-notice-board-description">
+                {quest.description}
+              </p>
+            ) : null}
+
             <div className="guild-notice-board-objectives">
               <strong>Objectives</strong>
               {quest.objectives.map((objective) => {
-                const enemyType = getEnemyType(objective.enemyTypeId);
-                const enemyDisplayName =
-                  enemyType?.displayName ?? objective.enemyTypeId;
                 return (
                   <span key={objective.id}>
-                    Kill {enemyDisplayName}: {objective.currentCount}/
+                    {getBoardObjectiveLabel(objective)}: {objective.currentCount}/
                     {objective.requiredCount}
                   </span>
                 );
@@ -2927,16 +2923,9 @@ function formatNoticeBoardRewards(
   quest: GuildNoticeBoardQuest,
 ): string {
   const rewardPercent = getGuildNoticeBoardRewardPercent(state);
-  const crowns = Math.floor((quest.rewards.crowns * rewardPercent) / 100);
-  const guaranteedBooks = Math.floor(rewardPercent / 100);
-  const extraChance = Math.floor(rewardPercent % 100);
-  const bookName = getItemDefinition(quest.rewards.skillBookItemId).displayName;
-  const bookText =
-    extraChance > 0
-      ? `${guaranteedBooks} ${bookName} + ${extraChance}% extra`
-      : `${guaranteedBooks} ${bookName}`;
-
-  return `${crowns} Crowns, ${bookText}`;
+  const reward = getGuildNoticeBoardRewardPreview(quest, rewardPercent);
+  const bookText = reward.skillBookItemIds.map(id => getItemDefinition(id).displayName).join(", ");
+  return `${reward.characterXp} character XP, ${reward.crowns} Crowns, ${bookText}`;
 }
 
 function getNoticeBoardButtonStatus(
@@ -2961,6 +2950,13 @@ function getNoticeBoardQuestStatusLabel(
   }
 
   return "Available";
+}
+
+function getNoticeBoardQuestCategoryLabel(
+  quest: GuildNoticeBoardQuest,
+): string {
+  const labels = { assault: "Assault", extermination: "Extermination", rummage: "Rummage", forage: "Forage" };
+  return labels[quest.category ?? "extermination"];
 }
 
 function getRoleLabel(role: PartyMemberRole): string {

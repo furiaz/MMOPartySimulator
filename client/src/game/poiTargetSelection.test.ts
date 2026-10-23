@@ -60,6 +60,77 @@ describe("POI target selection", () => {
     });
   });
 
+  it("targets only the tracked quest spawn for a tracked-spawn objective", () => {
+    const leader = createLeader({ x: 145, y: 22 });
+    const trackedTarget = createEnemy(
+      "tracked-superior-wolf",
+      { x: 145, y: 22 },
+      "aggressive",
+      {
+        enemyTypeId: "wolf",
+        level: 8,
+        variant: "superior",
+        questSpawn: {
+          questId: "open_wolf_causeway",
+          objectiveId: "defeat_causeway_elite",
+          targetPosition: { x: 145, y: 22 },
+        },
+      },
+    );
+    const ambientSuperior = createEnemy(
+      "ambient-superior-wolf",
+      { x: 146, y: 22 },
+      "aggressive",
+      { enemyTypeId: "wolf", level: 8, variant: "superior" },
+    );
+    const quests = createQuestStates({ open_wolf_causeway: "active" });
+    const causewayQuest = quests.open_wolf_causeway;
+    quests.open_wolf_causeway = {
+      ...causewayQuest,
+      objectiveProgress: {
+        ...causewayQuest.objectiveProgress,
+        escort_causeway_worker: {
+          objectiveId: "escort_causeway_worker",
+          currentCount: 1,
+          completed: true,
+        },
+        defend_wolf_causeway: {
+          objectiveId: "defend_wolf_causeway",
+          currentCount: 1,
+          completed: true,
+        },
+      },
+      runtime: {
+        questSpawnedEnemyIdsByObjectiveId: {
+          defeat_causeway_elite: [trackedTarget.id],
+        },
+      },
+    };
+    const state = createGameState(
+      MAP_TWO_ID,
+      [leader, trackedTarget, ambientSuperior],
+      { partyLeaderId: leader.id, quests },
+    );
+
+    const selection = selectPoiTarget(
+      state,
+      {
+        type: "complete_current_quest",
+        questId: "open_wolf_causeway",
+        objectiveId: "defeat_causeway_elite",
+        reason: "active quest tracked spawn objective",
+      },
+      createEmptyReservations(),
+    );
+
+    expect(selection.localTarget).toMatchObject({
+      poiId: trackedTarget.id,
+      category: "combat",
+      targetEntityId: trackedTarget.id,
+      reason: "active quest tracked spawn objective",
+    });
+  });
+
   it("orders hub quest giver work before idle with enemy-part materials in inventory", () => {
     const leader = createLeader({ x: 7, y: 20 });
     let state = createGameState(

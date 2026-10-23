@@ -6,6 +6,7 @@ import {
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
   MAP_ONE_ID,
+  MAP_SEVEN_ID,
   MAP_TWO_ID,
   SLIMEWARD_FLOOR_ONE_ID,
   mapTwoEnemyStartData,
@@ -64,7 +65,7 @@ import {
 } from "./saveGame";
 import type { GameState } from "./state";
 import { createTestGameState } from "./testState";
-import type { Companion, GameEntity, ItemId, PartyMemberRole } from "./types";
+import type { Companion, Enemy, GameEntity, ItemId, PartyMemberRole } from "./types";
 import { addCurrencyToWalletState } from "./wallet";
 import { createAoeCastTransform, resolveAoePattern } from "./aoePatterns";
 
@@ -82,6 +83,61 @@ describe("save game serialization", () => {
     expect(validateSavedGame(save).ok).toBe(true);
     expect(validateSavedGame({ ...save, saveVersion: 999 }).ok).toBe(false);
     expect(validateSavedGame({ ...save, state: { ...save.state, entities: null } }).ok).toBe(false);
+  });
+
+  it("restores authored encounter bands and sanitizes dynamic enemy bands", () => {
+    const warmaster = createEnemy(
+      "zone-7-orc-warmaster-01",
+      { x: 82, y: 29 },
+      undefined,
+      { enemyTypeId: "orc_warmaster", encounterBand: "elite" },
+    );
+    const dynamicChampion = createEnemy(
+      "dynamic-champion",
+      { x: 40, y: 30 },
+      undefined,
+      { encounterBand: "champion" },
+    );
+    const malformedBandEnemy = {
+      ...createEnemy("malformed-band", { x: 45, y: 30 }),
+      encounterBand: "legendary" as Enemy["encounterBand"],
+    };
+    const state = {
+      ...createTestGameState(),
+      currentMapId: MAP_SEVEN_ID,
+      map: createDebugMap(MAP_SEVEN_ID),
+      entities: {
+        [warmaster.id]: warmaster,
+        [dynamicChampion.id]: dynamicChampion,
+        [malformedBandEnemy.id]: malformedBandEnemy,
+      },
+    };
+
+    const sanitized = sanitizeGameStateForSave(state, NOW_MS);
+
+    expect(sanitized.entities[warmaster.id]).toMatchObject({
+      encounterBand: "boss",
+    });
+    expect(sanitized.entities[dynamicChampion.id]).toMatchObject({
+      encounterBand: "champion",
+    });
+    expect(sanitized.entities[malformedBandEnemy.id]).toMatchObject({
+      encounterBand: "standard",
+    });
+
+    const legacySave = createSavedGame(state, NOW_MS);
+    const savedWarmaster = legacySave.state.entities[warmaster.id];
+    if (savedWarmaster?.kind === "enemy") {
+      delete (savedWarmaster as Partial<Enemy>).encounterBand;
+    }
+    const restored = restoreGameStateFromSave(legacySave);
+
+    expect(restored.ok).toBe(true);
+    if (restored.ok) {
+      expect(restored.state.entities[warmaster.id]).toMatchObject({
+        encounterBand: "boss",
+      });
+    }
   });
 
   it("migrates every persisted legacy item container before validation", () => {
@@ -336,6 +392,17 @@ describe("save game serialization", () => {
               suppressedSubzoneEnemiesByObjectiveId: {
                 defend_old_grove_cache: [secondEnemy],
               },
+              ambientEnemySuppressionsByGroupId: {
+                defend_old_grove_cache: {
+                  targetMapId: MAP_TWO_ID,
+                  scope: "subzone",
+                  targetSubzoneId: "south-east",
+                  restoreDelayMs: 3_000,
+                  variantPolicy: "reroll",
+                  activeObjectiveIds: ["defend_old_grove_cache"],
+                  enemySnapshots: [firstEnemy],
+                },
+              },
             },
           },
         },
@@ -361,6 +428,11 @@ describe("save game serialization", () => {
               },
               suppressedSubzoneEnemiesByObjectiveId: {
                 defend_old_grove_cache: [{ id: secondEnemyId }],
+              },
+              ambientEnemySuppressionsByGroupId: {
+                defend_old_grove_cache: {
+                  enemySnapshots: [{ id: firstEnemyId }],
+                },
               },
             },
           },
@@ -476,6 +548,67 @@ describe("save game serialization", () => {
     expect(restored.state.companionAoeChannelsByCasterId).toEqual({});
     expect(restored.state.aoeDummyPatternSequenceIndex).toBe(0);
     expect(restored.state.debugTelemetry).toBeUndefined();
+  });
+
+  it("clears a quest start-speech cue on restore without replaying the started defense", () => {
+    const quests = createInitialQuestStates();
+    const causeway = quests.open_wolf_causeway;
+    quests.open_wolf_causeway = {
+      ...causeway,
+      status: "active",
+      objectiveProgress: {
+        ...causeway.objectiveProgress,
+        escort_causeway_worker: {
+          objectiveId: "escort_causeway_worker",
+          currentCount: 1,
+          completed: true,
+        },
+      },
+      runtime: {
+        defenseStartedObjectiveIds: {
+          defend_wolf_causeway: true,
+        },
+      },
+    };
+    const state = createTestGameState({
+      currentMapId: MAP_TWO_ID,
+      map: createDebugMap(MAP_TWO_ID),
+      quests,
+      questNpcSpeechCue: {
+        id: "open_wolf_causeway:defend_wolf_causeway:999",
+        mapId: MAP_TWO_ID,
+        npcId: "map-2-causeway-worker",
+        text: "Its an ambush! Protect me!",
+        createdAt: NOW_MS - 1_000,
+      },
+    });
+    const save = createSavedGame(state, NOW_MS);
+
+    expect(save.state.questNpcSpeechCue).toBeUndefined();
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+
+    expect(restored.state.questNpcSpeechCue).toBeUndefined();
+    expect(
+      restored.state.quests.open_wolf_causeway.runtime
+        ?.defenseStartedObjectiveIds?.defend_wolf_causeway,
+    ).toBe(true);
+
+    const resumedState = updateQuestGuideSystem(
+      restored.state,
+      new Set(),
+      {
+        nowMs: NOW_MS + 100,
+        deltaMs: 100,
+        deltaSeconds: 0.1,
+        frameNumber: 1,
+      },
+    );
+    expect(resumedState.questNpcSpeechCue).toBeUndefined();
   });
 
   it("keeps persistent party, inventory, wallet, quests, map, and resources", () => {
@@ -611,6 +744,8 @@ describe("save game serialization", () => {
   it("preserves resting companions and highest-ever level through save restore", () => {
     const leader: Companion = {
       ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1", "defender", 0),
+      characterLevel: 19,
+      characterXp: 5302,
       state: "idle",
       currentTargetId: null,
     };
@@ -653,6 +788,11 @@ describe("save game serialization", () => {
     }
 
     expect(restored.state.entities[veteran.id]).toBeUndefined();
+    expect(restored.state.entities[leader.id]).toMatchObject({
+      id: leader.id,
+      characterLevel: 19,
+      characterXp: 5302,
+    });
     expect(restored.state.restingCompanionsById?.[veteran.id]).toMatchObject({
       id: veteran.id,
       characterLevel: 50,
@@ -813,15 +953,25 @@ describe("save game serialization", () => {
   });
 
   it("preserves Guild Notice Board quest, timer, and sequence through save restore", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW_MS);
     const guildNoticeBoard = {
       ...createInitialGuildNoticeBoardState(NOW_MS),
       questSequence: 5,
       hasSeenCurrentRefresh: true,
+      starterContractAccepted: true,
       nextRefreshAtMs: NOW_MS + GUILD_NOTICE_BOARD_REFRESH_INTERVAL_MS,
       slots: [
         {
           ...createInitialGuildNoticeBoardState(NOW_MS).slots[0]!,
+          schemaVersion: undefined,
+          targetMapId: undefined,
+          rewards: { crowns: 100, skillBookItemId: "throw_rock_skill_book" as const },
           id: "guild-notice-board-quest-5",
+          title: "Ashwatch Field Orders",
+          category: "extermination" as const,
+          zoneDisplayName: "Ashwatch",
+          description: undefined,
+          isStarterContract: undefined,
           sequence: 5,
           status: "taken" as const,
           takenAtMs: NOW_MS,
@@ -859,6 +1009,176 @@ describe("save game serialization", () => {
     }
 
     expect(restored.state.guildNoticeBoard).toEqual(guildNoticeBoard);
+  });
+
+  it("skips onboarding for an already-eligible legacy save without replacing Board progress", () => {
+    const leader = {
+      ...createCompanion("companion-1", { x: 14, y: 29 }, "companion-1"),
+      classId: "blade" as const,
+      characterLevel: 10,
+    };
+    const quests = createInitialQuestStates();
+    quests.azure_trial = {
+      ...quests.azure_trial,
+      status: "completed",
+      completedCycle: 1,
+      rewardClaimedCycle: 1,
+    };
+    const legacyBoard = createLegacyGuildNoticeBoardState();
+    const save = createSavedGame(
+      createTestGameState({
+        entities: { [leader.id]: leader },
+        partyLeaderId: leader.id,
+        quests,
+        guildNoticeBoard: legacyBoard,
+      }),
+      NOW_MS,
+    );
+    const legacyQuests = save.state.quests as Partial<typeof save.state.quests>;
+    delete legacyQuests.orders_from_the_guild;
+    delete legacyQuests.break_the_ash_camp;
+    save.state.guildNoticeBoard = legacyBoard;
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.quests.orders_from_the_guild.status).toBe("completed");
+    expect(restored.state.quests.break_the_ash_camp.status).toBe("available");
+    expect(restored.state.guildNoticeBoard?.slots).toHaveLength(1);
+    expect(restored.state.guildNoticeBoard?.slots[0]?.id).toBe(
+      "guild-notice-board-quest-5",
+    );
+    expect(restored.state.guildNoticeBoard?.starterContractAccepted).toBe(false);
+  });
+
+  it("keeps onboarding for a pre-eligibility legacy save and preserves its Board slot", () => {
+    const quests = createInitialQuestStates();
+    quests.azure_trial = {
+      ...quests.azure_trial,
+      status: "completed",
+      completedCycle: 1,
+      rewardClaimedCycle: 1,
+    };
+    const legacyBoard = createLegacyGuildNoticeBoardState();
+    const save = createSavedGame(
+      createTestGameState({
+        quests,
+        guildNoticeBoard: legacyBoard,
+      }),
+      NOW_MS,
+    );
+    const legacyQuests = save.state.quests as Partial<typeof save.state.quests>;
+    delete legacyQuests.orders_from_the_guild;
+    delete legacyQuests.break_the_ash_camp;
+    save.state.guildNoticeBoard = legacyBoard;
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.quests.orders_from_the_guild.status).toBe("locked");
+    expect(restored.state.guildNoticeBoard?.slots.map((slot) => slot?.id)).toEqual([
+      "guild-notice-board-starter-ash-goblin-encampment",
+      "guild-notice-board-quest-5",
+    ]);
+  });
+
+  it("unlocks Into the Briar Burrows when an older save completed Break the Ash Camp", () => {
+    const quests = createInitialQuestStates();
+    quests.break_the_ash_camp = {
+      ...quests.break_the_ash_camp,
+      status: "completed",
+      completedCycle: 1,
+      rewardClaimedCycle: 1,
+    };
+    const save = createSavedGame(createTestGameState({ quests }), NOW_MS);
+    delete (save.state.quests as Partial<typeof save.state.quests>)
+      .into_the_briar_burrows;
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(restored.state.quests.into_the_briar_burrows.status).toBe(
+      "available",
+    );
+  });
+
+  it("restores Briar Burrows kill progress and reconciles current ownership and party size", () => {
+    const leader = createCompanion(
+      "companion-1",
+      { x: 14, y: 29 },
+      "companion-1",
+    );
+    const follower = createCompanion(
+      "companion-2",
+      { x: 15, y: 29 },
+      leader.id,
+    );
+    const thirdCompanion = {
+      ...createCompanion("companion-3", { x: 16, y: 29 }, leader.id),
+      state: "dead" as const,
+      health: 0,
+    };
+    const quests = createInitialQuestStates();
+    quests.into_the_briar_burrows = {
+      ...quests.into_the_briar_burrows,
+      status: "active",
+      objectiveProgress: {
+        ...quests.into_the_briar_burrows.objectiveProgress,
+        defeat_briar_burrows_enemies: {
+          objectiveId: "defeat_briar_burrows_enemies",
+          currentCount: 123,
+          completed: false,
+        },
+      },
+    };
+    const baseState = createTestGameState();
+    const save = createSavedGame(
+      createTestGameState({
+        entities: {
+          [leader.id]: leader,
+          [follower.id]: follower,
+          [thirdCompanion.id]: thirdCompanion,
+        },
+        partyLeaderId: leader.id,
+        quests,
+        livestock: {
+          ...baseState.livestock!,
+          ownedCreaturesById: {
+            ...baseState.livestock!.ownedCreaturesById,
+            tin_crawler: 1,
+          },
+        },
+      }),
+      NOW_MS,
+    );
+
+    const restored = restoreGameStateFromSave(save);
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+    expect(
+      restored.state.quests.into_the_briar_burrows.objectiveProgress
+        .defeat_briar_burrows_enemies.currentCount,
+    ).toBe(123);
+    expect(
+      restored.state.quests.into_the_briar_burrows.objectiveProgress
+        .find_tin_crawler_hatchling,
+    ).toMatchObject({ currentCount: 1, completed: true });
+    expect(
+      restored.state.quests.into_the_briar_burrows.objectiveProgress
+        .assemble_three_companions,
+    ).toMatchObject({ currentCount: 3, completed: true });
   });
 
   it("preserves Guild Field Team assignment through save restore", () => {
@@ -1180,9 +1500,9 @@ describe("save game serialization", () => {
     expect(restored.state.guildRecruit?.recruitSequence).toBe(1);
     expect(restored.state.guildUpgrades?.recruit.recruit_slots).toBe(1);
     expect(restored.state.guildNoticeBoard?.slots[0]).toMatchObject({
-      id: "guild-notice-board-quest-1",
+      id: "guild-notice-board-starter-ash-goblin-encampment",
       status: "available",
-      sequence: 1,
+      sequence: 0,
     });
     expect(restored.state.guildNoticeBoard?.hasSeenCurrentRefresh).toBe(false);
     expect(restored.state.guildSecondaryParties).toEqual(
@@ -1315,6 +1635,46 @@ describe("save game serialization", () => {
     });
   });
 });
+
+function createLegacyGuildNoticeBoardState() {
+  const initial = createInitialGuildNoticeBoardState(NOW_MS);
+
+  return {
+    ...initial,
+    questSequence: 5,
+    starterContractAccepted: undefined,
+    slots: [
+      {
+        ...initial.slots[0]!,
+        schemaVersion: undefined,
+        targetMapId: undefined,
+        rewards: { crowns: 100, skillBookItemId: "throw_rock_skill_book" as const },
+        id: "guild-notice-board-quest-5",
+        title: "Ashwatch Field Orders",
+        category: "extermination" as const,
+        zoneDisplayName: "Ashwatch",
+        description: undefined,
+        isStarterContract: undefined,
+        sequence: 5,
+        status: "taken" as const,
+        objectives: [
+          {
+            id: "defeat-goblin_shaman",
+            enemyTypeId: "goblin_shaman" as const,
+            requiredCount: 50,
+            currentCount: 12,
+          },
+          {
+            id: "defeat-ash_wisp",
+            enemyTypeId: "ash_wisp" as const,
+            requiredCount: 50,
+            currentCount: 7,
+          },
+        ],
+      },
+    ],
+  };
+}
 
 describe("offline farming", () => {
   it("caps offline progress at thirty minutes", () => {

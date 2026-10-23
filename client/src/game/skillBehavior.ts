@@ -1,4 +1,5 @@
 import { updateEntity, type GameState } from "./state";
+import { COMPANION_AOE_VARIANTS } from "./companionAoeVariants";
 import type {
   Companion,
   CompanionSkillBehavior,
@@ -7,6 +8,8 @@ import type {
   MobilitySkillUseMode,
   SkillDefinition,
   SupportFocus,
+  SkillId,
+  SkillPreferenceValues,
 } from "./types";
 
 export const DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT = 20;
@@ -57,7 +60,137 @@ const FIRE_BURST_TARGET_MODE_VALUES: ReadonlySet<FireBurstTargetMode> = new Set(
   "highest_health",
 ]);
 const CIRCLE_OF_RENEWAL_TARGET_MODE_VALUES: ReadonlySet<CircleOfRenewalTargetMode> =
-  new Set(["big_group", "low_health", "defender"]);
+  new Set(["big_group", "low_health", "highest_health", "defender"]);
+
+type LegacyPreferenceKey = Exclude<keyof CompanionSkillBehavior, "preferencesBySkillId">;
+export type SkillPreferenceControl = {
+  key: keyof SkillPreferenceValues;
+  label: string;
+  description: string;
+  type: "number" | "choice" | "toggle";
+  defaultValue: string | number | boolean;
+  legacyField?: LegacyPreferenceKey;
+  min?: number;
+  max?: number;
+  choices?: readonly { value: string; label: string; description: string }[];
+  offensiveOnly?: boolean;
+};
+
+const TARGET_CHOICES = [
+  { value: "highest_health", label: "High HP", description: "Prioritize the eligible target with the highest remaining HP." },
+  { value: "big_group", label: "Big Group", description: "Choose a valid target/direction that includes the most eligible recipients inside the selected shape." },
+  { value: "low_health", label: "Low HP", description: "Prioritize the eligible target with the lowest HP percentage." },
+];
+const SUPPORT_CHOICES = [
+  { value: "lowest_hp", label: "Lowest HP", description: "Prefer the eligible ally with the lowest HP percentage." },
+  { value: "leader", label: "Leader", description: "Prefer the living leader when eligible; otherwise use normal support selection." },
+  { value: "defender", label: "Defender", description: "Prefer an eligible Defender-role companion; otherwise use normal support selection." },
+];
+
+function numberControl(key: keyof SkillPreferenceValues, label: string, legacyField: LegacyPreferenceKey, max: number, min = 1): SkillPreferenceControl {
+  return { key, label, legacyField, type: "number", min, max, defaultValue: 1,
+    description: `Use this skill's existing HP rule at the selected percentage (${min}–${max}%). Other skills are unaffected.` };
+}
+const supportControl: SkillPreferenceControl = { key: "supportFocus", label: "Target Focus", type: "choice", legacyField: "supportFocus", defaultValue: "lowest_hp", choices: SUPPORT_CHOICES, description: "Choose this skill's preferred eligible ally, without changing other support skills." };
+const safetyControl = numberControl("safetyFloorPercent", "Safety Floor", "selfSacrificeSafetyFloorPercent", SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT);
+const mobilityControls: SkillPreferenceControl[] = [
+  { key: "mobilityMode", label: "Use Mode", type: "choice", legacyField: "mobilitySkillUseMode", defaultValue: "offensive", description: "Offensive approaches a combat target. Defensive escapes a threat using this skill's HP threshold.", choices: [
+    { value: "offensive", label: "Offensive", description: "Use the existing offensive approach and landing rules." },
+    { value: "defensive", label: "Defensive", description: "Retreat from the existing threat; area effects remain at departure where supported." },
+  ] },
+  numberControl("defensiveHpThresholdPercent", "Defensive HP Threshold", "defensiveMobilityUseHpThresholdPercent", DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT),
+];
+const offensiveTargetControl: SkillPreferenceControl = { key: "targetMode", label: "Target Priority", type: "choice", defaultValue: "big_group", choices: TARGET_CHOICES, description: "Select targets using this skill's real area. Manual target constraints still apply." };
+
+const BASE_SKILL_CONTROLS: Partial<Record<SkillId, readonly SkillPreferenceControl[]>> = {
+  first_aid: [
+    numberControl("selfHealHpThresholdPercent", "Self-Heal HP Threshold", "beginnerFirstAidSelfHealHpThresholdPercent", 60, 10),
+    numberControl("allyHealHpThresholdPercent", "Ally-Heal HP Threshold", "beginnerFirstAidAllyHealHpThresholdPercent", 60, 10), supportControl,
+  ],
+  second_wind: [numberControl("selfHealHpThresholdPercent", "Self-Heal HP Threshold", "secondWindSelfHealHpThresholdPercent", 30)],
+  hold_fast: [numberControl("useHpThresholdPercent", "Use HP Threshold", "holdFastUseHpThresholdPercent", 100)],
+  fake_death: [numberControl("useHpThresholdPercent", "Use HP Threshold", "fakeDeathUseHpThresholdPercent", 30)],
+  blood_feast: [numberControl("useHpThresholdPercent", "Use HP Threshold", "bloodFeastUseHpThresholdPercent", 30)],
+  light_mend: [numberControl("allyHealHpThresholdPercent", "Ally HP Threshold", "lightMendAllyHealHpThresholdPercent", 80), supportControl],
+  frost_armor: [supportControl],
+  guiding_light: [supportControl],
+  penitents_gift: [
+    numberControl("allyHealHpThresholdPercent", "Ally HP Threshold", "penitentsGiftAllyHealHpThresholdPercent", 80),
+    numberControl("selfHealHpThresholdPercent", "Self HP Threshold", "penitentsGiftSelfHealHpThresholdPercent", 30), safetyControl, supportControl,
+  ],
+  flagellant_lash: [safetyControl],
+  martyrs_veil: [safetyControl],
+  eternal_hope: [numberControl("useHpThresholdPercent", "Use HP Threshold", "eternalHopeUseHpThresholdPercent", 80)],
+  overcharge: [{ key: "enabled", label: "Enabled", type: "toggle", legacyField: "overchargeEnabled", defaultValue: true, description: "Allow this companion to use Overcharge under its existing combat rules." }],
+  flash_step: mobilityControls, shield_rush: mobilityControls, skirmish_shot: mobilityControls,
+  pounce: mobilityControls, flame_step: mobilityControls, rune_step: mobilityControls,
+  dawn_step: [...mobilityControls, { ...offensiveTargetControl, offensiveOnly: true }],
+  atonement_step: [...mobilityControls, safetyControl, { ...offensiveTargetControl, offensiveOnly: true }],
+  arrow_burst: [offensiveTargetControl],
+  fire_burst: [{ ...offensiveTargetControl, legacyField: "fireBurstTargetMode" }],
+  circle_of_renewal: [
+    { ...offensiveTargetControl, legacyField: "circleOfRenewalTargetMode", choices: [...TARGET_CHOICES,
+      { value: "defender", label: "Defender", description: "Prefer an injured eligible Defender-role companion; otherwise use the normal low-HP fallback." }], description: "Choose an injured, living main target that meets this skill's HP threshold. Big Group counts injured allies inside the selected circle." },
+    numberControl("mainTargetHpThresholdPercent", "Main Target HP Threshold", "circleOfRenewalMainTargetHpThresholdPercent", 90),
+  ],
+};
+
+export function getSkillPreferenceControls(skillId: SkillId): readonly SkillPreferenceControl[] {
+  const variants = COMPANION_AOE_VARIANTS[skillId];
+  const controls = BASE_SKILL_CONTROLS[skillId] ?? [];
+  return variants ? [{ key: "variant", label: "Area Variant", type: "choice", defaultValue: variants[0].id,
+    description: "Choose this skill's authored area and effect tradeoff.",
+    choices: variants.map(option => ({ value: option.id, label: option.displayName, description: option.description })),
+  }, ...controls] : controls;
+}
+
+export function getSkillPreferences(companion: Companion, skillId: SkillId): SkillPreferenceValues {
+  const legacy = getCompanionSkillBehavior(companion);
+  const stored = legacy.preferencesBySkillId?.[skillId];
+  const values: Record<string, string | number | boolean> = {};
+  for (const control of getSkillPreferenceControls(skillId)) {
+    const legacyValue = control.legacyField ? legacy[control.legacyField] : control.defaultValue;
+    const fallback = control.type === "number" && (typeof legacyValue !== "number" || !Number.isFinite(legacyValue))
+      ? control.legacyField ? createDefaultCompanionSkillBehavior()[control.legacyField] : control.defaultValue : legacyValue;
+    const candidate = stored && typeof stored === "object" ? stored[control.key] ?? fallback : fallback;
+    values[control.key] = control.type === "number"
+      ? Math.min(control.max!, Math.max(control.min!, Math.round(typeof candidate === "number" && Number.isFinite(candidate) ? candidate : Number(fallback))))
+      : control.type === "toggle" ? typeof candidate === "boolean" ? candidate : Boolean(fallback)
+      : control.choices?.some(option => option.value === candidate) ? candidate as string
+      : control.choices?.some(option => option.value === fallback) ? fallback as string : control.defaultValue;
+  }
+  return values as SkillPreferenceValues;
+}
+
+/** Compatibility-shaped read for existing effect helpers, scoped to one skill. */
+export function getCompanionSkillBehaviorForSkill(companion: Companion, skillId: SkillId): CompanionSkillBehavior {
+  const behavior = getCompanionSkillBehavior(companion);
+  const values = getSkillPreferences(companion, skillId);
+  const overrides = Object.fromEntries(getSkillPreferenceControls(skillId)
+    .filter(control => control.legacyField).map(control => [control.legacyField!, values[control.key]]));
+  return { ...behavior, ...overrides };
+}
+
+export function normalizeCompanionSkillBehavior(companion: Companion): CompanionSkillBehavior {
+  const ids = new Set<SkillId>([
+    ...Object.keys(BASE_SKILL_CONTROLS) as SkillId[], ...Object.keys(COMPANION_AOE_VARIANTS) as SkillId[],
+  ]);
+  return { ...getCompanionSkillBehavior(companion), preferencesBySkillId: Object.fromEntries(
+    [...ids].map(skillId => [skillId, getSkillPreferences(companion, skillId)])),
+  };
+}
+
+export function updateCompanionSkillPreference(state: GameState, companionId: string, skillId: SkillId, update: SkillPreferenceValues): GameState {
+  const companion = state.entities[companionId];
+  if (companion?.kind !== "companion" || getSkillPreferenceControls(skillId).length === 0) return state;
+  const behavior = normalizeCompanionSkillBehavior(companion);
+  const candidate = { ...companion, skillBehavior: { ...behavior, preferencesBySkillId: {
+    ...behavior.preferencesBySkillId, [skillId]: { ...behavior.preferencesBySkillId?.[skillId], ...update },
+  } } };
+  return updateEntity(state, { ...candidate, skillBehavior: { ...candidate.skillBehavior, preferencesBySkillId: {
+    ...candidate.skillBehavior.preferencesBySkillId, [skillId]: getSkillPreferences(candidate, skillId),
+  } } });
+}
 
 export type SkillBehaviorUpdate = Partial<CompanionSkillBehavior>;
 type StoredCompanionSkillBehavior = Partial<CompanionSkillBehavior> & {
@@ -98,7 +231,9 @@ export function createDefaultCompanionSkillBehavior(): CompanionSkillBehavior {
 
 export function getCompanionSkillBehavior(
   companion: Companion,
+  skillId?: SkillId,
 ): CompanionSkillBehavior {
+  if (skillId) return getCompanionSkillBehaviorForSkill(companion, skillId);
   const storedBehavior: StoredCompanionSkillBehavior =
     companion.skillBehavior ?? createDefaultCompanionSkillBehavior();
 
@@ -189,6 +324,13 @@ export function updateCompanionSkillBehavior(
   companionId: string,
   update: SkillBehaviorUpdate,
 ): GameState {
+  if (update.preferencesBySkillId) {
+    let nextState = state;
+    for (const [skillId, values] of Object.entries(update.preferencesBySkillId)) {
+      if (values && typeof values === "object") nextState = updateCompanionSkillPreference(nextState, companionId, skillId as SkillId, values);
+    }
+    return nextState;
+  }
   const companion = state.entities[companionId];
 
   if (companion?.kind !== "companion") {
@@ -326,7 +468,7 @@ export function isBeginnerFirstAidSelfHealPriorityActive(
     caster.maxHealth > 0 &&
     caster.health < caster.maxHealth &&
     (caster.health / caster.maxHealth) * 100 <=
-      getCompanionSkillBehavior(caster)
+      getCompanionSkillBehaviorForSkill(caster, "first_aid")
         .beginnerFirstAidSelfHealHpThresholdPercent
   );
 }
