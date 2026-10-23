@@ -3,6 +3,7 @@ import { createCompanion, createEnemy, createNpc, createResource } from "./entit
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEntitySeparationSystem } from "./entitySeparationSystem";
 import { getEuclideanDistance } from "./positionUtils";
+import { areEntitiesOverlapping } from "./spatialGeometry";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, GameMap, Position } from "./types";
 
@@ -17,6 +18,26 @@ const OPEN_MAP: GameMap = {
 };
 
 describe("stationary overlap separation", () => {
+  it("incrementally recovers from two enemies without moving either enemy", () => {
+    const actor = createCompanion("actor", { x: 5, y: 5 }, "actor");
+    const first = createEnemy("first", { x: 6, y: 5 }, "passive", { combatBodyRadius: 0.7 });
+    const second = createEnemy("second", { x: 5, y: 6 }, "passive", { combatBodyRadius: 0.7 });
+    let state = createState([actor, first, second]);
+
+    for (let frame = 0; frame < 30; frame++) state = updateEntitySeparationSystem(state, new Set());
+
+    expect(state.entities.actor.position).not.toEqual(actor.position);
+    expect(areEntitiesOverlapping(state.entities.actor, first)).toBe(false);
+    expect(areEntitiesOverlapping(state.entities.actor, second)).toBe(false);
+    expect(state.entities.first.position).toEqual(first.position);
+    expect(state.entities.second.position).toEqual(second.position);
+    const settled = state.entities.actor.position;
+    for (let frame = 0; frame < 30; frame++) {
+      state = updateEntitySeparationSystem(state, new Set());
+      expect(state.entities.actor.position).toEqual(settled);
+    }
+  });
+
   it("does not separate a moving companion from a stationary normal enemy", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 });

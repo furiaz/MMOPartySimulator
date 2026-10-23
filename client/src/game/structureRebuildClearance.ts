@@ -1,6 +1,5 @@
-import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { getEnemyMovementBodyRadius, isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
-import { getEntityCollisionShape } from "./movementPlanning";
+import { getCollisionBody as body, getEntityCollisionShape } from "./spatialGeometry";
 import type { GameState } from "./state";
 import type { AoeBounds, GameEntity, Position } from "./types";
 
@@ -8,15 +7,6 @@ const CLEARANCE = 0.05;
 const PERIMETER_STEP = 0.25;
 const SWEEP_STEP = 0.1;
 
-function body(entity: GameEntity, position = entity.position) {
-  const shape = getEntityCollisionShape(entity);
-  return {
-    x: position.x,
-    top: shape.kind === "verticalCapsule" ? position.y - shape.height * shape.anchorY + shape.radius : position.y,
-    bottom: shape.kind === "verticalCapsule" ? position.y + shape.height * (1 - shape.anchorY) - shape.radius : position.y,
-    radius: entity.kind === "enemy" ? Math.max(shape.radius, getEnemyCombatBodyRadius(entity)) : shape.radius,
-  };
-}
 function isSolid(entity: GameEntity) {
   return entity.state !== "dead" && !(entity.kind === "resource" && (entity.isDepleted || entity.quantity <= 0));
 }

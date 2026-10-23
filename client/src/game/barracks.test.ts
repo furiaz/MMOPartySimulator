@@ -311,7 +311,7 @@ describe("Orc Barracks", () => {
   });
   it("allows attacks at the footprint edge, never requires reaching its center", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
-    let state = setup({ x: 75, y: 24.1 });
+    let state = setup({ x: 75, y: 22.8 });
     state = issuePartyOrder(state, { type: "attack", targetId: id });
     expect(state.entities.leader.state).toBe("attack");
     state = updateAttackSystem(state, new Set(), 10_000);

@@ -1,5 +1,5 @@
 import { getFollowTrailPosition, type GameState } from "./state";
-import { ENTITY_COLLISION_DISTANCE } from "./movementPlanning";
+import { areEntitiesOverlapping, ENTITY_COLLISION_DISTANCE } from "./spatialGeometry";
 import { getOrderedPartyMembers, type PartyMember } from "./partySystem";
 import { getEuclideanDistance } from "./positionUtils";
 import type { GameEntity, Position } from "./types";
@@ -66,11 +66,9 @@ export function isCombatPositionSpacedFromParty(
     const reservedPosition = state.reservedPositionsByEntityId?.[member.id];
 
     return (
-      getEuclideanDistance(position, member.position) >=
-        COMBAT_PARTY_SPACING_DISTANCE &&
+      !areEntitiesOverlapping(attacker, member, position) &&
       (!reservedPosition ||
-        getEuclideanDistance(position, reservedPosition) >=
-          COMBAT_PARTY_SPACING_DISTANCE)
+        !areEntitiesOverlapping(attacker, member, position, reservedPosition))
     );
   });
 }

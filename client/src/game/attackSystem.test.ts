@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCompanion, createEnemy, createTargetDummy } from "./entities";
 import {
   DEFAULT_COMPANION_ATTACK_RANGE,
@@ -13,6 +13,10 @@ import { ENEMY_ATTACK_WINDUP_MS, updateAttackSystem } from "./attackSystem";
 import { addEntity } from "./state";
 import { createTestGameState } from "./testState";
 import type { Enemy, GameEntity, Position } from "./types";
+import { getEffectiveAttackRange } from "./spatialGeometry";
+
+beforeEach(() => vi.spyOn(Math, "random").mockReturnValue(0.99));
+afterEach(() => vi.restoreAllMocks());
 
 describe("enemy attack leash movement", () => {
   it("keeps default companion basic attack range melee", () => {
@@ -100,7 +104,7 @@ describe("enemy attack leash movement", () => {
 
   it("lets slime archetypes fight back after being attacked", () => {
     const companion = {
-      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      ...createIdleCompanion("leader", { x: 1.7, y: 0 }),
       state: "attack" as const,
       currentTargetId: "enemy",
     };
@@ -119,7 +123,7 @@ describe("enemy attack leash movement", () => {
 
   it("starts companion global cooldown when a basic attack lands", () => {
     const companion = {
-      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      ...createIdleCompanion("leader", { x: 1.7, y: 0 }),
       state: "attack" as const,
       currentTargetId: "enemy",
     };
@@ -144,7 +148,7 @@ describe("enemy attack leash movement", () => {
 
   it("uses companion global cooldown to gate basic attacks", () => {
     const companion = {
-      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      ...createIdleCompanion("leader", { x: 1.7, y: 0 }),
       state: "attack" as const,
       currentTargetId: "enemy",
     };
@@ -180,7 +184,7 @@ describe("enemy attack leash movement", () => {
 
   it("keeps target dummies alive and non-retaliatory when attacked", () => {
     const companion = {
-      ...createIdleCompanion("leader", { x: 1, y: 0 }),
+      ...createIdleCompanion("leader", { x: 1.7, y: 0 }),
       state: "attack" as const,
       currentTargetId: "dummy",
     };
@@ -596,7 +600,7 @@ describe("enemy attack leash movement", () => {
   });
 
   it("still attacks from an unspaced position when no spaced combat slot exists", () => {
-    const attacker = createAttackingCompanion("attacker", { x: 4, y: 5 }, 0);
+    const attacker = createAttackingCompanion("attacker", { x: 3.3, y: 5 }, 0);
     const enemy = createEnemy("enemy", { x: 5, y: 5 }, undefined, {
       maxHealth: 20,
     });
@@ -660,10 +664,12 @@ function createSpacingBlockers(targetPosition: Position): GameEntity[] {
     { x: targetPosition.x - 1, y: targetPosition.y + 1 },
   ];
 
-  return blockerPositions.map((position, index) =>
-    createIdleCompanion(`blocker-${index}`, {
-      x: position.x + 0.2,
-      y: position.y,
-    }),
-  );
+  const range = getEffectiveAttackRange(createIdleCompanion("attacker", targetPosition), createEnemy("target", targetPosition), 1);
+  return blockerPositions.map((position, index) => {
+    const dx = position.x - targetPosition.x, dy = position.y - targetPosition.y;
+    return createIdleCompanion(`blocker-${index}`, {
+      x: targetPosition.x + dx / Math.hypot(dx, dy) * range + 0.2,
+      y: targetPosition.y + dy / Math.hypot(dx, dy) * range,
+    });
+  });
 }

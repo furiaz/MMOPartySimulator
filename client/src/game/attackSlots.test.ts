@@ -13,6 +13,10 @@ import {
   consumeGamePerformanceMetrics,
 } from "./performanceMetrics";
 import { createTestGameState } from "./testState";
+import { isCombatPositionSpacedFromParty } from "./partySpacing";
+import { getEffectiveAttackRange, isWithinAttackReach } from "./spatialGeometry";
+import { isCombatPositionAvailable } from "./movementPlanning";
+import { isForcedMovementPositionAvailable } from "./forcedMovement";
 import type { CombatEntity, GameEntity, GameMap, Position } from "./types";
 
 const entity: GameEntity = {
@@ -68,6 +72,58 @@ describe("getAttackSlotPathDistanceCacheKey", () => {
 });
 
 describe("chooseAttackSlot", () => {
+  it.each([false, true])("protects a friendly forced landing when choosing a slot (cached=%s)", cached => {
+    const actor = createCombatCompanion("actor", { x: 2, y: 5 });
+    const enemy = createEnemy("target", { x: 5, y: 5 }, "passive", { combatBodyRadius: 0.7 });
+    const friend = createCompanion("friend", { x: 9, y: 5 }, actor.id);
+    let state = createTestGameState({ entities: { actor, target: enemy, friend }, map: testMap });
+    const oldSlot = { x: 3.3, y: 5 };
+    if (cached) state = rememberAttackSlot(state, actor, enemy, 1, oldSlot, { allowPartyPassThrough: true });
+    const landing = { x: 3.5, y: 5 };
+    state.forcedMovementsByEntityId = { friend: { targetId: friend.id, sourceId: "source", origin: friend.position,
+      direction: { x: -1, y: 0 }, distance: 5.5, startedAt: 0, endsAt: 1000, lastSafePosition: friend.position } };
+    expect(isForcedMovementPositionAvailable(state, friend, landing, true)).toBe(true);
+    const slot = chooseAttackSlot(state, actor, enemy, 1, { allowPartyPassThrough: true, partySpacingMode: "prefer", maxPathDistance: 6 })!;
+    expect(slot).not.toBeNull();
+    expect(slot).not.toEqual(oldSlot);
+    state.entities.actor = { ...actor, position: slot };
+    expect(isForcedMovementPositionAvailable(state, friend, landing, true)).toBe(true);
+  });
+
+  it("normalizes diagonal slots to the same Euclidean attack edge", () => {
+    const actor = createCombatCompanion("actor", { x: 6, y: 6 });
+    const enemy = createEnemy("target", { x: 9, y: 9 }, undefined, { combatBodyRadius: 0.7 });
+    const state = createTestGameState({ entities: { actor, target: enemy }, map: testMap });
+    const slot = chooseAttackSlot(state, actor, enemy, 1)!;
+    expect(slot).not.toBeNull();
+    expect(Math.hypot(slot.x - 9, slot.y - 9)).toBeCloseTo(1.7);
+    expect(slot.x).toBeCloseTo(slot.y);
+    expect(isCombatPositionAvailable(state, actor, slot)).toBe(true);
+  });
+
+  it("invalidates a remembered slot when enemy growth consumes its clearance", () => {
+    const actor = createCombatCompanion("actor", { x: 2, y: 5 });
+    const enemy = createEnemy("target", { x: 5, y: 5 }, undefined, { combatBodyRadius: 0.7 });
+    const cached = { x: 3.3, y: 5 };
+    const state = rememberAttackSlot(createTestGameState({ entities: { actor, target: enemy }, map: testMap }), actor, enemy, 1, cached);
+    const grown = { ...enemy, combatSizeMultiplier: 2 };
+    state.entities.target = grown;
+    const slot = chooseAttackSlot(state, actor, grown, 1, { nowMs: 100 })!;
+    expect(slot).not.toBeNull();
+    expect(slot).not.toEqual(cached);
+    expect(Math.hypot(slot.x - 5, slot.y - 5)).toBeCloseTo(2.4);
+    expect(isCombatPositionAvailable(state, actor, slot)).toBe(true);
+  });
+
+  it("retains an existing legal engagement position without a path search", () => {
+    const actor = createCombatCompanion("actor", { x: 3.4, y: 5.2 });
+    const enemy = createEnemy("target", { x: 5, y: 5 }, undefined, { combatBodyRadius: 0.7 });
+    const state = createTestGameState({ entities: { actor, target: enemy }, map: testMap });
+    consumeGamePerformanceMetrics();
+    expect(chooseAttackSlot(state, actor, enemy, 1, { maxPathDistance: 6 })).toEqual(actor.position);
+    expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(0);
+  });
+
   it("checks the first cheaply valid ranked slot without double-counting path distance", () => {
     const state = createTestGameState({
       entities: {
@@ -79,9 +135,8 @@ describe("chooseAttackSlot", () => {
     consumeGamePerformanceMetrics();
 
     expect(
-      chooseAttackSlot(state, attacker, target.position, 1, {
+      chooseAttackSlot(state, attacker, target, 1, {
         maxPathDistance: 6,
-        targetId: target.id,
       }),
     ).toEqual({ x: 4, y: 5 });
 
@@ -101,12 +156,13 @@ describe("chooseAttackSlot", () => {
     });
     consumeGamePerformanceMetrics();
 
-    expect(
-      chooseAttackSlot(state, attacker, target.position, 1, {
+    const slot = chooseAttackSlot(state, attacker, target, 1, {
         maxPathDistance: 6,
-        targetId: target.id,
-      }),
-    ).toEqual({ x: 5, y: 4 });
+      });
+    expect(slot).not.toBeNull();
+    expect(slot).not.toEqual({ x: 4, y: 5 });
+    expect(isCombatPositionAvailable(state, attacker, slot!)).toBe(true);
+    expect(isWithinAttackReach(attacker, target, 1, slot!)).toBe(true);
 
     expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(1);
   });
@@ -125,14 +181,13 @@ describe("chooseAttackSlot", () => {
     const options = {
       maxPathDistance: 6,
       pathDistanceCache,
-      targetId: target.id,
     };
 
-    expect(chooseAttackSlot(state, attacker, target.position, 1, options)).toEqual({
+    expect(chooseAttackSlot(state, attacker, target, 1, options)).toEqual({
       x: 4,
       y: 5,
     });
-    expect(chooseAttackSlot(state, attacker, target.position, 1, options)).toEqual({
+    expect(chooseAttackSlot(state, attacker, target, 1, options)).toEqual({
       x: 4,
       y: 5,
     });
@@ -151,23 +206,21 @@ describe("chooseAttackSlot", () => {
         simulationTimeMs: 1000,
       }),
       attacker,
-      target.position,
+      target,
       1,
-      { x: 5, y: 4 },
+      { x: 4, y: 5 },
       {
         nowMs: 1000,
-        targetId: target.id,
       },
     );
     consumeGamePerformanceMetrics();
 
     expect(
-      chooseAttackSlot(state, attacker, target.position, 1, {
+      chooseAttackSlot(state, attacker, target, 1, {
         maxPathDistance: 6,
         nowMs: 1100,
-        targetId: target.id,
       }),
-    ).toEqual({ x: 5, y: 4 });
+    ).toEqual({ x: 4, y: 5 });
 
     expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(0);
   });
@@ -187,23 +240,21 @@ describe("chooseAttackSlot", () => {
         simulationTimeMs: 1000,
       }),
       attacker,
-      target.position,
+      target,
       1,
-      { x: 5, y: 4 },
+      { x: 4.3, y: 5 },
       {
         nowMs: 1000,
-        targetId: target.id,
       },
     );
     consumeGamePerformanceMetrics();
 
     expect(
-      chooseAttackSlot(state, attacker, movedTarget.position, 1, {
+      chooseAttackSlot(state, attacker, movedTarget, 1, {
         maxPathDistance: 6,
         nowMs: 1100,
-        targetId: target.id,
       }),
-    ).toEqual({ x: 5, y: 4 });
+    ).toEqual({ x: 4.3, y: 5 });
 
     expect(consumeGamePerformanceMetrics().pathDistanceQueries).toBe(0);
   });
@@ -223,22 +274,20 @@ describe("chooseAttackSlot", () => {
         simulationTimeMs: 1000,
       }),
       attacker,
-      target.position,
+      target,
       1,
-      { x: 5, y: 4 },
+      { x: 4.3, y: 5 },
       {
         nowMs: 1000,
-        targetId: target.id,
       },
     );
 
     expect(
-      chooseAttackSlot(state, attacker, movedTarget.position, 1, {
+      chooseAttackSlot(state, attacker, movedTarget, 1, {
         maxPathDistance: 6,
         nowMs: 1100,
-        targetId: target.id,
       }),
-    ).not.toEqual({ x: 5, y: 4 });
+    ).not.toEqual({ x: 4.3, y: 5 });
   });
 
   it("does not reuse a remembered slot when the cached slot becomes blocked", () => {
@@ -254,33 +303,31 @@ describe("chooseAttackSlot", () => {
         },
         map: {
           ...testMap,
-          walls: [{ x: 5, y: 4 }],
+          walls: [{ x: 4, y: 5 }],
         },
         simulationTimeMs: 1000,
       }),
       attacker,
-      target.position,
+      target,
       1,
-      { x: 5, y: 4 },
+      { x: 4.3, y: 5 },
       {
         nowMs: 1000,
-        targetId: target.id,
       },
     );
 
     expect(
-      chooseAttackSlot(state, attacker, movedTarget.position, 1, {
+      chooseAttackSlot(state, attacker, movedTarget, 1, {
         maxPathDistance: 6,
         nowMs: 1100,
-        targetId: target.id,
       }),
-    ).not.toEqual({ x: 5, y: 4 });
+    ).not.toEqual({ x: 4.3, y: 5 });
   });
 
   it("prefers a different combat slot when the nearest slot is too close to a living companion", () => {
     const combatAttacker = createCombatCompanion("attacker", { x: 3, y: 5 });
     const combatTarget = createEnemy("target", { x: 5, y: 5 });
-    const blocker = createCombatCompanion("blocker", { x: 4.2, y: 5 });
+    const blocker = createCombatCompanion("blocker", { x: 3.5, y: 5 });
     const state = createTestGameState({
       entities: {
         [combatAttacker.id]: combatAttacker,
@@ -290,14 +337,14 @@ describe("chooseAttackSlot", () => {
       map: testMap,
     });
 
-    expect(
-      chooseAttackSlot(state, combatAttacker, combatTarget.position, 1, {
+    const slot = chooseAttackSlot(state, combatAttacker, combatTarget, 1, {
         allowPartyPassThrough: true,
         maxPathDistance: 6,
         partySpacingMode: "prefer",
-        targetId: combatTarget.id,
-      }),
-    ).toEqual({ x: 5, y: 4 });
+      });
+    expect(slot).not.toBeNull();
+    expect(slot).not.toEqual({ x: 3.3, y: 5 });
+    expect(isCombatPositionSpacedFromParty(state, combatAttacker, slot!)).toBe(true);
   });
 
   it("falls back to an unspaced combat slot when every spaced slot is blocked", () => {
@@ -313,13 +360,12 @@ describe("chooseAttackSlot", () => {
     });
 
     expect(
-      chooseAttackSlot(state, combatAttacker, combatTarget.position, 1, {
+      chooseAttackSlot(state, combatAttacker, combatTarget, 1, {
         allowPartyPassThrough: true,
         maxPathDistance: 6,
         partySpacingMode: "prefer",
-        targetId: combatTarget.id,
       }),
-    ).toEqual({ x: 4, y: 5 });
+    ).toEqual({ x: 3.3, y: 5 });
   });
 
   it("returns null when required spacing has no valid combat slot", () => {
@@ -335,11 +381,10 @@ describe("chooseAttackSlot", () => {
     });
 
     expect(
-      chooseAttackSlot(state, combatAttacker, combatTarget.position, 1, {
+      chooseAttackSlot(state, combatAttacker, combatTarget, 1, {
         allowPartyPassThrough: true,
         maxPathDistance: 6,
         partySpacingMode: "required",
-        targetId: combatTarget.id,
       }),
     ).toBeNull();
   });
@@ -356,18 +401,18 @@ describe("chooseAttackSlot", () => {
       },
       map: testMap,
       reservedPositionsByEntityId: {
-        [blocker.id]: { x: 4.2, y: 5 },
+        [blocker.id]: { x: 3.5, y: 5 },
       },
     });
 
-    expect(
-      chooseAttackSlot(state, combatAttacker, combatTarget.position, 1, {
+    const slot = chooseAttackSlot(state, combatAttacker, combatTarget, 1, {
         allowPartyPassThrough: true,
         maxPathDistance: 6,
         partySpacingMode: "prefer",
-        targetId: combatTarget.id,
-      }),
-    ).toEqual({ x: 5, y: 4 });
+      });
+    expect(slot).not.toBeNull();
+    expect(slot).not.toEqual({ x: 3.3, y: 5 });
+    expect(isCombatPositionSpacedFromParty(state, combatAttacker, slot!)).toBe(true);
   });
 
   it("ignores dead companions when checking combat spacing", () => {
@@ -388,13 +433,12 @@ describe("chooseAttackSlot", () => {
     });
 
     expect(
-      chooseAttackSlot(state, combatAttacker, combatTarget.position, 1, {
+      chooseAttackSlot(state, combatAttacker, combatTarget, 1, {
         allowPartyPassThrough: true,
         maxPathDistance: 6,
         partySpacingMode: "prefer",
-        targetId: combatTarget.id,
       }),
-    ).toEqual({ x: 4, y: 5 });
+    ).toEqual({ x: 3.3, y: 5 });
   });
 });
 
@@ -422,9 +466,11 @@ function createSlotBlockers(
 
   return Object.fromEntries(
     blockerPositions.map((position, index) => {
+      const dx = position.x - targetPosition.x, dy = position.y - targetPosition.y;
+      const radius = getEffectiveAttackRange(attacker, createEnemy("target", targetPosition), 1);
       const blocker = createCombatCompanion(`blocker-${index}`, {
-        x: position.x + 0.2,
-        y: position.y,
+        x: targetPosition.x + dx / Math.hypot(dx, dy) * radius + 0.2,
+        y: targetPosition.y + dy / Math.hypot(dx, dy) * radius,
       });
 
       return [blocker.id, blocker];

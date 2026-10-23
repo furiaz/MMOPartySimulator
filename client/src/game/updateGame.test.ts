@@ -2969,7 +2969,7 @@ describe("game update intent priority", () => {
       commandPriority: "autonomous" as const,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      ...createEnemy("attacking-enemy", { x: 5.7, y: 4 }),
       state: "attack" as const,
       currentTargetId: leader.id,
       attackWindupStartedAt: 1_000,
@@ -3015,7 +3015,7 @@ describe("game update intent priority", () => {
       commandPriority: "autonomous" as const,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      ...createEnemy("attacking-enemy", { x: 6.5, y: 4 }),
       state: "attack" as const,
       currentTargetId: leader.id,
       attackWindupStartedAt: 1_000,
@@ -3059,7 +3059,7 @@ describe("game update intent priority", () => {
       commandPriority: "autonomous" as const,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      ...createEnemy("attacking-enemy", { x: 6.5, y: 4 }),
       state: "attack" as const,
       currentTargetId: leader.id,
       attackWindupStartedAt: 1_000,

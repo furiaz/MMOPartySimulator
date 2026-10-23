@@ -34,8 +34,26 @@ import {
 } from "./positionUtils";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { isMovementBlockedByStatus } from "./statusEffects";
-import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
+import {
+  areEntitiesOverlapping,
+  doesBodyOverlapBounds,
+  doCollisionBodiesOverlap,
+  getCollisionBody,
+  getEntityOverlapDepth,
+  getEntityCollisionShape,
+  isPositionInsideCollisionShape,
+  isPositionInsideEntityCollisionShape,
+  SPATIAL_EPSILON,
+} from "./spatialGeometry";
+export {
+  ENTITY_COLLISION_DISTANCE,
+  COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
+  COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
+  COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
+  getEntityCollisionShape,
+  isPositionInsideEntityCollisionShape,
+} from "./spatialGeometry";
 import type { GameState } from "./state";
 import type {
   DebugNavigationBlocker,
@@ -56,10 +74,6 @@ import type {
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const POSITION_EPSILON = 0.001;
-export const ENTITY_COLLISION_DISTANCE = 0.7;
-export const COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER = 0.8;
-export const COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER = 1.6;
-export const COMPANION_COLLISION_CAPSULE_ANCHOR_Y = 0.3;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
 const COMBAT_PATH_REFRESH_MS = 500;
@@ -67,40 +81,6 @@ const FOLLOW_PATH_REFRESH_MS = 500;
 const MOVEMENT_PATH_BLOCKED_REFRESH_COUNT = 2;
 const MEANINGFUL_TARGET_MOVE_DISTANCE = 1;
 const FOLLOW_TRAIL_LENGTH = 12;
-
-export function getEntityCollisionShape(
-  entity: GameEntity,
-): EntityCollisionShape {
-  if (entity.kind === "companion") {
-    return {
-      kind: "verticalCapsule",
-      radius:
-        ENTITY_COLLISION_DISTANCE *
-        COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
-      height:
-        ENTITY_COLLISION_DISTANCE *
-        2 *
-        COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
-      anchorY: COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
-    };
-  }
-
-  return {
-    kind: "circle",
-    radius: entity.kind === "enemy" && entity.combatSizeMultiplier !== undefined ? getEnemyCombatBodyRadius(entity) : ENTITY_COLLISION_DISTANCE,
-  };
-}
-
-export function isPositionInsideEntityCollisionShape(
-  entity: GameEntity,
-  position: Position,
-): boolean {
-  return isPositionInsideCollisionShape(
-    position,
-    entity.position,
-    getEntityCollisionShape(entity),
-  );
-}
 
 export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   state: GameState,
@@ -457,18 +437,75 @@ export function isEntitySeparationPositionAvailable(
   position: Position,
 ): boolean {
   const actor = state.entities[movingEntityId];
-  if (actor?.kind === "enemy" && !isEnemyMovementPositionAllowed(state, actor, position)) return false;
-  return (
-    isNavigationPositionWalkable(state, position) &&
-    !isActiveResourcePosition(state, position, movingEntityId) &&
-    !isReservedPosition(state, position, movingEntityId) &&
-    !isPositionOccupiedBySeparationBlocker(
-      state,
-      position,
-      movingEntityId,
-      sourceEntityId,
-    )
-  );
+  // The source is deliberately excluded: small nudges may only partially exit it.
+  return Boolean(actor && isCombatPositionAvailable(state, actor, position, {}, sourceEntityId));
+}
+
+/** Endpoint clearance only; ordinary path traversal keeps its pass-through rules. */
+export function isCombatPositionAvailable(
+  state: GameState,
+  actor: GameEntity,
+  position: Position,
+  options: WalkablePositionOptions = {},
+  recoverySourceEntityId?: string,
+): boolean {
+  if (!isCombatTerrainClear(state, actor, position)) return false;
+  for (const other of Object.values(state.entities)) {
+    if (other.id === actor.id || other.id === recoverySourceEntityId || !isClearanceBlocker(other)) continue;
+    if (other.kind === "structure" || other.kind === "resource") {
+      if (doCollisionBodiesOverlap(actor, position, other)) return false;
+    } else if (!canPassThroughPartyEntity(actor, other, options) && areEntitiesOverlapping(actor, other, position)) {
+      // Recovery may improve another pre-existing overlap, but never introduce or deepen one.
+      if (!recoverySourceEntityId || !areEntitiesOverlapping(actor, other) ||
+        getEntityOverlapDepth(actor, other, position) > getEntityOverlapDepth(actor, other) + SPATIAL_EPSILON) return false;
+    }
+  }
+  const reservations: Array<[string, Position]> = [
+    ...Object.entries(state.reservedPositionsByEntityId ?? {}),
+    ...Object.entries(state.moveIntentsByEntityId ?? {}),
+  ];
+  const landingReservations: Array<[string, Position]> = [
+    ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).flatMap(cast => cast.dashPlan ? [[cast.casterId, cast.dashPlan.destination] as [string, Position]] : []),
+    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => [dash.casterId, dash.destination] as [string, Position]),
+    ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => [move.targetId, {
+      x: move.origin.x + move.direction.x * move.distance,
+      y: move.origin.y + move.direction.y * move.distance,
+    }] as [string, Position]),
+  ];
+  // Scoped party transit must not waive the full body reserved for a specialized landing.
+  if (landingReservations.some(([id, reservedPosition]) => {
+    const owner = state.entities[id];
+    return id !== actor.id && owner && isClearanceBlocker(owner) &&
+      // Cancel the helper's epsilon so the existing landing safety margin stays intact.
+      doCollisionBodiesOverlap(actor, position, owner, reservedPosition, 0.05 + SPATIAL_EPSILON);
+  })) return false;
+  return reservations.every(([id, reservedPosition]) => {
+    if (id === actor.id || id === recoverySourceEntityId) return true;
+    const owner = state.entities[id];
+    if (!owner) return !isSamePosition(position, reservedPosition);
+    if (!isClearanceBlocker(owner)) return true;
+    return canPassThroughPartyEntity(actor, owner, options)
+      ? !isSamePosition(position, reservedPosition)
+      : !areEntitiesOverlapping(actor, owner, position, reservedPosition);
+  });
+}
+
+function isClearanceBlocker(entity: GameEntity): boolean {
+  return entity.state !== "dead" && (entity.kind !== "resource" || (!entity.isDepleted && entity.quantity > 0));
+}
+
+function isCombatTerrainClear(state: GameState, actor: GameEntity, position: Position): boolean {
+  if (actor.kind === "enemy" && !isEnemyMovementPositionAllowed(state, actor, position)) return false;
+  if (!state.map) return true;
+  const body = getCollisionBody(actor, position);
+  const radius = body.radius + 0.05;
+  if (body.x - radius < -0.5 || body.x + radius > state.map.columns - 0.5 ||
+    body.top - radius < -0.5 || body.bottom + radius > state.map.rows - 0.5) return false;
+  const overlapsWall = (wall: Position) =>
+    doesBodyOverlapBounds(body, {
+      minX: wall.x - 0.5, maxX: wall.x + 0.5, minY: wall.y - 0.5, maxY: wall.y + 0.5,
+    }, 0.05);
+  return !state.map.walls.some(overlapsWall) && !(state.map.collisionWalls ?? []).some(overlapsWall);
 }
 
 export function isPositionAvailable(
@@ -1203,29 +1240,6 @@ function getCollisionShapeBounds(
   };
 }
 
-function isPositionInsideCollisionShape(
-  position: Position,
-  origin: Position,
-  shape: EntityCollisionShape,
-): boolean {
-  if (shape.kind === "circle") {
-    return getEuclideanDistance(position, origin) < shape.radius;
-  }
-
-  const top = origin.y - shape.height * shape.anchorY;
-  const bottom = top + shape.height;
-  const segmentStartY = top + shape.radius;
-  const segmentEndY = bottom - shape.radius;
-  const closestY = Math.min(
-    Math.max(position.y, segmentStartY),
-    segmentEndY,
-  );
-
-  return (
-    getEuclideanDistance(position, { x: origin.x, y: closestY }) < shape.radius
-  );
-}
-
 function isNavigationPositionBlocked(
   state: GameState,
   position: Position,
@@ -1350,22 +1364,6 @@ function isPositionOccupiedByBlockingEntity(
       entity.kind !== "resource" &&
       entity.state !== "dead" &&
       !canPassThroughBlockingEntity(movingEntity, entity, options) &&
-      isPositionInsideEntityCollisionShape(entity, position),
-  );
-}
-
-function isPositionOccupiedBySeparationBlocker(
-  state: GameState,
-  position: Position,
-  movingEntityId: string,
-  sourceEntityId: string,
-): boolean {
-  return Object.values(state.entities).some(
-    (entity) =>
-      entity.id !== movingEntityId &&
-      entity.id !== sourceEntityId &&
-      entity.kind !== "resource" &&
-      entity.state !== "dead" &&
       isPositionInsideEntityCollisionShape(entity, position),
   );
 }

@@ -2,10 +2,12 @@ import { bakeNavigationGrid } from "./navigation";
 import { BARRACK_DEFINITIONS, BARRACK_RESPAWN_MS, getBarrackCollisionCells, getBarrackMaxHealth } from "./barrackDefinitions";
 import type { GameState } from "./state";
 import type { CombatStructure, Enemy, GameEntity, Position } from "./types";
-import { findNearestReachablePosition, isWalkablePosition, isWallPosition } from "./movementPlanning";
+import { findNearestReachablePosition, isCombatPositionAvailable, isWallPosition } from "./movementPlanning";
 import { DEFAULT_COMPANION_ATTACK_RANGE, getCompanionAttackRange } from "./companionCombat";
 import { clearEnemyFromPartyTargeting } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
+import { getCombatTargetPosition, isWithinAttackReach } from "./spatialGeometry";
+export { getCombatTargetPosition } from "./spatialGeometry";
 import { createAoeCastTransform, doesAoeIntersectFootprint, resolveAoePattern } from "./aoePatterns";
 
 export function isHostileTargetInRadius(target: Enemy | CombatStructure, center: Position, radius: number): boolean {
@@ -18,19 +20,14 @@ export function isLivingHostileTarget(entity: GameEntity | undefined): entity is
   return Boolean(entity && (entity.kind === "enemy" || entity.kind === "structure") && entity.state !== "dead" && entity.health > 0);
 }
 
-export function getCombatTargetPosition(from: Position, target: GameEntity): Position {
-  if (target.kind !== "structure") return target.position;
-  return { x: Math.max(target.attackBounds.minX, Math.min(from.x, target.attackBounds.maxX)),
-    y: Math.max(target.attackBounds.minY, Math.min(from.y, target.attackBounds.maxY)) };
-}
-
 /** Keep a valid firing position, or search once for any reachable attackable edge. */
 export function getStructureApproachPosition(state: GameState, actor: GameEntity, target: CombatStructure): Position | null {
   const range = actor.kind === "companion" ? getCompanionAttackRange(actor) : DEFAULT_COMPANION_ATTACK_RANGE;
   const canAttackFrom = (position: Position) =>
-    getGridDistance(position, getCombatTargetPosition(position, target)) <= range &&
+    isWithinAttackReach(actor, target, range, position) &&
+    isCombatPositionAvailable(state, actor, position, { allowPartyPassThrough: true }) &&
     hasStructureLineOfSight(state, position, target);
-  if (isWalkablePosition(state, actor.position, actor.id, { allowPartyPassThrough: true }) && canAttackFrom(actor.position)) {
+  if (canAttackFrom(actor.position)) {
     return actor.position;
   }
   return findNearestReachablePosition(state, actor, canAttackFrom, { allowPartyPassThrough: true });

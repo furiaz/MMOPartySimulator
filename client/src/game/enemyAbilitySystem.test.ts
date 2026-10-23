@@ -475,7 +475,7 @@ describe("enemy ability system", () => {
   it("requires a committed melee basic attack before another ability", () => {
     setAbilityIds("tin_crawler", ["ready"]);
     const definitions = { ready: createAbility("ready", { castDurationMs: 0, windupDurationMs: 0 }) };
-    const { state, enemy, leader } = createEngagedState("tin_crawler", { x: 1, y: 0 });
+    const { state, enemy, leader } = createEngagedState("tin_crawler", { x: 1.6, y: 0 });
     let nextState = updateEnemyAbilitySystem(state, 1000, definitions);
     nextState = updateEnemyAbilitySystem(nextState, 1001, definitions);
     nextState = applyStatusEffect(nextState, {

@@ -5,6 +5,22 @@ import { createTestGameState } from "./testState";
 import type { Enemy, GameMap } from "./types";
 
 describe("defender real-time movement", () => {
+  it("uses the same party pass-through policy for combat slot planning and walking", () => {
+    const leader = { ...createCompanion("leader", { x: 2, y: 1.5 }, "leader", "fighter"),
+      commandPriority: "direct" as const, currentTargetId: "target" };
+    const defender = { ...createCompanion("defender", { x: 3, y: 1.5 }, leader.id, "defender"),
+      state: "defend" as const, currentTargetId: "target", defendPosition: { x: 3, y: 1.5 } };
+    const blocker = createCompanion("blocker", { x: 3.8, y: 1.5 }, leader.id);
+    const target = createEnemy("target", { x: 7, y: 1.5 }, undefined, { combatBodyRadius: 0.7 });
+    const map: GameMap = { displayName: "Combat corridor", debugName: "combat-corridor", columns: 11, rows: 5,
+      walls: Array.from({ length: 11 }, (_, x) => [{ x, y: 0 }, { x, y: 4 }]).flat(), teleports: [], healingFountains: [] };
+    const state = createTestGameState({ map, entities: { leader, defender, blocker, target }, partyLeaderId: leader.id,
+      leaderIntent: { type: "attack", targetId: target.id, targetPosition: target.position } });
+    const next = updateDefendSystem(state);
+    expect(next.entities.defender.position.x).toBeGreaterThan(defender.position.x);
+    expect(next.attackSlotCacheByEntityId?.defender.usesPartyPassThrough).toBe(true);
+  });
+
   it("uses delta-scaled catch-up speed instead of multi-step bursts", () => {
     const leader = {
       ...createCompanion("leader", { x: 2, y: 0 }, "leader", "fighter"),

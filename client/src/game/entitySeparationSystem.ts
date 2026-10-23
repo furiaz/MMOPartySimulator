@@ -1,17 +1,14 @@
 import { moveEntityTo } from "./entities";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import {
-  ENTITY_COLLISION_DISTANCE,
-  getEntityCollisionShape,
   isEntitySeparationPositionAvailable,
-  isPositionInsideEntityCollisionShape,
 } from "./movementPlanning";
+import { areEntitiesOverlapping } from "./spatialGeometry";
 import { getEuclideanDistance } from "./positionUtils";
 import { updateEntity, type GameState } from "./state";
 import type { GameEntity, Position } from "./types";
 
 const SEPARATION_NUDGE_DISTANCE = 0.12;
-const COMPANION_ENEMY_SEPARATION_GRACE = 0.35;
 const SAME_POSITION_DIRECTION_COUNT = 8;
 
 type SeparationParticipant = GameEntity & {
@@ -103,7 +100,7 @@ function separateStationaryPair(
   }
 
   if (firstPushable && secondPushable) {
-    let nextState = pushEntityAwayFromSource(state, first, second);
+    const nextState = pushEntityAwayFromSource(state, first, second);
     const updatedSecond = nextState.entities[second.id];
 
     return isSeparationParticipant(updatedSecond)
@@ -185,76 +182,6 @@ function isStationaryForSeparation(
     !state.moveIntentsByEntityId?.[entity.id] &&
     !state.reservedPositionsByEntityId?.[entity.id]
   );
-}
-
-function areEntitiesOverlapping(
-  first: SeparationParticipant,
-  second: SeparationParticipant,
-): boolean {
-  if (isSamePartyCompanionPair(first, second)) {
-    return areSamePartyCompanionsOverlapping(first, second);
-  }
-
-  return (
-    isPositionInsideEntityCollisionShape(first, second.position) ||
-    isPositionInsideEntityCollisionShape(second, first.position) ||
-    getEuclideanDistance(first.position, second.position) <
-      getSeparationThreshold(first, second)
-  );
-}
-
-function areSamePartyCompanionsOverlapping(
-  first: SeparationParticipant,
-  second: SeparationParticipant,
-): boolean {
-  return (
-    isPositionInsideEntityCollisionShape(first, second.position) ||
-    isPositionInsideEntityCollisionShape(second, first.position) ||
-    getEuclideanDistance(first.position, second.position) <
-      ENTITY_COLLISION_DISTANCE
-  );
-}
-
-function isSamePartyCompanionPair(
-  first: SeparationParticipant,
-  second: SeparationParticipant,
-): boolean {
-  return first.kind === "companion" && second.kind === "companion";
-}
-
-function getSeparationThreshold(
-  first: SeparationParticipant,
-  second: SeparationParticipant,
-): number {
-  const baseThreshold = getSeparationRadius(first) + getSeparationRadius(second);
-
-  return isCompanionEnemyPair(first, second)
-    ? Math.max(0, baseThreshold - COMPANION_ENEMY_SEPARATION_GRACE)
-    : baseThreshold;
-}
-
-function isCompanionEnemyPair(
-  first: SeparationParticipant,
-  second: SeparationParticipant,
-): boolean {
-  return (
-    (first.kind === "companion" && second.kind === "enemy") ||
-    (first.kind === "enemy" && second.kind === "companion")
-  );
-}
-
-function getSeparationRadius(entity: SeparationParticipant): number {
-  const shape = getEntityCollisionShape(entity);
-  const shapeRadius =
-    shape.kind === "verticalCapsule"
-      ? Math.max(shape.radius, shape.height / 2)
-      : shape.radius;
-
-  if (entity.kind !== "enemy") {
-    return shapeRadius;
-  }
-
-  return Math.max(shapeRadius, getEnemyCombatBodyRadius(entity));
 }
 
 function isPushable(entity: SeparationParticipant): boolean {

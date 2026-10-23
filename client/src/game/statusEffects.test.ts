@@ -140,7 +140,7 @@ describe("status effects", () => {
       state: "attack" as const,
       currentTargetId: "target",
     };
-    const target = createEnemy("target", { x: 0.5, y: 0 }, "passive", {
+    const target = createEnemy("target", { x: 1.7, y: 0 }, "passive", {
       maxHealth: 50,
       evasion: 0,
     });

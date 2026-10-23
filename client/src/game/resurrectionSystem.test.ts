@@ -197,7 +197,7 @@ describe("resurrection system", () => {
   });
 
   it("lets a recovery participant attack an active enemy already in range", () => {
-    const helper = createCompanion("helper", { x: 2, y: 0 }, "helper");
+    const helper = createCompanion("helper", { x: 1.3, y: 0 }, "helper");
     const deadCompanion = createDeadCompanion("dead", { x: 0, y: 0 }, helper.id);
     const enemy = {
       ...createEnemy("enemy", { x: 3, y: 0 }, "aggressive"),
