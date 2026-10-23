@@ -180,10 +180,14 @@ Debugging / Fixing:
 ### Releases
 
 - Promote a release with a pull request from `main` into `live`.
+- Before creating a release pull request, review the full `main` versus `live` change set and update `client/src/PATCH_NOTES.md` with every player-facing change in that release. Patch notes must be reviewed, committed, and merged into `main` before the release pull request is created, so the notes ship with the release rather than afterward.
+- Use the actual release date in the user's timezone, keep entries newest first, and extend an existing same-day entry instead of duplicating its date heading. Preserve earlier entries and describe only verified changes. For maintenance-only releases, add a concise maintenance note rather than skipping patch notes.
+- Verify the new entry in the in-game Patch Notes dialog using a fresh production build before releasing. Do not merge into `live` with missing or stale patch notes; record this verification in the release summary.
 - A release must pass the configured build and deployment checks and receive explicit user authorization before merge.
 - Deploy the public site from the merged `live` commit only. Do not deploy pull-request heads, issue branches, or `main` to the production GitHub Pages site.
 - Record the deployed commit in the release summary so the public version is traceable.
 - Roll back production by reverting the responsible release commit or promoting a known-good commit through the reviewed release workflow. Do not rewrite `live` history.
+- The patch-note requirement does not authorize commits, pushes, pull requests, merges, or protected-document edits; their existing approval rules still apply.
 
 ### Production Hotfixes
 

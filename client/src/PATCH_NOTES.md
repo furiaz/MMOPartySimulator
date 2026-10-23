@@ -2,7 +2,63 @@
 
 These notes begin on June 19, 2026, when Beginner and all eight first classes had working prototype mechanics. Changes are listed newest first by day, with the starting baseline at the end so it remains the foundation that every later entry builds upon.
 
-Future entries are added when changes reach the live version, so this document describes player-facing releases rather than every development change.
+Entries are prepared before deployment and ship with the live release, so this document describes player-facing releases rather than every development change.
+
+## October 22, 2026
+
+### Added
+
+- Added a Hub 2 main-quest chain using the Forward Bastion's existing Quest Giver. Objectives within each main quest progress together, and eligible prior ownership or encounter milestones are recognized.
+- **Orders from the Guild** introduces the Guild Notice Board after the Azure Trial and first-class selection. Take the protected **Assault on Ash Goblin Encampment** starter contract, then return to the Quest Giver to unlock the Zone 4 main quest.
+- **Break the Ash Camp** requires 200 Zone 4 enemy credits, 20 gathered Zone 4 resource units, and a first-class weapon equipped on an active companion. Rewards: **1,800 character XP per eligible companion and 500 Crowns**.
+- **Into the Briar Burrows** requires 300 Zone 5 enemy credits, a Tin Crawler Hatchling, and three active companions. Rewards: **2,800 character XP per eligible companion and 750 Crowns**. Previously acquired Hatchlings and existing party members count immediately.
+- **The Patron's Shadow** requires breaking three Nightmire Canopy Patron Wards and owning an Elder Mossling. Charge each Ward with 100 matching Night Bat, Elder Mossling, or Cinder Wisp credits, then manually activate its themed defense in any order. Rewards: **4,000 character XP per eligible companion and 1,000 Crowns**.
+- Patron Ward defenses allow one active fight at a time, preserve charge after failed attempts, and unlock the Orc Warcamp route after the third Ward breaks, without waiting for quest turn-in. Added animated Patron auras, a dark-green portal barrier, and a Warmaster foreshadowing scene. Existing saves that already reached Orc Warcamp retain access.
+- **The Evil Patron's Chosen** tracks one Warmaster victory, the captive's rescue, full chest collection, and 150 Orc kill credits. Boss-first guidance does not prevent other objectives progressing in parallel. Rewards: **6,000 character XP per eligible living companion and 1,500 Crowns**.
+- Rebuilt Orc Warcamp around a broad farming field, a north-to-south approach, and a compact Boss arena with three Barracks. The route Barrack has walkable lanes beside it, and the return path to Nightmire remains accessible.
+- Added manually attackable Barracks that produce normal Orc reinforcements: 80% Grunts, 10% Raiders, and 10% Shieldbearers. The route building activates near visible companions; arena buildings activate during the Boss attempt when a companion is visible in the arena. Auto Combat does not independently target buildings, but manual attacks and incidental damaging AoEs can destroy them.
+- Barracks leave nonblocking ruins when destroyed, rebuild independently after two minutes when permitted, and announce **"Work Work"** ten seconds beforehand. Rebuilding safely separates movable occupants where possible and waits when no safe placement exists. Surviving reinforcements retain their building ownership.
+- Added the Orc Warmaster's **Kick**, **Rending Dash**, **Patron Cleave**, and **Patron Burst**. Kick pushes its target up to four units; Cleave unlocks at five Patron Power and Burst at ten. Skills retain telegraphs and require a basic attack between uses.
+- Arena Orc deaths send visible energy toward the Warmaster. Patron Power caps at ten, increases his sprite, aura, and combat size by up to 50%, and persists for the attempt without decaying. Wipes, retreat, travel, and restoration reset a living Boss attempt without requiring another 60-kill recharge.
+- Added repeatable Warmaster encounters. The first fight is ready immediately; subsequent fights recharge after **60 qualifying Zone 7 Orc deaths**, including Barrack reinforcements. Superiors grant one recharge credit per physical death. Rearming waits for full chest collection and a safely cleared entrance, then restores the Boss and all three arena Barracks.
+- Each Warmaster victory creates one persistent, manually collected chest: **500 Crowns**, independent **90% level-15 equipment** and **10% level-20 equipment** rolls, and **five independent first-class skill books**. Partial collection preserves overflow without rerolling rewards, and departure warnings let players return for unclaimed loot or leave it safely for later.
+- The first Warmaster victory automatically frees the captive. Added closed/open cage artwork with transparent bars; the cage stays open after rescue through later fights and saves.
+
+### Changed
+
+- Guild Board postings now randomly select among visited **Zones 4–7** and four categories: **Assault on {Zone}**, **{Enemy} Extermination in {Zone}**, **Rummage of {Zone}**, and **Forage in {Zone}**. Regular contracts exclude Boss, Elite, and Champion encounters.
+- Board refreshes prefer visited zones within five levels of the active party's average, with an 80% nearby-zone preference when both groups exist. Targets and rewards are fixed when postings generate, not when the menu opens; recruitment affects future refreshes rather than existing contracts.
+- Zone 4/5/6/7 contracts require **50/70/90/110 kill credits**, **30/42/54/66 Rummage items**, or **10/15/20/25 gathered resource units**. Rummage has a separate 50% drop roll per qualifying death and contract, uses no inventory slots, and has no pity mechanic. Forage accepts successfully gathered wood, ore, or herbs without consuming them at claim.
+- New Board contracts grant workload-based XP, **150/200/250/300 base Crowns** by zone, and **two independently rolled first-class books**. Reward Quality increases Crowns and offers an independently rolled third book, without increasing XP. Claims are all-or-nothing if the complete book award cannot fit; taken and completed-unclaimed postings remain protected from refresh.
+- The fixed Zone 4 starter now asks for 50 total ordinary-enemy credits and uses the new rewards. It remains available before the first Zone 4 visit and protected until taken. Existing taken or completed legacy contracts retain their original requirements and rewards.
+- Direct Superior defeats now grant two credits to matching ordinary kill quests and Board kill contracts. Quest-item drops still roll once per physical death, and Field Team reports retain one credit per reported kill. Field Teams contribute to Assault and Extermination, not Rummage or Forage.
+- Skill Preferences now groups supported controls under each skill's exact name. Settings are independent between skills, existing choices migrate, and disabled legacy skills no longer clutter preference cards. Detailed hover/focus descriptions show geometry, targeting, and effect tradeoffs.
+- Added **Sweeping Strike** and **Maul Sweep** semicircle/full-circle variants. Their full circles deal 70% of the semicircle's skill damage; Sweeping Strike now applies uniform damage rather than different primary and splash values.
+- **Shield Shockwave** can use its existing circle control or a forward semicircle that stuns for one second, pushes up to two units, then taunts for three seconds after displacement finishes.
+- **Arrow Burst** offers a longer line or wider cone. **FireBurst** offers similarly sized target-centered circle, cross, X, and line areas while retaining its damage and Burn.
+- **Circle of Renewal** offers its normal radius-five circle or a concentrated circle with 70% of the area and 130% healing. **Dawn Step** and **Atonement Step** offer circle/cross variants with their existing offensive and defensive effects. **Rune Step** remains a fixed circle.
+- Applicable skills offer **High HP**, **Big Group**, and **Low HP** targeting; Renewal also offers **Defender**. Big Group scores the selected shape, while caster-centered melee AoEs retain normal attack-context facing rather than adding target-priority controls. Shared resolved geometry keeps effects and telegraphs aligned.
+- Added hover-only **Rank** information for non-standard encounters, independent of Superior variants. Azure Mass and the single Orc Warmaster are Bosses; Standard enemies omit the Rank row, and world nameplates remain unchanged.
+- Tin Crawler acquisition is now named **Tin Crawler Hatchling**, with **Tin Crawler Hatchling Discovery** as its permanent key item. The placed adult remains Tin Crawler, and discovery probabilities are unchanged.
+
+### Balance
+
+- Rebalanced the higher-level XP curve for gentler progression while preserving companions' earned levels and XP.
+- Set the Orc Warmaster to **1,500 HP**. All Barracks have **1,248 HP** and a **12-second reinforcement cycle**; each arena Barrack caps at **two living reinforcements**, while the route Barrack retains its five-enemy cap. Patron growth does not add HP, attack, or defense bonuses.
+- Smith recipes now use level-appropriate materials: armor ingredients may come from at most two levels above the item, and weapon ingredients from at most three levels above it. Prefer lower/equal-level materials, with higher-level ingredients used in smaller quantities; removed late-Orc materials from inappropriate level-10 recipes.
+- **Open the Causeway** now has one repair ambush of two level-7 Wolves and one level-7 Goblin Thrower. The ten-second repair must finish and all three ambushers must die before the tracked level-8 Superior Wolf appears. That Wolf remains Standard rank and grants normal Superior rewards. Escort, route unlock, and quest rewards are unchanged.
+
+### Fixed
+
+- Guild-recruited companions now survive physical teleports, World Travel, and debug map reconstruction with their active-party records and leader identity intact. Inn reserves and Field Teams are not inserted into the active world.
+- Fountains now heal living active companions and refill equipped flasks wherever map data places a fountain, including Hub 2. They still do not revive dead companions.
+- Defense-focused Auto Combat stays with the encounter, ignores resource POIs, and holds near its anchor between waves and across shared encounter handoffs. Autonomous Gatherer-role companions rejoin the party; manual gathering orders remain available.
+- Patron Ward defenses suppress ambient enemies throughout Nightmire, including dead/respawning and Superior enemies, then restore them two seconds afterward. Consecutive defenses share suppression without a brief repopulation. Causeway suppression continues through the Superior Wolf and restores ambient enemies three seconds after its defeat.
+- World speech bubbles now avoid the minimap and registered HUD bounds, keeping the Warmaster's lower-Ward finale readable. The Causeway Worker also announces **"Its an ambush! Protect me!"** once when the repair ambush starts.
+- Warmaster victory turns Auto Combat off and clears remaining arena enemies without rewards. Arena production and rebuilding stay frozen until the next valid encounter; chest interaction also stops Auto Combat and keeps the loot interface open rather than letting autonomous movement close it.
+- The Warmaster waits near his Barracks until detecting the party instead of wandering away between attempts. Removed the duplicate Warmaster spawn, preserved ordinary combat movement, and kept Boss pursuit inside the arena.
+- Barrack attacks use the building's visible attackable area instead of crowding every attacker around one small point. Opened the route's former hard choke and made production respect line of sight to reduce crowding and prevent spawning through walls.
+- Added restoration and legacy-save reconciliation for the new quests, encounter milestones, chest history, Barracks, and preferences without resetting existing progress or requiring a new save version.
 
 ## October 9, 2026
 
