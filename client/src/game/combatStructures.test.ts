@@ -139,7 +139,8 @@ describe("structure attackable bounds and approach cost", () => {
     expect(state.combatProjectiles).toHaveLength(0);
     expect((state.entities[routeId] as CombatStructure).health).toBeLessThan(getBarrackMaxHealth());
     const beforeAoe = (state.entities[routeId] as CombatStructure).health;
-    state = startMaulSweepChannel(state, state.entities.leader as Companion, SKILL_DEFINITIONS.maul_sweep, 200);
+    const aoeCaster = state.entities.leader as Companion;
+    state = startMaulSweepChannel(state, { ...aoeCaster, skillBehavior: { ...aoeCaster.skillBehavior, preferencesBySkillId: { maul_sweep: { variant: "circle" } } } }, SKILL_DEFINITIONS.maul_sweep, 200);
     state = updateCompanionAoeChannelSystem(state, 400);
     expect((state.entities[routeId] as CombatStructure).health).toBeLessThan(beforeAoe);
   });

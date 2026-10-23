@@ -4126,6 +4126,21 @@ function drawCompanionAoeChannels(
   }
 }
 
+function drawCompanionSkillAreas(
+  graphics: Graphics,
+  events: SkillVisualEvent[],
+  currentTime: number,
+  transform: FullTransform,
+  visibleTileBounds: TileBounds,
+) {
+  for (const event of events) {
+    if (!event.area || !event.visualIntent || event.expiresAt <= currentTime ||
+        !doAoeBoundsIntersect(event.area.bounds, visibleTileBounds)) continue;
+    const opacity = Math.max(0, Math.min(1, (event.expiresAt - currentTime) / Math.max(1, event.expiresAt - event.createdAt)));
+    drawResolvedAoeArea(graphics, { area: event.area, intent: event.visualIntent, transform, opacity });
+  }
+}
+
 function drawResolvedAoeArea(
   graphics: Graphics,
   options: {
@@ -6852,6 +6867,7 @@ function drawFullMap({
     transform,
     visibleTileBounds,
   );
+  drawCompanionSkillAreas(effectsGraphics, skillVisualEvents, currentTime, transform, visibleTileBounds);
   drawFullEffects({
     cache: textureCache,
     combatFeedbackEvents,

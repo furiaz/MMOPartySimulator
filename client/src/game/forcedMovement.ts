@@ -2,6 +2,10 @@ import { getEntityCollisionShape } from "./movementPlanning";
 import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { updateEntity, type GameState } from "./state";
 import type { GameEntity, Position } from "./types";
+import { applyStatusEffect } from "./statusEffects";
+import { cancelEnemyAbilityCast } from "./enemyAbilitySystem";
+import { cancelEnemyDash } from "./enemyDashSystem";
+import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
 export type ForcedMovement = {
   targetId: string;
   sourceId: string;
@@ -11,6 +15,7 @@ export type ForcedMovement = {
   startedAt: number;
   endsAt: number;
   lastSafePosition: Position;
+  completionStatus?: { type: "taunted"; durationMs: number; sourceKey: string };
 };
 const SAMPLE_DISTANCE = 0.1;
 const CLEARANCE = 0.05;
@@ -39,6 +44,7 @@ function segment(entity: GameEntity, position: Position) {
 }
 /** Full circle/capsule clearance; living bodies may be crossed, never terrain. */
 export function isForcedMovementPositionAvailable(state: GameState, entity: GameEntity, position: Position, landing = false): boolean {
+  if (entity.kind === "enemy" && !isEnemyMovementPositionAllowed(state, entity, position)) return false;
   const body = segment(entity, position);
   const radius = body.radius + CLEARANCE;
   if (state.map) {
@@ -64,6 +70,13 @@ export function isForcedMovementPositionAvailable(state: GameState, entity: Game
   if (landing && Object.entries(state.reservedPositionsByEntityId ?? {}).some(([id, reserved]) => id !== entity.id && Math.hypot(reserved.x - position.x, reserved.y - position.y) < radius + 0.7))
     return false;
   if (landing) {
+    for (const movement of Object.values(state.forcedMovementsByEntityId ?? {})) {
+      const owner = state.entities[movement.targetId];
+      if (!owner || owner.id === entity.id || owner.state === "dead") continue;
+      const reservedBody = segment(owner, along(movement.origin, movement.direction, movement.distance));
+      const dy = Math.max(0, body.top - reservedBody.bottom, reservedBody.top - body.bottom);
+      if (Math.hypot(body.x - reservedBody.x, dy) < radius + reservedBody.radius) return false;
+    }
     const destinations = [
       ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).filter(cast => cast.dashPlan).map(cast => ({ id: cast.casterId, position: cast.dashPlan!.destination })),
       ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => ({ id: dash.casterId, position: dash.destination })),
@@ -83,7 +96,7 @@ export function isForcedMovementPositionAvailable(state: GameState, entity: Game
 function along(origin: Position, direction: Position, distance: number): Position {
   return { x: origin.x + direction.x * distance, y: origin.y + direction.y * distance };
 }
-export function startForcedMovement(state: GameState, targetId: string, sourceId: string, direction: Position, maximumDistance: number, durationMs: number, now: number): GameState {
+export function startForcedMovement(state: GameState, targetId: string, sourceId: string, direction: Position, maximumDistance: number, durationMs: number, now: number, completionStatus?: ForcedMovement["completionStatus"]): GameState {
   const target = state.entities[targetId];
   const length = Math.hypot(direction.x, direction.y);
   if (!target || (target.kind !== "companion" && target.kind !== "enemy") || target.health <= 0 || !Number.isFinite(length) || !length || !Number.isFinite(maximumDistance) || maximumDistance <= 0 || !Number.isFinite(durationMs) || durationMs <= 0)
@@ -99,7 +112,7 @@ export function startForcedMovement(state: GameState, targetId: string, sourceId
   while (distance > 0 && !isForcedMovementPositionAvailable(state, target, along(target.position, unit, distance), true))
     distance = Math.max(0, distance - SAMPLE_DISTANCE);
   if (distance < 0.001)
-    return state;
+    return applyMovementCompletionStatus(state, { targetId, sourceId, completionStatus }, now, now);
   const movement: ForcedMovement = {
     targetId,
     sourceId,
@@ -108,8 +121,15 @@ export function startForcedMovement(state: GameState, targetId: string, sourceId
     distance,
     startedAt: now,
     endsAt: now + durationMs * distance / maximumDistance,
-    lastSafePosition: { ...target.position }
+    lastSafePosition: { ...target.position },
+    completionStatus,
   };
+  if (target.kind === "enemy") {
+    state = cancelEnemyAbilityCast(state, targetId, "incapacitated", now);
+    state = cancelEnemyDash(state, targetId, "incapacitated", now);
+    // Hand motion off at the impact position, while retaining normal action cancellation.
+    state = updateEntity(state, { ...state.entities[targetId], position: { ...target.position } });
+  }
   const next = {
     ...state,
     forcedMovementsByEntityId: { ...state.forcedMovementsByEntityId, [targetId]: movement },
@@ -181,6 +201,19 @@ export function updateForcedMovements(state: GameState, movedEntityIds: Set<stri
     else
       movements[target.id] = { ...movement, lastSafePosition: safe ? position : movement.lastSafePosition };
     next = { ...next, forcedMovementsByEntityId: movements };
+    if (progress === 1 || blocked)
+      next = applyMovementCompletionStatus(next, movement, blocked ? now : movement.endsAt, now);
   }
+  return next;
+}
+
+function applyMovementCompletionStatus(state: GameState, movement: Pick<ForcedMovement, "sourceId" | "targetId" | "completionStatus">, finishedAt: number, now: number): GameState {
+  const status = movement.completionStatus;
+  const source = state.entities[movement.sourceId];
+  const target = state.entities[movement.targetId];
+  if (!status || !source || source.state === "dead" || !("health" in source) || source.health <= 0 ||
+      !target || target.state === "dead" || status.durationMs + finishedAt <= now) return state;
+  let next = applyStatusEffect(state, { ...status, targetId: movement.targetId, sourceId: movement.sourceId }, finishedAt);
+  if (target.kind === "enemy") next = updateEntity(next, { ...target, state: "attack", currentTargetId: source.id });
   return next;
 }

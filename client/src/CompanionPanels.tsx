@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { CompanionSkillPreferences as SkillPreferencesSection } from "./CompanionSkillPreferences";
 import {
   EMPTY_EQUIPMENT_SLOT_ICON_SRC,
   INVENTORY_ITEM_ICON_SRC,
@@ -12,43 +13,11 @@ import type {
 import {
   ARMOR_FAMILY_LABELS,
   CLASS_DEFINITIONS,
-  DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT,
-  DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT,
-  FIRST_AID_HP_THRESHOLD_MIN_PERCENT,
-  FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
-  DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT,
-  DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT,
-  DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT,
-  DEFAULT_FIRE_BURST_TARGET_MODE,
-  DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT,
-  DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT,
-  DEFAULT_MOBILITY_SKILL_USE_MODE,
-  DEFAULT_OVERCHARGE_ENABLED,
-  DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT,
-  DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT,
-  DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT,
-  DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT,
-  DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT,
-  BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT,
-  CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT,
-  DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT,
-  ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT,
-  FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT,
-  HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT,
-  LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
-  PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT,
-  PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
-  SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT,
-  SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT,
-  DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT,
-  DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE,
-  DEFAULT_SUPPORT_FOCUS,
   companionIds,
   EQUIPMENT_SLOT_LABELS,
   EQUIPMENT_SLOTS,
   EQUIPMENT_TYPE_LABELS,
   getConsumableCooldownRemainingMs,
-  getFirstAidHealingEffectiveness,
   getCharacterXpProgress,
   canCompanionEnterFirstClassSelection,
   getCompanionEquipmentPrimaryStatModifiers,
@@ -62,7 +31,6 @@ import {
   getActiveSkillsForCompanion,
   getCompanionSkillRank,
   getCompanionSkillMaxRank,
-  getLegacySkillCandidatesForCompanion,
   getLearnedPassivesForCompanion,
   getLearnedSkillGroupsForCompanion,
   getPassiveSkillEffectSummary,
@@ -74,7 +42,6 @@ import {
   getSkillRoleScore,
   getSkillCooldownMs,
   getSkillBooksRequiredForNextRank,
-  isLegacySkillEnabledForCompanion,
   validateEquipmentItemForCompanion,
   type Companion,
   type CompanionDerivedStats,
@@ -90,10 +57,6 @@ import {
   type ActiveSkillDefinition,
   type PassiveSkillDefinition,
   type SkillId,
-  type FireBurstTargetMode,
-  type CircleOfRenewalTargetMode,
-  type MobilitySkillUseMode,
-  type SupportFocus,
 } from "./game";
 export type {
   GameMenuTab,
@@ -148,47 +111,6 @@ const partyManagementSections: PartyManagementSection[] = [
 
 const partyCompanionSlotCount = 5;
 
-const supportFocusOptions: SupportFocus[] = ["lowest_hp", "leader", "defender"];
-
-const supportFocusLabels: Record<SupportFocus, string> = {
-  lowest_hp: "Lowest HP",
-  leader: "Leader",
-  defender: "Defender",
-};
-
-const mobilitySkillUseModeOptions: MobilitySkillUseMode[] = [
-  "offensive",
-  "defensive",
-];
-
-const mobilitySkillUseModeLabels: Record<MobilitySkillUseMode, string> = {
-  offensive: "Offensive",
-  defensive: "Defensive",
-};
-
-const fireBurstTargetModeOptions: FireBurstTargetMode[] = [
-  "big_group",
-  "low_health",
-  "highest_health",
-];
-
-const fireBurstTargetModeLabels: Record<FireBurstTargetMode, string> = {
-  big_group: "Big Group",
-  low_health: "Low HP",
-  highest_health: "High HP",
-};
-
-const circleOfRenewalTargetModeOptions: CircleOfRenewalTargetMode[] = [
-  "big_group",
-  "low_health",
-  "defender",
-];
-
-const circleOfRenewalTargetModeLabels: Record<CircleOfRenewalTargetMode, string> = {
-  big_group: "Big Group",
-  low_health: "Low HP",
-  defender: "Defender",
-};
 
 const primaryStatLabels: Record<PrimaryStatId, string> = {
   strength: "Strength",
@@ -641,7 +563,7 @@ function getSkillEffectSummary(skill: ActiveSkillDefinition): string {
   }
 
   if (effect.type === "sweepingDamage") {
-    return `Deals ${Math.round(effect.mainPowerMultiplier * 100)}% ${effect.damageType} damage and ${Math.round(effect.splashPowerMultiplier * 100)}% splash damage.`;
+    return `Deals ${formatPercent(effect.mainPowerMultiplier * 100)}% ${effect.damageType} damage to every enemy in the forward semicircle, or 70% of that damage in the full circle. Choose the area in Skill Preferences.`;
   }
 
   if (effect.type === "taunt") {
@@ -657,7 +579,7 @@ function getSkillEffectSummary(skill: ActiveSkillDefinition): string {
   }
 
   if (effect.type === "shockwave") {
-    return `Hits nearby enemies for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage and briefly binds them.`;
+    return `Deals ${formatPercent(effect.powerMultiplier * 100)}% ${effect.damageType} damage. Circle binds and taunts; forward cone stuns, pushes, then taunts. Choose the area in Skill Preferences.`;
   }
 
   if (effect.type === "pinningShot") {
@@ -757,7 +679,7 @@ function getSkillEffectSummary(skill: ActiveSkillDefinition): string {
   }
 
   if (effect.type === "arrowBurst") {
-    return `Hits enemies near the target for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage.`;
+    return `Deals ${formatPercent(effect.powerMultiplier * 100)}% ${effect.damageType} damage in a forward cone or longer line. Choose the area in Skill Preferences.`;
   }
 
   if (effect.type === "lifestealBuff") {
@@ -809,7 +731,7 @@ function getSkillEffectSummary(skill: ActiveSkillDefinition): string {
   }
 
   if (effect.type === "maulSweep") {
-    return `Hits nearby enemies for ${Math.round(effect.powerMultiplier * 100)}% ${effect.damageType} damage and disarms them briefly.`;
+    return `Deals ${formatPercent(effect.powerMultiplier * 100)}% ${effect.damageType} damage in a forward semicircle, or 70% of that damage in a full circle, and disarms affected enemies. Choose the area in Skill Preferences.`;
   }
 
   if (effect.type === "shieldBlock") {
@@ -883,13 +805,6 @@ function formatPercent(value: number): string {
   return String(Number(value.toFixed(3)));
 }
 
-function getFirstAidEffectivenessText(thresholdPercent: number): string {
-  const effectivenessPercent = Math.round(
-    getFirstAidHealingEffectiveness(thresholdPercent) * 100,
-  );
-
-  return `${thresholdPercent}% HP → ${effectivenessPercent}% normal healing`;
-}
 
 function CompanionMenuList({
   layout = "vertical",
@@ -1725,733 +1640,6 @@ function BehaviorSettingsSection({
   );
 }
 
-function SkillPreferencesSection({
-  member,
-  onChangeSkillBehavior,
-  onSetLegacySkillEnabled,
-}: {
-  member: Companion;
-  onChangeSkillBehavior: (
-    companionId: string,
-    update: Partial<Companion["skillBehavior"]>,
-  ) => void;
-  onSetLegacySkillEnabled: (
-    companionId: string,
-    skillId: SkillId,
-    enabled: boolean,
-  ) => void;
-}) {
-  const firstAidSelfThreshold =
-    member.skillBehavior.beginnerFirstAidSelfHealHpThresholdPercent ??
-    DEFAULT_BEGINNER_FIRST_AID_SELF_HEAL_HP_THRESHOLD_PERCENT;
-  const firstAidAllyThreshold =
-    member.skillBehavior.beginnerFirstAidAllyHealHpThresholdPercent ??
-    DEFAULT_BEGINNER_FIRST_AID_ALLY_HEAL_HP_THRESHOLD_PERCENT;
-  const secondWindThreshold =
-    member.skillBehavior.secondWindSelfHealHpThresholdPercent ??
-    DEFAULT_SECOND_WIND_SELF_HEAL_HP_THRESHOLD_PERCENT;
-  const holdFastThreshold =
-    member.skillBehavior.holdFastUseHpThresholdPercent ??
-    DEFAULT_HOLD_FAST_USE_HP_THRESHOLD_PERCENT;
-  const fakeDeathThreshold =
-    member.skillBehavior.fakeDeathUseHpThresholdPercent ??
-    DEFAULT_FAKE_DEATH_USE_HP_THRESHOLD_PERCENT;
-  const bloodFeastThreshold =
-    member.skillBehavior.bloodFeastUseHpThresholdPercent ??
-    DEFAULT_BLOOD_FEAST_USE_HP_THRESHOLD_PERCENT;
-  const lightMendAllyThreshold =
-    member.skillBehavior.lightMendAllyHealHpThresholdPercent ??
-    DEFAULT_LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_PERCENT;
-  const selfSacrificeSafetyFloor =
-    member.skillBehavior.selfSacrificeSafetyFloorPercent ??
-    DEFAULT_SELF_SACRIFICE_SAFETY_FLOOR_PERCENT;
-  const penitentsGiftAllyThreshold =
-    member.skillBehavior.penitentsGiftAllyHealHpThresholdPercent ??
-    DEFAULT_PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_PERCENT;
-  const penitentsGiftSelfThreshold =
-    member.skillBehavior.penitentsGiftSelfHealHpThresholdPercent ??
-    DEFAULT_PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_PERCENT;
-  const eternalHopeThreshold =
-    member.skillBehavior.eternalHopeUseHpThresholdPercent ??
-    DEFAULT_ETERNAL_HOPE_USE_HP_THRESHOLD_PERCENT;
-  const mobilitySkillUseMode =
-    member.skillBehavior.mobilitySkillUseMode ?? DEFAULT_MOBILITY_SKILL_USE_MODE;
-  const defensiveMobilityThreshold =
-    member.skillBehavior.defensiveMobilityUseHpThresholdPercent ??
-    DEFAULT_DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_PERCENT;
-  const supportFocus = member.skillBehavior.supportFocus ?? DEFAULT_SUPPORT_FOCUS;
-  const overchargeEnabled =
-    member.skillBehavior.overchargeEnabled ?? DEFAULT_OVERCHARGE_ENABLED;
-  const fireBurstTargetMode =
-    member.skillBehavior.fireBurstTargetMode ?? DEFAULT_FIRE_BURST_TARGET_MODE;
-  const circleOfRenewalTargetMode =
-    member.skillBehavior.circleOfRenewalTargetMode ??
-    DEFAULT_CIRCLE_OF_RENEWAL_TARGET_MODE;
-  const circleOfRenewalMainTargetThreshold =
-    member.skillBehavior.circleOfRenewalMainTargetHpThresholdPercent ??
-    DEFAULT_CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_PERCENT;
-  const learnedSkillGroups = getLearnedSkillGroupsForCompanion(member);
-  const hasFirstAid = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "first_aid"),
-  );
-  const hasSecondWind = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "second_wind"),
-  );
-  const hasHoldFast = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "hold_fast"),
-  );
-  const hasFakeDeath = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "fake_death"),
-  );
-  const hasBloodFeast = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "blood_feast"),
-  );
-  const hasMobilitySkill = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) =>
-      skill.id === "flash_step" ||
-      skill.id === "shield_rush" ||
-      skill.id === "skirmish_shot" ||
-      skill.id === "pounce" ||
-      skill.id === "flame_step" ||
-      skill.id === "rune_step" ||
-      skill.id === "dawn_step" ||
-      skill.id === "atonement_step"
-    ),
-  );
-  const hasOvercharge = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "overcharge"),
-  );
-  const hasFrostArmor = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "frost_armor"),
-  );
-  const hasLightMend = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "light_mend"),
-  );
-  const hasLightbearerSupportSkill = learnedSkillGroups.some((group) =>
-    group.skills.some(
-      (skill) =>
-        skill.id === "light_mend" ||
-        skill.id === "sanctuary_veil" ||
-        skill.id === "guiding_light",
-    ),
-  );
-  const hasFireBurst = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "fire_burst"),
-  );
-  const hasCircleOfRenewal = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "circle_of_renewal"),
-  );
-  const hasPenitentSelfCostSkill = learnedSkillGroups.some((group) =>
-    group.skills.some(
-      (skill) =>
-        skill.id === "flagellant_lash" ||
-        skill.id === "martyrs_veil" ||
-        skill.id === "penitents_gift" ||
-        skill.id === "eternal_hope" ||
-        skill.id === "atonement_step",
-    ),
-  );
-  const hasPenitentsGift = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "penitents_gift"),
-  );
-  const hasEternalHope = learnedSkillGroups.some((group) =>
-    group.skills.some((skill) => skill.id === "eternal_hope"),
-  );
-  const hasPenitentSupportSkill = learnedSkillGroups.some((group) =>
-    group.skills.some(
-      (skill) => skill.id === "martyrs_veil" || skill.id === "penitents_gift",
-    ),
-  );
-  const shouldShowSupportFocus =
-    member.role === "support" ||
-    hasFrostArmor ||
-    hasLightbearerSupportSkill ||
-    hasPenitentSupportSkill;
-  const legacyCandidates = getLegacySkillCandidatesForCompanion(member);
-
-  return (
-    <section className="management-section-card" aria-label="Skill Preferences">
-      <h3>Skill Preferences</h3>
-      <div className="behavior-settings-list">
-        {hasFirstAid ? (
-          <>
-            <label className="behavior-range-row">
-              <span>First Aid Self-Heal Threshold</span>
-              <input
-                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
-                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    beginnerFirstAidSelfHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="range"
-                value={firstAidSelfThreshold}
-              />
-              <input
-                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
-                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    beginnerFirstAidSelfHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="number"
-                value={firstAidSelfThreshold}
-              />
-              <strong>
-                {getFirstAidEffectivenessText(firstAidSelfThreshold)}
-              </strong>
-            </label>
-            <label className="behavior-range-row">
-              <span>First Aid Ally-Heal Threshold</span>
-              <input
-                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
-                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    beginnerFirstAidAllyHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="range"
-                value={firstAidAllyThreshold}
-              />
-              <input
-                max={FIRST_AID_HP_THRESHOLD_MAX_PERCENT}
-                min={FIRST_AID_HP_THRESHOLD_MIN_PERCENT}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    beginnerFirstAidAllyHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="number"
-                value={firstAidAllyThreshold}
-              />
-              <strong>
-                {getFirstAidEffectivenessText(firstAidAllyThreshold)}
-              </strong>
-            </label>
-          </>
-        ) : null}
-        {hasSecondWind ? (
-          <label className="behavior-range-row">
-            <span>Second Wind Self-Heal Threshold</span>
-            <input
-              max={SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  secondWindSelfHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="range"
-              value={secondWindThreshold}
-            />
-            <input
-              max={SECOND_WIND_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  secondWindSelfHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="number"
-              value={secondWindThreshold}
-            />
-            <strong>{secondWindThreshold}%</strong>
-          </label>
-        ) : null}
-        {hasHoldFast ? (
-          <label className="behavior-range-row">
-            <span>Hold Fast Use Threshold</span>
-            <input
-              max={HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  holdFastUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="range"
-              value={holdFastThreshold}
-            />
-            <input
-              max={HOLD_FAST_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  holdFastUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="number"
-              value={holdFastThreshold}
-            />
-            <strong>{holdFastThreshold}%</strong>
-          </label>
-        ) : null}
-        {hasFakeDeath ? (
-          <label className="behavior-range-row">
-            <span>Fake Death Use Threshold</span>
-            <input
-              max={FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  fakeDeathUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="range"
-              value={fakeDeathThreshold}
-            />
-            <input
-              max={FAKE_DEATH_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  fakeDeathUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="number"
-              value={fakeDeathThreshold}
-            />
-            <strong>{fakeDeathThreshold}%</strong>
-          </label>
-        ) : null}
-        {hasBloodFeast ? (
-          <label className="behavior-range-row">
-            <span>Blood Feast Use Threshold</span>
-            <input
-              max={BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  bloodFeastUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="range"
-              value={bloodFeastThreshold}
-            />
-            <input
-              max={BLOOD_FEAST_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  bloodFeastUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="number"
-              value={bloodFeastThreshold}
-            />
-            <strong>{bloodFeastThreshold}%</strong>
-          </label>
-        ) : null}
-        {hasLightMend ? (
-          <label className="behavior-range-row">
-            <span>Light Mend Ally HP Threshold</span>
-            <input
-              max={LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  lightMendAllyHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="range"
-              value={lightMendAllyThreshold}
-            />
-            <input
-              max={LIGHT_MEND_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  lightMendAllyHealHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="number"
-              value={lightMendAllyThreshold}
-            />
-            <strong>{lightMendAllyThreshold}%</strong>
-          </label>
-        ) : null}
-        {hasPenitentSelfCostSkill ? (
-          <label className="behavior-range-row">
-            <span>Self-Sacrifice Safety Floor</span>
-            <input
-              max={SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  selfSacrificeSafetyFloorPercent: Number(event.target.value),
-                })
-              }
-              type="range"
-              value={selfSacrificeSafetyFloor}
-            />
-            <input
-              max={SELF_SACRIFICE_SAFETY_FLOOR_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  selfSacrificeSafetyFloorPercent: Number(event.target.value),
-                })
-              }
-              type="number"
-              value={selfSacrificeSafetyFloor}
-            />
-            <strong>{selfSacrificeSafetyFloor}%</strong>
-          </label>
-        ) : null}
-        {hasPenitentsGift ? (
-          <>
-            <label className="behavior-range-row">
-              <span>Penitent's Gift Ally HP Threshold</span>
-              <input
-                max={PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
-                min={1}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    penitentsGiftAllyHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="range"
-                value={penitentsGiftAllyThreshold}
-              />
-              <input
-                max={PENITENTS_GIFT_ALLY_HEAL_HP_THRESHOLD_MAX_PERCENT}
-                min={1}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    penitentsGiftAllyHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="number"
-                value={penitentsGiftAllyThreshold}
-              />
-              <strong>{penitentsGiftAllyThreshold}%</strong>
-            </label>
-            <label className="behavior-range-row">
-              <span>Penitent's Gift Self HP Threshold</span>
-              <input
-                max={PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
-                min={1}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    penitentsGiftSelfHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="range"
-                value={penitentsGiftSelfThreshold}
-              />
-              <input
-                max={PENITENTS_GIFT_SELF_HEAL_HP_THRESHOLD_MAX_PERCENT}
-                min={1}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    penitentsGiftSelfHealHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="number"
-                value={penitentsGiftSelfThreshold}
-              />
-              <strong>{penitentsGiftSelfThreshold}%</strong>
-            </label>
-          </>
-        ) : null}
-        {hasEternalHope ? (
-          <label className="behavior-range-row">
-            <span>Eternal Hope Use Threshold</span>
-            <input
-              max={ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  eternalHopeUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="range"
-              value={eternalHopeThreshold}
-            />
-            <input
-              max={ETERNAL_HOPE_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  eternalHopeUseHpThresholdPercent: Number(event.target.value),
-                })
-              }
-              type="number"
-              value={eternalHopeThreshold}
-            />
-            <strong>{eternalHopeThreshold}%</strong>
-          </label>
-        ) : null}
-        {hasOvercharge ? (
-          <label className="behavior-toggle-row">
-            <span>Overcharge</span>
-            <input
-              checked={overchargeEnabled}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  overchargeEnabled: event.target.checked,
-                })
-              }
-              type="checkbox"
-            />
-          </label>
-        ) : null}
-        {hasMobilitySkill ? (
-          <div className="behavior-choice-row">
-            <span>Mobility Skill Use</span>
-            <div
-              aria-label="Mobility Skill Use"
-              className="behavior-choice-group"
-              role="group"
-            >
-              {mobilitySkillUseModeOptions.map((option) => (
-                <button
-                  aria-pressed={mobilitySkillUseMode === option}
-                  className={mobilitySkillUseMode === option ? "active" : ""}
-                  key={option}
-                  onClick={() =>
-                    onChangeSkillBehavior(member.id, {
-                      mobilitySkillUseMode: option,
-                    })
-                  }
-                  type="button"
-                >
-                  {mobilitySkillUseModeLabels[option]}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {hasMobilitySkill && mobilitySkillUseMode === "defensive" ? (
-          <label className="behavior-range-row">
-            <span>Defensive Mobility Threshold</span>
-            <input
-              max={DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  defensiveMobilityUseHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="range"
-              value={defensiveMobilityThreshold}
-            />
-            <input
-              max={DEFENSIVE_MOBILITY_USE_HP_THRESHOLD_MAX_PERCENT}
-              min={1}
-              onChange={(event) =>
-                onChangeSkillBehavior(member.id, {
-                  defensiveMobilityUseHpThresholdPercent: Number(
-                    event.target.value,
-                  ),
-                })
-              }
-              type="number"
-              value={defensiveMobilityThreshold}
-            />
-            <strong>{defensiveMobilityThreshold}%</strong>
-          </label>
-        ) : null}
-        {shouldShowSupportFocus ? (
-          <div className="behavior-choice-row">
-            <span>
-              {hasFrostArmor || hasLightbearerSupportSkill || hasPenitentSupportSkill
-                ? "Support Skill Focus"
-                : "Support Focus"}
-            </span>
-            <div
-              aria-label="Support Focus"
-              className="behavior-choice-group"
-              role="group"
-            >
-              {supportFocusOptions.map((option) => (
-                <button
-                  aria-pressed={supportFocus === option}
-                  className={supportFocus === option ? "active" : ""}
-                  key={option}
-                  onClick={() =>
-                    onChangeSkillBehavior(member.id, {
-                      supportFocus: option,
-                    })
-                  }
-                  type="button"
-                >
-                  {supportFocusLabels[option]}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {hasFireBurst ? (
-          <div className="behavior-choice-row">
-            <span>FireBurst Target</span>
-            <div
-              aria-label="FireBurst Target"
-              className="behavior-choice-group"
-              role="group"
-            >
-              {fireBurstTargetModeOptions.map((option) => (
-                <button
-                  aria-pressed={fireBurstTargetMode === option}
-                  className={fireBurstTargetMode === option ? "active" : ""}
-                  key={option}
-                  onClick={() =>
-                    onChangeSkillBehavior(member.id, {
-                      fireBurstTargetMode: option,
-                    })
-                  }
-                  type="button"
-                >
-                  {fireBurstTargetModeLabels[option]}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {hasCircleOfRenewal ? (
-          <>
-            <div className="behavior-choice-row">
-              <span>Circle of Renewal Target</span>
-              <div
-                aria-label="Circle of Renewal Target"
-                className="behavior-choice-group"
-                role="group"
-              >
-                {circleOfRenewalTargetModeOptions.map((option) => (
-                  <button
-                    aria-pressed={circleOfRenewalTargetMode === option}
-                    className={
-                      circleOfRenewalTargetMode === option ? "active" : ""
-                    }
-                    key={option}
-                    onClick={() =>
-                      onChangeSkillBehavior(member.id, {
-                        circleOfRenewalTargetMode: option,
-                      })
-                    }
-                    type="button"
-                  >
-                    {circleOfRenewalTargetModeLabels[option]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="behavior-range-row">
-              <span>Circle Main Target HP Threshold</span>
-              <input
-                max={CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT}
-                min={1}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    circleOfRenewalMainTargetHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="range"
-                value={circleOfRenewalMainTargetThreshold}
-              />
-              <input
-                max={CIRCLE_OF_RENEWAL_MAIN_TARGET_HP_THRESHOLD_MAX_PERCENT}
-                min={1}
-                onChange={(event) =>
-                  onChangeSkillBehavior(member.id, {
-                    circleOfRenewalMainTargetHpThresholdPercent: Number(
-                      event.target.value,
-                    ),
-                  })
-                }
-                type="number"
-                value={circleOfRenewalMainTargetThreshold}
-              />
-              <strong>{circleOfRenewalMainTargetThreshold}%</strong>
-            </label>
-          </>
-        ) : null}
-        {legacyCandidates.length > 0 ? (
-          <div className="companion-skill-summary" aria-label="Legacy skill toggles">
-            <span className="equipment-section-label">Legacy Skills</span>
-            <div className="companion-skill-list">
-              {legacyCandidates.map((skill) => {
-                const enabled = isLegacySkillEnabledForCompanion(member, skill.id);
-
-                return (
-                  <div key={skill.id} className="companion-skill-row">
-                    <div>
-                      <strong>{skill.displayName}</strong>
-                      <span>
-                        {CLASS_DEFINITIONS[skill.classId].displayName} | Rank{" "}
-                        {getCompanionSkillRank(member, skill.id)}/
-                        {getCompanionSkillMaxRank(member, skill)}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() =>
-                        onSetLegacySkillEnabled(member.id, skill.id, !enabled)
-                      }
-                      type="button"
-                    >
-                      {enabled ? "Disable" : "Enable"}
-                    </button>
-                    <span className="companion-skill-tags">
-                      {skill.tags.join(", ")}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-        {!hasFirstAid &&
-        !hasSecondWind &&
-        !hasHoldFast &&
-        !hasFakeDeath &&
-        !hasBloodFeast &&
-        !hasLightMend &&
-        !hasPenitentSelfCostSkill &&
-        !hasPenitentsGift &&
-        !hasEternalHope &&
-        !hasMobilitySkill &&
-        !hasOvercharge &&
-        !shouldShowSupportFocus &&
-        !hasFireBurst &&
-        !hasCircleOfRenewal &&
-        legacyCandidates.length === 0 ? (
-          <span className="party-menu-empty">No skill preferences available</span>
-        ) : null}
-      </div>
-    </section>
-  );
-}
 
 function PartyOrderSection({
   leaderId,

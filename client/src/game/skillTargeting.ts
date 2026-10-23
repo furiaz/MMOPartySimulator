@@ -1,5 +1,7 @@
 import { getPartyLeader, getPartyMembers } from "./partySystem";
-import { getCombatTargetPosition, hasStructureLineOfSight, isLivingHostileTarget, isHostileTargetInRadius } from "./combatStructures";
+import { prepareCompanionSkillArea } from "./companionSkillAreas";
+import { isEntityInsideCompanionAoe } from "./companionAoeVariants";
+import { getCombatTargetPosition, hasStructureLineOfSight, isLivingHostileTarget } from "./combatStructures";
 import type { CombatStructure } from "./types";
 import {
   isActiveResource,
@@ -25,6 +27,7 @@ import { isActivePartyThreat } from "./partyThreatSystem";
 import {
   FIRST_AID_HP_THRESHOLD_MAX_PERCENT,
   getCompanionSkillBehavior,
+  getSkillPreferences,
   isBeginnerFirstAidSelfHealPriorityActive,
 } from "./skillBehavior";
 import { canUsePartyClassBuff } from "./skillRuntime";
@@ -59,11 +62,20 @@ export function getSkillTarget(
   skill: SkillDefinition,
   options: SkillTargetOptions = {},
 ): Enemy | Companion | CombatStructure | undefined {
-  const orderedTargetId = options.forcedEnemyTargetId ?? caster.currentTargetId ?? getPartyCombatTarget(state)?.id;
+  const orderedTargetId = getForcedAreaTargetId(state, caster, options) ?? caster.currentTargetId ?? getPartyCombatTarget(state)?.id;
   const orderedTarget = orderedTargetId ? state.entities[orderedTargetId] : undefined;
-  if (orderedTarget?.kind === "structure" && orderedTarget.health > 0 &&
-      (skill.effect.type === "shockwave" || skill.effect.type === "maulSweep") &&
-      isHostileTargetInRadius(orderedTarget, caster.position, skill.effect.radius)) return caster;
+  if (skill.effect.type === "shockwave" || skill.effect.type === "maulSweep" || skill.effect.type === "sweepingDamage") {
+    if (caster.state !== "attack") return undefined;
+    const prepared = prepareCompanionSkillArea(state, caster, skill,
+      isLivingHostileTarget(orderedTarget) ? getCombatTargetPosition(caster.position, orderedTarget) : undefined);
+    return prepared && Object.values(state.entities).some(entity =>
+      (entity.kind === "structure" ? entity.id === orderedTargetId && isLivingHostileTarget(entity)
+        : isLivingEnemy(entity) && isAreaEnemyEligible(state, caster, entity, options)) &&
+      isEntityInsideCompanionAoe(prepared.area, entity))
+      ? getForcedAreaTargetId(state, caster, options) && isLivingHostileTarget(orderedTarget) ? orderedTarget : caster
+      : undefined;
+  }
+  if (skill.effect.type === "arrowBurst") return findOffensiveAreaTarget(state, caster, skill, options);
   // Buildings are not discovered autonomously: only an explicit attack target is eligible.
   if (orderedTarget?.kind === "structure" && isLivingHostileTarget(orderedTarget) &&
       skill.tags.some(tag => tag === "Damage" || tag === "DoT") &&
@@ -128,7 +140,7 @@ export function getSkillTarget(
   }
 
   if (skill.effect.type === "overcharge") {
-    const behavior = getCompanionSkillBehavior(caster);
+    const behavior = getCompanionSkillBehavior(caster, skill.id);
 
     return behavior.overchargeEnabled &&
       hasValidEnemyContext(state, caster, options) &&
@@ -174,7 +186,7 @@ export function getSkillTarget(
 
   if (skill.effect.type === "sacrificialBarrier") {
     return canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
-      respectSafetyFloor: true,
+      respectSafetyFloor: true, skillId: skill.id,
     }) &&
       (hasPartyDanger(state, caster) || hasValidEnemyContext(state, caster, options))
       ? findBarrierBlockTarget(state, caster, skill.range)
@@ -222,12 +234,9 @@ export function getSkillTarget(
     );
   }
 
-  if (skill.effect.type === "shockwave") {
-    return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
-  }
 
   if (skill.effect.type === "quickStep") {
-    return findQuickStepTarget(state, caster, skill.effect.distance, options);
+    return findQuickStepTarget(state, caster, skill.effect.distance, options, skill);
   }
 
   if (skill.effect.type === "skirmishShot") {
@@ -254,12 +263,9 @@ export function getSkillTarget(
     return findAtonementStepTarget(state, caster, skill, options);
   }
 
-  if (skill.effect.type === "maulSweep") {
-    return hasEnemyInRange(state, caster, skill.effect.radius) ? caster : undefined;
-  }
 
   if (skill.effect.type === "fireBurst") {
-    return findFireBurstTarget(state, caster, skill, options);
+    return findOffensiveAreaTarget(state, caster, skill, options);
   }
 
   if (skill.effect.type === "circleOfRenewal") {
@@ -274,7 +280,7 @@ export function getSkillTarget(
     return isEternalHopeUseThresholdActive(caster) &&
       !hasActiveEternalHope(state, caster) &&
       canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
-        respectSafetyFloor: false,
+        respectSafetyFloor: false, skillId: skill.id,
       })
       ? caster
       : undefined;
@@ -407,7 +413,7 @@ export function getSkillTarget(
   if (
     skill.effect.type === "flagellantLash" &&
     !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
-      respectSafetyFloor: true,
+      respectSafetyFloor: true, skillId: skill.id,
     })
   ) {
     return undefined;
@@ -618,7 +624,7 @@ function findFirstAidTarget(
   options: SkillTargetOptions,
 ): Companion | undefined {
   const inCombat = hasPartyCombatContext(state, caster);
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, "first_aid");
 
   if (caster.role !== "support" && inCombat) {
     return undefined;
@@ -863,7 +869,7 @@ function findFrostArmorTarget(
   range: number,
   options: SkillTargetOptions,
 ): Companion | undefined {
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, "frost_armor");
   const candidates = getPartyMembers(state).filter(
     (member) =>
       isLivingCompanion(member) &&
@@ -906,7 +912,7 @@ function findLightMendTarget(
   caster: Companion,
   range: number,
 ): Companion | undefined {
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, "light_mend");
   const candidates = getPartyMembers(state).filter(
     (member) =>
       isLivingCompanion(member) &&
@@ -928,7 +934,7 @@ function findHealOverTimeTarget(
   options: SkillTargetOptions,
 ): Companion | undefined {
   const now = options.now ?? Date.now();
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, "guiding_light");
   const candidates = getPartyMembers(state).filter((member) => {
     if (
       !isLivingCompanion(member) ||
@@ -954,50 +960,19 @@ function findHealOverTimeTarget(
   return findFocusedSupportTarget(state, caster, candidates, behavior.supportFocus);
 }
 
-function findCircleOfRenewalTarget(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-): Companion | undefined {
-  if (skill.effect.type !== "circleOfRenewal") {
-    return undefined;
-  }
-
-  const behavior = getCompanionSkillBehavior(caster);
-  const candidates = getPartyMembers(state).filter(
-    (member) =>
-      isLivingCompanion(member) &&
-      member.health < member.maxHealth &&
-      isCompanionAtOrBelowHpThreshold(
-        member,
-        behavior.circleOfRenewalMainTargetHpThresholdPercent,
-      ) &&
-      getGridDistance(caster.position, member.position) <= skill.range,
-  );
-
-  if (behavior.circleOfRenewalTargetMode === "low_health") {
-    return sortFrostArmorTargets(caster, candidates)[0];
-  }
-
-  if (behavior.circleOfRenewalTargetMode === "defender") {
-    return (
-      sortFrostArmorTargets(
-        caster,
-        candidates.filter((candidate) => candidate.role === "defender"),
-      )[0] ?? sortFrostArmorTargets(caster, candidates)[0]
-    );
-  }
-
-  const radius = skill.effect.radius;
-
-  return candidates.sort(
-    (a, b) =>
-      countInjuredCompanionsInRadius(state, b, radius) -
-        countInjuredCompanionsInRadius(state, a, radius) ||
-      getGridDistance(caster.position, a.position) -
-        getGridDistance(caster.position, b.position) ||
-      a.id.localeCompare(b.id),
-  )[0];
+function findCircleOfRenewalTarget(state: GameState, caster: Companion, skill: SkillDefinition): Companion | undefined {
+  if (skill.effect.type !== "circleOfRenewal") return undefined;
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
+  const injured = getPartyMembers(state).filter(member => isLivingCompanion(member) && member.health < member.maxHealth);
+  const candidates = injured.filter(member => isCompanionAtOrBelowHpThreshold(member, behavior.circleOfRenewalMainTargetHpThresholdPercent) &&
+    getGridDistance(caster.position, member.position) <= skill.range);
+  const mode = getSkillPreferences(caster, skill.id).targetMode;
+  if (mode === "low_health") return sortFrostArmorTargets(caster, candidates)[0];
+  if (mode === "defender") return sortFrostArmorTargets(caster, candidates.filter(member => member.role === "defender"))[0] ?? sortFrostArmorTargets(caster, candidates)[0];
+  return sortAreaTargets(caster, candidates.map(target => {
+    const prepared = prepareCompanionSkillArea(state, caster, skill, target.position);
+    return { target, count: prepared ? injured.filter(member => isEntityInsideCompanionAoe(prepared.area, member)).length : 0 };
+  }), mode)[0]?.target;
 }
 
 function findFocusedSupportTarget(
@@ -1032,18 +1007,6 @@ function findFocusedSupportTarget(
   return sortFrostArmorTargets(caster, candidates)[0];
 }
 
-function countInjuredCompanionsInRadius(
-  state: GameState,
-  target: Companion,
-  radius: number,
-): number {
-  return getPartyMembers(state).filter(
-    (member) =>
-      isLivingCompanion(member) &&
-      member.health < member.maxHealth &&
-      getGridDistance(member.position, target.position) <= radius,
-  ).length;
-}
 
 function hasRecentIncomingDamagePressure(
   state: GameState,
@@ -1331,8 +1294,9 @@ function findQuickStepTarget(
   caster: Companion,
   distance: number,
   options: SkillTargetOptions,
+  skill: SkillDefinition,
 ): Enemy | undefined {
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
 
   if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findOffensiveMobilityTarget(state, caster, 6, options);
@@ -1394,7 +1358,7 @@ function findSkirmishShotTarget(
     return undefined;
   }
 
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
 
   if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findOffensiveMobilityTarget(
@@ -1404,16 +1368,7 @@ function findSkirmishShotTarget(
       options,
     );
 
-    return enemy &&
-      getSkillDashPosition(
-        state,
-        caster,
-        getDirectionToward(caster, enemy),
-        skill.effect.distance,
-        { allowAngles: true },
-      )
-      ? enemy
-      : undefined;
+    return enemy && getSkillDashPosition(state, caster, getDirectionToward(caster, enemy), skill.effect.distance, { allowAngles: true }) ? enemy : undefined;
   }
 
   const threat = findQuickStepThreat(state, caster);
@@ -1441,7 +1396,7 @@ function findPounceTarget(
     return undefined;
   }
 
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
 
   if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findOffensiveMobilityTarget(
@@ -1488,7 +1443,7 @@ function findFlameStepTarget(
     return undefined;
   }
 
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
 
   if (behavior.mobilitySkillUseMode === "offensive") {
     const enemy = findOffensiveMobilityTarget(
@@ -1535,250 +1490,92 @@ function findRuneStepTarget(
     return undefined;
   }
 
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
+  const offensive = behavior.mobilitySkillUseMode === "offensive";
+  const target = offensive ? findOffensiveMobilityTarget(state, caster, skill.range, options) : findQuickStepThreat(state, caster);
+  if (!target || !isEnemyInRange(caster, target, skill.range)) return undefined;
+  const landing = getSkillDashPosition(state, caster, offensive ? getDirectionToward(caster, target) : getDirectionAwayFrom(caster, target), skill.effect.distance, { allowAngles: true });
+  const prepared = landing && prepareCompanionSkillArea(state, caster, skill, target.position, offensive ? landing : caster.position);
+  return prepared && Object.values(state.entities).some(entity => isLivingEnemy(entity) && isEntityInsideCompanionAoe(prepared.area, entity)) ? target : undefined;
+}
 
-  if (behavior.mobilitySkillUseMode === "offensive") {
-    const enemy = findOffensiveMobilityTarget(
-      state,
-      caster,
-      skill.range,
-      options,
-    );
+function findDawnStepTarget(state: GameState, caster: Companion, skill: SkillDefinition, options: SkillTargetOptions): Enemy | undefined {
+  if (skill.effect.type !== "dawnStep") return undefined;
+  return getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode === "offensive"
+    ? findOffensiveMobilityAreaTarget(state, caster, skill, options) : findDefensiveMobilityAreaTarget(state, caster, skill);
+}
 
-    return enemy &&
-      getSkillDashPosition(
-        state,
-        caster,
-        getDirectionToward(caster, enemy),
-        skill.effect.distance,
-        { allowAngles: true },
-      )
-      ? enemy
-      : undefined;
-  }
+function findAtonementStepTarget(state: GameState, caster: Companion, skill: SkillDefinition, options: SkillTargetOptions): Enemy | undefined {
+  if (skill.effect.type !== "atonementStep" || !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, { respectSafetyFloor: true, skillId: skill.id })) return undefined;
+  return getCompanionSkillBehavior(caster, skill.id).mobilitySkillUseMode === "offensive"
+    ? findOffensiveMobilityAreaTarget(state, caster, skill, options) : findDefensiveMobilityAreaTarget(state, caster, skill);
+}
 
+
+function getForcedAreaTargetId(state: GameState, caster: Companion, options: SkillTargetOptions): string | undefined {
+  const intent = getPartyExecutionIntent(state);
+  if (options.forcedEnemyTargetId) return options.forcedEnemyTargetId;
+  if (intent?.source === "player" && intent.type === "attack" && intent.targetId) return intent.targetId;
+  return state.entities[caster.currentTargetId ?? ""]?.kind === "structure" ? caster.currentTargetId ?? undefined : undefined;
+}
+
+function isAreaEnemyEligible(state: GameState, caster: Companion, enemy: Enemy, options: SkillTargetOptions): boolean {
+  const forcedId = getForcedAreaTargetId(state, caster, options);
+  return isLivingEnemy(enemy) && (!isTargetDummyEnemy(enemy) || enemy.id === forcedId || enemy.id === caster.currentTargetId) &&
+    isAllowedEnemyTarget(enemy, options) && isSkillEnemyTargetAvailable(state, caster, enemy);
+}
+
+function sortAreaTargets<T extends { target: Enemy | Companion | CombatStructure; count: number }>(caster: Companion, candidates: T[], mode: string | undefined): T[] {
+  return candidates.sort((a, b) =>
+    (mode === "highest_health" ? b.target.health - a.target.health : mode === "low_health"
+      ? a.target.health / a.target.maxHealth - b.target.health / b.target.maxHealth : b.count - a.count) ||
+    getGridDistance(caster.position, a.target.position) - getGridDistance(caster.position, b.target.position) || a.target.id.localeCompare(b.target.id));
+}
+
+function findOffensiveAreaTarget(state: GameState, caster: Companion, skill: SkillDefinition, options: SkillTargetOptions): Enemy | CombatStructure | undefined {
+  const forcedId = getForcedAreaTargetId(state, caster, options);
+  const enemies = Object.values(state.entities).filter((entity): entity is Enemy => isLivingEnemy(entity) && isAreaEnemyEligible(state, caster, entity, options));
+  const forced = forcedId ? state.entities[forcedId] : undefined;
+  const targets: (Enemy | CombatStructure)[] = forced?.kind === "structure" && isLivingHostileTarget(forced) && hasStructureLineOfSight(state, caster.position, forced)
+    ? [forced] : enemies.filter(enemy => !forcedId || enemy.id === forcedId);
+  const candidates = targets.flatMap(target => {
+    if (skill.effect.type === "fireBurst" && getGridDistance(caster.position, getCombatTargetPosition(caster.position, target)) > skill.range) return [];
+    const prepared = prepareCompanionSkillArea(state, caster, skill, target.position);
+    if (!prepared || !isEntityInsideCompanionAoe(prepared.area, target)) return [];
+    return [{ target, count: enemies.filter(enemy => isEntityInsideCompanionAoe(prepared.area, enemy)).length }];
+  });
+  return sortAreaTargets(caster, candidates, getSkillPreferences(caster, skill.id).targetMode)[0]?.target;
+}
+
+function findOffensiveMobilityAreaTarget(state: GameState, caster: Companion, skill: SkillDefinition, options: SkillTargetOptions): Enemy | undefined {
+  if (skill.effect.type !== "dawnStep" && skill.effect.type !== "atonementStep") return undefined;
+  const distance = skill.effect.distance;
+  const forcedId = getForcedAreaTargetId(state, caster, options);
+  const enemies = Object.values(state.entities).filter((entity): entity is Enemy => isLivingEnemy(entity) && isAreaEnemyEligible(state, caster, entity, options));
+  const candidates = enemies.filter(enemy => (!forcedId || enemy.id === forcedId) && isEnemyInRange(caster, enemy, skill.range)).flatMap(target => {
+    const landing = getSkillDashPosition(state, caster, getDirectionToward(caster, target), distance, { allowAngles: true });
+    if (!landing) return [];
+    const prepared = prepareCompanionSkillArea(state, caster, skill, target.position, landing);
+    const count = prepared ? enemies.filter(enemy => isEntityInsideCompanionAoe(prepared.area, enemy)).length : 0;
+    return count > 0 ? [{ target, count }] : [];
+  });
+  return sortAreaTargets(caster, candidates, getSkillPreferences(caster, skill.id).targetMode)[0]?.target;
+}
+
+function findDefensiveMobilityAreaTarget(state: GameState, caster: Companion, skill: SkillDefinition): Enemy | undefined {
+  if (skill.effect.type !== "dawnStep" && skill.effect.type !== "atonementStep") return undefined;
+  if (!isDefensiveMobilityUseThresholdActive(caster, skill.id)) return undefined;
   const threat = findQuickStepThreat(state, caster);
-
-  return threat &&
-    isEnemyInRange(caster, threat, skill.range) &&
-    getSkillDashPosition(
-      state,
-      caster,
-      getDirectionAwayFrom(caster, threat),
-      skill.effect.distance,
-      { allowAngles: true },
-    )
-    ? threat
-    : undefined;
+  if (!threat || !isEnemyInRange(caster, threat, skill.range) ||
+      !getSkillDashPosition(state, caster, getDirectionAwayFrom(caster, threat), skill.effect.distance, { allowAngles: true })) return undefined;
+  const prepared = prepareCompanionSkillArea(state, caster, skill, threat.position, caster.position);
+  if (!prepared) return undefined;
+  const eligible = skill.effect.type === "atonementStep"
+    ? getPartyMembers(state).some(member => member.id !== caster.id && isLivingCompanion(member) && member.health < member.maxHealth && isEntityInsideCompanionAoe(prepared.area, member))
+    : Object.values(state.entities).some(enemy => isLivingEnemy(enemy) && isEntityInsideCompanionAoe(prepared.area, enemy));
+  return eligible ? threat : undefined;
 }
 
-function findDawnStepTarget(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-  options: SkillTargetOptions,
-): Enemy | undefined {
-  if (skill.effect.type !== "dawnStep") {
-    return undefined;
-  }
-
-  const behavior = getCompanionSkillBehavior(caster);
-
-  if (behavior.mobilitySkillUseMode === "offensive") {
-    const enemy = findOffensiveMobilityTarget(
-      state,
-      caster,
-      skill.range,
-      options,
-    );
-
-    return enemy &&
-      getSkillDashPosition(
-        state,
-        caster,
-        getDirectionToward(caster, enemy),
-        skill.effect.distance,
-        { allowAngles: true },
-      )
-      ? enemy
-      : undefined;
-  }
-
-  if (!isDefensiveMobilityUseThresholdActive(caster)) {
-    return undefined;
-  }
-
-  if (!isDefensiveMobilityUseThresholdActive(caster)) {
-    return undefined;
-  }
-
-  if (!isDefensiveMobilityUseThresholdActive(caster)) {
-    return undefined;
-  }
-
-  if (!isDefensiveMobilityUseThresholdActive(caster)) {
-    return undefined;
-  }
-
-  if (!isDefensiveMobilityUseThresholdActive(caster)) {
-    return undefined;
-  }
-
-  if (!isDefensiveMobilityUseThresholdActive(caster)) {
-    return undefined;
-  }
-
-  const threat = findQuickStepThreat(state, caster);
-
-  return threat &&
-    isEnemyInRange(caster, threat, skill.range) &&
-    getSkillDashPosition(
-      state,
-      caster,
-      getDirectionAwayFrom(caster, threat),
-      skill.effect.distance,
-      { allowAngles: true },
-    )
-    ? threat
-    : undefined;
-}
-
-function findAtonementStepTarget(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-  options: SkillTargetOptions,
-): Enemy | undefined {
-  if (skill.effect.type !== "atonementStep") {
-    return undefined;
-  }
-
-  if (
-    !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
-      respectSafetyFloor: true,
-    })
-  ) {
-    return undefined;
-  }
-
-  const behavior = getCompanionSkillBehavior(caster);
-
-  if (behavior.mobilitySkillUseMode === "offensive") {
-    const enemy = findOffensiveMobilityTarget(
-      state,
-      caster,
-      skill.range,
-      options,
-    );
-
-    return enemy &&
-      getSkillDashPosition(
-        state,
-        caster,
-        getDirectionToward(caster, enemy),
-        skill.effect.distance,
-        { allowAngles: true },
-      )
-      ? enemy
-      : undefined;
-  }
-
-  if (
-    !isDefensiveMobilityUseThresholdActive(caster) ||
-    !hasAtonementStepHealTarget(state, caster, skill.effect.healRadius)
-  ) {
-    return undefined;
-  }
-
-  const threat = findQuickStepThreat(state, caster);
-
-  return threat &&
-    isEnemyInRange(caster, threat, skill.range) &&
-    getSkillDashPosition(
-      state,
-      caster,
-      getDirectionAwayFrom(caster, threat),
-      skill.effect.distance,
-      { allowAngles: true },
-    )
-    ? threat
-    : undefined;
-}
-
-function hasAtonementStepHealTarget(
-  state: GameState,
-  caster: Companion,
-  radius: number,
-): boolean {
-  return getPartyMembers(state).some(
-    (member) =>
-      member.id !== caster.id &&
-      isLivingCompanion(member) &&
-      member.health < member.maxHealth &&
-      getGridDistance(member.position, caster.position) <= radius,
-  );
-}
-
-function findFireBurstTarget(
-  state: GameState,
-  caster: Companion,
-  skill: SkillDefinition,
-  options: SkillTargetOptions,
-): Enemy | undefined {
-  if (skill.effect.type !== "fireBurst") {
-    return undefined;
-  }
-
-  const effect = skill.effect;
-  const candidates = Object.values(state.entities).filter(
-    (entity): entity is Enemy =>
-      isLivingEnemy(entity) &&
-      isEnemyInRange(caster, entity, skill.range) &&
-      isAllowedEnemyTarget(entity, options),
-  );
-  const targetMode = getCompanionSkillBehavior(caster).fireBurstTargetMode;
-
-  if (targetMode === "low_health") {
-    return candidates.sort(
-      (a, b) =>
-        a.health / a.maxHealth - b.health / b.maxHealth ||
-        getGridDistance(caster.position, a.position) -
-          getGridDistance(caster.position, b.position) ||
-        a.id.localeCompare(b.id),
-    )[0];
-  }
-
-  if (targetMode === "highest_health") {
-    return candidates.sort(
-      (a, b) =>
-        b.health - a.health ||
-        getGridDistance(caster.position, a.position) -
-          getGridDistance(caster.position, b.position) ||
-        a.id.localeCompare(b.id),
-    )[0];
-  }
-
-  return candidates.sort(
-    (a, b) =>
-      countEnemiesInRadius(state, b, effect.radius) -
-        countEnemiesInRadius(state, a, effect.radius) ||
-      getGridDistance(caster.position, a.position) -
-        getGridDistance(caster.position, b.position) ||
-      a.id.localeCompare(b.id),
-  )[0];
-}
-
-function countEnemiesInRadius(
-  state: GameState,
-  target: Enemy,
-  radius: number,
-): number {
-  return Object.values(state.entities).filter(
-    (entity): entity is Enemy =>
-      isLivingEnemy(entity) &&
-      getGridDistance(entity.position, target.position) <= radius,
-  ).length;
-}
 
 function hasGatherBuffResourceContext(
   state: GameState,
@@ -1862,21 +1659,21 @@ function hasActiveStatusEffect(
 function isHoldFastUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
-    getCompanionSkillBehavior(caster).holdFastUseHpThresholdPercent,
+    getCompanionSkillBehavior(caster, "hold_fast").holdFastUseHpThresholdPercent,
   );
 }
 
 function isFakeDeathUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
-    getCompanionSkillBehavior(caster).fakeDeathUseHpThresholdPercent,
+    getCompanionSkillBehavior(caster, "fake_death").fakeDeathUseHpThresholdPercent,
   );
 }
 
 function isBloodFeastUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
-    getCompanionSkillBehavior(caster).bloodFeastUseHpThresholdPercent,
+    getCompanionSkillBehavior(caster, "blood_feast").bloodFeastUseHpThresholdPercent,
   );
 }
 
@@ -1885,7 +1682,7 @@ function isPenitentsGiftSelfUseThresholdActive(caster: Companion): boolean {
     caster.health < caster.maxHealth &&
     isCompanionAtOrBelowHpThreshold(
       caster,
-      getCompanionSkillBehavior(caster).penitentsGiftSelfHealHpThresholdPercent,
+      getCompanionSkillBehavior(caster, "penitents_gift").penitentsGiftSelfHealHpThresholdPercent,
     )
   );
 }
@@ -1893,14 +1690,14 @@ function isPenitentsGiftSelfUseThresholdActive(caster: Companion): boolean {
 function isEternalHopeUseThresholdActive(caster: Companion): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
-    getCompanionSkillBehavior(caster).eternalHopeUseHpThresholdPercent,
+    getCompanionSkillBehavior(caster, "eternal_hope").eternalHopeUseHpThresholdPercent,
   );
 }
 
-function isDefensiveMobilityUseThresholdActive(caster: Companion): boolean {
+function isDefensiveMobilityUseThresholdActive(caster: Companion, skillId: SkillDefinition["id"]): boolean {
   return isCompanionAtOrBelowHpThreshold(
     caster,
-    getCompanionSkillBehavior(caster).defensiveMobilityUseHpThresholdPercent,
+    getCompanionSkillBehavior(caster, skillId).defensiveMobilityUseHpThresholdPercent,
   );
 }
 
@@ -1914,7 +1711,7 @@ function isSelfPercentHealPriorityActive(
 ): boolean {
   const thresholdPercent =
     skill.id === "second_wind"
-      ? getCompanionSkillBehavior(caster).secondWindSelfHealHpThresholdPercent
+      ? getCompanionSkillBehavior(caster, skill.id).secondWindSelfHealHpThresholdPercent
       : null;
 
   return (
@@ -1922,18 +1719,6 @@ function isSelfPercentHealPriorityActive(
     caster.maxHealth > 0 &&
     caster.health < caster.maxHealth &&
     (caster.health / caster.maxHealth) * 100 <= thresholdPercent
-  );
-}
-
-function hasEnemyInRange(
-  state: GameState,
-  caster: Companion,
-  range: number,
-): boolean {
-  return Object.values(state.entities).some(
-    (entity): entity is Enemy =>
-      isLivingEnemy(entity) &&
-      getGridDistance(caster.position, entity.position) <= range,
   );
 }
 
@@ -1961,7 +1746,7 @@ function findSacrificeHealTarget(
   if (
     isPenitentsGiftSelfUseThresholdActive(caster) &&
     canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
-      respectSafetyFloor: false,
+      respectSafetyFloor: false, skillId: skill.id,
     })
   ) {
     return caster;
@@ -1969,13 +1754,13 @@ function findSacrificeHealTarget(
 
   if (
     !canPayCurrentHpSacrifice(caster, skill.effect.hpCostCurrentPercent, {
-      respectSafetyFloor: true,
+      respectSafetyFloor: true, skillId: skill.id,
     })
   ) {
     return undefined;
   }
 
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
   const candidates = getPartyMembers(state).filter(
     (member) =>
       member.id !== caster.id &&
@@ -1994,7 +1779,7 @@ function findSacrificeHealTarget(
 function canPayCurrentHpSacrifice(
   caster: Companion,
   hpCostCurrentPercent: number,
-  { respectSafetyFloor }: { respectSafetyFloor: boolean },
+  { respectSafetyFloor, skillId }: { respectSafetyFloor: boolean; skillId: SkillDefinition["id"] },
 ): boolean {
   const cost = Math.max(
     1,
@@ -2014,7 +1799,7 @@ function canPayCurrentHpSacrifice(
 
   return (
     remainingPercent >=
-    getCompanionSkillBehavior(caster).selfSacrificeSafetyFloorPercent
+    getCompanionSkillBehavior(caster, skillId).selfSacrificeSafetyFloorPercent
   );
 }
 

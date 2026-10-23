@@ -1,22 +1,20 @@
 import { handleEnemyDefeatedDrops } from "./dropSystem";
+import { prepareCompanionSkillArea } from "./companionSkillAreas";
+import { isEntityInsideCompanionAoe } from "./companionAoeVariants";
+import { startForcedMovement } from "./forcedMovement";
 import { isLivingHostileTarget } from "./combatStructures";
-import { doesAoeIntersectFootprint } from "./aoePatterns";
 import type { HostileCombatTarget } from "./types";
 import { isLivingCompanion, isLivingEnemy, isTargetDummyEnemy } from "./entityGuards";
 import { grantCharacterXpToParty } from "./leveling";
 import { recordEnemyDefeatedForQuests } from "./questSystem";
 import { resolveAndApplyCombatDamage } from "./combatResolver";
 import { applyStatusEffect } from "./statusEffects";
-import {
-  createAoeCastTransform,
-  isPositionInsideAoe,
-  resolveAoePattern,
-} from "./aoePatterns";
 import { addCombatFeedback, updateEntity, type GameState } from "./state";
 import type {
   Companion,
   CompanionAoeChannelState,
   SkillDefinition,
+  Position,
 } from "./types";
 
 export const SHIELD_SHOCKWAVE_CHANNEL_MS = 200;
@@ -38,6 +36,7 @@ export function startShieldShockwaveChannel(
   caster: Companion,
   skill: SkillDefinition,
   now: number,
+  facingTarget?: Position,
 ): GameState {
   if (
     skill.effect.type !== "shockwave" ||
@@ -45,6 +44,9 @@ export function startShieldShockwaveChannel(
   ) {
     return state;
   }
+
+  const prepared = prepareCompanionSkillArea(state, caster, skill, facingTarget);
+  if (!prepared || !Object.values(state.entities).some(entity => isLivingHostileTarget(entity) && isEntityInsideCompanionAoe(prepared.area, entity))) return state;
 
   const nextState = addCombatFeedback(state, {
     type: "attack",
@@ -61,15 +63,14 @@ export function startShieldShockwaveChannel(
         id: `shield_shockwave:${caster.id}:${now}`,
         abilityId: "shield_shockwave",
         casterId: caster.id,
-        area: resolveAoePattern(
-          { type: "circle", radius: skill.effect.radius },
-          createAoeCastTransform(caster.position, caster.position),
-        ),
+        area: prepared.area,
         visualIntent: "partyOffensive",
         damageType: skill.effect.damageType,
-        powerMultiplier: skill.effect.powerMultiplier,
-        bindDurationMs: skill.effect.bindDurationMs,
-        tauntDurationMs: skill.effect.tauntDurationMs,
+        powerMultiplier: skill.effect.powerMultiplier * prepared.powerMultiplier,
+        bindDurationMs: prepared.variantId === "cone" ? undefined : skill.effect.bindDurationMs,
+        tauntDurationMs: prepared.variantId === "cone" ? 3000 : skill.effect.tauntDurationMs,
+        knockbackDistance: prepared.variantId === "cone" ? 2 : undefined,
+        stunDurationMs: prepared.variantId === "cone" ? 1000 : undefined,
         startedAt: now,
         channelEndsAt: now + SHIELD_SHOCKWAVE_CHANNEL_MS,
       },
@@ -82,6 +83,7 @@ export function startMaulSweepChannel(
   caster: Companion,
   skill: SkillDefinition,
   now: number,
+  facingTarget?: Position,
 ): GameState {
   if (
     skill.effect.type !== "maulSweep" ||
@@ -89,6 +91,9 @@ export function startMaulSweepChannel(
   ) {
     return state;
   }
+
+  const prepared = prepareCompanionSkillArea(state, caster, skill, facingTarget);
+  if (!prepared || !Object.values(state.entities).some(entity => isLivingHostileTarget(entity) && isEntityInsideCompanionAoe(prepared.area, entity))) return state;
 
   const nextState = addCombatFeedback(state, {
     type: "attack",
@@ -105,13 +110,10 @@ export function startMaulSweepChannel(
         id: `maul_sweep:${caster.id}:${now}`,
         abilityId: "maul_sweep",
         casterId: caster.id,
-        area: resolveAoePattern(
-          { type: "circle", radius: skill.effect.radius },
-          createAoeCastTransform(caster.position, caster.position),
-        ),
+        area: prepared.area,
         visualIntent: "partyOffensive",
         damageType: skill.effect.damageType,
-        powerMultiplier: skill.effect.powerMultiplier,
+        powerMultiplier: skill.effect.powerMultiplier * prepared.powerMultiplier,
         disarmDurationMs: skill.effect.disarmDurationMs,
         startedAt: now,
         channelEndsAt: now + SHIELD_SHOCKWAVE_CHANNEL_MS,
@@ -159,7 +161,7 @@ function resolveMaulSweepImpact(
 
     if (
       !isLivingHostileTarget(currentEnemy) ||
-      !(currentEnemy.kind === "structure" ? doesAoeIntersectFootprint(channel.area, currentEnemy.attackBounds) : isPositionInsideAoe(channel.area, currentEnemy.position))
+      !isEntityInsideCompanionAoe(channel.area, currentEnemy)
     ) {
       continue;
     }
@@ -172,7 +174,7 @@ function resolveMaulSweepImpact(
       now,
       channel.damageType,
       channel.powerMultiplier,
-    );
+    ).state;
 
     const damagedTarget = nextState.entities[currentEnemy.id];
 
@@ -211,12 +213,12 @@ function resolveShieldShockwaveImpact(
 
     if (
       !isLivingHostileTarget(currentEnemy) ||
-      !(currentEnemy.kind === "structure" ? doesAoeIntersectFootprint(channel.area, currentEnemy.attackBounds) : isPositionInsideAoe(channel.area, currentEnemy.position))
+      !isEntityInsideCompanionAoe(channel.area, currentEnemy)
     ) {
       continue;
     }
 
-    nextState = damageEnemy(
+    const result = damageEnemy(
       nextState,
       caster,
       currentEnemy,
@@ -225,8 +227,22 @@ function resolveShieldShockwaveImpact(
       channel.damageType,
       channel.powerMultiplier,
     );
+    nextState = result.state;
 
     const damagedTarget = nextState.entities[currentEnemy.id];
+
+    if (channel.knockbackDistance && isLivingEnemy(damagedTarget) && !isTargetDummyEnemy(damagedTarget)) {
+      if (result.evaded) continue;
+      nextState = applyStatusEffect(nextState, { type: "incapacitated", targetId: damagedTarget.id,
+        durationMs: channel.stunDurationMs ?? 1000, sourceId: caster.id, sourceKey: "shield_shockwave" }, now);
+      const origin = channel.area.castTransform.origin;
+      const direction = { x: damagedTarget.position.x - origin.x, y: damagedTarget.position.y - origin.y };
+      nextState = startForcedMovement(nextState, damagedTarget.id, caster.id,
+        Math.hypot(direction.x, direction.y) > 0 ? direction : channel.area.castTransform.direction,
+        channel.knockbackDistance, channel.knockbackDistance * 1000 / 16, now,
+        { type: "taunted", durationMs: channel.tauntDurationMs ?? 3000, sourceKey: "shield_shockwave" });
+      continue;
+    }
 
     if (
       isLivingEnemy(damagedTarget) &&
@@ -274,7 +290,7 @@ function damageEnemy(
   now: number,
   damageType: "physical" | "magic",
   powerMultiplier: number,
-): GameState {
+): { state: GameState; evaded: boolean } {
   const combatResult = resolveAndApplyCombatDamage(state, caster, target, {
     damageType,
     powerMultiplier,
@@ -308,7 +324,7 @@ function damageEnemy(
     });
   }
 
-  return nextState;
+  return { state: nextState, evaded: combatResult.evaded };
 }
 
 function finishChannel(

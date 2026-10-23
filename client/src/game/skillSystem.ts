@@ -521,7 +521,7 @@ function isDefensiveMobilityThresholdSkillUse(
   caster: Companion,
   skill: SkillDefinition,
 ): boolean {
-  const behavior = getCompanionSkillBehavior(caster);
+  const behavior = getCompanionSkillBehavior(caster, skill.id);
 
   return (
     behavior.mobilitySkillUseMode === "defensive" &&
