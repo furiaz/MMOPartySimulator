@@ -4,18 +4,19 @@ import {
 } from "./state";
 import {
   getBoundedPathDistance,
+  flushNormalMovementForEntity,
+  holdEntityMovement,
   isCombatPositionAvailable,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
-  reservePositionForFrame,
 } from "./movementPlanning";
 import type { SimulationTiming } from "./simulationTiming";
 import {
   chooseAttackSlot,
-  rememberAttackSlot,
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
+import { getNormalMovementResult } from "./movementAuthority";
 import { getPartyLeader } from "./partySystem";
 import { attackDefenderTarget } from "./defenderCombat";
 import {
@@ -71,7 +72,7 @@ export function updateDefendSystem(
     if (
       !isDefendingCompanion(defender) ||
       isCompanionAssignedToResurrectionRecovery(nextState, defender.id) ||
-      movedEntityIds.has(defender.id)
+      movedEntityIds.has(defender.id) || getNormalMovementResult(nextState, defender.id)
     ) {
       continue;
     }
@@ -102,6 +103,7 @@ export function updateDefendSystem(
     if (shouldWaitForIntercept) {
       waitingLeaderIds.add(leader.id);
       movedEntityIds.add(leader.id);
+      nextState = holdEntityMovement(nextState, leader, "attack", "Defender interception wait");
     } else if (
       leader &&
       (!target ||
@@ -142,13 +144,16 @@ export function updateDefendSystem(
           pathDistanceCache,
         );
 
-        if (spacedSlotState !== nextState) {
+        const spacingMoved = didEntityMove(spacedSlotState, syncedDefender);
+        nextState = spacedSlotState;
+        if (spacingMoved) {
           nextState = updateDefenderBlockedMs(spacedSlotState, syncedDefender.id, false);
           movedEntityIds.add(syncedDefender.id);
           continue;
         }
       }
 
+      nextState = holdEntityMovement(nextState, syncedDefender, "defend", "legal Defender engagement");
       nextState = attackDefenderTarget(nextState, syncedDefender, target, now);
       nextState = updateDefenderBlockedMs(nextState, syncedDefender.id, false);
       continue;
@@ -205,6 +210,7 @@ export function updateDefendSystem(
     }
 
     nextState = updateDefenderBlockedMs(nextState, defender.id, false);
+    nextState = holdEntityMovement(nextState, nextState.entities[defender.id], "defend", "Defender anchor settled");
   }
 
   for (const leaderId of waitingLeaderIds) {
@@ -460,7 +466,7 @@ function moveDefenderTowardCommittedTarget(
   }
 
   if (shouldHoldDefenderLine(state, defender, leader, target)) {
-    return updateDefenderBlockedMs(state, defender.id, false);
+    return holdEntityMovement(updateDefenderBlockedMs(state, defender.id, false), defender, "defend", "Defender line hold");
   }
 
   const attackPosition = chooseAttackSlot(
@@ -490,6 +496,10 @@ function moveDefenderTowardCommittedTarget(
   }
 
   const movementOptions = {
+    source: "defend" as const,
+    combatSlot: { targetId: target.id, attackReach: DEFENDER_ATTACK_RANGE, position: attackPosition },
+    isPositionAllowed: (position: Position) => !wouldExceedDefenderLineAtPosition(state, position, defender, leader, target),
+    rejectedPositionOutcome: "held" as const,
     allowPartyPassThrough: true,
     pathProfile: "combatSlot" as const,
     pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
@@ -502,48 +512,17 @@ function moveDefenderTowardCommittedTarget(
       useInterceptBoost,
     ),
   };
-  const slotState = rememberAttackSlot(
+  const nextState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
     state,
     defender,
-    target,
-    DEFENDER_ATTACK_RANGE,
-    attackPosition,
-    {
-      allowPartyPassThrough: true,
-      nowMs: state.simulationTimeMs,
-    },
-  );
-  const nextPosition = previewMoveTowardPosition(
-    reservePositionForFrame(slotState, defender.id, attackPosition),
-    defender,
     attackPosition,
     movementOptions,
-  );
-
-  if (
-    nextPosition &&
-    wouldExceedDefenderLineAtPosition(
-      state,
-      nextPosition,
-      defender,
-      leader,
-      target,
-    )
-  ) {
-    return updateDefenderBlockedMs(state, defender.id, false);
-  }
-
-  const nextState = moveEntityTowardPositionIfUnoccupied(
-    reservePositionForFrame(slotState, defender.id, attackPosition),
-    defender,
-    attackPosition,
-    movementOptions,
-  );
+  ), defender.id);
 
   const movedDefender = nextState.entities[defender.id];
 
   if (!isDefendingCompanion(movedDefender) || !didEntityMove(nextState, defender)) {
-    return updateDefenderBlockedMs(nextState, defender.id, true);
+    return updateDefenderBlockedMs(nextState, defender.id, getNormalMovementResult(nextState, defender.id)?.outcome === "blocked");
   }
 
   return updateDefenderBlockedMs(nextState, defender.id, false);
@@ -574,30 +553,21 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
   }
 
   const movementOptions = {
+    source: "defend" as const,
+    combatSlot: { targetId: target.id, attackReach: DEFENDER_ATTACK_RANGE, position: attackPosition },
     allowPartyPassThrough: true,
     pathProfile: "combatSlot" as const,
     pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
     pathTargetPosition: attackPosition,
   };
-  const slotState = rememberAttackSlot(
+  const nextState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
     state,
-    defender,
-    target,
-    DEFENDER_ATTACK_RANGE,
-    attackPosition,
-    {
-      allowPartyPassThrough: true,
-      nowMs: state.simulationTimeMs,
-    },
-  );
-  const nextState = moveEntityTowardPositionIfUnoccupied(
-    reservePositionForFrame(slotState, defender.id, attackPosition),
     defender,
     attackPosition,
     movementOptions,
-  );
+  ), defender.id);
 
-  return didEntityMove(nextState, defender) ? nextState : state;
+  return nextState;
 }
 
 function getCommittedTargetSpeedMultiplier(
@@ -788,7 +758,7 @@ function moveDefenderTowardPosition(
     return state;
   }
 
-  return moveEntityTowardPositionIfUnoccupied(
+  return flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
     state,
     defender,
     targetPosition,
@@ -796,10 +766,11 @@ function moveDefenderTowardPosition(
       allowPartyPassThrough: true,
       pathProfile: "follow",
       pathTargetKey: `defender-position:${getPositionPathKey(targetPosition)}`,
+      source: "defend",
       pathTargetPosition: targetPosition,
       speedMultiplier,
     },
-  );
+  ), defender.id);
 }
 
 function getDefenderSpeedMultiplier(

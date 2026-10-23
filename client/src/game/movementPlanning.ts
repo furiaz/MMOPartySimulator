@@ -5,6 +5,8 @@ import {
   moveEntityToward,
 } from "./entities";
 import { guardWarmasterWalkingDeparture } from "./warmasterLifecycleState";
+import { commitNormalMovementPosition, createNormalMovementRequest, finishNormalMovement, getMovementRequestRejection, getNormalMovementResult, selectNormalMovementRequest } from "./movementAuthority";
+import { rememberAttackSlot } from "./attackSlots";
 import {
   findNavigationPath,
   findNearestReachableNavigationPosition,
@@ -69,6 +71,10 @@ import type {
   MovementPathProfile,
   MoveResolution,
   NavigationBlockerLookup,
+  NormalMovementRequest,
+  NormalMovementOutcome,
+  NormalMovementSource,
+  NormalMovementSubmission,
   WalkablePositionOptions,
 } from "./movementTypes";
 
@@ -80,7 +86,6 @@ const COMBAT_PATH_REFRESH_MS = 500;
 const FOLLOW_PATH_REFRESH_MS = 500;
 const MOVEMENT_PATH_BLOCKED_REFRESH_COUNT = 2;
 const MEANINGFUL_TARGET_MOVE_DISTANCE = 1;
-const FOLLOW_TRAIL_LENGTH = 12;
 
 export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   state: GameState,
@@ -88,19 +93,147 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   target: GameEntity,
   options: MovementOptions = {},
 ): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, target.position, options), options, target).state;
+}
+
+export function moveEntityToPositionIfUnoccupied(
+  state: GameState, entity: GameEntity, position: Position, options: MovementOptions = {},
+): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, position, options, "step"), options).state;
+}
+
+export function holdEntityMovement(state: GameState, entity: GameEntity, source: NormalMovementSource, reason: string): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, entity.position, { source, sourceReason: reason }, "hold")).state;
+}
+
+export function resolveNormalMovement(
+  state: GameState, request: NormalMovementRequest, options: MovementOptions = {},
+  target: GameEntity = createPositionTarget(request.destination),
+): { state: GameState; outcome: NormalMovementOutcome } {
+  const rejection = getMovementRequestRejection(state, request);
+  if (rejection) return { state, outcome: rejection };
+  const submission = { request, options, target };
+  if (state.normalMovementPhase) {
+    const submissions = state.normalMovementPhase.submissions;
+    if (submissions.some(pending => JSON.stringify(pending.request) === JSON.stringify(request)))
+      return { state, outcome: "deferred" };
+    return { state: { ...state, normalMovementPhase: { submissions: [...submissions, submission] } }, outcome: "deferred" };
+  }
+  // Compatibility callers form a single-request phase. Once finalized, later
+  // calls must defer, even if intent changes before the simulation update ends.
+  return resolveMovementSubmissions(state, [submission]);
+}
+
+/** Phase-local batch API: choose once, then plan only the winner. */
+export function resolveNormalMovementRequests(state: GameState, entityId: string, requests: NormalMovementRequest[]): { state: GameState; outcome: NormalMovementOutcome } {
+  return resolveMovementSubmissions(state, requests.filter(request => request.entityId === entityId)
+    .map(request => ({ request, options: {}, target: createPositionTarget(request.destination) })));
+}
+
+function resolveMovementSubmissions(state: GameState, submissions: NormalMovementSubmission[]): { state: GameState; outcome: NormalMovementOutcome } {
+  const selected = selectNormalMovementRequest(state, submissions.map(submission => submission.request));
+  const winner = submissions.find(submission => submission.request === selected);
+  return winner ? resolveSelectedNormalMovement(state, winner.request, winner.options, winner.target)
+    : { state, outcome: "deferred" };
+}
+
+/** Resolve before an actor's action check or before deriving follower positions. */
+export function flushNormalMovementForEntity(state: GameState, entityId: string): GameState {
+  const phase = state.normalMovementPhase;
+  if (!phase) return state;
+  const submissions = phase.submissions.filter(submission => submission.request.entityId === entityId);
+  if (submissions.length === 0) return state;
+  const withoutPending = { ...state, normalMovementPhase: {
+    submissions: phase.submissions.filter(submission => submission.request.entityId !== entityId),
+  } };
+  return resolveMovementSubmissions(withoutPending, submissions).state;
+}
+
+export function flushNormalMovementPhase(state: GameState, movedEntityIds = new Set<string>()): GameState {
+  if (!state.normalMovementPhase) return state;
+  let nextState = state;
+  // Preserve producer actor ordering; request ties within each actor are sorted.
+  for (const entityId of new Set(state.normalMovementPhase.submissions.map(submission => submission.request.entityId))) {
+    nextState = flushNormalMovementForEntity(nextState, entityId);
+  }
+  // Include a swap partner even if it did not submit a request of its own.
+  for (const entityId of Object.keys(nextState.normalMovementResultsByEntityId ?? {}))
+    if (getNormalMovementResult(nextState, entityId)?.outcome === "moved") movedEntityIds.add(entityId);
+  return nextState;
+}
+
+export function endNormalMovementPhase(state: GameState, movedEntityIds = new Set<string>()): GameState {
+  return state.normalMovementPhase
+    ? { ...flushNormalMovementPhase(state, movedEntityIds), normalMovementPhase: undefined }
+    : state;
+}
+
+function resolveSelectedNormalMovement(state: GameState, request: NormalMovementRequest, options: MovementOptions, target: GameEntity): { state: GameState; outcome: NormalMovementOutcome } {
+  const actor = state.entities[request.entityId];
+  if (request.mode === "hold" || getEuclideanDistance(actor.position, request.destination) <= request.acceptableRadius) {
+    return { state: finishNormalMovement(state, request, "held", actor.position), outcome: "held" };
+  }
+  const selectedOptions = { ...options, pathProfile: request.pathProfile, pathTargetKey: request.pathTargetKey,
+    pathTargetPosition: request.pathTargetPosition, combatSlot: request.combatSlot,
+    allowPartyPassThrough: request.allowPartyPassThrough, speedMultiplier: request.speedMultiplier };
+  const next = commitNormalMovement(state, actor, target, selectedOptions, request);
+  const outcome = !isSamePosition(actor.position, next.entities[actor.id].position) ? "moved"
+    : getNormalMovementResult(next, actor.id)?.outcome ?? (next.failedMoveByEntityId?.[actor.id] ? "blocked" : "held");
+  return { state: finishNormalMovement(next, request, outcome, actor.position, next.entities[actor.id].position,
+    getNormalMovementResult(next, actor.id)?.reason ?? outcome), outcome };
+}
+
+/** Candidate planning is speculative; no entity position is changed here. */
+function planNormalMovement(state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions, request: NormalMovementRequest) {
+  const pathState = request.mode === "step" ? state : prepareMovementPath(state, entity, target, options);
+  const resolution: MoveResolution | null = request.mode === "step"
+    ? { position: request.destination, reason: "direct_step" }
+    : getNextMoveResolution(pathState, entity, target, options, { allowFreshPath: true });
+  return { pathState, resolution };
+}
+
+function commitNormalMovement(
+  state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions, request: NormalMovementRequest,
+): GameState {
   if (isMovementBlockedByStatus(state, entity.id)) {
     return markMoveFailed(state, entity.id, undefined, "blocked");
   }
 
-  const pathState = prepareMovementPath(state, entity, target, options);
-  const moveResolution = getNextMoveResolution(
-    pathState,
-    entity,
-    target,
-    options,
-    { allowFreshPath: true },
-  );
+  const { pathState, resolution: moveResolution } = planNormalMovement(state, entity, target, options, request);
+  if (request.mode === "step" && moveResolution && !isCombatPositionAvailable(state, entity, moveResolution.position, options))
+    return markMoveFailed(state, entity.id);
+  if (moveResolution && options.isPositionAllowed && !options.isPositionAllowed(moveResolution.position)) {
+    const outcome = options.rejectedPositionOutcome ?? "blocked";
+    return finishNormalMovement(outcome === "blocked" ? markMoveFailed(state, entity.id) : state,
+      request, outcome, entity.position, entity.position, "constraint");
+  }
+  if (moveResolution?.swapWithEntityId) {
+    const partner = state.entities[moveResolution.swapWithEntityId];
+    if (!partner || isMovementBlockedByStatus(state, partner.id) ||
+      getMovementRequestRejection(state, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source }))) {
+      return markMoveFailed(state, entity.id);
+    }
+    const swapRequest = createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source });
+    const pendingPartnerRequests = state.normalMovementPhase?.submissions
+      .filter(submission => submission.request.entityId === partner.id).map(submission => submission.request) ?? [];
+    if (selectNormalMovementRequest(state, [swapRequest, ...pendingPartnerRequests]) !== swapRequest)
+      return markMoveFailed(state, entity.id);
+    const swappedPreview = { ...state, entities: { ...state.entities,
+      [entity.id]: { ...entity, position: partner.position }, [partner.id]: { ...partner, position: entity.position } } };
+    if (!isMoveDestinationAvailable(swappedPreview, entity, partner.position, options) ||
+      !isMoveDestinationAvailable(swappedPreview, partner, entity.position, options)) return markMoveFailed(state, entity.id);
+    const partnerDeparture = guardWarmasterWalkingDeparture(state, partner, entity.position);
+    if (partnerDeparture?.warmasterInteraction?.departure) return partnerDeparture;
+  }
+  const departure = moveResolution ? guardWarmasterWalkingDeparture(state, entity, moveResolution.position) : null;
+  if (departure?.warmasterInteraction?.departure) return departure;
   let nextStateWithIntent = recordMoveIntent(pathState, entity.id, moveResolution?.position);
+
+  if (options.combatSlot) {
+    const slotTarget = state.entities[options.combatSlot.targetId];
+    if (slotTarget) nextStateWithIntent = rememberAttackSlot(nextStateWithIntent, entity, slotTarget,
+      options.combatSlot.attackReach, options.combatSlot.position, { allowPartyPassThrough: options.allowPartyPassThrough, nowMs: state.simulationTimeMs });
+  }
 
   if (moveResolution?.movementPath) {
     nextStateWithIntent = setMovementPath(
@@ -154,11 +287,15 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
       );
     }
 
-    return swapEntityPositions(
+    const swapped = swapEntityPositions(
       reservedState,
       entity.id,
       moveResolution.swapWithEntityId,
     );
+    const partner = state.entities[moveResolution.swapWithEntityId];
+    return isSamePosition(partner.position, swapped.entities[partner.id].position) ? swapped
+      : finishNormalMovement(swapped, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source }), "moved",
+        partner.position, swapped.entities[partner.id].position, "swap");
   }
 
   if (
@@ -225,7 +362,7 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   const guarded = guardWarmasterWalkingDeparture(reservedState, entity, moveResolution.position);
   if (guarded?.warmasterInteraction?.departure) return guarded;
   return markMoveSucceeded(
-    updateMovementEntity(
+    commitNormalMovementPosition(
       guarded ?? reservedState,
       moveEntityTo(entity, moveResolution.position),
     ),
@@ -1750,11 +1887,11 @@ function swapEntityPositions(
     state = guarded ?? state;
   }
 
-  let nextState = updateMovementEntity(
+  let nextState = commitNormalMovementPosition(
     state,
     moveEntityTo(firstEntity, secondEntity.position),
   );
-  nextState = updateMovementEntity(
+  nextState = commitNormalMovementPosition(
     nextState,
     moveEntityTo(secondEntity, firstEntity.position),
   );
@@ -1762,39 +1899,4 @@ function swapEntityPositions(
   nextState = markMoveSucceeded(nextState, secondEntity.id, secondEntity.position);
 
   return nextState;
-}
-
-function updateMovementEntity(state: GameState, entity: GameEntity): GameState {
-  const previousEntity = state.entities[entity.id];
-
-  return {
-    ...state,
-    entities: {
-      ...state.entities,
-      [entity.id]: entity,
-    },
-    followTrailsByEntityId:
-      previousEntity &&
-      !isSamePosition(previousEntity.position, entity.position)
-        ? {
-            ...state.followTrailsByEntityId,
-            [entity.id]: getUpdatedFollowTrail(
-              state.followTrailsByEntityId[entity.id] ?? [],
-              previousEntity.position,
-            ),
-          }
-        : state.followTrailsByEntityId,
-  };
-}
-
-function getUpdatedFollowTrail(
-  trail: Position[],
-  position: Position,
-): Position[] {
-  const nextTrail = [
-    position,
-    ...trail.filter((trailPosition) => !isSamePosition(trailPosition, position)),
-  ];
-
-  return nextTrail.slice(0, FOLLOW_TRAIL_LENGTH);
 }

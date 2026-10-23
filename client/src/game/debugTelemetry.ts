@@ -1,4 +1,5 @@
 import type { GameState } from "./state";
+import { getNormalMovementResult } from "./movementAuthority";
 import { getCharacterXpProgress } from "./leveling";
 import {
   getEnemyAttackRange,
@@ -410,6 +411,7 @@ function getEntitySnapshot(
   const previousEntity = previousState.entities[entity.id];
   const movementResult = getMovementResult(previousEntity, nextState, entity);
   const movementFailure = nextState.movementFailuresByEntityId?.[entity.id];
+  const normalMovement = getNormalMovementResult(nextState, entity.id);
   const navigation = getNavigationTelemetry(
     nextState,
     previousEntity ?? entity,
@@ -459,6 +461,10 @@ function getEntitySnapshot(
     ),
     movementResult,
     reason: getReason(nextState, entity, movementResult),
+    movementOwner: normalMovement?.request.source ?? nextState.externalMovementOwnersByEntityId?.[entity.id]?.source,
+    movementRequestPriority: normalMovement?.request.priority,
+    normalMovementOutcome: normalMovement?.outcome,
+    normalMovementCommitCount: normalMovement?.positionCommitCount,
     formationPhase: nextState.partyFormation?.phase,
     formationSlot: nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
     formationSlotReason:

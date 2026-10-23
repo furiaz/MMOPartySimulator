@@ -10,6 +10,9 @@ import {
 } from "./state";
 import {
   isPositionAvailable,
+  flushNormalMovementForEntity,
+  flushNormalMovementPhase,
+  holdEntityMovement,
   moveEntityTowardPositionIfUnoccupied,
 } from "./movementPlanning";
 import type {
@@ -50,6 +53,7 @@ export function updateResurrectionSystem(
 
   nextState = assignResurrectionAreaCombatTargets(nextState);
   nextState = moveResurrectionParticipants(nextState, movedEntityIds);
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = progressResurrectionArea(
     nextState,
     deltaMs,
@@ -181,6 +185,7 @@ function moveResurrectionParticipants(
 
     if (isInValidResurrectionStandPosition(nextState, helper, target)) {
       movedEntityIds.add(helper.id);
+      nextState = holdEntityMovement(nextState, helper, "resurrection", "resurrection area hold");
       continue;
     }
 
@@ -198,11 +203,13 @@ function moveResurrectionParticipants(
       {
         allowPartyPassThrough: true,
         pathProfile: "resurrection",
+        source: "resurrection",
         pathTargetKey: `resurrection:${target.id}`,
         pathTargetPosition: standPosition,
       },
     );
 
+    nextState = flushNormalMovementForEntity(nextState, helper.id);
     const movedHelper = getEntityById(nextState, helper.id);
 
     if (

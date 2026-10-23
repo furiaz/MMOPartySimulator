@@ -47,7 +47,57 @@ export type MovementOptions = WalkablePositionOptions & {
   pathTargetKey?: string;
   pathTargetPosition?: Position;
   speedMultiplier?: number;
+  source?: NormalMovementSource;
+  sourceReason?: string;
+  acceptableRadius?: number;
+  /** Producer-specific guard, evaluated before any position/bookkeeping commit. */
+  isPositionAllowed?: (position: Position) => boolean;
+  rejectedPositionOutcome?: "held" | "blocked";
+  combatSlot?: { targetId: string; attackReach: number; position: Position };
 };
+
+export type NormalMovementSource =
+  | "compatibility" | "direct" | "teleport" | "resurrection"
+  | "partyTravel" | "follow" | "defend" | "attack" | "gather" | "explore"
+  | "enemyHome" | "enemyRoam" | "enemyQuest" | "enemyFlee" | "questGuide";
+
+export type NormalMovementRequest = {
+  entityId: string;
+  source: NormalMovementSource;
+  reason: string;
+  priority: number;
+  mode: "walk" | "step" | "hold";
+  destination: Position;
+  acceptableRadius: number;
+  pathProfile?: MovementPathProfile;
+  pathTargetKey?: string;
+  pathTargetPosition?: Position;
+  allowPartyPassThrough?: boolean;
+  speedMultiplier?: number;
+  combatSlot?: MovementOptions["combatSlot"];
+};
+
+export type NormalMovementOutcome = "moved" | "held" | "blocked" | "invalid" | "deferred";
+
+/** Transient producer context; never persisted or copied into a movement result. */
+export type NormalMovementSubmission = {
+  request: NormalMovementRequest;
+  options: MovementOptions;
+  target: GameEntity;
+};
+
+export type NormalMovementResult = {
+  request: NormalMovementRequest;
+  outcome: NormalMovementOutcome;
+  reason: string;
+  from: Position;
+  to: Position;
+  positionCommitCount: number;
+  frameNumber: number;
+  timeMs: number;
+};
+
+export type ExternalMovementOwner = { source: string; positionCommitted: boolean };
 
 export type NavigationBlockerLookup = {
   resourceKeys: Set<string>;

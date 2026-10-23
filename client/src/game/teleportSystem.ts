@@ -58,7 +58,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { flushNormalMovementForEntity, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import {
   getPartyExecutionIntent,
   setPartyExecutionIntent,
@@ -412,17 +412,18 @@ function movePartyToTeleport(
       continue;
     }
 
-    const movedState = moveEntityTowardPositionIfUnoccupied(
+    const movedState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
       nextState,
       readyMember,
       teleport.position,
       {
         allowPartyPassThrough: true,
         pathProfile: "teleport",
+        source: "teleport",
         pathTargetKey: `teleport:${teleport.id}`,
         pathTargetPosition: teleport.position,
       },
-    );
+    ), readyMember.id);
 
     if (didEntityMove(movedState, readyMember)) {
       movedEntityIds.add(readyMember.id);

@@ -14,6 +14,8 @@ import {
 } from "./state";
 import {
   getBoundedPathDistance,
+  flushNormalMovementForEntity,
+  holdEntityMovement,
   moveEntityTowardPositionIfUnoccupied,
 } from "./movementPlanning";
 import { resolveInteractionStandPosition } from "./interactionApproach";
@@ -146,11 +148,13 @@ export function updateGatherSystem(
         ) ?? resource.position;
 
       nextState = moveEntityTowardPositionIfUnoccupied(nextState, gatherer, standPosition, {
+        source: "gather",
         allowPartyPassThrough: true,
         pathProfile: "gather",
         pathTargetKey: `gather:${resource.id}`,
         pathTargetPosition: standPosition,
       });
+      nextState = flushNormalMovementForEntity(nextState, gatherer.id);
       if (didEntityMove(nextState, gatherer)) {
         movedEntityIds.add(gatherer.id);
         const movedGatherer = getEntityById(nextState, gatherer.id);
@@ -174,6 +178,7 @@ export function updateGatherSystem(
       continue;
     }
 
+    nextState = holdEntityMovement(nextState, gatherer, "gather", "resource interaction position");
     if (!canGather(gatherer, now)) {
       continue;
     }

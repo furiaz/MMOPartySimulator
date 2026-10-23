@@ -91,6 +91,8 @@ import {
 import { recordCurrentWorldDiscovery } from "./worldDiscovery";
 import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
 import { updateForcedMovements } from "./forcedMovement";
+import { beginNormalMovementPhase } from "./movementAuthority";
+import { endNormalMovementPhase, flushNormalMovementPhase } from "./movementPlanning";
 import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 
@@ -160,6 +162,7 @@ export function updateGame(
 
   nextState = updatePartyIntentRecoverySystem(nextState);
 
+  nextState = beginNormalMovementPhase(nextState);
   nextState = updateResurrectionSystem(
     nextState,
     movedEntityIds,
@@ -170,7 +173,7 @@ export function updateGame(
   nextState = updatePartyIntentRecoverySystem(nextState);
 
   nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
-  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = initializeBarracks(nextState);
   nextState = updateMartialPassiveRuntime(
     nextState,
@@ -185,7 +188,7 @@ export function updateGame(
   ) {
     return recordDebugTelemetryTick(
       state,
-      clearExpiredCombatFeedback(nextState, timing.nowMs),
+      clearExpiredCombatFeedback(endNormalMovementPhase(nextState, movedEntityIds), timing.nowMs),
       timing,
     );
   }
@@ -196,6 +199,7 @@ export function updateGame(
     movedEntityIds,
     timing.nowMs,
   );
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
 
   let resourceWorkContext = createResourceWorkContext(nextState);
 
@@ -224,9 +228,11 @@ export function updateGame(
     attackSlotPathDistanceCache,
   );
   nextState = updateFollowSystem(nextState, movedEntityIds);
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
   nextState = updateAzureMassFleeBehavior(nextState, timing, movedEntityIds);
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,
@@ -254,6 +260,7 @@ export function updateGame(
     timing.nowMs,
     attackSlotPathDistanceCache,
   );
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateCombatProjectileSystem(
     nextState,
     timing.nowMs,
@@ -268,7 +275,7 @@ export function updateGame(
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_combat_update");
-  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateSlimewardDungeonSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(
@@ -276,6 +283,7 @@ export function updateGame(
     movedEntityIds,
     timing.nowMs,
   );
+  nextState = endNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
   nextState = updateEntitySeparationSystem(nextState, movedEntityIds);
   nextState = updateMartialPassiveRuntime(

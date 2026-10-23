@@ -376,6 +376,7 @@ function updateDirectMoveCommand(
     {
       allowPartyPassThrough: true,
       pathProfile: "directCommand",
+      source: "direct",
       pathTargetKey: `direct-command:${companion.id}`,
       pathTargetPosition: command.targetPosition,
     },

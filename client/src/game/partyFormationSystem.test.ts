@@ -190,6 +190,7 @@ describe("party formation real-time cohesion", () => {
       state = updatePartyFormationSystem({
         ...state,
         simulationDeltaMs: deltaMs,
+        simulationTimeMs: (state.simulationTimeMs ?? 0) + deltaMs,
       });
 
       expect(state.entities[leader.id].position.x).toBeGreaterThan(previousLeaderX);
