@@ -289,6 +289,13 @@ Before making any code, asset, or documentation changes:
 - If the user asks for ideas, designs, plans, recommendations, or searches, do not implement changes unless they explicitly approve an issue and request implementation.
 - If no issue exists, stop before editing and ask to create one.
 
+### Context Questions Versus Action Requests
+
+- Questions confirming context, prior discussion, or a possible next step authorize an answer only. They do not authorize performing that next step.
+- Example: "Was I about to ask for a plan?" means confirm where we left off. "Can you make the plan?" requests the plan.
+- Determine intent from the whole message, not whether it ends with a question mark.
+- This does not require renewed permission for work already clearly authorized and underway.
+
 Each implementation issue should include:
 
 - What will happen
