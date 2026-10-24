@@ -1,3 +1,4 @@
+import { getDirectLeaderCommand } from "./directCommandState";
 import {
   createEnemy,
   createNpc,
@@ -261,6 +262,9 @@ export function updateTeleportSystem(
     // Recovery helpers must also regain control while AI travel waits for them.
     return updateForcedMovements(state, movedEntityIds, nowMs);
   }
+
+  // An existing rally remains exclusive; suspended travel cannot start a new one.
+  if (!state.activeTeleport && getDirectLeaderCommand(state)) return state;
 
   const autoTeleport = getAutoTeleport(state);
   const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id, "ai") : state;

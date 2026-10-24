@@ -1,3 +1,4 @@
+import { finishDirectCompanionCommand, isDirectGatherPersonalThreat, hasDirectCompanionAuthority } from "./directCommandState";
 import {
   isAutonomousEntity,
   isCombatEntity,
@@ -9,6 +10,8 @@ import {
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
 import { getPartyMembers, isPartyMember } from "./partySystem";
+import { getPartyCombatTarget } from "./partyTargetSystem";
+import { isActivePartyThreat } from "./partyThreatSystem";
 import {
   getEntityById,
   updateEntity,
@@ -109,9 +112,17 @@ export function updateAttackSystem(
       continue;
     }
 
+    const command = nextState.directCompanionCommandsById?.[attacker.id];
+    if (command?.type === "move") continue;
+    if (command?.type === "gather" && (!attacker.currentTargetId ||
+      !isDirectGatherPersonalThreat(nextState, attacker.id, nextState.entities[attacker.currentTargetId]))) continue;
     const target = getValidTarget(nextState, attacker);
 
     if (!target) {
+      if (command?.type === "attack") {
+        nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
+        continue;
+      }
       nextState = updateEntity(nextState, finishAttack(nextState, attacker));
       continue;
     }
@@ -312,6 +323,8 @@ export function updateAttackSystem(
           ? finishAttack(nextState, finalUpdatedAttacker)
           : finalUpdatedAttacker,
       );
+      if (impactResult.target.state === "dead" && command?.type === "attack")
+        nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
       continue;
     }
 
@@ -458,6 +471,11 @@ function getValidTarget(
   state: GameState,
   attacker: CombatEntity,
 ): CombatEntity | undefined {
+  const command = state.directCompanionCommandsById?.[attacker.id];
+  if (command?.type === "attack") {
+    const target = state.entities[command.targetId];
+    return isLiveCombatTarget(target) ? target : undefined;
+  }
   const currentTarget = attacker.currentTargetId
     ? getEntityById(state, attacker.currentTargetId)
     : undefined;
@@ -477,6 +495,7 @@ function findPartyAssistTarget(
   state: GameState,
   attacker: Companion,
 ): CombatEntity | undefined {
+  const partyTarget = getPartyCombatTarget(state);
   for (const member of getPartyMembers(state)) {
     if (
       member.id === attacker.id ||
@@ -492,6 +511,10 @@ function findPartyAssistTarget(
       isLiveCombatTarget(target) &&
       getDistance(attacker.position, target.position) <= TARGET_SWITCH_DISTANCE
     ) {
+      // A private order is not shared focus. Existing party/threat authority can
+      // still make that same target eligible independently.
+      if (hasDirectCompanionAuthority(state, member) &&
+        partyTarget?.id !== target.id && !isActivePartyThreat(state, target)) continue;
       return target;
     }
   }
@@ -562,6 +585,7 @@ export function getAttackCooldownMs(entity: CombatEntity): number {
 }
 
 function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
+  if (hasDirectCompanionAuthority(state, attacker)) return attacker;
   if (!isAutonomousEntity(attacker) || !isPartyMember(attacker)) {
     return {
       ...clearAttackWindup(attacker),

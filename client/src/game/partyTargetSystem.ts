@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { isLivingCompanion } from "./entityGuards";
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
@@ -102,7 +103,7 @@ export function clearEnemyFromPartyTargeting(
 
   for (const member of getPartyMembers(nextState)) {
     if (
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       member.currentTargetId !== enemyId
     ) {
       continue;

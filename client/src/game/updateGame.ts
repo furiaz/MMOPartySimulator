@@ -1,3 +1,4 @@
+import { canFollowDirectLeader, hasDirectCompanionAuthority, getDirectLeaderCommand } from "./directCommandState";
 import { updateAttackSystem } from "./attackSystem";
 import { updateBarracks, initializeBarracks } from "./barracks";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
@@ -238,7 +239,11 @@ export function updateGame(
     timing,
     attackSlotPathDistanceCache,
   );
-  nextState = updateFollowSystem(nextState, movedEntityIds);
+  // Attack/gather approach commits in their existing action phases. Followers
+  // of that direct leader sample the committed reference after those phases.
+  const directLeaderCommand = getDirectLeaderCommand(nextState);
+  const deferDirectLeaderFollow = directLeaderCommand && directLeaderCommand.type !== "move";
+  if (!deferDirectLeaderFollow) nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
@@ -295,6 +300,7 @@ export function updateGame(
     movedEntityIds,
     timing.nowMs,
   );
+  if (deferDirectLeaderFollow) nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = endNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
@@ -342,7 +348,7 @@ function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
   for (const member of getPartyMembers(nextState)) {
     if (
       nextState.resurrectionChannelsByHelperId?.[member.id] ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) || canFollowDirectLeader(nextState, member) ||
       member.state === "idle" ||
       member.state === "dead" ||
       isPartyMemberBusyGatheringResource(nextState, member) ||

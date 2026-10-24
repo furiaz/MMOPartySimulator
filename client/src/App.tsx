@@ -7,6 +7,7 @@ import {
   useState,
   Suspense,
 } from "react";
+import { flushSync } from "react-dom";
 import "./App.css";
 import { WarmasterRewardOverlay } from "./WarmasterRewardOverlay";
 import { claimWarmasterChest, closeWarmasterChest, requestWarmasterChest } from "./game/warmasterLifecycle";
@@ -6798,11 +6799,14 @@ function App() {
     const now = Date.now();
     let resultCode: DirectCompanionCommandResultCode | null = null;
 
-    setGameState((state) => {
-      const result = issueCompanionDirectCommand(state, command, now);
-      resultCode = result.code;
-
-      return result.state;
+    // Resolve this discrete input before reading its rejection result. React
+    // may otherwise defer the updater until after the handler has returned.
+    flushSync(() => {
+      setGameState((state) => {
+        const result = issueCompanionDirectCommand(state, command, now);
+        resultCode = result.code;
+        return result.state;
+      });
     });
 
     if (resultCode && resultCode !== "success") {

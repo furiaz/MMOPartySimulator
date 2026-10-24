@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import {
   updateEntity,
   type GameState,
@@ -71,6 +72,7 @@ export function updateDefendSystem(
 
     if (
       !isDefendingCompanion(defender) ||
+      hasDirectCompanionAuthority(nextState, defender) ||
       isCompanionAssignedToResurrectionRecovery(nextState, defender.id) ||
       movedEntityIds.has(defender.id) || getNormalMovementResult(nextState, defender.id)
     ) {
@@ -390,7 +392,7 @@ function shouldLeaderWaitForDefender(
   leader: GameEntity,
   defendPosition: Position,
 ): boolean {
-  if (leader.kind === "companion" && leader.commandPriority === "direct") {
+  if (hasDirectCompanionAuthority(state, leader)) {
     return false;
   }
 
@@ -668,7 +670,7 @@ function canLeaderStepTowardDefender(
   leader: GameEntity,
   defender: Companion,
 ): boolean {
-  if (leader.kind !== "companion" || leader.commandPriority === "direct") {
+  if (leader.kind !== "companion" || hasDirectCompanionAuthority(state, leader)) {
     return true;
   }
 

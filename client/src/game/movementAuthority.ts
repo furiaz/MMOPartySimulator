@@ -1,3 +1,4 @@
+import { canFollowDirectLeader, hasDirectCompanionAuthority } from "./directCommandState";
 import { getPartyExecutionIntent } from "./partyIntentState";
 import { getPartyLeader } from "./partySystem";
 import type { GameState } from "./state";
@@ -22,6 +23,7 @@ function requiredSource(state: GameState, actor: GameEntity): NormalMovementSour
       : command.type === "attack" || actor.state === "attack" ? "attack" : "gather";
     if (state.resurrectionChannelsByHelperId?.[actor.id]) return actor.state === "attack" ? "attack" : "resurrection";
     if (state.activeTeleport) return "teleport";
+    if (canFollowDirectLeader(state, actor)) return "follow";
     const intent = getPartyExecutionIntent(state);
     if (intent?.source === "player" && actor.commandPriority !== "direct") {
       if (intent.type === "attack" && actor.state === "attack" && actor.currentTargetId === intent.targetId) return "attack";
@@ -43,7 +45,7 @@ function requiredSource(state: GameState, actor: GameEntity): NormalMovementSour
 
 function canProducePartyTravel(state: GameState): boolean {
   const leader = getPartyLeader(state);
-  return Boolean(leader && leader.state !== "dead" && leader.commandPriority !== "direct" &&
+  return Boolean(leader && leader.state !== "dead" && !hasDirectCompanionAuthority(state, leader) &&
     !state.resurrectionChannelsByHelperId?.[leader.id]);
 }
 

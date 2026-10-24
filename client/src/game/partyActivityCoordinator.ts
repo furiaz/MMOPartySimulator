@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority, canFollowDirectLeader, isDirectGatherPersonalThreat } from "./directCommandState";
 import { isCompanionInDirectCommandGrace } from "./directCompanionCommands";
 import { isLivingEnemy } from "./entityGuards";
 import { getCombatTargetPosition } from "./combatStructures";
@@ -112,7 +113,7 @@ export function canAssignPartyTravelTarget(
 ): boolean {
   return (
     member.id !== leaderId &&
-    member.commandPriority !== "direct" &&
+    !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member)) &&
     (hasPlayerIntent || !isPartyMemberBusyGatheringResource(state, member))
@@ -125,7 +126,7 @@ export function canAssignPartyGatherTarget(
   hasPlayerIntent: boolean,
 ): boolean {
   return (
-    member.commandPriority !== "direct" &&
+    !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member))
   );
@@ -137,7 +138,7 @@ export function canAssignPartyCombatTarget(
   hasPlayerIntent: boolean,
 ): boolean {
   return (
-    member.commandPriority !== "direct" &&
+    !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member)) &&
     (hasPlayerIntent || !isPartyMemberBusyGatheringResource(state, member))
@@ -153,6 +154,8 @@ export function canAssignSelfDefenseTarget(
     return false;
   }
 
+  if (hasDirectCompanionAuthority(state, member)) return isDirectGatherPersonalThreat(state, member.id, target);
+
   if (isCompanionPersonallyBlockedOrThreatened(state, member, target)) {
     return true;
   }
@@ -167,7 +170,7 @@ export function isRequiredForTravelCohesion(
   options: TravelCohesionOptions = {},
 ): boolean {
   if (
-    member.commandPriority === "direct" ||
+    hasDirectCompanionAuthority(state, member) ||
     isCompanionInDirectCommandGrace(state, member.id) ||
     isCompanionAssignedToResurrectionRecovery(state, member.id) ||
     isPartyMemberRespondingToActiveThreat(state, member)
@@ -197,7 +200,7 @@ export function canUseAutonomousRoleBehavior(
   if (
     !isPartyMember(entity) ||
     isCompanionAssignedToResurrectionRecovery(state, entity.id) ||
-    entity.commandPriority === "direct" ||
+    hasDirectCompanionAuthority(state, entity) || canFollowDirectLeader(state, entity) ||
     isPartyMemberRespondingToActiveThreat(state, entity) ||
     (entity.state !== "idle" &&
       entity.state !== "follow" &&
@@ -249,7 +252,7 @@ function getNearestPartyDistance(state: GameState, target: Enemy | CombatStructu
   const distances = getPartyMembers(state)
     .filter(
       (member) =>
-        member.commandPriority !== "direct" &&
+        !hasDirectCompanionAuthority(state, member) &&
         !isCompanionInDirectCommandGrace(state, member.id),
     )
     .map((member) => getDistance(member.position, target.position));

@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { isCombatEntity } from "./entities";
 import { getPartyMembers, isPartyMember, type PartyMember } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
@@ -203,7 +204,7 @@ function getNearestAutonomousPartyDistance(
   const distances = getPartyMembers(state)
     .filter(
       (member) =>
-        member.commandPriority !== "direct" &&
+        !hasDirectCompanionAuthority(state, member) &&
         !isCompanionInDirectCommandGrace(state, member.id),
     )
     .map((member) => getGridDistance(member.position, enemy.position))

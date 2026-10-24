@@ -1,3 +1,4 @@
+import { getDirectLeaderCommand, hasDirectCompanionAuthority } from "./directCommandState";
 import {
   getFollowTrailPosition,
   getEntityById,
@@ -214,7 +215,7 @@ export function isDefenderAttackTargetRelevant(
 ): boolean {
   if (
     defender.role !== "defender" ||
-    defender.commandPriority === "direct" ||
+    hasDirectCompanionAuthority(state, defender) ||
     !isValidEnemyTarget(target)
   ) {
     return true;
@@ -361,6 +362,8 @@ export function getLeaderMovementDirection(
 export function getResolvedPartyExecutionIntentTargetPosition(
   state: GameState,
 ): Position | null {
+  const direct = getDirectLeaderCommand(state);
+  if (direct) return direct.type === "move" ? direct.targetPosition : null;
   return getPartyMovementTargetPosition(state);
 }
 
@@ -379,7 +382,7 @@ function getDefenderSideOffset(
       entity.kind === "companion" &&
       entity.role === "defender" &&
       entity.followTargetId === companion.followTargetId &&
-      entity.commandPriority !== "direct",
+      !hasDirectCompanionAuthority(state, entity),
   );
   const defenderIndex = defenders.findIndex((entity) => entity.id === companion.id);
   const offsetRank = getDefenderOffsetRank(

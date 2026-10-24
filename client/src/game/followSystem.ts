@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority, getDirectLeaderCommand, canFollowDirectLeader } from "./directCommandState";
 import { isAutonomousEntity } from "./entities";
 import {
   getEntityById,
@@ -35,11 +36,11 @@ export function updateFollowSystem(
     if (
       !leader ||
       !follower ||
-      !isFollowingAutonomousEntity(follower) ||
+      (!isFollowingAutonomousEntity(follower) && !canFollowDirectLeader(nextState, follower)) ||
       !isPartyMember(follower) ||
       follower.id === leader.id ||
       isCompanionAssignedToResurrectionRecovery(nextState, follower.id) ||
-      follower.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, follower) ||
       isPartyMemberBusyGatheringResource(nextState, follower) ||
       movedEntityIds.has(follower.id)
     ) {
@@ -60,7 +61,10 @@ export function updateFollowSystem(
         ? FOLLOW_CATCH_UP_SPEED_MULTIPLIER
         : 1;
 
-    const movementTargetPosition = getPartyMovementTargetPosition(nextState);
+    const directLeaderCommand = getDirectLeaderCommand(nextState);
+    const movementTargetPosition = directLeaderCommand
+      ? (directLeaderCommand.type === "move" ? directLeaderCommand.targetPosition : null)
+      : getPartyMovementTargetPosition(nextState);
     const followPosition = movementTargetPosition
       ? getSoftFollowPosition(
           nextState,

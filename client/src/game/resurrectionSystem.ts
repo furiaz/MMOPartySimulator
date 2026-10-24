@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCompanionEntity, isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyResurrectionRecoveryTargetId } from "./partyIntentSystem";
@@ -152,7 +153,7 @@ function assignAvailableResurrectionParticipants(
 
   for (const helper of getLivingCompanions(nextState)) {
     if (
-      helper.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, helper) ||
       isCompanionAssignedToResurrectionRecovery(nextState, helper.id)
     ) {
       continue;
@@ -357,7 +358,7 @@ function clearInvalidResurrectionAssignments(
 
     if (
       !isLivingCompanion(helper) ||
-      helper.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, helper) ||
       !recoveryTargetId ||
       channel.targetId !== recoveryTargetId ||
       !isDeadCompanion(target)
@@ -365,7 +366,7 @@ function clearInvalidResurrectionAssignments(
       nextState = removeResurrectionAssignment(
         nextState,
         channel,
-        helper?.kind === "companion" && helper.commandPriority === "direct"
+        helper?.kind === "companion" && hasDirectCompanionAuthority(nextState, helper)
           ? "direct_command"
           : "target_invalid",
       );

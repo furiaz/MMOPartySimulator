@@ -1,3 +1,4 @@
+import { getDirectLeaderCommand } from "./directCommandState";
 import { isCombatEntity, isResourceEntity } from "./entities";
 import {
   beginAutoRouteCalmPeriod,
@@ -75,6 +76,8 @@ export function restoreInterruptedPoiTarget(state: GameState): GameState {
   if (hasLivePartyAggro(state)) {
     return state;
   }
+
+  if (getDirectLeaderCommand(state)) return state;
 
   if (interruptedTarget.worldTravelTargetMapId) {
     const nowMs = state.simulationTimeMs ?? 0;
@@ -242,6 +245,7 @@ function hasBlockingDirectPartyCommand(
   interruptedTarget: InterruptedPoiTarget,
 ): boolean {
   return getPartyMembers(state).some((member) => {
+    if (state.directCompanionCommandsById?.[member.id]) return false;
     if (member.commandPriority !== "direct") {
       return false;
     }
