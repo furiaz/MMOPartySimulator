@@ -3026,6 +3026,48 @@ export type FormationPhase =
   | "traveling"
   | "combat";
 
+export type FormationPresetId = "arrow" | "balanced" | "side-by-side";
+export type FormationDepth = "front" | "middle" | "rear" | "neutral";
+export type FormationLane = "left" | "center" | "right";
+
+export type FormationSlot = {
+  id: string;
+  side: number;
+  forward: number;
+  lane: FormationLane;
+  depth: FormationDepth;
+};
+
+export type FormationTemplate = {
+  preset: FormationPresetId;
+  spacing: number;
+  slots: FormationSlot[];
+};
+
+export type FormationMemberInput = {
+  id: string;
+  role: PartyMemberRole;
+  partyOrder: number;
+};
+
+/** Transient ownership of ideal slots, not navigation/collision reservations. */
+export type FormationAssignments = {
+  preset: FormationPresetId;
+  spacing: number;
+  leaderId: string;
+  members: FormationMemberInput[];
+  slotsByEntityId: Record<string, string>;
+};
+
+export type FormationDepartureReason =
+  | "missing"
+  | "dead"
+  | "direct"
+  | "gathering"
+  | "combat"
+  | "resurrection"
+  | "specialized";
+
 export type PartyFormationMemberSlot = {
   entityId: string;
   position: Position;

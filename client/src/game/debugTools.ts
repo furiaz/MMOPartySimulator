@@ -1099,6 +1099,7 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
 
   return {
     ...clearedState,
+    formationAssignments: undefined,
     currentMapId: SLIMEWARD_CAMP_ID,
     map,
     entities,
@@ -1193,6 +1194,7 @@ export function debugTeleportToHub(
 
   return pruneMissingEntityRuntimeState({
     ...clearSlimewardDungeonRuntime(preparedState),
+    formationAssignments: undefined,
     currentMapId: targetMapId,
     map,
     entities,
@@ -1270,6 +1272,7 @@ export function debugTeleportToSlimewardCamp(state: GameState): GameState {
 
   return pruneMissingEntityRuntimeState({
     ...clearSlimewardDungeonRuntime(preparedState),
+    formationAssignments: undefined,
     currentMapId: SLIMEWARD_CAMP_ID,
     map,
     entities,

@@ -1145,6 +1145,7 @@ export function sanitizeGameStateForSave(
     defenderWaitMsByLeaderId: {},
     defenderBlockedMsByEntityId: {},
     partyFormation: undefined,
+    formationAssignments: undefined,
     combatFeedbackEvents: [],
     combatProjectiles: [],
     autonomousTargetSuppressionsByEnemyId: undefined,
