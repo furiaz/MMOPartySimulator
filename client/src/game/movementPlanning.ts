@@ -5,6 +5,8 @@ import {
   moveEntityToward,
 } from "./entities";
 import { guardWarmasterWalkingDeparture } from "./warmasterLifecycleState";
+import { planLocalAvoidance } from "./localAvoidance";
+import { hasStructureLineOfSight } from "./combatStructures";
 import { commitNormalMovementPosition, createNormalMovementRequest, finishNormalMovement, getMovementRequestRejection, getNormalMovementResult, selectNormalMovementRequest } from "./movementAuthority";
 import { rememberAttackSlot } from "./attackSlots";
 import {
@@ -46,6 +48,7 @@ import {
   getEntityCollisionShape,
   isPositionInsideCollisionShape,
   isPositionInsideEntityCollisionShape,
+  isWithinAttackReach,
   SPATIAL_EPSILON,
 } from "./spatialGeometry";
 export {
@@ -199,7 +202,38 @@ function commitNormalMovement(
     return markMoveFailed(state, entity.id, undefined, "blocked");
   }
 
-  const { pathState, resolution: moveResolution } = planNormalMovement(state, entity, target, options, request);
+  const plan = planNormalMovement(state, entity, target, options, request);
+  let { pathState } = plan;
+  let moveResolution = plan.resolution;
+  if (!moveResolution?.swapWithEntityId) {
+    const preferred = moveResolution?.position ?? moveEntityToward(entity, target, getMovementDeltaMs(state, entity, options)).position;
+    const slotTarget = options.combatSlot && state.entities[options.combatSlot.targetId];
+    const mustRetainReach = slotTarget && isWithinAttackReach(entity, slotTarget, options.combatSlot!.attackReach, preferred);
+    const avoidance = planLocalAvoidance(state, entity, request, preferred,
+      getMovementStepDistance(entity, getMovementDeltaMs(state, entity, options)), {
+        ignoresBody: other => canPassThroughStaticNpcForPartyMovement(entity, other),
+        canTransit: other => canPassThroughPartyEntity(entity, other, options),
+        isSettlingPosition: options.isSettlingPosition,
+        canUse: position => isMoveDestinationAvailable(state, entity, position, options) &&
+          (!mustRetainReach || (isWithinAttackReach(entity, slotTarget, options.combatSlot!.attackReach, position) &&
+            hasStructureLineOfSight(state, position, slotTarget))) &&
+          (request.mode !== "step" || isCombatPositionAvailable(state, entity, position, options)) &&
+          (!options.isPositionAllowed || options.isPositionAllowed(position)),
+      });
+    if (avoidance.crowded && !avoidance.position) {
+      // Speculative path changes are discarded. Waiting is not evidence that
+      // the target/path is unreachable, and cannot authorize a second request.
+      return finishNormalMovement(markMovementDecision(state, entity.id, "crowd_wait"),
+        request, "held", entity.position, entity.position, "crowd_wait");
+    }
+    if (avoidance.crowded && avoidance.position) {
+      moveResolution = { ...moveResolution, position: avoidance.position, reason: "avoidance" };
+    }
+    const memory = { ...state.localAvoidanceByEntityId };
+    if (avoidance.memory) memory[entity.id] = avoidance.memory;
+    else delete memory[entity.id];
+    pathState = { ...pathState, localAvoidanceByEntityId: memory };
+  }
   if (request.mode === "step" && moveResolution && !isCombatPositionAvailable(state, entity, moveResolution.position, options))
     return markMoveFailed(state, entity.id);
   if (moveResolution && options.isPositionAllowed && !options.isPositionAllowed(moveResolution.position)) {

@@ -1,12 +1,10 @@
 import { getFollowTrailPosition, type GameState } from "./state";
 import { areEntitiesOverlapping, ENTITY_COLLISION_DISTANCE } from "./spatialGeometry";
 import { getOrderedPartyMembers, type PartyMember } from "./partySystem";
-import { getEuclideanDistance } from "./positionUtils";
 import type { GameEntity, Position } from "./types";
 
 const SOFT_SIDE_SPACING = 0.9;
 const SOFT_BACK_SPACING = 0.45;
-const STACK_DISTANCE = 0.45;
 export const COMBAT_PARTY_SPACING_DISTANCE = ENTITY_COLLISION_DISTANCE;
 
 export function getSoftFollowPosition(
@@ -41,7 +39,7 @@ export function isStackedWithPartyMember(
   return getOrderedPartyMembers(state).some(
     (otherMember) =>
       otherMember.id !== member.id &&
-      getEuclideanDistance(member.position, otherMember.position) < STACK_DISTANCE,
+      areEntitiesOverlapping(member, otherMember),
   );
 }
 

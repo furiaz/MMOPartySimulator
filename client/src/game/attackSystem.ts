@@ -178,6 +178,8 @@ export function updateAttackSystem(
     if (finalStepPosition) {
       nextState = moveEntityToPositionIfUnoccupied(nextState, currentAttacker, finalStepPosition, {
         source: "attack", sourceReason: "combat final step", allowPartyPassThrough: true,
+        combatSlot: { targetId: target.id, attackReach: getAttackRange(currentAttacker), position: finalStepPosition },
+        isPositionAllowed: position => !isResurrectionParticipant || isPositionInActiveResurrectionArea(nextState, position),
       });
       nextState = flushNormalMovementForEntity(nextState, currentAttacker.id);
       if (didEntityMove(nextState, currentAttacker)) movedEntityIds.add(currentAttacker.id);
@@ -358,8 +360,9 @@ export function updateAttackSystem(
     nextState = moveEntityTowardPositionIfUnoccupied(nextState, currentAttacker, movementTarget, {
       source: "attack",
       combatSlot: attackSlot ? { targetId: target.id, attackReach: getAttackRange(currentAttacker), position: attackSlot } : undefined,
-      isPositionAllowed: position => !isEnemy(currentAttacker) || Boolean(currentAttacker.movementBounds) ||
-        getEuclideanDistance(currentAttacker.homePosition, position) <= getEnemyAttackLeashDistance(),
+      isPositionAllowed: position => (!isResurrectionParticipant || isPositionInActiveResurrectionArea(nextState, position)) &&
+        (!isEnemy(currentAttacker) || Boolean(currentAttacker.movementBounds) ||
+        getEuclideanDistance(currentAttacker.homePosition, position) <= getEnemyAttackLeashDistance()),
       rejectedPositionOutcome: "held",
       allowPartyPassThrough: true,
       pathProfile: attackSlot ? "combatSlot" : "chase",

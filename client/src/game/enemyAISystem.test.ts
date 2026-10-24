@@ -486,7 +486,8 @@ describe("enemy AI aggro and roaming", () => {
   });
 
   it("moves quest-spawned Goblin Scouts toward their pressure point before off-point aggro", () => {
-    const leader = createIdleCompanion("leader", { x: 1, y: 0 });
+    // Keep the aggro target nearby, but outside the new body-aware travel envelope.
+    const leader = createIdleCompanion("leader", { x: 1, y: 2 });
     const enemy = createEnemy("enemy", { x: 0, y: 0 }, "aggressive", {
       enemyTypeId: "goblin_scout",
       questSpawn: {
@@ -510,7 +511,7 @@ describe("enemy AI aggro and roaming", () => {
   });
 
   it("keeps quest-spawned enemies moving toward their pressure point inside aggro range", () => {
-    const leader = createIdleCompanion("leader", { x: 10, y: 0 });
+    const leader = createIdleCompanion("leader", { x: 10, y: 2 });
     const enemy = createEnemy("enemy", { x: 9, y: 0 }, "aggressive", {
       enemyTypeId: "goblin_scout",
       questSpawn: {

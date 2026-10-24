@@ -78,6 +78,9 @@ export function updateFollowSystem(
         allowPartyPassThrough: true,
         pathProfile: "follow",
         source: "follow",
+        // Without a travel intent the game loop can idle the follower after
+        // this step, even if it has not reached its soft follow destination.
+        isSettlingPosition: position => !movementTargetPosition || getGridDistance(position, leader.position) <= FOLLOW_LEASH_RADIUS,
         pathTargetKey: getFollowPathTargetKey(
           leader.id,
           follower.id,

@@ -20,7 +20,7 @@ import {
 } from "./enemyDashSystem";
 import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
-import { updateEntitySeparationSystem } from "./entitySeparationSystem";
+import { updateOverlapRecoverySystem } from "./overlapRecovery";
 import {
   isSlimewardDungeonChestUiOpen,
   updateAzureMassFleeBehavior,
@@ -125,6 +125,8 @@ export function updateGame(
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
+  nextState = updateOverlapRecoverySystem(nextState, movedEntityIds);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState), frozenEncounterIds: getFrozenWarmasterEncounterIds(nextState), movedEntityIds });
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
@@ -295,7 +297,6 @@ export function updateGame(
   );
   nextState = endNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
-  nextState = updateEntitySeparationSystem(nextState, movedEntityIds);
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateMartialPassiveRuntime(
     nextState,

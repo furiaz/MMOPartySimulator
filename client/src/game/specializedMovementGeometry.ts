@@ -21,7 +21,12 @@ export function isSpecializedMovementPathAvailable(state: GameState, actor: Game
 }
 
 /** Shared endpoints, not permanent blockers along the entire swept corridor. */
-export function getSpecializedMovementReservations(state: GameState): Array<{ entity: GameEntity; position: Position }> {
+export function getSpecializedMovementReservations(state: GameState): Array<{ entity: GameEntity; position: Position; specialized: boolean }> {
+  const specializedIds = new Set([
+    ...Object.keys(state.enemyDashesByEnemyId ?? {}), ...Object.keys(state.forcedMovementsByEntityId ?? {}),
+    ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).filter(cast => cast.dashPlan).map(cast => cast.casterId),
+    ...Object.entries(state.movementPositionCommitsByEntityId ?? {}).filter(([, commit]) => commit.source !== "normal").map(([id]) => id),
+  ]);
   const points: Array<[string, Position]> = [
     ...Object.entries(state.reservedPositionsByEntityId ?? {}),
     ...Object.entries(state.moveIntentsByEntityId ?? {}),
@@ -33,7 +38,7 @@ export function getSpecializedMovementReservations(state: GameState): Array<{ en
   ];
   return points.flatMap(([id, position]) => {
     const entity = state.entities[id];
-    return entity && entity.state !== "dead" ? [{ entity, position }] : [];
+    return entity && entity.state !== "dead" ? [{ entity, position, specialized: specializedIds.has(id) }] : [];
   });
 }
 

@@ -6,6 +6,14 @@ import type { DebugNavigationReason, GameEntity, Position } from "./types";
 const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
 
 export function clearFrameMovementPlanning(state: GameState): GameState {
+  const isLiving = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
+  const avoidance = Object.entries(state.localAvoidanceByEntityId ?? {});
+  const recovery = Object.entries(state.overlapRecoveryByEntityId ?? {});
+  if (avoidance.some(([id, entry]) => !isLiving(id) || (state.simulationTimeMs ?? 0) - entry.lastActiveAtMs > 750) ||
+    recovery.some(([id]) => !isLiving(id))) state = { ...state,
+      localAvoidanceByEntityId: Object.fromEntries(avoidance.filter(([id, entry]) => isLiving(id) && (state.simulationTimeMs ?? 0) - entry.lastActiveAtMs <= 750)),
+      overlapRecoveryByEntityId: Object.fromEntries(recovery.filter(([id]) => isLiving(id))),
+    };
   const hasFramePlanning =
     Boolean(state.normalMovementPhase) ||
     Object.keys(state.movementPositionCommitsByEntityId ?? {}).length > 0 ||

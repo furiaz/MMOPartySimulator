@@ -120,6 +120,8 @@ export function getSpecializedMovementOwner(state: GameState, entityId: string):
   if (dash) return { source: "enemyDash", transactionId: dash.id, positionCommitted: false };
   if (state.warmasterResetPending === entityId)
     return { source: "encounterReset", transactionId: `reset:${entityId}`, positionCommitted: false };
+  if (state.overlapRecoveryByEntityId?.[entityId]?.pending)
+    return { source: "overlapRecovery", transactionId: `recovery:${entityId}`, positionCommitted: false };
   const frameOwner = state.externalMovementOwnersByEntityId?.[entityId];
   return frameOwner?.released ? undefined : frameOwner;
 }
@@ -206,12 +208,15 @@ function publishMovementPosition(state: GameState, entityId: string, position: P
   const trail = state.followTrailsByEntityId[entity.id] ?? [];
   const withoutActor = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => id !== entityId));
   return { ...state, entities: { ...state.entities, [entity.id]: { ...entity, position: { ...position } } },
+    overlapRecoveryByEntityId: state.overlapRecoveryByEntityId?.[entityId] ? { ...state.overlapRecoveryByEntityId,
+      [entityId]: { ...state.overlapRecoveryByEntityId[entityId], position: { ...position } } } : state.overlapRecoveryByEntityId,
     movementPositionCommitsByEntityId: { ...state.movementPositionCommitsByEntityId,
       [entityId]: { source, transactionId, from: { ...previous.position }, to: { ...position },
         frameNumber: state.simulationFrame ?? state.simulationTick ?? 0, timeMs: state.simulationTimeMs ?? 0 } },
     lastPositionsByEntityId: { ...state.lastPositionsByEntityId, [entityId]: previous.position },
     reservedPositionsByEntityId: { ...state.reservedPositionsByEntityId, [entityId]: { ...position } },
     ...(source === "normal" ? {} : {
+      localAvoidanceByEntityId: withoutActor(state.localAvoidanceByEntityId),
       movementPathsByEntityId: withoutActor(state.movementPathsByEntityId),
       attackSlotCacheByEntityId: withoutActor(state.attackSlotCacheByEntityId),
       movementPathRetryAtMsByEntityId: withoutActor(state.movementPathRetryAtMsByEntityId),
