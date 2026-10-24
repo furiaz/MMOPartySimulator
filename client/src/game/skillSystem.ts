@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import { acquireSpecializedMovement } from "./movementAuthority";
@@ -164,7 +165,7 @@ function canUsePrototypeSkill(
       entity.state !== "dead" &&
       entity.health > 0 &&
       !isSkillUseBlockedByStatus(state, entity.id) &&
-      entity.commandPriority !== "direct",
+      !hasDirectCompanionAuthority(state, entity),
   );
 }
 
@@ -173,7 +174,7 @@ function hasCombatSkillContext(state: GameState, caster: Companion): boolean {
     ? state.entities[caster.currentTargetId]
     : undefined;
 
-  if (caster.commandPriority !== "direct") {
+  if (!hasDirectCompanionAuthority(state, caster)) {
     return caster.state === "attack" && isLivingEnemy(currentTarget);
   }
 

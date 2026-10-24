@@ -1,3 +1,4 @@
+import { getDirectLeaderCommand } from "./directCommandState";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { autoDepositByRoutingMode } from "./bank";
 import {
@@ -91,6 +92,7 @@ export function updatePoiSystem(
   state: GameState,
   resourceWorkContext?: ResourceWorkContext,
 ): GameState {
+  if (getDirectLeaderCommand(state)) return state;
   const focusedState = clearAutomaticResourceWorkForQuestDefense(state);
   const markerInteractionState =
     focusedState.activeTeleport || isAutoRoutePaused(focusedState)

@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { isCompanionEntity, isLivingEnemy } from "./entityGuards";
 import {
   canAutoRouteInterrupt,
@@ -138,7 +139,7 @@ function assignCompanionsToSelfDefense(
       state: "attack",
       currentTargetId: target.id,
       commandPriority:
-        companion.commandPriority === "direct" ? "direct" : "autonomous",
+        hasDirectCompanionAuthority(nextState, companion) ? "direct" : "autonomous",
     });
   }
 
@@ -201,7 +202,7 @@ function getAutoRouteEmergencyTarget(state: GameState): Enemy | null {
 
 function getBlockedMovementEnemyTarget(state: GameState): Enemy | null {
   const candidates = getPartyMembers(state)
-    .filter((companion) => companion.commandPriority !== "direct")
+    .filter((companion) => !hasDirectCompanionAuthority(state, companion))
     .map((companion) => ({
       companion,
       enemy: getMovementBlockerEnemy(state, companion),
@@ -240,7 +241,7 @@ function getStuckNearEnemyTarget(
   const candidates = getPartyMembers(state)
     .filter(
       (companion) =>
-        companion.commandPriority !== "direct" &&
+        !hasDirectCompanionAuthority(state, companion) &&
         (state.movementFailureMsByEntityId?.[companion.id] ?? 0) >=
           minimumFailureMs,
     )
@@ -270,7 +271,7 @@ function getRouteMovementBlockedTarget(state: GameState): Enemy | null {
 
 function getRouteStatusBlockedTarget(state: GameState): Enemy | null {
   const candidates = getPartyMembers(state)
-    .filter((companion) => companion.commandPriority !== "direct")
+    .filter((companion) => !hasDirectCompanionAuthority(state, companion))
     .filter(
       (companion) =>
         isMovementBlockedByStatus(state, companion.id) ||

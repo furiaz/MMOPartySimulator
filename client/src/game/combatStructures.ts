@@ -1,3 +1,4 @@
+import { finishDirectCompanionCommand } from "./directCommandState";
 import { bakeNavigationGrid } from "./navigation";
 import { BARRACK_DEFINITIONS, BARRACK_RESPAWN_MS, getBarrackCollisionCells, getBarrackMaxHealth } from "./barrackDefinitions";
 import type { GameState } from "./state";
@@ -58,8 +59,10 @@ export function updateStructureRuntime(state: GameState, structure: CombatStruct
   } } };
   if (health <= 0 && (!previous || previous.health > 0)) {
     nextState = clearEnemyFromPartyTargeting(nextState, structure.id);
-    const commands = Object.fromEntries(Object.entries(nextState.directCompanionCommandsById ?? {}).filter(([, command]) => !("targetId" in command && command.targetId === structure.id)));
-    nextState = { ...nextState, directCompanionCommandsById: commands,
+    for (const command of Object.values(nextState.directCompanionCommandsById ?? {}))
+      if ("targetId" in command && command.targetId === structure.id)
+        nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
+    nextState = { ...nextState,
       entities: Object.fromEntries(Object.entries(nextState.entities).map(([id, entity]) => [id,
         entity.kind === "companion" && entity.currentTargetId === structure.id
           ? { ...entity, state: "follow", currentTargetId: null, commandPriority: "autonomous" } : entity])),

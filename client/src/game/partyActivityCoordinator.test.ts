@@ -299,7 +299,7 @@ describe("party activity coordinator", () => {
     expect(canAssignPartyGatherTarget(state, directCompanion, true)).toBe(false);
   });
 
-  it("lets direct-commanded companions join self-defense only when personally threatened", () => {
+  it("lets a direct collector join self-defense only when personally threatened", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const directCompanion = {
       ...createCompanion("direct", { x: 1, y: 0 }, leader.id, "support"),
@@ -323,6 +323,8 @@ describe("party activity coordinator", () => {
         [personalThreat.id]: personalThreat,
       },
       partyLeaderId: leader.id,
+      directCompanionCommandsById: { [directCompanion.id]: { type: "gather", companionId: directCompanion.id,
+        targetId: "resource", targetPosition: null, issuedAt: 1000 } },
     });
 
     expect(canAssignSelfDefenseTarget(state, directCompanion, leaderThreat)).toBe(

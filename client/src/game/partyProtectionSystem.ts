@@ -1,4 +1,5 @@
 import { isWithinFollowLeash } from "./followSystem";
+import { hasDirectCompanionAuthority, isDirectGatherPersonalThreat } from "./directCommandState";
 import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getActiveQuestGuide,
@@ -35,7 +36,7 @@ export function protectPartyMember(
   }
 
   if (hasDirectPlayerPartyIntent(state)) {
-    return canSelfDefendDuringInteraction(state, attackedMember)
+    return canSelfDefendDuringInteraction(state, attackedMember, attacker)
       ? updateSelfDefenseTarget(state, attackedMember, attacker)
       : state;
   }
@@ -51,7 +52,7 @@ export function protectPartyMember(
   });
 
   for (const entity of Object.values(state.entities)) {
-    if (!canProtectPartyMember(state, entity, attackedMember)) {
+    if (!canProtectPartyMember(state, entity, attackedMember, attacker)) {
       continue;
     }
 
@@ -59,7 +60,7 @@ export function protectPartyMember(
       ...entity,
       state: "attack",
       currentTargetId: attacker.id,
-      commandPriority: "autonomous",
+      commandPriority: hasDirectCompanionAuthority(state, entity) ? "direct" : "autonomous",
     });
   }
 
@@ -119,9 +120,14 @@ function hasRetainableAutonomousProtectionTarget(
 function canSelfDefendDuringInteraction(
   state: GameState,
   attackedMember: AutonomousEntity,
+  attacker: Enemy,
 ): boolean {
   if (!isPartyMember(attackedMember)) {
     return false;
+  }
+
+  if (hasDirectCompanionAuthority(state, attackedMember)) {
+    return isDirectGatherPersonalThreat(state, attackedMember.id, attacker);
   }
 
   return (
@@ -192,7 +198,7 @@ function updateSelfDefenseTarget(
     ...attackedMember,
     state: "attack",
     currentTargetId: attacker.id,
-    commandPriority: "autonomous",
+    commandPriority: hasDirectCompanionAuthority(state, attackedMember) ? "direct" : "autonomous",
   });
 }
 
@@ -200,14 +206,15 @@ function canProtectPartyMember(
   state: GameState,
   entity: GameEntity,
   attackedMember: AutonomousEntity,
+  attacker: Enemy,
 ): entity is AutonomousEntity {
   if (entity.kind !== "companion") {
     return false;
   }
 
   if (
-    entity.commandPriority === "direct" &&
-    !(entity.id === attackedMember.id && canSelfDefendDuringInteraction(state, attackedMember))
+    hasDirectCompanionAuthority(state, entity) &&
+    !(entity.id === attackedMember.id && canSelfDefendDuringInteraction(state, attackedMember, attacker))
   ) {
     return false;
   }

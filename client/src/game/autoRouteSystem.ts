@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { isLivingEnemy } from "./entityGuards";
 import { getNextWorldTravelTeleport } from "./worldTravelRouting";
 import {
@@ -208,7 +209,7 @@ export function hasAutoRouteResumeCohesion(state: GameState): boolean {
       member.id === leader.id ||
       member.state === "dead" ||
       member.health <= 0 ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(state, member) ||
       member.state === "gather"
     ) {
       return true;
@@ -256,7 +257,7 @@ function haltAutonomousPartyMembers(state: GameState): GameState {
   let nextState = state;
 
   for (const member of getPartyMembers(nextState)) {
-    if (member.commandPriority === "direct" || member.state === "dead") {
+    if (hasDirectCompanionAuthority(nextState, member) || member.state === "dead") {
       continue;
     }
 

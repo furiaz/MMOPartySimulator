@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
@@ -83,7 +84,7 @@ export function updatePartyFormationSystem(
   if (
     !leader ||
     leader.state === "dead" ||
-    leader.commandPriority === "direct" ||
+    hasDirectCompanionAuthority(state, leader) ||
     isCompanionAssignedToResurrectionRecovery(state, leader.id)
   ) {
     return clearFormation(state);
@@ -162,7 +163,7 @@ function markSmallObjectiveHoldMembers(
   for (const member of getPartyMembers(state)) {
     if (
       member.state === "dead" ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(state, member.id) ||
       isPartyMemberRespondingToActiveThreat(state, member) ||
       isPartyMemberBusyGatheringResource(state, member)
@@ -320,7 +321,7 @@ function clearStalePlayerPartyIntent(
 
   for (const member of getPartyMembers(nextState)) {
     if (
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       isPartyMemberRespondingToActiveThreat(nextState, member) ||
       !isMemberAssignedToExecutionIntent(member, leader.id, executionIntent)
@@ -359,7 +360,7 @@ function clearStaleGatherPartyIntent(
 
   for (const member of getPartyMembers(nextState)) {
     if (
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       member.state !== "gather" ||
       member.currentTargetId !== targetId
@@ -535,7 +536,7 @@ function moveFollowersTowardLeader(
   for (const member of getPartyMembers(nextState)) {
     if (
       member.id === leader.id ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       isPartyMemberRespondingToActiveThreat(nextState, member) ||
       isPartyMemberBusyGatheringResource(nextState, member) ||
@@ -682,7 +683,7 @@ function getActiveEscortGuide(state: GameState): GameEntity | null {
 function canHoldNearEscortGuide(state: GameState, member: PartyMember): boolean {
   return (
     member.state !== "dead" &&
-    member.commandPriority !== "direct" &&
+    !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     !isPartyMemberBusyGatheringResource(state, member) &&
     !isPartyMemberRespondingToActiveThreat(state, member)
@@ -712,7 +713,7 @@ function clearFinishedCombat(state: GameState): GameState {
   }
 
   for (const member of getPartyMembers(nextState)) {
-    if (member.commandPriority === "direct" || member.state !== "attack") {
+    if (hasDirectCompanionAuthority(nextState, member) || member.state !== "attack") {
       continue;
     }
 

@@ -3,6 +3,7 @@ import { isAutonomousEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
 import { getPartyExecutionIntentReachability } from "./partyOrderReachability";
 import { getPartyLeader, getPartyMembers } from "./partySystem";
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import {
   getEntityById,
   updateEntity,
@@ -83,7 +84,7 @@ export function issueEntityCommand(
 
   const commandPriority = command.priority ?? "direct";
 
-  if (!canApplyCommand(entity, commandPriority)) {
+  if (!canApplyCommand(state, entity, commandPriority)) {
     return state;
   }
 
@@ -216,11 +217,13 @@ export function issuePartyOrder(
 
   nextState = {
     ...nextState,
+    worldTravelTargetMapId: null,
     autoRoute: undefined,
+    interruptedPoiTarget: null,
   };
 
   for (const member of getPartyMembers(nextState)) {
-    if (member.state === "dead") {
+    if (member.state === "dead" || hasDirectCompanionAuthority(nextState, member)) {
       continue;
     }
 
@@ -235,10 +238,11 @@ export function issuePartyOrder(
 }
 
 function canApplyCommand(
+  state: GameState,
   entity: AutonomousEntity,
   commandPriority: CommandPriority,
 ): boolean {
-  return commandPriority === "direct" || entity.commandPriority !== "direct";
+  return commandPriority === "direct" || !hasDirectCompanionAuthority(state, entity);
 }
 
 function getPlayerPartyExecutionIntent(
