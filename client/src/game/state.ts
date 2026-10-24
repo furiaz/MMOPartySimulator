@@ -197,6 +197,9 @@ export type {
 import { updateStructureRuntime } from "./combatStructures";
 
 export type GameState = {
+  localAvoidanceByEntityId?: Record<string, import("./movementTypes").LocalAvoidanceMemory>;
+  overlapRecoveryByEntityId?: Record<string, import("./movementTypes").OverlapRecoveryObservation>;
+  overlapRecoveryGeometryKey?: string;
   normalMovementResultsByEntityId?: Record<string, NormalMovementResult>;
   normalMovementPhase?: { submissions: NormalMovementSubmission[] };
   externalMovementOwnersByEntityId?: Record<string, ExternalMovementOwner>;
@@ -398,6 +401,8 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
       forcedMovementsByEntityId: withoutEntity(nextState.forcedMovementsByEntityId),
       enemyDashesByEnemyId: withoutEntity(nextState.enemyDashesByEnemyId),
       externalMovementOwnersByEntityId: withoutEntity(nextState.externalMovementOwnersByEntityId),
+      localAvoidanceByEntityId: withoutEntity(nextState.localAvoidanceByEntityId),
+      overlapRecoveryByEntityId: withoutEntity(nextState.overlapRecoveryByEntityId),
       warmasterResetPending: nextState.warmasterResetPending === entity.id ? undefined : nextState.warmasterResetPending,
     };
   }

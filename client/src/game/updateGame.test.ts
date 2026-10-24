@@ -614,7 +614,8 @@ describe("game update intent priority", () => {
   it("holds Map 2 escort party movement near the active guide", () => {
     const leader = createLeader({ x: 8.5, y: 29 });
     const follower = {
-      ...createCompanion("escort-follower", { x: 8, y: 30 }, leader.id),
+      // A legal settled offset, not a fresh overlap with the leader/guide.
+      ...createCompanion("escort-follower", { x: 9.6, y: 30 }, leader.id),
       state: "follow" as const,
       currentTargetId: leader.id,
     };
@@ -2483,7 +2484,8 @@ describe("game update intent priority", () => {
     };
     const chosenEnemy = createEnemy("chosen-enemy", { x: 9, y: 4 });
     const closerAttacker = {
-      ...createEnemy("closer-attacker", { x: 4, y: 5 }),
+      // Nearby threat, but not spawned inside the companion capsule.
+      ...createEnemy("closer-attacker", { x: 4, y: 6 }),
       state: "attack" as const,
       currentTargetId: leader.id,
     };

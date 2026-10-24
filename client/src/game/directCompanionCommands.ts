@@ -629,6 +629,7 @@ function clearMovementPlanningForCompanion(
 ): GameState {
   return {
     ...state,
+    localAvoidanceByEntityId: removeRecordEntry(state.localAvoidanceByEntityId, companionId),
     failedMoveByEntityId: removeRecordEntry(state.failedMoveByEntityId, companionId),
     movementDecisionsByEntityId: removeRecordEntry(
       state.movementDecisionsByEntityId,

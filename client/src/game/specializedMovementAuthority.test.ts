@@ -11,7 +11,7 @@ import { cancelForcedMovement, startForcedMovement, updateForcedMovements } from
 import { cancelEnemyDash, cleanupEnemyDashRuntime, updateEnemyDashSystem } from "./enemyDashSystem";
 import { updateEnemyAbilitySystem } from "./enemyAbilitySystem";
 import { issueCompanionDirectCommand, updateDirectCompanionCommandSystem } from "./directCompanionCommands";
-import { updateEntitySeparationSystem } from "./entitySeparationSystem";
+import { updateOverlapRecoverySystem } from "./overlapRecovery";
 import { updatePartyFormationSystem } from "./partyFormationSystem";
 import { clearMapTransitionRuntimeState, pruneMissingEntityRuntimeState } from "./mapRuntimeCleanup";
 import { sanitizeGameStateForSave } from "./saveGame";
@@ -409,7 +409,7 @@ describe("specialized movement authority", () => {
     const forced = startForcedMovement(state, actor.id, "enemy", { x: -1, y: 0 }, 2, 250, 1000);
     const overlapping = { ...forced, entities: { ...forced.entities, friend: createCompanion("friend", actor.position, "friend") } };
     expect(moveEntityTowardPositionIfUnoccupied(overlapping, actor, { x: 5, y: 10 })).toBe(overlapping);
-    const next = updateEntitySeparationSystem(overlapping, new Set());
+    const next = updateOverlapRecoverySystem(overlapping, new Set());
     expect(next.entities.actor.position).toEqual(actor.position);
     expect(getMovementPositionCommit(next, actor.id)).toBeUndefined();
   });

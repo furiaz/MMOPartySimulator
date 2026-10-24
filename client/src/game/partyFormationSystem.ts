@@ -594,6 +594,9 @@ function moveFollowersTowardLeader(
         pathProfile: "follow",
         source: "partyTravel",
         pathTargetKey: `follow:${leader.id}`,
+        isSettlingPosition: position => getDistance(position, leader.position) <= FOLLOW_DISTANCE ||
+          Boolean(escortGuide && canHoldNearEscortGuide(nextState, currentMember) &&
+            shouldHoldNearEscortGuide(getDistance(position, escortGuide.position))),
         pathTargetPosition: followPosition,
         speedMultiplier: shouldCatchUp ? FOLLOWER_CATCH_UP_SPEED_MULTIPLIER : 1,
       },

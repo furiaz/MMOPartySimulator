@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createEnemy, createNpc, createResource } from "./entities";
 import { updateEnemyAISystem } from "./enemyAISystem";
-import { updateEntitySeparationSystem } from "./entitySeparationSystem";
+import { updateOverlapRecoverySystem } from "./overlapRecovery";
 import { getEuclideanDistance } from "./positionUtils";
 import { areEntitiesOverlapping } from "./spatialGeometry";
 import { createTestGameState } from "./testState";
@@ -18,14 +18,14 @@ const OPEN_MAP: GameMap = {
   healingFountains: [],
 };
 
-describe("stationary overlap separation", () => {
+describe("exceptional starting-overlap recovery", () => {
   it("incrementally recovers from two enemies without moving either enemy", () => {
     const actor = createCompanion("actor", { x: 5, y: 5 }, "actor");
     const first = createEnemy("first", { x: 6, y: 5 }, "passive", { combatBodyRadius: 0.7 });
     const second = createEnemy("second", { x: 5, y: 6 }, "passive", { combatBodyRadius: 0.7 });
     let state = createState([actor, first, second]);
 
-    for (let frame = 0; frame < 30; frame++) state = updateEntitySeparationSystem(clearFrameMovementPlanning(state), new Set());
+    for (let frame = 0; frame < 30; frame++) state = updateOverlapRecoverySystem(clearFrameMovementPlanning(state), new Set());
 
     expect(state.entities.actor.position).not.toEqual(actor.position);
     expect(areEntitiesOverlapping(state.entities.actor, first)).toBe(false);
@@ -34,7 +34,7 @@ describe("stationary overlap separation", () => {
     expect(state.entities.second.position).toEqual(second.position);
     const settled = state.entities.actor.position;
     for (let frame = 0; frame < 30; frame++) {
-      state = updateEntitySeparationSystem(clearFrameMovementPlanning(state), new Set());
+      state = updateOverlapRecoverySystem(clearFrameMovementPlanning(state), new Set());
       expect(state.entities.actor.position).toEqual(settled);
     }
   });
@@ -43,7 +43,7 @@ describe("stationary overlap separation", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(
+    const nextState = updateOverlapRecoverySystem(
       state,
       new Set([companion.id]),
     );
@@ -52,16 +52,16 @@ describe("stationary overlap separation", () => {
     expect(nextState.entities[enemy.id].position).toEqual(enemy.position);
   });
 
-  it("separates a stationary companion and stationary normal enemy", () => {
+  it("recovers an invalid companion/enemy overlap without another correction after the first actor committed", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).not.toEqual(
       companion.position,
     );
-    expect(nextState.entities[enemy.id].position).not.toEqual(enemy.position);
+    expect(nextState.entities[enemy.id].position).toEqual(enemy.position);
     expect(
       getEuclideanDistance(
         nextState.entities[companion.id].position,
@@ -81,7 +81,7 @@ describe("stationary overlap separation", () => {
     const state = createState([leader, gatherer], {
       partyLeaderId: leader.id,
     });
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[leader.id].position).toEqual(leader.position);
     expect(nextState.entities[gatherer.id].position).not.toEqual(
@@ -100,7 +100,7 @@ describe("stationary overlap separation", () => {
     const state = createState([gatherer, leader], {
       partyLeaderId: leader.id,
     });
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[leader.id].position).toEqual(leader.position);
     expect(nextState.entities[gatherer.id].position).not.toEqual(
@@ -120,7 +120,7 @@ describe("stationary overlap separation", () => {
     const state = createState([leader, gatherer], {
       partyLeaderId: leader.id,
     });
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[leader.id].position).toEqual(leader.position);
     expect(nextState.entities[gatherer.id].position).toEqual(
@@ -141,7 +141,7 @@ describe("stationary overlap separation", () => {
       enemyTypeId: "green_slime",
     });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).toEqual(companion.position);
     expect(nextState.entities[enemy.id].position).toEqual(enemy.position);
@@ -153,7 +153,7 @@ describe("stationary overlap separation", () => {
       enemyTypeId: "green_slime",
     });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).toEqual(companion.position);
     expect(nextState.entities[enemy.id].position).toEqual(enemy.position);
@@ -165,7 +165,7 @@ describe("stationary overlap separation", () => {
       enemyTypeId: "green_slime",
     });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).not.toEqual(
       companion.position,
@@ -177,7 +177,7 @@ describe("stationary overlap separation", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(state, new Set([enemy.id]));
+    const nextState = updateOverlapRecoverySystem(state, new Set([enemy.id]));
 
     expect(nextState.entities[companion.id].position).toEqual(companion.position);
     expect(nextState.entities[enemy.id].position).toEqual(enemy.position);
@@ -191,7 +191,7 @@ describe("stationary overlap separation", () => {
         [companion.id]: { x: 6, y: 5 },
       },
     });
-    const nextState = updateEntitySeparationSystem(
+    const nextState = updateOverlapRecoverySystem(
       state,
       new Set([companion.id]),
     );
@@ -204,7 +204,7 @@ describe("stationary overlap separation", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5, y: 5 });
     const state = createState([companion, enemy]);
-    const nextState = updateEntitySeparationSystem(
+    const nextState = updateOverlapRecoverySystem(
       state,
       new Set([companion.id, enemy.id]),
     );
@@ -219,7 +219,7 @@ describe("stationary overlap separation", () => {
       combatBodyRadius: 2,
     });
     const state = createState([companion, boss]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).not.toEqual(
       companion.position,
@@ -233,7 +233,7 @@ describe("stationary overlap separation", () => {
       enemyTypeId: "azure_mass",
     });
     const state = createState([companion, boss]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).toEqual(companion.position);
     expect(nextState.entities[boss.id].position).toEqual(boss.position);
@@ -245,7 +245,7 @@ describe("stationary overlap separation", () => {
       combatBodyRadius: 2,
     });
     const state = createState([companion, boss]);
-    const nextState = updateEntitySeparationSystem(state, new Set([boss.id]));
+    const nextState = updateOverlapRecoverySystem(state, new Set([boss.id]));
 
     expect(nextState.entities[companion.id].position).toEqual(companion.position);
     expect(nextState.entities[boss.id].position).toEqual(boss.position);
@@ -255,7 +255,7 @@ describe("stationary overlap separation", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const npc = createNpc("npc", { x: 5, y: 5 }, "Quest Giver", "quest_giver");
     const state = createState([companion, npc]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
     expect(nextState.entities[companion.id].position).not.toEqual(
       companion.position,
@@ -267,13 +267,13 @@ describe("stationary overlap separation", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const npc = createNpc("npc", { x: 5, y: 5 }, "Quest Giver", "quest_giver");
     const state = createState([companion, npc]);
-    const nextState = updateEntitySeparationSystem(state, new Set([npc.id]));
+    const nextState = updateOverlapRecoverySystem(state, new Set([npc.id]));
 
     expect(nextState.entities[companion.id].position).toEqual(companion.position);
     expect(nextState.entities[npc.id].position).toEqual(npc.position);
   });
 
-  it("rejects separation into walls", () => {
+  it("finds a recovery angle that does not deepen an existing wall overlap", () => {
     const companion = createCompanion("companion", { x: 1.55, y: 1 }, "companion");
     const enemy = createEnemy("enemy", { x: 1.45, y: 1 });
     const state = createState([companion, enemy], {
@@ -282,19 +282,20 @@ describe("stationary overlap separation", () => {
         walls: [{ x: 2, y: 1 }],
       },
     });
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
-    expect(nextState.entities[companion.id].position).toEqual(companion.position);
+    expect(nextState.entities[companion.id].position.x).toBeLessThanOrEqual(companion.position.x);
   });
 
-  it("rejects separation into active resources", () => {
+  it("finds a recovery angle that does not deepen an existing resource overlap", () => {
     const companion = createCompanion("companion", { x: 5.55, y: 5 }, "companion");
     const enemy = createEnemy("enemy", { x: 5.45, y: 5 });
     const resource = createResource("resource", { x: 5.67, y: 5 });
     const state = createState([companion, enemy, resource]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
-    expect(nextState.entities[companion.id].position).toEqual(companion.position);
+    expect(getEuclideanDistance(nextState.entities[companion.id].position, resource.position))
+      .toBeGreaterThanOrEqual(getEuclideanDistance(companion.position, resource.position));
   });
 
   it("rejects separation into third-party entity overlap", () => {
@@ -302,7 +303,7 @@ describe("stationary overlap separation", () => {
     const enemy = createEnemy("enemy", { x: 5.45, y: 5 });
     const blocker = createCompanion("blocker", { x: 5.67, y: 5 }, "companion");
     const state = createState([companion, enemy, blocker]);
-    const nextState = updateEntitySeparationSystem(
+    const nextState = updateOverlapRecoverySystem(
       state,
       new Set([blocker.id]),
     );
@@ -318,12 +319,12 @@ describe("stationary overlap separation", () => {
         other: { x: 5.67, y: 5 },
       },
     });
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
-    expect(nextState.entities[companion.id].position).toEqual(companion.position);
+    expect(nextState.entities[companion.id].position).not.toEqual({ x: 5.67, y: 5 });
   });
 
-  it("ignores dead entities and resources as separation participants", () => {
+  it("ignores dead actors while recovering away from an active resource without moving it", () => {
     const companion = createCompanion("companion", { x: 5, y: 5 }, "companion");
     const deadEnemy: Enemy = {
       ...createEnemy("dead-enemy", { x: 5, y: 5 }),
@@ -332,9 +333,9 @@ describe("stationary overlap separation", () => {
     };
     const resource = createResource("resource", { x: 5, y: 5 });
     const state = createState([companion, deadEnemy, resource]);
-    const nextState = updateEntitySeparationSystem(state, new Set());
+    const nextState = updateOverlapRecoverySystem(state, new Set());
 
-    expect(nextState.entities[companion.id].position).toEqual(companion.position);
+    expect(nextState.entities[companion.id].position).not.toEqual(companion.position);
     expect(nextState.entities[deadEnemy.id].position).toEqual(deadEnemy.position);
     expect(nextState.entities[resource.id].position).toEqual(resource.position);
   });

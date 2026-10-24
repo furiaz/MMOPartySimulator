@@ -2279,6 +2279,9 @@ export type WorldWipeRecoveryState =
 export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 
 export type DebugNavigationReason =
+  | "avoidance"
+  | "crowd_wait"
+  | "overlap_recovery"
   | "path"
   | "direct_step"
   | "swap"

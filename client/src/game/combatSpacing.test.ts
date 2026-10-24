@@ -3,7 +3,7 @@ import { updateAttackSystem } from "./attackSystem";
 import { BARRACK_DEFINITIONS, createBarrackEntity } from "./barrackDefinitions";
 import { updateDefendSystem } from "./defendSystem";
 import { createCompanion, createEnemy, createResource } from "./entities";
-import { updateEntitySeparationSystem } from "./entitySeparationSystem";
+import { updateOverlapRecoverySystem } from "./overlapRecovery";
 import { isCombatPositionAvailable } from "./movementPlanning";
 import { clearFrameMovementPlanning } from "./movementState";
 import { areEntitiesOverlapping, isWithinAttackReach } from "./spatialGeometry";
@@ -21,10 +21,11 @@ function advance(state: GameState, frame: number, defender: boolean): GameState 
   const now = frame * 100;
   let next = clearFrameMovementPlanning({ ...state, simulationTimeMs: now, simulationDeltaMs: 100 });
   const moved = new Set<string>();
-  // Stationary-target fixture: exercise the real approach writer, then late separation.
+  // Match the real loop: exceptional recovery precedes ordinary approach/action.
+  next = updateOverlapRecoverySystem(next, moved);
   next = defender ? updateDefendSystem(next, moved, { nowMs: now, deltaMs: 100, deltaSeconds: 0.1, frameNumber: frame })
     : updateAttackSystem(next, moved, now);
-  return updateEntitySeparationSystem(next, moved);
+  return next;
 }
 
 describe.each([false, true])("settled combat spacing (Defender=%s)", defender => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCompanion, createNpc } from "./entities";
-import { updateEntitySeparationSystem } from "./entitySeparationSystem";
+import { updateOverlapRecoverySystem } from "./overlapRecovery";
 import {
   GUILD_INN_COMPANION_CAPACITY,
   GUILD_SECONDARY_PARTY_ID,
@@ -234,7 +234,7 @@ describe("guild secondary parties", () => {
 
     const leaderPositionBeforeSeparation = result.state.entities.leader.position;
     const reservePositionBeforeSeparation = result.state.entities.reserve.position;
-    const separatedState = updateEntitySeparationSystem(result.state, new Set());
+    const separatedState = updateOverlapRecoverySystem(result.state, new Set());
 
     expect(separatedState.entities.leader.position).toEqual(
       leaderPositionBeforeSeparation,

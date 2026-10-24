@@ -19,6 +19,9 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
     normalMovementResultsByEntityId: {},
+    localAvoidanceByEntityId: {},
+    overlapRecoveryByEntityId: {},
+    overlapRecoveryGeometryKey: undefined,
     movementPositionCommitsByEntityId: {},
     warmasterResetPending: undefined,
     normalMovementPhase: undefined,
@@ -106,6 +109,8 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
   state = { ...state,
+    localAvoidanceByEntityId: Object.fromEntries(Object.entries(state.localAvoidanceByEntityId ?? {}).filter(([id]) => living(id))),
+    overlapRecoveryByEntityId: Object.fromEntries(Object.entries(state.overlapRecoveryByEntityId ?? {}).filter(([id]) => living(id))),
     normalMovementResultsByEntityId: Object.fromEntries(Object.entries(state.normalMovementResultsByEntityId ?? {}).filter(([id]) => living(id))),
     movementPositionCommitsByEntityId: Object.fromEntries(Object.entries(state.movementPositionCommitsByEntityId ?? {}).filter(([id]) => living(id))),
     warmasterResetPending: state.warmasterResetPending && living(state.warmasterResetPending) ? state.warmasterResetPending : undefined,

@@ -52,6 +52,8 @@ export type MovementOptions = WalkablePositionOptions & {
   acceptableRadius?: number;
   /** Producer-specific guard, evaluated before any position/bookkeeping commit. */
   isPositionAllowed?: (position: Position) => boolean;
+  /** Producer's stop region; scoped party transit must end with standing clearance here. */
+  isSettlingPosition?: (position: Position) => boolean;
   rejectedPositionOutcome?: "held" | "blocked";
   combatSlot?: { targetId: string; attackReach: number; position: Position };
 };
@@ -78,6 +80,21 @@ export type NormalMovementRequest = {
 };
 
 export type NormalMovementOutcome = "moved" | "held" | "blocked" | "invalid" | "deferred";
+
+/** Simulation-only hysteresis, not saved formation or command state. */
+export type LocalAvoidanceMemory = {
+  requestKey: string;
+  destination: Position;
+  direction: Position;
+  side: number;
+  lastActiveAtMs: number;
+};
+
+export type OverlapRecoveryObservation = {
+  position: Position;
+  bodyKey: string;
+  pending: boolean;
+};
 
 /** Transient producer context; never persisted or copied into a movement result. */
 export type NormalMovementSubmission = {
