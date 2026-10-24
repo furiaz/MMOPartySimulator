@@ -34,6 +34,7 @@ function unit(vector: Position): Position {
 function distance(a: Position, b: Position): number { return Math.hypot(a.x - b.x, a.y - b.y); }
 
 export type LocalAvoidanceResult = {
+  blockingEnemyIds?: string[];
   position: Position | null;
   crowded: boolean;
   memory?: LocalAvoidanceMemory;
@@ -149,9 +150,11 @@ export function planLocalAvoidance(
       (!remembered || (forward.x * direction.y - forward.y * direction.x) * side >= -0.05);
   };
   const selected = candidates.find(position => keepsSide(position) && available(position)) ?? candidates.find(available);
-  if (!selected) return { position: null, crowded: true, memory: remembered };
+  const blockingEnemyIds = neighbors.filter(other => other.kind === "enemy" &&
+    (areEntitiesOverlapping(actor, other, preferred) || areEntitiesOverlapping(actor, other, lookAhead))).map(other => other.id);
+  if (!selected) return { position: null, crowded: true, memory: remembered, blockingEnemyIds };
   const direction = unit({ x: selected.x - actor.position.x, y: selected.y - actor.position.y });
   const cross = forward.x * direction.y - forward.y * direction.x;
-  return { position: selected, crowded: true, memory: { requestKey, destination: { ...request.destination }, direction,
+  return { position: selected, crowded: true, blockingEnemyIds, memory: { requestKey, destination: { ...request.destination }, direction,
     side: Math.abs(cross) > 0.05 ? Math.sign(cross) : side, lastActiveAtMs: now } };
 }

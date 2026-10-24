@@ -21,6 +21,8 @@ import {
 } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
 import { shouldUseAutomaticQuestDefenseFocus } from "./questDefenseFocus";
+import { canReacquireCombatTarget } from "./targetCommitment";
+import { hasDirectPlayerPartyIntent } from "./partyIntentState";
 import type {
   Companion,
   CombatStructure,
@@ -59,6 +61,9 @@ export function updateRoleSystem(
     if (!roleTarget) {
       continue;
     }
+    const combatTarget = roleTarget.state === "attack" && roleTarget.targetId ? nextState.entities[roleTarget.targetId] : undefined;
+    if (!hasDirectPlayerPartyIntent(nextState) && combatTarget?.kind === "enemy" &&
+      !canReacquireCombatTarget(nextState, entity, combatTarget)) continue;
 
     nextState = updateEntity(nextState, {
       ...entity,

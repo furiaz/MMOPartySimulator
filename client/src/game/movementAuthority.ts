@@ -6,6 +6,7 @@ import type { GameEntity, Position } from "./types";
 import type { MovementOptions, NormalMovementOutcome, NormalMovementRequest, NormalMovementSource } from "./movementTypes";
 import type { ExternalMovementOwner, MovementAuthorityResult } from "./movementTypes";
 import { guardWarmasterWalkingDeparture, isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
+import { isPlayerInteractionDefense, observeTargetApproach } from "./targetCommitment";
 
 // Explicit source ties, independent of producer submission/iteration order.
 const SOURCE_ORDER: NormalMovementSource[] = [
@@ -24,6 +25,7 @@ function requiredSource(state: GameState, actor: GameEntity): NormalMovementSour
     if (state.resurrectionChannelsByHelperId?.[actor.id]) return actor.state === "attack" ? "attack" : "resurrection";
     if (state.activeTeleport) return "teleport";
     if (canFollowDirectLeader(state, actor)) return "follow";
+    if (isPlayerInteractionDefense(state, actor)) return "attack";
     const intent = getPartyExecutionIntent(state);
     if (intent?.source === "player" && actor.commandPriority !== "direct") {
       if (intent.type === "attack" && actor.state === "attack" && actor.currentTargetId === intent.targetId) return "attack";
@@ -99,11 +101,13 @@ export function selectNormalMovementRequest(state: GameState, requests: NormalMo
 
 export function finishNormalMovement(
   state: GameState, request: NormalMovementRequest, outcome: NormalMovementOutcome,
-  from: Position, to = from, reason: string = outcome,
+  from: Position, to = from, reason: string = outcome, blockingEnemyIds?: string[],
 ): GameState {
-  return { ...state, normalMovementResultsByEntityId: { ...state.normalMovementResultsByEntityId,
-    [request.entityId]: { request, outcome, reason, from, to, positionCommitCount: outcome === "moved" ? 1 : 0,
-      frameNumber: state.simulationFrame ?? state.simulationTick ?? 0, timeMs: state.simulationTimeMs ?? 0 } } };
+  const result = { request, outcome, reason, from, to, blockingEnemyIds: blockingEnemyIds ?? getNormalMovementResult(state, request.entityId)?.blockingEnemyIds,
+    positionCommitCount: outcome === "moved" ? 1 : 0,
+    frameNumber: state.simulationFrame ?? state.simulationTick ?? 0, timeMs: state.simulationTimeMs ?? 0 };
+  return observeTargetApproach({ ...state, normalMovementResultsByEntityId: { ...state.normalMovementResultsByEntityId,
+    [request.entityId]: result } }, result);
 }
 
 export function getMovementPositionCommit(state: GameState, entityId: string) {

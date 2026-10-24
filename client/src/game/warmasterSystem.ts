@@ -9,6 +9,7 @@ import { ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
 import type { Enemy } from "./types";
 import { isWarmasterAvailable } from "./warmasterLifecycleState";
 import { commitSpecializedMovementPosition, getMovementPositionCommit, handoffSpecializedMovement, releaseSpecializedMovement } from "./movementAuthority";
+import { clearTargetCommitmentsForTarget } from "./targetCommitment";
 function configureBoss(boss: Enemy): Enemy {
   return {
     ...boss,
@@ -30,6 +31,7 @@ export function resetWarmasterAttempt(state: GameState, now: number): GameState 
   next = { ...next, warmasterAttempt: undefined };
   if (!boss)
     return { ...next, warmasterResetPending: undefined };
+  next = clearTargetCommitmentsForTarget(next, boss.id);
   next = clearEnemyAbilityRuntimeForEnemy(next, boss.id);
   next = cancelForcedMovement(next, boss.id, { handoff: true });
   next = clearStatusEffectsForEntity(next, boss.id);

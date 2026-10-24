@@ -195,8 +195,15 @@ export type {
 } from "./movementTypes";
 
 import { updateStructureRuntime } from "./combatStructures";
+import { clearTargetCommitmentsForTarget, recordCompanionTargetTransition } from "./targetCommitment";
 
 export type GameState = {
+  targetCommitmentsByEntityId?: Record<string, import("./targetCommitment").TargetCommitment>;
+  targetApproachesByEntityId?: Record<string, import("./targetCommitment").TargetApproachObservation>;
+  targetEngagementProbeAtMsByEntityId?: Record<string, number>;
+  rejectedCombatTargetsByEntityId?: Record<string, Record<string, import("./targetCommitment").RejectedCombatTarget>>;
+  companionTargetDecisionByEntityId?: Record<string, import("./targetCommitment").CompanionTargetTransition>;
+  companionTargetTransitions?: import("./targetCommitment").CompanionTargetTransition[];
   localAvoidanceByEntityId?: Record<string, import("./movementTypes").LocalAvoidanceMemory>;
   overlapRecoveryByEntityId?: Record<string, import("./movementTypes").OverlapRecoveryObservation>;
   overlapRecoveryGeometryKey?: string;
@@ -395,7 +402,9 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
           }
         : state.followTrailsByEntityId,
   };
+  nextState = recordCompanionTargetTransition(nextState, previousEntity, entity);
   if (entity.state === "dead" || ("health" in entity && entity.health <= 0)) {
+    nextState = clearTargetCommitmentsForTarget(nextState, entity.id);
     const withoutEntity = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => id !== entity.id));
     nextState = { ...nextState,
       forcedMovementsByEntityId: withoutEntity(nextState.forcedMovementsByEntityId),
@@ -403,6 +412,10 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
       externalMovementOwnersByEntityId: withoutEntity(nextState.externalMovementOwnersByEntityId),
       localAvoidanceByEntityId: withoutEntity(nextState.localAvoidanceByEntityId),
       overlapRecoveryByEntityId: withoutEntity(nextState.overlapRecoveryByEntityId),
+      targetCommitmentsByEntityId: withoutEntity(nextState.targetCommitmentsByEntityId),
+      targetApproachesByEntityId: withoutEntity(nextState.targetApproachesByEntityId),
+      targetEngagementProbeAtMsByEntityId: withoutEntity(nextState.targetEngagementProbeAtMsByEntityId),
+      rejectedCombatTargetsByEntityId: withoutEntity(nextState.rejectedCombatTargetsByEntityId),
       warmasterResetPending: nextState.warmasterResetPending === entity.id ? undefined : nextState.warmasterResetPending,
     };
   }

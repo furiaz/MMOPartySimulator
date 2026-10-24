@@ -2356,6 +2356,7 @@ export type DebugDismissibleUiTarget =
 export type DebugTelemetryEventType =
   | "target_acquired"
   | "target_changed"
+  | "target_released"
   | "formation_changed"
   | "target_skipped"
   | "movement_failed"
@@ -2567,7 +2568,7 @@ export type DebugTelemetryEntitySnapshot = {
   enemyEvasion?: number;
   enemyScalingOverrides?: string[];
   attackRange?: number;
-  targetDecisionReason?: EnemyTargetDecisionReason;
+  targetDecisionReason?: EnemyTargetDecisionReason | import("./targetCommitment").CompanionTargetReason;
   commandPriority?: CommandPriority;
   characterLevel?: number;
   characterXp?: number;
@@ -2653,7 +2654,7 @@ export type DebugTelemetryEvent = {
   enemyEvasion?: number;
   enemyScalingOverrides?: string[];
   attackRange?: number;
-  targetDecisionReason?: EnemyTargetDecisionReason;
+  targetDecisionReason?: EnemyTargetDecisionReason | import("./targetCommitment").CompanionTargetReason;
   amount?: number;
   damageType?: CombatDamageType;
   powerMultiplier?: number;

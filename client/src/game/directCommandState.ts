@@ -34,6 +34,11 @@ export function clearDirectCommandPlanning(state: GameState, companionId: string
     return next;
   };
   return { ...state,
+    targetCommitmentsByEntityId: withoutActor(state.targetCommitmentsByEntityId),
+    targetApproachesByEntityId: withoutActor(state.targetApproachesByEntityId),
+    targetEngagementProbeAtMsByEntityId: withoutActor(state.targetEngagementProbeAtMsByEntityId),
+    rejectedCombatTargetsByEntityId: withoutActor(state.rejectedCombatTargetsByEntityId),
+    companionTargetDecisionByEntityId: withoutActor(state.companionTargetDecisionByEntityId),
     localAvoidanceByEntityId: withoutActor(state.localAvoidanceByEntityId),
     attackSlotCacheByEntityId: withoutActor(state.attackSlotCacheByEntityId),
     failedMoveByEntityId: withoutActor(state.failedMoveByEntityId),
@@ -41,6 +46,8 @@ export function clearDirectCommandPlanning(state: GameState, companionId: string
     movementFailuresByEntityId: withoutActor(state.movementFailuresByEntityId),
     movementFailureMsByEntityId: withoutActor(state.movementFailureMsByEntityId),
     movementPathRetryAtMsByEntityId: withoutActor(state.movementPathRetryAtMsByEntityId),
+    defenderBlockedMsByEntityId: withoutActor(state.defenderBlockedMsByEntityId),
+    defenderBlockedTicksByEntityId: withoutActor(state.defenderBlockedTicksByEntityId),
     movementPathsByEntityId: withoutActor(state.movementPathsByEntityId),
     moveIntentsByEntityId: state.movementPositionCommitsByEntityId?.[companionId] || state.forcedMovementsByEntityId?.[companionId]
       ? state.moveIntentsByEntityId : withoutActor(state.moveIntentsByEntityId),

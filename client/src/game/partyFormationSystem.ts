@@ -35,6 +35,7 @@ import {
   setPartyExecutionIntent,
 } from "./partyIntentState";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
+import { hasLocalTargetCommitment, isPlayerInteractionDefense } from "./targetCommitment";
 import { getPartyMovementTargetPosition } from "./partyTargetSystem";
 import {
   FOLLOW_DISTANCE,
@@ -222,6 +223,7 @@ function assignPartyTravelTargets(
   if (
     currentLeader &&
     isPartyMember(currentLeader) &&
+    !isPlayerInteractionDefense(nextState, currentLeader) &&
     (hasPlayerIntent ||
       !isPartyMemberRespondingToActiveThreat(nextState, currentLeader))
   ) {
@@ -446,6 +448,7 @@ function moveLeaderTowardPoi(
   if (!leader || !isPartyMember(leader)) {
     return state;
   }
+  if (hasLocalTargetCommitment(state, leader)) return state;
 
   const escortGuide = getActiveEscortGuide(state);
 

@@ -1,26 +1,19 @@
 import { isWithinFollowLeash } from "./followSystem";
 import { hasDirectCompanionAuthority, isDirectGatherPersonalThreat } from "./directCommandState";
-import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import {
   getActiveQuestGuide,
   QUEST_GUIDE_ENEMY_PAUSE_RANGE,
 } from "./questGuideSystem";
 import {
-  getEntityById,
-  updateEntity,
   type GameState,
 } from "./state";
 import {
-  getPartyExecutionIntent,
   hasDirectPlayerPartyIntent,
-  setPartyExecutionIntent,
 } from "./partyIntentState";
-import { isRetainableActivePartyThreat } from "./partyThreatSystem";
+import { applyTargetCommitment, isPlayerInteractionIntent, selectTargetCommitment } from "./targetCommitment";
 import { isPartyMember, isPartyMemberBusyGatheringResource } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
-
-const PROTECTION_TARGET_RETAIN_DISTANCE = 3;
 
 export function protectPartyMember(
   state: GameState,
@@ -41,27 +34,15 @@ export function protectPartyMember(
       : state;
   }
 
-  if (hasRetainableAutonomousProtectionTarget(state, attacker)) {
-    return state;
-  }
-
-  let nextState = setPartyExecutionIntent(captureInterruptedPoiTarget(state, attacker), {
-    type: "attack",
-    targetId: attacker.id,
-    targetPosition: attacker.position,
-  });
+  let nextState = state;
 
   for (const entity of Object.values(state.entities)) {
     if (!canProtectPartyMember(state, entity, attackedMember, attacker)) {
       continue;
     }
 
-    nextState = updateEntity(nextState, {
-      ...entity,
-      state: "attack",
-      currentTargetId: attacker.id,
-      commandPriority: hasDirectCompanionAuthority(state, entity) ? "direct" : "autonomous",
-    });
+    if (entity.kind === "companion") nextState = applyTargetCommitment(nextState, entity,
+      selectTargetCommitment(nextState, entity, { damage: { attackerId: attacker.id, victimId: attackedMember.id } }));
   }
 
   return nextState;
@@ -90,33 +71,6 @@ function isRelevantGuideEscortAttack(
   );
 }
 
-function hasRetainableAutonomousProtectionTarget(
-  state: GameState,
-  attacker: Enemy,
-): boolean {
-  const executionIntent = getPartyExecutionIntent(state);
-
-  if (
-    executionIntent?.type !== "attack" ||
-    executionIntent.source === "player" ||
-    !executionIntent.targetId ||
-    executionIntent.targetId === attacker.id
-  ) {
-    return false;
-  }
-
-  const currentTarget = getEntityById(state, executionIntent.targetId);
-
-  return (
-    currentTarget?.kind === "enemy" &&
-    isRetainableActivePartyThreat(
-      state,
-      currentTarget,
-      PROTECTION_TARGET_RETAIN_DISTANCE,
-    )
-  );
-}
-
 function canSelfDefendDuringInteraction(
   state: GameState,
   attackedMember: AutonomousEntity,
@@ -131,45 +85,9 @@ function canSelfDefendDuringInteraction(
   }
 
   return (
-    isPlayerGatherIntent(state) ||
-    isPlayerNpcInteractionIntent(state) ||
+    isPlayerInteractionIntent(state) ||
     isResourceInteraction(state, attackedMember)
   );
-}
-
-function isPlayerGatherIntent(state: GameState): boolean {
-  const executionIntent = getPartyExecutionIntent(state);
-
-  return (
-    executionIntent?.source === "player" &&
-    executionIntent.type === "gather"
-  );
-}
-
-function isPlayerNpcInteractionIntent(state: GameState): boolean {
-  const intent = getPartyExecutionIntent(state);
-
-  if (
-    intent?.source !== "player" ||
-    intent.type !== "move" ||
-    !intent.targetPosition
-  ) {
-    return false;
-  }
-
-  return Object.values(state.entities).some(
-    (entity) =>
-      entity.kind === "npc" &&
-      getGridDistance(entity.position, intent.targetPosition ?? entity.position) <=
-        getNpcInteractionRange(entity),
-  );
-}
-
-function getNpcInteractionRange(entity: GameEntity): number {
-  return entity.kind === "npc" &&
-    (entity.npcRole === "quest_giver" || entity.npcRole === "class_mentor")
-    ? 4
-    : 3;
 }
 
 function isResourceInteraction(
@@ -188,18 +106,9 @@ function updateSelfDefenseTarget(
   attackedMember: AutonomousEntity,
   attacker: Enemy,
 ): GameState {
-  const defenseState = setPartyExecutionIntent(captureInterruptedPoiTarget(state, attacker), {
-    type: "attack",
-    targetId: attacker.id,
-    targetPosition: attacker.position,
-  });
-
-  return updateEntity(defenseState, {
-    ...attackedMember,
-    state: "attack",
-    currentTargetId: attacker.id,
-    commandPriority: hasDirectCompanionAuthority(state, attackedMember) ? "direct" : "autonomous",
-  });
+  return attackedMember.kind === "companion" ? applyTargetCommitment(state, attackedMember,
+    selectTargetCommitment(state, attackedMember, { allowPlayerInteractionDefense: true,
+      damage: { attackerId: attacker.id, victimId: attackedMember.id } })) : state;
 }
 
 function canProtectPartyMember(
@@ -236,8 +145,8 @@ function canProtectPartyMember(
   }
 
   if (entity.id === attackedMember.id) {
-    return entity.state === "idle" || entity.state === "follow" || entity.state === "gather";
+    return entity.state === "idle" || entity.state === "follow" || entity.state === "gather" || entity.state === "attack" || entity.state === "defend";
   }
 
-  return entity.state === "idle" || entity.state === "follow" || entity.state === "gather";
+  return entity.state === "idle" || entity.state === "follow" || entity.state === "gather" || entity.state === "attack" || entity.state === "defend";
 }

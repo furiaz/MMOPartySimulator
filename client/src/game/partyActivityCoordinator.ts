@@ -24,13 +24,14 @@ import {
   isPartyMemberRespondingToActiveThreat,
 } from "./partyThreatSystem";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
-import { getEntityById, type GameState } from "./state";
+import { type GameState } from "./state";
 import type {
   Enemy,
   CombatStructure,
   GameEntity,
   Position,
 } from "./types";
+import { canReacquireCombatTarget, hasRetainedAutomaticTarget, isPlayerInteractionDefense } from "./targetCommitment";
 
 export const PARTY_COHESION_DISTANCE = 4;
 export const PARTY_WAIT_DISTANCE = 7;
@@ -112,6 +113,7 @@ export function canAssignPartyTravelTarget(
   hasPlayerIntent: boolean,
 ): boolean {
   return (
+    !isPlayerInteractionDefense(state, member) &&
     member.id !== leaderId &&
     !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
@@ -126,8 +128,10 @@ export function canAssignPartyGatherTarget(
   hasPlayerIntent: boolean,
 ): boolean {
   return (
+    !isPlayerInteractionDefense(state, member) &&
     !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
+    (hasPlayerIntent || !hasRetainedAutomaticTarget(state, member)) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member))
   );
 }
@@ -137,9 +141,12 @@ export function canAssignPartyCombatTarget(
   member: PartyMember,
   hasPlayerIntent: boolean,
 ): boolean {
+  const target = getPartyCombatTarget(state);
   return (
     !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
+    (hasPlayerIntent || target?.kind !== "enemy" || canReacquireCombatTarget(state, member, target)) &&
+    (hasPlayerIntent || member.currentTargetId === getPartyCombatTarget(state)?.id || !hasRetainedAutomaticTarget(state, member)) &&
     (hasPlayerIntent || !isPartyMemberRespondingToActiveThreat(state, member)) &&
     (hasPlayerIntent || !isPartyMemberBusyGatheringResource(state, member))
   );
@@ -156,7 +163,7 @@ export function canAssignSelfDefenseTarget(
 
   if (hasDirectCompanionAuthority(state, member)) return isDirectGatherPersonalThreat(state, member.id, target);
 
-  if (isCompanionPersonallyBlockedOrThreatened(state, member, target)) {
+  if (isCompanionPersonallyBlockedOrThreatened(member, target)) {
     return true;
   }
 
@@ -261,26 +268,12 @@ function getNearestPartyDistance(state: GameState, target: Enemy | CombatStructu
 }
 
 function isCompanionPersonallyBlockedOrThreatened(
-  state: GameState,
   member: PartyMember,
   target: Enemy,
 ): boolean {
   return (
-    getMovementBlockerEnemy(state, member)?.id === target.id ||
-    target.currentTargetId === member.id
+    isLivingEnemy(target) && target.state === "attack" && target.currentTargetId === member.id
   );
-}
-
-function getMovementBlockerEnemy(
-  state: GameState,
-  member: PartyMember,
-): Enemy | null {
-  const failure = state.movementFailuresByEntityId?.[member.id];
-  const blocker = failure?.blockerId
-    ? getEntityById(state, failure.blockerId)
-    : undefined;
-
-  return isLivingEnemy(blocker) ? blocker : null;
 }
 
 function getDistance(from: Position, to: Position): number {

@@ -444,7 +444,7 @@ function getEntitySnapshot(
     enemyEvasion: getEnemyEvasion(entity),
     enemyScalingOverrides: getEnemyScalingOverrides(entity),
     attackRange: getAttackRangeSnapshot(entity),
-    targetDecisionReason: getTargetDecisionReason(entity),
+    targetDecisionReason: getTargetDecisionReason(entity, nextState),
     commandPriority: getCommandPriority(entity),
     characterLevel: getCharacterLevel(entity),
     characterXp: getCharacterXp(entity),
@@ -580,7 +580,8 @@ function getTelemetryEvents(
       continue;
     }
 
-    addTargetEvents(events, previousEntity, entity, tick);
+    if (entity.kind !== "companion" || !nextState.companionTargetTransitions?.some(transition => transition.entityId === entity.id))
+      addTargetEvents(events, previousEntity, entity, tick);
     addStateEvents(events, previousEntity, entity, tick);
     addRoleEvents(events, previousEntity, entity, tick);
     addHealthEvents(events, previousEntity, entity, tick);
@@ -1008,8 +1009,9 @@ function getAttackRangeSnapshot(entity: GameEntity): number | undefined {
   return entity.kind === "enemy" ? getEnemyAttackRange(entity) : undefined;
 }
 
-function getTargetDecisionReason(entity: GameEntity) {
-  return entity.kind === "enemy" ? entity.targetDecisionReason : undefined;
+function getTargetDecisionReason(entity: GameEntity, state?: GameState) {
+  return entity.kind === "enemy" ? entity.targetDecisionReason : entity.kind === "companion"
+    ? state?.companionTargetDecisionByEntityId?.[entity.id]?.reason : undefined;
 }
 
 function getCommandPriority(entity: GameEntity): CommandPriority | undefined {

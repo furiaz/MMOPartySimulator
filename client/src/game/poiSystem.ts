@@ -1,4 +1,5 @@
 import { getDirectLeaderCommand } from "./directCommandState";
+import { canReacquireCombatTarget, hasLocalTargetCommitment, isRetainableCombatEnemy } from "./targetCommitment";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { autoDepositByRoutingMode } from "./bank";
 import {
@@ -20,7 +21,6 @@ import {
 } from "./partySystem";
 import {
   getCommittedPartyThreatTarget,
-  getPartyMembersRespondingToActiveThreat,
   isPartyMemberRespondingToActiveThreat,
 } from "./partyThreatSystem";
 import {
@@ -121,6 +121,14 @@ export function updatePoiSystem(
   if (!leader || leader.commandPriority === "direct") {
     return clearPoiSelection(markerInteractionState);
   }
+  if (hasLocalTargetCommitment(markerInteractionState, leader)) return markerInteractionState;
+  const commitment = getPartyExecutionIntent(markerInteractionState);
+  const committedTarget = commitment?.type === "attack" && commitment.targetId ? markerInteractionState.entities[commitment.targetId] : undefined;
+  const defenseFocus = getActiveQuestDefenseFocus(markerInteractionState);
+  if (commitment && isRetainableCombatEnemy(markerInteractionState, committedTarget) &&
+    canReacquireCombatTarget(markerInteractionState, leader, committedTarget) &&
+    (!defenseFocus || defenseFocus.defenderIds.includes(committedTarget.id)))
+    return setPartyExecutionIntent(markerInteractionState, { ...commitment, targetPosition: committedTarget.position });
 
   const dungeonPoiTarget = getSlimewardDungeonPoiTarget(markerInteractionState);
   if (markerInteractionState.autoModeEnabled && dungeonPoiTarget) {
@@ -386,6 +394,10 @@ function isLocalPoiTargetStillValid(
 ): boolean {
   if (target.mapId !== state.currentMapId) {
     return false;
+  }
+  if (target.category === "combat" && target.targetEntityId) {
+    const leader = getPartyLeader(state), enemy = state.entities[target.targetEntityId];
+    if (!isRetainableCombatEnemy(state, enemy) || (leader && !canReacquireCombatTarget(state, leader, enemy))) return false;
   }
 
   if (!target.targetEntityId) {
@@ -854,22 +866,9 @@ function getPreservedPartyThreatTarget(
     });
   }
 
-  const respondingTarget = getRespondingPartyThreatTarget(state);
+  if (getPartyExecutionIntent(state)?.type === "attack") return getCommittedPartyThreatTarget(state, { range: POI_THREAT_PRESERVATION_DISTANCE });
 
-  if (respondingTarget) {
-    return getCommittedPartyThreatTarget(state, {
-      currentTarget: respondingTarget,
-      range: POI_THREAT_PRESERVATION_DISTANCE,
-    });
-  }
-
-  if (localTarget.category === "resource") {
-    return null;
-  }
-
-  return getCommittedPartyThreatTarget(state, {
-    range: POI_THREAT_PRESERVATION_DISTANCE,
-  });
+  return null;
 }
 
 function shouldPreserveActiveThreatForPoi(
@@ -902,17 +901,6 @@ function getCurrentExecutionEnemyTarget(state: GameState): Enemy | null {
   const executionIntent = getPartyExecutionIntent(state);
   const target = executionIntent?.targetId
     ? getEntityById(state, executionIntent.targetId)
-    : undefined;
-
-  return target?.kind === "enemy" && target.state !== "dead" && target.health > 0
-    ? target
-    : null;
-}
-
-function getRespondingPartyThreatTarget(state: GameState): Enemy | null {
-  const responder = getPartyMembersRespondingToActiveThreat(state)[0];
-  const target = responder?.currentTargetId
-    ? getEntityById(state, responder.currentTargetId)
     : undefined;
 
   return target?.kind === "enemy" && target.state !== "dead" && target.health > 0

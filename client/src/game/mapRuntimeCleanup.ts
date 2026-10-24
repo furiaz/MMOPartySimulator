@@ -2,6 +2,7 @@ import type { GameState } from "./state";
 import { initializeBarracks } from "./barracks";
 import { reconcileWarmasterLifecycle } from "./warmasterLifecycle";
 import type { PartyFormationState } from "./types";
+import { pruneTargetCommitmentState } from "./targetCommitment";
 
 function createIdlePartyFormation(): PartyFormationState {
   return {
@@ -18,6 +19,12 @@ function createIdlePartyFormation(): PartyFormationState {
 export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
+    targetCommitmentsByEntityId: {},
+    targetApproachesByEntityId: {},
+    targetEngagementProbeAtMsByEntityId: {},
+    rejectedCombatTargetsByEntityId: {},
+    companionTargetDecisionByEntityId: {},
+    companionTargetTransitions: [],
     normalMovementResultsByEntityId: {},
     localAvoidanceByEntityId: {},
     overlapRecoveryByEntityId: {},
@@ -107,6 +114,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 }
 
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
+  state = pruneTargetCommitmentState(state);
   const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
   state = { ...state,
     localAvoidanceByEntityId: Object.fromEntries(Object.entries(state.localAvoidanceByEntityId ?? {}).filter(([id]) => living(id))),

@@ -2962,7 +2962,7 @@ describe("game update intent priority", () => {
     expect(currentEnemy.health).toBeLessThan(enemy.health);
   });
 
-  it("lets player gather intent self-defend after damage and restores the resource intent later", () => {
+  it("lets player gathering self-defend locally after damage while retaining the resource intent", () => {
     const resource = createResource("player-resource", { x: 4, y: 4 });
     const leader = {
       ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
@@ -2995,14 +2995,11 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.leaderIntent).toMatchObject({
-      type: "attack",
-      targetId: attacker.id,
-    });
-    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
       type: "gather",
       targetId: resource.id,
       source: "player",
     });
+    expect(nextState.interruptedPoiTarget).toBeUndefined();
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: attacker.id,
@@ -3085,14 +3082,11 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.leaderIntent).toMatchObject({
-      type: "attack",
-      targetId: attacker.id,
-    });
-    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
       type: "move",
       targetPosition: npc.position,
       source: "player",
     });
+    expect(nextState.interruptedPoiTarget).toBeUndefined();
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: attacker.id,

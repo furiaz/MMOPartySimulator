@@ -4,6 +4,7 @@ import { getPartyMembers, isPartyMember, type PartyMember } from "./partySystem"
 import { getGridDistance } from "./positionUtils";
 import { getEntityById, type GameState } from "./state";
 import type { Enemy, GameEntity } from "./types";
+import { canReacquireCombatTarget, hasLocalTargetCommitment, isPrivateResponseTarget, isRetainableCombatEnemy } from "./targetCommitment";
 
 type CommittedPartyThreatTargetOptions = {
   currentTarget?: Enemy | null;
@@ -13,9 +14,9 @@ type CommittedPartyThreatTargetOptions = {
 
 export function getActivePartyThreatTarget(state: GameState): Enemy | null {
   return (
-    Object.values(state.entities).find((entity): entity is Enemy =>
+    Object.values(state.entities).filter((entity): entity is Enemy =>
       isActivePartyThreat(state, entity),
-    ) ?? null
+    ).sort((a, b) => a.id.localeCompare(b.id))[0] ?? null
   );
 }
 
@@ -27,17 +28,12 @@ export function getCommittedPartyThreatTarget(
   state: GameState,
   options: CommittedPartyThreatTargetOptions,
 ): Enemy | null {
-  const immediateTarget = getImmediatePartyThreatTarget(state, options);
-
-  if (immediateTarget) {
-    return immediateTarget;
-  }
-
   if (
     options.currentTarget &&
-    isRetainableActivePartyThreat(state, options.currentTarget, options.range)
+    isRetainableCombatEnemy(state, options.currentTarget)
   ) {
-    return options.currentTarget;
+    const leader = state.entities[state.partyLeaderId];
+    if (leader?.kind !== "companion" || canReacquireCombatTarget(state, leader, options.currentTarget)) return options.currentTarget;
   }
 
   return getNearestActivePartyThreatTarget(state, options.range);
@@ -47,6 +43,7 @@ export function isPartyMemberRespondingToActiveThreat(
   state: GameState,
   partyMember: PartyMember,
 ): boolean {
+  if (hasLocalTargetCommitment(state, partyMember)) return true;
   if (partyMember.state !== "attack" || !partyMember.currentTargetId) {
     return false;
   }
@@ -87,77 +84,6 @@ export function getPartyMembersRespondingToActiveThreat(
   );
 }
 
-function getImmediatePartyThreatTarget(
-  state: GameState,
-  options: CommittedPartyThreatTargetOptions,
-): Enemy | null {
-  const candidates = getPartyMembers(state).flatMap((member) => {
-    const blocker = getMovementBlockerEnemy(state, member);
-    const directAttacker = options.includeDirectPersonalAttackers
-      ? getDirectPersonalAttacker(state, member, options.range)
-      : null;
-    const targets: { enemy: Enemy; priority: number; distance: number }[] = [];
-
-    if (blocker && member.commandPriority !== "direct") {
-      targets.push({
-        enemy: blocker,
-        priority: 0,
-        distance: getGridDistance(member.position, blocker.position),
-      });
-    }
-
-    if (directAttacker) {
-      targets.push({
-        enemy: directAttacker,
-        priority: 1,
-        distance: getGridDistance(member.position, directAttacker.position),
-      });
-    }
-
-    return targets;
-  });
-
-  return getSortedThreatCandidates(candidates)[0]?.enemy ?? null;
-}
-
-function getMovementBlockerEnemy(
-  state: GameState,
-  member: PartyMember,
-): Enemy | null {
-  const failure = state.movementFailuresByEntityId?.[member.id];
-  const blocker = failure?.blockerId
-    ? getEntityById(state, failure.blockerId)
-    : undefined;
-
-  return isLiveEnemy(blocker) ? blocker : null;
-}
-
-function getDirectPersonalAttacker(
-  state: GameState,
-  member: PartyMember,
-  range: number,
-): Enemy | null {
-  if (member.commandPriority !== "direct") {
-    return null;
-  }
-
-  return (
-    Object.values(state.entities)
-      .filter((entity): entity is Enemy => isActivePartyThreat(state, entity))
-      .filter(
-        (enemy) =>
-          enemy.currentTargetId === member.id &&
-          getGridDistance(member.position, enemy.position) <= range,
-      )
-      .sort(
-        (first, second) =>
-          getGridDistance(member.position, first.position) -
-            getGridDistance(member.position, second.position) ||
-          first.id.localeCompare(second.id),
-      )[0] ?? null
-  );
-}
-
 export function isRetainableActivePartyThreat(
   state: GameState,
   enemy: Enemy,
@@ -173,10 +99,13 @@ function getNearestActivePartyThreatTarget(
   state: GameState,
   range: number,
 ): Enemy | null {
+  const leader = state.entities[state.partyLeaderId];
   return (
     getSortedThreatCandidates(
       Object.values(state.entities)
         .filter((entity): entity is Enemy => isActivePartyThreat(state, entity))
+        .filter(enemy => !isPrivateResponseTarget(state, enemy.id))
+        .filter(enemy => leader?.kind !== "companion" || canReacquireCombatTarget(state, leader, enemy))
         .flatMap((enemy) => {
           const distance = getNearestAutonomousPartyDistance(state, enemy, range);
 

@@ -62,7 +62,9 @@ describe("party intent state helpers", () => {
     const enemy = { ...createEnemy("enemy", { x: 11, y: 10 }, "aggressive"), state: "attack" as const, currentTargetId: leader.id };
     const stopped = stopPartyAutoCombat(createTestGameState({ partyLeaderId: leader.id, entities: { leader, enemy }, autoModeEnabled: true,
       movementFailureMsByEntityId: { [leader.id]: 1000 } }));
-    expect(getPartyExecutionIntent(updatePartyIntentSelfDefenseSystem(stopped))).toMatchObject({ type: "attack", targetId: enemy.id });
+    const defended = updatePartyIntentSelfDefenseSystem(stopped);
+    expect(getPartyExecutionIntent(defended)).toBeNull();
+    expect(defended.entities[leader.id]).toMatchObject({ state: "attack", currentTargetId: enemy.id });
   });
   it("sets execution intent and mirrors it to leaderIntent", () => {
     const executionIntent = createMoveIntent();

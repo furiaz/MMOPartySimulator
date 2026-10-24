@@ -10,7 +10,6 @@ import { captureInterruptedPoiTarget } from "./poiResumeSystem";
 import { isMovementBlockedByStatus } from "./statusEffects";
 import {
   getEntityById,
-  updateEntity,
   type GameState,
 } from "./state";
 import {
@@ -18,9 +17,12 @@ import {
   queuePartyIntent,
   restoreQueuedPartyIntent,
   setPartyIntent,
+  setPartyExecutionIntent,
 } from "./partyIntentState";
 import { canAssignSelfDefenseTarget } from "./partyActivityCoordinator";
 import { getCommittedPartyThreatTarget } from "./partyThreatSystem";
+import { applyTargetCommitment, isAutomaticCombatTarget, isPlayerInteractionDefense, selectTargetCommitment } from "./targetCommitment";
+import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import type {
   Companion,
   Enemy,
@@ -28,12 +30,30 @@ import type {
   PartyExecutionIntent,
 } from "./types";
 
-const SELF_DEFENSE_THREAT_RADIUS = 3;
 const STUCK_SELF_DEFENSE_RADIUS = 2;
 const AUTO_ROUTE_BODY_BLOCK_RADIUS = 3;
 const AUTO_ROUTE_BODY_BLOCK_MS = 1000;
 const AUTO_ROUTE_LOW_HEALTH_THREAT_RADIUS = 5;
 const AUTO_ROUTE_LOW_HEALTH_RATIO = 0.5;
+
+/** Consume late attack-approach evidence after its single movement result is final. */
+export function updateFinalizedTargetApproaches(state: GameState): GameState {
+  let next = state;
+  for (const member of getPartyMembers(state).sort((a, b) => a.id.localeCompare(b.id))) {
+    const actor = next.entities[member.id], observation = next.targetApproachesByEntityId?.[member.id];
+    if (actor?.kind !== "companion" || !observation || observation.frame !== (next.simulationFrame ?? next.simulationTick) ||
+      observation.timeMs !== (next.simulationTimeMs ?? 0) || observation.targetId !== actor.currentTargetId) continue;
+    const decision = selectTargetCommitment(next, actor, { allowEmergency: false, allowOrdinaryThreat: false,
+      isEligible: enemy => isDefenderAttackTargetRelevant(next, actor, enemy) });
+    if ((decision.kind !== "switch" && decision.kind !== "release") ||
+      (decision.reason !== "sustained_obstruction" && decision.reason !== "unreachable_engagement")) continue;
+    const intent = getPartyExecutionIntent(next);
+    next = applyTargetCommitment(next, actor, decision, actor.state === "defend" ? "defend" : "attack");
+    if (decision.kind === "release" && actor.id === next.partyLeaderId && intent?.source !== "player" &&
+      intent?.type === "attack" && intent.targetId === actor.currentTargetId) next = setPartyExecutionIntent(next, null);
+  }
+  return next;
+}
 
 export function updatePartyIntentRecoverySystem(state: GameState): GameState {
   const deadCompanion = getDeadCompanion(state);
@@ -68,16 +88,27 @@ export function getPartyResurrectionRecoveryTargetId(
 export function updatePartyIntentSelfDefenseSystem(state: GameState): GameState {
   const executionIntent = getPartyExecutionIntent(state);
 
-  if (executionIntent?.source === "player") {
-    return state;
+  if (!isAutoRouteActive(state)) {
+    let next = state;
+    for (const companion of getPartyMembers(state).sort((a, b) => a.id.localeCompare(b.id))) {
+      const actor = next.entities[companion.id];
+      if (actor?.kind !== "companion" || actor.state === "dead" || state.resurrectionChannelsByHelperId?.[actor.id]) continue;
+      const command = next.directCompanionCommandsById?.[actor.id];
+      if ((hasDirectCompanionAuthority(next, actor) && command?.type !== "gather") ||
+        (executionIntent?.source === "player" && !command && !isPlayerInteractionDefense(next, actor))) continue;
+      const decision = selectTargetCommitment(next, actor, { allowOrdinaryThreat: Boolean(executionIntent) || next.autoModeEnabled,
+        isEligible: enemy => isDefenderAttackTargetRelevant(next, actor, enemy) });
+      next = applyTargetCommitment(next, actor, decision);
+      if (decision.kind === "release" && decision.reason === "unreachable_engagement" && actor.id === next.partyLeaderId &&
+        executionIntent?.type === "attack" && executionIntent.source !== "player" && executionIntent.targetId === actor.currentTargetId)
+        next = setPartyExecutionIntent(next, null);
+    }
+    return next;
   }
-
-  const selfDefenseTarget = isAutoRouteActive(state)
-    ? getAutoRouteEmergencyTarget(state)
-    : getSelfDefenseTarget(
-        state,
-        Boolean(executionIntent) || state.autoModeEnabled,
-      );
+  if (executionIntent?.source === "player") return state;
+  const current = getCurrentExecutionEnemyTarget(state);
+  const selfDefenseTarget = current && isAutomaticCombatTarget(state, current)
+    ? getCommittedPartyThreatTarget(state, { currentTarget: current, range: 3 }) : getAutoRouteEmergencyTarget(state);
 
   if (!selfDefenseTarget) {
     return state;
@@ -134,13 +165,7 @@ function assignCompanionsToSelfDefense(
       continue;
     }
 
-    nextState = updateEntity(nextState, {
-      ...companion,
-      state: "attack",
-      currentTargetId: target.id,
-      commandPriority:
-        hasDirectCompanionAuthority(nextState, companion) ? "direct" : "autonomous",
-    });
+    nextState = applyTargetCommitment(nextState, companion, selectTargetCommitment(nextState, companion, { preferredTarget: target }));
   }
 
   return nextState;
@@ -158,25 +183,6 @@ function getDeadCompanion(state: GameState): Companion | null {
       (entity): entity is Companion => isDeadCompanion(entity),
     ) ?? null
   );
-}
-
-function getSelfDefenseTarget(
-  state: GameState,
-  hasManagerExecutionIntent: boolean,
-): Enemy | null {
-  const blockedTarget = getBlockedMovementEnemyTarget(state);
-
-  if (blockedTarget) {
-    return blockedTarget;
-  }
-
-  const stuckTarget = getStuckNearEnemyTarget(state);
-
-  if (stuckTarget) {
-    return stuckTarget;
-  }
-
-  return hasManagerExecutionIntent ? getCloseActiveThreatTarget(state) : null;
 }
 
 function getAutoRouteEmergencyTarget(state: GameState): Enemy | null {
@@ -334,13 +340,6 @@ function hasActiveStatusType(
       status.type === type &&
       status.expiresAt > nowMs,
   );
-}
-
-function getCloseActiveThreatTarget(state: GameState): Enemy | null {
-  return getCommittedPartyThreatTarget(state, {
-    currentTarget: getCurrentExecutionEnemyTarget(state),
-    range: SELF_DEFENSE_THREAT_RADIUS,
-  });
 }
 
 function getCurrentExecutionEnemyTarget(state: GameState): Enemy | null {
