@@ -25,12 +25,13 @@ import {
   getLeaderEnemyTarget,
   getLeaderMovementDirection,
   getPartyExecutionIntentPosition,
+  isDefenderAttackTargetRelevant,
 } from "./roleSystem";
 import {
   getActiveQuestGuide,
   QUEST_GUIDE_ENEMY_PAUSE_RANGE,
 } from "./questGuideSystem";
-import { getCommittedPartyThreatTarget } from "./partyThreatSystem";
+import { applyTargetCommitment, selectTargetCommitment } from "./targetCommitment";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import { isWithinAttackReach } from "./spatialGeometry";
@@ -93,9 +94,12 @@ export function updateDefendSystem(
           preferredDefendPosition,
         )
       : null;
-    const target = leader
-      ? getDefenderTarget(nextState, defender)
-      : undefined;
+    const targetDecision = leader ? selectTargetCommitment(nextState, defender, {
+      preferredTarget: getLeaderEnemyTarget(nextState), range: DEFENDER_THREAT_SEARCH_RADIUS,
+      isEligible: enemy => isRelevantGuideEscortThreat(nextState, enemy) && isDefenderAttackTargetRelevant(nextState, defender, enemy),
+    }) : null;
+    if (targetDecision) nextState = applyTargetCommitment(nextState, defender, targetDecision, "defend");
+    const target = targetDecision?.target ?? undefined;
     const shouldWaitForIntercept =
       target &&
       leader &&
@@ -323,38 +327,6 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
       (currentEntity.position.x !== entity.position.x ||
         currentEntity.position.y !== entity.position.y),
   );
-}
-
-function getDefenderTarget(
-  state: GameState,
-  defender: Companion,
-): Enemy | undefined {
-  const leaderTarget = getLeaderEnemyTarget(state);
-
-  if (leaderTarget && isRelevantGuideEscortThreat(state, leaderTarget)) {
-    return leaderTarget;
-  }
-
-  const activeThreatTarget = getCommittedPartyThreatTarget(state, {
-    currentTarget: leaderTarget ?? getCurrentDefenderEnemyTarget(state, defender),
-    includeDirectPersonalAttackers: true,
-    range: DEFENDER_THREAT_SEARCH_RADIUS,
-  });
-
-  return activeThreatTarget && isRelevantGuideEscortThreat(state, activeThreatTarget)
-    ? activeThreatTarget
-    : undefined;
-}
-
-function getCurrentDefenderEnemyTarget(
-  state: GameState,
-  defender: Companion,
-): Enemy | null {
-  const target = defender.currentTargetId
-    ? state.entities[defender.currentTargetId]
-    : undefined;
-
-  return target?.kind === "enemy" ? target : null;
 }
 
 function isRelevantGuideEscortThreat(

@@ -46,6 +46,7 @@ import { updatePartyFormationSystem } from "./partyFormationSystem";
 import {
   updatePartyIntentRecoverySystem,
   updatePartyIntentSelfDefenseSystem,
+  updateFinalizedTargetApproaches,
 } from "./partyIntentSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
@@ -97,6 +98,7 @@ import { beginNormalMovementPhase } from "./movementAuthority";
 import { endNormalMovementPhase, flushNormalMovementPhase } from "./movementPlanning";
 import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
+import { hasLocalTargetCommitment, pruneTargetCommitmentState } from "./targetCommitment";
 
 export function updateGame(
   state: GameState,
@@ -113,6 +115,7 @@ export function updateGame(
     timing.nowMs,
   );
   const movedEntityIds = new Set<string>();
+  nextState = pruneTargetCommitmentState(nextState);
   for (const movement of Object.values(nextState.forcedMovementsByEntityId ?? {}))
     if (movement.pendingFinalization) nextState = cancelForcedMovement(nextState, movement.targetId);
   for (const dash of Object.values(nextState.enemyDashesByEnemyId ?? {}))
@@ -278,6 +281,7 @@ export function updateGame(
     attackSlotPathDistanceCache,
   );
   nextState = flushNormalMovementPhase(nextState, movedEntityIds);
+  nextState = updateFinalizedTargetApproaches(nextState);
   nextState = updateCombatProjectileSystem(
     nextState,
     timing.nowMs,
@@ -349,6 +353,7 @@ function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
     if (
       nextState.resurrectionChannelsByHelperId?.[member.id] ||
       hasDirectCompanionAuthority(nextState, member) || canFollowDirectLeader(nextState, member) ||
+      hasLocalTargetCommitment(nextState, member) ||
       member.state === "idle" ||
       member.state === "dead" ||
       isPartyMemberBusyGatheringResource(nextState, member) ||

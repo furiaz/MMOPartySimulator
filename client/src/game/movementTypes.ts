@@ -104,6 +104,7 @@ export type NormalMovementSubmission = {
 };
 
 export type NormalMovementResult = {
+  blockingEnemyIds?: string[];
   request: NormalMovementRequest;
   outcome: NormalMovementOutcome;
   reason: string;

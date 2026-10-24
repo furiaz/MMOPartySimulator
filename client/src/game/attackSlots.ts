@@ -1,6 +1,8 @@
 import {
   getBoundedPathDistance,
+  findNearestReachablePosition,
   isCombatPositionAvailable,
+  isWallPosition,
   previewMoveTowardPosition,
 } from "./movementPlanning";
 import type { GameState } from "./state";
@@ -40,6 +42,7 @@ type AttackSlotOptions = {
 };
 
 export type AttackSlotPathDistanceCache = Map<string, number>;
+export type AttackEngagementProbe = { reachable: boolean | null; position?: Position };
 export type AttackSlotPartySpacingMode = NonNullable<
   AttackSlotOptions["partySpacingMode"]
 >;
@@ -113,6 +116,12 @@ export function chooseAttackSlot(
     }
   }
 
+  const observation = state.targetApproachesByEntityId?.[attacker.id];
+  const observedPosition = observation?.targetId === target.id ? observation.engagementPosition : undefined;
+  const observedIsValid = observedPosition && isValidCombatPosition(state, attacker, target, attackReach, observedPosition, options) &&
+    isReachableCombatPosition(state, attacker, observedPosition, options, pathDistanceCache);
+  if (observedIsValid && (partySpacingMode === "off" || isCombatPositionSpacedFromParty(state, attacker, observedPosition))) return observedPosition;
+
   if (partySpacingMode === "required") {
     return null;
   }
@@ -137,7 +146,43 @@ export function chooseAttackSlot(
     }
   }
 
+  if (observedIsValid) return observedPosition;
+
   return null;
+}
+
+/** A failed slot sample is not proof that the continuous engagement area is unreachable. */
+export function probeAttackEngagement(
+  state: GameState, attacker: CombatEntity, target: GameEntity, attackReach: number,
+): AttackEngagementProbe {
+  if (!state.map || isWallPosition(state, attacker.position)) return { reachable: null };
+  const options = { allowPartyPassThrough: true, maxPathDistance: state.map.columns * state.map.rows * 2 };
+  const slot = chooseAttackSlot(state, attacker, target, attackReach, options);
+  if (slot) return { reachable: true, position: slot };
+  const center = getCombatTargetPosition(attacker.position, target);
+  const range = getEffectiveAttackRange(attacker, target, attackReach);
+  let reachedEnvelope = false;
+  let position: Position | undefined;
+  findNearestReachablePosition(state, attacker, node => {
+    const distance = getEuclideanDistance(node, center);
+    // Include adjacent goal cells: navigation permits a blocked final node.
+    // Reaching this conservative envelope makes an unsuccessful sample unknown.
+    if (distance > range + 2) return false;
+    reachedEnvelope = true;
+    if (distance > range + Math.SQRT1_2) return false;
+    for (const y of [0, -0.2, 0.2, -0.4, 0.4]) {
+      for (const x of [0, -0.2, 0.2, -0.4, 0.4]) {
+        const candidate = { x: node.x + x, y: node.y + y };
+        if (isValidCombatPosition(state, attacker, target, attackReach, candidate, options)) {
+          position = candidate;
+          return true;
+        }
+      }
+    }
+    return false;
+  }, options);
+  if (position) return { reachable: true, position };
+  return { reachable: reachedEnvelope ? null : false };
 }
 
 export function getAttackSlotPathDistanceCacheKey(

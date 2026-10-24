@@ -15,6 +15,7 @@ export function clearFrameMovementPlanning(state: GameState): GameState {
       overlapRecoveryByEntityId: Object.fromEntries(recovery.filter(([id]) => isLiving(id))),
     };
   const hasFramePlanning =
+    Boolean(state.companionTargetTransitions?.length) ||
     Boolean(state.normalMovementPhase) ||
     Object.keys(state.movementPositionCommitsByEntityId ?? {}).length > 0 ||
     Object.keys(state.normalMovementResultsByEntityId ?? {}).length > 0 ||
@@ -54,6 +55,7 @@ export function clearFrameMovementPlanning(state: GameState): GameState {
 
   return {
     ...state,
+    companionTargetTransitions: [],
     normalMovementResultsByEntityId: {},
     movementPositionCommitsByEntityId: {},
     normalMovementPhase: undefined,

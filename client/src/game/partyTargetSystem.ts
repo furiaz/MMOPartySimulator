@@ -11,6 +11,7 @@ import {
 import type { Enemy, Position } from "./types";
 import { isLivingHostileTarget, getCombatTargetPosition } from "./combatStructures";
 import type { CombatStructure } from "./types";
+import { clearTargetCommitmentsForTarget } from "./targetCommitment";
 
 const DEFAULT_SUPPRESSION_TIME_MS = 0;
 
@@ -125,7 +126,7 @@ export function clearEnemyFromPartyTargeting(
     });
   }
 
-  return nextState;
+  return clearTargetCommitmentsForTarget(nextState, enemyId);
 }
 
 export function clearExpiredAutonomousTargetSuppressions(

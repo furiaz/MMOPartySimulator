@@ -12,6 +12,9 @@ import {
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import { getPartyCombatTarget } from "./partyTargetSystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
+import { applyTargetCommitment, canReacquireCombatTarget, isPrivateResponseTarget, selectTargetCommitment } from "./targetCommitment";
+import { getPartyExecutionIntent } from "./partyIntentState";
+import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import {
   getEntityById,
   updateEntity,
@@ -100,7 +103,7 @@ export function updateAttackSystem(
   let nextState = state;
 
   for (const entity of getCombatMovementOrder(state)) {
-    const attacker = getEntityById(nextState, entity.id);
+    let attacker = getEntityById(nextState, entity.id);
 
     if (
       !attacker ||
@@ -116,6 +119,18 @@ export function updateAttackSystem(
     if (command?.type === "move") continue;
     if (command?.type === "gather" && (!attacker.currentTargetId ||
       !isDirectGatherPersonalThreat(nextState, attacker.id, nextState.entities[attacker.currentTargetId]))) continue;
+    if (attacker.kind === "companion" && !hasDirectCompanionAuthority(nextState, attacker) &&
+      getPartyExecutionIntent(nextState)?.source !== "player" &&
+      nextState.entities[attacker.currentTargetId ?? ""]?.kind !== "structure") {
+      const actor = attacker;
+      const assist = findPartyAssistTarget(nextState, actor);
+      nextState = applyTargetCommitment(nextState, actor, selectTargetCommitment(nextState, actor, {
+        preferredTarget: assist?.kind === "enemy" ? assist : null,
+        isEligible: enemy => isDefenderAttackTargetRelevant(nextState, actor, enemy),
+      }));
+      attacker = nextState.entities[actor.id];
+      if (!isAttackingCombatEntity(attacker)) continue;
+    }
     const target = getValidTarget(nextState, attacker);
 
     if (!target) {
@@ -496,7 +511,7 @@ function findPartyAssistTarget(
   attacker: Companion,
 ): CombatEntity | undefined {
   const partyTarget = getPartyCombatTarget(state);
-  for (const member of getPartyMembers(state)) {
+  for (const member of getPartyMembers(state).sort((a, b) => a.id.localeCompare(b.id))) {
     if (
       member.id === attacker.id ||
       member.state !== "attack" ||
@@ -511,6 +526,7 @@ function findPartyAssistTarget(
       isLiveCombatTarget(target) &&
       getDistance(attacker.position, target.position) <= TARGET_SWITCH_DISTANCE
     ) {
+      if (target.kind === "enemy" && (!canReacquireCombatTarget(state, attacker, target) || isPrivateResponseTarget(state, target.id))) continue;
       // A private order is not shared focus. Existing party/threat authority can
       // still make that same target eligible independently.
       if (hasDirectCompanionAuthority(state, member) &&

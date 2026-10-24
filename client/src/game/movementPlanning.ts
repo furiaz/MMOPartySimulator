@@ -205,6 +205,7 @@ function commitNormalMovement(
   const plan = planNormalMovement(state, entity, target, options, request);
   let { pathState } = plan;
   let moveResolution = plan.resolution;
+  let blockingEnemyIds: string[] | undefined;
   if (!moveResolution?.swapWithEntityId) {
     const preferred = moveResolution?.position ?? moveEntityToward(entity, target, getMovementDeltaMs(state, entity, options)).position;
     const slotTarget = options.combatSlot && state.entities[options.combatSlot.targetId];
@@ -220,11 +221,12 @@ function commitNormalMovement(
           (request.mode !== "step" || isCombatPositionAvailable(state, entity, position, options)) &&
           (!options.isPositionAllowed || options.isPositionAllowed(position)),
       });
+    blockingEnemyIds = avoidance.blockingEnemyIds;
     if (avoidance.crowded && !avoidance.position) {
       // Speculative path changes are discarded. Waiting is not evidence that
       // the target/path is unreachable, and cannot authorize a second request.
       return finishNormalMovement(markMovementDecision(state, entity.id, "crowd_wait"),
-        request, "held", entity.position, entity.position, "crowd_wait");
+        request, "held", entity.position, entity.position, "crowd_wait", blockingEnemyIds);
     }
     if (avoidance.crowded && avoidance.position) {
       moveResolution = { ...moveResolution, position: avoidance.position, reason: "avoidance" };
@@ -395,14 +397,14 @@ function commitNormalMovement(
 
   const guarded = guardWarmasterWalkingDeparture(reservedState, entity, moveResolution.position);
   if (guarded?.warmasterInteraction?.departure) return guarded;
-  return markMoveSucceeded(
+  return finishNormalMovement(markMoveSucceeded(
     commitNormalMovementPosition(
       guarded ?? reservedState,
       moveEntityTo(entity, moveResolution.position),
     ),
     entity.id,
     entity.position,
-  );
+  ), request, "moved", entity.position, moveResolution.position, moveResolution.reason, blockingEnemyIds);
 }
 
 export function moveEntityTowardPositionIfUnoccupied<T extends GameEntity>(
