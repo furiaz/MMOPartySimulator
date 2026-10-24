@@ -1,4 +1,5 @@
 import { canFollowDirectLeader, hasDirectCompanionAuthority, getDirectLeaderCommand } from "./directCommandState";
+import { isTravelFormationMember, prepareTravelFormation } from "./travelFormation";
 import { updateAttackSystem } from "./attackSystem";
 import { updateBarracks, initializeBarracks } from "./barracks";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
@@ -313,6 +314,7 @@ function runGameUpdate(state: GameState, timing: SimulationTiming): GameState {
   );
   if (deferDirectLeaderFollow) nextState = updateFollowSystem(nextState, movedEntityIds);
   nextState = endNormalMovementPhase(nextState, movedEntityIds);
+  nextState = prepareTravelFormation(nextState);
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateMartialPassiveRuntime(
@@ -361,6 +363,7 @@ function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
       nextState.resurrectionChannelsByHelperId?.[member.id] ||
       hasDirectCompanionAuthority(nextState, member) || canFollowDirectLeader(nextState, member) ||
       hasLocalTargetCommitment(nextState, member) ||
+      isTravelFormationMember(nextState, member) ||
       member.state === "idle" ||
       member.state === "dead" ||
       isPartyMemberBusyGatheringResource(nextState, member) ||

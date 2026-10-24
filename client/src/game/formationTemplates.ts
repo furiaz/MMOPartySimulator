@@ -50,6 +50,7 @@ export function transformFormationSlots(
   leader: Pick<Companion, "id" | "position" | "health" | "state"> | undefined,
   facing: Position,
   origin = leader?.position,
+  lateralScale = 1,
 ): Record<string, Position> {
   if (!leader || leader.id !== assignments.leaderId || leader.state === "dead" ||
     leader.health <= 0 || !origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return {};
@@ -65,7 +66,7 @@ export function transformFormationSlots(
   for (const member of assignments.members) {
     const slot = template.slots.find(candidate => candidate.id === assignments.slotsByEntityId[member.id]);
     if (!slot) continue;
-    const side = slot.side - leaderSlot.side;
+    const side = (slot.side - leaderSlot.side) * lateralScale;
     const ahead = slot.forward - leaderSlot.forward;
     positions[member.id] = {
       x: origin.x + forward.x * ahead + right.x * side,

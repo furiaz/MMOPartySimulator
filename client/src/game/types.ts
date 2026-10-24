@@ -3057,6 +3057,31 @@ export type FormationAssignments = {
   leaderId: string;
   members: FormationMemberInput[];
   slotsByEntityId: Record<string, string>;
+  travel?: TravelFormationRuntime;
+};
+
+export type TravelFormationGoal = {
+  position: Position;
+  /** The slot/trail target, even when the only safe action is a hold. */
+  expectedPosition: Position;
+  mode: "normal" | "compressed" | "substitute" | "trailing" | "held";
+  settled: boolean;
+  clearSinceMs?: number;
+};
+
+export type TravelFormationRuntime = {
+  leaderId: string;
+  facing: Position;
+  lateralScale: number;
+  trailing: boolean;
+  trail: Position[];
+  trailOrder: string[];
+  lastLeaderPosition: Position;
+  frameKey?: string;
+  clearSinceMs?: number;
+  cohesion: "normal" | "slow" | "wait";
+  goalsByEntityId: Record<string, TravelFormationGoal>;
+  proposedGoalsByEntityId?: Record<string, TravelFormationGoal>;
 };
 
 export type FormationDepartureReason =

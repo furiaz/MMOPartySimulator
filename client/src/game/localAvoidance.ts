@@ -64,7 +64,10 @@ export function planLocalAvoidance(
   const reservationOverlaps = (position: Position, item: typeof reserved[number]) => item.specialized
     ? doCollisionBodiesOverlap(actor, position, item.entity, item.position, 0.05)
     : areEntitiesOverlapping(actor, item.entity, position, item.position);
-  if (neighbors.length === 0 && reservations.length === 0) return { position: preferred, crowded: false };
+  // Formation walking adds full-body terrain constraints to ordinary navigation.
+  // Reuse the same bounded steering when its preferred step violates those constraints.
+  const formationStepBlocked = Boolean(request.travelFormationGoal && !options.canUse(preferred));
+  if (neighbors.length === 0 && reservations.length === 0 && !formationStepBlocked) return { position: preferred, crowded: false };
 
   const settling = distance(actor.position, request.destination) <= stepDistance + Math.max(0.25, request.acceptableRadius) + SPATIAL_EPSILON;
   const needsStandingClearance = (position: Position) => settling || Boolean(options.isSettlingPosition?.(position));
@@ -113,7 +116,7 @@ export function planLocalAvoidance(
     const weight = Math.max(0.05, getEntityOverlapDepth(actor, other, lookAhead));
     pressure = { x: pressure.x + direction.x * weight, y: pressure.y + direction.y * weight };
   }
-  const physicallyBlocked = !bodyClear(preferred, true) || reserved.some(item => reservationOverlaps(preferred, item)) ||
+  const physicallyBlocked = formationStepBlocked || !bodyClear(preferred, true) || reserved.some(item => reservationOverlaps(preferred, item)) ||
     (needsStandingClearance(preferred) && standingPartyReservations.some(item => reservationOverlaps(preferred, item)));
   if (!physicallyBlocked && Math.hypot(pressure.x, pressure.y) < 0.03) return { position: preferred, crowded: false };
   const preferredClear = candidateClear(preferred, false);

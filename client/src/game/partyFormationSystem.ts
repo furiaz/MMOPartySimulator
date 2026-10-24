@@ -1,4 +1,5 @@
 import { hasDirectCompanionAuthority } from "./directCommandState";
+import { isTravelFormationMember, moveTravelFormationMember, updateTravelFormationCohesion } from "./travelFormation";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
@@ -130,7 +131,9 @@ export function updatePartyFormationSystem(
     nextState = markSmallObjectiveHoldMembers(nextState, movedEntityIds);
   } else {
     const handoffActive = isLeaderHandoffActive(nextState, leader);
-    const travelCohesion = getPartyTravelCohesion(nextState, leader);
+    const adaptiveCohesion = updateTravelFormationCohesion(nextState);
+    if (adaptiveCohesion) nextState = adaptiveCohesion.state;
+    const travelCohesion = adaptiveCohesion ?? getPartyTravelCohesion(nextState, leader);
 
     if (travelCohesion.canMoveLeader || handoffActive) {
       nextState = moveLeaderTowardPoi(
@@ -140,6 +143,9 @@ export function updatePartyFormationSystem(
         movedEntityIds,
         handoffActive ? 1 : travelCohesion.leaderSpeedMultiplier,
       );
+    } else if (adaptiveCohesion) {
+      nextState = holdEntityMovement(nextState, leader, "partyTravel", "formation cohesion wait");
+      nextState = flushNormalMovementForEntity(nextState, leader.id);
     }
 
     nextState = moveFollowersTowardLeader(
@@ -568,6 +574,12 @@ function moveFollowersTowardLeader(
         nextState = holdEntityMovement(nextState, currentMember, "partyTravel", "escort hold");
         continue;
       }
+    }
+
+    if (isTravelFormationMember(nextState, currentMember)) {
+      nextState = moveTravelFormationMember(nextState, currentMember, "partyTravel");
+      if (didEntityMove(nextState, currentMember)) movedEntityIds.add(currentMember.id);
+      continue;
     }
 
     if (

@@ -109,6 +109,12 @@ export function assignFormationSlots(
   return {
     preset, spacing, leaderId, members,
     slotsByEntityId: Object.fromEntries(members.map((member, i) => [member.id, template.slots[best!.indices[i]].id])),
+    travel: previous?.travel ? { ...previous.travel,
+      goalsByEntityId: Object.fromEntries(Object.entries(previous.travel.goalsByEntityId).filter(([id]) => members.some(member => member.id === id))),
+      proposedGoalsByEntityId: undefined,
+      trailOrder: previous.travel.trailOrder.filter(id => members.some(member => member.id === id)),
+      frameKey: undefined,
+    } : undefined,
   };
 }
 

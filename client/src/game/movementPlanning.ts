@@ -105,8 +105,8 @@ export function moveEntityToPositionIfUnoccupied(
   return resolveNormalMovement(state, createNormalMovementRequest(state, entity, position, options, "step"), options).state;
 }
 
-export function holdEntityMovement(state: GameState, entity: GameEntity, source: NormalMovementSource, reason: string): GameState {
-  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, entity.position, { source, sourceReason: reason }, "hold")).state;
+export function holdEntityMovement(state: GameState, entity: GameEntity, source: NormalMovementSource, reason: string, travelFormationGoal?: MovementOptions["travelFormationGoal"]): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, entity.position, { source, sourceReason: reason, travelFormationGoal }, "hold")).state;
 }
 
 export function resolveNormalMovement(
@@ -225,8 +225,9 @@ function commitNormalMovement(
     if (avoidance.crowded && !avoidance.position) {
       // Speculative path changes are discarded. Waiting is not evidence that
       // the target/path is unreachable, and cannot authorize a second request.
-      return finishNormalMovement(markMovementDecision(state, entity.id, "crowd_wait"),
-        request, "held", entity.position, entity.position, "crowd_wait", blockingEnemyIds);
+      const constrained = request.travelFormationGoal && options.isPositionAllowed && !options.isPositionAllowed(preferred);
+      return finishNormalMovement(constrained ? state : markMovementDecision(state, entity.id, "crowd_wait"),
+        request, "held", entity.position, entity.position, constrained ? "constraint" : "crowd_wait", blockingEnemyIds);
     }
     if (avoidance.crowded && avoidance.position) {
       moveResolution = { ...moveResolution, position: avoidance.position, reason: "avoidance" };
@@ -330,7 +331,7 @@ function commitNormalMovement(
     );
     const partner = state.entities[moveResolution.swapWithEntityId];
     return isSamePosition(partner.position, swapped.entities[partner.id].position) ? swapped
-      : finishNormalMovement(swapped, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source }), "moved",
+      : finishNormalMovement(swapped, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source, travelFormationGoal: undefined }), "moved",
         partner.position, swapped.entities[partner.id].position, "swap");
   }
 
