@@ -1,4 +1,5 @@
-import { hasDirectCompanionAuthority } from "./directCommandState";
+import { getDirectLeaderCommand, hasDirectCompanionAuthority } from "./directCommandState";
+import { isTravelFormationMember, moveTravelFormationMember } from "./travelFormation";
 import {
   updateEntity,
   type GameState,
@@ -193,6 +194,17 @@ export function updateDefendSystem(
         ...syncedDefender,
         currentTargetId: null,
       });
+    }
+
+    const standbyDefender = nextState.entities[defender.id];
+    if (standbyDefender.kind === "companion" && isTravelFormationMember(nextState, standbyDefender)) {
+      const leaderCommand = getDirectLeaderCommand(nextState);
+      // Attack/gather approach commits later; the late follow phase consumes its actual origin.
+      if (leaderCommand?.type !== "attack" && leaderCommand?.type !== "gather") {
+        nextState = moveTravelFormationMember(nextState, standbyDefender, "defend");
+        if (didEntityMove(nextState, standbyDefender)) movedEntityIds.add(defender.id);
+      }
+      continue;
     }
 
     if (

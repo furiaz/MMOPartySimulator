@@ -3978,11 +3978,11 @@ describe("game update intent priority", () => {
     );
   });
 
-  it("keeps a Gatherer-role follower still at settled follow spacing when the leader is idle", () => {
+  it("keeps a Gatherer-role follower still in its settled formation slot when the leader is idle", () => {
     const leader = createLeader({ x: 10, y: 10 });
     const settledFollowPosition = {
-      x: leader.position.x - 0.9,
-      y: leader.position.y + 0.45,
+      x: leader.position.x,
+      y: leader.position.y + 2.5,
     };
     const gatherer = {
       ...createCompanion(

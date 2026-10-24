@@ -470,9 +470,9 @@ function getEntitySnapshot(
     movementPositionCommitCount: positionCommit ? 1 : 0,
     movementTransactionId: positionCommit?.transactionId,
     formationPhase: nextState.partyFormation?.phase,
-    formationSlot: nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
+    formationSlot: normalMovement?.request.travelFormationGoal?.position ?? nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
     formationSlotReason:
-      nextState.partyFormation?.slotReasonsByEntityId[entity.id],
+      normalMovement?.request.travelFormationGoal ? normalMovement.request.reason : nextState.partyFormation?.slotReasonsByEntityId[entity.id],
     targetDistance: movementFailure?.targetDistance,
     intendedPosition: movementFailure?.intendedPosition,
     blockerId: movementFailure?.blockerId,

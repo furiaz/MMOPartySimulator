@@ -55,6 +55,22 @@ function publications() {
 }
 
 describe("pre-commit local avoidance", () => {
+  it.each([false, true])("only formation walking steers a terrain-constrained preferred step without nearby bodies (%s)", formation => {
+    const { actor, state } = fixture();
+    const destination = { x: 15, y: 5 }, preferred = { x: 5.8, y: 5 };
+    const request = createNormalMovementRequest(state, actor, destination, formation ? {
+      travelFormationGoal: { position: destination, expectedPosition: destination, mode: "normal", settled: false },
+    } : {});
+    const result = planLocalAvoidance(state, actor, request, preferred, 0.8, {
+      canUse: position => position.y < 4.9, ignoresBody: () => false, canTransit: () => false,
+    });
+    if (formation) {
+      expect(result.position).not.toBeNull();
+      expect(result.position!.y).toBeLessThan(4.9);
+      expect(result.crowded).toBe(true);
+    } else expect(result).toEqual({ position: preferred, crowded: false });
+    expect(state.reservedPositionsByEntityId).toBeUndefined();
+  });
   it("accumulates every nearby body with deterministic neighbor/candidate ties", () => {
     const first = createEnemy("first", { x: 7, y: 5 }, "passive", { combatBodyRadius: 0.7 });
     const second = createEnemy("second", { x: 5.8, y: 7.2 }, "passive", { combatBodyRadius: 0.7 });

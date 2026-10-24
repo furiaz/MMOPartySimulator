@@ -1,4 +1,5 @@
 import { hasDirectCompanionAuthority, getDirectLeaderCommand, canFollowDirectLeader } from "./directCommandState";
+import { isTravelFormationMember, moveTravelFormationMember } from "./travelFormation";
 import { isAutonomousEntity } from "./entities";
 import {
   getEntityById,
@@ -32,6 +33,13 @@ export function updateFollowSystem(
 
   for (const entity of Object.values(state.entities)) {
     const follower = getEntityById(nextState, entity.id);
+
+    if (follower?.kind === "companion" && isTravelFormationMember(nextState, follower) && !movedEntityIds.has(follower.id)) {
+      const before = follower.position;
+      nextState = moveTravelFormationMember(nextState, follower);
+      if (!arePositionsEqual(before, nextState.entities[follower.id].position)) movedEntityIds.add(follower.id);
+      continue;
+    }
 
     if (
       !leader ||

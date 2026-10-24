@@ -68,7 +68,7 @@ export function createNormalMovementRequest(
   return { entityId: actor.id, source, priority, reason: options.sourceReason ?? source, mode,
     destination: { ...destination }, acceptableRadius: options.acceptableRadius ?? 0,
     pathProfile: options.pathProfile, pathTargetKey: options.pathTargetKey, pathTargetPosition: options.pathTargetPosition,
-    combatSlot: options.combatSlot,
+    combatSlot: options.combatSlot, travelFormationGoal: options.travelFormationGoal,
     allowPartyPassThrough: options.allowPartyPassThrough, speedMultiplier: options.speedMultiplier };
 }
 
@@ -106,6 +106,12 @@ export function finishNormalMovement(
   const result = { request, outcome, reason, from, to, blockingEnemyIds: blockingEnemyIds ?? getNormalMovementResult(state, request.entityId)?.blockingEnemyIds,
     positionCommitCount: outcome === "moved" ? 1 : 0,
     frameNumber: state.simulationFrame ?? state.simulationTick ?? 0, timeMs: state.simulationTimeMs ?? 0 };
+  if (request.travelFormationGoal && state.formationAssignments?.travel) {
+    const assignments = state.formationAssignments, travel = assignments.travel!;
+    state = { ...state, formationAssignments: { ...assignments, travel: { ...travel,
+      goalsByEntityId: { ...travel.goalsByEntityId, [request.entityId]: request.travelFormationGoal },
+    } } };
+  }
   return observeTargetApproach({ ...state, normalMovementResultsByEntityId: { ...state.normalMovementResultsByEntityId,
     [request.entityId]: result } }, result);
 }

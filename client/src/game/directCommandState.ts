@@ -34,6 +34,10 @@ export function clearDirectCommandPlanning(state: GameState, companionId: string
     return next;
   };
   return { ...state,
+    formationAssignments: state.formationAssignments?.travel ? { ...state.formationAssignments,
+      travel: { ...state.formationAssignments.travel, goalsByEntityId: withoutActor(state.formationAssignments.travel.goalsByEntityId)!,
+        proposedGoalsByEntityId: withoutActor(state.formationAssignments.travel.proposedGoalsByEntityId) },
+    } : state.formationAssignments,
     targetCommitmentsByEntityId: withoutActor(state.targetCommitmentsByEntityId),
     targetApproachesByEntityId: withoutActor(state.targetApproachesByEntityId),
     targetEngagementProbeAtMsByEntityId: withoutActor(state.targetEngagementProbeAtMsByEntityId),
