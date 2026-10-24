@@ -99,6 +99,7 @@ import { endNormalMovementPhase, flushNormalMovementPhase } from "./movementPlan
 import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import { hasLocalTargetCommitment, pruneTargetCommitmentState } from "./targetCommitment";
+import { reconcileFormationAssignments } from "./formationAssignments";
 
 export function updateGame(
   state: GameState,
@@ -110,6 +111,12 @@ export function updateGame(
     return recordDebugTelemetryTick(state, state, timing);
   }
 
+  // Observe complete player edits once at the simulation boundary, not between
+  // the setters of an order swap. Final reconciliation also covers early returns.
+  return reconcileFormationAssignments(runGameUpdate(reconcileFormationAssignments(state), timing));
+}
+
+function runGameUpdate(state: GameState, timing: SimulationTiming): GameState {
   let nextState = clearExpiredCombatFeedback(
     clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
     timing.nowMs,

@@ -3,6 +3,7 @@ import { initializeBarracks } from "./barracks";
 import { reconcileWarmasterLifecycle } from "./warmasterLifecycle";
 import type { PartyFormationState } from "./types";
 import { pruneTargetCommitmentState } from "./targetCommitment";
+import { reconcileFormationAssignments } from "./formationAssignments";
 
 function createIdlePartyFormation(): PartyFormationState {
   return {
@@ -19,6 +20,7 @@ function createIdlePartyFormation(): PartyFormationState {
 export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
+    formationAssignments: undefined,
     targetCommitmentsByEntityId: {},
     targetApproachesByEntityId: {},
     targetEngagementProbeAtMsByEntityId: {},
@@ -115,6 +117,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   state = pruneTargetCommitmentState(state);
+  if (state.formationAssignments) state = reconcileFormationAssignments(state);
   const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
   state = { ...state,
     localAvoidanceByEntityId: Object.fromEntries(Object.entries(state.localAvoidanceByEntityId ?? {}).filter(([id]) => living(id))),

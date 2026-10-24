@@ -158,8 +158,10 @@ export function updateWarmasterLifecycle(state: GameState, now: number): GameSta
   }
   if (next.warmasterInteraction?.rescueSpeechStartedAt !== undefined && now >= next.warmasterInteraction.rescueSpeechStartedAt + 5000) next = { ...next, warmasterInteraction: { ...next.warmasterInteraction, rescueSpeechStartedAt: undefined } };
   if (!hasPendingWarmasterChest(next) && canCloseGate(next)) {
+    const partyDeparted = lifecycle.phase === "defeated";
     lifecycle = { ...lifecycle, phase: lifecycle.recharge >= WARMASTER_RECHARGE_KILLS ? "reset_pending" : "recharging" };
-    next = updateGateCollision({ ...next, warmasterLifecycle: lifecycle });
+    next = updateGateCollision({ ...next, warmasterLifecycle: lifecycle,
+      ...(partyDeparted ? { formationAssignments: undefined } : {}) });
     if (lifecycle.phase === "reset_pending" && arenaBarracks.every(definition => !isBarrackFootprintOccupied(next, definition))) {
       const entities = { ...next.entities };
       const barracksById = { ...next.barracksById };
@@ -215,7 +217,7 @@ export function closeWarmasterChest(state: GameState): GameState {
 export function answerWarmasterDeparture(state: GameState, leave: boolean): GameState {
   if (!state.warmasterInteraction?.departure) return state;
   const next = { ...state, warmasterInteraction: { ...state.warmasterInteraction, departure: undefined, departureAcknowledged: leave ? true as const : undefined } };
-  if (leave) return next;
+  if (leave) return { ...next, formationAssignments: undefined };
   let canceled: GameState = next;
   for (const command of Object.values(canceled.directCompanionCommandsById ?? {}))
     canceled = finishDirectCompanionCommand(canceled, command, canceled.simulationTimeMs ?? 0, "direct_command_canceled", "encounter_departure");

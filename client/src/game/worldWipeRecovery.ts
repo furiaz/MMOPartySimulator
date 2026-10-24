@@ -128,6 +128,7 @@ export function updateWorldWipeRecovery(
   if (choices.length > 1) {
     return {
       ...state,
+      formationAssignments: undefined,
       worldWipeRecovery: {
         status: "pending_choice",
         wipeId,

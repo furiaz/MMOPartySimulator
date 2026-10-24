@@ -40,6 +40,7 @@ import type {
   PartyWallet,
   RestingCompanionsById,
   PartyFormationState,
+  FormationAssignments,
   PartyBank,
   PartyMemberRole,
   Position,
@@ -277,6 +278,7 @@ export type GameState = {
   defenderWaitMsByLeaderId?: Record<string, number>;
   defenderBlockedMsByEntityId?: Record<string, number>;
   partyFormation?: PartyFormationState;
+  formationAssignments?: FormationAssignments;
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles?: ActiveCombatProjectile[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
