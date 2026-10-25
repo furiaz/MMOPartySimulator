@@ -21,6 +21,7 @@ export const TRAVEL_FORMATION = {
   settle: 0.35, resume: 0.6, catchUpDistance: 4, maxSpeed: 1.8,
   slowEnter: 4, slowExit: 3, waitEnter: 7, waitExit: 5, slowSpeed: 0.45,
   clearanceMs: 500, expansionPerSecond: 0.5, trailLength: 32, trailPoints: 256,
+  recoveryCandidates: 32,
 } as const;
 const distance = (a: Position, b: Position) => Math.hypot(a.x - b.x, a.y - b.y);
 const frameKey = (state: GameState) => `${state.simulationFrame ?? state.simulationTick ?? 0}:${state.simulationTimeMs ?? 0}`;
@@ -127,8 +128,9 @@ function slotPositions(state: GameState, runtime: TravelFormationRuntime, scale 
   return transformFormationSlots(state.formationAssignments!, leaderOf(state), runtime.facing, leaderOf(state)!.position, scale, runtime.rowScale ?? 1);
 }
 
-function alternatives(position: Position, radius: number): Position[] {
-  return [position, ...Array.from({ length: 8 }, (_, i) => ({ x: position.x + Math.cos(i * Math.PI / 4) * radius, y: position.y + Math.sin(i * Math.PI / 4) * radius }))];
+function alternatives(position: Position, radius: number, directions = 8): Position[] {
+  return [position, ...Array.from({ length: directions }, (_, i) => ({ x: position.x + Math.cos(i * 2 * Math.PI / directions) * radius,
+    y: position.y + Math.sin(i * 2 * Math.PI / directions) * radius }))];
 }
 
 /** Pure hard fit: passing living bodies are handled by avoidance, not compression. */
@@ -193,12 +195,18 @@ function getCombatRecoveryStep(state: GameState): number {
 }
 
 function expectedPosition(state: GameState, runtime: TravelFormationRuntime, actor: Companion): Position {
-  if (runtime.trailing) {
-    const behind = (runtime.trailOrder.indexOf(actor.id) + 1) * state.formationAssignments!.spacing;
-    const sample = sampleTravelTrail(runtime.trail, behind);
-    if (sample) return sample;
-  }
+  if (runtime.trailing || runtime.goalsByEntityId[actor.id]?.recovery?.resolved) return trailingPosition(state, runtime, actor);
   return slotPositions(state, runtime)[actor.id];
+}
+
+function trailingPosition(state: GameState, runtime: TravelFormationRuntime, actor: Companion): Position {
+  const behind = (runtime.trailOrder.indexOf(actor.id) + 1) * state.formationAssignments!.spacing;
+  // This is a proposed region, not invented committed trail history.
+  const leader = leaderOf(state)!;
+  return sampleTravelTrail(runtime.trail, behind) ?? {
+    x: leader.position.x - runtime.facing.x * behind,
+    y: leader.position.y - runtime.facing.y * behind,
+  };
 }
 
 /** Cohesion reads ideal slot/trail geometry, never a held or obstructed substitute. */
@@ -216,26 +224,59 @@ function standingGoal(state: GameState, actor: Companion, position: Position): b
 }
 
 function chooseGoal(state: GameState, actor: Companion, runtime: TravelFormationRuntime, proposed: Record<string, Position>): TravelFormationGoal {
-  const expected = expectedPosition(state, runtime, actor), old = runtime.goalsByEntityId[actor.id], now = state.simulationTimeMs ?? 0;
+  const nominal = runtime.trailing ? trailingPosition(state, runtime, actor) : slotPositions(state, runtime)[actor.id];
+  const old = runtime.goalsByEntityId[actor.id], now = state.simulationTimeMs ?? 0;
   const radius = state.formationAssignments!.spacing / 2;
   const insufficientTrail = runtime.trailing && !sampleTravelTrail(runtime.trail, (runtime.trailOrder.indexOf(actor.id) + 1) * state.formationAssignments!.spacing);
   let position: Position | undefined;
   let clearSinceMs: number | undefined;
   const available = (candidate: Position) => standingGoal(state, actor, candidate) && !Object.entries(proposed).some(([id, other]) =>
     id !== actor.id && doCollisionBodiesOverlap(actor, candidate, state.entities[id], other, 0.05));
-  if (old?.mode === "substitute" && available(old.position) && distance(old.position, expected) <= radius + 0.001) {
-    clearSinceMs = available(expected) ? old.clearSinceMs ?? now : undefined;
+  const search = state.formationPathSearchesByEntityId?.[actor.id];
+  const failedApproach = Boolean(old && search?.failed && search.requestKey?.includes(`formation:${runtime.leaderId}:${state.formationAssignments!.slotsByEntityId[actor.id]}:`) &&
+    (!old.recovery || search.requestKey.includes(":recovery:")));
+  const normal = alternatives(nominal, radius).find(available);
+  if (old?.recovery) clearSinceMs = normal && !failedApproach ? old.clearSinceMs ?? now : undefined;
+  const anchor = trailingPosition(state, runtime, actor);
+  const recoveryNeedsProgress = old?.recovery?.resolved && (distance(old.recovery.anchorPosition, anchor) >= 1 ||
+    distance(actor.position, old.position) > TRAVEL_FORMATION.resume);
+  if (old?.recovery && normal && !insufficientTrail && !recoveryNeedsProgress && clearSinceMs !== undefined && now - clearSinceMs >= TRAVEL_FORMATION.clearanceMs) {
+    // Geometry alone cannot prove a rejoin: the clear slot may be across a wall.
+    // Validate its approach in the same winning request and shared search budget.
+    return { position: normal, expectedPosition: nominal, mode: runtime.trailing ? "trailing" : runtime.lateralScale < 1 ? "compressed" : "normal",
+      settled: false, clearSinceMs, recovery: { reason: old.recovery.reason, anchorPosition: nominal,
+        candidates: alternatives(nominal, radius).filter(available), resolved: false, rejoining: true } };
+  }
+  const recovering = insufficientTrail || !normal || failedApproach || Boolean(old?.recovery &&
+    (recoveryNeedsProgress || clearSinceMs === undefined || now - clearSinceMs < TRAVEL_FORMATION.clearanceMs));
+  if (recovering) {
+    const retained = old?.recovery?.resolved && !failedApproach && available(old.position) &&
+      distance(old.recovery.anchorPosition, anchor) < 1 ? old.position : undefined;
+    const candidates: Position[] = [];
+    for (const candidate of retained ? [retained] : [...alternatives(anchor, radius, 16), ...alternatives(nominal, radius, 16),
+      ...alternatives(anchor, radius * 2, 16), ...alternatives(nominal, radius * 2, 16)]) {
+      if (candidate && available(candidate) && !candidates.some(other => distance(candidate, other) < 0.001)) candidates.push(candidate);
+      if (candidates.length === TRAVEL_FORMATION.recoveryCandidates) break;
+    }
+    const selected = retained ?? candidates[0];
+    const resolved = Boolean(retained);
+    return { position: selected ?? actor.position, expectedPosition: resolved || runtime.trailing ? anchor : nominal,
+      mode: selected ? "trailing" : "held", settled: resolved && distance(actor.position, selected!) <= (old?.settled ? TRAVEL_FORMATION.resume : TRAVEL_FORMATION.settle),
+      clearSinceMs, recovery: { reason: insufficientTrail ? "short_trail" : failedApproach ? "path_failed" : "blocked_slot",
+        anchorPosition: retained ? old!.recovery!.anchorPosition : anchor, candidates, resolved } };
+  }
+  if (old?.mode === "substitute" && available(old.position) && distance(old.position, nominal) <= radius + 0.001) {
+    clearSinceMs = available(nominal) ? old.clearSinceMs ?? now : undefined;
     if (clearSinceMs === undefined || now - clearSinceMs < TRAVEL_FORMATION.clearanceMs) position = old.position;
   }
-  const approach = insufficientTrail ? runtime.trail[0] : expected;
-  if (!position) position = alternatives(approach, radius).find(available);
+  position ??= normal;
   const held = !position;
   position ??= actor.position;
-  const mode = held ? "held" : runtime.trailing ? "trailing" : distance(position, expected) > 0.01 ? "substitute" : runtime.lateralScale < 1 ? "compressed" : "normal";
+  const mode = held ? "held" : runtime.trailing ? "trailing" : distance(position, nominal) > 0.01 ? "substitute" : runtime.lateralScale < 1 ? "compressed" : "normal";
   // Reuse the selected request's existing bounded path planning; no candidate launches a search.
   const error = distance(actor.position, position);
-  const settled = mode === "held" || (old?.settled ? error <= TRAVEL_FORMATION.resume : error <= TRAVEL_FORMATION.settle);
-  return { position, expectedPosition: expected, mode, settled, clearSinceMs };
+  const settled = !held && (old?.settled ? error <= TRAVEL_FORMATION.resume : error <= TRAVEL_FORMATION.settle);
+  return { position, expectedPosition: nominal, mode, settled, clearSinceMs };
 }
 
 /** Shared geometry proposals, never collision reservations or accepted movement results. */
@@ -259,14 +300,14 @@ export function moveTravelFormationMember(state: GameState, actor: Companion, so
   const runtime = next.formationAssignments!.travel!;
   const goal = runtime.proposedGoalsByEntityId?.[actor.id];
   if (!goal) return state;
-  const reason = `formation ${next.formationAssignments?.combat?.mode === "recovering" ? "recovering " : ""}${goal.mode}`;
+  const reason = `formation ${next.formationAssignments?.combat?.mode === "recovering" ? "recovering " : ""}${goal.mode}${goal.recovery ? ` recovery ${goal.recovery.reason}` : ""}`;
   const settlingWithoutTravel = !getPartyExecutionIntent(next) && !getDirectLeaderCommand(next);
-  if (goal.settled) next = holdEntityMovement(next, actor, source, reason, goal);
+  if (goal.settled || goal.mode === "held") next = holdEntityMovement(next, actor, source, reason, goal);
   else next = moveEntityTowardPositionIfUnoccupied(next, actor, goal.position, {
     source, sourceReason: reason, allowPartyPassThrough: true, pathProfile: "follow",
     travelFormationGoal: goal,
-    pathTargetKey: `formation:${runtime.leaderId}:${next.formationAssignments!.slotsByEntityId[actor.id]}:${runtime.trailing ? "trail" : "shape"}`,
-    pathTargetPosition: goal.position, acceptableRadius: TRAVEL_FORMATION.settle,
+    pathTargetKey: `formation:${runtime.leaderId}:${next.formationAssignments!.slotsByEntityId[actor.id]}:${goal.recovery && !goal.recovery.rejoining ? "recovery" : runtime.trailing ? "trail" : "shape"}`,
+    pathTargetPosition: goal.recovery?.anchorPosition ?? goal.position, acceptableRadius: TRAVEL_FORMATION.settle,
     speedMultiplier: 1 + (TRAVEL_FORMATION.maxSpeed - 1) * Math.max(0, Math.min(1, (distance(actor.position, goal.position) - TRAVEL_FORMATION.resume) / (TRAVEL_FORMATION.catchUpDistance - TRAVEL_FORMATION.resume))),
     isSettlingPosition: position => settlingWithoutTravel || distance(position, goal.position) <= TRAVEL_FORMATION.resume,
     isPositionAllowed: position => isSpecializedMovementPathAvailable(next, actor, actor.position, position),

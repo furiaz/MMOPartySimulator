@@ -31,6 +31,8 @@ Entries are prepared before deployment and ship with the live release, so this d
 - Replaced repeated late pushing with local avoidance and bounded overlap recovery, reducing crowd jitter while preserving walls, resources, structures, movement bounds, and reservations.
 - Aligned melee approach, Defender positioning, attack slots, and collision spacing around continuous body-aware geometry. Diagonal approaches, large or growing enemies, and broad structure edges now use consistent reach and standing-clearance checks.
 - Blocked formation followers now hold and retry bounded path searches instead of repeatedly stepping sideways against hard obstacles. Preset changes receive fresh substitute-clearance timing, and Debug inspection avoids showing stale goals when the leader or execution context becomes unavailable.
+- Companions now find safe temporary trailing positions when obstacles block their formation slots, reducing rear-member stalls and narrow-passage deadlocks before enough leader movement history exists.
+- Recovery paths refresh when terrain or respawned resources block an accepted route. Companions keep their assigned slots and return smoothly once clearance improves.
 - Preserved skill costs/effects and command resumption when movement must wait, including dash interruption, safe landings, Shield Shockwave completion timing, and safe Barracks rebuilding.
 
 ### Known Issues

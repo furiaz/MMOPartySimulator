@@ -33,6 +33,7 @@ export function getFormationDiagnostics(state: GameState) {
       return { entityId: actor.id, slotId: slot?.id, lane: slot?.lane, depth: slot?.depth,
         expectedPosition, acceptedPosition: goal?.position,
         mode: goal?.mode ?? (departures.length ? "departed" : "unavailable"),
+        recoveryReason: travelMember ? result?.request.travelFormationGoal?.recovery?.reason : undefined,
         movementOwner: getSpecializedMovementOwner(state, actor.id)?.source ??
           (commit?.source === "normal" ? result?.request.source : commit?.source) ?? result?.request.source,
         departureReasons: departures,

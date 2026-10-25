@@ -10,6 +10,7 @@ import { hasStructureLineOfSight } from "./combatStructures";
 import { commitNormalMovementPosition, createNormalMovementRequest, finishNormalMovement, getMovementRequestRejection, getNormalMovementResult, selectNormalMovementRequest } from "./movementAuthority";
 import { rememberAttackSlot } from "./attackSlots";
 import {
+  bakeNavigationGrid,
   findNavigationPath,
   findNearestReachableNavigationPosition,
   getNavigationDistance,
@@ -32,6 +33,7 @@ import {
   type NavigationPathMetricBucket,
 } from "./performanceMetrics";
 import {
+  arePositionsEqual,
   getEuclideanDistance,
   getGridDistance,
   getManhattanDistance,
@@ -39,7 +41,7 @@ import {
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { isMovementBlockedByStatus } from "./statusEffects";
 import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
-import { isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
+import { isSpecializedMovementPathAvailable, isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
 import {
   areEntitiesOverlapping,
   doesBodyOverlapBounds,
@@ -190,6 +192,21 @@ export function endNormalMovementPhase(state: GameState, movedEntityIds = new Se
 
 function resolveSelectedNormalMovement(state: GameState, request: NormalMovementRequest, options: MovementOptions, target: GameEntity): { state: GameState; outcome: NormalMovementOutcome } {
   const actor = state.entities[request.entityId];
+  options = { ...options, travelFormationGoal: request.travelFormationGoal, combatFormationGoal: request.combatFormationGoal };
+  if (request.travelFormationGoal?.recovery && !request.travelFormationGoal.recovery.resolved && request.mode !== "hold") {
+    const recovery = resolveTravelRecovery(state, actor, request, options, target);
+    state = recovery.state;
+    if (!recovery.request) {
+      const previous = state.formationAssignments?.travel?.goalsByEntityId[actor.id];
+      const goal = request.travelFormationGoal.recovery?.rejoining && previous?.recovery?.resolved
+        ? previous : { ...request.travelFormationGoal, mode: "held" as const, settled: false };
+      request = { ...request, travelFormationGoal: goal };
+      return { state: finishNormalMovement(state, request, "held", actor.position, actor.position, "constraint"), outcome: "held" };
+    }
+    request = recovery.request;
+    options = recovery.options;
+    target = createPositionTarget(request.destination);
+  }
   if (request.mode === "hold" || getEuclideanDistance(actor.position, request.destination) <= request.acceptableRadius) {
     const observedState = publishFormationSearch(state, actor.id, formationSearchContext(state, actor, target, options));
     return { state: finishNormalMovement(observedState, request, "held", actor.position), outcome: "held" };
@@ -202,6 +219,39 @@ function resolveSelectedNormalMovement(state: GameState, request: NormalMovement
     : getNormalMovementResult(next, actor.id)?.outcome ?? (next.failedMoveByEntityId?.[actor.id] ? "blocked" : "held");
   return { state: finishNormalMovement(next, request, outcome, actor.position, next.entities[actor.id].position,
     getNormalMovementResult(next, actor.id)?.reason ?? outcome), outcome };
+}
+
+/** Only the winning request may resolve alternatives or publish their selected endpoint. */
+function resolveTravelRecovery(state: GameState, actor: GameEntity, request: NormalMovementRequest, options: MovementOptions, target: GameEntity) {
+  const goal = request.travelFormationGoal!, recovery = goal.recovery!;
+  const search = formationSearchContext(state, actor, target, options);
+  let path = getCompatibleMovementPath(state, actor, target, options);
+  if (!path?.resolvedGoalPosition || !recovery.candidates.some(candidate => arePositionsEqual(candidate, path!.resolvedGoalPosition!)) ||
+    !isRecoveryGoalAvailable(state, actor, path.resolvedGoalPosition, options)) path = null;
+  // A continuous corridor may fit between navigation-node centers. Prefer a
+  // fully swept direct route before asking the internal grid for a detour.
+  if (!path) {
+    const direct = recovery.candidates.find(position => isRecoveryGoalAvailable(state, actor, position, options) &&
+      isSpecializedMovementPathAvailable(state, actor, actor.position, position));
+    if (direct) {
+      path = { targetKey: getMovementPathTargetKey(state, actor, target, options), profile: getMovementPathProfile(options),
+        targetPosition: getMovementPathTargetPosition(target, options), lastRequestedAtMs: state.simulationTimeMs ?? 0,
+        resolvedGoalPosition: direct, waypoints: [direct] };
+      if (search?.record) search.record = { ...search.record, failed: false, temporaryBlockers: undefined };
+    }
+  }
+  if (!path || shouldRefreshMovementPath(state, path, options)) path = getFreshMovementPath(state, actor, target, options, search) ?? path;
+  state = publishFormationSearch(state, actor.id, search);
+  if (!path?.resolvedGoalPosition) return { state, request: undefined, options };
+  const position = path.resolvedGoalPosition;
+  const accepted = { ...goal, position, expectedPosition: recovery.anchorPosition,
+    settled: getEuclideanDistance(actor.position, position) <= request.acceptableRadius,
+    mode: recovery.rejoining && getEuclideanDistance(position, goal.expectedPosition) > 0.01 ? "substitute" as const : goal.mode,
+    recovery: recovery.rejoining ? undefined : { ...recovery, resolved: true } };
+  return { state: setMovementPath(state, actor.id, path),
+    request: { ...request, destination: position, travelFormationGoal: accepted },
+    options: { ...options, travelFormationGoal: accepted,
+      isSettlingPosition: (point: Position) => getEuclideanDistance(point, position) <= 0.6 } };
 }
 
 /** Candidate planning is speculative; no entity position is changed here. */
@@ -835,12 +885,19 @@ function prepareMovementPath(
       waypoints: currentWaypoints,
     };
 
-    if (shouldRefreshMovementPath(state, prunedPath, options)) {
+    // A cached recovery endpoint may stay clear after its route changes.
+    // Check the upcoming walking step rather than sweeping a long route every frame.
+    const blockedRecoverySegment = options.travelFormationGoal?.recovery &&
+      !isSpecializedMovementPathAvailable(state, entity, entity.position, moveEntityToward(
+        entity, createPositionTarget(currentWaypoints[0]), getMovementDeltaMs(state, entity, options),
+      ).position);
+    if (blockedRecoverySegment || shouldRefreshMovementPath(state, prunedPath, options)) {
       const refreshedPath = getFreshMovementPath(state, entity, target, options, search);
 
       if (refreshedPath && refreshedPath.waypoints.length > 0) {
         return setMovementPath(state, entity.id, refreshedPath);
       }
+      if (blockedRecoverySegment) return clearMovementPath(state, entity.id);
     }
 
     return setMovementPath(state, entity.id, {
@@ -930,6 +987,13 @@ function isFormationWaypointAvailable(state: GameState, entity: GameEntity, posi
     other.state !== "dead" && areEntitiesOverlapping(entity, other, position));
 }
 
+function isRecoveryGoalAvailable(state: GameState, entity: GameEntity, position: Position, options: MovementOptions): boolean {
+  // The producer separates proposed destinations. Scoped party transit may
+  // approach a peer's departing position; avoidance still requires standing
+  // clearance before arriving, so an ordering cycle need not freeze everyone.
+  return isCombatPositionAvailable(state, entity, position, options) && isSpecializedMovementPositionAvailable(state, entity, position);
+}
+
 function getFreshMovementPath(
   state: GameState,
   entity: GameEntity,
@@ -947,8 +1011,29 @@ function getFreshMovementPath(
 
   const formationGoal = options.travelFormationGoal || options.combatFormationGoal;
   const now = state.simulationTimeMs ?? 0;
+  const recovery = options.travelFormationGoal?.recovery;
+  const recoveryCandidates = recovery ? recovery.resolved ? [options.travelFormationGoal!.position] : recovery.candidates : undefined;
+  const recoveryGoals = recoveryCandidates?.flatMap(position => {
+    if (!isRecoveryGoalAvailable(state, entity, position, options)) return [];
+    return [toNavigationNode(position), ...getNavigationNeighborPositions(toNavigationNode(position))]
+      .filter(node => isMoveDestinationAvailable(state, entity, node, options) &&
+        isSpecializedMovementPositionAvailable(state, entity, node) &&
+        isSpecializedMovementPathAvailable(state, entity, node, position))
+      .map(node => ({ node, position }));
+  });
+  // Navigation returns no path when start and goal round to the same node.
+  // A body-safe final segment still reaches the requested continuous endpoint.
+  const localGoal = recoveryGoals?.find(goal => arePositionsEqual(goal.node, toNavigationNode(entity.position)) &&
+    isSpecializedMovementPathAvailable(state, entity, entity.position, goal.position));
+  if (localGoal) {
+    if (search?.record) search.record = { ...search.record, failed: false, temporaryBlockers: undefined };
+    return { targetKey: getMovementPathTargetKey(state, entity, target, options), profile: getMovementPathProfile(options),
+      targetPosition: getMovementPathTargetPosition(target, options), lastRequestedAtMs: now,
+      resolvedGoalPosition: localGoal.position, waypoints: [localGoal.position] };
+  }
   if (formationGoal && search?.record && now - search.record.lastQueryAtMs < FORMATION_PATH_QUERY_INTERVAL_MS) return null;
-  const goals = getPathGoals(state, entity, target, options).flatMap((goal) => {
+  const goals = recoveryGoals ? recoveryGoals.map(goal => goal.node).filter(node => !arePositionsEqual(node, toNavigationNode(entity.position)))
+    : getPathGoals(state, entity, target, options).flatMap((goal) => {
     if (!formationGoal || isFormationWaypointAvailable(state, entity, toNavigationNode(goal), options)) return [goal];
     // Navigation exempts its goal nodes from isBlocked. Keep those nodes body-safe too.
     return getNavigationNeighborPositions(toNavigationNode(goal)).filter((position) =>
@@ -958,6 +1043,7 @@ function getFreshMovementPath(
   });
 
   if (goals.length === 0) {
+    if (recoveryGoals && search) search.record = { requestKey: getMovementPathTargetKey(state, entity, target, options), lastQueryAtMs: now, failed: true };
     return null;
   }
 
@@ -965,7 +1051,8 @@ function getFreshMovementPath(
   let temporaryBlockers = false;
 
   recordNavigationPathQuery(getNavigationPathMetricBucket(options.pathProfile));
-  const waypoints = findNavigationPath(state.map, entity.position, goals, {
+  const navigationMap = recoveryGoals && !state.map.navigationGrid ? { ...state.map, navigationGrid: bakeNavigationGrid(state.map) } : state.map;
+  const waypoints = findNavigationPath(navigationMap, entity.position, goals, {
     isBlocked: (position) => {
       const blocked = isNavigationPositionBlocked(
         state,
@@ -989,12 +1076,16 @@ function getFreshMovementPath(
     return null;
   }
 
+  const resolvedGoalPosition = recoveryGoals?.find(goal => arePositionsEqual(goal.node, waypoints[waypoints.length - 1]))?.position;
+  if (resolvedGoalPosition && !arePositionsEqual(waypoints[waypoints.length - 1], resolvedGoalPosition)) waypoints.push(resolvedGoalPosition);
+
   return {
     blockedCount: 0,
     lastRequestedAtMs: state.simulationTimeMs ?? 0,
     profile: getMovementPathProfile(options),
     targetKey: getMovementPathTargetKey(state, entity, target, options),
     targetPosition: getMovementPathTargetPosition(target, options),
+    resolvedGoalPosition,
     waypoints,
   };
 }

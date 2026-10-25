@@ -3085,7 +3085,7 @@ export type FormationAssignments = {
   };
 };
 
-export type CombatFormationGoal = Omit<TravelFormationGoal, "mode"> & {
+export type CombatFormationGoal = Omit<TravelFormationGoal, "mode" | "recovery"> & {
   mode: "expanded" | "compressed" | "substitute" | "held";
 };
 
@@ -3109,6 +3109,14 @@ export type TravelFormationGoal = {
   mode: "normal" | "compressed" | "substitute" | "trailing" | "held";
   settled: boolean;
   clearSinceMs?: number;
+  /** Proposed candidates become an accepted endpoint only in the movement resolver. */
+  recovery?: {
+    reason: "blocked_slot" | "path_failed" | "short_trail";
+    anchorPosition: Position;
+    candidates: Position[];
+    resolved: boolean;
+    rejoining?: boolean;
+  };
 };
 
 export type TravelFormationRuntime = {
