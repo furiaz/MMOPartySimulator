@@ -51,6 +51,8 @@ import type {
   LivestockPlacementRotation,
 } from "./game";
 import { ImportSaveButton } from "./ImportSaveButton";
+import { getFormationSelectionOptions, getSelectedFormationPreset } from "./game/formationSelection";
+import type { FormationPresetId } from "./game/types";
 
 export type GuildSecondaryPartyRedeemSummaryState = GuildSecondaryPartyRedeemSummary;
 
@@ -91,6 +93,7 @@ export function GameMenu({
   onAllocateStatPoint,
   onChangeLeader,
   onChangeRole,
+  onSelectFormationPreset,
   onChangeConsumableBehavior,
   onChangeSkillBehavior,
   onEquipEquipment,
@@ -187,6 +190,7 @@ export function GameMenu({
   onAllocateStatPoint: (companionId: string, statId: PrimaryStatId) => void;
   onChangeLeader: (companionId: string) => void;
   onChangeRole: (companionId: string, role: PartyMemberRole) => void;
+  onSelectFormationPreset: (preset: FormationPresetId) => void;
   onChangeConsumableBehavior: (
     companionId: string,
     update: Partial<Companion["consumableBehavior"]>,
@@ -365,6 +369,9 @@ export function GameMenu({
                 />
               ) : activeTab === "partyManagement" ? (
                 <PartyManagementPanel
+                  formationOptions={getFormationSelectionOptions(members.length)}
+                  selectedFormationPreset={getSelectedFormationPreset(gameState)}
+                  onSelectFormationPreset={onSelectFormationPreset}
                   activeSection={activeManagementSection}
                   currentTime={currentTime}
                   leaderId={leaderId}

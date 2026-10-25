@@ -7,6 +7,9 @@ const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
 
 export function clearFrameMovementPlanning(state: GameState): GameState {
   const isLiving = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
+  if (Object.keys(state.formationPathSearchesByEntityId ?? {}).some(id => !isLiving(id))) state = { ...state,
+    formationPathSearchesByEntityId: Object.fromEntries(Object.entries(state.formationPathSearchesByEntityId ?? {}).filter(([id]) => isLiving(id))),
+  };
   const avoidance = Object.entries(state.localAvoidanceByEntityId ?? {});
   const recovery = Object.entries(state.overlapRecoveryByEntityId ?? {});
   if (avoidance.some(([id, entry]) => !isLiving(id) || (state.simulationTimeMs ?? 0) - entry.lastActiveAtMs > 750) ||

@@ -39,6 +39,7 @@ import {
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { isMovementBlockedByStatus } from "./statusEffects";
 import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
+import { isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
 import {
   areEntitiesOverlapping,
   doesBodyOverlapBounds,
@@ -78,6 +79,7 @@ import type {
   NormalMovementOutcome,
   NormalMovementSource,
   NormalMovementSubmission,
+  FormationPathSearch,
   WalkablePositionOptions,
 } from "./movementTypes";
 
@@ -87,8 +89,23 @@ const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
 const COMBAT_PATH_REFRESH_MS = 500;
 const FOLLOW_PATH_REFRESH_MS = 500;
+const FORMATION_PATH_QUERY_INTERVAL_MS = 500;
 const MOVEMENT_PATH_BLOCKED_REFRESH_COUNT = 2;
 const MEANINGFUL_TARGET_MOVE_DISTANCE = 1;
+
+type FormationSearchContext = { record?: FormationPathSearch };
+
+function formationSearchContext(state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions): FormationSearchContext | undefined {
+  if (!options.travelFormationGoal && !options.combatFormationGoal) return undefined;
+  const previous = state.formationPathSearchesByEntityId?.[entity.id];
+  const requestKey = getMovementPathTargetKey(state, entity, target, options);
+  return { record: previous && (previous.requestKey === requestKey ? previous : { ...previous, requestKey, failed: false, temporaryBlockers: undefined }) };
+}
+
+function publishFormationSearch(state: GameState, entityId: string, search: FormationSearchContext | undefined): GameState {
+  return search?.record && search.record !== state.formationPathSearchesByEntityId?.[entityId]
+    ? { ...state, formationPathSearchesByEntityId: { ...state.formationPathSearchesByEntityId, [entityId]: search.record } } : state;
+}
 
 export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   state: GameState,
@@ -174,7 +191,8 @@ export function endNormalMovementPhase(state: GameState, movedEntityIds = new Se
 function resolveSelectedNormalMovement(state: GameState, request: NormalMovementRequest, options: MovementOptions, target: GameEntity): { state: GameState; outcome: NormalMovementOutcome } {
   const actor = state.entities[request.entityId];
   if (request.mode === "hold" || getEuclideanDistance(actor.position, request.destination) <= request.acceptableRadius) {
-    return { state: finishNormalMovement(state, request, "held", actor.position), outcome: "held" };
+    const observedState = publishFormationSearch(state, actor.id, formationSearchContext(state, actor, target, options));
+    return { state: finishNormalMovement(observedState, request, "held", actor.position), outcome: "held" };
   }
   const selectedOptions = { ...options, pathProfile: request.pathProfile, pathTargetKey: request.pathTargetKey,
     pathTargetPosition: request.pathTargetPosition, combatSlot: request.combatSlot,
@@ -188,11 +206,15 @@ function resolveSelectedNormalMovement(state: GameState, request: NormalMovement
 
 /** Candidate planning is speculative; no entity position is changed here. */
 function planNormalMovement(state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions, request: NormalMovementRequest) {
-  const pathState = request.mode === "step" ? state : prepareMovementPath(state, entity, target, options);
+  const formation = Boolean(options.travelFormationGoal || options.combatFormationGoal);
+  const search = formationSearchContext(state, entity, target, options);
+  const preparedState = request.mode === "step" ? state : prepareMovementPath(state, entity, target, options, search);
   const resolution: MoveResolution | null = request.mode === "step"
     ? { position: request.destination, reason: "direct_step" }
-    : getNextMoveResolution(pathState, entity, target, options, { allowFreshPath: true });
-  return { pathState, resolution };
+    : getNextMoveResolution(preparedState, entity, target, options, { allowFreshPath: true, search });
+  const directStep = moveEntityToward(entity, target, getMovementDeltaMs(state, entity, options)).position;
+  return { pathState: publishFormationSearch(preparedState, entity.id, search), resolution, search,
+    hardFormationHold: formation && !resolution && !search?.record?.temporaryBlockers && Boolean(options.isPositionAllowed && !options.isPositionAllowed(directStep)) };
 }
 
 function commitNormalMovement(
@@ -203,6 +225,10 @@ function commitNormalMovement(
   }
 
   const plan = planNormalMovement(state, entity, target, options, request);
+  // A failed hard-terrain search is a bounded wait, not an invitation to orbit.
+  const observedState = publishFormationSearch(state, entity.id, plan.search);
+  state = observedState;
+  if (plan.hardFormationHold) return finishNormalMovement(observedState, request, "held", entity.position, entity.position, "constraint");
   let { pathState } = plan;
   let moveResolution = plan.resolution;
   let blockingEnemyIds: string[] | undefined;
@@ -226,7 +252,7 @@ function commitNormalMovement(
       // Speculative path changes are discarded. Waiting is not evidence that
       // the target/path is unreachable, and cannot authorize a second request.
       const constrained = (request.travelFormationGoal || request.combatFormationGoal) && options.isPositionAllowed && !options.isPositionAllowed(preferred);
-      return finishNormalMovement(constrained ? state : markMovementDecision(state, entity.id, "crowd_wait"),
+      return finishNormalMovement(constrained ? observedState : markMovementDecision(observedState, entity.id, "crowd_wait"),
         request, "held", entity.position, entity.position, constrained ? "constraint" : "crowd_wait", blockingEnemyIds);
     }
     if (avoidance.crowded && avoidance.position) {
@@ -241,7 +267,7 @@ function commitNormalMovement(
     return markMoveFailed(state, entity.id);
   if (moveResolution && options.isPositionAllowed && !options.isPositionAllowed(moveResolution.position)) {
     const outcome = options.rejectedPositionOutcome ?? "blocked";
-    return finishNormalMovement(outcome === "blocked" ? markMoveFailed(state, entity.id) : state,
+    return finishNormalMovement(outcome === "blocked" ? markMoveFailed(observedState, entity.id) : observedState,
       request, outcome, entity.position, entity.position, "constraint");
   }
   if (moveResolution?.swapWithEntityId) {
@@ -714,17 +740,21 @@ function getNextMoveResolution(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions = {},
-  planningOptions: { allowFreshPath?: boolean } = {},
+  planningOptions: { allowFreshPath?: boolean; search?: FormationSearchContext } = {},
 ): MoveResolution | null {
   const cachedPath = getCompatibleMovementPath(state, entity, target, options);
+  const formation = Boolean(options.travelFormationGoal || options.combatFormationGoal);
+  const waypoint = cachedPath && pruneReachedWaypoints(cachedPath.waypoints, entity.position)[0];
+  const usablePath = !formation || (waypoint && isSpecializedMovementPositionAvailable(state, entity, waypoint));
 
   if (cachedPath && pruneReachedWaypoints(cachedPath.waypoints, entity.position).length > 0) {
-    return getPathMoveResolution(state, entity, target, options);
+    const cached = getPathMoveResolution(state, entity, target, options);
+    if (usablePath) return cached;
   }
 
   const pathMoveResolution = getPathMoveResolution(state, entity, target, options);
 
-  if (pathMoveResolution) {
+  if (pathMoveResolution && usablePath) {
     return pathMoveResolution;
   }
 
@@ -738,7 +768,9 @@ function getNextMoveResolution(
     return null;
   }
 
-  if (isMoveDestinationAvailable(state, entity, movedEntity.position, options)) {
+  if (isMoveDestinationAvailable(state, entity, movedEntity.position, options) &&
+    (!formation || (isFormationWaypointAvailable(state, entity, movedEntity.position, options) &&
+      (!options.isPositionAllowed || options.isPositionAllowed(movedEntity.position))))) {
     return { position: movedEntity.position, reason: "direct_step" };
   }
 
@@ -748,12 +780,15 @@ function getNextMoveResolution(
       entity,
       target,
       options,
+      planningOptions.search,
     );
 
     if (freshPathResolution) {
       return freshPathResolution;
     }
   }
+
+  if (formation && !planningOptions.search?.record?.temporaryBlockers && options.isPositionAllowed && !options.isPositionAllowed(movedEntity.position)) return null;
 
   const swapWithEntity = getSwapCandidate(
     state,
@@ -777,6 +812,7 @@ function prepareMovementPath(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
+  search?: FormationSearchContext,
 ): GameState {
   if (!state.map) {
     return clearMovementPath(state, entity.id);
@@ -800,7 +836,7 @@ function prepareMovementPath(
     };
 
     if (shouldRefreshMovementPath(state, prunedPath, options)) {
-      const refreshedPath = getFreshMovementPath(state, entity, target, options);
+      const refreshedPath = getFreshMovementPath(state, entity, target, options, search);
 
       if (refreshedPath && refreshedPath.waypoints.length > 0) {
         return setMovementPath(state, entity.id, refreshedPath);
@@ -858,8 +894,9 @@ function getFreshPathMoveResolution(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
+  search?: FormationSearchContext,
 ): MoveResolution | null {
-  const movementPath = getFreshMovementPath(state, entity, target, options);
+  const movementPath = getFreshMovementPath(state, entity, target, options, search);
   const waypoint = movementPath?.waypoints[0];
 
   if (!movementPath || !waypoint) {
@@ -886,11 +923,19 @@ function getFreshPathMoveResolution(
   };
 }
 
+function isFormationWaypointAvailable(state: GameState, entity: GameEntity, position: Position, options: MovementOptions): boolean {
+  if (!isSpecializedMovementPositionAvailable(state, entity, position)) return false;
+  if (!options.isSettlingPosition?.(position)) return true;
+  return !Object.values(state.entities).some(other => other.id !== entity.id && other.kind === "companion" &&
+    other.state !== "dead" && areEntitiesOverlapping(entity, other, position));
+}
+
 function getFreshMovementPath(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
+  search?: FormationSearchContext,
 ): MovementPath | null {
   if (!state.map) {
     return null;
@@ -900,25 +945,45 @@ function getFreshMovementPath(
     return null;
   }
 
-  const goals = getPathGoals(state, entity, target, options);
+  const formationGoal = options.travelFormationGoal || options.combatFormationGoal;
+  const now = state.simulationTimeMs ?? 0;
+  if (formationGoal && search?.record && now - search.record.lastQueryAtMs < FORMATION_PATH_QUERY_INTERVAL_MS) return null;
+  const goals = getPathGoals(state, entity, target, options).flatMap((goal) => {
+    if (!formationGoal || isFormationWaypointAvailable(state, entity, toNavigationNode(goal), options)) return [goal];
+    // Navigation exempts its goal nodes from isBlocked. Keep those nodes body-safe too.
+    return getNavigationNeighborPositions(toNavigationNode(goal)).filter((position) =>
+      isMoveDestinationAvailable(state, entity, position, options) &&
+      isFormationWaypointAvailable(state, entity, position, options),
+    );
+  });
 
   if (goals.length === 0) {
     return null;
   }
 
   const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
+  let temporaryBlockers = false;
 
   recordNavigationPathQuery(getNavigationPathMetricBucket(options.pathProfile));
   const waypoints = findNavigationPath(state.map, entity.position, goals, {
-    isBlocked: (position) =>
-      isNavigationPositionBlocked(
+    isBlocked: (position) => {
+      const blocked = isNavigationPositionBlocked(
         state,
         position,
         entity.id,
         options,
         blockerLookup,
-      ),
+      );
+      const formationBlocked = Boolean(formationGoal && !isFormationWaypointAvailable(state, entity, position, options));
+      // A body-limited search must retain local steering rather than become a
+      // hard-terrain hold. This is not evidence about any combat target.
+      if (formationGoal && (blocked || formationBlocked) && isSpecializedMovementPositionAvailable(state, entity, position)) temporaryBlockers = true;
+      return blocked || formationBlocked;
+    },
   });
+
+  if (search) search.record = { requestKey: getMovementPathTargetKey(state, entity, target, options), lastQueryAtMs: now, failed: waypoints.length === 0,
+    ...(temporaryBlockers ? { temporaryBlockers: true } : {}) };
 
   if (waypoints.length === 0) {
     return null;
@@ -940,12 +1005,13 @@ function getMovementPathTargetKey(
   target: GameEntity,
   options: MovementOptions,
 ): string {
-  return [
+  const key = [
     getMovementPathProfile(options),
     target.id,
     options.pathTargetKey ?? getNavigationPositionKey(target.position),
     options.allowPartyPassThrough ? "party-pass" : "solid-party",
   ].join(":");
+  return options.travelFormationGoal || options.combatFormationGoal ? `${key}:formation-body` : key;
 }
 
 function getMovementPathProfile(options: MovementOptions): MovementPathProfile {

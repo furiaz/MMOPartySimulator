@@ -1,4 +1,5 @@
 import { restoreBarracks } from "./barracks";
+import { getSelectedFormationPreset } from "./formationSelection";
 import { reconcileWarmasterLifecycle, sanitizeWarmasterLifecycle } from "./warmasterLifecycle";
 import { restoreOrcWarcampLayout } from "./orcWarcampRestoration";
 import { resetWarmasterAttempt } from "./warmasterSystem";
@@ -912,6 +913,8 @@ export function sanitizeGameStateForSave(
   enemyAbilityDefinitions: EnemyAbilityRegistry = ENEMY_ABILITY_DEFINITIONS,
 ): GameState {
   const currentMapId = state.currentMapId ?? "hub";
+  // Untrusted formation runtime must not reach lifecycle helpers during restoration.
+  state = { ...state, formationAssignments: undefined, formationPathSearchesByEntityId: undefined };
   const didSaveHaveNewQuestStates = Boolean(
     state.quests[GUILD_BOARD_ONBOARDING_QUEST_ID] ||
       state.quests[ASH_GOBLIN_MAIN_QUEST_ID],
@@ -1074,6 +1077,7 @@ export function sanitizeGameStateForSave(
 
   return resetWarmasterAttempt(restoreOrcWarcampLayout(restoreSpecializedMovementPositions(reconcileWarmasterLifecycle(restoreBarracks({
     ...state,
+    selectedFormationPreset: getSelectedFormationPreset(state),
     entities,
     restingCompanionsById,
     highestCharacterLevelEver,
@@ -1146,6 +1150,7 @@ export function sanitizeGameStateForSave(
     defenderBlockedMsByEntityId: {},
     partyFormation: undefined,
     formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
     combatFeedbackEvents: [],
     combatProjectiles: [],
     autonomousTargetSuppressionsByEnemyId: undefined,

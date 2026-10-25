@@ -162,6 +162,14 @@ export type MoveResolution = {
   reason: DebugNavigationReason;
 };
 
+/** Selected formation searches keep their budget even when steering succeeds. */
+export type FormationPathSearch = {
+  requestKey?: string;
+  lastQueryAtMs: number;
+  failed: boolean;
+  temporaryBlockers?: boolean;
+};
+
 export type MovementFailureDetail = {
   targetId?: string | null;
   targetDistance?: number;

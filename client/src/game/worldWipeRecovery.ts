@@ -129,6 +129,7 @@ export function updateWorldWipeRecovery(
     return {
       ...state,
       formationAssignments: undefined,
+      formationPathSearchesByEntityId: undefined,
       worldWipeRecovery: {
         status: "pending_choice",
         wipeId,

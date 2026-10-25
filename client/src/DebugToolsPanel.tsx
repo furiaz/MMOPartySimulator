@@ -1,4 +1,10 @@
 import type { KeyboardEvent } from "react";
+import type { FormationDiagnostics } from "./game/formationDiagnostics";
+import type { Position } from "./game/types";
+
+function formatFormationPoint(point: Position | undefined): string {
+  return point ? `${point.x.toFixed(2)}, ${point.y.toFixed(2)}` : "unavailable";
+}
 
 export type DebugToolsSection =
   | "companion"
@@ -10,6 +16,7 @@ export type DebugToolsSection =
   | "debug";
 
 type DebugToolsPanelProps = {
+  formationDiagnostics: FormationDiagnostics;
   activeSection: DebugToolsSection;
   onSectionChange: (section: DebugToolsSection) => void;
   superSpeedEnabled: boolean;
@@ -106,6 +113,7 @@ const debugToolSections: Array<{
 ];
 
 export function DebugToolsPanel({
+  formationDiagnostics,
   activeSection,
   onSectionChange,
   superSpeedEnabled,
@@ -310,6 +318,16 @@ export function DebugToolsPanel({
         {activeSection === "movement" ? (
           <div className="debug-tool-section">
             <h3>Movement</h3>
+            <div className="formation-debug" aria-label="Formation diagnostics">
+              <strong>Formation: {formationDiagnostics.selectedPreset}</strong>
+              <span>Applied: {formationDiagnostics.appliedPreset ?? "unavailable"} · Blend: {formationDiagnostics.transitionProgress === undefined ? "unavailable" : `${Math.round(formationDiagnostics.transitionProgress * 100)}%`}</span>
+              {formationDiagnostics.members.map(member => <div className="formation-debug-member" key={member.entityId}>
+                <strong>{member.entityId} · {member.slotId ?? "unavailable"}</strong>
+                <span>Lane/depth: {member.lane ?? "unavailable"} / {member.depth ?? "unavailable"} · Mode: {member.mode}</span>
+                <span>Expected: {formatFormationPoint(member.expectedPosition)} · Accepted: {formatFormationPoint(member.acceptedPosition)}</span>
+                <span>Owner: {member.movementOwner ?? "unavailable"} · Departure: {member.departureReasons.join(", ") || "none"}</span>
+              </div>)}
+            </div>
             <div className="debug-tool-grid">
               <button onClick={onTeleportHubOne} type="button">Teleport Hub 1</button>
               <button onClick={onTeleportHubTwo} type="button">Teleport Hub 2</button>

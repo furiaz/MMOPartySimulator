@@ -1,5 +1,5 @@
 import { getCompanionAttackRange } from "./companionCombat";
-import { getFormationTemplate } from "./formationTemplates";
+import { getEffectiveFormationOffsets, getFormationTemplate } from "./formationTemplates";
 import { getEffectiveAttackRange, SPATIAL_EPSILON } from "./spatialGeometry";
 import type { GameState } from "./state";
 import type { Companion, Enemy, FormationLane, FormationSlot } from "./types";
@@ -19,7 +19,7 @@ function formationFrame(state: GameState) {
   if (!assignments || assignments.leaderId !== state.partyLeaderId || leader?.kind !== "companion" ||
     leader.health <= 0 || leader.state === "dead") return undefined;
   const template = getFormationTemplate(assignments.preset, assignments.members.length, assignments.spacing);
-  const leaderSlot = template?.slots.find(slot => slot.id === assignments.slotsByEntityId[leader.id]);
+  const leaderSlot = getEffectiveFormationOffsets(assignments)[leader.id];
   if (!template || !leaderSlot) return undefined;
   const combat = assignments.combat;
   const runtime = combat?.mode === "combat" ? combat : assignments.travel ?? combat;

@@ -1,4 +1,5 @@
 import type { GameState } from "./state";
+import { getFormationDiagnostics } from "./formationDiagnostics";
 import { getMovementPositionCommit, getSpecializedMovementOwner, getNormalMovementResult } from "./movementAuthority";
 import { getCharacterXpProgress } from "./leveling";
 import {
@@ -190,6 +191,7 @@ export function recordDebugTelemetryTick(
     ...getTelemetryEvents(previousState, nextState, tick),
   ];
   const telemetryTick = {
+    formationDiagnostics: getFormationDiagnostics(nextState),
     tick,
     frame: tick,
     sample: tick,

@@ -8,6 +8,7 @@ import type {
 } from "./types";
 
 export const DEFAULT_FORMATION_SPACING = 2.5;
+export const FORMATION_TRANSITION_MS = 1000;
 
 const TEMPLATE_ROWS: Record<FormationPresetId, number[][]> = {
   arrow: [[1], [1, 1], [1, 2], [1, 2, 1], [1, 2, 2]],
@@ -44,6 +45,19 @@ export function getFormationTemplate(
   };
 }
 
+/** Pure local geometry shared by positioning, cohesion, and lane-center projection. */
+export function getEffectiveFormationOffsets(assignments: FormationAssignments): Record<string, { side: number; forward: number }> {
+  const template = getFormationTemplate(assignments.preset, assignments.members.length, assignments.spacing);
+  const progress = Math.max(0, Math.min(1, (assignments.transition?.elapsedMs ?? FORMATION_TRANSITION_MS) / FORMATION_TRANSITION_MS));
+  return Object.fromEntries(assignments.members.flatMap(member => {
+    const slot = template?.slots.find(candidate => candidate.id === assignments.slotsByEntityId[member.id]);
+    if (!slot) return [];
+    const from = assignments.transition?.fromOffsetsByEntityId[member.id] ?? slot;
+    return [[member.id, { side: from.side + (slot.side - from.side) * progress,
+      forward: from.forward + (slot.forward - from.forward) * progress }]];
+  }));
+}
+
 /** Ideal geometry only: callers must validate standing/movement before using it. */
 export function transformFormationSlots(
   assignments: FormationAssignments,
@@ -55,9 +69,8 @@ export function transformFormationSlots(
 ): Record<string, Position> {
   if (!leader || leader.id !== assignments.leaderId || leader.state === "dead" ||
     leader.health <= 0 || !origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return {};
-  const template = getFormationTemplate(assignments.preset, assignments.members.length, assignments.spacing);
-  const leaderSlot = template?.slots.find(slot => slot.id === assignments.slotsByEntityId[leader.id]);
-  if (!template || !leaderSlot) return {};
+  const offsets = getEffectiveFormationOffsets(assignments), leaderSlot = offsets[leader.id];
+  if (!leaderSlot) return {};
 
   const length = Math.hypot(facing.x, facing.y);
   const forward = Number.isFinite(length) && length > 0
@@ -65,7 +78,7 @@ export function transformFormationSlots(
   const right = { x: -forward.y, y: forward.x };
   const positions: Record<string, Position> = {};
   for (const member of assignments.members) {
-    const slot = template.slots.find(candidate => candidate.id === assignments.slotsByEntityId[member.id]);
+    const slot = offsets[member.id];
     if (!slot) continue;
     const side = (slot.side - leaderSlot.side) * lateralScale;
     const ahead = (slot.forward - leaderSlot.forward) * rowScale;
