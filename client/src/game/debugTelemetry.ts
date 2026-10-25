@@ -1,4 +1,6 @@
 import type { GameState } from "./state";
+import { getFormationDiagnostics } from "./formationDiagnostics";
+import { getMovementPositionCommit, getSpecializedMovementOwner, getNormalMovementResult } from "./movementAuthority";
 import { getCharacterXpProgress } from "./leveling";
 import {
   getEnemyAttackRange,
@@ -189,6 +191,7 @@ export function recordDebugTelemetryTick(
     ...getTelemetryEvents(previousState, nextState, tick),
   ];
   const telemetryTick = {
+    formationDiagnostics: getFormationDiagnostics(nextState),
     tick,
     frame: tick,
     sample: tick,
@@ -410,6 +413,8 @@ function getEntitySnapshot(
   const previousEntity = previousState.entities[entity.id];
   const movementResult = getMovementResult(previousEntity, nextState, entity);
   const movementFailure = nextState.movementFailuresByEntityId?.[entity.id];
+  const normalMovement = getNormalMovementResult(nextState, entity.id);
+  const positionCommit = getMovementPositionCommit(nextState, entity.id);
   const navigation = getNavigationTelemetry(
     nextState,
     previousEntity ?? entity,
@@ -441,7 +446,8 @@ function getEntitySnapshot(
     enemyEvasion: getEnemyEvasion(entity),
     enemyScalingOverrides: getEnemyScalingOverrides(entity),
     attackRange: getAttackRangeSnapshot(entity),
-    targetDecisionReason: getTargetDecisionReason(entity),
+    targetDecisionReason: getTargetDecisionReason(entity, nextState),
+    targetFormationScore: nextState.companionTargetDecisionByEntityId?.[entity.id]?.formationScore,
     commandPriority: getCommandPriority(entity),
     characterLevel: getCharacterLevel(entity),
     characterXp: getCharacterXp(entity),
@@ -459,10 +465,18 @@ function getEntitySnapshot(
     ),
     movementResult,
     reason: getReason(nextState, entity, movementResult),
+    movementOwner: positionCommit?.source === "normal" ? normalMovement?.request.source
+      : getSpecializedMovementOwner(nextState, entity.id)?.source ?? positionCommit?.source ?? normalMovement?.request.source,
+    movementRequestPriority: normalMovement?.request.priority,
+    normalMovementOutcome: normalMovement?.outcome,
+    normalMovementCommitCount: normalMovement?.positionCommitCount,
+    movementPositionCommitCount: positionCommit ? 1 : 0,
+    movementTransactionId: positionCommit?.transactionId,
     formationPhase: nextState.partyFormation?.phase,
-    formationSlot: nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
+    formationSlot: normalMovement?.request.combatFormationGoal?.position ?? normalMovement?.request.travelFormationGoal?.position ?? nextState.partyFormation?.slotsByEntityId[entity.id] ?? null,
     formationSlotReason:
-      nextState.partyFormation?.slotReasonsByEntityId[entity.id],
+      normalMovement?.request.combatFormationGoal || normalMovement?.request.travelFormationGoal
+        ? normalMovement.request.reason : nextState.partyFormation?.slotReasonsByEntityId[entity.id],
     targetDistance: movementFailure?.targetDistance,
     intendedPosition: movementFailure?.intendedPosition,
     blockerId: movementFailure?.blockerId,
@@ -570,7 +584,8 @@ function getTelemetryEvents(
       continue;
     }
 
-    addTargetEvents(events, previousEntity, entity, tick);
+    if (entity.kind !== "companion" || !nextState.companionTargetTransitions?.some(transition => transition.entityId === entity.id))
+      addTargetEvents(events, previousEntity, entity, tick);
     addStateEvents(events, previousEntity, entity, tick);
     addRoleEvents(events, previousEntity, entity, tick);
     addHealthEvents(events, previousEntity, entity, tick);
@@ -998,8 +1013,9 @@ function getAttackRangeSnapshot(entity: GameEntity): number | undefined {
   return entity.kind === "enemy" ? getEnemyAttackRange(entity) : undefined;
 }
 
-function getTargetDecisionReason(entity: GameEntity) {
-  return entity.kind === "enemy" ? entity.targetDecisionReason : undefined;
+function getTargetDecisionReason(entity: GameEntity, state?: GameState) {
+  return entity.kind === "enemy" ? entity.targetDecisionReason : entity.kind === "companion"
+    ? state?.companionTargetDecisionByEntityId?.[entity.id]?.reason : undefined;
 }
 
 function getCommandPriority(entity: GameEntity): CommandPriority | undefined {

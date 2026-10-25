@@ -1,3 +1,4 @@
+import { finishDirectCompanionCommand, hasDirectCompanionAuthority } from "./directCommandState";
 import {
   gatherResource,
   isAutonomousEntity,
@@ -14,6 +15,8 @@ import {
 } from "./state";
 import {
   getBoundedPathDistance,
+  flushNormalMovementForEntity,
+  holdEntityMovement,
   moveEntityTowardPositionIfUnoccupied,
 } from "./movementPlanning";
 import { resolveInteractionStandPosition } from "./interactionApproach";
@@ -64,6 +67,9 @@ export function updateGatherSystem(
       continue;
     }
 
+    const command = nextState.directCompanionCommandsById?.[gatherer.id];
+    if (command && (command.type !== "gather" || command.targetId !== gatherer.currentTargetId)) continue;
+
     if (isGatherBlockedByStatus(nextState, gatherer.id)) {
       continue;
     }
@@ -78,6 +84,10 @@ export function updateGatherSystem(
     const resource = getEntityById(nextState, gatherer.currentTargetId);
 
     if (!isActiveResource(resource)) {
+      if (command) {
+        nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
+        continue;
+      }
       nextState = updateEntity(nextState, switchToFollow(gatherer));
       continue;
     }
@@ -109,6 +119,7 @@ export function updateGatherSystem(
         .get(resource.id)
         ?.has(gatherer.id)
     ) {
+      if (command) continue;
       if (isCommittedGatherer(gatherer)) {
         continue;
       }
@@ -124,7 +135,7 @@ export function updateGatherSystem(
         ...gatherer,
         state: "attack",
         currentTargetId: selfDefenseThreat.id,
-        commandPriority: "autonomous",
+        commandPriority: command ? "direct" : "autonomous",
       });
       continue;
     }
@@ -146,11 +157,13 @@ export function updateGatherSystem(
         ) ?? resource.position;
 
       nextState = moveEntityTowardPositionIfUnoccupied(nextState, gatherer, standPosition, {
+        source: "gather",
         allowPartyPassThrough: true,
         pathProfile: "gather",
         pathTargetKey: `gather:${resource.id}`,
         pathTargetPosition: standPosition,
       });
+      nextState = flushNormalMovementForEntity(nextState, gatherer.id);
       if (didEntityMove(nextState, gatherer)) {
         movedEntityIds.add(gatherer.id);
         const movedGatherer = getEntityById(nextState, gatherer.id);
@@ -174,6 +187,7 @@ export function updateGatherSystem(
       continue;
     }
 
+    nextState = holdEntityMovement(nextState, gatherer, "gather", "resource interaction position");
     if (!canGather(gatherer, now)) {
       continue;
     }
@@ -237,8 +251,10 @@ export function updateGatherSystem(
 
     nextState = updateEntity(
       nextState,
-      shouldReturnToParty ? switchToFollow(updatedGatherer) : updatedGatherer,
+      shouldReturnToParty && !command ? switchToFollow(updatedGatherer) : updatedGatherer,
     );
+    if (command && gatheredResource.isDepleted)
+      nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
   }
 
   return nextState;
@@ -274,7 +290,7 @@ function getPlayerIntentOverride(
 
   if (
     gatherer.kind !== "companion" ||
-    gatherer.commandPriority !== "autonomous" ||
+    hasDirectCompanionAuthority(state, gatherer) ||
     executionIntent?.source !== "player"
   ) {
     return null;
@@ -384,6 +400,19 @@ function getAllowedGathererIdsByResource(
 ): Map<string, Set<string>> {
   const allowedGathererIdsByResource = new Map<string, Set<string>>();
   const gathererCountsByResource = new Map<string, number>();
+  // Stored direct work retains its place while personally defending or displaced.
+  for (const command of Object.values(state.directCompanionCommandsById ?? {}).sort((a, b) =>
+    a.issuedAt - b.issuedAt || a.companionId.localeCompare(b.companionId))) {
+    if (command.type !== "gather") continue;
+    const actor = state.entities[command.companionId], resource = state.entities[command.targetId];
+    if (actor?.kind !== "companion" || actor.state === "dead" || actor.health <= 0 || !isActiveResource(resource)) continue;
+    const count = gathererCountsByResource.get(resource.id) ?? 0;
+    if (count >= getMaxGatherers(resource)) continue;
+    gathererCountsByResource.set(resource.id, count + 1);
+    const allowed = allowedGathererIdsByResource.get(resource.id) ?? new Set<string>();
+    allowed.add(actor.id);
+    allowedGathererIdsByResource.set(resource.id, allowed);
+  }
   const gatheringEntities = Object.values(state.entities)
     .filter(
       (entity): entity is AutonomousEntity =>
@@ -418,6 +447,8 @@ function getAllowedGathererIdsByResource(
     }
 
     const currentCount = gathererCountsByResource.get(resource.id) ?? 0;
+
+    if (allowedGathererIdsByResource.get(resource.id)?.has(entity.id)) continue;
 
     if (currentCount >= getMaxGatherers(resource)) {
       continue;

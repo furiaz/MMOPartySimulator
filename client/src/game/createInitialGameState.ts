@@ -99,6 +99,7 @@ export function createInitialGameState(): GameState {
     autoCombatOnArrivalEnabled: false,
     autoRoute: undefined,
     worldTravelTargetMapId: null,
+    selectedFormationPreset: "arrow",
     poiPreferences: {
       stayInMap: false,
       searchScope: "zone_only",

@@ -1,7 +1,9 @@
+import { canFollowDirectLeader, hasDirectCompanionAuthority, getDirectLeaderCommand } from "./directCommandState";
+import { isTravelFormationMember, prepareTravelFormation } from "./travelFormation";
 import { updateAttackSystem } from "./attackSystem";
 import { updateBarracks, initializeBarracks } from "./barracks";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
-import { updateAutoRouteRuntime } from "./autoRouteSystem";
+import { updateAutoRouteExecution, updateAutoRouteRuntime } from "./autoRouteSystem";
 import { updateCompanionAoeChannelSystem } from "./companionAoeChannelSystem";
 import { updateCombatProjectileSystem } from "./combatProjectileSystem";
 import {
@@ -14,12 +16,13 @@ import { updateDefendSystem } from "./defendSystem";
 import { updateEnemyAISystem } from "./enemyAISystem";
 import { updateEnemyAbilitySystem } from "./enemyAbilitySystem";
 import {
+  cancelEnemyDash,
   cleanupEnemyDashRuntime,
   updateEnemyDashSystem,
 } from "./enemyDashSystem";
 import { updateEnemyAoeChannelSystem } from "./enemyAoeChannelSystem";
 import { updateEnemyRespawnSystem } from "./enemyRespawnSystem";
-import { updateEntitySeparationSystem } from "./entitySeparationSystem";
+import { updateOverlapRecoverySystem } from "./overlapRecovery";
 import {
   isSlimewardDungeonChestUiOpen,
   updateAzureMassFleeBehavior,
@@ -44,6 +47,7 @@ import { updatePartyFormationSystem } from "./partyFormationSystem";
 import {
   updatePartyIntentRecoverySystem,
   updatePartyIntentSelfDefenseSystem,
+  updateFinalizedTargetApproaches,
 } from "./partyIntentSystem";
 import { restoreInterruptedPoiTarget } from "./poiResumeSystem";
 import { updatePoiSystem } from "./poiSystem";
@@ -90,9 +94,15 @@ import {
 } from "./simulationTiming";
 import { recordCurrentWorldDiscovery } from "./worldDiscovery";
 import { getActiveWarmasterEncounterIds, updateWarmasterSystem } from "./warmasterSystem";
-import { updateForcedMovements } from "./forcedMovement";
+import { cancelForcedMovement, updateForcedMovements } from "./forcedMovement";
+import { beginNormalMovementPhase } from "./movementAuthority";
+import { endNormalMovementPhase, flushNormalMovementPhase } from "./movementPlanning";
 import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warmasterLifecycle";
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
+import { hasLocalTargetCommitment, pruneTargetCommitmentState } from "./targetCommitment";
+import { reconcileFormationAssignments } from "./formationAssignments";
+import { advanceFormationTransition } from "./formationTransition";
+import { isCombatFormationMember, prepareCombatFormation } from "./combatFormation";
 
 export function updateGame(
   state: GameState,
@@ -104,20 +114,36 @@ export function updateGame(
     return recordDebugTelemetryTick(state, state, timing);
   }
 
+  // Observe complete player edits once at the simulation boundary, not between
+  // the setters of an order swap. Final reconciliation also covers early returns.
+  return reconcileFormationAssignments(runGameUpdate(reconcileFormationAssignments(state), timing));
+}
+
+function runGameUpdate(state: GameState, timing: SimulationTiming): GameState {
   let nextState = clearExpiredCombatFeedback(
     clearFrameMovementPlanning(advanceSimulationTime(state, timing)),
     timing.nowMs,
   );
   const movedEntityIds = new Set<string>();
+  nextState = pruneTargetCommitmentState(nextState);
+  for (const movement of Object.values(nextState.forcedMovementsByEntityId ?? {}))
+    if (movement.pendingFinalization) nextState = cancelForcedMovement(nextState, movement.targetId);
+  for (const dash of Object.values(nextState.enemyDashesByEnemyId ?? {}))
+    if (dash.pendingFinalization) nextState = cancelEnemyDash(nextState, dash.casterId, "incapacitated", timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateAutoRouteRuntime(nextState);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_lifecycle_update");
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateWarmasterSystem(nextState, timing.nowMs);
+  nextState = advanceFormationTransition(nextState);
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);
+  nextState = updateOverlapRecoverySystem(nextState, movedEntityIds);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateBarracks(nextState, timing.nowMs, timing.deltaMs, Math.random, { activeEncounterIds: getActiveWarmasterEncounterIds(nextState), frozenEncounterIds: getFrozenWarmasterEncounterIds(nextState), movedEntityIds });
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateRuneSkillRuntime(nextState, timing.nowMs);
   nextState = clearExpiredSkillRuntimeState(nextState, timing.nowMs);
   nextState = updateMartialPassiveRuntime(nextState, timing.nowMs);
@@ -160,6 +186,7 @@ export function updateGame(
 
   nextState = updatePartyIntentRecoverySystem(nextState);
 
+  nextState = beginNormalMovementPhase(nextState);
   nextState = updateResurrectionSystem(
     nextState,
     movedEntityIds,
@@ -169,8 +196,9 @@ export function updateGame(
 
   nextState = updatePartyIntentRecoverySystem(nextState);
 
+  nextState = updateAutoRouteExecution(nextState);
   nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
-  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = initializeBarracks(nextState);
   nextState = updateMartialPassiveRuntime(
     nextState,
@@ -185,17 +213,19 @@ export function updateGame(
   ) {
     return recordDebugTelemetryTick(
       state,
-      clearExpiredCombatFeedback(nextState, timing.nowMs),
+      clearExpiredCombatFeedback(endNormalMovementPhase(nextState, movedEntityIds), timing.nowMs),
       timing,
     );
   }
 
   nextState = updateForcedMovements(nextState, movedEntityIds, timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateDirectCompanionCommandSystem(
     nextState,
     movedEntityIds,
     timing.nowMs,
   );
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
 
   let resourceWorkContext = createResourceWorkContext(nextState);
 
@@ -211,6 +241,7 @@ export function updateGame(
   if (nextState.autoModeEnabled) {
     nextState = updateRoleSystem(nextState, resourceWorkContext);
     nextState = updateSkillSystem(nextState, timing.nowMs);
+    if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   }
 
   if (shouldMovePartyTowardPoi) {
@@ -223,10 +254,16 @@ export function updateGame(
     timing,
     attackSlotPathDistanceCache,
   );
-  nextState = updateFollowSystem(nextState, movedEntityIds);
+  // Attack/gather approach commits in their existing action phases. Followers
+  // of that direct leader sample the committed reference after those phases.
+  const directLeaderCommand = getDirectLeaderCommand(nextState);
+  const deferDirectLeaderFollow = directLeaderCommand && directLeaderCommand.type !== "move";
+  if (!deferDirectLeaderFollow) nextState = updateFollowSystem(nextState, movedEntityIds);
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateQuestGuideSystem(nextState, movedEntityIds, timing);
   nextState = updateEnemyAISystem(nextState, timing, movedEntityIds);
   nextState = updateAzureMassFleeBehavior(nextState, timing, movedEntityIds);
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,
@@ -242,7 +279,9 @@ export function updateGame(
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
+  nextState = prepareCombatFormation(nextState);
   nextState = updateCombatSkillSystem(nextState, timing.nowMs);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,
@@ -254,6 +293,8 @@ export function updateGame(
     timing.nowMs,
     attackSlotPathDistanceCache,
   );
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
+  nextState = updateFinalizedTargetApproaches(nextState);
   nextState = updateCombatProjectileSystem(
     nextState,
     timing.nowMs,
@@ -268,7 +309,7 @@ export function updateGame(
   nextState = updateDropSystem(nextState, timing.nowMs);
   nextState = updateWarmasterLifecycle(nextState, timing.nowMs);
   nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_combat_update");
-  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateSlimewardDungeonSystem(nextState, timing.nowMs);
   nextState = updateEnemyRespawnSystem(nextState, timing.nowMs);
   nextState = updateGatherSystem(
@@ -276,8 +317,11 @@ export function updateGame(
     movedEntityIds,
     timing.nowMs,
   );
+  if (deferDirectLeaderFollow) nextState = updateFollowSystem(nextState, movedEntityIds);
+  nextState = endNormalMovementPhase(nextState, movedEntityIds);
+  nextState = prepareTravelFormation(nextState);
   nextState = updateResourceRespawnSystem(nextState, timing.nowMs);
-  nextState = updateEntitySeparationSystem(nextState, movedEntityIds);
+  if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateMartialPassiveRuntime(
     nextState,
     timing.nowMs,
@@ -322,7 +366,10 @@ function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
   for (const member of getPartyMembers(nextState)) {
     if (
       nextState.resurrectionChannelsByHelperId?.[member.id] ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) || canFollowDirectLeader(nextState, member) ||
+      hasLocalTargetCommitment(nextState, member) ||
+      isTravelFormationMember(nextState, member) ||
+      isCombatFormationMember(nextState, member) ||
       member.state === "idle" ||
       member.state === "dead" ||
       isPartyMemberBusyGatheringResource(nextState, member) ||

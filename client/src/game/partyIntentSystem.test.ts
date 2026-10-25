@@ -5,7 +5,7 @@ import { applyStatusEffect } from "./statusEffects";
 import { createTestGameState } from "./testState";
 
 describe("party intent self-defense", () => {
-  it("turns blocked autonomous POI movement into self-defense against the enemy blocker", () => {
+  it("does not let one-frame blocker evidence replace an autonomous POI", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const blocker = createEnemy("blocking-enemy", { x: 1, y: 0 }, "passive", {
       maxHealth: 30,
@@ -41,26 +41,10 @@ describe("party intent self-defense", () => {
 
     const nextState = updatePartyIntentSelfDefenseSystem(state);
 
-    expect(nextState.partyIntent).toMatchObject({
-      mode: "engage",
-      source: "ai",
-      executionIntent: {
-        type: "attack",
-        targetId: blocker.id,
-      },
-    });
-    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
-      type: "move",
-      targetPosition: { x: 10, y: 0 },
-    });
-    expect(nextState.interruptedPoiTarget?.localPoiTarget).toMatchObject({
-      poiId: "road-poi",
-    });
-    expect(nextState.entities[leader.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: blocker.id,
-      commandPriority: "autonomous",
-    });
+    expect(nextState.leaderIntent).toEqual(state.leaderIntent);
+    expect(nextState.partyIntent).toBe(state.partyIntent);
+    expect(nextState.interruptedPoiTarget).toBeUndefined();
+    expect(nextState.entities[leader.id]).toBe(leader);
   });
 
   it("responds to close same-frame enemy aggro before the attack system runs", () => {
@@ -88,20 +72,15 @@ describe("party intent self-defense", () => {
 
     const nextState = updatePartyIntentSelfDefenseSystem(state);
 
-    expect(nextState.partyIntent).toMatchObject({
-      mode: "engage",
-      executionIntent: {
-        type: "attack",
-        targetId: attacker.id,
-      },
-    });
+    expect(nextState.leaderIntent).toEqual(state.leaderIntent);
+    expect(nextState.partyIntent).toBe(state.partyIntent);
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: attacker.id,
     });
   });
 
-  it("self-defends when a movement-stuck companion has a nearby enemy without a blocker id", () => {
+  it("does not treat a failure timer and proximity as actual blocker evidence", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const nearbyEnemy = createEnemy("nearby-enemy", { x: 1, y: 0 }, "passive", {
       maxHealth: 30,
@@ -125,17 +104,8 @@ describe("party intent self-defense", () => {
 
     const nextState = updatePartyIntentSelfDefenseSystem(state);
 
-    expect(nextState.partyIntent).toMatchObject({
-      mode: "engage",
-      executionIntent: {
-        type: "attack",
-        targetId: nearbyEnemy.id,
-      },
-    });
-    expect(nextState.entities[leader.id]).toMatchObject({
-      state: "attack",
-      currentTargetId: nearbyEnemy.id,
-    });
+    expect(nextState.leaderIntent).toEqual(state.leaderIntent);
+    expect(nextState.entities[leader.id]).toBe(leader);
   });
 
   it("keeps self-defense committed to the current valid active threat", () => {
@@ -175,13 +145,8 @@ describe("party intent self-defense", () => {
 
     const nextState = updatePartyIntentSelfDefenseSystem(state);
 
-    expect(nextState.partyIntent).toMatchObject({
-      mode: "engage",
-      executionIntent: {
-        type: "attack",
-        targetId: currentThreat.id,
-      },
-    });
+    expect(nextState.leaderIntent).toEqual(state.leaderIntent);
+    expect(nextState.partyIntent).toBe(state.partyIntent);
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: currentThreat.id,
@@ -231,7 +196,7 @@ describe("party intent self-defense", () => {
     });
   });
 
-  it("interrupts Auto Route when a party member is body blocked near a hostile for 1000 ms", () => {
+  it("interrupts Auto Route after 1000 ms of finalized movement blocked by the same enemy", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const blocker = createEnemy("body-blocker", { x: 2, y: 0 }, "passive");
     const state = createTestGameState({
@@ -240,6 +205,12 @@ describe("party intent self-defense", () => {
         [blocker.id]: blocker,
       },
       partyLeaderId: leader.id,
+      currentMapId: "hub",
+      simulationDeltaMs: 1000,
+      normalMovementResultsByEntityId: {
+        leader: { request: { entityId: "leader", source: "partyTravel", reason: "route", priority: 40, mode: "walk", destination: { x: 20, y: 0 }, acceptableRadius: 0 },
+          outcome: "held", reason: "crowd_wait", blockingEnemyIds: [blocker.id], from: leader.position, to: leader.position, positionCommitCount: 0, frameNumber: 0, timeMs: 0 },
+      },
       worldTravelTargetMapId: "map-2",
       movementFailureMsByEntityId: {
         [leader.id]: 1000,
@@ -252,7 +223,8 @@ describe("party intent self-defense", () => {
       type: "attack",
       targetId: blocker.id,
     });
-    expect(nextState.interruptedPoiTarget?.worldTravelTargetMapId).toBe("map-2");
+    expect(nextState.worldTravelTargetMapId).toBe("map-2");
+    expect(nextState.autoRoute?.pauseReason).toBe("emergency");
   });
 
   it("does not interrupt Auto Route for body block detection during route cooldown", () => {
@@ -276,7 +248,7 @@ describe("party intent self-defense", () => {
 
     const nextState = updatePartyIntentSelfDefenseSystem(state);
 
-    expect(nextState.partyIntent).toBeNull();
+    expect(nextState.partyIntent?.executionIntent?.type).not.toBe("attack");
   });
 
   it("lets movement-blocking status bypass Auto Route interrupt cooldown", () => {

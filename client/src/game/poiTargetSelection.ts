@@ -1,4 +1,6 @@
 import { isTargetDummyEnemy } from "./entityGuards";
+import { canReacquireCombatTarget, isAutomaticCombatTarget, isRetainableCombatEnemy } from "./targetCommitment";
+import { getPartyExecutionIntent } from "./partyIntentState";
 import {
   HUB_MAP_ID,
   HUB_TWO_MAP_ID,
@@ -295,6 +297,9 @@ function selectAutoCombatActiveThreatTarget(
   state: GameState,
   candidates: PointOfInterest[],
 ): PoiSelectionResult {
+  const intent = getPartyExecutionIntent(state);
+  if (intent?.type === "attack" && intent.targetId && isRetainableCombatEnemy(state, state.entities[intent.targetId]))
+    return { localTarget: null, consideredTargets: [], skippedReasons: {} };
   const skippedReasons: Record<string, string> = {};
   const options = candidates
     .filter(isActivePartyThreatPoi(state))
@@ -1193,6 +1198,11 @@ function selectStablePoiTarget(
   state: GameState,
   scoredTargets: ScoredPoiTarget[],
 ): ScoredPoiTarget | null {
+  const intent = getPartyExecutionIntent(state);
+  const committed = intent?.type === "attack" && intent.targetId ? scoredTargets.find(target =>
+    target.localTarget.category === "combat" && target.localTarget.targetEntityId === intent.targetId &&
+    isRetainableCombatEnemy(state, state.entities[intent.targetId!])) : undefined;
+  if (committed) return committed;
   const bestTarget = scoredTargets[0];
 
   if (!bestTarget) {
@@ -1476,13 +1486,14 @@ function getTeleportPois(state: GameState): PointOfInterest[] {
 }
 
 function getEnemyPois(state: GameState): PointOfInterest[] {
+  const leader = getPartyLeader(state);
   return Object.values(state.entities)
     .filter(
       (entity) =>
         entity.kind === "enemy" &&
         !isTargetDummyEnemy(entity) &&
-        entity.state !== "dead" &&
-        entity.health > 0,
+        isAutomaticCombatTarget(state, entity) &&
+        (!leader || canReacquireCombatTarget(state, leader, entity)),
     )
     .map((enemy) => ({
       id: enemy.id,

@@ -6,7 +6,23 @@ import type { DebugNavigationReason, GameEntity, Position } from "./types";
 const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
 
 export function clearFrameMovementPlanning(state: GameState): GameState {
+  const isLiving = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
+  if (Object.keys(state.formationPathSearchesByEntityId ?? {}).some(id => !isLiving(id))) state = { ...state,
+    formationPathSearchesByEntityId: Object.fromEntries(Object.entries(state.formationPathSearchesByEntityId ?? {}).filter(([id]) => isLiving(id))),
+  };
+  const avoidance = Object.entries(state.localAvoidanceByEntityId ?? {});
+  const recovery = Object.entries(state.overlapRecoveryByEntityId ?? {});
+  if (avoidance.some(([id, entry]) => !isLiving(id) || (state.simulationTimeMs ?? 0) - entry.lastActiveAtMs > 750) ||
+    recovery.some(([id]) => !isLiving(id))) state = { ...state,
+      localAvoidanceByEntityId: Object.fromEntries(avoidance.filter(([id, entry]) => isLiving(id) && (state.simulationTimeMs ?? 0) - entry.lastActiveAtMs <= 750)),
+      overlapRecoveryByEntityId: Object.fromEntries(recovery.filter(([id]) => isLiving(id))),
+    };
   const hasFramePlanning =
+    Boolean(state.companionTargetTransitions?.length) ||
+    Boolean(state.normalMovementPhase) ||
+    Object.keys(state.movementPositionCommitsByEntityId ?? {}).length > 0 ||
+    Object.keys(state.normalMovementResultsByEntityId ?? {}).length > 0 ||
+    Object.keys(state.externalMovementOwnersByEntityId ?? {}).length > 0 ||
     Object.keys(state.failedMoveByEntityId ?? {}).length > 0 ||
     Object.keys(state.movementFailuresByEntityId ?? {}).length > 0 ||
     Object.keys(state.movementDecisionsByEntityId ?? {}).length > 0 ||
@@ -42,6 +58,11 @@ export function clearFrameMovementPlanning(state: GameState): GameState {
 
   return {
     ...state,
+    companionTargetTransitions: [],
+    normalMovementResultsByEntityId: {},
+    movementPositionCommitsByEntityId: {},
+    normalMovementPhase: undefined,
+    externalMovementOwnersByEntityId: {},
     failedMoveByEntityId: {},
     movementFailureMsByEntityId,
     movementFailuresByEntityId: {},

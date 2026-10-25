@@ -1,12 +1,10 @@
 import { getFollowTrailPosition, type GameState } from "./state";
-import { ENTITY_COLLISION_DISTANCE } from "./movementPlanning";
+import { areEntitiesOverlapping, ENTITY_COLLISION_DISTANCE } from "./spatialGeometry";
 import { getOrderedPartyMembers, type PartyMember } from "./partySystem";
-import { getEuclideanDistance } from "./positionUtils";
 import type { GameEntity, Position } from "./types";
 
 const SOFT_SIDE_SPACING = 0.9;
 const SOFT_BACK_SPACING = 0.45;
-const STACK_DISTANCE = 0.45;
 export const COMBAT_PARTY_SPACING_DISTANCE = ENTITY_COLLISION_DISTANCE;
 
 export function getSoftFollowPosition(
@@ -41,7 +39,7 @@ export function isStackedWithPartyMember(
   return getOrderedPartyMembers(state).some(
     (otherMember) =>
       otherMember.id !== member.id &&
-      getEuclideanDistance(member.position, otherMember.position) < STACK_DISTANCE,
+      areEntitiesOverlapping(member, otherMember),
   );
 }
 
@@ -66,11 +64,9 @@ export function isCombatPositionSpacedFromParty(
     const reservedPosition = state.reservedPositionsByEntityId?.[member.id];
 
     return (
-      getEuclideanDistance(position, member.position) >=
-        COMBAT_PARTY_SPACING_DISTANCE &&
+      !areEntitiesOverlapping(attacker, member, position) &&
       (!reservedPosition ||
-        getEuclideanDistance(position, reservedPosition) >=
-          COMBAT_PARTY_SPACING_DISTANCE)
+        !areEntitiesOverlapping(attacker, member, position, reservedPosition))
     );
   });
 }

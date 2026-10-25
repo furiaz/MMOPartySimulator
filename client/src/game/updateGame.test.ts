@@ -614,7 +614,8 @@ describe("game update intent priority", () => {
   it("holds Map 2 escort party movement near the active guide", () => {
     const leader = createLeader({ x: 8.5, y: 29 });
     const follower = {
-      ...createCompanion("escort-follower", { x: 8, y: 30 }, leader.id),
+      // A legal settled offset, not a fresh overlap with the leader/guide.
+      ...createCompanion("escort-follower", { x: 9.6, y: 30 }, leader.id),
       state: "follow" as const,
       currentTargetId: leader.id,
     };
@@ -2483,7 +2484,8 @@ describe("game update intent priority", () => {
     };
     const chosenEnemy = createEnemy("chosen-enemy", { x: 9, y: 4 });
     const closerAttacker = {
-      ...createEnemy("closer-attacker", { x: 4, y: 5 }),
+      // Nearby threat, but not spawned inside the companion capsule.
+      ...createEnemy("closer-attacker", { x: 4, y: 6 }),
       state: "attack" as const,
       currentTargetId: leader.id,
     };
@@ -2571,7 +2573,7 @@ describe("game update intent priority", () => {
   });
 
   it("uses combat skills when a direct collector is forced into self-defense", () => {
-    const resource = createResource("direct-resource", { x: 4, y: 6 }, {
+    const resource = createResource("direct-resource", { x: 4, y: 7 }, {
       maxGatherers: 2,
     });
     const collector = {
@@ -2960,7 +2962,7 @@ describe("game update intent priority", () => {
     expect(currentEnemy.health).toBeLessThan(enemy.health);
   });
 
-  it("lets player gather intent self-defend after damage and restores the resource intent later", () => {
+  it("lets player gathering self-defend locally after damage while retaining the resource intent", () => {
     const resource = createResource("player-resource", { x: 4, y: 4 });
     const leader = {
       ...createCompanion("leader", { x: 4, y: 4 }, "leader", "fighter", 0),
@@ -2969,7 +2971,7 @@ describe("game update intent priority", () => {
       commandPriority: "autonomous" as const,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      ...createEnemy("attacking-enemy", { x: 5.7, y: 4 }),
       state: "attack" as const,
       currentTargetId: leader.id,
       attackWindupStartedAt: 1_000,
@@ -2993,14 +2995,11 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.leaderIntent).toMatchObject({
-      type: "attack",
-      targetId: attacker.id,
-    });
-    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
       type: "gather",
       targetId: resource.id,
       source: "player",
     });
+    expect(nextState.interruptedPoiTarget).toBeUndefined();
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: attacker.id,
@@ -3015,7 +3014,7 @@ describe("game update intent priority", () => {
       commandPriority: "autonomous" as const,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      ...createEnemy("attacking-enemy", { x: 6.5, y: 4 }),
       state: "attack" as const,
       currentTargetId: leader.id,
       attackWindupStartedAt: 1_000,
@@ -3059,7 +3058,7 @@ describe("game update intent priority", () => {
       commandPriority: "autonomous" as const,
     };
     const attacker = {
-      ...createEnemy("attacking-enemy", { x: 5, y: 4 }),
+      ...createEnemy("attacking-enemy", { x: 6.5, y: 4 }),
       state: "attack" as const,
       currentTargetId: leader.id,
       attackWindupStartedAt: 1_000,
@@ -3083,14 +3082,11 @@ describe("game update intent priority", () => {
     );
 
     expect(nextState.leaderIntent).toMatchObject({
-      type: "attack",
-      targetId: attacker.id,
-    });
-    expect(nextState.interruptedPoiTarget?.leaderIntent).toMatchObject({
       type: "move",
       targetPosition: npc.position,
       source: "player",
     });
+    expect(nextState.interruptedPoiTarget).toBeUndefined();
     expect(nextState.entities[leader.id]).toMatchObject({
       state: "attack",
       currentTargetId: attacker.id,
@@ -3292,6 +3288,7 @@ describe("game update intent priority", () => {
       createMapOneState([leader, attacker], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_TWO_ID,
+        autoRoute: { pauseReason: "calm", resumeAfterMs: 0 },
         teleportStatesById: {
           [TELEPORTER_ID]: { isWorking: true },
         },
@@ -3329,7 +3326,7 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent).toMatchObject({
       type: "move",
       targetId: null,
-      targetPosition: teleportPosition,
+      targetPosition: getForwardMapOneTeleport().position,
     });
     expect(nextState.localPoiTarget?.poiId).toBe("map-1-to-map-2");
   });
@@ -3982,11 +3979,11 @@ describe("game update intent priority", () => {
     );
   });
 
-  it("keeps a Gatherer-role follower still at settled follow spacing when the leader is idle", () => {
+  it("keeps a Gatherer-role follower still in its settled formation slot when the leader is idle", () => {
     const leader = createLeader({ x: 10, y: 10 });
     const settledFollowPosition = {
-      x: leader.position.x - 0.9,
-      y: leader.position.y + 0.45,
+      x: leader.position.x,
+      y: leader.position.y + 2.5,
     };
     const gatherer = {
       ...createCompanion(

@@ -5,8 +5,9 @@ import {
 } from "./movementPlanning";
 import type { GameState } from "./state";
 import { getEuclideanDistance } from "./positionUtils";
-import type { Companion, HostileCombatTarget, GameEntity, Position } from "./types";
+import type { Companion, HostileCombatTarget, GameEntity, Position, SkillDefinition } from "./types";
 import { getCombatTargetPosition, hasStructureLineOfSight } from "./combatStructures";
+import { isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
 
 const SKILL_MOVEMENT_SAMPLE_DISTANCE = 0.1;
 const QUICK_STEP_ANGLE_OFFSETS_RADIANS = [
@@ -20,6 +21,10 @@ const QUICK_STEP_ANGLE_OFFSETS_RADIANS = [
 type SkillPositionOptions = {
   ignoredEntityIds?: string[];
 };
+
+export function isCompanionMovementSkill(skill: SkillDefinition): boolean {
+  return ["lungeDamage", "quickStep", "skirmishShot", "pounce", "flameStep", "runeStep", "dawnStep", "atonementStep"].includes(skill.effect.type);
+}
 
 export function getClearLungePosition(
   state: GameState,
@@ -133,11 +138,12 @@ function getFarthestSkillPosition(
       y: caster.position.y + direction.y * stepDistance,
     };
 
-    if (!isSkillPositionAvailable(state, position, options)) {
+    if (!isSkillPositionAvailable(state, position, options) ||
+      !isSpecializedMovementPositionAvailable(state, caster, position)) {
       break;
     }
 
-    farthestPosition = position;
+    if (isSpecializedMovementPositionAvailable(state, caster, position, { landing: true })) farthestPosition = position;
   }
 
   return farthestPosition;

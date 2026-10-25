@@ -1,3 +1,7 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
+import { prepareCombatFormation } from "./combatFormation";
+import { isAutoRoutePaused } from "./autoRouteSystem";
+import { isTravelFormationMember, moveTravelFormationMember, updateTravelFormationCohesion } from "./travelFormation";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
 import { isActiveResource } from "./entityGuards";
@@ -26,13 +30,16 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { flushNormalMovementForEntity, holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { getSpecializedMovementOwner } from "./movementAuthority";
 import {
   getPartyExecutionIntent,
   hasDirectPlayerPartyIntent,
   setPartyExecutionIntent,
 } from "./partyIntentState";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
+import { applyTargetCommitment, hasLocalTargetCommitment, isPlayerInteractionDefense, selectTargetCommitment } from "./targetCommitment";
+import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import { getPartyMovementTargetPosition } from "./partyTargetSystem";
 import {
   FOLLOW_DISTANCE,
@@ -82,11 +89,12 @@ export function updatePartyFormationSystem(
   if (
     !leader ||
     leader.state === "dead" ||
-    leader.commandPriority === "direct" ||
+    hasDirectCompanionAuthority(state, leader) ||
     isCompanionAssignedToResurrectionRecovery(state, leader.id)
   ) {
     return clearFormation(state);
   }
+  if (isAutoRoutePaused(state) && getPartyExecutionIntent(state)?.type !== "attack") return clearFormation(state);
 
   const playerIntentClearedState = clearStalePlayerPartyIntent(state, leader);
 
@@ -112,7 +120,7 @@ export function updatePartyFormationSystem(
 
   if (plan.phase === "combat" && plan.target) {
     nextState = assignPartyCombatTarget(nextState, plan.target.id);
-    return nextState;
+    return prepareCombatFormation(nextState);
   }
 
   nextState = assignPartyTravelTargets(nextState, leader, plan);
@@ -124,10 +132,12 @@ export function updatePartyFormationSystem(
   );
 
   if (smallObjectiveHoldActive) {
-    markSmallObjectiveHoldMembers(nextState, movedEntityIds);
+    nextState = markSmallObjectiveHoldMembers(nextState, movedEntityIds);
   } else {
     const handoffActive = isLeaderHandoffActive(nextState, leader);
-    const travelCohesion = getPartyTravelCohesion(nextState, leader);
+    const adaptiveCohesion = updateTravelFormationCohesion(nextState);
+    if (adaptiveCohesion) nextState = adaptiveCohesion.state;
+    const travelCohesion = adaptiveCohesion ?? getPartyTravelCohesion(nextState, leader);
 
     if (travelCohesion.canMoveLeader || handoffActive) {
       nextState = moveLeaderTowardPoi(
@@ -137,6 +147,9 @@ export function updatePartyFormationSystem(
         movedEntityIds,
         handoffActive ? 1 : travelCohesion.leaderSpeedMultiplier,
       );
+    } else if (adaptiveCohesion) {
+      nextState = holdEntityMovement(nextState, leader, "partyTravel", "formation cohesion wait");
+      nextState = flushNormalMovementForEntity(nextState, leader.id);
     }
 
     nextState = moveFollowersTowardLeader(
@@ -156,11 +169,12 @@ export function updatePartyFormationSystem(
 function markSmallObjectiveHoldMembers(
   state: GameState,
   movedEntityIds: Set<string>,
-): void {
+): GameState {
+  let nextState = state;
   for (const member of getPartyMembers(state)) {
     if (
       member.state === "dead" ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(state, member.id) ||
       isPartyMemberRespondingToActiveThreat(state, member) ||
       isPartyMemberBusyGatheringResource(state, member)
@@ -169,7 +183,9 @@ function markSmallObjectiveHoldMembers(
     }
 
     movedEntityIds.add(member.id);
+    nextState = holdEntityMovement(nextState, member, "partyTravel", "objective hold");
   }
+  return nextState;
 }
 
 function isSmallObjectiveHoldActive(
@@ -217,6 +233,7 @@ function assignPartyTravelTargets(
   if (
     currentLeader &&
     isPartyMember(currentLeader) &&
+    !isPlayerInteractionDefense(nextState, currentLeader) &&
     (hasPlayerIntent ||
       !isPartyMemberRespondingToActiveThreat(nextState, currentLeader))
   ) {
@@ -316,7 +333,7 @@ function clearStalePlayerPartyIntent(
 
   for (const member of getPartyMembers(nextState)) {
     if (
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       isPartyMemberRespondingToActiveThreat(nextState, member) ||
       !isMemberAssignedToExecutionIntent(member, leader.id, executionIntent)
@@ -355,7 +372,7 @@ function clearStaleGatherPartyIntent(
 
   for (const member of getPartyMembers(nextState)) {
     if (
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       member.state !== "gather" ||
       member.currentTargetId !== targetId
@@ -409,8 +426,20 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
     source: executionIntent?.source,
   });
 
-  for (const member of getPartyMembers(nextState)) {
+  for (const member of getPartyMembers(nextState).sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id))) {
     if (!canAssignPartyCombatTarget(nextState, member, hasPlayerIntent)) {
+      continue;
+    }
+
+    if (!hasPlayerIntent && target?.kind === "enemy") {
+      const decision = selectTargetCommitment(nextState, member, {
+        preferredTarget: target, isEligible: enemy => isDefenderAttackTargetRelevant(nextState, member, enemy),
+      });
+      nextState = applyTargetCommitment(nextState, member, decision);
+      // Combat entry resumes an accepted approach without replacing its target or evidence.
+      const actor = nextState.entities[member.id];
+      if (decision.target && actor?.kind === "companion" && (actor.state === "follow" || actor.state === "idle"))
+        nextState = updateEntity(nextState, { ...actor, state: "attack" });
       continue;
     }
 
@@ -441,6 +470,7 @@ function moveLeaderTowardPoi(
   if (!leader || !isPartyMember(leader)) {
     return state;
   }
+  if (hasLocalTargetCommitment(state, leader)) return state;
 
   const escortGuide = getActiveEscortGuide(state);
 
@@ -451,7 +481,7 @@ function moveLeaderTowardPoi(
     getDistance(leader.position, escortGuide.position) <=
       ESCORT_GUIDE_RESUME_DISTANCE
   ) {
-    return state;
+    return holdEntityMovement(state, leader, "partyTravel", "escort hold");
   }
 
   if (
@@ -459,16 +489,17 @@ function moveLeaderTowardPoi(
     getDistance(leader.position, plan.targetPosition) <=
     getPoiReachedDistance(state, plan)
   ) {
-    return state;
+    return holdEntityMovement(state, leader, "partyTravel", "travel destination reached");
   }
 
-  const nextState = moveEntityTowardPositionIfUnoccupied(
+  let nextState = moveEntityTowardPositionIfUnoccupied(
     state,
     leader,
     plan.targetPosition,
     {
       allowPartyPassThrough: true,
       pathProfile: plan.target ? "chase" : "poi",
+      source: "partyTravel",
       pathTargetKey: plan.target
         ? `leader-chase:${plan.target.id}`
         : `leader-poi:${getPositionPathKey(plan.targetPosition)}`,
@@ -477,6 +508,7 @@ function moveLeaderTowardPoi(
     },
   );
 
+  nextState = flushNormalMovementForEntity(nextState, leader.id);
   if (didEntityMove(nextState, leader)) {
     movedEntityIds.add(leader.id);
   }
@@ -529,7 +561,7 @@ function moveFollowersTowardLeader(
   for (const member of getPartyMembers(nextState)) {
     if (
       member.id === leader.id ||
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       isCompanionAssignedToResurrectionRecovery(nextState, member.id) ||
       isPartyMemberRespondingToActiveThreat(nextState, member) ||
       isPartyMemberBusyGatheringResource(nextState, member) ||
@@ -555,14 +587,22 @@ function moveFollowersTowardLeader(
         !isStackedWithPartyMember(nextState, currentMember)
       ) {
         movedEntityIds.add(currentMember.id);
+        nextState = holdEntityMovement(nextState, currentMember, "partyTravel", "escort hold");
         continue;
       }
+    }
+
+    if (isTravelFormationMember(nextState, currentMember)) {
+      nextState = moveTravelFormationMember(nextState, currentMember, "partyTravel");
+      if (didEntityMove(nextState, currentMember)) movedEntityIds.add(currentMember.id);
+      continue;
     }
 
     if (
       getDistance(currentMember.position, leader.position) <= FOLLOW_DISTANCE &&
       !isStackedWithPartyMember(nextState, currentMember)
     ) {
+      nextState = holdEntityMovement(nextState, currentMember, "partyTravel", "travel follow settled");
       continue;
     }
 
@@ -584,7 +624,11 @@ function moveFollowersTowardLeader(
       {
         allowPartyPassThrough: true,
         pathProfile: "follow",
+        source: "partyTravel",
         pathTargetKey: `follow:${leader.id}`,
+        isSettlingPosition: position => getDistance(position, leader.position) <= FOLLOW_DISTANCE ||
+          Boolean(escortGuide && canHoldNearEscortGuide(nextState, currentMember) &&
+            shouldHoldNearEscortGuide(getDistance(position, escortGuide.position))),
         pathTargetPosition: followPosition,
         speedMultiplier: shouldCatchUp ? FOLLOWER_CATCH_UP_SPEED_MULTIPLIER : 1,
       },
@@ -670,7 +714,7 @@ function getActiveEscortGuide(state: GameState): GameEntity | null {
 function canHoldNearEscortGuide(state: GameState, member: PartyMember): boolean {
   return (
     member.state !== "dead" &&
-    member.commandPriority !== "direct" &&
+    !hasDirectCompanionAuthority(state, member) &&
     !isCompanionAssignedToResurrectionRecovery(state, member.id) &&
     !isPartyMemberBusyGatheringResource(state, member) &&
     !isPartyMemberRespondingToActiveThreat(state, member)
@@ -700,7 +744,7 @@ function clearFinishedCombat(state: GameState): GameState {
   }
 
   for (const member of getPartyMembers(nextState)) {
-    if (member.commandPriority === "direct" || member.state !== "attack") {
+    if (hasDirectCompanionAuthority(nextState, member) || member.state !== "attack") {
       continue;
     }
 
@@ -784,8 +828,8 @@ function setFormationState(state: GameState, plan: PartyActivityPlan): GameState
     targetId: plan.target?.id ?? null,
     approachPoint: plan.targetPosition,
     direction: { x: 0, y: 0 },
-    slotsByEntityId: {},
-    slotReasonsByEntityId: {},
+    slotsByEntityId: Object.fromEntries(Object.entries(previousFormation.slotsByEntityId).filter(([id]) => getSpecializedMovementOwner(state, id))),
+    slotReasonsByEntityId: Object.fromEntries(Object.entries(previousFormation.slotReasonsByEntityId).filter(([id]) => getSpecializedMovementOwner(state, id))),
     skippedTargetIds: [],
   };
 
@@ -817,14 +861,18 @@ function clearFormation(state: GameState): GameState {
 
   return {
     ...state,
-    partyFormation: createIdleFormation(),
+    partyFormation: { ...createIdleFormation(),
+      slotsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))),
+      slotReasonsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotReasonsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))) },
   };
 }
 
 function clearFormationTarget(state: GameState): GameState {
   return {
     ...state,
-    partyFormation: createIdleFormation(),
+    partyFormation: { ...createIdleFormation(),
+      slotsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))),
+      slotReasonsByEntityId: Object.fromEntries(Object.entries(state.partyFormation?.slotReasonsByEntityId ?? {}).filter(([id]) => getSpecializedMovementOwner(state, id))) },
   };
 }
 

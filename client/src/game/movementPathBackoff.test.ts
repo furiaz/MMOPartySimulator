@@ -6,6 +6,8 @@ import {
   createResource,
 } from ".";
 import { markMoveFailed } from "./movementState";
+import { getNormalMovementResult } from "./movementAuthority";
+import { getEntityOverlapDepth, isPositionInsideEntityCollisionShape } from "./spatialGeometry";
 import { consumeGamePerformanceMetrics } from "./performanceMetrics";
 import {
   getEntityById,
@@ -327,7 +329,8 @@ describe("movement path backoff", () => {
     );
 
     expect(getEntityById(nextState, enemy.id)?.position).toEqual(enemy.position);
-    expect(nextState.failedMoveByEntityId?.[enemy.id]).toBe(true);
+    expect(getNormalMovementResult(nextState, enemy.id)).toMatchObject({ outcome: "held", reason: "crowd_wait" });
+    expect(nextState.failedMoveByEntityId?.[enemy.id]).toBeUndefined();
   });
 
   it("keeps resources and enemies solid for companion movement", () => {
@@ -360,10 +363,13 @@ describe("movement path backoff", () => {
         },
       );
 
-      expect(getEntityById(nextState, movingCompanion.id)?.position).toEqual(
-        movingCompanion.position,
-      );
-      expect(nextState.failedMoveByEntityId?.[movingCompanion.id]).toBe(true);
+      const position = nextState.entities[movingCompanion.id].position;
+      expect(isPositionInsideEntityCollisionShape(blocker, position)).toBe(false);
+      if (blocker.kind === "resource") expect(nextState.failedMoveByEntityId?.[movingCompanion.id]).toBe(true);
+      else {
+        expect(getEntityOverlapDepth(movingCompanion, blocker, position)).toBeLessThanOrEqual(getEntityOverlapDepth(movingCompanion, blocker));
+        expect(nextState.failedMoveByEntityId?.[movingCompanion.id]).toBeUndefined();
+      }
     }
   });
 
@@ -396,10 +402,10 @@ describe("movement path backoff", () => {
       },
     );
 
-    expect(getEntityById(nextState, movingCompanion.id)?.position).toEqual(
-      movingCompanion.position,
-    );
-    expect(nextState.failedMoveByEntityId?.[movingCompanion.id]).toBe(true);
+    expect(isPositionInsideEntityCollisionShape(questGuide, nextState.entities[movingCompanion.id].position)).toBe(false);
+    expect(getEntityOverlapDepth(movingCompanion, questGuide, nextState.entities[movingCompanion.id].position))
+      .toBeLessThanOrEqual(getEntityOverlapDepth(movingCompanion, questGuide));
+    expect(nextState.entities[questGuide.id].position).toEqual(questGuide.position);
   });
 
   it("moves through the Quest Giver stall shape from telemetry", () => {

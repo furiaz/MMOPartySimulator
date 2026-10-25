@@ -171,7 +171,7 @@ describe("party activity coordinator", () => {
     expect(plan.target?.id).toBe(liveThreat.id);
   });
 
-  it("switches AI combat commitment when the current threat leaves combat range", () => {
+  it("retains AI combat commitment through an ordinary range change", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const distantThreat = {
       ...createEnemy("distant-threat", { x: 5, y: 0 }, "aggressive"),
@@ -200,11 +200,11 @@ describe("party activity coordinator", () => {
 
     const plan = resolvePartyActivityPlan(state, leader);
 
-    expect(plan.phase).toBe("combat");
-    expect(plan.target?.id).toBe(closeThreat.id);
+    expect(plan.phase).toBe("traveling");
+    expect(plan.target?.id).toBe(distantThreat.id);
   });
 
-  it("lets a movement blocker override the current AI combat commitment", () => {
+  it("does not let a movement blocker override shared AI combat commitment", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const currentThreat = {
       ...createEnemy("current-threat", { x: 2, y: 0 }, "aggressive"),
@@ -237,10 +237,10 @@ describe("party activity coordinator", () => {
     const plan = resolvePartyActivityPlan(state, leader);
 
     expect(plan.phase).toBe("combat");
-    expect(plan.target?.id).toBe(blocker.id);
+    expect(plan.target?.id).toBe(currentThreat.id);
   });
 
-  it("lets a direct companion's personal attacker override AI combat commitment", () => {
+  it("does not broadcast a direct companion's personal attacker over shared commitment", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const directCompanion = {
       ...createCompanion("direct", { x: 0, y: 1 }, leader.id, "support"),
@@ -275,7 +275,7 @@ describe("party activity coordinator", () => {
     const plan = resolvePartyActivityPlan(state, leader);
 
     expect(plan.phase).toBe("combat");
-    expect(plan.target?.id).toBe(personalAttacker.id);
+    expect(plan.target?.id).toBe(currentThreat.id);
   });
 
   it("keeps direct-commanded companions out of autonomous travel combat and gather assignment", () => {
@@ -299,7 +299,7 @@ describe("party activity coordinator", () => {
     expect(canAssignPartyGatherTarget(state, directCompanion, true)).toBe(false);
   });
 
-  it("lets direct-commanded companions join self-defense only when personally threatened", () => {
+  it("lets a direct collector join self-defense only when personally threatened", () => {
     const leader = createCompanion("leader", { x: 0, y: 0 }, "leader", "fighter");
     const directCompanion = {
       ...createCompanion("direct", { x: 1, y: 0 }, leader.id, "support"),
@@ -323,6 +323,8 @@ describe("party activity coordinator", () => {
         [personalThreat.id]: personalThreat,
       },
       partyLeaderId: leader.id,
+      directCompanionCommandsById: { [directCompanion.id]: { type: "gather", companionId: directCompanion.id,
+        targetId: "resource", targetPosition: null, issuedAt: 1000 } },
     });
 
     expect(canAssignSelfDefenseTarget(state, directCompanion, leaderThreat)).toBe(

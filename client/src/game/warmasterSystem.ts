@@ -1,6 +1,6 @@
 import { clearEnemyAbilityRuntimeForEnemy } from "./enemyAbilitySystem";
 import { ENEMY_TYPES } from "./enemyArchetypes";
-import { clearForcedMovements, isForcedMovementPositionAvailable } from "./forcedMovement";
+import { cancelForcedMovement, clearForcedMovements, isForcedMovementPositionAvailable } from "./forcedMovement";
 import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
 import { updateEntity, type GameState } from "./state";
 import { clearStatusEffectsForEntity } from "./statusEffects";
@@ -8,6 +8,8 @@ import { WARMASTER_ARENA, WARMASTER_MAX_POWER, WARMASTER_RETREAT_MS, isInsideWar
 import { ORC_WARCAMP_ENCOUNTER_ID } from "./orcWarcampLayout";
 import type { Enemy } from "./types";
 import { isWarmasterAvailable } from "./warmasterLifecycleState";
+import { commitSpecializedMovementPosition, getMovementPositionCommit, handoffSpecializedMovement, releaseSpecializedMovement } from "./movementAuthority";
+import { clearTargetCommitmentsForTarget } from "./targetCommitment";
 function configureBoss(boss: Enemy): Enemy {
   return {
     ...boss,
@@ -23,13 +25,15 @@ export function getActiveWarmasterEncounterIds(state: GameState): ReadonlySet<st
 }
 export function resetWarmasterAttempt(state: GameState, now: number): GameState {
   if (state.currentMapId !== "map-7")
-    return { ...state, warmasterAttempt: undefined };
+    return { ...state, warmasterAttempt: undefined, warmasterResetPending: undefined };
   const boss = Object.values(state.entities).find(isWarmaster);
   let next = state.warmasterAttempt ? clearForcedMovements(state, state.warmasterAttempt.bossId) : state;
   next = { ...next, warmasterAttempt: undefined };
   if (!boss)
-    return next;
+    return { ...next, warmasterResetPending: undefined };
+  next = clearTargetCommitmentsForTarget(next, boss.id);
   next = clearEnemyAbilityRuntimeForEnemy(next, boss.id);
+  next = cancelForcedMovement(next, boss.id, { handoff: true });
   next = clearStatusEffectsForEntity(next, boss.id);
   const skillBindsByEnemyId = { ...next.skillBindsByEnemyId };
   const skillMarksByEnemyId = { ...next.skillMarksByEnemyId };
@@ -42,7 +46,11 @@ export function resetWarmasterAttempt(state: GameState, now: number): GameState 
   };
   const base = configureBoss(boss);
   if (boss.health <= 0 || boss.state === "dead")
-    return updateEntity(next, base, now);
+    return updateEntity({ ...next, warmasterResetPending: undefined }, base, now);
+  // Reset bookkeeping may run late in a tick, but its placement cannot refund movement.
+  next = { ...next, warmasterResetPending: boss.id };
+  next = handoffSpecializedMovement(next, boss.id, "encounterReset", `reset:${boss.id}`).state;
+  if (getMovementPositionCommit(next, boss.id)) return next;
   let position = { ...boss.homePosition };
   // Only run this bounded placement search at reset, never per animation frame.
   const candidates = [position];
@@ -54,13 +62,17 @@ export function resetWarmasterAttempt(state: GameState, now: number): GameState 
       }
   }
   position = candidates.find(candidate => isEnemyMovementPositionAllowed(next, base, candidate) && isForcedMovementPositionAvailable(next, base, candidate, true)) ?? position;
+  if (!isForcedMovementPositionAvailable(next, base, position, true)) return next;
+  const movement = commitSpecializedMovementPosition(next, boss.id, position, "encounterReset", `reset:${boss.id}`);
+  if (movement.outcome !== "moved" && movement.outcome !== "held") return movement.state;
+  next = releaseSpecializedMovement({ ...movement.state, warmasterResetPending: undefined }, boss.id, `reset:${boss.id}`).state;
   return updateEntity({
     ...next,
     attackSlotCacheByEntityId: {},
     movementPathsByEntityId: {}
   }, {
     ...base,
-    position,
+    position: next.entities[boss.id].position,
     health: base.maxHealth,
     state: "idle",
     currentTargetId: null,
@@ -73,6 +85,7 @@ export function resetWarmasterAttempt(state: GameState, now: number): GameState 
   }, now);
 }
 export function updateWarmasterSystem(state: GameState, now: number): GameState {
+  if (state.warmasterResetPending) return resetWarmasterAttempt(state, now);
   if (!isWarmasterAvailable(state)) return state.warmasterAttempt ? { ...state, warmasterAttempt: undefined } : state;
   if (state.currentMapId !== "map-7")
     return state.warmasterAttempt ? { ...state, warmasterAttempt: undefined } : state;

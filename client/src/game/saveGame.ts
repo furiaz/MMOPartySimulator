@@ -1,7 +1,9 @@
 import { restoreBarracks } from "./barracks";
+import { getSelectedFormationPreset } from "./formationSelection";
 import { reconcileWarmasterLifecycle, sanitizeWarmasterLifecycle } from "./warmasterLifecycle";
 import { restoreOrcWarcampLayout } from "./orcWarcampRestoration";
 import { resetWarmasterAttempt } from "./warmasterSystem";
+import { isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
 import {
   aoeTargetDummyId,
   aoeTargetDummyPosition,
@@ -92,6 +94,7 @@ import type {
   DebugMapId,
   EnemyEncounterBand,
   GameEntity,
+  Position,
   InventorySlot,
   ItemId,
   OfflineFarmingPendingLootState,
@@ -910,13 +913,8 @@ export function sanitizeGameStateForSave(
   enemyAbilityDefinitions: EnemyAbilityRegistry = ENEMY_ABILITY_DEFINITIONS,
 ): GameState {
   const currentMapId = state.currentMapId ?? "hub";
-  // Displacements are transient; restore their last safe point, not a body-overlap mid-flight.
-  const restoredPositions = Object.fromEntries(Object.entries(state.entities).map(([id, entity]) => {
-    const savedPosition = state.forcedMovementsByEntityId?.[id]?.lastSafePosition;
-    return [id, savedPosition && Number.isFinite(savedPosition.x) && Number.isFinite(savedPosition.y)
-      ? { ...entity, position: { ...savedPosition } } : entity];
-  }));
-  state = { ...state, entities: restoredPositions };
+  // Untrusted formation runtime must not reach lifecycle helpers during restoration.
+  state = { ...state, formationAssignments: undefined, formationPathSearchesByEntityId: undefined };
   const didSaveHaveNewQuestStates = Boolean(
     state.quests[GUILD_BOARD_ONBOARDING_QUEST_ID] ||
       state.quests[ASH_GOBLIN_MAIN_QUEST_ID],
@@ -1077,8 +1075,9 @@ export function sanitizeGameStateForSave(
     enemyAbilityDefinitions,
   );
 
-  return resetWarmasterAttempt(restoreOrcWarcampLayout(reconcileWarmasterLifecycle(restoreBarracks({
+  return resetWarmasterAttempt(restoreOrcWarcampLayout(restoreSpecializedMovementPositions(reconcileWarmasterLifecycle(restoreBarracks({
     ...state,
+    selectedFormationPreset: getSelectedFormationPreset(state),
     entities,
     restingCompanionsById,
     highestCharacterLevelEver,
@@ -1122,6 +1121,20 @@ export function sanitizeGameStateForSave(
     lastPoiDecision: undefined,
     followTrailsByEntityId,
     lastPositionsByEntityId: {},
+    normalMovementResultsByEntityId: {},
+    targetCommitmentsByEntityId: {},
+    targetApproachesByEntityId: {},
+    targetEngagementProbeAtMsByEntityId: {},
+    rejectedCombatTargetsByEntityId: {},
+    companionTargetDecisionByEntityId: {},
+    companionTargetTransitions: [],
+    localAvoidanceByEntityId: {},
+    overlapRecoveryByEntityId: {},
+    overlapRecoveryGeometryKey: undefined,
+    movementPositionCommitsByEntityId: {},
+    warmasterResetPending: undefined,
+    normalMovementPhase: undefined,
+    externalMovementOwnersByEntityId: {},
     failedMoveByEntityId: {},
     movementFailureMsByEntityId: {},
     movementFailuresByEntityId: {},
@@ -1136,6 +1149,8 @@ export function sanitizeGameStateForSave(
     defenderWaitMsByLeaderId: {},
     defenderBlockedMsByEntityId: {},
     partyFormation: undefined,
+    formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
     combatFeedbackEvents: [],
     combatProjectiles: [],
     autonomousTargetSuppressionsByEnemyId: undefined,
@@ -1198,7 +1213,49 @@ export function sanitizeGameStateForSave(
     lastHealthRegenAtByCompanionId: {},
     lastTargetDummyRegenAtByEnemyId: {},
     debugTelemetry: undefined,
-  }, now))), now);
+  }, now)), state)), now);
+}
+
+/** Snapshot-only placement: never resume a trajectory or publish into the live game. */
+function restoreSpecializedMovementPositions(restored: GameState, original: GameState): GameState {
+  let next = restored;
+  const movements = { ...original.enemyDashesByEnemyId, ...original.forcedMovementsByEntityId };
+  for (const id of Object.keys(movements).sort()) {
+    const actor = next.entities[id];
+    const movement = movements[id];
+    if (!movement || !actor || (actor.kind !== "companion" && actor.kind !== "enemy") || actor.state === "dead" || actor.health <= 0) continue;
+    const safe = (position: Position) => isSpecializedMovementPositionAvailable(next, actor, position, { landing: true });
+    // Last-safe is a preference, not proof: occupants, resources and restored
+    // structure footprints may have changed since it was recorded.
+    let position = [movement.lastSafePosition, actor.position].find(candidate => candidate && safe(candidate));
+    const origin = movement.origin;
+    if (!position && origin && Number.isFinite(origin.x) && Number.isFinite(origin.y)) {
+      const steps = Math.min(80, Math.max(1, Math.ceil(Math.hypot(actor.position.x - origin.x, actor.position.y - origin.y) / 0.1)));
+      for (let step = 1; step <= steps && !position; step++) {
+        const candidate = { x: actor.position.x + (origin.x - actor.position.x) * step / steps,
+          y: actor.position.y + (origin.y - actor.position.y) * step / steps };
+        if (safe(candidate)) position = candidate;
+      }
+    }
+    // Exceptional load recovery only, not lateral steering during live motion.
+    // Use a bounded local search first, like the existing restoration helpers.
+    for (let radius = 1; radius <= 8 && !position; radius++) {
+      for (let x = -radius; x <= radius && !position; x++) for (let y = -radius; y <= radius && !position; y++) {
+        if (Math.abs(x) !== radius && Math.abs(y) !== radius) continue;
+        const candidate = { x: actor.position.x + x, y: actor.position.y + y };
+        if (safe(candidate)) position = candidate;
+      }
+    }
+    // As in Orc-warcamp restoration, unusually crowded imported/debug snapshots
+    // may need the remaining finite map search. This never runs in live ticks.
+    for (let y = 0; y < (next.map?.rows ?? 0) && !position; y++) {
+      for (let x = 0; x < (next.map?.columns ?? 0) && !position; x++) {
+        if (safe({ x, y })) position = { x, y };
+      }
+    }
+    if (position) next = { ...next, entities: { ...next.entities, [id]: { ...actor, position: { ...position } } } };
+  }
+  return next;
 }
 
 function sanitizeQuestStates(

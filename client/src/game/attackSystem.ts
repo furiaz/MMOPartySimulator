@@ -1,26 +1,34 @@
+import { finishDirectCompanionCommand, isDirectGatherPersonalThreat, hasDirectCompanionAuthority } from "./directCommandState";
+import { getCombatFormationPreference, prepareCombatFormation } from "./combatFormation";
 import {
   isAutonomousEntity,
   isCombatEntity,
-  moveEntityTo,
   MOVEMENT_STEP_DISTANCE,
   setLastAttackAt,
 } from "./entities";
 import {
   chooseAttackSlot,
-  rememberAttackSlot,
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
-import { getPartyMembers, isPartyMember } from "./partySystem";
+import { getActiveCompanionsInPartyOrder, getPartyMembers, isPartyMember } from "./partySystem";
+import { getPartyCombatTarget } from "./partyTargetSystem";
+import { isActivePartyThreat } from "./partyThreatSystem";
+import { applyTargetCommitment, canReacquireCombatTarget, isPrivateResponseTarget, isRetainableCombatEnemy, selectTargetCommitment } from "./targetCommitment";
+import { getPartyExecutionIntent } from "./partyIntentState";
+import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import {
   getEntityById,
   updateEntity,
   type GameState,
 } from "./state";
 import {
-  isWalkablePosition,
+  isCombatPositionAvailable,
+  flushNormalMovementForEntity,
+  holdEntityMovement,
+  moveEntityToPositionIfUnoccupied,
   moveEntityTowardPositionIfUnoccupied,
-  reservePositionForFrame,
 } from "./movementPlanning";
+import { getNormalMovementResult } from "./movementAuthority";
 import { getRolePriority } from "./roleProfiles";
 import { isEnemyBound } from "./skillRuntime";
 import {
@@ -47,10 +55,10 @@ import {
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
 import { isEnemyEntity } from "./entityGuards";
 import { getCombatTargetPosition, getStructureApproachPosition, hasStructureLineOfSight } from "./combatStructures";
+import { getEffectiveAttackRange, isWithinAttackReach } from "./spatialGeometry";
 import { isInsideEnemyMovementBounds } from "./enemyMovementBounds";
 import {
   getEnemyAttackRange,
-  getEnemyCombatBodyRadius,
 } from "./enemyArchetypes";
 import {
   DEFAULT_COMPANION_ATTACK_RANGE,
@@ -93,10 +101,10 @@ export function updateAttackSystem(
   now = Date.now(),
   pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
-  let nextState = state;
+  let nextState = resolveAutomaticAttackTargets(state);
 
   for (const entity of getCombatMovementOrder(state)) {
-    const attacker = getEntityById(nextState, entity.id);
+    let attacker = getEntityById(nextState, entity.id);
 
     if (
       !attacker ||
@@ -108,10 +116,29 @@ export function updateAttackSystem(
       continue;
     }
 
+    const command = nextState.directCompanionCommandsById?.[attacker.id];
+    if (command?.type === "move") continue;
+    if (command?.type === "gather" && (!attacker.currentTargetId ||
+      !isDirectGatherPersonalThreat(nextState, attacker.id, nextState.entities[attacker.currentTargetId]))) continue;
+    if (usesAutomaticAttackTarget(nextState, attacker) && !isRetainableCombatEnemy(nextState, nextState.entities[attacker.currentTargetId ?? ""])) {
+      nextState = resolveAutomaticAttackTargets(nextState, true);
+      attacker = getEntityById(nextState, entity.id);
+      if (!attacker || !isAttackingCombatEntity(attacker)) continue;
+    }
+    if (usesAutomaticAttackTarget(nextState, attacker)) {
+      const actor = attacker;
+      nextState = applyTargetCommitment(nextState, actor, chooseAutomaticAttackTarget(nextState, actor));
+      attacker = nextState.entities[actor.id];
+      if (!isAttackingCombatEntity(attacker)) continue;
+    }
     const target = getValidTarget(nextState, attacker);
 
     if (!target) {
-      nextState = updateEntity(nextState, finishAttack(nextState, attacker));
+      if (command?.type === "attack") {
+        nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
+        continue;
+      }
+      nextState = finishAttack(nextState, attacker);
       continue;
     }
 
@@ -133,7 +160,7 @@ export function updateAttackSystem(
       !canEnemyChaseTarget(currentAttacker, target) &&
       !isInAttackRange(currentAttacker, target)
     ) {
-      nextState = updateEntity(nextState, finishAttack(nextState, currentAttacker));
+      nextState = finishAttack(nextState, currentAttacker);
       continue;
     }
 
@@ -148,6 +175,7 @@ export function updateAttackSystem(
     const isResurrectionParticipant =
       isPartyCombatEntity(currentAttacker) &&
       isCompanionAssignedToResurrectionRecovery(nextState, currentAttacker.id);
+    nextState = prepareCombatFormation(nextState);
 
     if (
       isResurrectionParticipant &&
@@ -169,18 +197,21 @@ export function updateAttackSystem(
         : null;
     const finalStepPosition =
       candidateAllowedFinalStepPosition &&
+      !movedEntityIds.has(currentAttacker.id) &&
+      !getNormalMovementResult(nextState, currentAttacker.id) &&
       !isMovementBlockedByStatus(nextState, currentAttacker.id)
         ? candidateAllowedFinalStepPosition
         : null;
-    const attackReadyAttacker = finalStepPosition
-      ? moveEntityTo(currentAttacker, finalStepPosition)
-      : currentAttacker;
-
     if (finalStepPosition) {
-      nextState = reservePositionForFrame(nextState, currentAttacker.id, finalStepPosition);
-      nextState = updateEntity(nextState, attackReadyAttacker);
-      movedEntityIds.add(currentAttacker.id);
+      nextState = moveEntityToPositionIfUnoccupied(nextState, currentAttacker, finalStepPosition, {
+        source: "attack", sourceReason: "combat final step", allowPartyPassThrough: true,
+        combatSlot: { targetId: target.id, attackReach: getAttackRange(currentAttacker), position: finalStepPosition },
+        isPositionAllowed: position => !isResurrectionParticipant || isPositionInActiveResurrectionArea(nextState, position),
+      });
+      nextState = flushNormalMovementForEntity(nextState, currentAttacker.id);
+      if (didEntityMove(nextState, currentAttacker)) movedEntityIds.add(currentAttacker.id);
     }
+    const attackReadyAttacker = nextState.entities[currentAttacker.id] as CombatEntity;
 
     if (
       isInAttackRange(attackReadyAttacker, target) &&
@@ -201,13 +232,17 @@ export function updateAttackSystem(
         pathDistanceCache,
       );
 
-      if (spacedSlotState !== nextState) {
-        nextState = spacedSlotState;
+      const spacingMoved = didEntityMove(spacedSlotState, attackReadyAttacker);
+      nextState = spacedSlotState;
+      if (spacingMoved) {
         continue;
       }
     }
 
-    if (isInAttackRange(attackReadyAttacker, target) && hasStructureLineOfSight(nextState, attackReadyAttacker.position, target)) {
+    if (isInAttackRange(attackReadyAttacker, target) &&
+      isCombatPositionAvailable(nextState, attackReadyAttacker, attackReadyAttacker.position, { allowPartyPassThrough: true }) &&
+      hasStructureLineOfSight(nextState, attackReadyAttacker.position, target)) {
+      nextState = holdEntityMovement(nextState, attackReadyAttacker, "attack", "legal engagement");
       if (isEnemy(attackReadyAttacker) && isStompOnlyEnemy(attackReadyAttacker)) {
         nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
         continue;
@@ -298,37 +333,39 @@ export function updateAttackSystem(
         ? clearAttackWindup(setLastAttackAt(currentUpdatedAttacker, now))
         : updatedAttacker;
 
-      nextState = updateEntity(
-        nextState,
-        impactResult.target.state === "dead"
-          ? finishAttack(nextState, finalUpdatedAttacker)
-          : finalUpdatedAttacker,
-      );
+      nextState = updateEntity(nextState, finalUpdatedAttacker);
+      if (impactResult.target.state === "dead") {
+        const automatic = usesAutomaticAttackTarget(nextState, finalUpdatedAttacker);
+        nextState = resolveAutomaticAttackTargets(nextState, true);
+        if (!automatic) nextState = finishAttack(nextState, finalUpdatedAttacker);
+      }
+      if (impactResult.target.state === "dead" && command?.type === "attack")
+        nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
       continue;
     }
 
     nextState = clearAttackWindupInState(nextState, attackReadyAttacker);
 
-    if (movedEntityIds.has(currentAttacker.id)) {
+    if (movedEntityIds.has(currentAttacker.id) || getNormalMovementResult(nextState, currentAttacker.id)) {
       continue;
     }
 
     const candidateAttackSlot = chooseAttackSlot(
       nextState,
       currentAttacker,
-      getCombatTargetPosition(currentAttacker.position, target),
-      getEffectiveAttackRange(currentAttacker, target),
+      target,
+      getAttackRange(currentAttacker),
       {
         allowPartyPassThrough: true,
         maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
         nowMs: now,
         pathDistanceCache,
         preferredSlotIndex: getAttackSlotPreference(currentAttacker),
+        preferredFormationPosition: currentAttacker.kind === "companion" ? getCombatFormationPreference(nextState, currentAttacker) : undefined,
         partySpacingMode:
           currentAttacker.kind === "companion" && !isResurrectionParticipant
             ? "prefer"
             : "off",
-        targetId: target.id,
       },
     );
     const attackSlot =
@@ -340,34 +377,23 @@ export function updateAttackSystem(
 
     const movementTarget = isResurrectionParticipant
       ? attackSlot
-      : attackSlot ?? (target.kind === "structure" ? getStructureApproachPosition(nextState, currentAttacker, target) : target.position);
+      : attackSlot ?? (target.kind === "structure" ? getStructureApproachPosition(nextState, currentAttacker, target)
+        : isInAttackRange(currentAttacker, target) ? null : target.position);
 
     if (!movementTarget) {
+      nextState = holdEntityMovement(nextState, currentAttacker, "attack", "no legal engagement slot");
       continue;
     }
 
     const previousPosition = currentAttacker.position;
 
-    if (attackSlot) {
-      nextState = rememberAttackSlot(
-        nextState,
-        currentAttacker,
-        getCombatTargetPosition(currentAttacker.position, target),
-        getEffectiveAttackRange(currentAttacker, target),
-        attackSlot,
-        {
-          allowPartyPassThrough: true,
-          nowMs: now,
-          targetId: target.id,
-        },
-      );
-      nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
-      nextState = reservePositionForFrame(nextState, currentAttacker.id, attackSlot, {
-        allowPartyPassThrough: true,
-      });
-    }
-
     nextState = moveEntityTowardPositionIfUnoccupied(nextState, currentAttacker, movementTarget, {
+      source: "attack",
+      combatSlot: attackSlot ? { targetId: target.id, attackReach: getAttackRange(currentAttacker), position: attackSlot } : undefined,
+      isPositionAllowed: position => (!isResurrectionParticipant || isPositionInActiveResurrectionArea(nextState, position)) &&
+        (!isEnemy(currentAttacker) || Boolean(currentAttacker.movementBounds) ||
+        getEuclideanDistance(currentAttacker.homePosition, position) <= getEnemyAttackLeashDistance()),
+      rejectedPositionOutcome: "held",
       allowPartyPassThrough: true,
       pathProfile: attackSlot ? "combatSlot" : "chase",
       pathTargetKey: attackSlot
@@ -377,21 +403,11 @@ export function updateAttackSystem(
       speedMultiplier: isEnemy(currentAttacker) ? getEnemyChaseSpeedMultiplier() : 1,
     });
 
+    nextState = flushNormalMovementForEntity(nextState, currentAttacker.id);
     const movedAttacker = getEntityById(nextState, currentAttacker.id);
 
-    if (
-      movedAttacker &&
-      isEnemy(currentAttacker) &&
-      !currentAttacker.movementBounds &&
-      getEuclideanDistance(currentAttacker.homePosition, movedAttacker.position) >
-        getEnemyAttackLeashDistance()
-    ) {
-      nextState = updateEntity(
-        nextState,
-        moveEntityTo(movedAttacker, previousPosition),
-      );
-      continue;
-    }
+    if (attackSlot && getNormalMovementResult(nextState, currentAttacker.id)?.request.source === "attack")
+      nextState = setCombatSlot(nextState, currentAttacker.id, attackSlot);
 
     if (
       movedAttacker &&
@@ -472,6 +488,11 @@ function getValidTarget(
   state: GameState,
   attacker: CombatEntity,
 ): CombatEntity | undefined {
+  const command = state.directCompanionCommandsById?.[attacker.id];
+  if (command?.type === "attack") {
+    const target = state.entities[command.targetId];
+    return isLiveCombatTarget(target) ? target : undefined;
+  }
   const currentTarget = attacker.currentTargetId
     ? getEntityById(state, attacker.currentTargetId)
     : undefined;
@@ -484,14 +505,40 @@ function getValidTarget(
     return undefined;
   }
 
-  return findPartyAssistTarget(state, attacker);
+  // Explicit party focus remains independently authoritative for an assisting member.
+  const shared = getPartyExecutionIntent(state)?.source === "player" ? getPartyCombatTarget(state) : null;
+  return shared && getDistance(attacker.position, shared.position) <= TARGET_SWITCH_DISTANCE ? shared : undefined;
 }
 
-function findPartyAssistTarget(
+function usesAutomaticAttackTarget(state: GameState, actor: GameEntity): actor is Companion {
+  return actor.kind === "companion" && actor.state === "attack" && !hasDirectCompanionAuthority(state, actor) &&
+    !isCompanionAssignedToResurrectionRecovery(state, actor.id) && getPartyExecutionIntent(state)?.source !== "player" &&
+    state.entities[actor.currentTargetId ?? ""]?.kind !== "structure";
+}
+
+/** Late invalidation uses the same acquisition order without reordering actions. */
+function resolveAutomaticAttackTargets(state: GameState, onlyInvalid = false): GameState {
+  let next = state;
+  for (const actor of getActiveCompanionsInPartyOrder(state)) {
+    if (usesAutomaticAttackTarget(next, actor) && (!onlyInvalid || !isRetainableCombatEnemy(next, next.entities[actor.currentTargetId ?? ""])))
+      next = applyTargetCommitment(next, actor, chooseAutomaticAttackTarget(next, actor));
+  }
+  return next;
+}
+
+function chooseAutomaticAttackTarget(state: GameState, actor: Companion) {
+  const assists = findPartyAssistTargets(state, actor).filter((target): target is Enemy => target.kind === "enemy");
+  return selectTargetCommitment(state, actor, { preferredTarget: assists[0], candidateTargets: assists,
+    isEligible: enemy => isDefenderAttackTargetRelevant(state, actor, enemy) });
+}
+
+function findPartyAssistTargets(
   state: GameState,
   attacker: Companion,
-): CombatEntity | undefined {
-  for (const member of getPartyMembers(state)) {
+): CombatEntity[] {
+  const partyTarget = getPartyCombatTarget(state);
+  const targets: CombatEntity[] = [];
+  for (const member of getPartyMembers(state).sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id))) {
     if (
       member.id === attacker.id ||
       member.state !== "attack" ||
@@ -506,11 +553,16 @@ function findPartyAssistTarget(
       isLiveCombatTarget(target) &&
       getDistance(attacker.position, target.position) <= TARGET_SWITCH_DISTANCE
     ) {
-      return target;
+      if (target.kind === "enemy" && (!canReacquireCombatTarget(state, attacker, target) || isPrivateResponseTarget(state, target.id))) continue;
+      // A private order is not shared focus. Existing party/threat authority can
+      // still make that same target eligible independently.
+      if (hasDirectCompanionAuthority(state, member) &&
+        partyTarget?.id !== target.id && !isActivePartyThreat(state, target)) continue;
+      if (!targets.some(other => other.id === target.id)) targets.push(target);
     }
   }
 
-  return undefined;
+  return targets;
 }
 
 function getCombatMovementOrder(state: GameState): GameEntity[] {
@@ -550,10 +602,7 @@ function isFakeDeathTarget(
 }
 
 function isInAttackRange(attacker: GameEntity, target: GameEntity): boolean {
-  return (
-    getDistance(attacker.position, getCombatTargetPosition(attacker.position, target)) <=
-    getEffectiveAttackRange(attacker, target)
-  );
+  return isWithinAttackReach(attacker, target, getAttackRange(attacker));
 }
 
 function canAttack(
@@ -578,32 +627,19 @@ export function getAttackCooldownMs(entity: CombatEntity): number {
     : COMPANION_GLOBAL_COOLDOWN_MS;
 }
 
-function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
+function finishAttack(state: GameState, attacker: CombatEntity): GameState {
+  if (hasDirectCompanionAuthority(state, attacker)) return state;
   if (!isAutonomousEntity(attacker) || !isPartyMember(attacker)) {
-    return {
+    return updateEntity(state, {
       ...clearAttackWindup(attacker),
       state: "idle",
       currentTargetId: null,
-    };
+    });
   }
-
-  const sharedTarget = findPartyAssistTarget(state, attacker);
-
-  if (sharedTarget) {
-    return {
-      ...clearAttackWindup(attacker),
-      state: "attack",
-      currentTargetId: sharedTarget.id,
-      commandPriority: "autonomous",
-    };
-  }
-
-  return {
-    ...clearAttackWindup(attacker),
-    state: "follow",
-    currentTargetId: attacker.id === state.partyLeaderId ? null : state.partyLeaderId,
-    commandPriority: "autonomous",
-  };
+  const decision = chooseAutomaticAttackTarget(state, attacker);
+  return decision.kind === "none" ? updateEntity(state, { ...clearAttackWindup(attacker), state: "follow",
+    currentTargetId: attacker.id === state.partyLeaderId ? null : state.partyLeaderId, commandPriority: "autonomous" })
+    : applyTargetCommitment(state, clearAttackWindup(attacker), decision);
 }
 
 function isEnemy(entity: GameEntity): entity is Enemy {
@@ -639,7 +675,7 @@ function getFinalStepAttackPosition(
 
   const targetPosition = getCombatTargetPosition(attacker.position, target);
   const euclideanDistance = getEuclideanDistance(attacker.position, targetPosition);
-  const effectiveAttackRange = getEffectiveAttackRange(attacker, target);
+  const effectiveAttackRange = getEffectiveAttackRange(attacker, target, getAttackRange(attacker));
   const gap = euclideanDistance - effectiveAttackRange;
 
   if (gap <= 0 || gap > FINAL_STEP_ATTACK_DISTANCE) {
@@ -664,7 +700,8 @@ function getFinalStepAttackPosition(
   if (
     getEuclideanDistance(attacker.position, finalPosition) >
       FINAL_STEP_ATTACK_DISTANCE ||
-    !isWalkablePosition(state, finalPosition, attacker.id) ||
+    !isCombatPositionAvailable(state, attacker, finalPosition, { allowPartyPassThrough: true }) ||
+    !hasStructureLineOfSight(state, finalPosition, target) ||
     (isPartyCombatEntity(attacker) &&
       !isCombatPositionSpacedFromParty(state, attacker, finalPosition))
   ) {
@@ -682,23 +719,23 @@ function moveTowardRequiredSpacedAttackSlot(
   movedEntityIds: Set<string>,
   pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
-  if (movedEntityIds.has(attacker.id)) {
+  if (movedEntityIds.has(attacker.id) || getNormalMovementResult(state, attacker.id)) {
     return state;
   }
 
   const attackSlot = chooseAttackSlot(
     state,
     attacker,
-    getCombatTargetPosition(attacker.position, target),
-    getEffectiveAttackRange(attacker, target),
+    target,
+    getAttackRange(attacker),
     {
       allowPartyPassThrough: true,
       maxPathDistance: MAX_ATTACK_SLOT_PATH_DISTANCE,
       nowMs: now,
       pathDistanceCache,
       preferredSlotIndex: getAttackSlotPreference(attacker),
+      preferredFormationPosition: getCombatFormationPreference(state, attacker),
       partySpacingMode: "required",
-      targetId: target.id,
     },
   );
 
@@ -706,35 +743,24 @@ function moveTowardRequiredSpacedAttackSlot(
     return state;
   }
 
-  let nextState = rememberAttackSlot(
-    state,
-    attacker,
-    getCombatTargetPosition(attacker.position, target),
-    getEffectiveAttackRange(attacker, target),
-    attackSlot,
-    {
-      allowPartyPassThrough: true,
-      nowMs: now,
-      targetId: target.id,
-    },
-  );
-  nextState = setCombatSlot(nextState, attacker.id, attackSlot);
-  nextState = reservePositionForFrame(nextState, attacker.id, attackSlot, {
-    allowPartyPassThrough: true,
-  });
-  nextState = moveEntityTowardPositionIfUnoccupied(nextState, attacker, attackSlot, {
+  let nextState = moveEntityTowardPositionIfUnoccupied(state, attacker, attackSlot, {
+    source: "attack",
+    combatSlot: { targetId: target.id, attackReach: getAttackRange(attacker), position: attackSlot },
     allowPartyPassThrough: true,
     pathProfile: "combatSlot",
     pathTargetKey: `combat-slot:${target.id}:${getPositionPathKey(attackSlot)}`,
     pathTargetPosition: attackSlot,
   });
+  nextState = flushNormalMovementForEntity(nextState, attacker.id);
+  if (getNormalMovementResult(nextState, attacker.id)?.request.source === "attack")
+    nextState = setCombatSlot(nextState, attacker.id, attackSlot);
 
   if (didEntityMove(nextState, attacker)) {
     movedEntityIds.add(attacker.id);
     return nextState;
   }
 
-  return state;
+  return nextState;
 }
 
 function getAttackRange(attacker: GameEntity): number {
@@ -753,18 +779,6 @@ function getBasicAttackProjectileProfile(
   return isEnemy(attacker)
     ? getEnemyBasicProjectileProfile(attacker)
     : attacker.kind === "companion" ? getCompanionBasicProjectileProfile(attacker) : null;
-}
-
-function getEffectiveAttackRange(attacker: GameEntity, target: GameEntity): number {
-  return (
-    getAttackRange(attacker) +
-    getCombatBodyRadius(attacker) +
-    getCombatBodyRadius(target)
-  );
-}
-
-function getCombatBodyRadius(entity: GameEntity): number {
-  return isEnemy(entity) ? getEnemyCombatBodyRadius(entity) : 0;
 }
 
 function setCombatSlot(

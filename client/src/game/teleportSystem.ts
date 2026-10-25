@@ -1,3 +1,5 @@
+import { getDirectLeaderCommand } from "./directCommandState";
+import { canStartAutoRouteRally, isAutoRoutePaused, isAutoRouteStepAvailable } from "./autoRouteSystem";
 import {
   createEnemy,
   createNpc,
@@ -50,7 +52,8 @@ import {
   pruneMissingEntityRuntimeState,
 } from "./mapRuntimeCleanup";
 import { preparePatronWardStateForMapExit } from "./patronWardSystem";
-import { requestWarmasterDeparture } from "./warmasterLifecycleState";
+import { isWarmasterRewardUiOpen, requestWarmasterDeparture } from "./warmasterLifecycleState";
+import { updateForcedMovements } from "./forcedMovement";
 import { answerWarmasterDeparture } from "./warmasterLifecycle";
 import { assignCurrentRoleBonuses } from "./roleBonus";
 import { getWorldTravelTeleportStatus } from "./worldTravelTeleports";
@@ -58,7 +61,7 @@ import {
   updateEntity,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { flushNormalMovementForEntity, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import {
   getPartyExecutionIntent,
   setPartyExecutionIntent,
@@ -111,6 +114,7 @@ export function triggerMapTeleport(
   if (!isTeleportWorking(state, teleport.id)) {
     return appendTeleportSkippedEvent(state, "teleport_not_working", teleport.id);
   }
+  if (!canStartAutoRouteRally(state, teleport.id)) return state;
 
   const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
   if (guarded !== state) return guarded;
@@ -254,13 +258,16 @@ export function resolveWarmasterDeparture(state: GameState, leave: boolean): Gam
 export function updateTeleportSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
-  _nowMs = Date.now(),
+  nowMs = Date.now(),
 ): GameState {
-  void _nowMs;
-
   if (isAiTeleportPausedForResurrection(state)) {
-    return state;
+    // Recovery helpers must also regain control while AI travel waits for them.
+    return updateForcedMovements(state, movedEntityIds, nowMs);
   }
+
+  // An existing rally remains exclusive; suspended travel cannot start a new one.
+  if (!state.activeTeleport && getDirectLeaderCommand(state)) return state;
+  if (!state.activeTeleport && isAutoRoutePaused(state)) return state;
 
   const autoTeleport = getAutoTeleport(state);
   const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id, "ai") : state;
@@ -270,11 +277,15 @@ export function updateTeleportSystem(
     return activatedState;
   }
 
-  if (isPartyWithinTeleportRange(activatedState)) {
-    return completeTeleport(activatedState);
+  // Rallying exits the ordinary update loop early. Finish existing displacement
+  // here so its owner cannot permanently prevent a companion from joining it.
+  const displacedState = updateForcedMovements(activatedState, movedEntityIds, nowMs);
+  if (isWarmasterRewardUiOpen(displacedState)) return displacedState;
+  if (isPartyWithinTeleportRange(displacedState)) {
+    return completeTeleport(displacedState);
   }
 
-  return movePartyToTeleport(activatedState, movedEntityIds);
+  return movePartyToTeleport(displacedState, movedEntityIds);
 }
 
 export function isTeleportRallyActive(state: GameState): boolean {
@@ -412,17 +423,18 @@ function movePartyToTeleport(
       continue;
     }
 
-    const movedState = moveEntityTowardPositionIfUnoccupied(
+    const movedState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
       nextState,
       readyMember,
       teleport.position,
       {
         allowPartyPassThrough: true,
         pathProfile: "teleport",
+        source: "teleport",
         pathTargetKey: `teleport:${teleport.id}`,
         pathTargetPosition: teleport.position,
       },
-    );
+    ), readyMember.id);
 
     if (didEntityMove(movedState, readyMember)) {
       movedEntityIds.add(readyMember.id);
@@ -446,6 +458,8 @@ function completeTeleport(state: GameState): GameState {
   if (!teleportDefinition) {
     return appendTeleportSkippedEvent(state, "teleport_definition_missing", teleport.id);
   }
+  if (state.worldTravelTargetMapId && (!isTeleportWorking(state, teleport.id) ||
+    !isAutoRouteStepAvailable(state))) return state;
 
   const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
   if (guarded !== state) return guarded;

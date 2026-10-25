@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCompanionEntity, isLivingCompanion, isLivingEnemy } from "./entityGuards";
 import { getPartyResurrectionRecoveryTargetId } from "./partyIntentSystem";
@@ -10,6 +11,9 @@ import {
 } from "./state";
 import {
   isPositionAvailable,
+  flushNormalMovementForEntity,
+  flushNormalMovementPhase,
+  holdEntityMovement,
   moveEntityTowardPositionIfUnoccupied,
 } from "./movementPlanning";
 import type {
@@ -50,6 +54,7 @@ export function updateResurrectionSystem(
 
   nextState = assignResurrectionAreaCombatTargets(nextState);
   nextState = moveResurrectionParticipants(nextState, movedEntityIds);
+  nextState = flushNormalMovementPhase(nextState, movedEntityIds);
   nextState = progressResurrectionArea(
     nextState,
     deltaMs,
@@ -148,7 +153,7 @@ function assignAvailableResurrectionParticipants(
 
   for (const helper of getLivingCompanions(nextState)) {
     if (
-      helper.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, helper) ||
       isCompanionAssignedToResurrectionRecovery(nextState, helper.id)
     ) {
       continue;
@@ -181,6 +186,7 @@ function moveResurrectionParticipants(
 
     if (isInValidResurrectionStandPosition(nextState, helper, target)) {
       movedEntityIds.add(helper.id);
+      nextState = holdEntityMovement(nextState, helper, "resurrection", "resurrection area hold");
       continue;
     }
 
@@ -198,11 +204,13 @@ function moveResurrectionParticipants(
       {
         allowPartyPassThrough: true,
         pathProfile: "resurrection",
+        source: "resurrection",
         pathTargetKey: `resurrection:${target.id}`,
         pathTargetPosition: standPosition,
       },
     );
 
+    nextState = flushNormalMovementForEntity(nextState, helper.id);
     const movedHelper = getEntityById(nextState, helper.id);
 
     if (
@@ -350,7 +358,7 @@ function clearInvalidResurrectionAssignments(
 
     if (
       !isLivingCompanion(helper) ||
-      helper.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, helper) ||
       !recoveryTargetId ||
       channel.targetId !== recoveryTargetId ||
       !isDeadCompanion(target)
@@ -358,7 +366,7 @@ function clearInvalidResurrectionAssignments(
       nextState = removeResurrectionAssignment(
         nextState,
         channel,
-        helper?.kind === "companion" && helper.commandPriority === "direct"
+        helper?.kind === "companion" && hasDirectCompanionAuthority(nextState, helper)
           ? "direct_command"
           : "target_invalid",
       );

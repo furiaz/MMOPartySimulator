@@ -1071,6 +1071,20 @@ export type AutoRouteRuntimeState = {
   resumeAfterMs?: number;
   interruptCooldownUntilMs?: number;
   autoCombatEnableAtMs?: number;
+  pauseReason?: "emergency" | "calm" | "cohesion" | "gate";
+  emergencyTargetId?: string;
+  emergencyFrame?: number;
+  bodyBlocksByEntityId?: Record<string, {
+    enemyId: string;
+    requestKey: string;
+    frame: number;
+    timeMs: number;
+    blockedMs: number;
+    position: Position;
+    waypoint: Position;
+    bestDistance: number;
+    progressCredit?: number;
+  }>;
 };
 
 export type CombatFeedbackType =
@@ -2170,6 +2184,7 @@ export type EnemyDashPlan = {
 };
 
 export type EnemyDashState = {
+  pendingFinalization?: true;
   id: string;
   abilityId: EnemyAbilityId;
   casterId: string;
@@ -2278,6 +2293,9 @@ export type WorldWipeRecoveryState =
 export type DebugMovementResult = "moved" | "waited" | "blocked" | "failed";
 
 export type DebugNavigationReason =
+  | "avoidance"
+  | "crowd_wait"
+  | "overlap_recovery"
   | "path"
   | "direct_step"
   | "swap"
@@ -2350,8 +2368,11 @@ export type DebugDismissibleUiTarget =
   | "secondary_party_summary";
 
 export type DebugTelemetryEventType =
+  | "auto_route_paused"
+  | "auto_route_resumed"
   | "target_acquired"
   | "target_changed"
+  | "target_released"
   | "formation_changed"
   | "target_skipped"
   | "movement_failed"
@@ -2563,7 +2584,8 @@ export type DebugTelemetryEntitySnapshot = {
   enemyEvasion?: number;
   enemyScalingOverrides?: string[];
   attackRange?: number;
-  targetDecisionReason?: EnemyTargetDecisionReason;
+  targetDecisionReason?: EnemyTargetDecisionReason | import("./targetCommitment").CompanionTargetReason;
+  targetFormationScore?: import("./formationTargeting").FormationTargetScore;
   commandPriority?: CommandPriority;
   characterLevel?: number;
   characterXp?: number;
@@ -2576,6 +2598,12 @@ export type DebugTelemetryEntitySnapshot = {
   directCommandTargetPosition?: Position | null;
   directCommandGraceRemainingMs?: number;
   movementResult: DebugMovementResult;
+  movementOwner?: string;
+  movementRequestPriority?: number;
+  normalMovementOutcome?: "moved" | "held" | "blocked" | "invalid" | "deferred";
+  normalMovementCommitCount?: number;
+  movementPositionCommitCount?: number;
+  movementTransactionId?: string;
   reason?: string;
   formationPhase?: FormationPhase;
   formationSlot?: Position | null;
@@ -2643,7 +2671,8 @@ export type DebugTelemetryEvent = {
   enemyEvasion?: number;
   enemyScalingOverrides?: string[];
   attackRange?: number;
-  targetDecisionReason?: EnemyTargetDecisionReason;
+  targetDecisionReason?: EnemyTargetDecisionReason | import("./targetCommitment").CompanionTargetReason;
+  targetFormationScore?: import("./formationTargeting").FormationTargetScore;
   amount?: number;
   damageType?: CombatDamageType;
   powerMultiplier?: number;
@@ -2819,6 +2848,7 @@ export type DebugTelemetryEvent = {
 };
 
 export type DebugTelemetryTick = {
+  formationDiagnostics?: import("./formationDiagnostics").FormationDiagnostics;
   tick: number;
   frame: number;
   sample: number;
@@ -3014,6 +3044,97 @@ export type FormationPhase =
   | "forming"
   | "traveling"
   | "combat";
+
+export type FormationPresetId = "arrow" | "balanced" | "side-by-side";
+export type FormationDepth = "front" | "middle" | "rear" | "neutral";
+export type FormationLane = "left" | "center" | "right";
+
+export type FormationSlot = {
+  id: string;
+  side: number;
+  forward: number;
+  lane: FormationLane;
+  depth: FormationDepth;
+};
+
+export type FormationTemplate = {
+  preset: FormationPresetId;
+  spacing: number;
+  slots: FormationSlot[];
+};
+
+export type FormationMemberInput = {
+  id: string;
+  role: PartyMemberRole;
+  partyOrder: number;
+};
+
+/** Transient ownership of ideal slots, not navigation/collision reservations. */
+export type FormationAssignments = {
+  preset: FormationPresetId;
+  spacing: number;
+  leaderId: string;
+  members: FormationMemberInput[];
+  slotsByEntityId: Record<string, string>;
+  travel?: TravelFormationRuntime;
+  combat?: CombatFormationRuntime;
+  transition?: {
+    fromOffsetsByEntityId: Record<string, { side: number; forward: number }>;
+    elapsedMs: number;
+    frameKey?: string;
+  };
+};
+
+export type CombatFormationGoal = Omit<TravelFormationGoal, "mode"> & {
+  mode: "expanded" | "compressed" | "substitute" | "held";
+};
+
+export type CombatFormationRuntime = {
+  leaderId: string;
+  referenceTargetId?: string;
+  mode: "combat" | "recovering";
+  facing: Position;
+  spacing: number;
+  lateralScale: number;
+  frameKey?: string;
+  clearSinceMs?: number;
+  goalsByEntityId: Record<string, CombatFormationGoal>;
+  proposedGoalsByEntityId?: Record<string, CombatFormationGoal>;
+};
+
+export type TravelFormationGoal = {
+  position: Position;
+  /** The slot/trail target, even when the only safe action is a hold. */
+  expectedPosition: Position;
+  mode: "normal" | "compressed" | "substitute" | "trailing" | "held";
+  settled: boolean;
+  clearSinceMs?: number;
+};
+
+export type TravelFormationRuntime = {
+  leaderId: string;
+  facing: Position;
+  lateralScale: number;
+  rowScale?: number;
+  trailing: boolean;
+  trail: Position[];
+  trailOrder: string[];
+  lastLeaderPosition: Position;
+  frameKey?: string;
+  clearSinceMs?: number;
+  cohesion: "normal" | "slow" | "wait";
+  goalsByEntityId: Record<string, TravelFormationGoal>;
+  proposedGoalsByEntityId?: Record<string, TravelFormationGoal>;
+};
+
+export type FormationDepartureReason =
+  | "missing"
+  | "dead"
+  | "direct"
+  | "gathering"
+  | "combat"
+  | "resurrection"
+  | "specialized";
 
 export type PartyFormationMemberSlot = {
   entityId: string;

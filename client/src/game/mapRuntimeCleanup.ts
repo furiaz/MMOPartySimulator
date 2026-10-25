@@ -2,6 +2,10 @@ import type { GameState } from "./state";
 import { initializeBarracks } from "./barracks";
 import { reconcileWarmasterLifecycle } from "./warmasterLifecycle";
 import type { PartyFormationState } from "./types";
+import { pruneTargetCommitmentState } from "./targetCommitment";
+import { reconcileFormationAssignments } from "./formationAssignments";
+import { pruneAutoRouteObservations } from "./autoRouteSystem";
+import { pruneCombatFormationState } from "./combatFormation";
 
 function createIdlePartyFormation(): PartyFormationState {
   return {
@@ -18,6 +22,23 @@ function createIdlePartyFormation(): PartyFormationState {
 export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
+    formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
+    autoRoute: undefined,
+    targetCommitmentsByEntityId: {},
+    targetApproachesByEntityId: {},
+    targetEngagementProbeAtMsByEntityId: {},
+    rejectedCombatTargetsByEntityId: {},
+    companionTargetDecisionByEntityId: {},
+    companionTargetTransitions: [],
+    normalMovementResultsByEntityId: {},
+    localAvoidanceByEntityId: {},
+    overlapRecoveryByEntityId: {},
+    overlapRecoveryGeometryKey: undefined,
+    movementPositionCommitsByEntityId: {},
+    warmasterResetPending: undefined,
+    normalMovementPhase: undefined,
+    externalMovementOwnersByEntityId: {},
     warmasterAttempt: undefined,
     warmasterInteraction: undefined,
     warmasterLifecycle: state.warmasterLifecycle?.phase === "active" ? { ...state.warmasterLifecycle, phase: "ready" } : state.warmasterLifecycle,
@@ -99,9 +120,24 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 }
 
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
+  state = pruneAutoRouteObservations(state);
+  state = pruneTargetCommitmentState(state);
+  if (state.formationAssignments) state = reconcileFormationAssignments(state);
+  state = pruneCombatFormationState(state);
+  const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
+  state = { ...state,
+    formationPathSearchesByEntityId: Object.fromEntries(Object.entries(state.formationPathSearchesByEntityId ?? {}).filter(([id]) => living(id))),
+    localAvoidanceByEntityId: Object.fromEntries(Object.entries(state.localAvoidanceByEntityId ?? {}).filter(([id]) => living(id))),
+    overlapRecoveryByEntityId: Object.fromEntries(Object.entries(state.overlapRecoveryByEntityId ?? {}).filter(([id]) => living(id))),
+    normalMovementResultsByEntityId: Object.fromEntries(Object.entries(state.normalMovementResultsByEntityId ?? {}).filter(([id]) => living(id))),
+    movementPositionCommitsByEntityId: Object.fromEntries(Object.entries(state.movementPositionCommitsByEntityId ?? {}).filter(([id]) => living(id))),
+    warmasterResetPending: state.warmasterResetPending && living(state.warmasterResetPending) ? state.warmasterResetPending : undefined,
+    normalMovementPhase: state.normalMovementPhase ? { submissions: state.normalMovementPhase.submissions.filter(submission => living(submission.request.entityId)) } : undefined,
+    externalMovementOwnersByEntityId: Object.fromEntries(Object.entries(state.externalMovementOwnersByEntityId ?? {}).filter(([id]) => living(id))),
+  };
   if (state.warmasterAttempt && !state.entities[state.warmasterAttempt.bossId]) state = { ...state, warmasterAttempt: undefined };
-  if (Object.keys(state.forcedMovementsByEntityId ?? {}).some(id => !state.entities[id])) {
-    state = { ...state, forcedMovementsByEntityId: Object.fromEntries(Object.entries(state.forcedMovementsByEntityId ?? {}).filter(([id]) => Boolean(state.entities[id]))) };
+  if (Object.keys(state.forcedMovementsByEntityId ?? {}).some(id => !living(id))) {
+    state = { ...state, forcedMovementsByEntityId: Object.fromEntries(Object.entries(state.forcedMovementsByEntityId ?? {}).filter(([id]) => living(id))) };
   }
   state = initializeBarracks(state);
   state = reconcileWarmasterLifecycle(state);

@@ -40,6 +40,7 @@ import type {
   PartyWallet,
   RestingCompanionsById,
   PartyFormationState,
+  FormationAssignments,
   PartyBank,
   PartyMemberRole,
   Position,
@@ -102,6 +103,10 @@ import type {
 } from "./questTypes";
 import type { SimulationTiming } from "./simulationTiming";
 import type {
+  NormalMovementResult,
+  MovementPositionCommit,
+  NormalMovementSubmission,
+  ExternalMovementOwner,
   MovementFailureDetail,
   MovementPath,
 } from "./movementTypes";
@@ -191,8 +196,23 @@ export type {
 } from "./movementTypes";
 
 import { updateStructureRuntime } from "./combatStructures";
+import { clearTargetCommitmentsForTarget, recordCompanionTargetTransition } from "./targetCommitment";
 
 export type GameState = {
+  targetCommitmentsByEntityId?: Record<string, import("./targetCommitment").TargetCommitment>;
+  targetApproachesByEntityId?: Record<string, import("./targetCommitment").TargetApproachObservation>;
+  targetEngagementProbeAtMsByEntityId?: Record<string, number>;
+  rejectedCombatTargetsByEntityId?: Record<string, Record<string, import("./targetCommitment").RejectedCombatTarget>>;
+  companionTargetDecisionByEntityId?: Record<string, import("./targetCommitment").CompanionTargetTransition>;
+  companionTargetTransitions?: import("./targetCommitment").CompanionTargetTransition[];
+  localAvoidanceByEntityId?: Record<string, import("./movementTypes").LocalAvoidanceMemory>;
+  overlapRecoveryByEntityId?: Record<string, import("./movementTypes").OverlapRecoveryObservation>;
+  overlapRecoveryGeometryKey?: string;
+  normalMovementResultsByEntityId?: Record<string, NormalMovementResult>;
+  normalMovementPhase?: { submissions: NormalMovementSubmission[] };
+  externalMovementOwnersByEntityId?: Record<string, ExternalMovementOwner>;
+  movementPositionCommitsByEntityId?: Record<string, MovementPositionCommit>;
+  warmasterResetPending?: string;
   barracksById?: Record<string, import("./types").BarrackRuntime>;
   entities: Record<string, GameEntity>;
   restingCompanionsById?: RestingCompanionsById;
@@ -247,6 +267,7 @@ export type GameState = {
   moveIntentsByEntityId?: Record<string, Position>;
   reservedPositionsByEntityId?: Record<string, Position>;
   movementPathsByEntityId?: Record<string, MovementPath>;
+  formationPathSearchesByEntityId?: Record<string, import("./movementTypes").FormationPathSearch>;
   attackSlotCacheByEntityId?: Record<string, AttackSlotCacheEntry>;
   enemyTargetReachabilityCacheByEnemyId?: Record<
     string,
@@ -258,6 +279,8 @@ export type GameState = {
   defenderWaitMsByLeaderId?: Record<string, number>;
   defenderBlockedMsByEntityId?: Record<string, number>;
   partyFormation?: PartyFormationState;
+  formationAssignments?: FormationAssignments;
+  selectedFormationPreset?: import("./types").FormationPresetId;
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles?: ActiveCombatProjectile[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;
@@ -365,7 +388,7 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
     return state;
   }
 
-  const nextState: GameState = {
+  let nextState: GameState = {
     ...state,
     entities: {
       ...state.entities,
@@ -383,6 +406,23 @@ export function updateEntity(state: GameState, entity: GameEntity, now = Date.no
           }
         : state.followTrailsByEntityId,
   };
+  nextState = recordCompanionTargetTransition(nextState, previousEntity, entity);
+  if (entity.state === "dead" || ("health" in entity && entity.health <= 0)) {
+    nextState = clearTargetCommitmentsForTarget(nextState, entity.id);
+    const withoutEntity = <T,>(record: Record<string, T> | undefined) => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => id !== entity.id));
+    nextState = { ...nextState,
+      forcedMovementsByEntityId: withoutEntity(nextState.forcedMovementsByEntityId),
+      enemyDashesByEnemyId: withoutEntity(nextState.enemyDashesByEnemyId),
+      externalMovementOwnersByEntityId: withoutEntity(nextState.externalMovementOwnersByEntityId),
+      localAvoidanceByEntityId: withoutEntity(nextState.localAvoidanceByEntityId),
+      overlapRecoveryByEntityId: withoutEntity(nextState.overlapRecoveryByEntityId),
+      targetCommitmentsByEntityId: withoutEntity(nextState.targetCommitmentsByEntityId),
+      targetApproachesByEntityId: withoutEntity(nextState.targetApproachesByEntityId),
+      targetEngagementProbeAtMsByEntityId: withoutEntity(nextState.targetEngagementProbeAtMsByEntityId),
+      rejectedCombatTargetsByEntityId: withoutEntity(nextState.rejectedCombatTargetsByEntityId),
+      warmasterResetPending: nextState.warmasterResetPending === entity.id ? undefined : nextState.warmasterResetPending,
+    };
+  }
   return entity.kind === "structure" ? updateStructureRuntime(nextState, entity, now) : recordWarmasterLifecycleDeath(recordPatronDeath(nextState, previousEntity, entity, now), previousEntity, entity, now);
 }
 

@@ -1,35 +1,42 @@
+import { getDirectLeaderCommand, hasDirectCompanionAuthority } from "./directCommandState";
+import { getCombatFormationPreference, isCombatFormationMember, moveCombatFormationMember, prepareCombatFormation } from "./combatFormation";
+import { isTravelFormationMember, moveTravelFormationMember } from "./travelFormation";
 import {
   updateEntity,
   type GameState,
 } from "./state";
 import {
   getBoundedPathDistance,
+  flushNormalMovementForEntity,
+  holdEntityMovement,
+  isCombatPositionAvailable,
   isWalkablePosition,
   moveEntityTowardPositionIfUnoccupied,
   previewMoveTowardPosition,
-  reservePositionForFrame,
 } from "./movementPlanning";
 import type { SimulationTiming } from "./simulationTiming";
 import {
   chooseAttackSlot,
-  rememberAttackSlot,
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
-import { getPartyLeader } from "./partySystem";
+import { getNormalMovementResult } from "./movementAuthority";
+import { getActiveCompanionsInPartyOrder, getPartyLeader } from "./partySystem";
 import { attackDefenderTarget } from "./defenderCombat";
 import {
   getDefenderAnchorPosition,
   getLeaderEnemyTarget,
   getLeaderMovementDirection,
   getPartyExecutionIntentPosition,
+  isDefenderAttackTargetRelevant,
 } from "./roleSystem";
 import {
   getActiveQuestGuide,
   QUEST_GUIDE_ENEMY_PAUSE_RANGE,
 } from "./questGuideSystem";
-import { getCommittedPartyThreatTarget } from "./partyThreatSystem";
+import { applyTargetCommitment, selectTargetCommitment } from "./targetCommitment";
 import { isCompanionAssignedToResurrectionRecovery } from "./resurrectionSystem";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
+import { isWithinAttackReach } from "./spatialGeometry";
 import type { Companion, Enemy, GameEntity, Position } from "./types";
 
 const DEFENDER_CATCH_UP_DISTANCE = 3;
@@ -58,18 +65,26 @@ export function updateDefendSystem(
   },
   pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
-  let nextState = state;
+  let nextState = prepareCombatFormation(state);
   const now = timing.nowMs;
   const waitingLeaderIds = new Set<string>();
   const resetLeaderWaitIds = new Set<string>();
+
+  for (const defender of getActiveCompanionsInPartyOrder(nextState)) {
+    if (!isDefendingCompanion(defender) || hasDirectCompanionAuthority(nextState, defender) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, defender.id) || movedEntityIds.has(defender.id) ||
+      getNormalMovementResult(nextState, defender.id) || isFormationTravelMovementActive(nextState) || !getDefenderLeader(nextState, defender)) continue;
+    nextState = applyTargetCommitment(nextState, defender, getDefenderTargetDecision(nextState, defender), "defend");
+  }
 
   for (const entity of Object.values(state.entities)) {
     const defender = nextState.entities[entity.id];
 
     if (
       !isDefendingCompanion(defender) ||
+      hasDirectCompanionAuthority(nextState, defender) ||
       isCompanionAssignedToResurrectionRecovery(nextState, defender.id) ||
-      movedEntityIds.has(defender.id)
+      movedEntityIds.has(defender.id) || getNormalMovementResult(nextState, defender.id)
     ) {
       continue;
     }
@@ -88,9 +103,10 @@ export function updateDefendSystem(
           preferredDefendPosition,
         )
       : null;
-    const target = leader
-      ? getDefenderTarget(nextState, defender)
-      : undefined;
+    const targetDecision = leader ? getDefenderTargetDecision(nextState, defender) : null;
+    if (targetDecision) nextState = applyTargetCommitment(nextState, defender, targetDecision, "defend");
+    nextState = prepareCombatFormation(nextState);
+    const target = targetDecision?.target ?? undefined;
     const shouldWaitForIntercept =
       target &&
       leader &&
@@ -100,6 +116,7 @@ export function updateDefendSystem(
     if (shouldWaitForIntercept) {
       waitingLeaderIds.add(leader.id);
       movedEntityIds.add(leader.id);
+      nextState = holdEntityMovement(nextState, leader, "attack", "Defender interception wait");
     } else if (
       leader &&
       (!target ||
@@ -124,7 +141,7 @@ export function updateDefendSystem(
 
     if (
       target &&
-      isInAttackRange(syncedDefender, target)
+      isInLegalAttackPosition(nextState, syncedDefender, target)
     ) {
       if (
         !isCombatPositionSpacedFromParty(
@@ -140,13 +157,16 @@ export function updateDefendSystem(
           pathDistanceCache,
         );
 
-        if (spacedSlotState !== nextState) {
+        const spacingMoved = didEntityMove(spacedSlotState, syncedDefender);
+        nextState = spacedSlotState;
+        if (spacingMoved) {
           nextState = updateDefenderBlockedMs(spacedSlotState, syncedDefender.id, false);
           movedEntityIds.add(syncedDefender.id);
           continue;
         }
       }
 
+      nextState = holdEntityMovement(nextState, syncedDefender, "defend", "legal Defender engagement");
       nextState = attackDefenderTarget(nextState, syncedDefender, target, now);
       nextState = updateDefenderBlockedMs(nextState, syncedDefender.id, false);
       continue;
@@ -182,6 +202,22 @@ export function updateDefendSystem(
       });
     }
 
+    const standbyDefender = nextState.entities[defender.id];
+    if (standbyDefender.kind === "companion" && isCombatFormationMember(nextState, standbyDefender)) {
+      nextState = moveCombatFormationMember(nextState, standbyDefender);
+      if (didEntityMove(nextState, standbyDefender)) movedEntityIds.add(defender.id);
+      continue;
+    }
+    if (standbyDefender.kind === "companion" && isTravelFormationMember(nextState, standbyDefender)) {
+      const leaderCommand = getDirectLeaderCommand(nextState);
+      // Attack/gather approach commits later; the late follow phase consumes its actual origin.
+      if (leaderCommand?.type !== "attack" && leaderCommand?.type !== "gather") {
+        nextState = moveTravelFormationMember(nextState, standbyDefender, "defend");
+        if (didEntityMove(nextState, standbyDefender)) movedEntityIds.add(defender.id);
+      }
+      continue;
+    }
+
     if (
       defendPosition &&
       getGridDistance(defender.position, defendPosition) >
@@ -203,6 +239,7 @@ export function updateDefendSystem(
     }
 
     nextState = updateDefenderBlockedMs(nextState, defender.id, false);
+    nextState = holdEntityMovement(nextState, nextState.entities[defender.id], "defend", "Defender anchor settled");
   }
 
   for (const leaderId of waitingLeaderIds) {
@@ -315,38 +352,6 @@ function didEntityMove(state: GameState, entity: GameEntity): boolean {
   );
 }
 
-function getDefenderTarget(
-  state: GameState,
-  defender: Companion,
-): Enemy | undefined {
-  const leaderTarget = getLeaderEnemyTarget(state);
-
-  if (leaderTarget && isRelevantGuideEscortThreat(state, leaderTarget)) {
-    return leaderTarget;
-  }
-
-  const activeThreatTarget = getCommittedPartyThreatTarget(state, {
-    currentTarget: leaderTarget ?? getCurrentDefenderEnemyTarget(state, defender),
-    includeDirectPersonalAttackers: true,
-    range: DEFENDER_THREAT_SEARCH_RADIUS,
-  });
-
-  return activeThreatTarget && isRelevantGuideEscortThreat(state, activeThreatTarget)
-    ? activeThreatTarget
-    : undefined;
-}
-
-function getCurrentDefenderEnemyTarget(
-  state: GameState,
-  defender: Companion,
-): Enemy | null {
-  const target = defender.currentTargetId
-    ? state.entities[defender.currentTargetId]
-    : undefined;
-
-  return target?.kind === "enemy" ? target : null;
-}
-
 function isRelevantGuideEscortThreat(
   state: GameState,
   enemy: Enemy,
@@ -371,8 +376,9 @@ function isWithinLeaderLeash(
   );
 }
 
-function isInAttackRange(defender: Companion, target: Enemy): boolean {
-  return getGridDistance(defender.position, target.position) <= DEFENDER_ATTACK_RANGE;
+function isInLegalAttackPosition(state: GameState, defender: Companion, target: Enemy): boolean {
+  return isWithinAttackReach(defender, target, DEFENDER_ATTACK_RANGE) &&
+    isCombatPositionAvailable(state, defender, defender.position, { allowPartyPassThrough: true });
 }
 
 function shouldLeaderWaitForDefender(
@@ -381,7 +387,7 @@ function shouldLeaderWaitForDefender(
   leader: GameEntity,
   defendPosition: Position,
 ): boolean {
-  if (leader.kind === "companion" && leader.commandPriority === "direct") {
+  if (hasDirectCompanionAuthority(state, leader)) {
     return false;
   }
 
@@ -432,6 +438,11 @@ function updateLeaderWait(
   };
 }
 
+function getDefenderTargetDecision(state: GameState, defender: Companion) {
+  return selectTargetCommitment(state, defender, { preferredTarget: getLeaderEnemyTarget(state), range: DEFENDER_THREAT_SEARCH_RADIUS,
+    isEligible: enemy => isRelevantGuideEscortThreat(state, enemy) && isDefenderAttackTargetRelevant(state, defender, enemy) });
+}
+
 function moveDefenderTowardCommittedTarget(
   state: GameState,
   defender: Companion,
@@ -452,20 +463,21 @@ function moveDefenderTowardCommittedTarget(
     );
   }
 
-  if (isInAttackRange(defender, target)) {
+  if (isInLegalAttackPosition(state, defender, target)) {
     return updateDefenderBlockedMs(state, defender.id, false);
   }
 
   if (shouldHoldDefenderLine(state, defender, leader, target)) {
-    return updateDefenderBlockedMs(state, defender.id, false);
+    return holdEntityMovement(updateDefenderBlockedMs(state, defender.id, false), defender, "defend", "Defender line hold");
   }
 
   const attackPosition = chooseAttackSlot(
     state,
     defender,
-    target.position,
+    target,
     DEFENDER_ATTACK_RANGE,
     {
+      allowPartyPassThrough: true,
       maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
       leader,
       leaderSafeDistance: DEFENDER_LEADER_SAFE_ATTACK_SLOT_DISTANCE,
@@ -473,7 +485,7 @@ function moveDefenderTowardCommittedTarget(
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
       partySpacingMode: "prefer",
-      targetId: target.id,
+      preferredFormationPosition: getCombatFormationPreference(state, defender),
     },
   );
 
@@ -487,6 +499,10 @@ function moveDefenderTowardCommittedTarget(
   }
 
   const movementOptions = {
+    source: "defend" as const,
+    combatSlot: { targetId: target.id, attackReach: DEFENDER_ATTACK_RANGE, position: attackPosition },
+    isPositionAllowed: (position: Position) => !wouldExceedDefenderLineAtPosition(state, position, defender, leader, target),
+    rejectedPositionOutcome: "held" as const,
     allowPartyPassThrough: true,
     pathProfile: "combatSlot" as const,
     pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
@@ -499,48 +515,17 @@ function moveDefenderTowardCommittedTarget(
       useInterceptBoost,
     ),
   };
-  const slotState = rememberAttackSlot(
+  const nextState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
     state,
     defender,
-    target.position,
-    DEFENDER_ATTACK_RANGE,
-    attackPosition,
-    {
-      nowMs: state.simulationTimeMs,
-      targetId: target.id,
-    },
-  );
-  const nextPosition = previewMoveTowardPosition(
-    reservePositionForFrame(slotState, defender.id, attackPosition),
-    defender,
     attackPosition,
     movementOptions,
-  );
-
-  if (
-    nextPosition &&
-    wouldExceedDefenderLineAtPosition(
-      state,
-      nextPosition,
-      defender,
-      leader,
-      target,
-    )
-  ) {
-    return updateDefenderBlockedMs(state, defender.id, false);
-  }
-
-  const nextState = moveEntityTowardPositionIfUnoccupied(
-    reservePositionForFrame(slotState, defender.id, attackPosition),
-    defender,
-    attackPosition,
-    movementOptions,
-  );
+  ), defender.id);
 
   const movedDefender = nextState.entities[defender.id];
 
   if (!isDefendingCompanion(movedDefender) || !didEntityMove(nextState, defender)) {
-    return updateDefenderBlockedMs(nextState, defender.id, true);
+    return updateDefenderBlockedMs(nextState, defender.id, getNormalMovementResult(nextState, defender.id)?.outcome === "blocked");
   }
 
   return updateDefenderBlockedMs(nextState, defender.id, false);
@@ -555,14 +540,15 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
   const attackPosition = chooseAttackSlot(
     state,
     defender,
-    target.position,
+    target,
     DEFENDER_ATTACK_RANGE,
     {
+      allowPartyPassThrough: true,
       maxPathDistance: DEFENDER_MAX_ATTACK_SLOT_PATH_DISTANCE,
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
       partySpacingMode: "required",
-      targetId: target.id,
+      preferredFormationPosition: getCombatFormationPreference(state, defender),
     },
   );
 
@@ -571,30 +557,21 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
   }
 
   const movementOptions = {
+    source: "defend" as const,
+    combatSlot: { targetId: target.id, attackReach: DEFENDER_ATTACK_RANGE, position: attackPosition },
     allowPartyPassThrough: true,
     pathProfile: "combatSlot" as const,
     pathTargetKey: `defender-combat:${target.id}:${getPositionPathKey(attackPosition)}`,
     pathTargetPosition: attackPosition,
   };
-  const slotState = rememberAttackSlot(
+  const nextState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
     state,
-    defender,
-    target.position,
-    DEFENDER_ATTACK_RANGE,
-    attackPosition,
-    {
-      nowMs: state.simulationTimeMs,
-      targetId: target.id,
-    },
-  );
-  const nextState = moveEntityTowardPositionIfUnoccupied(
-    reservePositionForFrame(slotState, defender.id, attackPosition),
     defender,
     attackPosition,
     movementOptions,
-  );
+  ), defender.id);
 
-  return didEntityMove(nextState, defender) ? nextState : state;
+  return nextState;
 }
 
 function getCommittedTargetSpeedMultiplier(
@@ -695,7 +672,7 @@ function canLeaderStepTowardDefender(
   leader: GameEntity,
   defender: Companion,
 ): boolean {
-  if (leader.kind !== "companion" || leader.commandPriority === "direct") {
+  if (leader.kind !== "companion" || hasDirectCompanionAuthority(state, leader)) {
     return true;
   }
 
@@ -785,7 +762,7 @@ function moveDefenderTowardPosition(
     return state;
   }
 
-  return moveEntityTowardPositionIfUnoccupied(
+  return flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(
     state,
     defender,
     targetPosition,
@@ -793,10 +770,11 @@ function moveDefenderTowardPosition(
       allowPartyPassThrough: true,
       pathProfile: "follow",
       pathTargetKey: `defender-position:${getPositionPathKey(targetPosition)}`,
+      source: "defend",
       pathTargetPosition: targetPosition,
       speedMultiplier,
     },
-  );
+  ), defender.id);
 }
 
 function getDefenderSpeedMultiplier(

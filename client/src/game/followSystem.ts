@@ -1,9 +1,12 @@
+import { hasDirectCompanionAuthority, getDirectLeaderCommand, canFollowDirectLeader } from "./directCommandState";
+import { isTravelFormationMember, moveTravelFormationMember } from "./travelFormation";
+import { isCombatFormationMember, moveCombatFormationMember, prepareCombatFormation } from "./combatFormation";
 import { isAutonomousEntity } from "./entities";
 import {
   getEntityById,
   type GameState,
 } from "./state";
-import { moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
+import { holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import { getSoftFollowPosition, isStackedWithPartyMember } from "./partySpacing";
 import {
   getOrderedPartyMembers,
@@ -26,20 +29,34 @@ export function updateFollowSystem(
   state: GameState,
   movedEntityIds = new Set<string>(),
 ): GameState {
-  let nextState = state;
+  let nextState = prepareCombatFormation(state);
   const leader = getPartyLeader(nextState);
 
   for (const entity of Object.values(state.entities)) {
     const follower = getEntityById(nextState, entity.id);
 
+    if (follower?.kind === "companion" && isCombatFormationMember(nextState, follower) && !movedEntityIds.has(follower.id)) {
+      const before = follower.position;
+      nextState = moveCombatFormationMember(nextState, follower);
+      if (!arePositionsEqual(before, nextState.entities[follower.id].position)) movedEntityIds.add(follower.id);
+      continue;
+    }
+
+    if (follower?.kind === "companion" && isTravelFormationMember(nextState, follower) && !movedEntityIds.has(follower.id)) {
+      const before = follower.position;
+      nextState = moveTravelFormationMember(nextState, follower);
+      if (!arePositionsEqual(before, nextState.entities[follower.id].position)) movedEntityIds.add(follower.id);
+      continue;
+    }
+
     if (
       !leader ||
       !follower ||
-      !isFollowingAutonomousEntity(follower) ||
+      (!isFollowingAutonomousEntity(follower) && !canFollowDirectLeader(nextState, follower)) ||
       !isPartyMember(follower) ||
       follower.id === leader.id ||
       isCompanionAssignedToResurrectionRecovery(nextState, follower.id) ||
-      follower.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, follower) ||
       isPartyMemberBusyGatheringResource(nextState, follower) ||
       movedEntityIds.has(follower.id)
     ) {
@@ -50,6 +67,7 @@ export function updateFollowSystem(
       isWithinFollowLeash(nextState, follower, leader) &&
       !isStackedWithPartyMember(nextState, follower)
     ) {
+      nextState = holdEntityMovement(nextState, follower, "follow", "follow settled");
       continue;
     }
 
@@ -59,7 +77,10 @@ export function updateFollowSystem(
         ? FOLLOW_CATCH_UP_SPEED_MULTIPLIER
         : 1;
 
-    const movementTargetPosition = getPartyMovementTargetPosition(nextState);
+    const directLeaderCommand = getDirectLeaderCommand(nextState);
+    const movementTargetPosition = directLeaderCommand
+      ? (directLeaderCommand.type === "move" ? directLeaderCommand.targetPosition : null)
+      : getPartyMovementTargetPosition(nextState);
     const followPosition = movementTargetPosition
       ? getSoftFollowPosition(
           nextState,
@@ -76,6 +97,10 @@ export function updateFollowSystem(
       {
         allowPartyPassThrough: true,
         pathProfile: "follow",
+        source: "follow",
+        // Without a travel intent the game loop can idle the follower after
+        // this step, even if it has not reached its soft follow destination.
+        isSettlingPosition: position => !movementTargetPosition || getGridDistance(position, leader.position) <= FOLLOW_LEASH_RADIUS,
         pathTargetKey: getFollowPathTargetKey(
           leader.id,
           follower.id,

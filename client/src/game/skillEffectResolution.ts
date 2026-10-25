@@ -1,4 +1,6 @@
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
+import { acquireSpecializedMovement, commitSpecializedMovementPosition, releaseSpecializedMovement } from "./movementAuthority";
+import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import { prepareCompanionSkillArea } from "./companionSkillAreas";
 import { isEntityInsideCompanionAoe } from "./companionAoeVariants";
 import { handleEnemyDefeatedDrops } from "./dropSystem";
@@ -31,6 +33,7 @@ import {
   getDirectionAwayFrom,
   getDirectionToward,
   getSkillDashPosition,
+  isCompanionMovementSkill,
 } from "./skillMovement";
 import {
   getCompanionSkillBehavior,
@@ -122,6 +125,9 @@ function resolveSkillEffectOnce(
   now: number,
   isRunicFocusDuplicate = false,
 ): SkillEffectResolutionResult {
+  const moving = isCompanionMovementSkill(skillUse.skill);
+  if (moving && acquireSpecializedMovement(state, caster.id, "companionSkill", `skill:${caster.id}:${skillUse.skill.id}:${now}`).outcome !== "acquired")
+    return skipSkillEffect(state);
   const scaledSkill = getScaledSkillDefinitionForCompanion(caster, skillUse.skill);
   if (scaledSkill.type !== "active") {
     return skipSkillEffect(state);
@@ -149,6 +155,7 @@ function resolveSkillEffectOnce(
     { ...skillUse, skill },
     now,
   );
+  if (moving && isWarmasterRewardUiOpen(result.state)) return skipSkillEffect(result.state);
 
   return result.shouldConsumeCooldown
     ? {
@@ -164,6 +171,13 @@ function resolveSkillEffectOnce(
         ),
       }
     : result;
+}
+
+function commitCompanionSkillMovement(state: GameState, caster: Companion, position: Position, skill: SkillDefinition, now: number): GameState | null {
+  const result = commitSpecializedMovementPosition(state, caster.id, position, "companionSkill", `skill:${caster.id}:${skill.id}:${now}`);
+  if (result.outcome === "moved" || result.outcome === "held")
+    return releaseSpecializedMovement(result.state, caster.id, `skill:${caster.id}:${skill.id}:${now}`).state;
+  return isWarmasterRewardUiOpen(result.state) ? result.state : null;
 }
 
 function resolvePreparedSkillEffect(
@@ -898,7 +912,10 @@ function applyLungeDamageSkill(
     ...caster,
     position: lungePosition,
   };
-  let nextState = updateEntity(state, lungedCaster);
+  const movement = commitCompanionSkillMovement(state, caster, lungePosition, skill, now);
+  if (!movement) return state;
+  if (isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
 
   const currentTarget = nextState.entities[target.id];
 
@@ -2342,10 +2359,9 @@ function applyQuickStep(
     return null;
   }
 
-  let nextState = updateEntity(state, {
-    ...caster,
-    position,
-  });
+  const movement = commitCompanionSkillMovement(state, caster, position, skill, now);
+  if (!movement || isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
 
   nextState = addSkillVisualEvent(nextState, {
     type: "heal",
@@ -2403,7 +2419,9 @@ function applySkirmishShot(
     ...caster,
     position,
   };
-  let nextState = updateEntity(state, movedCaster);
+  const movement = commitCompanionSkillMovement(state, caster, position, skill, now);
+  if (!movement || isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
   const currentTarget = nextState.entities[target.id];
 
   if (isLivingHostileTarget(currentTarget)) {
@@ -2476,7 +2494,9 @@ function applyPounce(
     ...caster,
     position,
   };
-  let nextState = updateEntity(state, movedCaster);
+  const movement = commitCompanionSkillMovement(state, caster, position, skill, now);
+  if (!movement || isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
   const currentTarget = nextState.entities[target.id];
 
   if (isLivingHostileTarget(currentTarget)) {
@@ -2549,7 +2569,9 @@ function applyFlameStep(
     ...caster,
     position,
   };
-  let nextState = updateEntity(state, movedCaster);
+  const movement = commitCompanionSkillMovement(state, caster, position, skill, now);
+  if (!movement || isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
   const currentTarget = nextState.entities[target.id];
 
   if (isLivingHostileTarget(currentTarget)) {
@@ -2619,10 +2641,10 @@ function applyRuneStep(
   const trapPosition = useMode === "offensive" ? position : caster.position;
   const prepared = prepareCompanionSkillArea(state, caster, skill, target.position, trapPosition);
   if (!prepared) return null;
-  let nextState = updateEntity(state, {
-    ...caster,
-    position,
-  });
+  if (!Object.values(state.entities).some(enemy => isLivingEnemy(enemy) && isEntityInsideCompanionAoe(prepared.area, enemy))) return null;
+  const movement = commitCompanionSkillMovement(state, caster, position, skill, now);
+  if (!movement || isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
   let affectedEnemies = 0;
 
   for (const enemy of Object.values(nextState.entities)) {
@@ -2710,10 +2732,10 @@ function applyDawnStep(
   const disarmPosition = useMode === "offensive" ? position : caster.position;
   const prepared = prepareCompanionSkillArea(state, caster, skill, target.position, disarmPosition);
   if (!prepared) return null;
-  let nextState = updateEntity(state, {
-    ...caster,
-    position,
-  });
+  if (!Object.values(state.entities).some(enemy => isLivingEnemy(enemy) && isEntityInsideCompanionAoe(prepared.area, enemy))) return null;
+  const movement = commitCompanionSkillMovement(state, caster, position, skill, now);
+  if (!movement || isWarmasterRewardUiOpen(movement)) return movement;
+  let nextState = movement;
   let affectedEnemies = 0;
 
   for (const enemy of Object.values(nextState.entities)) {
@@ -3060,10 +3082,10 @@ function applyAtonementStep(
     return null;
   }
 
-  let nextState = updateEntity(sacrifice.state, {
-    ...sacrifice.caster,
-    position,
-  });
+  const movement = commitCompanionSkillMovement(sacrifice.state, sacrifice.caster, position, skill, now);
+  if (!movement) return null;
+  if (isWarmasterRewardUiOpen(movement)) return { ...state, warmasterInteraction: movement.warmasterInteraction };
+  let nextState = movement;
 
   if (useMode === "offensive") {
     for (const enemy of affectedEnemies) {

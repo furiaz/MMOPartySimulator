@@ -5,6 +5,10 @@ import {
   moveEntityToward,
 } from "./entities";
 import { guardWarmasterWalkingDeparture } from "./warmasterLifecycleState";
+import { planLocalAvoidance } from "./localAvoidance";
+import { hasStructureLineOfSight } from "./combatStructures";
+import { commitNormalMovementPosition, createNormalMovementRequest, finishNormalMovement, getMovementRequestRejection, getNormalMovementResult, selectNormalMovementRequest } from "./movementAuthority";
+import { rememberAttackSlot } from "./attackSlots";
 import {
   findNavigationPath,
   findNearestReachableNavigationPosition,
@@ -34,8 +38,28 @@ import {
 } from "./positionUtils";
 import { GAME_LOOP_TICK_MS } from "./simulationTiming";
 import { isMovementBlockedByStatus } from "./statusEffects";
-import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
+import { isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
+import {
+  areEntitiesOverlapping,
+  doesBodyOverlapBounds,
+  doCollisionBodiesOverlap,
+  getCollisionBody,
+  getEntityOverlapDepth,
+  getEntityCollisionShape,
+  isPositionInsideCollisionShape,
+  isPositionInsideEntityCollisionShape,
+  isWithinAttackReach,
+  SPATIAL_EPSILON,
+} from "./spatialGeometry";
+export {
+  ENTITY_COLLISION_DISTANCE,
+  COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
+  COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
+  COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
+  getEntityCollisionShape,
+  isPositionInsideEntityCollisionShape,
+} from "./spatialGeometry";
 import type { GameState } from "./state";
 import type {
   DebugNavigationBlocker,
@@ -51,55 +75,36 @@ import type {
   MovementPathProfile,
   MoveResolution,
   NavigationBlockerLookup,
+  NormalMovementRequest,
+  NormalMovementOutcome,
+  NormalMovementSource,
+  NormalMovementSubmission,
+  FormationPathSearch,
   WalkablePositionOptions,
 } from "./movementTypes";
 
 const AVAILABLE_TILE_SEARCH_RADIUS = 8;
 const POSITION_EPSILON = 0.001;
-export const ENTITY_COLLISION_DISTANCE = 0.7;
-export const COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER = 0.8;
-export const COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER = 1.6;
-export const COMPANION_COLLISION_CAPSULE_ANCHOR_Y = 0.3;
 const RESOURCE_COLLISION_DISTANCE = 0.7;
 const PATH_WAYPOINT_REACHED_DISTANCE = 0.1;
 const COMBAT_PATH_REFRESH_MS = 500;
 const FOLLOW_PATH_REFRESH_MS = 500;
+const FORMATION_PATH_QUERY_INTERVAL_MS = 500;
 const MOVEMENT_PATH_BLOCKED_REFRESH_COUNT = 2;
 const MEANINGFUL_TARGET_MOVE_DISTANCE = 1;
-const FOLLOW_TRAIL_LENGTH = 12;
 
-export function getEntityCollisionShape(
-  entity: GameEntity,
-): EntityCollisionShape {
-  if (entity.kind === "companion") {
-    return {
-      kind: "verticalCapsule",
-      radius:
-        ENTITY_COLLISION_DISTANCE *
-        COMPANION_COLLISION_CAPSULE_WIDTH_MULTIPLIER,
-      height:
-        ENTITY_COLLISION_DISTANCE *
-        2 *
-        COMPANION_COLLISION_CAPSULE_HEIGHT_MULTIPLIER,
-      anchorY: COMPANION_COLLISION_CAPSULE_ANCHOR_Y,
-    };
-  }
+type FormationSearchContext = { record?: FormationPathSearch };
 
-  return {
-    kind: "circle",
-    radius: entity.kind === "enemy" && entity.combatSizeMultiplier !== undefined ? getEnemyCombatBodyRadius(entity) : ENTITY_COLLISION_DISTANCE,
-  };
+function formationSearchContext(state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions): FormationSearchContext | undefined {
+  if (!options.travelFormationGoal && !options.combatFormationGoal) return undefined;
+  const previous = state.formationPathSearchesByEntityId?.[entity.id];
+  const requestKey = getMovementPathTargetKey(state, entity, target, options);
+  return { record: previous && (previous.requestKey === requestKey ? previous : { ...previous, requestKey, failed: false, temporaryBlockers: undefined }) };
 }
 
-export function isPositionInsideEntityCollisionShape(
-  entity: GameEntity,
-  position: Position,
-): boolean {
-  return isPositionInsideCollisionShape(
-    position,
-    entity.position,
-    getEntityCollisionShape(entity),
-  );
+function publishFormationSearch(state: GameState, entityId: string, search: FormationSearchContext | undefined): GameState {
+  return search?.record && search.record !== state.formationPathSearchesByEntityId?.[entityId]
+    ? { ...state, formationPathSearchesByEntityId: { ...state.formationPathSearchesByEntityId, [entityId]: search.record } } : state;
 }
 
 export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
@@ -108,19 +113,190 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
   target: GameEntity,
   options: MovementOptions = {},
 ): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, target.position, options), options, target).state;
+}
+
+export function moveEntityToPositionIfUnoccupied(
+  state: GameState, entity: GameEntity, position: Position, options: MovementOptions = {},
+): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, position, options, "step"), options).state;
+}
+
+export function holdEntityMovement(state: GameState, entity: GameEntity, source: NormalMovementSource, reason: string, travelFormationGoal?: MovementOptions["travelFormationGoal"]): GameState {
+  return resolveNormalMovement(state, createNormalMovementRequest(state, entity, entity.position, { source, sourceReason: reason, travelFormationGoal }, "hold")).state;
+}
+
+export function resolveNormalMovement(
+  state: GameState, request: NormalMovementRequest, options: MovementOptions = {},
+  target: GameEntity = createPositionTarget(request.destination),
+): { state: GameState; outcome: NormalMovementOutcome } {
+  const rejection = getMovementRequestRejection(state, request);
+  if (rejection) return { state, outcome: rejection };
+  const submission = { request, options, target };
+  if (state.normalMovementPhase) {
+    const submissions = state.normalMovementPhase.submissions;
+    if (submissions.some(pending => JSON.stringify(pending.request) === JSON.stringify(request)))
+      return { state, outcome: "deferred" };
+    return { state: { ...state, normalMovementPhase: { submissions: [...submissions, submission] } }, outcome: "deferred" };
+  }
+  // Compatibility callers form a single-request phase. Once finalized, later
+  // calls must defer, even if intent changes before the simulation update ends.
+  return resolveMovementSubmissions(state, [submission]);
+}
+
+/** Phase-local batch API: choose once, then plan only the winner. */
+export function resolveNormalMovementRequests(state: GameState, entityId: string, requests: NormalMovementRequest[]): { state: GameState; outcome: NormalMovementOutcome } {
+  return resolveMovementSubmissions(state, requests.filter(request => request.entityId === entityId)
+    .map(request => ({ request, options: {}, target: createPositionTarget(request.destination) })));
+}
+
+function resolveMovementSubmissions(state: GameState, submissions: NormalMovementSubmission[]): { state: GameState; outcome: NormalMovementOutcome } {
+  const selected = selectNormalMovementRequest(state, submissions.map(submission => submission.request));
+  const winner = submissions.find(submission => submission.request === selected);
+  return winner ? resolveSelectedNormalMovement(state, winner.request, winner.options, winner.target)
+    : { state, outcome: "deferred" };
+}
+
+/** Resolve before an actor's action check or before deriving follower positions. */
+export function flushNormalMovementForEntity(state: GameState, entityId: string): GameState {
+  const phase = state.normalMovementPhase;
+  if (!phase) return state;
+  const submissions = phase.submissions.filter(submission => submission.request.entityId === entityId);
+  if (submissions.length === 0) return state;
+  const withoutPending = { ...state, normalMovementPhase: {
+    submissions: phase.submissions.filter(submission => submission.request.entityId !== entityId),
+  } };
+  return resolveMovementSubmissions(withoutPending, submissions).state;
+}
+
+export function flushNormalMovementPhase(state: GameState, movedEntityIds = new Set<string>()): GameState {
+  if (!state.normalMovementPhase) return state;
+  let nextState = state;
+  // Preserve producer actor ordering; request ties within each actor are sorted.
+  for (const entityId of new Set(state.normalMovementPhase.submissions.map(submission => submission.request.entityId))) {
+    nextState = flushNormalMovementForEntity(nextState, entityId);
+  }
+  // Include a swap partner even if it did not submit a request of its own.
+  for (const entityId of Object.keys(nextState.normalMovementResultsByEntityId ?? {}))
+    if (getNormalMovementResult(nextState, entityId)?.outcome === "moved") movedEntityIds.add(entityId);
+  return nextState;
+}
+
+export function endNormalMovementPhase(state: GameState, movedEntityIds = new Set<string>()): GameState {
+  return state.normalMovementPhase
+    ? { ...flushNormalMovementPhase(state, movedEntityIds), normalMovementPhase: undefined }
+    : state;
+}
+
+function resolveSelectedNormalMovement(state: GameState, request: NormalMovementRequest, options: MovementOptions, target: GameEntity): { state: GameState; outcome: NormalMovementOutcome } {
+  const actor = state.entities[request.entityId];
+  if (request.mode === "hold" || getEuclideanDistance(actor.position, request.destination) <= request.acceptableRadius) {
+    const observedState = publishFormationSearch(state, actor.id, formationSearchContext(state, actor, target, options));
+    return { state: finishNormalMovement(observedState, request, "held", actor.position), outcome: "held" };
+  }
+  const selectedOptions = { ...options, pathProfile: request.pathProfile, pathTargetKey: request.pathTargetKey,
+    pathTargetPosition: request.pathTargetPosition, combatSlot: request.combatSlot,
+    allowPartyPassThrough: request.allowPartyPassThrough, speedMultiplier: request.speedMultiplier };
+  const next = commitNormalMovement(state, actor, target, selectedOptions, request);
+  const outcome = !isSamePosition(actor.position, next.entities[actor.id].position) ? "moved"
+    : getNormalMovementResult(next, actor.id)?.outcome ?? (next.failedMoveByEntityId?.[actor.id] ? "blocked" : "held");
+  return { state: finishNormalMovement(next, request, outcome, actor.position, next.entities[actor.id].position,
+    getNormalMovementResult(next, actor.id)?.reason ?? outcome), outcome };
+}
+
+/** Candidate planning is speculative; no entity position is changed here. */
+function planNormalMovement(state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions, request: NormalMovementRequest) {
+  const formation = Boolean(options.travelFormationGoal || options.combatFormationGoal);
+  const search = formationSearchContext(state, entity, target, options);
+  const preparedState = request.mode === "step" ? state : prepareMovementPath(state, entity, target, options, search);
+  const resolution: MoveResolution | null = request.mode === "step"
+    ? { position: request.destination, reason: "direct_step" }
+    : getNextMoveResolution(preparedState, entity, target, options, { allowFreshPath: true, search });
+  const directStep = moveEntityToward(entity, target, getMovementDeltaMs(state, entity, options)).position;
+  return { pathState: publishFormationSearch(preparedState, entity.id, search), resolution, search,
+    hardFormationHold: formation && !resolution && !search?.record?.temporaryBlockers && Boolean(options.isPositionAllowed && !options.isPositionAllowed(directStep)) };
+}
+
+function commitNormalMovement(
+  state: GameState, entity: GameEntity, target: GameEntity, options: MovementOptions, request: NormalMovementRequest,
+): GameState {
   if (isMovementBlockedByStatus(state, entity.id)) {
     return markMoveFailed(state, entity.id, undefined, "blocked");
   }
 
-  const pathState = prepareMovementPath(state, entity, target, options);
-  const moveResolution = getNextMoveResolution(
-    pathState,
-    entity,
-    target,
-    options,
-    { allowFreshPath: true },
-  );
+  const plan = planNormalMovement(state, entity, target, options, request);
+  // A failed hard-terrain search is a bounded wait, not an invitation to orbit.
+  const observedState = publishFormationSearch(state, entity.id, plan.search);
+  state = observedState;
+  if (plan.hardFormationHold) return finishNormalMovement(observedState, request, "held", entity.position, entity.position, "constraint");
+  let { pathState } = plan;
+  let moveResolution = plan.resolution;
+  let blockingEnemyIds: string[] | undefined;
+  if (!moveResolution?.swapWithEntityId) {
+    const preferred = moveResolution?.position ?? moveEntityToward(entity, target, getMovementDeltaMs(state, entity, options)).position;
+    const slotTarget = options.combatSlot && state.entities[options.combatSlot.targetId];
+    const mustRetainReach = slotTarget && isWithinAttackReach(entity, slotTarget, options.combatSlot!.attackReach, preferred);
+    const avoidance = planLocalAvoidance(state, entity, request, preferred,
+      getMovementStepDistance(entity, getMovementDeltaMs(state, entity, options)), {
+        ignoresBody: other => canPassThroughStaticNpcForPartyMovement(entity, other),
+        canTransit: other => canPassThroughPartyEntity(entity, other, options),
+        isSettlingPosition: options.isSettlingPosition,
+        canUse: position => isMoveDestinationAvailable(state, entity, position, options) &&
+          (!mustRetainReach || (isWithinAttackReach(entity, slotTarget, options.combatSlot!.attackReach, position) &&
+            hasStructureLineOfSight(state, position, slotTarget))) &&
+          (request.mode !== "step" || isCombatPositionAvailable(state, entity, position, options)) &&
+          (!options.isPositionAllowed || options.isPositionAllowed(position)),
+      });
+    blockingEnemyIds = avoidance.blockingEnemyIds;
+    if (avoidance.crowded && !avoidance.position) {
+      // Speculative path changes are discarded. Waiting is not evidence that
+      // the target/path is unreachable, and cannot authorize a second request.
+      const constrained = (request.travelFormationGoal || request.combatFormationGoal) && options.isPositionAllowed && !options.isPositionAllowed(preferred);
+      return finishNormalMovement(constrained ? observedState : markMovementDecision(observedState, entity.id, "crowd_wait"),
+        request, "held", entity.position, entity.position, constrained ? "constraint" : "crowd_wait", blockingEnemyIds);
+    }
+    if (avoidance.crowded && avoidance.position) {
+      moveResolution = { ...moveResolution, position: avoidance.position, reason: "avoidance" };
+    }
+    const memory = { ...state.localAvoidanceByEntityId };
+    if (avoidance.memory) memory[entity.id] = avoidance.memory;
+    else delete memory[entity.id];
+    pathState = { ...pathState, localAvoidanceByEntityId: memory };
+  }
+  if (request.mode === "step" && moveResolution && !isCombatPositionAvailable(state, entity, moveResolution.position, options))
+    return markMoveFailed(state, entity.id);
+  if (moveResolution && options.isPositionAllowed && !options.isPositionAllowed(moveResolution.position)) {
+    const outcome = options.rejectedPositionOutcome ?? "blocked";
+    return finishNormalMovement(outcome === "blocked" ? markMoveFailed(observedState, entity.id) : observedState,
+      request, outcome, entity.position, entity.position, "constraint");
+  }
+  if (moveResolution?.swapWithEntityId) {
+    const partner = state.entities[moveResolution.swapWithEntityId];
+    if (!partner || isMovementBlockedByStatus(state, partner.id) ||
+      getMovementRequestRejection(state, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source }))) {
+      return markMoveFailed(state, entity.id);
+    }
+    const swapRequest = createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source });
+    const pendingPartnerRequests = state.normalMovementPhase?.submissions
+      .filter(submission => submission.request.entityId === partner.id).map(submission => submission.request) ?? [];
+    if (selectNormalMovementRequest(state, [swapRequest, ...pendingPartnerRequests]) !== swapRequest)
+      return markMoveFailed(state, entity.id);
+    const swappedPreview = { ...state, entities: { ...state.entities,
+      [entity.id]: { ...entity, position: partner.position }, [partner.id]: { ...partner, position: entity.position } } };
+    if (!isMoveDestinationAvailable(swappedPreview, entity, partner.position, options) ||
+      !isMoveDestinationAvailable(swappedPreview, partner, entity.position, options)) return markMoveFailed(state, entity.id);
+    const partnerDeparture = guardWarmasterWalkingDeparture(state, partner, entity.position);
+    if (partnerDeparture?.warmasterInteraction?.departure) return partnerDeparture;
+  }
+  const departure = moveResolution ? guardWarmasterWalkingDeparture(state, entity, moveResolution.position) : null;
+  if (departure?.warmasterInteraction?.departure) return departure;
   let nextStateWithIntent = recordMoveIntent(pathState, entity.id, moveResolution?.position);
+
+  if (options.combatSlot) {
+    const slotTarget = state.entities[options.combatSlot.targetId];
+    if (slotTarget) nextStateWithIntent = rememberAttackSlot(nextStateWithIntent, entity, slotTarget,
+      options.combatSlot.attackReach, options.combatSlot.position, { allowPartyPassThrough: options.allowPartyPassThrough, nowMs: state.simulationTimeMs });
+  }
 
   if (moveResolution?.movementPath) {
     nextStateWithIntent = setMovementPath(
@@ -174,11 +350,16 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
       );
     }
 
-    return swapEntityPositions(
+    const swapped = swapEntityPositions(
       reservedState,
       entity.id,
       moveResolution.swapWithEntityId,
     );
+    const partner = state.entities[moveResolution.swapWithEntityId];
+    return isSamePosition(partner.position, swapped.entities[partner.id].position) ? swapped
+      : finishNormalMovement(swapped, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source, travelFormationGoal: undefined,
+        combatFormationGoal: undefined, isFormationStaging: request.isFormationStaging }), "moved",
+        partner.position, swapped.entities[partner.id].position, "swap");
   }
 
   if (
@@ -244,14 +425,14 @@ export function moveEntityTowardIfUnoccupied<T extends GameEntity>(
 
   const guarded = guardWarmasterWalkingDeparture(reservedState, entity, moveResolution.position);
   if (guarded?.warmasterInteraction?.departure) return guarded;
-  return markMoveSucceeded(
-    updateMovementEntity(
+  return finishNormalMovement(markMoveSucceeded(
+    commitNormalMovementPosition(
       guarded ?? reservedState,
       moveEntityTo(entity, moveResolution.position),
     ),
     entity.id,
     entity.position,
-  );
+  ), request, "moved", entity.position, moveResolution.position, moveResolution.reason, blockingEnemyIds);
 }
 
 export function moveEntityTowardPositionIfUnoccupied<T extends GameEntity>(
@@ -457,18 +638,75 @@ export function isEntitySeparationPositionAvailable(
   position: Position,
 ): boolean {
   const actor = state.entities[movingEntityId];
-  if (actor?.kind === "enemy" && !isEnemyMovementPositionAllowed(state, actor, position)) return false;
-  return (
-    isNavigationPositionWalkable(state, position) &&
-    !isActiveResourcePosition(state, position, movingEntityId) &&
-    !isReservedPosition(state, position, movingEntityId) &&
-    !isPositionOccupiedBySeparationBlocker(
-      state,
-      position,
-      movingEntityId,
-      sourceEntityId,
-    )
-  );
+  // The source is deliberately excluded: small nudges may only partially exit it.
+  return Boolean(actor && isCombatPositionAvailable(state, actor, position, {}, sourceEntityId));
+}
+
+/** Endpoint clearance only; ordinary path traversal keeps its pass-through rules. */
+export function isCombatPositionAvailable(
+  state: GameState,
+  actor: GameEntity,
+  position: Position,
+  options: WalkablePositionOptions = {},
+  recoverySourceEntityId?: string,
+): boolean {
+  if (!isCombatTerrainClear(state, actor, position)) return false;
+  for (const other of Object.values(state.entities)) {
+    if (other.id === actor.id || other.id === recoverySourceEntityId || !isClearanceBlocker(other)) continue;
+    if (other.kind === "structure" || other.kind === "resource") {
+      if (doCollisionBodiesOverlap(actor, position, other)) return false;
+    } else if (!canPassThroughPartyEntity(actor, other, options) && areEntitiesOverlapping(actor, other, position)) {
+      // Recovery may improve another pre-existing overlap, but never introduce or deepen one.
+      if (!recoverySourceEntityId || !areEntitiesOverlapping(actor, other) ||
+        getEntityOverlapDepth(actor, other, position) > getEntityOverlapDepth(actor, other) + SPATIAL_EPSILON) return false;
+    }
+  }
+  const reservations: Array<[string, Position]> = [
+    ...Object.entries(state.reservedPositionsByEntityId ?? {}),
+    ...Object.entries(state.moveIntentsByEntityId ?? {}),
+  ];
+  const landingReservations: Array<[string, Position]> = [
+    ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).flatMap(cast => cast.dashPlan ? [[cast.casterId, cast.dashPlan.destination] as [string, Position]] : []),
+    ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => [dash.casterId, dash.pendingFinalization ? dash.lastSafePosition : dash.destination] as [string, Position]),
+    ...Object.values(state.forcedMovementsByEntityId ?? {}).map(move => [move.targetId, move.pendingFinalization ? move.lastSafePosition : {
+      x: move.origin.x + move.direction.x * move.distance,
+      y: move.origin.y + move.direction.y * move.distance,
+    }] as [string, Position]),
+  ];
+  // Scoped party transit must not waive the full body reserved for a specialized landing.
+  if (landingReservations.some(([id, reservedPosition]) => {
+    const owner = state.entities[id];
+    return id !== actor.id && owner && isClearanceBlocker(owner) &&
+      // Cancel the helper's epsilon so the existing landing safety margin stays intact.
+      doCollisionBodiesOverlap(actor, position, owner, reservedPosition, 0.05 + SPATIAL_EPSILON);
+  })) return false;
+  return reservations.every(([id, reservedPosition]) => {
+    if (id === actor.id || id === recoverySourceEntityId) return true;
+    const owner = state.entities[id];
+    if (!owner) return !isSamePosition(position, reservedPosition);
+    if (!isClearanceBlocker(owner)) return true;
+    return canPassThroughPartyEntity(actor, owner, options)
+      ? !isSamePosition(position, reservedPosition)
+      : !areEntitiesOverlapping(actor, owner, position, reservedPosition);
+  });
+}
+
+function isClearanceBlocker(entity: GameEntity): boolean {
+  return entity.state !== "dead" && (entity.kind !== "resource" || (!entity.isDepleted && entity.quantity > 0));
+}
+
+function isCombatTerrainClear(state: GameState, actor: GameEntity, position: Position): boolean {
+  if (actor.kind === "enemy" && !isEnemyMovementPositionAllowed(state, actor, position)) return false;
+  if (!state.map) return true;
+  const body = getCollisionBody(actor, position);
+  const radius = body.radius + 0.05;
+  if (body.x - radius < -0.5 || body.x + radius > state.map.columns - 0.5 ||
+    body.top - radius < -0.5 || body.bottom + radius > state.map.rows - 0.5) return false;
+  const overlapsWall = (wall: Position) =>
+    doesBodyOverlapBounds(body, {
+      minX: wall.x - 0.5, maxX: wall.x + 0.5, minY: wall.y - 0.5, maxY: wall.y + 0.5,
+    }, 0.05);
+  return !state.map.walls.some(overlapsWall) && !(state.map.collisionWalls ?? []).some(overlapsWall);
 }
 
 export function isPositionAvailable(
@@ -502,17 +740,21 @@ function getNextMoveResolution(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions = {},
-  planningOptions: { allowFreshPath?: boolean } = {},
+  planningOptions: { allowFreshPath?: boolean; search?: FormationSearchContext } = {},
 ): MoveResolution | null {
   const cachedPath = getCompatibleMovementPath(state, entity, target, options);
+  const formation = Boolean(options.travelFormationGoal || options.combatFormationGoal);
+  const waypoint = cachedPath && pruneReachedWaypoints(cachedPath.waypoints, entity.position)[0];
+  const usablePath = !formation || (waypoint && isSpecializedMovementPositionAvailable(state, entity, waypoint));
 
   if (cachedPath && pruneReachedWaypoints(cachedPath.waypoints, entity.position).length > 0) {
-    return getPathMoveResolution(state, entity, target, options);
+    const cached = getPathMoveResolution(state, entity, target, options);
+    if (usablePath) return cached;
   }
 
   const pathMoveResolution = getPathMoveResolution(state, entity, target, options);
 
-  if (pathMoveResolution) {
+  if (pathMoveResolution && usablePath) {
     return pathMoveResolution;
   }
 
@@ -526,7 +768,9 @@ function getNextMoveResolution(
     return null;
   }
 
-  if (isMoveDestinationAvailable(state, entity, movedEntity.position, options)) {
+  if (isMoveDestinationAvailable(state, entity, movedEntity.position, options) &&
+    (!formation || (isFormationWaypointAvailable(state, entity, movedEntity.position, options) &&
+      (!options.isPositionAllowed || options.isPositionAllowed(movedEntity.position))))) {
     return { position: movedEntity.position, reason: "direct_step" };
   }
 
@@ -536,12 +780,15 @@ function getNextMoveResolution(
       entity,
       target,
       options,
+      planningOptions.search,
     );
 
     if (freshPathResolution) {
       return freshPathResolution;
     }
   }
+
+  if (formation && !planningOptions.search?.record?.temporaryBlockers && options.isPositionAllowed && !options.isPositionAllowed(movedEntity.position)) return null;
 
   const swapWithEntity = getSwapCandidate(
     state,
@@ -565,6 +812,7 @@ function prepareMovementPath(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
+  search?: FormationSearchContext,
 ): GameState {
   if (!state.map) {
     return clearMovementPath(state, entity.id);
@@ -588,7 +836,7 @@ function prepareMovementPath(
     };
 
     if (shouldRefreshMovementPath(state, prunedPath, options)) {
-      const refreshedPath = getFreshMovementPath(state, entity, target, options);
+      const refreshedPath = getFreshMovementPath(state, entity, target, options, search);
 
       if (refreshedPath && refreshedPath.waypoints.length > 0) {
         return setMovementPath(state, entity.id, refreshedPath);
@@ -646,8 +894,9 @@ function getFreshPathMoveResolution(
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
+  search?: FormationSearchContext,
 ): MoveResolution | null {
-  const movementPath = getFreshMovementPath(state, entity, target, options);
+  const movementPath = getFreshMovementPath(state, entity, target, options, search);
   const waypoint = movementPath?.waypoints[0];
 
   if (!movementPath || !waypoint) {
@@ -674,11 +923,19 @@ function getFreshPathMoveResolution(
   };
 }
 
+function isFormationWaypointAvailable(state: GameState, entity: GameEntity, position: Position, options: MovementOptions): boolean {
+  if (!isSpecializedMovementPositionAvailable(state, entity, position)) return false;
+  if (!options.isSettlingPosition?.(position)) return true;
+  return !Object.values(state.entities).some(other => other.id !== entity.id && other.kind === "companion" &&
+    other.state !== "dead" && areEntitiesOverlapping(entity, other, position));
+}
+
 function getFreshMovementPath(
   state: GameState,
   entity: GameEntity,
   target: GameEntity,
   options: MovementOptions,
+  search?: FormationSearchContext,
 ): MovementPath | null {
   if (!state.map) {
     return null;
@@ -688,25 +945,45 @@ function getFreshMovementPath(
     return null;
   }
 
-  const goals = getPathGoals(state, entity, target, options);
+  const formationGoal = options.travelFormationGoal || options.combatFormationGoal;
+  const now = state.simulationTimeMs ?? 0;
+  if (formationGoal && search?.record && now - search.record.lastQueryAtMs < FORMATION_PATH_QUERY_INTERVAL_MS) return null;
+  const goals = getPathGoals(state, entity, target, options).flatMap((goal) => {
+    if (!formationGoal || isFormationWaypointAvailable(state, entity, toNavigationNode(goal), options)) return [goal];
+    // Navigation exempts its goal nodes from isBlocked. Keep those nodes body-safe too.
+    return getNavigationNeighborPositions(toNavigationNode(goal)).filter((position) =>
+      isMoveDestinationAvailable(state, entity, position, options) &&
+      isFormationWaypointAvailable(state, entity, position, options),
+    );
+  });
 
   if (goals.length === 0) {
     return null;
   }
 
   const blockerLookup = createNavigationBlockerLookup(state, entity.id, options);
+  let temporaryBlockers = false;
 
   recordNavigationPathQuery(getNavigationPathMetricBucket(options.pathProfile));
   const waypoints = findNavigationPath(state.map, entity.position, goals, {
-    isBlocked: (position) =>
-      isNavigationPositionBlocked(
+    isBlocked: (position) => {
+      const blocked = isNavigationPositionBlocked(
         state,
         position,
         entity.id,
         options,
         blockerLookup,
-      ),
+      );
+      const formationBlocked = Boolean(formationGoal && !isFormationWaypointAvailable(state, entity, position, options));
+      // A body-limited search must retain local steering rather than become a
+      // hard-terrain hold. This is not evidence about any combat target.
+      if (formationGoal && (blocked || formationBlocked) && isSpecializedMovementPositionAvailable(state, entity, position)) temporaryBlockers = true;
+      return blocked || formationBlocked;
+    },
   });
+
+  if (search) search.record = { requestKey: getMovementPathTargetKey(state, entity, target, options), lastQueryAtMs: now, failed: waypoints.length === 0,
+    ...(temporaryBlockers ? { temporaryBlockers: true } : {}) };
 
   if (waypoints.length === 0) {
     return null;
@@ -728,12 +1005,13 @@ function getMovementPathTargetKey(
   target: GameEntity,
   options: MovementOptions,
 ): string {
-  return [
+  const key = [
     getMovementPathProfile(options),
     target.id,
     options.pathTargetKey ?? getNavigationPositionKey(target.position),
     options.allowPartyPassThrough ? "party-pass" : "solid-party",
   ].join(":");
+  return options.travelFormationGoal || options.combatFormationGoal ? `${key}:formation-body` : key;
 }
 
 function getMovementPathProfile(options: MovementOptions): MovementPathProfile {
@@ -1203,29 +1481,6 @@ function getCollisionShapeBounds(
   };
 }
 
-function isPositionInsideCollisionShape(
-  position: Position,
-  origin: Position,
-  shape: EntityCollisionShape,
-): boolean {
-  if (shape.kind === "circle") {
-    return getEuclideanDistance(position, origin) < shape.radius;
-  }
-
-  const top = origin.y - shape.height * shape.anchorY;
-  const bottom = top + shape.height;
-  const segmentStartY = top + shape.radius;
-  const segmentEndY = bottom - shape.radius;
-  const closestY = Math.min(
-    Math.max(position.y, segmentStartY),
-    segmentEndY,
-  );
-
-  return (
-    getEuclideanDistance(position, { x: origin.x, y: closestY }) < shape.radius
-  );
-}
-
 function isNavigationPositionBlocked(
   state: GameState,
   position: Position,
@@ -1350,22 +1605,6 @@ function isPositionOccupiedByBlockingEntity(
       entity.kind !== "resource" &&
       entity.state !== "dead" &&
       !canPassThroughBlockingEntity(movingEntity, entity, options) &&
-      isPositionInsideEntityCollisionShape(entity, position),
-  );
-}
-
-function isPositionOccupiedBySeparationBlocker(
-  state: GameState,
-  position: Position,
-  movingEntityId: string,
-  sourceEntityId: string,
-): boolean {
-  return Object.values(state.entities).some(
-    (entity) =>
-      entity.id !== movingEntityId &&
-      entity.id !== sourceEntityId &&
-      entity.kind !== "resource" &&
-      entity.state !== "dead" &&
       isPositionInsideEntityCollisionShape(entity, position),
   );
 }
@@ -1752,11 +1991,11 @@ function swapEntityPositions(
     state = guarded ?? state;
   }
 
-  let nextState = updateMovementEntity(
+  let nextState = commitNormalMovementPosition(
     state,
     moveEntityTo(firstEntity, secondEntity.position),
   );
-  nextState = updateMovementEntity(
+  nextState = commitNormalMovementPosition(
     nextState,
     moveEntityTo(secondEntity, firstEntity.position),
   );
@@ -1764,39 +2003,4 @@ function swapEntityPositions(
   nextState = markMoveSucceeded(nextState, secondEntity.id, secondEntity.position);
 
   return nextState;
-}
-
-function updateMovementEntity(state: GameState, entity: GameEntity): GameState {
-  const previousEntity = state.entities[entity.id];
-
-  return {
-    ...state,
-    entities: {
-      ...state.entities,
-      [entity.id]: entity,
-    },
-    followTrailsByEntityId:
-      previousEntity &&
-      !isSamePosition(previousEntity.position, entity.position)
-        ? {
-            ...state.followTrailsByEntityId,
-            [entity.id]: getUpdatedFollowTrail(
-              state.followTrailsByEntityId[entity.id] ?? [],
-              previousEntity.position,
-            ),
-          }
-        : state.followTrailsByEntityId,
-  };
-}
-
-function getUpdatedFollowTrail(
-  trail: Position[],
-  position: Position,
-): Position[] {
-  const nextTrail = [
-    position,
-    ...trail.filter((trailPosition) => !isSamePosition(trailPosition, position)),
-  ];
-
-  return nextTrail.slice(0, FOLLOW_TRAIL_LENGTH);
 }

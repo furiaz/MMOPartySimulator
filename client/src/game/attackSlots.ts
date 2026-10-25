@@ -1,6 +1,7 @@
 import {
   getBoundedPathDistance,
-  isActiveResourcePosition,
+  findNearestReachablePosition,
+  isCombatPositionAvailable,
   isWallPosition,
   previewMoveTowardPosition,
 } from "./movementPlanning";
@@ -10,9 +11,10 @@ import {
   arePositionsEqual,
   getEuclideanDistance,
   getGridDistance,
-  getManhattanDistance,
 } from "./positionUtils";
 import { isCombatPositionSpacedFromParty } from "./partySpacing";
+import { getCombatTargetPosition, getEffectiveAttackRange, isWithinAttackReach, SPATIAL_EPSILON } from "./spatialGeometry";
+import { hasStructureLineOfSight } from "./combatStructures";
 import type { CombatEntity, GameEntity, Position } from "./types";
 
 const ATTACK_SLOT_DIRECTIONS: Position[] = [
@@ -33,14 +35,15 @@ type AttackSlotOptions = {
   leaderSafeDistance?: number;
   leaderMaxPathDistance?: number;
   preferredSlotIndex?: number;
+  preferredFormationPosition?: Position;
   allowPartyPassThrough?: boolean;
   partySpacingMode?: "off" | "prefer" | "required";
   nowMs?: number;
   pathDistanceCache?: AttackSlotPathDistanceCache;
-  targetId?: string;
 };
 
 export type AttackSlotPathDistanceCache = Map<string, number>;
+export type AttackEngagementProbe = { reachable: boolean | null; position?: Position };
 export type AttackSlotPartySpacingMode = NonNullable<
   AttackSlotOptions["partySpacingMode"]
 >;
@@ -55,17 +58,23 @@ export function createAttackSlotPathDistanceCache(): AttackSlotPathDistanceCache
 export function chooseAttackSlot(
   state: GameState,
   attacker: CombatEntity,
-  targetPosition: Position,
-  attackRange: number,
+  target: GameEntity,
+  attackReach: number,
   options: AttackSlotOptions = {},
 ): Position | null {
   recordAttackSlotCheck();
+  const targetPosition = getCombatTargetPosition(attacker.position, target);
+  const attackRange = getEffectiveAttackRange(attacker, target, attackReach);
   const partySpacingMode = options.partySpacingMode ?? "off";
+  if (isValidCombatPosition(state, attacker, target, attackReach, attacker.position, options) &&
+    (partySpacingMode === "off" || isCombatPositionSpacedFromParty(state, attacker, attacker.position))) {
+    return attacker.position;
+  }
   const cachedAttackSlot = getReusableCachedAttackSlot(
     state,
     attacker,
-    targetPosition,
-    attackRange,
+    target,
+    attackReach,
     options,
   );
 
@@ -82,9 +91,10 @@ export function chooseAttackSlot(
   const rankedPositions = getRankedCombatPositions(
     getAttackSlotPositions(targetPosition, attackRange),
     attacker,
-    targetPosition,
     options.preferredSlotIndex,
+    options.preferredFormationPosition,
   ).filter((position) =>
+    isValidCombatPosition(state, attacker, target, attackReach, position, options) &&
     isCheaplyReachableCombatPosition(state, attacker, position, options),
   );
   const preferredPositions =
@@ -107,6 +117,12 @@ export function chooseAttackSlot(
       return position;
     }
   }
+
+  const observation = state.targetApproachesByEntityId?.[attacker.id];
+  const observedPosition = observation?.targetId === target.id ? observation.engagementPosition : undefined;
+  const observedIsValid = observedPosition && isValidCombatPosition(state, attacker, target, attackReach, observedPosition, options) &&
+    isReachableCombatPosition(state, attacker, observedPosition, options, pathDistanceCache);
+  if (observedIsValid && (partySpacingMode === "off" || isCombatPositionSpacedFromParty(state, attacker, observedPosition))) return observedPosition;
 
   if (partySpacingMode === "required") {
     return null;
@@ -132,7 +148,43 @@ export function chooseAttackSlot(
     }
   }
 
+  if (observedIsValid) return observedPosition;
+
   return null;
+}
+
+/** A failed slot sample is not proof that the continuous engagement area is unreachable. */
+export function probeAttackEngagement(
+  state: GameState, attacker: CombatEntity, target: GameEntity, attackReach: number,
+): AttackEngagementProbe {
+  if (!state.map || isWallPosition(state, attacker.position)) return { reachable: null };
+  const options = { allowPartyPassThrough: true, maxPathDistance: state.map.columns * state.map.rows * 2 };
+  const slot = chooseAttackSlot(state, attacker, target, attackReach, options);
+  if (slot) return { reachable: true, position: slot };
+  const center = getCombatTargetPosition(attacker.position, target);
+  const range = getEffectiveAttackRange(attacker, target, attackReach);
+  let reachedEnvelope = false;
+  let position: Position | undefined;
+  findNearestReachablePosition(state, attacker, node => {
+    const distance = getEuclideanDistance(node, center);
+    // Include adjacent goal cells: navigation permits a blocked final node.
+    // Reaching this conservative envelope makes an unsuccessful sample unknown.
+    if (distance > range + 2) return false;
+    reachedEnvelope = true;
+    if (distance > range + Math.SQRT1_2) return false;
+    for (const y of [0, -0.2, 0.2, -0.4, 0.4]) {
+      for (const x of [0, -0.2, 0.2, -0.4, 0.4]) {
+        const candidate = { x: node.x + x, y: node.y + y };
+        if (isValidCombatPosition(state, attacker, target, attackReach, candidate, options)) {
+          position = candidate;
+          return true;
+        }
+      }
+    }
+    return false;
+  }, options);
+  if (position) return { reachable: true, position };
+  return { reachable: reachedEnvelope ? null : false };
 }
 
 export function getAttackSlotPathDistanceCacheKey(
@@ -155,12 +207,12 @@ export function getAttackSlotPathDistanceCacheKey(
 export function rememberAttackSlot(
   state: GameState,
   attacker: GameEntity,
-  targetPosition: Position,
-  attackRange: number,
+  target: GameEntity,
+  attackReach: number,
   attackSlot: Position,
   options: Pick<
     AttackSlotOptions,
-    "allowPartyPassThrough" | "nowMs" | "targetId"
+    "allowPartyPassThrough" | "nowMs"
   > = {},
 ): GameState {
   return {
@@ -168,12 +220,12 @@ export function rememberAttackSlot(
     attackSlotCacheByEntityId: {
       ...(state.attackSlotCacheByEntityId ?? {}),
       [attacker.id]: {
-        attackRange,
+        attackRange: getEffectiveAttackRange(attacker, target, attackReach),
         attackSlot,
         createdAtMs: options.nowMs ?? state.simulationTimeMs ?? 0,
         mapKey: getAttackSlotMapCacheKey(state),
-        targetId: options.targetId,
-        targetPosition,
+        targetId: target.id,
+        targetPosition: getCombatTargetPosition(attacker.position, target),
         usesPartyPassThrough: Boolean(options.allowPartyPassThrough),
       },
     },
@@ -188,20 +240,25 @@ function getAttackSlotPositions(
   targetPosition: Position,
   attackRange: number,
 ): Position[] {
-  return ATTACK_SLOT_DIRECTIONS.map((direction) => ({
-    x: targetPosition.x + direction.x * attackRange,
-    y: targetPosition.y + direction.y * attackRange,
-  }));
+  return ATTACK_SLOT_DIRECTIONS.map((direction) => {
+    const length = Math.hypot(direction.x, direction.y);
+    return {
+      x: targetPosition.x + direction.x / length * attackRange,
+      y: targetPosition.y + direction.y / length * attackRange,
+    };
+  });
 }
 
 function getReusableCachedAttackSlot(
   state: GameState,
   attacker: CombatEntity,
-  targetPosition: Position,
-  attackRange: number,
+  target: GameEntity,
+  attackReach: number,
   options: AttackSlotOptions,
 ): Position | null {
   const cachedSlot = state.attackSlotCacheByEntityId?.[attacker.id];
+  const targetPosition = getCombatTargetPosition(attacker.position, target);
+  const attackRange = getEffectiveAttackRange(attacker, target, attackReach);
 
   if (!cachedSlot) {
     return null;
@@ -213,12 +270,12 @@ function getReusableCachedAttackSlot(
   if (
     nowMs - cachedSlot.createdAtMs > reuseMs ||
     cachedSlot.mapKey !== getAttackSlotMapCacheKey(state) ||
-    cachedSlot.targetId !== options.targetId ||
+    cachedSlot.targetId !== target.id ||
     cachedSlot.attackRange !== attackRange ||
     cachedSlot.usesPartyPassThrough !== Boolean(options.allowPartyPassThrough) ||
     getEuclideanDistance(cachedSlot.targetPosition, targetPosition) >
       TARGET_POSITION_REUSE_DISTANCE ||
-    getGridDistance(cachedSlot.attackSlot, targetPosition) > attackRange ||
+    !isValidCombatPosition(state, attacker, target, attackReach, cachedSlot.attackSlot, options) ||
     (state.movementFailureMsByEntityId?.[attacker.id] ?? 0) >= reuseMs
   ) {
     return null;
@@ -237,8 +294,8 @@ function getReusableCachedAttackSlot(
 function getRankedCombatPositions(
   positions: Position[],
   attacker: CombatEntity,
-  targetPosition: Position,
   preferredSlotIndex = 0,
+  preferredFormationPosition?: Position,
 ): Position[] {
   return [...positions]
     .map((position, index) => ({
@@ -247,14 +304,9 @@ function getRankedCombatPositions(
     }))
     .sort(
       (a, b) =>
-        getGridDistance(a.position, targetPosition) -
-          getGridDistance(b.position, targetPosition) ||
-        getManhattanDistance(a.position, targetPosition) -
-          getManhattanDistance(b.position, targetPosition) ||
-        getGridDistance(a.position, attacker.position) -
-          getGridDistance(b.position, attacker.position) ||
-        getManhattanDistance(a.position, attacker.position) -
-          getManhattanDistance(b.position, attacker.position) ||
+        compareDistances(getEuclideanDistance(a.position, attacker.position), getEuclideanDistance(b.position, attacker.position)) ||
+        (preferredFormationPosition ? compareDistances(getEuclideanDistance(a.position, preferredFormationPosition),
+          getEuclideanDistance(b.position, preferredFormationPosition)) : 0) ||
         getSlotPreferenceDistance(a.index, preferredSlotIndex, positions.length) -
           getSlotPreferenceDistance(b.index, preferredSlotIndex, positions.length) ||
         a.position.y - b.position.y ||
@@ -270,7 +322,6 @@ function isCheaplyReachableCombatPosition(
   options: AttackSlotOptions,
 ): boolean {
   return (
-    isCombatPositionAvailable(state, attacker, position) &&
     (arePositionsEqual(attacker.position, position) ||
       previewMoveTowardPosition(state, attacker, position, {
         allowPartyPassThrough: options.allowPartyPassThrough,
@@ -333,7 +384,6 @@ function isReachableCombatPosition(
   pathDistanceCache: AttackSlotPathDistanceCache,
 ): boolean {
   return (
-    isCombatPositionAvailable(state, attacker, position) &&
     isWithinAttackerPathLimit(state, attacker, position, options, pathDistanceCache) &&
     isLeaderSafeAttackSlot(state, position, options, pathDistanceCache) &&
     (arePositionsEqual(attacker.position, position) ||
@@ -390,48 +440,21 @@ function isLeaderSafeAttackSlot(
   );
 }
 
-function isCombatPositionAvailable(
+function isValidCombatPosition(
   state: GameState,
   attacker: CombatEntity,
+  target: GameEntity,
+  attackReach: number,
   position: Position,
+  options: AttackSlotOptions,
 ): boolean {
   return (
-    isInMapBounds(state, position) &&
-    !isWallPosition(state, position) &&
-    !isActiveResourcePosition(state, position, attacker.id) &&
-    !isReservedByOtherEntity(state, attacker, position) &&
-    !isOccupiedByOtherEntity(state, attacker, position)
+    isWithinAttackReach(attacker, target, attackReach, position) &&
+    isCombatPositionAvailable(state, attacker, position, options) &&
+    hasStructureLineOfSight(state, position, target)
   );
 }
 
-function isInMapBounds(state: GameState, position: Position): boolean {
-  return (
-    !state.map ||
-    (position.x >= 0 &&
-      position.x < state.map.columns &&
-      position.y >= 0 &&
-      position.y < state.map.rows)
-  );
-}
-
-function isReservedByOtherEntity(
-  state: GameState,
-  attacker: CombatEntity,
-  position: Position,
-): boolean {
-  return Object.entries(state.reservedPositionsByEntityId ?? {}).some(
-    ([entityId, reservedPosition]) =>
-      entityId !== attacker.id && arePositionsEqual(reservedPosition, position),
-  );
-}
-
-function isOccupiedByOtherEntity(
-  state: GameState,
-  attacker: CombatEntity,
-  position: Position,
-): boolean {
-  return Object.values(state.entities).some(
-    (entity: GameEntity) =>
-      entity.id !== attacker.id && arePositionsEqual(entity.position, position),
-  );
+function compareDistances(a: number, b: number): number {
+  return Math.abs(a - b) <= SPATIAL_EPSILON ? 0 : a - b;
 }

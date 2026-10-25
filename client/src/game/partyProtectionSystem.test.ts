@@ -57,7 +57,7 @@ describe("party protection target stability", () => {
     });
   });
 
-  it("switches to the attacker when the current combat target is no longer retainable", () => {
+  it("responds locally when the previous combat target is no longer retainable", () => {
     const leader = {
       ...createCompanion("leader", { x: 0, y: 0 }, "leader", "defender", 0),
       state: "attack" as const,
@@ -91,9 +91,7 @@ describe("party protection target stability", () => {
 
     const nextState = protectPartyMember(state, leader, latestAttacker);
 
-    expect(nextState.leaderIntent).toMatchObject({
-      type: "attack",
-      targetId: latestAttacker.id,
-    });
+    expect(nextState.leaderIntent).toEqual(state.leaderIntent);
+    expect(nextState.entities[leader.id]).toMatchObject({ state: "attack", currentTargetId: latestAttacker.id });
   });
 });

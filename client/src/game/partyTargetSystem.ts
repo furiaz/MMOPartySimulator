@@ -1,3 +1,4 @@
+import { hasDirectCompanionAuthority } from "./directCommandState";
 import { isLivingCompanion } from "./entityGuards";
 import { getPartyMembers, isPartyMember } from "./partySystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
@@ -10,6 +11,7 @@ import {
 import type { Enemy, Position } from "./types";
 import { isLivingHostileTarget, getCombatTargetPosition } from "./combatStructures";
 import type { CombatStructure } from "./types";
+import { clearTargetCommitmentsForTarget } from "./targetCommitment";
 
 const DEFAULT_SUPPRESSION_TIME_MS = 0;
 
@@ -102,7 +104,7 @@ export function clearEnemyFromPartyTargeting(
 
   for (const member of getPartyMembers(nextState)) {
     if (
-      member.commandPriority === "direct" ||
+      hasDirectCompanionAuthority(nextState, member) ||
       member.currentTargetId !== enemyId
     ) {
       continue;
@@ -124,7 +126,7 @@ export function clearEnemyFromPartyTargeting(
     });
   }
 
-  return nextState;
+  return clearTargetCommitmentsForTarget(nextState, enemyId);
 }
 
 export function clearExpiredAutonomousTargetSuppressions(

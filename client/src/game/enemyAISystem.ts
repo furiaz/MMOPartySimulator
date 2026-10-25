@@ -1,4 +1,5 @@
 import { getMovementStepDistance, isAutonomousEntity } from "./entities";
+import { getNormalMovementResult } from "./movementAuthority";
 import {
   addCombatFeedback,
   getEntityById,
@@ -8,6 +9,7 @@ import {
 } from "./state";
 import {
   getBoundedPathDistance,
+  flushNormalMovementForEntity,
   moveEntityTowardPositionIfUnoccupied,
 } from "./movementPlanning";
 import { getEuclideanDistance } from "./positionUtils";
@@ -537,6 +539,7 @@ function moveEnemyTowardHome(
       enemy.homePosition,
       {
         pathProfile: "home",
+        source: "enemyHome",
         pathTargetKey: `home:${enemy.id}`,
         pathTargetPosition: enemy.homePosition,
         speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
@@ -577,6 +580,7 @@ function moveQuestSpawnTowardPressureTarget(
       {
         allowPartyPassThrough: false,
         pathProfile: "chase",
+        source: "enemyQuest",
         pathTargetKey: `quest:${questSpawn.questId}:${questSpawn.objectiveId}`,
         pathTargetPosition: targetPosition,
         speedMultiplier: ENEMY_CHASE_SPEED_MULTIPLIER,
@@ -602,12 +606,15 @@ function moveEnemyTowardRoamTarget(
     return updateEntity(state, finishEnemyRoam(enemy, now));
   }
 
-  const movedState = moveEntityTowardPositionIfUnoccupied(state, enemy, roamTarget, {
+  const movedState = flushNormalMovementForEntity(moveEntityTowardPositionIfUnoccupied(state, enemy, roamTarget, {
     pathProfile: "roam",
+    source: "enemyRoam",
+    isPositionAllowed: position => getDistance(position, enemy.homePosition) <= ENEMY_ROAM_LEASH_DISTANCE,
+    rejectedPositionOutcome: "held",
     pathTargetKey: `roam:${enemy.id}:${getPositionPathKey(roamTarget)}`,
     pathTargetPosition: roamTarget,
     speedMultiplier: ENEMY_ROAM_SPEED_MULTIPLIER,
-  });
+  }), enemy.id);
   const movedEnemy = getEntityById(movedState, enemy.id);
 
   if (!movedEnemy || !isEnemy(movedEnemy)) {
@@ -619,18 +626,8 @@ function moveEnemyTowardRoamTarget(
     movedEntityIds.add(enemy.id);
   }
 
-  if (getDistance(movedEnemy.position, movedEnemy.homePosition) > ENEMY_ROAM_LEASH_DISTANCE) {
-    return updateEntity(
-      movedState,
-      finishEnemyRoam(
-        {
-          ...movedEnemy,
-          position: enemy.position,
-        },
-        now,
-      ),
-    );
-  }
+  if (getNormalMovementResult(movedState, enemy.id)?.reason === "constraint")
+    return updateEntity(movedState, finishEnemyRoam(movedEnemy, now));
 
   return movedState;
 }
@@ -640,6 +637,7 @@ function markEnemyMovedIfPositionChanged(
   state: GameState,
   movedEntityIds: Set<string>,
 ): GameState {
+  state = flushNormalMovementForEntity(state, previousEnemy.id);
   const nextEnemy = getEntityById(state, previousEnemy.id);
 
   if (

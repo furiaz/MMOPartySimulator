@@ -182,7 +182,7 @@ describe("area targeting and resolution", () => {
   it.each(["dawn_step", "atonement_step"] as const)("uses each selected %s shape at a valid offensive landing", skillId => {
     for (const variant of ["circle", "cross"] as const) {
       const caster = prefer(companion(), skillId, { variant });
-      const target = enemy("front", 13);
+      const target = enemy("front", 13.5);
       const state = setup(caster, target);
       expect(getSkillTarget(state, caster, SKILL_DEFINITIONS[skillId])?.id).toBe(target.id);
       const result = cast(state, skillId);
@@ -335,7 +335,7 @@ describe("Shockwave completion sequencing", () => {
   it("taunts at an earlier dynamic stop, not the original scheduled endpoint", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     let state = impact();
-    state = { ...state, map: { ...state.map!, walls: [{ x: 12, y: 10 }] } };
+    state = { ...state, map: { ...state.map!, walls: [{ x: 13, y: 10 }] } };
     state = updateForcedMovements(state, new Set(), 1250);
     expect(state.forcedMovementsByEntityId?.front).toBeUndefined();
     expect(statuses(state, "taunted")[0]?.expiresAt).toBe(4250);

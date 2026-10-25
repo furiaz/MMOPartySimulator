@@ -3,6 +3,9 @@ import { isLivingHostileTarget, getStructureApproachPosition } from "./combatStr
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getGridDistance } from "./positionUtils";
 import { clearResurrectionRecoveryAssignmentForCompanion } from "./resurrectionSystem";
+import { clearDirectCommandPlanning, finishDirectCompanionCommand } from "./directCommandState";
+export { DIRECT_COMMAND_REJOIN_GRACE_MS } from "./directCommandState";
+import { getSpecializedMovementOwner } from "./movementAuthority";
 import {
   addCombatFeedback,
   getEntityById,
@@ -25,7 +28,6 @@ import type {
 } from "./types";
 
 export const DIRECT_COMMAND_MAX_PATH_DISTANCE = 30;
-export const DIRECT_COMMAND_REJOIN_GRACE_MS = 1500;
 const DIRECT_MOVE_ARRIVAL_DISTANCE = 0.25;
 
 export type CompanionDirectCommandInput =
@@ -80,9 +82,7 @@ export function issueCompanionDirectCommand(
   }
 
   const command = createDirectCommand(input, validation.targetPosition, now);
-  if (command.type === "move") {
-    nextState = clearMovementPlanningForCompanion(nextState, companion.id);
-  }
+  nextState = clearDirectCommandPlanning(nextState, companion.id);
 
   nextState = {
     ...nextState,
@@ -140,9 +140,8 @@ export function updateDirectCompanionCommandSystem(
       continue;
     }
 
-    if (nextState.forcedMovementsByEntityId?.[companion.id]) continue;
-
     if (command.type === "move") {
+      if (getSpecializedMovementOwner(nextState, companion.id)) continue;
       nextState = updateDirectMoveCommand(nextState, companion, command, movedEntityIds, now);
       continue;
     }
@@ -376,6 +375,7 @@ function updateDirectMoveCommand(
     {
       allowPartyPassThrough: true,
       pathProfile: "directCommand",
+      source: "direct",
       pathTargetKey: `direct-command:${companion.id}`,
       pathTargetPosition: command.targetPosition,
     },
@@ -402,57 +402,7 @@ function clearDirectCompanionCommand(
   reason: string,
   shouldStartGrace = true,
 ): GameState {
-  const companion = getEntityById(state, command.companionId);
-  let nextState: GameState = {
-    ...state,
-    directCompanionCommandsById: removeRecordEntry(
-      state.directCompanionCommandsById,
-      command.companionId,
-    ),
-  };
-
-  if (isLivingCompanion(companion)) {
-    nextState = updateEntity(nextState, {
-      ...companion,
-      state: "follow",
-      currentTargetId:
-        companion.id === nextState.partyLeaderId ? null : nextState.partyLeaderId,
-      commandPriority: "autonomous",
-    });
-  }
-
-  nextState = appendDirectCommandEvent(nextState, {
-    type: eventType,
-    companionId: command.companionId,
-    command,
-    reason,
-  });
-
-  return shouldStartGrace
-    ? startDirectCommandGrace(nextState, command, now)
-    : nextState;
-}
-
-function startDirectCommandGrace(
-  state: GameState,
-  command: DirectCompanionCommand,
-  now: number,
-): GameState {
-  const graceUntil = now + DIRECT_COMMAND_REJOIN_GRACE_MS;
-  const nextState: GameState = {
-    ...state,
-    directCommandGraceUntilByCompanionId: {
-      ...(state.directCommandGraceUntilByCompanionId ?? {}),
-      [command.companionId]: graceUntil,
-    },
-  };
-
-  return appendDirectCommandEvent(nextState, {
-    type: "direct_command_grace_started",
-    companionId: command.companionId,
-    command,
-    reason: "rejoin",
-  });
+  return finishDirectCompanionCommand(state, command, now, eventType, reason, shouldStartGrace);
 }
 
 function clearExpiredDirectCommandGrace(state: GameState, now: number): GameState {
@@ -551,15 +501,6 @@ function isDirectGatherCommandAllowed(
 }
 
 function findPersonalThreat(state: GameState, companion: Companion): Enemy | null {
-  const movementFailure = state.movementFailuresByEntityId?.[companion.id];
-  const blocker = movementFailure?.blockerId
-    ? getEntityById(state, movementFailure.blockerId)
-    : undefined;
-
-  if (isLivingEnemy(blocker)) {
-    return blocker;
-  }
-
   return (
     Object.values(state.entities)
       .filter(isLivingEnemy)
@@ -620,34 +561,4 @@ function removeRecordEntry<T>(
   delete nextRecord[key];
 
   return Object.keys(nextRecord).length > 0 ? nextRecord : undefined;
-}
-
-function clearMovementPlanningForCompanion(
-  state: GameState,
-  companionId: string,
-): GameState {
-  return {
-    ...state,
-    failedMoveByEntityId: removeRecordEntry(state.failedMoveByEntityId, companionId),
-    movementDecisionsByEntityId: removeRecordEntry(
-      state.movementDecisionsByEntityId,
-      companionId,
-    ),
-    movementFailuresByEntityId: removeRecordEntry(
-      state.movementFailuresByEntityId,
-      companionId,
-    ),
-    movementPathRetryAtMsByEntityId: removeRecordEntry(
-      state.movementPathRetryAtMsByEntityId,
-      companionId,
-    ),
-    movementPathsByEntityId: removeRecordEntry(
-      state.movementPathsByEntityId,
-      companionId,
-    ),
-    moveIntentsByEntityId: removeRecordEntry(
-      state.moveIntentsByEntityId,
-      companionId,
-    ),
-  };
 }

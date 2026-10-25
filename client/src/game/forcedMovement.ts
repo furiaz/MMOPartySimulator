@@ -1,12 +1,13 @@
-import { getEntityCollisionShape } from "./movementPlanning";
-import { getEnemyCombatBodyRadius } from "./enemyArchetypes";
 import { updateEntity, type GameState } from "./state";
 import type { GameEntity, Position } from "./types";
 import { applyStatusEffect } from "./statusEffects";
 import { cancelEnemyAbilityCast } from "./enemyAbilitySystem";
 import { cancelEnemyDash } from "./enemyDashSystem";
-import { isEnemyMovementPositionAllowed } from "./enemyMovementBounds";
+import { isSpecializedMovementPathAvailable, isSpecializedMovementPositionAvailable } from "./specializedMovementGeometry";
+import { commitSpecializedMovementPosition, handoffSpecializedMovement, releaseSpecializedMovement, getMovementPositionCommit } from "./movementAuthority";
+import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 export type ForcedMovement = {
+  pendingFinalization?: true;
   targetId: string;
   sourceId: string;
   origin: Position;
@@ -18,80 +19,9 @@ export type ForcedMovement = {
   completionStatus?: { type: "taunted"; durationMs: number; sourceKey: string };
 };
 const SAMPLE_DISTANCE = 0.1;
-const CLEARANCE = 0.05;
-function segment(entity: GameEntity, position: Position) {
-  if (entity.kind === "enemy")
-    return {
-      x: position.x,
-      top: position.y,
-      bottom: position.y,
-      radius: getEnemyCombatBodyRadius(entity) || 0.7
-    };
-  const shape = getEntityCollisionShape(entity);
-  return shape.kind === "circle"
-    ? {
-      x: position.x,
-      top: position.y,
-      bottom: position.y,
-      radius: shape.radius
-    }
-    : {
-      x: position.x,
-      top: position.y - shape.height * shape.anchorY + shape.radius,
-      bottom: position.y + shape.height * (1 - shape.anchorY) - shape.radius,
-      radius: shape.radius
-    };
-}
 /** Full circle/capsule clearance; living bodies may be crossed, never terrain. */
 export function isForcedMovementPositionAvailable(state: GameState, entity: GameEntity, position: Position, landing = false): boolean {
-  if (entity.kind === "enemy" && !isEnemyMovementPositionAllowed(state, entity, position)) return false;
-  const body = segment(entity, position);
-  const radius = body.radius + CLEARANCE;
-  if (state.map) {
-    if (body.x - radius < -0.5 || body.x + radius > state.map.columns - 0.5 || body.top - radius < -0.5 || body.bottom + radius > state.map.rows - 0.5)
-      return false;
-    for (const wall of [...state.map.walls, ...(state.map.collisionWalls ?? [])]) {
-      const dx = Math.max(0, Math.abs(body.x - wall.x) - 0.5);
-      const dy = Math.max(0, wall.y - 0.5 - body.bottom, body.top - wall.y - 0.5);
-      if (Math.hypot(dx, dy) < radius)
-        return false;
-    }
-  }
-  for (const other of Object.values(state.entities)) {
-    if (other.id === entity.id || other.state === "dead" || other.kind === "structure")
-      continue;
-    if (other.kind === "resource" ? other.isDepleted || other.quantity <= 0 : !landing)
-      continue;
-    const blocker = segment(other, other.position);
-    const dy = Math.max(0, body.top - blocker.bottom, blocker.top - body.bottom);
-    if (Math.hypot(body.x - blocker.x, dy) < radius + blocker.radius)
-      return false;
-  }
-  if (landing && Object.entries(state.reservedPositionsByEntityId ?? {}).some(([id, reserved]) => id !== entity.id && Math.hypot(reserved.x - position.x, reserved.y - position.y) < radius + 0.7))
-    return false;
-  if (landing) {
-    for (const movement of Object.values(state.forcedMovementsByEntityId ?? {})) {
-      const owner = state.entities[movement.targetId];
-      if (!owner || owner.id === entity.id || owner.state === "dead") continue;
-      const reservedBody = segment(owner, along(movement.origin, movement.direction, movement.distance));
-      const dy = Math.max(0, body.top - reservedBody.bottom, reservedBody.top - body.bottom);
-      if (Math.hypot(body.x - reservedBody.x, dy) < radius + reservedBody.radius) return false;
-    }
-    const destinations = [
-      ...Object.values(state.enemyAbilityCastsByEnemyId ?? {}).filter(cast => cast.dashPlan).map(cast => ({ id: cast.casterId, position: cast.dashPlan!.destination })),
-      ...Object.values(state.enemyDashesByEnemyId ?? {}).map(dash => ({ id: dash.casterId, position: dash.destination })),
-    ];
-    for (const destination of destinations) {
-      const owner = state.entities[destination.id];
-      if (!owner || owner.id === entity.id || owner.state === "dead")
-        continue;
-      const reservedBody = segment(owner, destination.position);
-      const dy = Math.max(0, body.top - reservedBody.bottom, reservedBody.top - body.bottom);
-      if (Math.hypot(body.x - reservedBody.x, dy) < radius + reservedBody.radius)
-        return false;
-    }
-  }
-  return true;
+  return isSpecializedMovementPositionAvailable(state, entity, position, { landing });
 }
 function along(origin: Position, direction: Position, distance: number): Position {
   return { x: origin.x + direction.x * distance, y: origin.y + direction.y * distance };
@@ -126,9 +56,7 @@ export function startForcedMovement(state: GameState, targetId: string, sourceId
   };
   if (target.kind === "enemy") {
     state = cancelEnemyAbilityCast(state, targetId, "incapacitated", now);
-    state = cancelEnemyDash(state, targetId, "incapacitated", now);
-    // Hand motion off at the impact position, while retaining normal action cancellation.
-    state = updateEntity(state, { ...state.entities[targetId], position: { ...target.position } });
+    state = cancelEnemyDash(state, targetId, "incapacitated", now, { handoff: true });
   }
   const next = {
     ...state,
@@ -146,17 +74,36 @@ export function startForcedMovement(state: GameState, targetId: string, sourceId
   delete next.enemyAoeChannelsByCasterId[targetId];
   delete next.consumableUsesByCompanionId[targetId];
   delete next.resurrectionChannelsByHelperId[targetId];
-  return next;
+  return handoffSpecializedMovement(next, targetId, "forcedMovement", `forced:${targetId}:${now}`).state;
 }
-export function cancelForcedMovement(state: GameState, targetId: string): GameState {
+export function cancelForcedMovement(state: GameState, targetId: string, options: { handoff?: boolean } = {}): GameState {
   const movement = state.forcedMovementsByEntityId?.[targetId];
   if (!movement)
     return state;
+  if (options.handoff) return removeForcedMovement(state, targetId);
+  const target = state.entities[targetId];
+  if (!target || target.state === "dead" || !("health" in target) || target.health <= 0) return removeForcedMovement(state, targetId);
+  const canceled = { ...movement, pendingFinalization: true as const, completionStatus: undefined };
+  let next: GameState = { ...state, forcedMovementsByEntityId: { ...state.forcedMovementsByEntityId, [targetId]: canceled } };
+  let distance = Math.max(0, (movement.lastSafePosition.x - movement.origin.x) * movement.direction.x +
+    (movement.lastSafePosition.y - movement.origin.y) * movement.direction.y);
+  while (!isForcedMovementPositionAvailable(next, target, along(movement.origin, movement.direction, distance), true)) {
+    if (distance <= 0) return next;
+    distance = Math.max(0, distance - SAMPLE_DISTANCE);
+  }
+  const position = along(movement.origin, movement.direction, distance);
+  if (target.position.x === position.x && target.position.y === position.y) return removeForcedMovement(next, targetId);
+  if (!isSpecializedMovementPathAvailable(next, target, target.position, position)) return next;
+  const result = commitSpecializedMovementPosition(next, targetId, position, "forcedMovement", `forced:${targetId}:${movement.startedAt}`);
+  next = result.state;
+  return result.outcome === "moved" || result.outcome === "held" ? removeForcedMovement(next, targetId) : next;
+}
+
+function removeForcedMovement(state: GameState, targetId: string): GameState {
+  const movement = state.forcedMovementsByEntityId?.[targetId];
   const movements = { ...state.forcedMovementsByEntityId };
   delete movements[targetId];
-  const target = state.entities[targetId];
-  const next = { ...state, forcedMovementsByEntityId: movements };
-  return target && target.state !== "dead" ? updateEntity(next, { ...target, position: { ...movement.lastSafePosition } }) : next;
+  return releaseSpecializedMovement({ ...state, forcedMovementsByEntityId: movements }, targetId, `forced:${targetId}:${movement?.startedAt}`).state;
 }
 export function clearForcedMovements(state: GameState, sourceId?: string): GameState {
   for (const movement of Object.values(state.forcedMovementsByEntityId ?? {})) {
@@ -168,11 +115,18 @@ export function clearForcedMovements(state: GameState, sourceId?: string): GameS
 export function updateForcedMovements(state: GameState, movedEntityIds: Set<string>, now: number): GameState {
   let next = state;
   for (const movement of Object.values(state.forcedMovementsByEntityId ?? {})) {
+    if (isWarmasterRewardUiOpen(next)) break;
     const target = next.entities[movement.targetId];
     if (!target || target.state === "dead" || !("health" in target) || target.health <= 0) {
       next = cancelForcedMovement(next, movement.targetId);
       continue;
     }
+    if (movement.pendingFinalization) {
+      next = cancelForcedMovement(next, movement.targetId);
+      if (getMovementPositionCommit(next, movement.targetId)?.source === "forcedMovement") movedEntityIds.add(movement.targetId);
+      continue;
+    }
+    if (getMovementPositionCommit(next, target.id)) continue;
     const progress = Math.max(0, Math.min(1, (now - movement.startedAt) / Math.max(1, movement.endsAt - movement.startedAt)));
     let distance = movement.distance * progress;
     // Sweep the intervening path even when simulation advances by a large delta.
@@ -193,16 +147,30 @@ export function updateForcedMovements(state: GameState, movedEntityIds: Set<stri
     }
     const position = along(movement.origin, movement.direction, distance);
     const safe = isForcedMovementPositionAvailable(next, target, position, true);
-    next = updateEntity(next, { ...target, position: safe || (progress < 1 && !blocked) ? position : movement.lastSafePosition });
-    movedEntityIds.add(target.id);
+    const destination = safe || (progress < 1 && !blocked) ? position : movement.lastSafePosition;
+    if ((progress === 1 || blocked) && !isForcedMovementPositionAvailable(next, target, destination, true)) {
+      next = cancelForcedMovement(next, target.id);
+      continue;
+    }
+    if (distance < previousDistance && !isSpecializedMovementPathAvailable(next, target, target.position, destination)) {
+      next = cancelForcedMovement(next, target.id);
+      continue;
+    }
+    const result = commitSpecializedMovementPosition(next, target.id, destination, "forcedMovement", `forced:${target.id}:${movement.startedAt}`);
+    next = result.state;
+    if (isWarmasterRewardUiOpen(next)) return cancelForcedMovement(next, target.id);
+    if (result.outcome !== "moved" && result.outcome !== "held") continue;
+    if (result.outcome === "moved") movedEntityIds.add(target.id);
     const movements = { ...next.forcedMovementsByEntityId };
     if (progress === 1 || blocked)
       delete movements[target.id];
     else
       movements[target.id] = { ...movement, lastSafePosition: safe ? position : movement.lastSafePosition };
     next = { ...next, forcedMovementsByEntityId: movements };
-    if (progress === 1 || blocked)
+    if (progress === 1 || blocked) {
+      next = releaseSpecializedMovement(next, target.id, `forced:${target.id}:${movement.startedAt}`).state;
       next = applyMovementCompletionStatus(next, movement, blocked ? now : movement.endsAt, now);
+    }
   }
   return next;
 }

@@ -1,3 +1,4 @@
+import { finishDirectCompanionCommand } from "./directCommandState";
 import { BARRACK_DEFINITIONS, createBarrackEntity, getBarrackMaxHealth } from "./barrackDefinitions";
 import { isBarrackFootprintOccupied, doesEntityOverlapFootprint } from "./barracks";
 import { refreshStructureCollision } from "./combatStructures";
@@ -104,7 +105,9 @@ function clearDefeatedArena(state: GameState): GameState {
       changed = true;
     }
   }
-  if (removed.size) next = { ...next, directCompanionCommandsById: Object.fromEntries(Object.entries(next.directCompanionCommandsById ?? {}).filter(([, command]) => !("targetId" in command && command.targetId && removed.has(command.targetId)))) };
+  for (const command of Object.values(next.directCompanionCommandsById ?? {}))
+    if ("targetId" in command && !next.entities[command.targetId])
+      next = finishDirectCompanionCommand(next, command, next.simulationTimeMs ?? 0, "direct_command_completed", "target_invalid");
   return changed || next.warmasterAttempt || removed.size ? { ...next, warmasterAttempt: undefined } : next;
 }
 
@@ -113,7 +116,7 @@ function partyOverlaps(state: GameState, bounds = ORC_WARCAMP_ARENA): boolean {
     if (entity.kind !== "companion") return false;
     const solid = { ...entity, state: "idle" as const };
     const forced = state.forcedMovementsByEntityId?.[entity.id];
-    const landing = forced ? { x: forced.origin.x + forced.direction.x * forced.distance, y: forced.origin.y + forced.direction.y * forced.distance } : undefined;
+    const landing = forced ? forced.pendingFinalization ? forced.lastSafePosition : { x: forced.origin.x + forced.direction.x * forced.distance, y: forced.origin.y + forced.direction.y * forced.distance } : undefined;
     const positions = [entity.position, state.reservedPositionsByEntityId?.[entity.id], state.moveIntentsByEntityId?.[entity.id], landing];
     return positions.some(position => position && doesEntityOverlapFootprint(solid, bounds, position));
   });
@@ -155,8 +158,10 @@ export function updateWarmasterLifecycle(state: GameState, now: number): GameSta
   }
   if (next.warmasterInteraction?.rescueSpeechStartedAt !== undefined && now >= next.warmasterInteraction.rescueSpeechStartedAt + 5000) next = { ...next, warmasterInteraction: { ...next.warmasterInteraction, rescueSpeechStartedAt: undefined } };
   if (!hasPendingWarmasterChest(next) && canCloseGate(next)) {
+    const partyDeparted = lifecycle.phase === "defeated";
     lifecycle = { ...lifecycle, phase: lifecycle.recharge >= WARMASTER_RECHARGE_KILLS ? "reset_pending" : "recharging" };
-    next = updateGateCollision({ ...next, warmasterLifecycle: lifecycle });
+    next = updateGateCollision({ ...next, warmasterLifecycle: lifecycle,
+      ...(partyDeparted ? { formationAssignments: undefined, formationPathSearchesByEntityId: undefined } : {}) });
     if (lifecycle.phase === "reset_pending" && arenaBarracks.every(definition => !isBarrackFootprintOccupied(next, definition))) {
       const entities = { ...next.entities };
       const barracksById = { ...next.barracksById };
@@ -212,6 +217,9 @@ export function closeWarmasterChest(state: GameState): GameState {
 export function answerWarmasterDeparture(state: GameState, leave: boolean): GameState {
   if (!state.warmasterInteraction?.departure) return state;
   const next = { ...state, warmasterInteraction: { ...state.warmasterInteraction, departure: undefined, departureAcknowledged: leave ? true as const : undefined } };
-  if (leave) return next;
-  return setPartyExecutionIntent({ ...next, activeTeleport: null, worldTravelTargetMapId: null, autoRoute: undefined, directCompanionCommandsById: {} }, { type: "move", source: "player", targetId: null, targetPosition: ORC_WARCAMP_CHEST_POSITION });
+  if (leave) return { ...next, formationAssignments: undefined, formationPathSearchesByEntityId: undefined };
+  let canceled: GameState = next;
+  for (const command of Object.values(canceled.directCompanionCommandsById ?? {}))
+    canceled = finishDirectCompanionCommand(canceled, command, canceled.simulationTimeMs ?? 0, "direct_command_canceled", "encounter_departure");
+  return setPartyExecutionIntent({ ...canceled, activeTeleport: null, worldTravelTargetMapId: null, autoRoute: undefined }, { type: "move", source: "player", targetId: null, targetPosition: ORC_WARCAMP_CHEST_POSITION });
 }

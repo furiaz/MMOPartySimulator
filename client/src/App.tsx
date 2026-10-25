@@ -7,7 +7,11 @@ import {
   useState,
   Suspense,
 } from "react";
+import { flushSync } from "react-dom";
 import "./App.css";
+import { selectFormationPreset } from "./game/formationSelection";
+import { getFormationDiagnostics } from "./game/formationDiagnostics";
+import type { FormationPresetId } from "./game/types";
 import { WarmasterRewardOverlay } from "./WarmasterRewardOverlay";
 import { claimWarmasterChest, closeWarmasterChest, requestWarmasterChest } from "./game/warmasterLifecycle";
 import { isWarmasterRewardUiOpen, WARMASTER_CAPTIVE_ID, WARMASTER_CHEST_ID } from "./game/warmasterLifecycleState";
@@ -4952,6 +4956,11 @@ function App() {
     setGameState((state) => setPartyMemberRole(state, entityId, role));
   }
 
+  function changeFormationPreset(preset: FormationPresetId) {
+    queueSaveAfterStateChange("Party formation saved");
+    setGameState(state => selectFormationPreset(state, preset));
+  }
+
   function changePartyLeader(companionId: string) {
     queueSaveAfterStateChange("Party leader saved");
     setGameState((state) => {
@@ -6798,11 +6807,14 @@ function App() {
     const now = Date.now();
     let resultCode: DirectCompanionCommandResultCode | null = null;
 
-    setGameState((state) => {
-      const result = issueCompanionDirectCommand(state, command, now);
-      resultCode = result.code;
-
-      return result.state;
+    // Resolve this discrete input before reading its rejection result. React
+    // may otherwise defer the updater until after the handler has returned.
+    flushSync(() => {
+      setGameState((state) => {
+        const result = issueCompanionDirectCommand(state, command, now);
+        resultCode = result.code;
+        return result.state;
+      });
     });
 
     if (resultCode && resultCode !== "success") {
@@ -7639,6 +7651,7 @@ function App() {
               onAllocateStatPoint={allocateStatPoint}
               onChangeLeader={changePartyLeader}
               onChangeRole={changePartyMemberRole}
+              onSelectFormationPreset={changeFormationPreset}
               onChangeConsumableBehavior={changeConsumableBehavior}
               onChangeSkillBehavior={changeSkillBehavior}
               onEquipEquipment={equipEquipment}
@@ -7858,6 +7871,7 @@ function App() {
 
           {showDebugTools ? (
             <DebugToolsPanel
+              formationDiagnostics={getFormationDiagnostics(gameState)}
               actionFeedback={debugActionFeedback}
               activeSection={activeDebugToolsSection}
               canAddCompanion={partyMembers.length < companionIds.length}

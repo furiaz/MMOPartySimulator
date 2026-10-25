@@ -1099,6 +1099,8 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
 
   return {
     ...clearedState,
+    formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
     currentMapId: SLIMEWARD_CAMP_ID,
     map,
     entities,
@@ -1116,6 +1118,9 @@ export function debugResetSlimewardDungeon(state: GameState): GameState {
     followTrailsByEntityId: {},
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    localAvoidanceByEntityId: {},
+    overlapRecoveryByEntityId: {},
+    overlapRecoveryGeometryKey: undefined,
     failedMoveByEntityId: {},
     movementFailuresByEntityId: {},
     moveIntentsByEntityId: {},
@@ -1190,6 +1195,8 @@ export function debugTeleportToHub(
 
   return pruneMissingEntityRuntimeState({
     ...clearSlimewardDungeonRuntime(preparedState),
+    formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
     currentMapId: targetMapId,
     map,
     entities,
@@ -1209,6 +1216,9 @@ export function debugTeleportToHub(
     ),
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    localAvoidanceByEntityId: {},
+    overlapRecoveryByEntityId: {},
+    overlapRecoveryGeometryKey: undefined,
     failedMoveByEntityId: {},
     movementFailuresByEntityId: {},
     moveIntentsByEntityId: {},
@@ -1264,6 +1274,8 @@ export function debugTeleportToSlimewardCamp(state: GameState): GameState {
 
   return pruneMissingEntityRuntimeState({
     ...clearSlimewardDungeonRuntime(preparedState),
+    formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
     currentMapId: SLIMEWARD_CAMP_ID,
     map,
     entities,
@@ -1283,6 +1295,9 @@ export function debugTeleportToSlimewardCamp(state: GameState): GameState {
     ),
     combatFeedbackEvents: [],
     combatProjectiles: [],
+    localAvoidanceByEntityId: {},
+    overlapRecoveryByEntityId: {},
+    overlapRecoveryGeometryKey: undefined,
     failedMoveByEntityId: {},
     movementFailuresByEntityId: {},
     moveIntentsByEntityId: {},
