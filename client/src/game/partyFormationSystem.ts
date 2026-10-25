@@ -1,4 +1,5 @@
 import { hasDirectCompanionAuthority } from "./directCommandState";
+import { prepareCombatFormation } from "./combatFormation";
 import { isAutoRoutePaused } from "./autoRouteSystem";
 import { isTravelFormationMember, moveTravelFormationMember, updateTravelFormationCohesion } from "./travelFormation";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
@@ -118,7 +119,7 @@ export function updatePartyFormationSystem(
 
   if (plan.phase === "combat" && plan.target) {
     nextState = assignPartyCombatTarget(nextState, plan.target.id);
-    return nextState;
+    return prepareCombatFormation(nextState);
   }
 
   nextState = assignPartyTravelTargets(nextState, leader, plan);

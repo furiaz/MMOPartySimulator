@@ -6,6 +6,7 @@ import type {
   GameEntity,
   Position,
   TravelFormationGoal,
+  CombatFormationGoal,
 } from "./types";
 
 export type FindAvailablePositionOptions = {
@@ -58,6 +59,8 @@ export type MovementOptions = WalkablePositionOptions & {
   rejectedPositionOutcome?: "held" | "blocked";
   combatSlot?: { targetId: string; attackReach: number; position: Position };
   travelFormationGoal?: TravelFormationGoal;
+  combatFormationGoal?: CombatFormationGoal;
+  isFormationStaging?: boolean;
 };
 
 export type NormalMovementSource =
@@ -80,6 +83,8 @@ export type NormalMovementRequest = {
   speedMultiplier?: number;
   combatSlot?: MovementOptions["combatSlot"];
   travelFormationGoal?: TravelFormationGoal;
+  combatFormationGoal?: CombatFormationGoal;
+  isFormationStaging?: boolean;
 };
 
 export type NormalMovementOutcome = "moved" | "held" | "blocked" | "invalid" | "deferred";

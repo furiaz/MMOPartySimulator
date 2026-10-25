@@ -5,6 +5,7 @@ import type { PartyFormationState } from "./types";
 import { pruneTargetCommitmentState } from "./targetCommitment";
 import { reconcileFormationAssignments } from "./formationAssignments";
 import { pruneAutoRouteObservations } from "./autoRouteSystem";
+import { pruneCombatFormationState } from "./combatFormation";
 
 function createIdlePartyFormation(): PartyFormationState {
   return {
@@ -121,6 +122,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   state = pruneAutoRouteObservations(state);
   state = pruneTargetCommitmentState(state);
   if (state.formationAssignments) state = reconcileFormationAssignments(state);
+  state = pruneCombatFormationState(state);
   const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
   state = { ...state,
     localAvoidanceByEntityId: Object.fromEntries(Object.entries(state.localAvoidanceByEntityId ?? {}).filter(([id]) => living(id))),

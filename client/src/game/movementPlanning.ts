@@ -225,7 +225,7 @@ function commitNormalMovement(
     if (avoidance.crowded && !avoidance.position) {
       // Speculative path changes are discarded. Waiting is not evidence that
       // the target/path is unreachable, and cannot authorize a second request.
-      const constrained = request.travelFormationGoal && options.isPositionAllowed && !options.isPositionAllowed(preferred);
+      const constrained = (request.travelFormationGoal || request.combatFormationGoal) && options.isPositionAllowed && !options.isPositionAllowed(preferred);
       return finishNormalMovement(constrained ? state : markMovementDecision(state, entity.id, "crowd_wait"),
         request, "held", entity.position, entity.position, constrained ? "constraint" : "crowd_wait", blockingEnemyIds);
     }
@@ -331,7 +331,8 @@ function commitNormalMovement(
     );
     const partner = state.entities[moveResolution.swapWithEntityId];
     return isSamePosition(partner.position, swapped.entities[partner.id].position) ? swapped
-      : finishNormalMovement(swapped, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source, travelFormationGoal: undefined }), "moved",
+      : finishNormalMovement(swapped, createNormalMovementRequest(state, partner, entity.position, { ...options, source: request.source, travelFormationGoal: undefined,
+        combatFormationGoal: undefined, isFormationStaging: request.isFormationStaging }), "moved",
         partner.position, swapped.entities[partner.id].position, "swap");
   }
 

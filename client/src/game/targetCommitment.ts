@@ -306,6 +306,7 @@ export function getMovementApproachProgress(state: GameState, result: NormalMove
 
 /** Called for the winning result. Inner/outer finishes are idempotent. */
 export function observeTargetApproach(state: GameState, result: NormalMovementResult): GameState {
+  if (result.request.isFormationStaging || result.request.combatFormationGoal) return state;
   const actor = state.entities[result.request.entityId];
   if (actor?.kind !== "companion" || hasDirectCompanionAuthority(state, actor) || getPartyExecutionIntent(state)?.source === "player") return state;
   const previous = state.targetApproachesByEntityId?.[actor.id];

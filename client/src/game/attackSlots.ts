@@ -35,6 +35,7 @@ type AttackSlotOptions = {
   leaderSafeDistance?: number;
   leaderMaxPathDistance?: number;
   preferredSlotIndex?: number;
+  preferredFormationPosition?: Position;
   allowPartyPassThrough?: boolean;
   partySpacingMode?: "off" | "prefer" | "required";
   nowMs?: number;
@@ -91,6 +92,7 @@ export function chooseAttackSlot(
     getAttackSlotPositions(targetPosition, attackRange),
     attacker,
     options.preferredSlotIndex,
+    options.preferredFormationPosition,
   ).filter((position) =>
     isValidCombatPosition(state, attacker, target, attackReach, position, options) &&
     isCheaplyReachableCombatPosition(state, attacker, position, options),
@@ -293,6 +295,7 @@ function getRankedCombatPositions(
   positions: Position[],
   attacker: CombatEntity,
   preferredSlotIndex = 0,
+  preferredFormationPosition?: Position,
 ): Position[] {
   return [...positions]
     .map((position, index) => ({
@@ -302,6 +305,8 @@ function getRankedCombatPositions(
     .sort(
       (a, b) =>
         compareDistances(getEuclideanDistance(a.position, attacker.position), getEuclideanDistance(b.position, attacker.position)) ||
+        (preferredFormationPosition ? compareDistances(getEuclideanDistance(a.position, preferredFormationPosition),
+          getEuclideanDistance(b.position, preferredFormationPosition)) : 0) ||
         getSlotPreferenceDistance(a.index, preferredSlotIndex, positions.length) -
           getSlotPreferenceDistance(b.index, preferredSlotIndex, positions.length) ||
         a.position.y - b.position.y ||

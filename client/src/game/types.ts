@@ -3074,6 +3074,24 @@ export type FormationAssignments = {
   members: FormationMemberInput[];
   slotsByEntityId: Record<string, string>;
   travel?: TravelFormationRuntime;
+  combat?: CombatFormationRuntime;
+};
+
+export type CombatFormationGoal = Omit<TravelFormationGoal, "mode"> & {
+  mode: "expanded" | "compressed" | "substitute" | "held";
+};
+
+export type CombatFormationRuntime = {
+  leaderId: string;
+  referenceTargetId?: string;
+  mode: "combat" | "recovering";
+  facing: Position;
+  spacing: number;
+  lateralScale: number;
+  frameKey?: string;
+  clearSinceMs?: number;
+  goalsByEntityId: Record<string, CombatFormationGoal>;
+  proposedGoalsByEntityId?: Record<string, CombatFormationGoal>;
 };
 
 export type TravelFormationGoal = {
@@ -3089,6 +3107,7 @@ export type TravelFormationRuntime = {
   leaderId: string;
   facing: Position;
   lateralScale: number;
+  rowScale?: number;
   trailing: boolean;
   trail: Position[];
   trailOrder: string[];

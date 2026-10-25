@@ -1,6 +1,9 @@
 import { getDirectLeaderCommand, hasDirectCompanionAuthority } from "./directCommandState";
 import { canRegroupAutoRoute } from "./autoRouteSystem";
 import { getFormationTemplate, transformFormationSlots } from "./formationTemplates";
+import { getCombatFormationTarget, prepareCombatFormation } from "./combatFormation";
+export { rotateFormationFacing as rotateTravelFacing } from "./formationTemplates";
+import { rotateFormationFacing as rotateTravelFacing } from "./formationTemplates";
 import { createNormalMovementRequest, getMovementPositionCommit, getMovementRequestRejection, getNormalMovementResult, getSpecializedMovementOwner } from "./movementAuthority";
 import { holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
 import type { NormalMovementSource } from "./movementTypes";
@@ -31,6 +34,7 @@ export function usesTravelFormation(state: GameState): boolean {
   if (!state.formationAssignments || !leaderOf(state) || state.activeTeleport || !canRegroupAutoRoute(state)) return false;
   if (getActiveQuestGuideObjectiveId(state) && getActiveQuestGuide(state)) return false;
   if (getDirectLeaderCommand(state)) return true;
+  if (getCombatFormationTarget(state)) return false;
   const intent = getPartyExecutionIntent(state);
   const target = intent?.targetId ? state.entities[intent.targetId] : undefined;
   const leader = leaderOf(state)!;
@@ -54,16 +58,6 @@ export function isTravelFormationMember(state: GameState, actor: Companion): boo
 export function travelFormationSource(state: GameState, actor: Companion): NormalMovementSource {
   if (actor.state === "defend" && state.partyFormation?.phase !== "traveling") return "defend";
   return getPartyExecutionIntent(state) && !getDirectLeaderCommand(state) ? "partyTravel" : "follow";
-}
-
-export function rotateTravelFacing(previous: Position, desired: Position, deltaSeconds: number): Position {
-  if (Math.hypot(desired.x, desired.y) < 0.001) return previous;
-  const start = Math.atan2(previous.y, previous.x), end = Math.atan2(desired.y, desired.x);
-  let turn = ((end - start) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-  if (Math.abs(turn + Math.PI) < 1e-9) turn = Math.PI; // Clockwise in world/screen coordinates.
-  const cap = Math.max(0, deltaSeconds) * 2 * Math.PI;
-  const angle = start + Math.max(-cap, Math.min(cap, turn));
-  return { x: Math.cos(angle), y: Math.sin(angle) };
 }
 
 export function sampleTravelTrail(trail: readonly Position[], behind: number): Position | undefined {
@@ -108,13 +102,17 @@ function runtimeOf(state: GameState): TravelFormationRuntime {
     .flatMap(slot => state.formationAssignments!.members.filter(member => member.id !== leader.id && state.formationAssignments!.slotsByEntityId[member.id] === slot.id).map(member => member.id));
   if (old?.leaderId === leader.id) return { ...old, trailOrder: order };
   const origin = old ? leader.position : getMovementPositionCommit(state, leader.id)?.from ?? leader.position;
-  return { leaderId: leader.id, facing: old?.facing ?? { x: 0, y: -1 }, lateralScale: 1, trailing: false,
+  const recovery = state.formationAssignments?.combat?.mode === "recovering" ? state.formationAssignments.combat : undefined;
+  return { leaderId: leader.id, facing: recovery?.facing ?? old?.facing ?? { x: 0, y: -1 },
+    lateralScale: recovery?.lateralScale ?? 1, rowScale: recovery ? recovery.spacing / state.formationAssignments!.spacing : 1, trailing: false,
     trail: [{ ...origin }], trailOrder: order, lastLeaderPosition: { ...origin },
-    cohesion: "normal", goalsByEntityId: {} };
+    cohesion: "normal", goalsByEntityId: {}, frameKey: recovery?.frameKey === frameKey(state) ? frameKey(state) : undefined };
 }
 
 function withRuntime(state: GameState, travel: TravelFormationRuntime): GameState {
-  return { ...state, formationAssignments: { ...state.formationAssignments!, travel } };
+  const combat = state.formationAssignments?.combat;
+  return { ...state, formationAssignments: { ...state.formationAssignments!, travel,
+    combat: combat?.mode === "recovering" && (travel.rowScale ?? 1) <= 1 && travel.lateralScale <= 1 ? undefined : combat } };
 }
 
 function participants(state: GameState): Companion[] {
@@ -125,7 +123,7 @@ function participants(state: GameState): Companion[] {
 }
 
 function slotPositions(state: GameState, runtime: TravelFormationRuntime, scale = runtime.lateralScale) {
-  return transformFormationSlots(state.formationAssignments!, leaderOf(state), runtime.facing, leaderOf(state)!.position, scale);
+  return transformFormationSlots(state.formationAssignments!, leaderOf(state), runtime.facing, leaderOf(state)!.position, scale, runtime.rowScale ?? 1);
 }
 
 function alternatives(position: Position, radius: number): Position[] {
@@ -148,9 +146,13 @@ function shapeGoals(state: GameState, runtime: TravelFormationRuntime, scale: nu
 
 /** Observe the leader only after its applicable phase has committed. Idempotent in a frame. */
 export function prepareTravelFormation(state: GameState): GameState {
+  state = prepareCombatFormation(state);
   if (!usesTravelFormation(state)) return state;
   const leader = leaderOf(state)!, runtime = runtimeOf(state);
-  if (runtime.frameKey === frameKey(state)) return state;
+  if (runtime.frameKey === frameKey(state)) return runtime.proposedGoalsByEntityId ? state : withRuntime(state,
+    { ...runtime, proposedGoalsByEntityId: planTravelGoals(state, runtime) });
+  const recovering = state.formationAssignments?.combat?.mode === "recovering";
+  if (recovering) runtime.rowScale = Math.max(1, (runtime.rowScale ?? 1) - getCombatRecoveryStep(state));
   const commit = getMovementPositionCommit(state, leader.id), result = getNormalMovementResult(state, leader.id);
   const walking = commit?.source === "normal" && result?.request.mode === "walk" &&
     ["direct", "partyTravel", "follow", "explore", "attack", "gather"].includes(result.request.source);
@@ -174,7 +176,8 @@ export function prepareTravelFormation(state: GameState): GameState {
       if (shapeGoals(state, runtime, expanded)) runtime.lateralScale = expanded;
     }
   } else {
-    runtime.lateralScale = widest;
+    runtime.lateralScale = recovering && runtime.lateralScale > 1 && widest === 1
+      ? Math.max(1, runtime.lateralScale - getCombatRecoveryStep(state)) : widest;
     runtime.trailing = false;
     runtime.clearSinceMs = undefined;
   }
@@ -182,6 +185,10 @@ export function prepareTravelFormation(state: GameState): GameState {
   runtime.proposedGoalsByEntityId = planTravelGoals(state, runtime);
   runtime.frameKey = frameKey(state);
   return withRuntime(state, runtime);
+}
+
+function getCombatRecoveryStep(state: GameState): number {
+  return 0.5 / state.formationAssignments!.spacing * Math.max(0, state.simulationDeltaMs ?? 100) / 1000;
 }
 
 function expectedPosition(state: GameState, runtime: TravelFormationRuntime, actor: Companion): Position {
@@ -251,7 +258,7 @@ export function moveTravelFormationMember(state: GameState, actor: Companion, so
   const runtime = next.formationAssignments!.travel!;
   const goal = runtime.proposedGoalsByEntityId?.[actor.id];
   if (!goal) return state;
-  const reason = `formation ${goal.mode}`;
+  const reason = `formation ${next.formationAssignments?.combat?.mode === "recovering" ? "recovering " : ""}${goal.mode}`;
   const settlingWithoutTravel = !getPartyExecutionIntent(next) && !getDirectLeaderCommand(next);
   if (goal.settled) next = holdEntityMovement(next, actor, source, reason, goal);
   else next = moveEntityTowardPositionIfUnoccupied(next, actor, goal.position, {
