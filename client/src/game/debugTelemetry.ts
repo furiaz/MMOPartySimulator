@@ -445,6 +445,7 @@ function getEntitySnapshot(
     enemyScalingOverrides: getEnemyScalingOverrides(entity),
     attackRange: getAttackRangeSnapshot(entity),
     targetDecisionReason: getTargetDecisionReason(entity, nextState),
+    targetFormationScore: nextState.companionTargetDecisionByEntityId?.[entity.id]?.formationScore,
     commandPriority: getCommandPriority(entity),
     characterLevel: getCharacterLevel(entity),
     characterXp: getCharacterXp(entity),

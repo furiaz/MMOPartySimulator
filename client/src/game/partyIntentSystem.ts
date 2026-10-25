@@ -81,7 +81,7 @@ export function updatePartyIntentSelfDefenseSystem(state: GameState): GameState 
 
   if (!isAutoRouteActive(state)) {
     let next = state;
-    for (const companion of getPartyMembers(state).sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const companion of getPartyMembers(state).sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id))) {
       const actor = next.entities[companion.id];
       if (actor?.kind !== "companion" || actor.state === "dead" || state.resurrectionChannelsByHelperId?.[actor.id]) continue;
       const command = next.directCompanionCommandsById?.[actor.id];
@@ -149,7 +149,7 @@ function assignCompanionsToSelfDefense(
 ): GameState {
   let nextState = state;
 
-  for (const companion of getPartyMembers(nextState)) {
+  for (const companion of getPartyMembers(nextState).sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id))) {
     if (!canAssignSelfDefenseTarget(nextState, companion, target)) {
       continue;
     }

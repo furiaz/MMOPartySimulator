@@ -11,7 +11,7 @@ import {
   hasDirectPlayerPartyIntent,
 } from "./partyIntentState";
 import { applyTargetCommitment, isPlayerInteractionIntent, selectTargetCommitment } from "./targetCommitment";
-import { isPartyMember, isPartyMemberBusyGatheringResource } from "./partySystem";
+import { getActiveCompanionsInPartyOrder, isPartyMember, isPartyMemberBusyGatheringResource } from "./partySystem";
 import { getGridDistance } from "./positionUtils";
 import type { AutonomousEntity, Enemy, GameEntity } from "./types";
 
@@ -36,7 +36,7 @@ export function protectPartyMember(
 
   let nextState = state;
 
-  for (const entity of Object.values(state.entities)) {
+  for (const entity of getActiveCompanionsInPartyOrder(state)) {
     if (!canProtectPartyMember(state, entity, attackedMember, attacker)) {
       continue;
     }

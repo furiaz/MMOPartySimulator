@@ -21,7 +21,7 @@ import {
 } from "./partyTargetSystem";
 import { getGridDistance } from "./positionUtils";
 import { shouldUseAutomaticQuestDefenseFocus } from "./questDefenseFocus";
-import { canReacquireCombatTarget } from "./targetCommitment";
+import { applyTargetCommitment, canReacquireCombatTarget, hasRetainedAutomaticTarget, selectTargetCommitment } from "./targetCommitment";
 import { hasDirectPlayerPartyIntent } from "./partyIntentState";
 import type {
   Companion,
@@ -45,11 +45,13 @@ export function updateRoleSystem(
     state,
     resourceWorkContext,
   );
+  const combatAcquisitions: { actorId: string; target: Enemy }[] = [];
 
   for (const entity of Object.values(state.entities)) {
     if (!canUseAutonomousRoleBehavior(nextState, entity)) {
       continue;
     }
+    if (entity.role !== "gatherer" && !hasDirectPlayerPartyIntent(nextState) && hasRetainedAutomaticTarget(nextState, entity)) continue;
 
     const roleTarget = getRoleTarget(
       nextState,
@@ -64,6 +66,10 @@ export function updateRoleSystem(
     const combatTarget = roleTarget.state === "attack" && roleTarget.targetId ? nextState.entities[roleTarget.targetId] : undefined;
     if (!hasDirectPlayerPartyIntent(nextState) && combatTarget?.kind === "enemy" &&
       !canReacquireCombatTarget(nextState, entity, combatTarget)) continue;
+    if (!hasDirectPlayerPartyIntent(nextState) && combatTarget?.kind === "enemy") {
+      combatAcquisitions.push({ actorId: entity.id, target: combatTarget });
+      continue;
+    }
 
     nextState = updateEntity(nextState, {
       ...entity,
@@ -71,6 +77,15 @@ export function updateRoleSystem(
       currentTargetId: roleTarget.targetId,
       commandPriority: "autonomous",
     });
+  }
+
+  // Only combat acquisitions are reordered; resource allocation keeps its existing iteration.
+  for (const acquisition of combatAcquisitions.sort((a, b) =>
+    (nextState.entities[a.actorId] as Companion).partyOrder - (nextState.entities[b.actorId] as Companion).partyOrder || a.actorId.localeCompare(b.actorId))) {
+    const actor = nextState.entities[acquisition.actorId];
+    if (actor?.kind === "companion") nextState = applyTargetCommitment(nextState, actor, selectTargetCommitment(nextState, actor, {
+      preferredTarget: acquisition.target, isEligible: enemy => isDefenderAttackTargetRelevant(nextState, actor, enemy),
+    }));
   }
 
   return nextState;
