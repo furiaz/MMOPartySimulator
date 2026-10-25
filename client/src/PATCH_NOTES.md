@@ -26,6 +26,7 @@ Entries are prepared before deployment and ship with the live release, so this d
 
 ### Fixed
 
+- Fixed Nightmire Canopy's three Patron Ward auras sometimes appearing in front of their props after loading, animation-frame changes, or camera movement. The dark auras now consistently remain behind the Wards.
 - Unified walking, combat approach, mobility skills, enemy dashes, knockback, and overlap recovery so competing movement systems cannot publish multiple position changes for one actor in the same update.
 - Replaced repeated late pushing with local avoidance and bounded overlap recovery, reducing crowd jitter while preserving walls, resources, structures, movement bounds, and reservations.
 - Aligned melee approach, Defender positioning, attack slots, and collision spacing around continuous body-aware geometry. Diagonal approaches, large or growing enemies, and broad structure edges now use consistent reach and standing-clearance checks.
