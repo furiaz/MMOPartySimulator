@@ -1,4 +1,5 @@
 import { getDirectLeaderCommand, hasDirectCompanionAuthority } from "./directCommandState";
+import { getCombatFormationPreference, isCombatFormationMember, moveCombatFormationMember, prepareCombatFormation } from "./combatFormation";
 import { isTravelFormationMember, moveTravelFormationMember } from "./travelFormation";
 import {
   updateEntity,
@@ -64,7 +65,7 @@ export function updateDefendSystem(
   },
   pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
-  let nextState = state;
+  let nextState = prepareCombatFormation(state);
   const now = timing.nowMs;
   const waitingLeaderIds = new Set<string>();
   const resetLeaderWaitIds = new Set<string>();
@@ -100,6 +101,7 @@ export function updateDefendSystem(
       isEligible: enemy => isRelevantGuideEscortThreat(nextState, enemy) && isDefenderAttackTargetRelevant(nextState, defender, enemy),
     }) : null;
     if (targetDecision) nextState = applyTargetCommitment(nextState, defender, targetDecision, "defend");
+    nextState = prepareCombatFormation(nextState);
     const target = targetDecision?.target ?? undefined;
     const shouldWaitForIntercept =
       target &&
@@ -197,6 +199,11 @@ export function updateDefendSystem(
     }
 
     const standbyDefender = nextState.entities[defender.id];
+    if (standbyDefender.kind === "companion" && isCombatFormationMember(nextState, standbyDefender)) {
+      nextState = moveCombatFormationMember(nextState, standbyDefender);
+      if (didEntityMove(nextState, standbyDefender)) movedEntityIds.add(defender.id);
+      continue;
+    }
     if (standbyDefender.kind === "companion" && isTravelFormationMember(nextState, standbyDefender)) {
       const leaderCommand = getDirectLeaderCommand(nextState);
       // Attack/gather approach commits later; the late follow phase consumes its actual origin.
@@ -469,6 +476,7 @@ function moveDefenderTowardCommittedTarget(
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
       partySpacingMode: "prefer",
+      preferredFormationPosition: getCombatFormationPreference(state, defender),
     },
   );
 
@@ -531,6 +539,7 @@ function moveDefenderTowardRequiredSpacedAttackSlot(
       nowMs: state.simulationTimeMs,
       pathDistanceCache,
       partySpacingMode: "required",
+      preferredFormationPosition: getCombatFormationPreference(state, defender),
     },
   );
 

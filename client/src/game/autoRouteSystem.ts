@@ -342,7 +342,7 @@ function observeRouteBodyBlocks(state: GameState): GameState {
     const paused = hasDirectCompanionAuthority(state, actor) || isMovementBlockedByStatus(state, actor.id) ||
       Boolean(getSpecializedMovementOwner(state, actor.id)) || Boolean(state.forcedMovementsByEntityId?.[actor.id]) ||
       isCompanionAssignedToResurrectionRecovery(state, actor.id);
-    if (paused || !result || result.request.mode !== "walk" || !["partyTravel", "follow"].includes(result.request.source) ||
+    if (paused || !result || result.request.isFormationStaging || result.request.combatFormationGoal || result.request.mode !== "walk" || !["partyTravel", "follow"].includes(result.request.source) ||
       result.outcome === "deferred" || result.outcome === "invalid" || result.reason === "constraint" ||
       (result.outcome === "held" && result.reason !== "crowd_wait")) {
       continue;

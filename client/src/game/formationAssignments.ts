@@ -115,6 +115,10 @@ export function assignFormationSlots(
       trailOrder: previous.travel.trailOrder.filter(id => members.some(member => member.id === id)),
       frameKey: undefined,
     } : undefined,
+    combat: previous?.combat ? { ...previous.combat,
+      goalsByEntityId: {}, proposedGoalsByEntityId: undefined,
+      referenceTargetId: previous.leaderId === leaderId ? previous.combat.referenceTargetId : undefined,
+    } : undefined,
   };
 }
 

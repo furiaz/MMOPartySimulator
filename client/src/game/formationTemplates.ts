@@ -51,6 +51,7 @@ export function transformFormationSlots(
   facing: Position,
   origin = leader?.position,
   lateralScale = 1,
+  rowScale = 1,
 ): Record<string, Position> {
   if (!leader || leader.id !== assignments.leaderId || leader.state === "dead" ||
     leader.health <= 0 || !origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return {};
@@ -67,11 +68,21 @@ export function transformFormationSlots(
     const slot = template.slots.find(candidate => candidate.id === assignments.slotsByEntityId[member.id]);
     if (!slot) continue;
     const side = (slot.side - leaderSlot.side) * lateralScale;
-    const ahead = slot.forward - leaderSlot.forward;
+    const ahead = (slot.forward - leaderSlot.forward) * rowScale;
     positions[member.id] = {
       x: origin.x + forward.x * ahead + right.x * side,
       y: origin.y + forward.y * ahead + right.y * side,
     };
   }
   return positions;
+}
+
+export function rotateFormationFacing(previous: Position, desired: Position, deltaSeconds: number): Position {
+  if (Math.hypot(desired.x, desired.y) < 0.001) return previous;
+  const start = Math.atan2(previous.y, previous.x), end = Math.atan2(desired.y, desired.x);
+  let turn = ((end - start) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+  if (Math.abs(turn + Math.PI) < 1e-9) turn = Math.PI;
+  const cap = Math.max(0, deltaSeconds) * 2 * Math.PI;
+  const angle = start + Math.max(-cap, Math.min(cap, turn));
+  return { x: Math.cos(angle), y: Math.sin(angle) };
 }

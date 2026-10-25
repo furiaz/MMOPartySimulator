@@ -1,4 +1,5 @@
 import { finishDirectCompanionCommand, isDirectGatherPersonalThreat, hasDirectCompanionAuthority } from "./directCommandState";
+import { getCombatFormationPreference, prepareCombatFormation } from "./combatFormation";
 import {
   isAutonomousEntity,
   isCombatEntity,
@@ -175,6 +176,7 @@ export function updateAttackSystem(
     const isResurrectionParticipant =
       isPartyCombatEntity(currentAttacker) &&
       isCompanionAssignedToResurrectionRecovery(nextState, currentAttacker.id);
+    nextState = prepareCombatFormation(nextState);
 
     if (
       isResurrectionParticipant &&
@@ -360,6 +362,7 @@ export function updateAttackSystem(
         nowMs: now,
         pathDistanceCache,
         preferredSlotIndex: getAttackSlotPreference(currentAttacker),
+        preferredFormationPosition: currentAttacker.kind === "companion" ? getCombatFormationPreference(nextState, currentAttacker) : undefined,
         partySpacingMode:
           currentAttacker.kind === "companion" && !isResurrectionParticipant
             ? "prefer"
@@ -721,6 +724,7 @@ function moveTowardRequiredSpacedAttackSlot(
       nowMs: now,
       pathDistanceCache,
       preferredSlotIndex: getAttackSlotPreference(attacker),
+      preferredFormationPosition: getCombatFormationPreference(state, attacker),
       partySpacingMode: "required",
     },
   );

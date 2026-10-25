@@ -101,6 +101,7 @@ import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warm
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import { hasLocalTargetCommitment, pruneTargetCommitmentState } from "./targetCommitment";
 import { reconcileFormationAssignments } from "./formationAssignments";
+import { isCombatFormationMember, prepareCombatFormation } from "./combatFormation";
 
 export function updateGame(
   state: GameState,
@@ -276,6 +277,7 @@ function runGameUpdate(state: GameState, timing: SimulationTiming): GameState {
   nextState = updateEnemyAoeChannelSystem(nextState, timing.nowMs);
   nextState = updateCompanionAoeChannelSystem(nextState, timing.nowMs);
   nextState = updatePartyIntentSelfDefenseSystem(nextState);
+  nextState = prepareCombatFormation(nextState);
   nextState = updateCombatSkillSystem(nextState, timing.nowMs);
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = updateMartialPassiveRuntime(
@@ -365,6 +367,7 @@ function idleAutonomousPartyMembersWithoutPoi(state: GameState): GameState {
       hasDirectCompanionAuthority(nextState, member) || canFollowDirectLeader(nextState, member) ||
       hasLocalTargetCommitment(nextState, member) ||
       isTravelFormationMember(nextState, member) ||
+      isCombatFormationMember(nextState, member) ||
       member.state === "idle" ||
       member.state === "dead" ||
       isPartyMemberBusyGatheringResource(nextState, member) ||
