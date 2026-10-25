@@ -1,5 +1,7 @@
 import { getSpecializedMovementOwner } from "./movementAuthority";
-import { DEFAULT_FORMATION_SPACING, getFormationTemplate, transformFormationSlots } from "./formationTemplates";
+import { getSelectedFormationPreset } from "./formationSelection";
+import { DEFAULT_FORMATION_SPACING, getEffectiveFormationOffsets, getFormationTemplate, transformFormationSlots } from "./formationTemplates";
+import { SPATIAL_EPSILON } from "./spatialGeometry";
 import type { GameState } from "./state";
 import type {
   FormationAssignments,
@@ -38,12 +40,13 @@ function validPreviousSlots(previous: FormationAssignments | undefined): Map<str
   const slots = new Map<string, FormationSlot>();
   if (!previous) return slots;
   const template = getFormationTemplate(previous.preset, previous.members.length, previous.spacing);
+  const offsets = getEffectiveFormationOffsets(previous);
   const counts = new Map<string, number>();
   for (const slotId of Object.values(previous.slotsByEntityId)) counts.set(slotId, (counts.get(slotId) ?? 0) + 1);
   for (const member of previous.members) {
     const id = previous.slotsByEntityId[member.id];
     const slot = template?.slots.find(candidate => candidate.id === id);
-    if (slot && counts.get(id) === 1) slots.set(member.id, slot);
+    if (slot && counts.get(id) === 1) slots.set(member.id, { ...slot, ...offsets[member.id] });
   }
   return slots;
 }
@@ -106,20 +109,31 @@ export function assignFormationSlots(
   }
   visit([], template.slots.map((_, index) => index));
 
-  return {
+  const assignments: FormationAssignments = {
     preset, spacing, leaderId, members,
     slotsByEntityId: Object.fromEntries(members.map((member, i) => [member.id, template.slots[best!.indices[i]].id])),
     travel: previous?.travel ? { ...previous.travel,
-      goalsByEntityId: Object.fromEntries(Object.entries(previous.travel.goalsByEntityId).filter(([id]) => members.some(member => member.id === id))),
+      goalsByEntityId: Object.fromEntries(Object.entries(previous.travel.goalsByEntityId).filter(([id]) => members.some(member => member.id === id))
+        .map(([id, goal]) => [id, { ...goal, clearSinceMs: undefined }])),
       proposedGoalsByEntityId: undefined,
       trailOrder: previous.travel.trailOrder.filter(id => members.some(member => member.id === id)),
-      frameKey: undefined,
+      clearSinceMs: undefined,
     } : undefined,
     combat: previous?.combat ? { ...previous.combat,
       goalsByEntityId: {}, proposedGoalsByEntityId: undefined,
+      clearSinceMs: undefined,
       referenceTargetId: previous.leaderId === leaderId ? previous.combat.referenceTargetId : undefined,
     } : undefined,
   };
+  if (previous && (previous.preset !== preset || previous.transition)) {
+    const before = getEffectiveFormationOffsets(previous), after = getEffectiveFormationOffsets(assignments);
+    const from = Object.fromEntries(members.map(member => [member.id, before[member.id] ?? after[member.id]]));
+    if (members.some(member => Math.hypot(from[member.id].side - after[member.id].side,
+      from[member.id].forward - after[member.id].forward) > SPATIAL_EPSILON)) {
+      assignments.transition = { fromOffsetsByEntityId: from, elapsedMs: 0, frameKey: previous.transition?.frameKey };
+    }
+  }
+  return assignments;
 }
 
 function compareScores(first: number[], second: number[]): number {
@@ -129,11 +143,13 @@ function compareScores(first: number[], second: number[]): number {
 
 export function reconcileFormationAssignments(state: GameState): GameState {
   if (state.worldWipeRecovery?.status === "pending_choice") {
-    return state.formationAssignments ? { ...state, formationAssignments: undefined } : state;
+    return state.formationAssignments || state.formationPathSearchesByEntityId
+      ? { ...state, formationAssignments: undefined, formationPathSearchesByEntityId: undefined } : state;
   }
   // Active entities include dead members; reserves and secondary parties live elsewhere.
   const members = Object.values(state.entities).filter(entity => entity.kind === "companion");
-  const assignments = assignFormationSlots(members, state.partyLeaderId, "arrow", state.formationAssignments);
+  const assignments = assignFormationSlots(members, state.partyLeaderId, getSelectedFormationPreset(state), state.formationAssignments);
+  if (!assignments && state.formationPathSearchesByEntityId) return { ...state, formationAssignments: undefined, formationPathSearchesByEntityId: undefined };
   return assignments === state.formationAssignments ? state : { ...state, formationAssignments: assignments };
 }
 

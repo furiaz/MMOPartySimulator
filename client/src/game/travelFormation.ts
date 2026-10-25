@@ -100,7 +100,8 @@ function runtimeOf(state: GameState): TravelFormationRuntime {
   const old = state.formationAssignments!.travel;
   const order = getFormationTemplate(state.formationAssignments!.preset, state.formationAssignments!.members.length)!.slots
     .flatMap(slot => state.formationAssignments!.members.filter(member => member.id !== leader.id && state.formationAssignments!.slotsByEntityId[member.id] === slot.id).map(member => member.id));
-  if (old?.leaderId === leader.id) return { ...old, trailOrder: order };
+  if (old?.leaderId === leader.id) return { ...old, trailOrder: old.trailing
+    ? [...old.trailOrder.filter(id => order.includes(id)), ...order.filter(id => !old.trailOrder.includes(id))] : order };
   const origin = old ? leader.position : getMovementPositionCommit(state, leader.id)?.from ?? leader.position;
   const recovery = state.formationAssignments?.combat?.mode === "recovering" ? state.formationAssignments.combat : undefined;
   return { leaderId: leader.id, facing: recovery?.facing ?? old?.facing ?? { x: 0, y: -1 },

@@ -267,6 +267,7 @@ export type GameState = {
   moveIntentsByEntityId?: Record<string, Position>;
   reservedPositionsByEntityId?: Record<string, Position>;
   movementPathsByEntityId?: Record<string, MovementPath>;
+  formationPathSearchesByEntityId?: Record<string, import("./movementTypes").FormationPathSearch>;
   attackSlotCacheByEntityId?: Record<string, AttackSlotCacheEntry>;
   enemyTargetReachabilityCacheByEnemyId?: Record<
     string,
@@ -279,6 +280,7 @@ export type GameState = {
   defenderBlockedMsByEntityId?: Record<string, number>;
   partyFormation?: PartyFormationState;
   formationAssignments?: FormationAssignments;
+  selectedFormationPreset?: import("./types").FormationPresetId;
   combatFeedbackEvents: CombatFeedbackEvent[];
   combatProjectiles?: ActiveCombatProjectile[];
   skillMarksByEnemyId?: Record<string, SkillMarkState>;

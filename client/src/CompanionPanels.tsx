@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from "react";
+import type { FormationSelectionOption } from "./game/formationSelection";
+import type { FormationPresetId } from "./game/types";
 import { CompanionSkillPreferences as SkillPreferencesSection } from "./CompanionSkillPreferences";
 import {
   EMPTY_EQUIPMENT_SLOT_ICON_SRC,
@@ -918,6 +920,9 @@ function CompanionMenuList({
 }
 
 export function PartyManagementPanel({
+  formationOptions,
+  selectedFormationPreset,
+  onSelectFormationPreset,
   activeSection,
   currentTime,
   leaderId,
@@ -931,6 +936,9 @@ export function PartyManagementPanel({
   onSelectSection,
   onMovePartyOrder,
 }: {
+  formationOptions: FormationSelectionOption[];
+  selectedFormationPreset: FormationPresetId;
+  onSelectFormationPreset: (preset: FormationPresetId) => void;
   activeSection: PartyManagementSection;
   currentTime: number;
   leaderId: string;
@@ -988,7 +996,9 @@ export function PartyManagementPanel({
           partySizeUnlockLevel={highestCharacterLevelEver}
           onSelectCompanion={onSelectCompanion}
         />
-        {selectedMember ? (
+        {activeSection === "formation" ? (
+          <FormationSelectionSection options={formationOptions} selectedPreset={selectedFormationPreset} onSelect={onSelectFormationPreset} />
+        ) : selectedMember ? (
           <PartyManagementSectionPanel
             activeSection={activeSection}
             currentTime={currentTime}
@@ -1006,6 +1016,31 @@ export function PartyManagementPanel({
       </div>
     </section>
   );
+}
+
+export function FormationSelectionSection({ options, selectedPreset, onSelect }: {
+  options: FormationSelectionOption[];
+  selectedPreset: FormationPresetId;
+  onSelect: (preset: FormationPresetId) => void;
+}) {
+  return <section className="formation-selection" aria-label="Formation selection">
+    <h3>Formation</h3>
+    <p>Choose a soft formation for travel and combat. Companions keep their current orders and targets.</p>
+    <div className="formation-options">
+      {options.map(option => <button key={option.id} type="button" aria-pressed={option.id === selectedPreset}
+        onKeyDown={event => { if (event.key === " " || event.key === "Enter") event.stopPropagation(); }}
+        className={`formation-option${option.id === selectedPreset ? " active" : ""}`} onClick={() => onSelect(option.id)}>
+        <strong>{option.label}</strong>
+        {option.slots.length ? <span className="formation-preview" aria-hidden="true">
+          <small>Front</small>
+          {[...new Set(option.slots.map(slot => slot.forward))].map(row => <span className="formation-preview-row" key={row}>
+            {option.slots.filter(slot => slot.forward === row).map(slot => <span className="formation-preview-dot" key={slot.id} />)}
+          </span>)}
+        </span> : <span>Preview unavailable for this party size</span>}
+        <span>{option.id === selectedPreset ? "Selected" : "Select"}</span>
+      </button>)}
+    </div>
+  </section>;
 }
 
 function LeadershipHeaderAction({

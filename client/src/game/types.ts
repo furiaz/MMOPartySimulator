@@ -2848,6 +2848,7 @@ export type DebugTelemetryEvent = {
 };
 
 export type DebugTelemetryTick = {
+  formationDiagnostics?: import("./formationDiagnostics").FormationDiagnostics;
   tick: number;
   frame: number;
   sample: number;
@@ -3077,6 +3078,11 @@ export type FormationAssignments = {
   slotsByEntityId: Record<string, string>;
   travel?: TravelFormationRuntime;
   combat?: CombatFormationRuntime;
+  transition?: {
+    fromOffsetsByEntityId: Record<string, { side: number; forward: number }>;
+    elapsedMs: number;
+    frameKey?: string;
+  };
 };
 
 export type CombatFormationGoal = Omit<TravelFormationGoal, "mode"> & {

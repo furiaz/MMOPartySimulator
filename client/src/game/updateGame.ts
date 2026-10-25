@@ -101,6 +101,7 @@ import { getFrozenWarmasterEncounterIds, updateWarmasterLifecycle } from "./warm
 import { isWarmasterRewardUiOpen } from "./warmasterLifecycleState";
 import { hasLocalTargetCommitment, pruneTargetCommitmentState } from "./targetCommitment";
 import { reconcileFormationAssignments } from "./formationAssignments";
+import { advanceFormationTransition } from "./formationTransition";
 import { isCombatFormationMember, prepareCombatFormation } from "./combatFormation";
 
 export function updateGame(
@@ -135,6 +136,7 @@ function runGameUpdate(state: GameState, timing: SimulationTiming): GameState {
   nextState = reconcileStateDerivedQuestObjectivesForQuests(nextState, "encounter_lifecycle_update");
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, nextState, timing);
   nextState = updateWarmasterSystem(nextState, timing.nowMs);
+  nextState = advanceFormationTransition(nextState);
   nextState = updateNewsBroadcasts(nextState, timing.nowMs);
   nextState = clearExpiredAutonomousTargetSuppressions(nextState);
   nextState = updateStatusEffects(nextState, timing.nowMs);

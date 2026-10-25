@@ -23,6 +23,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
     formationAssignments: undefined,
+    formationPathSearchesByEntityId: undefined,
     autoRoute: undefined,
     targetCommitmentsByEntityId: {},
     targetApproachesByEntityId: {},
@@ -125,6 +126,7 @@ export function pruneMissingEntityRuntimeState(state: GameState): GameState {
   state = pruneCombatFormationState(state);
   const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
   state = { ...state,
+    formationPathSearchesByEntityId: Object.fromEntries(Object.entries(state.formationPathSearchesByEntityId ?? {}).filter(([id]) => living(id))),
     localAvoidanceByEntityId: Object.fromEntries(Object.entries(state.localAvoidanceByEntityId ?? {}).filter(([id]) => living(id))),
     overlapRecoveryByEntityId: Object.fromEntries(Object.entries(state.overlapRecoveryByEntityId ?? {}).filter(([id]) => living(id))),
     normalMovementResultsByEntityId: Object.fromEntries(Object.entries(state.normalMovementResultsByEntityId ?? {}).filter(([id]) => living(id))),
