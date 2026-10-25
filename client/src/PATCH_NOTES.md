@@ -4,6 +4,38 @@ These notes begin on June 19, 2026, when Beginner and all eight first classes ha
 
 Entries are prepared before deployment and ship with the live release, so this document describes player-facing releases rather than every development change.
 
+## October 25, 2026
+
+### Added
+
+- Added **Arrow**, **Balanced**, and **Side-by-side** formation selection in **Party Management → Formation**, with previews for parties of one to five companions. One saved choice serves both travel and combat; new games and older saves default to Arrow.
+- Formation slots use soft role preferences: Defenders and Fighters favor forward positions, while Support and Gatherer-role companions favor rear positions. The leader receives a normal role-appropriate slot and remains the party's movement reference wherever that slot is.
+- Formation changes blend their suggested positions over one second. Selection remains available while companions are dead, busy, or displaced; actual movement continues to respect commands, tasks, obstacles, and normal movement speeds.
+- Added formation details to existing Debug Movement inspection, including the selected/applied preset, transition progress, slots, expected positions, substitutes, and current movement owner.
+
+### Changed
+
+- Party travel now uses adaptive soft formations with smooth turns, follower catch-up, and formation-aware regrouping. Narrow passages compress the formation sideways, then use distinct trailing positions when necessary; the party gradually reforms after the passage and retains soft positions when stopped.
+- Combat uses formation positions as staging and recovery areas. Companions keep legal attack positions instead of chasing exact slots, and gradually return to travel formation after combat. Temporary tasks and displacement preserve slot ownership; a dead member leaves a hole until the roster changes.
+- Newly acquiring automatic combatants softly prefer threats in their assigned left, center, or right lane and spread across suitable targets. Existing valid targets stay committed, while explicit party focus and single-target encounters still allow everyone to attack the same enemy.
+- Automatic companion targets survive temporary crowding, avoidance, and movement changes. Obstruction-based retargeting requires sustained lack of progress and repeated reachability checks instead of a single blocked step.
+- Personal defense stays local rather than replacing the whole party's objective. Defenders can also respond to real attacks on rear-slot allies before those allies become critically injured; critical-ally and personal-attacker responses retain higher priority.
+- Individual floor drags remain one-shot movement orders and continue when attacked. Individual enemy/structure focus remains authoritative for that companion. Valid orders survive knockback and mobility, accepted replacements resume afterward, and direct gathering retains its personal self-defense exception before returning to the resource.
+- Directly moving the leader lets eligible followers track the leader's actual movement without inheriting its individual attack or gathering target. Ordinary party floor orders also retain their destination when enemies attack.
+- World Travel now uses adaptive formations while preserving the selected destination through emergency combat, individual commands, displacement, and temporary route restrictions. After an emergency, travel waits for calm and required regrouping. New automatic teleport rallies wait for active individual commands; an already-active rally keeps its existing priority.
+
+### Fixed
+
+- Unified walking, combat approach, mobility skills, enemy dashes, knockback, and overlap recovery so competing movement systems cannot publish multiple position changes for one actor in the same update.
+- Replaced repeated late pushing with local avoidance and bounded overlap recovery, reducing crowd jitter while preserving walls, resources, structures, movement bounds, and reservations.
+- Aligned melee approach, Defender positioning, attack slots, and collision spacing around continuous body-aware geometry. Diagonal approaches, large or growing enemies, and broad structure edges now use consistent reach and standing-clearance checks.
+- Blocked formation followers now hold and retry bounded path searches instead of repeatedly stepping sideways against hard obstacles. Preset changes receive fresh substitute-clearance timing, and Debug inspection avoids showing stale goals when the leader or execution context becomes unavailable.
+- Preserved skill costs/effects and command resumption when movement must wait, including dash interruption, safe landings, Shield Shockwave completion timing, and safe Barracks rebuilding.
+
+### Known Issues
+
+- In very dense fights, an enemy can briefly drop and reacquire its target when other bodies block its path. This can cause short Defender target switches; the enemy-side retention behavior is unchanged in this release.
+
 ## October 22, 2026
 
 ### Added
