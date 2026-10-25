@@ -105,7 +105,7 @@ export function updatePoiSystem(
     markerInteractionState.activeTeleport ||
     isAutoRoutePaused(markerInteractionState)
   ) {
-    return clearPoiSelection(markerInteractionState);
+    return markerInteractionState.worldTravelTargetMapId ? markerInteractionState : clearPoiSelection(markerInteractionState);
   }
 
   if (getPartyExecutionIntent(markerInteractionState)?.source === "player") {

@@ -1071,6 +1071,20 @@ export type AutoRouteRuntimeState = {
   resumeAfterMs?: number;
   interruptCooldownUntilMs?: number;
   autoCombatEnableAtMs?: number;
+  pauseReason?: "emergency" | "calm" | "cohesion" | "gate";
+  emergencyTargetId?: string;
+  emergencyFrame?: number;
+  bodyBlocksByEntityId?: Record<string, {
+    enemyId: string;
+    requestKey: string;
+    frame: number;
+    timeMs: number;
+    blockedMs: number;
+    position: Position;
+    waypoint: Position;
+    bestDistance: number;
+    progressCredit?: number;
+  }>;
 };
 
 export type CombatFeedbackType =
@@ -2354,6 +2368,8 @@ export type DebugDismissibleUiTarget =
   | "secondary_party_summary";
 
 export type DebugTelemetryEventType =
+  | "auto_route_paused"
+  | "auto_route_resumed"
   | "target_acquired"
   | "target_changed"
   | "target_released"

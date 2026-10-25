@@ -286,7 +286,8 @@ function getLastEngagementProbeAt(state: GameState, actorId: string): number {
     ...Object.values(state.rejectedCombatTargetsByEntityId?.[actorId] ?? {}).map(entry => entry.lastProbeAtMs));
 }
 
-function getApproachProgress(state: GameState, result: NormalMovementResult, last: TargetApproachObservation | undefined) {
+export function getMovementApproachProgress(state: GameState, result: NormalMovementResult,
+  last: Pick<TargetApproachObservation, "waypoint" | "position" | "bestDistance" | "progressCredit"> | undefined) {
   const waypoints = state.movementPathsByEntityId?.[result.request.entityId]?.waypoints ?? [];
   const nextWaypoint = (position: Position) => waypoints.find(point => getEuclideanDistance(position, point) > TARGET_PROGRESS_DISTANCE) ?? result.request.destination;
   const waypoint = last?.waypoint ?? nextWaypoint(result.from);
@@ -317,7 +318,7 @@ export function observeTargetApproach(state: GameState, result: NormalMovementRe
   const target = targetId ? state.entities[targetId] : undefined;
   const key = targetId ?? `${result.request.source}:${result.request.pathTargetKey ?? JSON.stringify(result.request.destination)}`;
   const last = previous?.key === key ? previous : undefined;
-  const { progressed, displaced, ...progress } = getApproachProgress(state, result, last);
+  const { progressed, displaced, ...progress } = getMovementApproachProgress(state, result, last);
   const paused = isApproachSuspended(state, actor.id) || result.request.mode === "hold" ||
     (result.outcome === "held" && result.reason !== "crowd_wait") || result.outcome === "deferred" || result.reason === "constraint";
   const settled = target && isWithinAttackReach(actor, target, actor.role === "defender" ? 1 : getCompanionAttackRange(actor));

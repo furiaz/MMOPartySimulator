@@ -360,10 +360,11 @@ describe("travel movement integration", () => {
     expect(updateTravelFormationCohesion(state)!.canMoveLeader).toBe(true);
   });
 
-  it("suspends for route destination, route pauses, teleport and individual authority", () => {
+  it("regroups during route calm but yields to emergency combat and individual authority", () => {
     const state = party(3);
-    expect(usesTravelFormation({ ...state, worldTravelTargetMapId: "hub" })).toBe(false);
-    expect(usesTravelFormation({ ...state, autoRoute: { resumeAfterMs: 3000 } })).toBe(false);
+    expect(usesTravelFormation({ ...state, worldTravelTargetMapId: "map-1" })).toBe(true);
+    expect(usesTravelFormation({ ...state, worldTravelTargetMapId: "map-1", autoRoute: { pauseReason: "calm", resumeAfterMs: 3000 } })).toBe(true);
+    expect(usesTravelFormation({ ...state, worldTravelTargetMapId: "map-1", autoRoute: { pauseReason: "emergency" } })).toBe(false);
     const direct = issueCompanionDirectCommand(state, { type: "move", companionId: "m1", targetPosition: { x: 40, y: 35 } }, 1000).state;
     expect(isTravelFormationMember(direct, direct.entities.m1 as Companion)).toBe(false);
     expect(moveTravelFormationMember(direct, direct.entities.m1 as Companion)).toBe(direct);

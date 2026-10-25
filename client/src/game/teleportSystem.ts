@@ -1,4 +1,5 @@
 import { getDirectLeaderCommand } from "./directCommandState";
+import { canStartAutoRouteRally, isAutoRoutePaused, isAutoRouteStepAvailable } from "./autoRouteSystem";
 import {
   createEnemy,
   createNpc,
@@ -113,6 +114,7 @@ export function triggerMapTeleport(
   if (!isTeleportWorking(state, teleport.id)) {
     return appendTeleportSkippedEvent(state, "teleport_not_working", teleport.id);
   }
+  if (!canStartAutoRouteRally(state, teleport.id)) return state;
 
   const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
   if (guarded !== state) return guarded;
@@ -265,6 +267,7 @@ export function updateTeleportSystem(
 
   // An existing rally remains exclusive; suspended travel cannot start a new one.
   if (!state.activeTeleport && getDirectLeaderCommand(state)) return state;
+  if (!state.activeTeleport && isAutoRoutePaused(state)) return state;
 
   const autoTeleport = getAutoTeleport(state);
   const poiState = autoTeleport ? setMapTeleportPoi(state, autoTeleport.id, "ai") : state;
@@ -455,6 +458,8 @@ function completeTeleport(state: GameState): GameState {
   if (!teleportDefinition) {
     return appendTeleportSkippedEvent(state, "teleport_definition_missing", teleport.id);
   }
+  if (state.worldTravelTargetMapId && (!isTeleportWorking(state, teleport.id) ||
+    !isAutoRouteStepAvailable(state))) return state;
 
   const guarded = requestWarmasterDeparture(state, { kind: "route", teleportId: teleport.id });
   if (guarded !== state) return guarded;

@@ -4,6 +4,7 @@ import { reconcileWarmasterLifecycle } from "./warmasterLifecycle";
 import type { PartyFormationState } from "./types";
 import { pruneTargetCommitmentState } from "./targetCommitment";
 import { reconcileFormationAssignments } from "./formationAssignments";
+import { pruneAutoRouteObservations } from "./autoRouteSystem";
 
 function createIdlePartyFormation(): PartyFormationState {
   return {
@@ -21,6 +22,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
   return {
     ...state,
     formationAssignments: undefined,
+    autoRoute: undefined,
     targetCommitmentsByEntityId: {},
     targetApproachesByEntityId: {},
     targetEngagementProbeAtMsByEntityId: {},
@@ -116,6 +118,7 @@ export function clearMapTransitionRuntimeState(state: GameState): GameState {
 }
 
 export function pruneMissingEntityRuntimeState(state: GameState): GameState {
+  state = pruneAutoRouteObservations(state);
   state = pruneTargetCommitmentState(state);
   if (state.formationAssignments) state = reconcileFormationAssignments(state);
   const living = (id: string) => state.entities[id] && state.entities[id].state !== "dead";

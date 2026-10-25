@@ -3288,6 +3288,7 @@ describe("game update intent priority", () => {
       createMapOneState([leader, attacker], {
         partyLeaderId: leader.id,
         worldTravelTargetMapId: MAP_TWO_ID,
+        autoRoute: { pauseReason: "calm", resumeAfterMs: 0 },
         teleportStatesById: {
           [TELEPORTER_ID]: { isWorking: true },
         },
@@ -3325,7 +3326,7 @@ describe("game update intent priority", () => {
     expect(nextState.leaderIntent).toMatchObject({
       type: "move",
       targetId: null,
-      targetPosition: teleportPosition,
+      targetPosition: getForwardMapOneTeleport().position,
     });
     expect(nextState.localPoiTarget?.poiId).toBe("map-1-to-map-2");
   });

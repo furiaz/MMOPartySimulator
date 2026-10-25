@@ -1,9 +1,7 @@
 import { getDirectLeaderCommand } from "./directCommandState";
 import { isCombatEntity, isResourceEntity } from "./entities";
 import {
-  beginAutoRouteCalmPeriod,
-  finishAutoRouteCalmPeriod,
-  hasAutoRouteResumeCohesion,
+  updateAutoRouteExecution,
 } from "./autoRouteSystem";
 import { isPartyMember, getPartyMembers } from "./partySystem";
 import type {
@@ -59,6 +57,8 @@ export function captureInterruptedPoiTarget(
 }
 
 export function restoreInterruptedPoiTarget(state: GameState): GameState {
+  // Route intent lives in the current destination, not this map-local snapshot.
+  if (state.worldTravelTargetMapId) return updateAutoRouteExecution(state.interruptedPoiTarget ? { ...state, interruptedPoiTarget: null } : state);
   const interruptedTarget = state.interruptedPoiTarget;
 
   if (!interruptedTarget) {
@@ -79,18 +79,7 @@ export function restoreInterruptedPoiTarget(state: GameState): GameState {
 
   if (getDirectLeaderCommand(state)) return state;
 
-  if (interruptedTarget.worldTravelTargetMapId) {
-    const nowMs = state.simulationTimeMs ?? 0;
-    const resumeAfterMs = state.autoRoute?.resumeAfterMs;
-
-    if (!resumeAfterMs || resumeAfterMs > nowMs) {
-      return beginAutoRouteCalmPeriod(state);
-    }
-
-    if (!hasAutoRouteResumeCohesion(state)) {
-      return state;
-    }
-  }
+  if (interruptedTarget.worldTravelTargetMapId) return clearInterruptedPoiTarget(state);
 
   const restoredState = setPartyIntent(state, {
     mode: getPartyBehaviorModeForIntent(interruptedTarget.leaderIntent),
@@ -111,9 +100,7 @@ export function restoreInterruptedPoiTarget(state: GameState): GameState {
     interruptedPoiTarget: null,
   };
 
-  return interruptedTarget.worldTravelTargetMapId
-    ? finishAutoRouteCalmPeriod(resumedState)
-    : resumedState;
+  return resumedState;
 }
 
 export function clearInterruptedPoiTarget(state: GameState): GameState {
