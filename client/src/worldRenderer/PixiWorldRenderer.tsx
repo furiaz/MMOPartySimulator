@@ -430,6 +430,7 @@ type PixiRenderLayers = {
   objectLayer: Container;
   overlayGraphics: Graphics;
   speechLayer: Container;
+  wardAuraLayer: Container;
   wallLayer: Container;
 };
 
@@ -648,9 +649,42 @@ function clearLayer(layer: Container) {
   });
 }
 
+function createPixiRenderLayers(stage: Container): PixiRenderLayers {
+  const layers: PixiRenderLayers = {
+    auraLayer: new Container(),
+    backgroundGraphics: new Graphics(),
+    entityLayer: new Container(),
+    effectsLayer: new Container(),
+    effectsGraphics: new Graphics(),
+    fallbackGraphics: new Graphics(),
+    floorLayer: new Container(),
+    objectLayer: new Container(),
+    overlayGraphics: new Graphics(),
+    speechLayer: new Container(),
+    wardAuraLayer: new Container(),
+    wallLayer: new Container(),
+  };
+
+  stage.addChild(layers.backgroundGraphics);
+  stage.addChild(layers.floorLayer);
+  stage.addChild(layers.wallLayer);
+  stage.addChild(layers.wardAuraLayer);
+  stage.addChild(layers.objectLayer);
+  stage.addChild(layers.auraLayer);
+  stage.addChild(layers.entityLayer);
+  stage.addChild(layers.fallbackGraphics);
+  stage.addChild(layers.effectsGraphics);
+  stage.addChild(layers.effectsLayer);
+  stage.addChild(layers.overlayGraphics);
+  stage.addChild(layers.speechLayer);
+
+  return layers;
+}
+
 function clearLayers(layers: PixiRenderLayers) {
   clearLayer(layers.floorLayer);
   clearLayer(layers.wallLayer);
+  clearLayer(layers.wardAuraLayer);
   clearLayer(layers.objectLayer);
   clearLayer(layers.auraLayer);
   clearLayer(layers.entityLayer);
@@ -828,6 +862,22 @@ function endManagedFrame(state: ManagedRendererState) {
     }
   }
 }
+
+/* eslint-disable react-refresh/only-export-components -- Renderer primitives support display-tree regression tests. */
+export {
+  beginManagedFrame,
+  clearLayers,
+  createManagedRendererState,
+  createPixiDrawMetrics,
+  createPixiRenderLayers,
+  createTextureCache,
+  destroyManagedRendererState,
+  drawPatronDefenderAuras,
+  drawPatronWardObjects,
+  endManagedFrame,
+  resetManagedRendererState,
+};
+/* eslint-enable react-refresh/only-export-components */
 
 function requestTexture(
   src: string,
@@ -5596,9 +5646,10 @@ function isMapVisualObjectInTileBounds(
 }
 
 function drawPatronWardObjects({
+  auraLayer,
   cache,
   currentTime,
-  layer,
+  propLayer,
   map,
   managedState,
   metrics,
@@ -5607,9 +5658,10 @@ function drawPatronWardObjects({
   transform,
   visibleTileBounds,
 }: {
+  auraLayer: Container;
   cache: TextureCache;
   currentTime: number;
-  layer: Container;
+  propLayer: Container;
   map: GameMap;
   managedState: ManagedRendererState;
   metrics: PixiDrawMetrics;
@@ -5652,7 +5704,7 @@ function drawPatronWardObjects({
         cache,
         height: 128,
         key: `patron-ward-aura:${ward.id}`,
-        layer,
+        layer: auraLayer,
         managedState,
         metrics,
         position: bottomPosition,
@@ -5669,7 +5721,7 @@ function drawPatronWardObjects({
       cache,
       height: visualObject.heightCells * transform.cellPixelSize,
       key: `patron-ward-prop:${ward.id}`,
-      layer,
+      layer: propLayer,
       managedState,
       metrics,
       position: bottomPosition,
@@ -6724,9 +6776,10 @@ function drawFullMap({
     entities,
   });
   drawPatronWardObjects({
+    auraLayer: layers.wardAuraLayer,
     cache: textureCache,
     currentTime,
-    layer: layers.objectLayer,
+    propLayer: layers.objectLayer,
     map,
     managedState,
     metrics,
@@ -7969,19 +8022,7 @@ export function PixiWorldRenderer({
     let isInitialized = false;
     const app = new Application();
     const stage = new Container();
-    const layers: PixiRenderLayers = {
-      auraLayer: new Container(),
-      backgroundGraphics: new Graphics(),
-      entityLayer: new Container(),
-      effectsLayer: new Container(),
-      effectsGraphics: new Graphics(),
-      fallbackGraphics: new Graphics(),
-      floorLayer: new Container(),
-      objectLayer: new Container(),
-      overlayGraphics: new Graphics(),
-      speechLayer: new Container(),
-      wallLayer: new Container(),
-    };
+    const layers = createPixiRenderLayers(stage);
     const managedState = managedStateRef.current;
 
     function shouldContinueRedrawing() {
@@ -8160,17 +8201,6 @@ export function PixiWorldRenderer({
       }
 
       app.stage.addChild(stage);
-      stage.addChild(layers.backgroundGraphics);
-      stage.addChild(layers.floorLayer);
-      stage.addChild(layers.wallLayer);
-      stage.addChild(layers.objectLayer);
-      stage.addChild(layers.auraLayer);
-      stage.addChild(layers.entityLayer);
-      stage.addChild(layers.fallbackGraphics);
-      stage.addChild(layers.effectsGraphics);
-      stage.addChild(layers.effectsLayer);
-      stage.addChild(layers.overlayGraphics);
-      stage.addChild(layers.speechLayer);
       hostRef.current.appendChild(app.canvas);
       appRef.current = app;
       layersRef.current = layers;
