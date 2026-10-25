@@ -3,7 +3,7 @@ import { isTravelFormationMember, prepareTravelFormation } from "./travelFormati
 import { updateAttackSystem } from "./attackSystem";
 import { updateBarracks, initializeBarracks } from "./barracks";
 import { createAttackSlotPathDistanceCache } from "./attackSlots";
-import { updateAutoRouteRuntime } from "./autoRouteSystem";
+import { updateAutoRouteExecution, updateAutoRouteRuntime } from "./autoRouteSystem";
 import { updateCompanionAoeChannelSystem } from "./companionAoeChannelSystem";
 import { updateCombatProjectileSystem } from "./combatProjectileSystem";
 import {
@@ -193,6 +193,7 @@ function runGameUpdate(state: GameState, timing: SimulationTiming): GameState {
 
   nextState = updatePartyIntentRecoverySystem(nextState);
 
+  nextState = updateAutoRouteExecution(nextState);
   nextState = updateTeleportSystem(nextState, movedEntityIds, timing.nowMs);
   if (isWarmasterRewardUiOpen(nextState)) return recordDebugTelemetryTick(state, endNormalMovementPhase(nextState, movedEntityIds), timing);
   nextState = initializeBarracks(nextState);

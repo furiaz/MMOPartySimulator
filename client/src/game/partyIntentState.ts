@@ -155,6 +155,10 @@ export function restoreQueuedPartyIntent(state: GameState): GameState {
   if (!queuedIntent) {
     return state.partyIntent?.recoveryIntent ? clearPartyIntent(state) : state;
   }
+  if (state.worldTravelTargetMapId) return setPartyIntent(state, {
+    mode: "travel", source: "player", executionIntent: null, globalPoiIntent: null, localPoiTarget: null,
+    worldTravelTargetMapId: state.worldTravelTargetMapId, queuedIntent: null, recoveryIntent: null,
+  });
 
   return setPartyIntent(state, {
     mode: getPartyBehaviorModeForIntent(queuedIntent.executionIntent),

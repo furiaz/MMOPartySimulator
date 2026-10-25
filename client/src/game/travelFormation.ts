@@ -1,4 +1,5 @@
 import { getDirectLeaderCommand, hasDirectCompanionAuthority } from "./directCommandState";
+import { canRegroupAutoRoute } from "./autoRouteSystem";
 import { getFormationTemplate, transformFormationSlots } from "./formationTemplates";
 import { createNormalMovementRequest, getMovementPositionCommit, getMovementRequestRejection, getNormalMovementResult, getSpecializedMovementOwner } from "./movementAuthority";
 import { holdEntityMovement, moveEntityTowardPositionIfUnoccupied } from "./movementPlanning";
@@ -26,9 +27,8 @@ function leaderOf(state: GameState): Companion | undefined {
   return leader?.kind === "companion" && leader.health > 0 && leader.state !== "dead" ? leader : undefined;
 }
 
-/** #701 owns every Auto Route state, including pauses and individual leader overrides. */
 export function usesTravelFormation(state: GameState): boolean {
-  if (!state.formationAssignments || !leaderOf(state) || state.worldTravelTargetMapId || state.autoRoute || state.activeTeleport) return false;
+  if (!state.formationAssignments || !leaderOf(state) || state.activeTeleport || !canRegroupAutoRoute(state)) return false;
   if (getActiveQuestGuideObjectiveId(state) && getActiveQuestGuide(state)) return false;
   if (getDirectLeaderCommand(state)) return true;
   const intent = getPartyExecutionIntent(state);
@@ -191,6 +191,12 @@ function expectedPosition(state: GameState, runtime: TravelFormationRuntime, act
     if (sample) return sample;
   }
   return slotPositions(state, runtime)[actor.id];
+}
+
+/** Cohesion reads ideal slot/trail geometry, never a held or obstructed substitute. */
+export function getTravelFormationExpectedPosition(state: GameState, actor: Companion): Position | undefined {
+  if (!state.formationAssignments?.slotsByEntityId[actor.id] || !leaderOf(state)) return undefined;
+  return expectedPosition(state, runtimeOf(state), actor);
 }
 
 function standingGoal(state: GameState, actor: Companion, position: Position): boolean {

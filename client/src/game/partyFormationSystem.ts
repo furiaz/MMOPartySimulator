@@ -1,4 +1,5 @@
 import { hasDirectCompanionAuthority } from "./directCommandState";
+import { isAutoRoutePaused } from "./autoRouteSystem";
 import { isTravelFormationMember, moveTravelFormationMember, updateTravelFormationCohesion } from "./travelFormation";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { isCombatEntity } from "./entities";
@@ -91,6 +92,7 @@ export function updatePartyFormationSystem(
   ) {
     return clearFormation(state);
   }
+  if (isAutoRoutePaused(state) && getPartyExecutionIntent(state)?.type !== "attack") return clearFormation(state);
 
   const playerIntentClearedState = clearStalePlayerPartyIntent(state, leader);
 
