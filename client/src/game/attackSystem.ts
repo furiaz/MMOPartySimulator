@@ -10,10 +10,10 @@ import {
   chooseAttackSlot,
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
-import { getPartyMembers, isPartyMember } from "./partySystem";
+import { getActiveCompanionsInPartyOrder, getPartyMembers, isPartyMember } from "./partySystem";
 import { getPartyCombatTarget } from "./partyTargetSystem";
 import { isActivePartyThreat } from "./partyThreatSystem";
-import { applyTargetCommitment, canReacquireCombatTarget, isPrivateResponseTarget, selectTargetCommitment } from "./targetCommitment";
+import { applyTargetCommitment, canReacquireCombatTarget, isPrivateResponseTarget, isRetainableCombatEnemy, selectTargetCommitment } from "./targetCommitment";
 import { getPartyExecutionIntent } from "./partyIntentState";
 import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import {
@@ -101,7 +101,7 @@ export function updateAttackSystem(
   now = Date.now(),
   pathDistanceCache?: AttackSlotPathDistanceCache,
 ): GameState {
-  let nextState = state;
+  let nextState = resolveAutomaticAttackTargets(state);
 
   for (const entity of getCombatMovementOrder(state)) {
     let attacker = getEntityById(nextState, entity.id);
@@ -120,15 +120,14 @@ export function updateAttackSystem(
     if (command?.type === "move") continue;
     if (command?.type === "gather" && (!attacker.currentTargetId ||
       !isDirectGatherPersonalThreat(nextState, attacker.id, nextState.entities[attacker.currentTargetId]))) continue;
-    if (attacker.kind === "companion" && !hasDirectCompanionAuthority(nextState, attacker) &&
-      getPartyExecutionIntent(nextState)?.source !== "player" &&
-      nextState.entities[attacker.currentTargetId ?? ""]?.kind !== "structure") {
+    if (usesAutomaticAttackTarget(nextState, attacker) && !isRetainableCombatEnemy(nextState, nextState.entities[attacker.currentTargetId ?? ""])) {
+      nextState = resolveAutomaticAttackTargets(nextState, true);
+      attacker = getEntityById(nextState, entity.id);
+      if (!attacker || !isAttackingCombatEntity(attacker)) continue;
+    }
+    if (usesAutomaticAttackTarget(nextState, attacker)) {
       const actor = attacker;
-      const assist = findPartyAssistTarget(nextState, actor);
-      nextState = applyTargetCommitment(nextState, actor, selectTargetCommitment(nextState, actor, {
-        preferredTarget: assist?.kind === "enemy" ? assist : null,
-        isEligible: enemy => isDefenderAttackTargetRelevant(nextState, actor, enemy),
-      }));
+      nextState = applyTargetCommitment(nextState, actor, chooseAutomaticAttackTarget(nextState, actor));
       attacker = nextState.entities[actor.id];
       if (!isAttackingCombatEntity(attacker)) continue;
     }
@@ -139,7 +138,7 @@ export function updateAttackSystem(
         nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
         continue;
       }
-      nextState = updateEntity(nextState, finishAttack(nextState, attacker));
+      nextState = finishAttack(nextState, attacker);
       continue;
     }
 
@@ -161,7 +160,7 @@ export function updateAttackSystem(
       !canEnemyChaseTarget(currentAttacker, target) &&
       !isInAttackRange(currentAttacker, target)
     ) {
-      nextState = updateEntity(nextState, finishAttack(nextState, currentAttacker));
+      nextState = finishAttack(nextState, currentAttacker);
       continue;
     }
 
@@ -334,12 +333,12 @@ export function updateAttackSystem(
         ? clearAttackWindup(setLastAttackAt(currentUpdatedAttacker, now))
         : updatedAttacker;
 
-      nextState = updateEntity(
-        nextState,
-        impactResult.target.state === "dead"
-          ? finishAttack(nextState, finalUpdatedAttacker)
-          : finalUpdatedAttacker,
-      );
+      nextState = updateEntity(nextState, finalUpdatedAttacker);
+      if (impactResult.target.state === "dead") {
+        const automatic = usesAutomaticAttackTarget(nextState, finalUpdatedAttacker);
+        nextState = resolveAutomaticAttackTargets(nextState, true);
+        if (!automatic) nextState = finishAttack(nextState, finalUpdatedAttacker);
+      }
       if (impactResult.target.state === "dead" && command?.type === "attack")
         nextState = finishDirectCompanionCommand(nextState, command, now, "direct_command_completed", "target_invalid");
       continue;
@@ -506,15 +505,40 @@ function getValidTarget(
     return undefined;
   }
 
-  return findPartyAssistTarget(state, attacker);
+  // Explicit party focus remains independently authoritative for an assisting member.
+  const shared = getPartyExecutionIntent(state)?.source === "player" ? getPartyCombatTarget(state) : null;
+  return shared && getDistance(attacker.position, shared.position) <= TARGET_SWITCH_DISTANCE ? shared : undefined;
 }
 
-function findPartyAssistTarget(
+function usesAutomaticAttackTarget(state: GameState, actor: GameEntity): actor is Companion {
+  return actor.kind === "companion" && actor.state === "attack" && !hasDirectCompanionAuthority(state, actor) &&
+    !isCompanionAssignedToResurrectionRecovery(state, actor.id) && getPartyExecutionIntent(state)?.source !== "player" &&
+    state.entities[actor.currentTargetId ?? ""]?.kind !== "structure";
+}
+
+/** Late invalidation uses the same acquisition order without reordering actions. */
+function resolveAutomaticAttackTargets(state: GameState, onlyInvalid = false): GameState {
+  let next = state;
+  for (const actor of getActiveCompanionsInPartyOrder(state)) {
+    if (usesAutomaticAttackTarget(next, actor) && (!onlyInvalid || !isRetainableCombatEnemy(next, next.entities[actor.currentTargetId ?? ""])))
+      next = applyTargetCommitment(next, actor, chooseAutomaticAttackTarget(next, actor));
+  }
+  return next;
+}
+
+function chooseAutomaticAttackTarget(state: GameState, actor: Companion) {
+  const assists = findPartyAssistTargets(state, actor).filter((target): target is Enemy => target.kind === "enemy");
+  return selectTargetCommitment(state, actor, { preferredTarget: assists[0], candidateTargets: assists,
+    isEligible: enemy => isDefenderAttackTargetRelevant(state, actor, enemy) });
+}
+
+function findPartyAssistTargets(
   state: GameState,
   attacker: Companion,
-): CombatEntity | undefined {
+): CombatEntity[] {
   const partyTarget = getPartyCombatTarget(state);
-  for (const member of getPartyMembers(state).sort((a, b) => a.id.localeCompare(b.id))) {
+  const targets: CombatEntity[] = [];
+  for (const member of getPartyMembers(state).sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id))) {
     if (
       member.id === attacker.id ||
       member.state !== "attack" ||
@@ -534,11 +558,11 @@ function findPartyAssistTarget(
       // still make that same target eligible independently.
       if (hasDirectCompanionAuthority(state, member) &&
         partyTarget?.id !== target.id && !isActivePartyThreat(state, target)) continue;
-      return target;
+      if (!targets.some(other => other.id === target.id)) targets.push(target);
     }
   }
 
-  return undefined;
+  return targets;
 }
 
 function getCombatMovementOrder(state: GameState): GameEntity[] {
@@ -603,33 +627,19 @@ export function getAttackCooldownMs(entity: CombatEntity): number {
     : COMPANION_GLOBAL_COOLDOWN_MS;
 }
 
-function finishAttack(state: GameState, attacker: CombatEntity): CombatEntity {
-  if (hasDirectCompanionAuthority(state, attacker)) return attacker;
+function finishAttack(state: GameState, attacker: CombatEntity): GameState {
+  if (hasDirectCompanionAuthority(state, attacker)) return state;
   if (!isAutonomousEntity(attacker) || !isPartyMember(attacker)) {
-    return {
+    return updateEntity(state, {
       ...clearAttackWindup(attacker),
       state: "idle",
       currentTargetId: null,
-    };
+    });
   }
-
-  const sharedTarget = findPartyAssistTarget(state, attacker);
-
-  if (sharedTarget) {
-    return {
-      ...clearAttackWindup(attacker),
-      state: "attack",
-      currentTargetId: sharedTarget.id,
-      commandPriority: "autonomous",
-    };
-  }
-
-  return {
-    ...clearAttackWindup(attacker),
-    state: "follow",
-    currentTargetId: attacker.id === state.partyLeaderId ? null : state.partyLeaderId,
-    commandPriority: "autonomous",
-  };
+  const decision = chooseAutomaticAttackTarget(state, attacker);
+  return decision.kind === "none" ? updateEntity(state, { ...clearAttackWindup(attacker), state: "follow",
+    currentTargetId: attacker.id === state.partyLeaderId ? null : state.partyLeaderId, commandPriority: "autonomous" })
+    : applyTargetCommitment(state, clearAttackWindup(attacker), decision);
 }
 
 function isEnemy(entity: GameEntity): entity is Enemy {

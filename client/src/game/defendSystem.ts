@@ -20,7 +20,7 @@ import {
   type AttackSlotPathDistanceCache,
 } from "./attackSlots";
 import { getNormalMovementResult } from "./movementAuthority";
-import { getPartyLeader } from "./partySystem";
+import { getActiveCompanionsInPartyOrder, getPartyLeader } from "./partySystem";
 import { attackDefenderTarget } from "./defenderCombat";
 import {
   getDefenderAnchorPosition,
@@ -70,6 +70,13 @@ export function updateDefendSystem(
   const waitingLeaderIds = new Set<string>();
   const resetLeaderWaitIds = new Set<string>();
 
+  for (const defender of getActiveCompanionsInPartyOrder(nextState)) {
+    if (!isDefendingCompanion(defender) || hasDirectCompanionAuthority(nextState, defender) ||
+      isCompanionAssignedToResurrectionRecovery(nextState, defender.id) || movedEntityIds.has(defender.id) ||
+      getNormalMovementResult(nextState, defender.id) || isFormationTravelMovementActive(nextState) || !getDefenderLeader(nextState, defender)) continue;
+    nextState = applyTargetCommitment(nextState, defender, getDefenderTargetDecision(nextState, defender), "defend");
+  }
+
   for (const entity of Object.values(state.entities)) {
     const defender = nextState.entities[entity.id];
 
@@ -96,10 +103,7 @@ export function updateDefendSystem(
           preferredDefendPosition,
         )
       : null;
-    const targetDecision = leader ? selectTargetCommitment(nextState, defender, {
-      preferredTarget: getLeaderEnemyTarget(nextState), range: DEFENDER_THREAT_SEARCH_RADIUS,
-      isEligible: enemy => isRelevantGuideEscortThreat(nextState, enemy) && isDefenderAttackTargetRelevant(nextState, defender, enemy),
-    }) : null;
+    const targetDecision = leader ? getDefenderTargetDecision(nextState, defender) : null;
     if (targetDecision) nextState = applyTargetCommitment(nextState, defender, targetDecision, "defend");
     nextState = prepareCombatFormation(nextState);
     const target = targetDecision?.target ?? undefined;
@@ -432,6 +436,11 @@ function updateLeaderWait(
     ...state,
     defenderWaitMsByLeaderId: waitMs,
   };
+}
+
+function getDefenderTargetDecision(state: GameState, defender: Companion) {
+  return selectTargetCommitment(state, defender, { preferredTarget: getLeaderEnemyTarget(state), range: DEFENDER_THREAT_SEARCH_RADIUS,
+    isEligible: enemy => isRelevantGuideEscortThreat(state, enemy) && isDefenderAttackTargetRelevant(state, defender, enemy) });
 }
 
 function moveDefenderTowardCommittedTarget(

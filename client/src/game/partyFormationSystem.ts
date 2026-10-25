@@ -38,7 +38,8 @@ import {
   setPartyExecutionIntent,
 } from "./partyIntentState";
 import { RESOURCE_INTERACTION_RANGE } from "./resourceInteraction";
-import { hasLocalTargetCommitment, isPlayerInteractionDefense } from "./targetCommitment";
+import { applyTargetCommitment, hasLocalTargetCommitment, isPlayerInteractionDefense, selectTargetCommitment } from "./targetCommitment";
+import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import { getPartyMovementTargetPosition } from "./partyTargetSystem";
 import {
   FOLLOW_DISTANCE,
@@ -425,8 +426,20 @@ function assignPartyCombatTarget(state: GameState, targetId: string): GameState 
     source: executionIntent?.source,
   });
 
-  for (const member of getPartyMembers(nextState)) {
+  for (const member of getPartyMembers(nextState).sort((a, b) => a.partyOrder - b.partyOrder || a.id.localeCompare(b.id))) {
     if (!canAssignPartyCombatTarget(nextState, member, hasPlayerIntent)) {
+      continue;
+    }
+
+    if (!hasPlayerIntent && target?.kind === "enemy") {
+      const decision = selectTargetCommitment(nextState, member, {
+        preferredTarget: target, isEligible: enemy => isDefenderAttackTargetRelevant(nextState, member, enemy),
+      });
+      nextState = applyTargetCommitment(nextState, member, decision);
+      // Combat entry resumes an accepted approach without replacing its target or evidence.
+      const actor = nextState.entities[member.id];
+      if (decision.target && actor?.kind === "companion" && (actor.state === "follow" || actor.state === "idle"))
+        nextState = updateEntity(nextState, { ...actor, state: "attack" });
       continue;
     }
 

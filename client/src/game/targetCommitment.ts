@@ -1,10 +1,13 @@
 import { probeAttackEngagement, type AttackEngagementProbe } from "./attackSlots";
 import { appendDebugTelemetryEvent } from "./debugTelemetry";
 import { getCompanionAttackRange } from "./companionCombat";
+import { compareFormationTargetScores, getAssignedFormationSlot, getFormationTargetScore, type FormationTargetScore } from "./formationTargeting";
 import { isTargetDummyEnemy } from "./entityGuards";
 import { clearDirectCommandPlanning, hasDirectCompanionAuthority, isDirectGatherPersonalThreat } from "./directCommandState";
 import { getPartyExecutionIntent } from "./partyIntentState";
-import { getBoundedPathDistance } from "./movementPlanning";
+import { COMBAT_BREAK_DISTANCE } from "./partyActivityCoordinator";
+import { getBoundedPathDistance, isCombatPositionAvailable } from "./movementPlanning";
+import { isDefenderAttackTargetRelevant } from "./roleSystem";
 import { getEuclideanDistance, getGridDistance } from "./positionUtils";
 import { getActiveQuestGuide, QUEST_GUIDE_ENEMY_PAUSE_RANGE } from "./questGuideSystem";
 import { getEntityCollisionShape, isWithinAttackReach, SPATIAL_EPSILON } from "./spatialGeometry";
@@ -22,16 +25,20 @@ export const TARGET_PROGRESS_DISTANCE = 0.1;
 export const CRITICAL_ALLY_HEALTH_RATIO = 0.35;
 
 export type CompanionTargetReason = "acquired" | "shared_target" | "player_focus" | "personal_attacker" |
-  "critical_ally" | "sustained_obstruction" | "unreachable_engagement" | "target_died" |
+  "critical_ally" | "formation_lane" | "rear_protection" | "sustained_obstruction" | "unreachable_engagement" | "target_died" |
   "target_removed" | "scripted_suppression" | "leash_failure" | "response_ended" | "command_replaced" | "actor_defeated" | "encounter_invalidated";
 
-export type TargetCommitment = { targetId: string; reason: CompanionTargetReason; priority: number; local: boolean };
+type TargetDamageEvidence = { frame: number; timeMs: number; victimId: string };
+export type TargetCommitment = { targetId: string; reason: CompanionTargetReason; priority: number; local: boolean;
+  formationScore?: FormationTargetScore; damageEvidence?: TargetDamageEvidence };
 export type TargetCommitmentDecision = {
   kind: "retain" | "acquire" | "switch" | "release" | "none";
   target: Enemy | null;
   reason: CompanionTargetReason;
   priority: number;
   local: boolean;
+  formationScore?: FormationTargetScore;
+  damageEvidence?: TargetDamageEvidence;
 };
 export type TargetApproachObservation = {
   key: string;
@@ -57,6 +64,7 @@ export type RejectedCombatTarget = { targetId: string; worldKey: string; checked
 export type CompanionTargetTransition = {
   entityId: string; previousTargetId: string | null; targetId: string | null;
   reason: CompanionTargetReason; frame: number; timeMs: number;
+  formationScore?: FormationTargetScore;
 };
 
 export function isAutomaticCombatTarget(state: GameState, target: GameEntity | undefined): target is Enemy {
@@ -77,10 +85,41 @@ function isAggressor(state: GameState, target: Enemy): boolean {
   return target.state === "attack" && victim?.kind === "companion" && victim.state !== "dead" && victim.health > 0;
 }
 
+/** Accepted damage remains visible to later consumers in this update only. */
+function getCurrentDamageEvidence(state: GameState, memory: TargetCommitment | undefined): TargetDamageEvidence | undefined {
+  const evidence = memory?.damageEvidence, victim = evidence ? state.entities[evidence.victimId] : undefined;
+  return memory?.local && memory.priority > 0 && evidence?.frame === (state.simulationFrame ?? state.simulationTick) &&
+    evidence.timeMs === (state.simulationTimeMs ?? 0) && victim?.kind === "companion" && victim.health > 0 && victim.state !== "dead"
+    ? evidence : undefined;
+}
+
 function emergencyPriority(state: GameState, actor: Companion, enemy: Enemy, damage?: { attackerId: string; victimId: string }): number {
   const victim = state.entities[damage?.attackerId === enemy.id ? damage.victimId : enemy.currentTargetId ?? ""];
   if ((!isAggressor(state, enemy) && damage?.attackerId !== enemy.id) || victim?.kind !== "companion" || victim.health <= 0) return 0;
-  return victim.health / victim.maxHealth <= CRITICAL_ALLY_HEALTH_RATIO ? 2 : victim.id === actor.id ? 1 : 0;
+  if (victim.health / victim.maxHealth <= CRITICAL_ALLY_HEALTH_RATIO) return 2;
+  if (victim.id === actor.id) return 1;
+  return actor.role === "defender" && (!state.worldTravelTargetMapId || state.autoRoute?.pauseReason === "emergency") &&
+    getAssignedFormationSlot(state, victim.id)?.depth === "rear" && isDefenderAttackTargetRelevant(state, actor,
+      damage?.attackerId === enemy.id ? { ...enemy, state: "attack", currentTargetId: victim.id } : enemy) ? 0.5 : 0;
+}
+
+/** Claims are accepted base targets, never predictions or skill targets. */
+function countTargetClaims(state: GameState, actor: Companion, target: Enemy): number {
+  return Object.values(state.entities).filter(other => other.id !== actor.id && other.kind === "companion" && other.health > 0 &&
+    (other.state === "attack" || other.state === "defend") && other.currentTargetId === target.id && isRetainableCombatEnemy(state, target)).length;
+}
+
+function hasKnownEngagement(state: GameState, actor: Companion, target: Enemy): boolean {
+  const reach = actor.role === "defender" ? 1 : getCompanionAttackRange(actor);
+  if (isWithinAttackReach(actor, target, reach) && isCombatPositionAvailable(state, actor, actor.position, { allowPartyPassThrough: true })) return true;
+  const rejected = state.rejectedCombatTargetsByEntityId?.[actor.id]?.[target.id];
+  if (rejected?.reachable && rejected.checkedWorldKey === getReacquisitionKey(state, actor, target)) return true;
+  const observation = state.targetApproachesByEntityId?.[actor.id];
+  return Boolean(observation?.targetId === target.id && observation.engagementPosition && observation.position &&
+    getEuclideanDistance(actor.position, observation.position) <= SPATIAL_EPSILON &&
+    observation.probeKey === getProbeKey(state, actor, target, target.position) &&
+    isWithinAttackReach(actor, target, reach, observation.engagementPosition) &&
+    isCombatPositionAvailable(state, actor, observation.engagementPosition, { allowPartyPassThrough: true }));
 }
 
 function canRespond(state: GameState, actor: Companion, enemy: Enemy, range: number): boolean {
@@ -107,23 +146,43 @@ function isWithinLocalResponseLeash(state: GameState, actor: Companion, enemy: E
 /** Authority and validity precede scoring. Repeated reads never advance timing. */
 export function selectTargetCommitment(
   state: GameState, actor: Companion,
-  options: { preferredTarget?: Enemy | null; range?: number; isEligible?: (enemy: Enemy) => boolean; allowEmergency?: boolean;
+  options: { preferredTarget?: Enemy | null; candidateTargets?: readonly Enemy[]; range?: number; isEligible?: (enemy: Enemy) => boolean; allowEmergency?: boolean;
     allowPlayerInteractionDefense?: boolean; allowOrdinaryThreat?: boolean; damage?: { attackerId: string; victimId: string } } = {},
 ): TargetCommitmentDecision {
   const rawCurrent = actor.currentTargetId ? state.entities[actor.currentTargetId] : undefined;
   const intent = getPartyExecutionIntent(state);
   const shared = intent?.type === "attack" && intent.source !== "player" && intent.targetId ? state.entities[intent.targetId] : undefined;
+  const formationAcquisition = Boolean(getAssignedFormationSlot(state, actor.id)) &&
+    (!state.worldTravelTargetMapId || state.autoRoute?.pauseReason === "emergency");
   const inherited = (actor.state === "follow" || actor.state === "idle") && isRetainableCombatEnemy(state, shared) &&
-    canReacquireCombatTarget(state, actor, shared) ? shared : null;
-  const retained = isRetainableCombatEnemy(state, rawCurrent) && (actor.state === "attack" || actor.state === "defend") ? rawCurrent : inherited;
+    canReacquireCombatTarget(state, actor, shared) && (!formationAcquisition || options.preferredTarget ||
+      state.partyFormation?.phase === "combat" || getGridDistance(actor.position, shared.position) <= COMBAT_BREAK_DISTANCE) ? shared : null;
   const memory = state.targetCommitmentsByEntityId?.[actor.id];
-  const current = retained && (options.isEligible?.(retained) ?? true) &&
+  const isEligible = (enemy: Enemy): boolean => {
+    const victimId = options.damage?.attackerId === enemy.id ? options.damage.victimId
+      : memory?.targetId === enemy.id ? getCurrentDamageEvidence(state, memory)?.victimId : undefined;
+    const victim = victimId ? state.entities[victimId] : undefined;
+    // Apply existing threat/leash predicates to the accepted aggression fact,
+    // without rewriting the enemy's actual task or target.
+    return options.isEligible?.(victim?.kind === "companion" && victim.health > 0 && victim.state !== "dead"
+      ? { ...enemy, state: "attack", currentTargetId: victim.id } : enemy) ?? true;
+  };
+  // Travel can temporarily label an already accepted hunt as follow. It is not
+  // a fresh inherited candidate merely because its locomotion phase changed.
+  const retained = isRetainableCombatEnemy(state, rawCurrent) && (actor.state === "attack" || actor.state === "defend" ||
+    memory?.targetId === rawCurrent.id || (actor.id === state.partyLeaderId && rawCurrent.id === shared?.id))
+    ? rawCurrent : formationAcquisition ? null : inherited;
+  const current = retained && isEligible(retained) &&
     (!memory?.local || memory.targetId !== retained.id || isWithinLocalResponseLeash(state, actor, retained)) ? retained : null;
-  const decision = (target: Enemy | null, reason: CompanionTargetReason, priority = 0, local = false): TargetCommitmentDecision => ({
-    kind: target ? target.id === current?.id ? "retain" : current ? "switch" : "acquire" : current || rawCurrent?.kind === "enemy" ||
-      (!rawCurrent && actor.currentTargetId && (actor.state === "attack" || actor.state === "defend")) ? "release" : "none",
-    target, reason, priority, local,
-  });
+  const actualCurrent = current === rawCurrent || (!formationAcquisition && !options.preferredTarget) ? current : null;
+  const decision = (target: Enemy | null, reason: CompanionTargetReason, priority = 0, local = false, formationScore?: FormationTargetScore): TargetCommitmentDecision => {
+    const damageEvidence = target && local && priority > 0 ? options.damage?.attackerId === target.id
+      ? { frame: state.simulationFrame ?? state.simulationTick, timeMs: state.simulationTimeMs ?? 0, victimId: options.damage.victimId }
+      : memory?.targetId === target.id ? getCurrentDamageEvidence(state, memory) : undefined : undefined;
+    return { kind: target ? target.id === actualCurrent?.id ? "retain" : actualCurrent ? "switch" : "acquire" : current || rawCurrent?.kind === "enemy" ||
+        (!rawCurrent && actor.currentTargetId && (actor.state === "attack" || actor.state === "defend")) ? "release" : "none",
+      target, reason, priority, local, ...(formationScore ? { formationScore } : {}), ...(damageEvidence ? { damageEvidence } : {}) };
+  };
   const command = state.directCompanionCommandsById?.[actor.id];
   if (hasDirectCompanionAuthority(state, actor) && command?.type !== "gather")
     return decision(current, "player_focus", 3);
@@ -133,20 +192,23 @@ export function selectTargetCommitment(
     return decision(null, "response_ended");
 
   const range = options.range ?? (actor.role === "defender" ? 6 : 3);
-  const currentPriority = current && isAggressor(state, current)
-    ? Math.max(emergencyPriority(state, actor, current), memory?.targetId === current.id ? memory.priority : 0) : 0;
+  const currentDamage = Boolean(current && (memory?.targetId === current.id && getCurrentDamageEvidence(state, memory) ||
+    options.damage?.attackerId === current.id && emergencyPriority(state, actor, current, options.damage) > 0));
+  const currentPriority = current && (isAggressor(state, current) || currentDamage)
+    ? Math.max(emergencyPriority(state, actor, current, options.damage), memory?.targetId === current.id ? memory.priority : 0) : 0;
   const candidates = options.allowEmergency === false ? [] : Object.values(state.entities)
     .filter((enemy): enemy is Enemy => isAutomaticCombatTarget(state, enemy) && (isAggressor(state, enemy) || options.damage?.attackerId === enemy.id))
-    .filter(enemy => canRespond(state, actor, enemy, range) && (options.isEligible?.(enemy) ?? true) &&
+    .filter(enemy => canRespond(state, actor, enemy, range) && isEligible(enemy) &&
       (!command || isDirectGatherPersonalThreat(state, actor.id, enemy)) &&
       (intent?.source !== "player" || enemy.currentTargetId === actor.id || options.damage?.victimId === actor.id))
+    .filter(enemy => canReacquireCombatTarget(state, actor, enemy))
     .sort((a, b) => emergencyPriority(state, actor, b, options.damage) - emergencyPriority(state, actor, a, options.damage) ||
       getGridDistance(actor.position, a.position) - getGridDistance(actor.position, b.position) || a.id.localeCompare(b.id));
   const emergency = candidates[0];
   if (emergency && emergencyPriority(state, actor, emergency, options.damage) > 0 &&
     (!current || emergencyPriority(state, actor, emergency, options.damage) > currentPriority)) {
     const priority = emergencyPriority(state, actor, emergency, options.damage);
-    return decision(emergency, priority === 2 ? "critical_ally" : priority === 1 ? "personal_attacker" : "acquired", priority, true);
+    return decision(emergency, priority === 2 ? "critical_ally" : priority === 1 ? "personal_attacker" : "rear_protection", priority, true);
   }
   if (current) {
     const observation = state.targetApproachesByEntityId?.[actor.id];
@@ -157,14 +219,26 @@ export function selectTargetCommitment(
     const blocker = getSustainedBlockerTarget(state, actor);
     if (blocker && blocker.id !== current.id && !command && currentPriority === 0)
       return decision(blocker, "sustained_obstruction", 0, true);
-    if (memory?.targetId === current.id && memory.local && memory.priority > 0 && !isAggressor(state, current))
+    if (memory?.targetId === current.id && memory.local && memory.priority > 0 && !isAggressor(state, current) && !currentDamage)
       return decision(null, "response_ended");
     return decision(current, memory?.targetId === current.id ? memory.reason : "acquired", currentPriority,
-      memory?.targetId === current.id && memory.local);
+      memory?.targetId === current.id && memory.local, memory?.targetId === current.id ? memory.formationScore : undefined);
   }
   if (command) return decision(null, "response_ended");
   const preferred = options.preferredTarget;
-  if (preferred && isAutomaticCombatTarget(state, preferred) && (options.isEligible?.(preferred) ?? true) &&
+  if (formationAcquisition) {
+    const eligiblePreferred = [preferred, inherited, ...(options.candidateTargets ?? [])].filter((target): target is Enemy => Boolean(target && isAutomaticCombatTarget(state, target) &&
+      isEligible(target) && canReacquireCombatTarget(state, actor, target)));
+    const ordinary = options.allowOrdinaryThreat !== false ? candidates.filter(target => canReacquireCombatTarget(state, actor, target)) : [];
+    const pool = [...new Map([...eligiblePreferred, ...ordinary].map(target => [target.id, target])).values()];
+    const ranked = pool.map(target => ({ target, score: getFormationTargetScore(state, actor, target,
+      countTargetClaims(state, actor, target), hasKnownEngagement(state, actor, target))! }))
+      .sort((a, b) => Number(isAggressor(state, b.target)) - Number(isAggressor(state, a.target)) ||
+        compareFormationTargetScores(a.score, b.score) || a.target.id.localeCompare(b.target.id));
+    if (ranked[0]) return decision(ranked[0].target, "formation_lane", 0,
+      ranked[0].target.id !== shared?.id && ranked[0].target.id !== preferred?.id, ranked[0].score);
+  }
+  if (preferred && isAutomaticCombatTarget(state, preferred) && isEligible(preferred) &&
     canReacquireCombatTarget(state, actor, preferred)) return decision(preferred,
       actor.currentTargetId && actor.state === "attack" && !current ? getTargetReleaseReason(state, actor.currentTargetId) : "shared_target");
   const blocker = getSustainedBlockerTarget(state, actor);
@@ -180,9 +254,13 @@ export function applyTargetCommitment(state: GameState, actor: Companion, decisi
   if (decision.kind === "none") return state;
   const previous = state.targetCommitmentsByEntityId?.[actor.id];
   if (decision.kind === "retain") {
-    if (previous && previous.targetId === decision.target?.id && previous.priority >= decision.priority) return state;
+    const freshDamage = decision.damageEvidence && (previous?.damageEvidence?.frame !== decision.damageEvidence.frame ||
+      previous.damageEvidence.timeMs !== decision.damageEvidence.timeMs || previous.damageEvidence.victimId !== decision.damageEvidence.victimId);
+    if (previous && previous.targetId === decision.target?.id && previous.priority >= decision.priority && !freshDamage) return state;
     return { ...state, targetCommitmentsByEntityId: { ...state.targetCommitmentsByEntityId,
-      [actor.id]: { targetId: decision.target!.id, reason: decision.reason, priority: decision.priority, local: decision.local } } };
+      [actor.id]: { targetId: decision.target!.id, reason: decision.reason, priority: decision.priority, local: decision.local,
+        ...(decision.formationScore ? { formationScore: decision.formationScore } : {}),
+        ...(decision.damageEvidence ? { damageEvidence: decision.damageEvidence } : {}) } } };
   }
   const rejections = { ...state.rejectedCombatTargetsByEntityId?.[actor.id] };
   const rejection = decision.reason === "sustained_obstruction" || decision.reason === "unreachable_engagement"
@@ -195,13 +273,15 @@ export function applyTargetCommitment(state: GameState, actor: Companion, decisi
   const commitments = { ...next.targetCommitmentsByEntityId };
   delete commitments[actor.id];
   if (decision.target) commitments[actor.id] = { targetId: decision.target.id, reason: decision.reason,
-    priority: decision.priority, local: decision.local };
+    priority: decision.priority, local: decision.local, ...(decision.formationScore ? { formationScore: decision.formationScore } : {}),
+    ...(decision.damageEvidence ? { damageEvidence: decision.damageEvidence } : {}) };
   next = { ...next, targetCommitmentsByEntityId: commitments,
     targetEngagementProbeAtMsByEntityId: state.targetEngagementProbeAtMsByEntityId,
     rejectedCombatTargetsByEntityId: { ...next.rejectedCombatTargetsByEntityId, ...(Object.keys(rejections).length ? { [actor.id]: rejections } : {}) },
     companionTargetDecisionByEntityId: { ...next.companionTargetDecisionByEntityId, [actor.id]: {
       entityId: actor.id, previousTargetId: actor.currentTargetId, targetId: decision.target?.id ?? null, reason: decision.reason,
-      frame: state.simulationFrame ?? state.simulationTick, timeMs: state.simulationTimeMs ?? 0 } } };
+      frame: state.simulationFrame ?? state.simulationTick, timeMs: state.simulationTimeMs ?? 0,
+      ...(decision.formationScore ? { formationScore: decision.formationScore } : {}) } } };
   return updateEntity(next, { ...actor, state: decision.target ? attackState : "follow",
     currentTargetId: decision.target?.id ?? (actor.id === state.partyLeaderId ? null : state.partyLeaderId),
     commandPriority: hasDirectCompanionAuthority(state, actor) ? "direct" : "autonomous" });
@@ -418,14 +498,16 @@ export function recordCompanionTargetTransition(state: GameState, before: GameEn
     hasDirectCompanionAuthority(state, actor) || getPartyExecutionIntent(state)?.source === "player" ? "player_focus" :
       !targetId && previousTargetId ? getTargetReleaseReason(state, previousTargetId) : "shared_target";
   const transition: CompanionTargetTransition = { entityId: actor.id, previousTargetId, targetId, reason,
-    frame: state.simulationFrame ?? state.simulationTick, timeMs: state.simulationTimeMs ?? 0 };
+    frame: state.simulationFrame ?? state.simulationTick, timeMs: state.simulationTimeMs ?? 0,
+    ...(accepted?.targetId === targetId && accepted.frame === (state.simulationFrame ?? state.simulationTick) &&
+      accepted.timeMs === (state.simulationTimeMs ?? 0) && accepted.formationScore ? { formationScore: accepted.formationScore } : {}) };
   const commitments = { ...state.targetCommitmentsByEntityId };
   if (commitments[actor.id]?.targetId !== targetId) delete commitments[actor.id];
   return appendDebugTelemetryEvent({ ...state, targetCommitmentsByEntityId: commitments,
     companionTargetDecisionByEntityId: { ...state.companionTargetDecisionByEntityId, [actor.id]: transition },
     companionTargetTransitions: [...state.companionTargetTransitions ?? [], transition] }, {
     type: !targetId ? "target_released" : previousTargetId ? "target_changed" : "target_acquired",
-    entityId: actor.id, targetId, previousTargetId, targetDecisionReason: reason,
+    entityId: actor.id, targetId, previousTargetId, targetDecisionReason: reason, targetFormationScore: transition.formationScore,
   });
 }
 

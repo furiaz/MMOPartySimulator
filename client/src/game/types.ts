@@ -2585,6 +2585,7 @@ export type DebugTelemetryEntitySnapshot = {
   enemyScalingOverrides?: string[];
   attackRange?: number;
   targetDecisionReason?: EnemyTargetDecisionReason | import("./targetCommitment").CompanionTargetReason;
+  targetFormationScore?: import("./formationTargeting").FormationTargetScore;
   commandPriority?: CommandPriority;
   characterLevel?: number;
   characterXp?: number;
@@ -2671,6 +2672,7 @@ export type DebugTelemetryEvent = {
   enemyScalingOverrides?: string[];
   attackRange?: number;
   targetDecisionReason?: EnemyTargetDecisionReason | import("./targetCommitment").CompanionTargetReason;
+  targetFormationScore?: import("./formationTargeting").FormationTargetScore;
   amount?: number;
   damageType?: CombatDamageType;
   powerMultiplier?: number;
