@@ -114,7 +114,7 @@ export function assignFormationSlots(
     slotsByEntityId: Object.fromEntries(members.map((member, i) => [member.id, template.slots[best!.indices[i]].id])),
     travel: previous?.travel ? { ...previous.travel,
       goalsByEntityId: Object.fromEntries(Object.entries(previous.travel.goalsByEntityId).filter(([id]) => members.some(member => member.id === id))
-        .map(([id, goal]) => [id, { ...goal, clearSinceMs: undefined }])),
+        .map(([id, goal]) => [id, { ...goal, recovery: undefined, clearSinceMs: undefined }])),
       proposedGoalsByEntityId: undefined,
       trailOrder: previous.travel.trailOrder.filter(id => members.some(member => member.id === id)),
       clearSinceMs: undefined,

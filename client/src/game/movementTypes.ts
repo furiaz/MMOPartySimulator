@@ -151,6 +151,8 @@ export type MovementPath = {
   lastRequestedAtMs?: number;
   profile?: MovementPathProfile;
   targetPosition?: Position;
+  /** Continuous endpoint selected from a travel recovery request's alternatives. */
+  resolvedGoalPosition?: Position;
   targetKey: string;
   waypoints: Position[];
 };

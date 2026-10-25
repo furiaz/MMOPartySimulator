@@ -7,6 +7,14 @@ const MOVEMENT_REPATH_FAILURE_BACKOFF_MS = 250;
 
 export function clearFrameMovementPlanning(state: GameState): GameState {
   const isLiving = (id: string) => state.entities[id] && state.entities[id].state !== "dead";
+  const travel = state.formationAssignments?.travel;
+  if (travel && [...Object.entries(travel.goalsByEntityId), ...Object.entries(travel.proposedGoalsByEntityId ?? {})]
+    .some(([id, goal]) => goal.recovery && !isLiving(id))) state = { ...state,
+      formationAssignments: { ...state.formationAssignments!, travel: { ...travel,
+        goalsByEntityId: Object.fromEntries(Object.entries(travel.goalsByEntityId).filter(([id]) => isLiving(id))),
+        proposedGoalsByEntityId: travel.proposedGoalsByEntityId && Object.fromEntries(Object.entries(travel.proposedGoalsByEntityId).filter(([id]) => isLiving(id))),
+      } },
+    };
   if (Object.keys(state.formationPathSearchesByEntityId ?? {}).some(id => !isLiving(id))) state = { ...state,
     formationPathSearchesByEntityId: Object.fromEntries(Object.entries(state.formationPathSearchesByEntityId ?? {}).filter(([id]) => isLiving(id))),
   };
